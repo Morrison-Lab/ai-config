@@ -33,6 +33,11 @@ committed pass.
   step, or a preference wasn't encoded)
 - When the user says "did you update memories?" (the answer should be "let
   me do that now")
+- **While paused waiting on a subagent or a long-running background process
+  to complete.** That idle stretch is exactly when there's time to survey
+  what's accumulated so far and persist it, rather than only running UMS at
+  a hard stop. Don't let a real wait sit fully idle when a useful pass is
+  available to run alongside it.
 
 ## Procedure
 

@@ -9,7 +9,8 @@ on:
   # substring match on the bot mention, with no regard for code-span
   # formatting, so filing an issue that merely *discusses* the bot dispatched
   # a full agent run (#682 -> #683). Summon the agent explicitly instead:
-  # assign the issue, or mention the bot in a comment.
+  # assign the issue (the upstream gate still requires the mention in the
+  # body or title), or mention the bot in a comment.
   issues:
     types: [assigned]
   pull_request_review:

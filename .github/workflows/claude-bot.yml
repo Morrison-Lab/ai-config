@@ -5,8 +5,13 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  # Deliberately NOT `opened`: the upstream gate in claude.yml is a plain
+  # substring match on the bot mention, with no regard for code-span
+  # formatting, so filing an issue that merely *discusses* the bot dispatched
+  # a full agent run (#682 -> #683). Summon the agent explicitly instead:
+  # assign the issue, or mention the bot in a comment.
   issues:
-    types: [opened, assigned]
+    types: [assigned]
   pull_request_review:
     types: [submitted]
 

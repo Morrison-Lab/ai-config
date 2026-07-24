@@ -47,7 +47,7 @@ def commit(tmpdir: Path, message: str) -> None:
     subprocess.run(["git", "commit", "-q", "-m", message], cwd=tmpdir, check=True)
 
 
-def run_check(tmpdir: Path, base: str) -> list:
+def run_check(tmpdir: Path, base: str) -> tuple[str, int]:
     result = subprocess.run(
         [sys.executable, "scripts/check-new-line-breaks.py", "--base", base],
         cwd=tmpdir,
@@ -100,6 +100,47 @@ with tempfile.TemporaryDirectory() as tmp:
     check("table cells are not checked", "Two sentences in a cell" not in out)
     check("a single-token URL line is not flagged", "example.com" not in out)
     check("no violations reported", out.strip() == "No new lines missing semantic breaks.")
+
+with tempfile.TemporaryDirectory() as tmp:
+    repo = make_repo(Path(tmp))
+    (repo / "notes.md").write_text("# Notes\n", encoding="utf-8")
+    commit(repo, "base")
+
+    (repo / "notes.md").write_text(
+        "# Notes\n\n> First sentence. Second sentence in the same quoted line.\n",
+        encoding="utf-8",
+    )
+    commit(repo, "add blockquote violation")
+
+    out, _code = run_check(repo, "HEAD~1")
+    check(
+        "a newly-added blockquote line with two sentences is flagged (gha review finding 1)",
+        "notes.md:3" in out,
+    )
+
+with tempfile.TemporaryDirectory() as tmp:
+    repo = make_repo(Path(tmp))
+    (repo / "notes.md").write_text("# Notes\n", encoding="utf-8")
+    commit(repo, "base")
+
+    (repo / "notes.md").write_text(
+        "# Notes\n\n<!--\n"
+        "Interior comment line. With two sentences that must not be flagged.\n"
+        "-->\n"
+        "- A real bullet. With two sentences that must be flagged.\n",
+        encoding="utf-8",
+    )
+    commit(repo, "add multi-line HTML comment plus a real violation")
+
+    out, _code = run_check(repo, "HEAD~1")
+    check(
+        "a line inside a multi-line HTML comment is not flagged (review finding 2)",
+        "Interior comment line" not in out,
+    )
+    check(
+        "a genuine violation after the comment is still flagged",
+        "notes.md:6" in out,
+    )
 
 with tempfile.TemporaryDirectory() as tmp:
     repo = make_repo(Path(tmp))

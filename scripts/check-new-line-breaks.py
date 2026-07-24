@@ -80,8 +80,11 @@ def prose_line_numbers(text: str) -> set[int]:
     """1-indexed lines eligible for a sentence-count check.
 
     Excludes frontmatter, fenced code, tables, headings, horizontal rules,
-    blockquotes, HTML comments, and @-import directives --- the same block
-    types `semantic-line-breaks.py` passes through untouched.
+    HTML comments, and @-import directives --- the block types
+    `semantic-line-breaks.py` passes through untouched. Blockquote *prose*
+    is included (checked), matching that script actively sentence-splitting
+    it; only a bullet/blank/fenced-code line nested inside a blockquote is
+    excluded, the same as at the top level.
     """
     lines = text.split("\n")
     prose: set[int] = set()
@@ -90,6 +93,8 @@ def prose_line_numbers(text: str) -> set[int]:
     in_code = False
     fence_len = 0
     fence_char: str | None = None
+    in_html_comment = False
+    in_bq_code = False
 
     for idx, line in enumerate(lines, start=1):
         stripped = line.strip()
@@ -101,6 +106,15 @@ def prose_line_numbers(text: str) -> set[int]:
             if stripped == "---":
                 in_frontmatter = False
                 frontmatter_done = True
+            continue
+
+        if in_html_comment:
+            if "-->" in line:
+                in_html_comment = False
+            continue
+        if slb._HTML_COMMENT_RE.match(line):
+            if "-->" not in line:
+                in_html_comment = True
             continue
 
         fence_m = slb._FENCE_RE.match(stripped)
@@ -115,14 +129,23 @@ def prose_line_numbers(text: str) -> set[int]:
         if in_code:
             continue
 
+        if slb._BQ_RE.match(line):
+            inner = re.sub(r"^\s*>\s?", "", line)
+            if slb._FENCE_RE.match(inner.strip()):
+                in_bq_code = not in_bq_code
+                continue
+            if in_bq_code or slb._BULLET_RE.match(inner) or slb._BLANK_RE.match(inner):
+                continue
+            prose.add(idx)
+            continue
+        in_bq_code = False
+
         if (
             slb._BLANK_RE.match(line)
             or slb._HEADING_RE.match(line)
             or slb._TABLE_RE.match(line)
             or slb._HR_RE.match(stripped)
             or slb._AT_DIRECTIVE_RE.match(line)
-            or slb._BQ_RE.match(line)
-            or slb._HTML_COMMENT_RE.match(line)
         ):
             continue
 
@@ -132,9 +155,13 @@ def prose_line_numbers(text: str) -> set[int]:
 
 
 def line_content(line: str) -> str:
-    """Strip a bullet marker (if any) so the sentence-splitter sees prose."""
+    """Strip a bullet marker or blockquote prefix so the splitter sees plain prose."""
     bullet_m = slb._BULLET_RE.match(line)
-    return bullet_m.group(3) if bullet_m else line.strip()
+    if bullet_m:
+        return bullet_m.group(3)
+    if slb._BQ_RE.match(line):
+        return re.sub(r"^\s*>\s?", "", line).strip()
+    return line.strip()
 
 
 def find_violations(base: str, pathspec: str = "*.md") -> list[tuple[str, int, str]]:

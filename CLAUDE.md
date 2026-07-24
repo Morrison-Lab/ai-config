@@ -27,6 +27,8 @@ Don't suggest it when there's still live state only this conversation holds: a b
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) — anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
 If UMS hasn't run recently, say so in the same flag rather than assuming it's safe.
 
+**Offer archiving as the default alternative to `/clear`, not just the bare `/clear` flag.** Whenever there's a meaningful chance I'd want to come back to this conversation later, recommend leaving the session alone and starting a fresh one for the next task, instead of `/clear`ing it -- the old session stays fully retrievable (nothing to lose), at the cost of a small navigation step to reopen it. Reserve a bare `/clear` recommendation for when nothing in the session is worth revisiting; when in doubt, default to the archive-and-start-new option since it's strictly safer.
+
 ## Flag good moments to run `compress-session`, too
 
 The mid-task counterpart to the section above: don't wait for the automatic compaction to guess what matters, and don't wait to be asked.

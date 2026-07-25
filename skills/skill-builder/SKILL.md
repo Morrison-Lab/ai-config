@@ -211,7 +211,7 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   looks like the `$PATH` env var, and `path` is a zsh special that mirrors
   `$PATH`. A reader who copies the command without substituting the placeholder
   runs something wrong. Use `<path>`, `<url>`, `<target>` instead. (See
-  `memories/tools.md` → "Skill command blocks".)
+  `memories/claude-code.md` → "Skill command blocks".)
 - **Every procedural step needs a runnable command, not just prose.** If
   sibling steps in the same skill show a bash snippet, a step that only
   describes the action in prose ("rebase to drop the commits") reads as

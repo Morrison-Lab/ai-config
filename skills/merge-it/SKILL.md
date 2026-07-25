@@ -99,8 +99,10 @@ gh pr merge <N> --squash --subject "<title>" --body "<accurate summary; Closes #
 
 In remote/web sessions, load the merge tool's schema with `ToolSearch`
 (`select:mcp__github__merge_pull_request`) before the first call to confirm the
-exact name and parameters — the `d-morrison/gha` CLAUDE.md mapping table
-(`tools.md`) is the canonical `gh`→MCP reference.
+exact name and parameters -- [`tool-mappings.md`](../../tool-mappings.md) is
+the canonical `gh`→MCP reference (per `CLAUDE.md`'s "Skills that call
+gh/glab" rule); `d-morrison/gha`'s own CLAUDE.md carries an equivalent table
+for that repo.
 
 ### 3. Verify the merge landed — never assume
 

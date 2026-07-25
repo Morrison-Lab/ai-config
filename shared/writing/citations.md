@@ -32,7 +32,7 @@ statements between pages while keeping old URLs resolving via redirects ---
 so the remembered URL lands on a live page that no longer contains the
 claim. Fetch the cited target at writing time and confirm the statement is
 actually there (when a docs site is blocked by a network policy, use its
-source repo instead --- see the `github/docs` bullet in `memories/tools.md`). (gha#272: the
+source repo instead --- see the `github/docs` bullet in `memories/claude-code.md`). (gha#272: the
 `GITHUB_TOKEN` no-retrigger claim was cited to GitHub's
 `automatic-token-authentication` page, whose successor no longer carries the
 statement --- it had moved to the "Triggering a workflow" article; caught by

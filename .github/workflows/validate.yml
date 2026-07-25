@@ -25,6 +25,15 @@ jobs:
         run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
       - name: Run semantic-line-break tool tests
         run: python3 scripts/test_slb.py
+      - name: Run memory-file-size check tests
+        run: python3 scripts/test_check_memory_file_size.py
+      - name: Check for oversized memory files (advisory)
+        # Non-blocking (ai-config#695): memory files are read on demand, so
+        # length is a real per-use cost -- but crossing the threshold is a
+        # prompt to consider splitting, not a defect that should block an
+        # unrelated PR. See the script's docstring for the threshold's
+        # rationale.
+        run: python3 scripts/check-memory-file-size.py
       - name: Check Quarto (.qmd) prose style
         uses: d-morrison/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
 

@@ -73,7 +73,7 @@ finding → push → post summary → re-request review → repeat until clean.
      review-link case above; the reviews list itself is `READ_PR_REVIEWS`)
      before treating it as an all-clear:
      `gh api`'s own `--jq` flag has no `--arg`/`--argjson` (see
-     [`memories/tools.md`](../../memories/tools.md)'s `gh api`/`jq` note) --
+     [`memories/github.md`](../../memories/github.md)'s `gh api`/`jq` note) --
      pipe the raw paginated output into standalone `jq -s` instead, which
      supports both:
      ```bash
@@ -234,7 +234,7 @@ finding → push → post summary → re-request review → repeat until clean.
      `.../actions/workflows/claude-code-review.yml/dispatches` endpoint, or your
      GitHub MCP workflow-dispatch tool). Closing+reopening the PR also works
      (fires `reopened`) but adds timeline noise. See
-     [`memories/tools.md`](../../memories/tools.md).
+     [`memories/github-actions.md`](../../memories/github-actions.md).
    - **Marking a draft ready seconds after its final push is another
      cancel-in-progress race** — the ready-event and synchronize runs fire a
      second apart and the cancellation can land on the newer (current-head)

@@ -306,6 +306,25 @@ by #328.)
 - After resolving conflicts and staging (`git add <files>`), use `git merge --continue` alone.
 - In a non-interactive (headless) session git uses the auto-generated merge commit message without prompting — no editor opens.
 
+## Git merge --- editing away the conflict markers is not resolving the conflict
+- Rewriting a conflicted file to remove `<<<<<<<`/`=======`/`>>>>>>>` leaves it
+  at `UU` in `git status` until you `git add` it.
+  The merge stays in progress, and a `git commit` that names other paths, or a
+  later `git status` glanced at for a different reason, will not necessarily
+  make that obvious.
+- Grepping the tree for leftover conflict markers is therefore **not** a check
+  that the merge is done: the markers being gone is exactly the state this
+  failure mode produces.
+  `git status --short | grep '^UU'` (or `git diff --name-only --diff-filter=U`)
+  is the check that actually decides it.
+- A test run started at this point is still **valid** --- `git add` does not
+  change working-tree content, so the suite reads the correctly-resolved file.
+  Don't discard a run's results on this basis; the problem is with the commit,
+  not the run.
+- (`d-morrison/altdoc#61`, 2026-07-25: a `NEWS.md` conflict was resolved in the
+  editor and left unstaged; caught only because `git status` was checked for an
+  unrelated reason before pushing.)
+
 ## Git merge — uncommitted edits to an untouched file silently ride along, uncommitted, through repeated merges
 - `git merge <branch>` only refuses when the incoming branch's commits touch a
   file you also have uncommitted changes to. If the incoming commits don't

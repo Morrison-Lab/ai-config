@@ -176,6 +176,43 @@
 - System skills (e.g. `claude-api`) may be globally available but have no local
   `skills/<name>/` directory. An absent local dir means ❓ Unverifiable, not
   ❌ Fabricated — check the session's available-skills list before classifying.
+- **Editing one frontmatter field programmatically: replace that field's text,
+  don't re-serialize the mapping.** Parsing a `SKILL.md`'s frontmatter with
+  `yaml.safe_load`, changing one key, and writing it back with
+  `yaml.safe_dump` reformats every *other* key too -- most visibly, an
+  `allowed-tools` block goes from block-sequence style (`  - Bash`) to
+  flush style (`- Bash`). Both are valid YAML and nothing errors, so the
+  churn only shows up in the diff size. Do a targeted regex replacement of
+  the `description:` entry through to the next top-level key instead, and
+  emit the value via `json.dumps` (a valid YAML double-quoted scalar, and
+  the style several skills already use). Use a lambda as the `re.sub`
+  replacement, or JSON's own `\uXXXX` escapes get read as regex group
+  templates and raise `bad escape \u`. (ai-config#700: the safe_dump
+  approach turned a 63-line change into 427 insertions across 63 files
+  before being reverted and redone surgically.)
+
+## ai-config's three context pools -- only one of them is worth splitting
+
+Not all of this corpus costs the same per session, and the cheapest way to
+waste effort is to "reduce context" by shrinking the wrong layer:
+
+- **Always-loaded** -- `CLAUDE.md` plus every `@shared/...` fragment it
+  references, plus *every* skill's `description` frontmatter. Paid on every
+  session regardless of task. Splitting a file here saves **nothing**: each
+  piece still loads. The only levers are pruning, consolidating, or
+  demoting a fragment to on-demand.
+- **On-demand** -- `memories/*.md` and skill bodies. Paid only when read, so
+  file length is a real per-use cost and splitting genuinely helps.
+- **Generated** -- `codex-skills/` and other derived trees. Costs CI time
+  and merge conflicts, not context.
+
+Measure before acting: as of 2026-07-24 the always-loaded set was ~48.5k
+tokens (`CLAUDE.md` + 47 fragments) plus ~15.2k tokens of skill
+descriptions, against `memories/tools.md` at ~48k tokens paid only on a
+whole-file read. That is why ai-config#696 split `tools.md` (on-demand, so
+the split pays) while ai-config#700 attacked the description budget by
+removing duplication rather than by splitting anything (always-loaded, so
+splitting would not have paid).
 
 ## Custom subagents (`.claude/agents/*.md`) — Bash is a write-access loophole
 

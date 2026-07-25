@@ -120,6 +120,25 @@ that same logic to `scripts/check-review-execution.sh` was still open; the
 conflict resolution updated the script to match verbatim and added two new
 fixtures for #173's specific fix, verified to fail against the pre-fix logic.)
 
+**When `main` DELETES a file your branch references, resolving the marked
+conflict is not enough --- grep the whole tree for the deleted path.** Git
+only conflicts where both sides edited the same lines, so a merge that
+brings in a deletion flags the file that *used* the thing, and nothing
+else. Any other reference to the deleted path --- a docstring citing it as
+precedent, a comment, a doc cross-reference --- merges cleanly and silently
+becomes a dangling reference, because those files were never in the
+conflict's scope. After resolving any merge that removed a file, run
+`grep -rn "<deleted-path>"` across the repo and re-point or reword each
+hit; then distinguish live references (must be fixed) from historical
+citations of the removal itself (correct as-is, leave them). This is the
+deletion counterpart to the extracted-copy case above: there the logic
+moved and a copy went stale, here it vanished and the pointers went dead.
+(ai-config#696: `main` retired `scripts/check-new-line-breaks.py` via #703
+while the PR was open. The `validate.yml` conflict was visible and
+resolved, but `scripts/check-memory-file-size.py`'s docstring cited the
+deleted script as its advisory-exit-code precedent --- a file the conflict
+never touched, caught only by grepping for the path afterward.)
+
 **A textual conflict in a skill file can be the symptom of a conceptual
 duplicate, not just competing edits to the same line.** When merging `main`
 into a branch that's authoring a new skill, if the conflict lands in a

@@ -4,6 +4,11 @@ When babysitting a PR (subscribed to its activity, driving ARDI, watching CI), d
 Each separate push re-triggers CI and the review bot from scratch, and two pushes close together race each other's review runs (see [`fully-clean`](fully-clean.md) and gha's own `CLAUDE.md` "canceled review" section for the concrete failure mode this causes).
 Fewer, complete pushes mean fewer wasted CI minutes and fewer webhook events to triage.
 
+**When a round needs both a `main` merge and a code fix, merge first, then commit the fix, then push once.**
+This is the ordering the batch rule implies but doesn't spell out, and the natural sequence is the wrong one: you fix what the review flagged, push it, then notice `main` moved, merge, and push again --- two pushes seconds apart, two review runs, the second cancelling the first.
+Merging first costs nothing (the merge commit and the fix commit both ride out in the same push) and collapses the round to a single review run.
+(ai-config#700: pushed the review fix, then merged `main` and pushed again about a minute later; the first review run was cancelled mid-flight and the round cost an extra cycle.)
+
 **When CI already reports the specific gap, work from that report instead of re-deriving it locally.** A codecov comment naming the exact missing file/line, or a benchmark comment giving exact before/after numbers, already answers "what's wrong and by how much" --- don't re-run the equivalent check locally (a full coverage-instrumented test suite, a full benchmark sweep) just to rediscover the same fact.
 Reserve a local re-run for **verifying a fix**, once you've already decided what to change from CI's own report. (A local re-run is still the right move when you need an apples-to-apples comparison CI's own baseline can't give you --- e.g. confirming a benchmark regression's true magnitude on the same hardware, since CI's baseline was recorded on a different/differently-loaded runner.)
 

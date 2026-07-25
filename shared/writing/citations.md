@@ -54,6 +54,50 @@ by stating the review-time claim directly. Fixed at the root in
 the fragment self-sufficient rather than just softening the downstream
 citation.)
 
+**When a reviewer calls a citation hallucinated, test it before conceding ---
+the alleged correction can be the hallucination.** A reviewer asserting what
+the "known" URL patterns or the source's "typical" phrasing are is making a
+factual claim from memory,
+and it deserves the same verification as the citation it challenges.
+Both of these are decidable in one command,
+so decide them rather than arguing (or capitulating) from recollection:
+
+- **A docs URL's canonicality: check the target page's own `redirect_from`
+  frontmatter.**
+  For a docs site whose source is a public repo,
+  fetch the content file and read its frontmatter.
+  Every path listed under `redirect_from` is by definition one that
+  redirects *to* that page ---
+  so if the reviewer's proposed "correct" URL appears in that list,
+  it is a superseded path and the cited one is current.
+  A content file's path also maps directly to its URL
+  (`content/<path>.md` -> `/en/<path>`),
+  so a successful raw fetch of the source is itself evidence the URL resolves.
+- **A quotation's fidelity: exact-substring grep, not a read-and-judge.**
+  `grep -c "<the quoted sentence>" <fetched source>` settles
+  verbatim-or-not outright,
+  and grepping the reviewer's proposed alternative wording in the same file
+  often shows it appears zero times.
+
+**Then fix what the challenge was really pointing at.**
+A wrong finding can still mark a genuine weakness.
+The most common one: the quoted sentence lives in a
+**version-conditional fragment**,
+so a reader who finds the other branch first sees different wording
+and reasonably concludes the quote was misremembered.
+Name the exact source file and the branch the quote comes from,
+and say whether the claim survives the other branch's wording.
+That converts a citation a reader has to trust into one they can check.
+(`ai-config#697`, 2026-07-24: a review flagged a `docs.github.com` URL as
+"likely fabricated" and a quote as "likely a paraphrase".
+The frontmatter listed both of the reviewer's proposed URLs as
+`redirect_from` entries for the cited page,
+and the quote grepped as verbatim while the reviewer's suggested phrasing
+appeared zero times ---
+but the quote did sit in a `{% ifversion %}` branch,
+so naming the fragment and branch was a real improvement.
+The reviewer retracted both findings.)
+
 **Match the claim's strength to what was actually verified.** Fetching a
 file's *current* content only supports a present-tense claim ("X currently
 does Y") --- it does not support a comparative or temporal claim ("X predates

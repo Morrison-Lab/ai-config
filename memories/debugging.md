@@ -708,10 +708,22 @@ occurrence, not the flagged one.)
   ``date: '`r Sys.Date()`'`` reaches Quarto's date handling as a literal
   backtick string, fails to parse, and renders as `Invalid Date`.
 - Fix: use Quarto's own resolved keywords, which need no R evaluation --
-  `date: today` (or `now` / `last-modified`). `today` renders the same
-  ISO `YYYY-MM-DD` that `Sys.Date()` was meant to produce. Leave a comment
+  `date: today` (or `now` / `last-modified`). `today` resolves to the same
+  current date `Sys.Date()` was meant to produce; how it is *displayed* is
+  a separate question, controlled by `date-format`. Leave a comment
   next to it, or the inline-R form gets reintroduced by the next person who
   "fixes" the hardcoded-looking value.
+- The per-format display defaults differ, which is easy to mistake for a
+  bug when comparing two outputs of the same document. With no
+  `date-format` set, the same `date: today` renders as a locale long date
+  in HTML (`July 25, 2026`) but as ISO in revealjs (`2026-07-25`) --
+  observed on one render of the reprex below under Quarto 1.10.18
+  (2026-07-25), not looked up as a documented guarantee.
+  Set `date-format: iso`
+  explicitly if you need them to agree. Note that the `dcterms.date` meta
+  tag is always ISO in both, so grepping the raw HTML for `\d{4}-\d\d-\d\d`
+  finds a match even when the visible date is not ISO -- read the title
+  block's own text, not just any date-shaped string in the file.
 - Reprex (fast, no package deps): put the date in a `vignettes/_metadata.yml`,
   add a trivial `.qmd` beside it, `quarto render`, then
   `grep -c 'Invalid Date'` the outputs. The same throwaway-`.qmd`-beside-the-

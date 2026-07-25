@@ -61,8 +61,14 @@ Read its output rather than its color --- this is the same
 green-check-does-not-mean-clean-content pattern
 [`fully-clean`](../workflow/fully-clean.md) documents for review jobs, and it
 is easy to miss precisely because nothing turns red.
-Run it locally before pushing (`NLB_BASE_REF=origin/main python3
-<path>/check-new-line-breaks.py`) and fix what it names.
+Run it locally before pushing and fix what it names --- the script lives in a
+[`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, at
+`check-new-line-breaks/check-new-line-breaks.py` relative to that repo's root:
+
+```bash
+NLB_BASE_REF=origin/main \
+  python3 <gha-checkout>/check-new-line-breaks/check-new-line-breaks.py
+```
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)

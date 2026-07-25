@@ -51,3 +51,18 @@ the paragraph to a narrower column.
 against the wrong criterion; reading the retired script's own source settled
 it, and the real check then found 7 multi-sentence lines a length check had
 passed over.)
+
+**That check is advisory: it warns and exits 0, so a green CI job does not
+mean the diff is clean.**
+It emits `::warning::` annotations and a `N line(s) pack more than one
+sentence/clause` summary, then exits successfully, so the job it runs in
+reports success either way.
+Read its output rather than its color --- this is the same
+green-check-does-not-mean-clean-content pattern
+[`fully-clean`](../workflow/fully-clean.md) documents for review jobs, and it
+is easy to miss precisely because nothing turns red.
+Run it locally before pushing (`NLB_BASE_REF=origin/main python3
+<path>/check-new-line-breaks.py`) and fix what it names.
+(ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
+check flagged all 7 while `validate` stayed green, and the review bot did not
+catch them either --- they were found only by reading the check's own output.)

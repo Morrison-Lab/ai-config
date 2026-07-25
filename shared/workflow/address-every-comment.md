@@ -6,10 +6,12 @@ free pass for the implementer.
 For each flagged item, do exactly one of:
 
 1. **Fix it in this PR.** The default path --- most nits are 1--3 line changes.
-2. **Defer to a tracked issue.** Only when the fix expands the PR's scope (new
-   feature, broader refactor, separate concern) or the requester has explicitly
-   said this PR shouldn't grow. File a follow-up issue and reference it in a PR
-   comment so the item isn't lost.
+2. **Defer.** Only when the fix expands the PR's scope (new feature, broader
+   refactor, separate concern), the requester has explicitly said this PR
+   shouldn't grow, or the flagged content isn't actually yours to fix here
+   (see the `main`-sync case below). File a follow-up issue and reference it
+   in a PR comment so the item isn't lost --- except in the `main`-sync case,
+   where the "follow-up" is fixing it on `main` directly, not a new issue.
 
 Then trigger another review and repeat until the PR is **fully clean** --- zero
 flagged items under any heading, no "non-blocking", "harmless", "minor
@@ -69,6 +71,8 @@ prose but leaving the paraphrase stale reintroduces the same wording issue
 one file over. Grep the diff for the flagged phrase before considering the
 finding closed. (ai-config#373: fixed "routing/dispatch site" in the skill
 per review, but the CHANGELOG entry still said it until a follow-up commit.)
+
+**A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
 
 **This generalizes to a skill's own inline restatement of a fragment it
 links to.** A `SKILL.md` that links a backing `shared/` fragment for the

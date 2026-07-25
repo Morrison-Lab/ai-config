@@ -60,3 +60,19 @@ for arithmetic. It is a different axis from multi-agent orchestration
 model reasoning across subagents, while this rule removes model reasoning from
 checks that never needed it --- apply this rule first, then orchestrate
 whatever judgment remains.
+
+## Apply this to writing a memory bullet, not just to runtime checks
+
+The rule targets checks a system performs, but a UMS/memory bullet that
+documents *how to tell X from Y* is itself a check --- and the same
+tell applies: don't write down whatever fuzzy method you happened to use
+live in the moment (eyeballing wording, matching timing) without first
+asking whether a mechanical signal already exists in the data. Drafting a
+memory is a natural moment to *notice* an available instrument even when
+none was used at the time --- go back and check before finalizing the
+bullet, the same way a reviewer would flag a manual check that should be
+automated. (`ai-config#688`: a first-draft bullet on detecting self-echoed
+PR replies said to match body text and timing --- both fuzzy --- when
+every reply already carried a mechanical, unambiguous marker, the Claude
+Code attribution footer, sitting unused in the same data. Caught only when
+asked directly why the sharper signal hadn't been the first idea.)

@@ -827,7 +827,9 @@ binary appeared ~7h later, so the right move was retry-later
 hand-edit it. But a remote/web session often has neither `rmarkdown` nor
 `knitr` installed, so `rmarkdown::render()` isn't an option -- while `pandoc`
 usually *is* on `PATH`. For a prose-only edit (no R code in the changed
-chunk), the rendered form can be reproduced directly:
+chunk), the rendered form can be reproduced directly. Copy the affected
+paragraph out of `README.Rmd` into a scratch file -- `para.md` below -- keeping
+its source line breaks exactly, then run:
 
 ```bash
 pandoc para.md -f markdown -t gfm --wrap=auto --columns=72

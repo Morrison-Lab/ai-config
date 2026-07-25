@@ -410,6 +410,58 @@ formats resolve to the same output file," runs in ~8s, and would have caught the
 original bug at PR time. Prevention (fix the scaffolder/template that emits the
 bad input) and enforcement (the PR guard) are complementary — ship both.
 
+## An Actions job that fails in ~1s with NO logs = a concurrency-group self-collision
+When a GitHub Actions job reports `failure` almost instantly and has no logs at
+all, don't hunt for a step that failed -- no step ran.
+The signature is distinctive: the run's `created_at` and `updated_at` are 1 second apart, the
+job's `completed_at` is stamped *before* its `started_at`, `get_job_logs`
+404s on the log download, and the check run's `output.title`/`summary`/`text`
+are all empty (so there's no annotation to read either).
+
+The cause is a **job-level `concurrency:` group that resolves to the same
+string as the workflow-level one**.
+Per the Actions docs
+([`jobs.<job_id>.concurrency`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idconcurrency)),
+"there can be at most one running job or workflow in a concurrency group at
+any time" -- the workflow run already holds the group, so its own job can
+never acquire it and is failed immediately.
+That sentence is verbatim from `data/reusables/actions/actions-group-concurrency.md`
+in `github/docs`, the fragment both concurrency pages include.
+It sits in that fragment's `{% ifversion actions-nga %}` branch; the `{% else %}`
+branch reads "at most one running and one pending job" instead, which supports
+the same deadlock, since only the at-most-one-*running* half is load-bearing here.
+Nothing in the docs calls this deadlock out explicitly,
+so it has to be recognized from the signature.
+
+**Why it hides until after merge.** The two groups usually collide on only
+*some* events.
+A workflow-level `docs-${{ github.event.pull_request.number
+|| github.ref }}` and a job-level `docs-${{ github.event_name ==
+'pull_request' && github.run_id || github.ref }}` differ on `pull_request`
+(PR number vs run id) but both fall through to `docs-<github.ref>` on push,
+`release`, and `workflow_dispatch`.
+So every PR check passes and the job dies the moment it merges --
+a specific instance of the push-to-main-only blind spot in the section above.
+
+**Confirming it cheaply,** since the logs are unavailable: read both
+`concurrency.group` expressions and hand-evaluate them for the failing
+event, then diff the workflow file against the last *successful* run of the
+same trigger to prove the block is new
+(`list_workflow_runs` with `workflow_runs_filter: {"event": "push",
+"branch": "main"}`, then `git show <that-sha>:.github/workflows/<file>`).
+Same-workflow, same-event, one variable changed is much stronger evidence
+than reasoning about the expressions alone.
+
+**The fix is usually to delete the job-level block, not to rename its
+group.** A workflow-level `cancel-in-progress: true` cancels the whole run
+including its jobs, so a per-`run_id` job group can't deliver the
+"don't cancel this job" behavior such a block is typically written to
+provide -- it was already dead code on every event where it differed, and a
+deadlock on every event where it didn't. (`UCD-SERG/serocalculator#590`/`#591`,
+2026-07-24: the altdoc-migration PR added such a block, so the merge to
+`main` published no `/dev/` docs at all -- and no tag/release/dispatch deploy
+could have run either -- while every PR docs build stayed green.)
+
 ## stop-hook-git-check's "N" flag can be a false positive for SSH-signed commits
 The `~/.claude/stop-hook-git-check.sh` Stop hook flags a commit "N" (Unverified)
 whenever local `git log --show-signature` can't verify it — but locally that

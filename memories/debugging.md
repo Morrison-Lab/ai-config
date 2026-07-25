@@ -262,6 +262,32 @@ the scout-peers duplicate `## Relationship to other skills` bug (ai-config#132)
 happened because an existing section was missed and a duplicate was appended at
 the end. Run `grep -n "^## " -- "<file>"` before appending.
 
+## An empty grep for one spelling is not evidence the concept is absent
+Grepping for the value you *expect* only tests that spelling. When the question
+is "does this document mention X at all," a miss has two very different causes:
+X genuinely isn't there, or X is there under a **different, wrong string** --
+and the second is precisely the case worth catching, since a stale value is a
+live defect while a missing one is only a gap.
+
+The tell is a grep whose pattern encodes an assumption about the *correct*
+answer (a current URL path, a renamed flag, the new function name). Before
+concluding "not present," read the surrounding section, or re-grep for the
+stable part of the concept rather than the volatile part -- the domain
+(`serocalculator.github.io`) rather than the path (`/dev/`), the function
+family rather than the exact name.
+
+Getting this backwards inverts the fix: "missing" leads you to *add* a second
+copy alongside the broken one, which is worse than the defect you started with
+(now two pointers, one wrong, and a DRY violation to boot).
+
+(`UCD-SERG/serocalculator#605`, 2026-07-25: grepped a README for `dev/` to
+check whether it linked the development docs, got nothing, and reported the
+link as missing. It existed -- pointing at a `/main/` path that had been dead
+since the docs deploy moved. Caught only when a full read of the file surfaced
+the real sentence, at which point the fix changed from "add a paragraph" to
+"correct the URL," and the originally-planned addition would have been a
+duplicate.)
+
 ## Writing robust bash scripts (recurring review findings)
 Lessons the reviewer flagged across the `session-lock` PR (d-morrison/ai-config#38) —
 pre-empt these when authoring shell, especially under `set -euo pipefail`:

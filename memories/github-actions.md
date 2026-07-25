@@ -438,6 +438,26 @@
   dispatch call, including in `.github/workflows/claude-review.yml`, but the
   push to `claude/issue-285-...` 403'd on exactly that file; re-implemented
   and pushed from the Claude Code web session instead.)
+- **Writing `@claude` anywhere in a PR/issue comment dispatches the agent --
+  backticks and quoting are NOT an escape.** `claude.yml`'s caller-side gate
+  is a plain substring test over `github.event.comment.body`
+  (`contains(github.event.comment.body, '@claude')`), applied to the raw
+  Markdown source. It has no notion of code spans, block quotes, or "this is
+  prose about the bot rather than a summons," so a status comment that merely
+  *mentions* the review bot in passing fires a full agent run. The cost is
+  real but bounded: the agent reads the thread, correctly concludes nothing
+  was asked of it, posts a short note saying so, and makes no code changes.
+  Two things make it worth avoiding anyway -- the spend, and the confusion of
+  an unexplained bot comment mid-thread. **The session usually cannot undo
+  it**: `cancel_workflow_run` 403s the same way `rerun_failed_jobs` does (see
+  `memories/github.md`), and there is no MCP tool to edit an existing comment,
+  so the mention can't be defused retroactively either. Editing wouldn't help
+  regardless -- the stub triggers on `issue_comment: [created]` only, so an
+  already-fired comment can't re-fire. **Write "the review bot" / "the agent"
+  in prose instead, and reserve the literal string for an actual summons.**
+  (`UCD-SERG/serocalculator#605`, 2026-07-25: a comment reporting a CI blocker
+  said "another `@claude` review (about $1.24)" -- backticked, purely
+  descriptive -- and spawned a $0.43 agent run.)
 
 ## d-morrison/gha reusable workflows
 Check `d-morrison/gha` before writing bespoke CI — it has reusable workflows for

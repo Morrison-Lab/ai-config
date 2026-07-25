@@ -497,3 +497,64 @@ names). Also verify the close reason from the API record: the earlier
 no comment was the actual record. (ucdavis/rampp #127 closed 2026-07-05;
 PRs #128/#129 merged into the orphaned `claude/split-survival`; re-cut
 as #136–#138, 2026-07-16..17.)
+
+## A CI failure caused by a documented-but-wrong convention may already have an upstream fix -- check before re-patching the symptom
+
+When a consumer repo's CI fails because a *documented* convention (a skip
+label, a config key) doesn't actually work as described, the first instinct
+is to fix the local documentation to match the tool's real behavior. Check
+first whether a **shared/reusable workflow this repo depends on** already
+fixed the actual root cause in a newer version than the one pinned -- the
+consumer's stale pin, not the doc wording, may be the real bug.
+
+Concretely: `UCD-SERG/serocalculator`'s docs said a PR could skip its
+`news.yaml` changelog check with a `no-changelog` (hyphen) label, but
+applying that label didn't work -- the wrapped `UCD-SERG/changelog-check-action`
+hardcodes checking for `no changelog` (space), a different string. The first
+fix redocumented the label as `no changelog` (space) everywhere -- technically
+unblocked the PR, but was wrong: it was really the shared
+`d-morrison/gha` `check-news.yml` reusable workflow, pinned to the repo's
+frozen `@v1` tag, that was stale. A newer version (`@v2`) already had a
+configurable `no-changelog-label` input, added specifically for this
+convention by an earlier, already-closed upstream issue (gha#143). The
+wrapper doesn't pass the label through to the action (which still
+unconditionally hardcodes `no changelog`, space) -- instead its own job
+carries a job-level `if:` that skips the whole job, action included,
+whenever the configured label is present, so the hardcoded check inside
+the action never runs at all for a PR carrying it. Confirmed by diffing
+the reusable workflow's file content at the two tags
+directly (`git show <tag>:<path>` / a raw fetch per tag), not by trusting a
+versioning doc's blanket claim. The correct fix was reverting the
+re-documented label and bumping the stale `@v1` pin to `@v2`, which restored
+the originally-documented (and originally correct) hyphenated label.
+
+**Tell:** a review flags "this looks like the fix for an issue that's already
+closed" or the bug's exact symptom appears in a shared workflow's own inline
+comments/changelog. Before accepting a symptom-level fix (redocumenting
+behavior to match what's observed), check the shared/reusable component's
+own issue tracker and version history for a fix already covering this exact
+case, and check whether the consumer is pinned to a version that predates it.
+
+**A second-order lesson from the same investigation:** a package/repo's own
+versioning docs claiming a component is "audited, unchanged since the freeze"
+can itself be stale -- the audit can predate a later fix to that exact
+component. Verify the claim against the two tags' actual file content rather
+than trusting the doc; if wrong, fix it too (not just the one broken
+reference that surfaced the problem) via a repo-wide grep, since the same
+claim is often restated in multiple docs/pages.
+
+**A third, narrower lesson: an unassembled `changelog.d/`-style fragment is a
+pending draft, not published history -- don't treat it as immutable.** A
+fragment already merged to `main` but not yet collated into `CHANGELOG.md` by
+the release script can assert the exact stale claim being corrected. Fix it
+in place like any other stale doc; leaving it risks a self-contradictory
+`CHANGELOG.md` once both fragments are assembled together. A review caught
+this only because it explicitly checked fragments outside the current PR's
+diff -- don't assume a `changelog.d/` file is out of scope just because this
+PR didn't author it.
+
+(`UCD-SERG/serocalculator#593` / `d-morrison/gha#304`/`#143`, 2026-07-25: the
+label-name fix round-tripped through a wrong "redocument the label" patch
+before the actual `@v1`→`@v2` pin bump was found; `gha#304`'s own review then
+caught two more stale `@v1` references in sibling docs pages and the
+contradicting pending changelog fragment, all in the same repo-wide sweep.)

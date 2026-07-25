@@ -69,7 +69,9 @@ Two things route elsewhere before you go further:
 
 What stays: a **general standing rule** ("always link PRs in tables") → `CLAUDE.md`,
 or a **general reference fact** ("`gh` opens a pager — pipe to `cat`") → a topical
-file in `memories/` (e.g. `tools.md`, `debugging.md`). These are exactly
+file in `memories/` (e.g. `github.md`, `git.md`, `debugging.md`
+-- see `memories/MEMORY.md` for the full set).
+These are exactly
 `memorize`'s two "general" scopes.
 
 ## Procedure

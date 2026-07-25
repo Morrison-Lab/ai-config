@@ -75,9 +75,12 @@ those forms — this skill is what it hands off to once memory is the answer.
      `~/.claude/CLAUDE.md` (it's loaded every session)
    - **General reference fact** — a cross-project fact that only matters when
      relevant ("gh opens a pager — pipe to cat") → a topical file in
-     `/memories/` (e.g. `tools.md`, `debugging.md`). When you add a *new* file
-     here (not just a bullet to an existing one), register it in
-     `memories/MEMORY.md` as an index entry.
+     `/memories/` -- `github.md`, `github-actions.md`, `git.md`,
+     `r-quarto.md`, `claude-code.md`, `debugging.md`,
+     or `tools.md` for what fits none of those.
+     Read `memories/MEMORY.md` for what each one covers.
+     When you add a *new* file here (not just a bullet to an existing one),
+     register it in `memories/MEMORY.md` as an index entry.
    - **Conversation-only** → `/memories/session/`
    - When ambiguous between project and general, judge by relevance; default
      to general.
@@ -88,8 +91,11 @@ those forms — this skill is what it hands off to once memory is the answer.
    Don't duplicate -- grep the target file for the subject
    (the tool name, the API call, the error string),
    not just the region you're appending to;
-   a long file like `memories/tools.md` can already cover it hundreds of
-   lines away.
+   a long file like `memories/github-actions.md` can already cover it
+   hundreds of lines away.
+   Grep every topical file, not just the one you picked -- a fact about
+   `gh workflow run` could plausibly have landed in `github.md` or
+   `github-actions.md`.
    If it's already recorded, update in place rather than stacking a second
    copy, and say so.
    Delete a memory that turns out wrong instead of leaving a contradiction.

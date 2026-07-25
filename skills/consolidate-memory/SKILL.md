@@ -22,8 +22,10 @@ allowed-tools:
 
 # consolidate-memory — merge redundant memory entries into one canonical
 
-The memory corpus (`memories/debugging.md`, `memories/preferences.md`,
-`memories/tools.md`, and per-repo entries in `~/.claude/projects/<path>/memory/`)
+The memory corpus (the topical files indexed in `memories/MEMORY.md` --
+`github.md`, `github-actions.md`, `git.md`, `r-quarto.md`, `claude-code.md`,
+`debugging.md`, `preferences.md`, `tools.md` -- plus per-repo entries in
+`~/.claude/projects/<path>/memory/`)
 accretes near-duplicates: two sessions each record the same lesson in different
 words, or a fact lands in both a general file and a repo-specific one. This skill collapses a
 genuine-duplicate cluster into **one canonical entry** — unioning the facts and
@@ -94,8 +96,8 @@ off. Present, per cluster:
 - **The members** (file + heading/bullet) and why they're genuine duplicates
   (not scope layering, not adjacent-but-distinct).
 - **The chosen canonical home** — which scope file the merged entry belongs in.
-  A fact true everywhere belongs in the general file (`preferences.md` /
-  `tools.md` / `debugging.md`); a repo-specific fact belongs in that repo's
+  A fact true everywhere belongs in the matching general file (one of the
+  topical files indexed in `memories/MEMORY.md`); a repo-specific fact belongs in that repo's
   Claude project memory (`~/.claude/projects/<path>/memory/`). State why.
 - **What gets folded in** — every non-obvious detail and *why*-clause unique to
   an absorbed entry that must survive into the canonical.

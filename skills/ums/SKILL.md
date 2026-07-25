@@ -65,9 +65,12 @@ committed pass.
    - Read the target file first (skill or memory) to understand current state
    - **Grep that file for the item's specific subject** -- the tool name, the
      API call, the error string -- before appending anything.
-     Reading the region you're editing is not enough: `memories/tools.md` runs
-     to thousands of lines, so an existing entry on the same subject can sit
-     hundreds of lines away in an unrelated cluster and never enter your view.
+     Reading the region you're editing is not enough: a topical memory file
+     runs to hundreds or a thousand-plus lines, so an existing entry on the
+     same subject can sit far away in an unrelated cluster and never enter
+     your view.
+     Grep the whole `memories/` directory rather than one file --
+     a fact can plausibly sit in either of two adjacent topical files.
      When one exists, extend it in place; don't add a second bullet.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already
@@ -196,13 +199,15 @@ committed pass.
    | What | Where | Change |
    |------|-------|--------|
    | Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
-   | glab has no --state flag | `/memories/tools.md` | New bullet |
+   | glab has no --state flag | `/memories/github.md` | New bullet |
 
 ## What to look for (checklist)
 
 - [ ] Did I follow a skill but miss a step? → Update the skill
 - [ ] Did the user correct my behavior? → Encode as preference + skill update
-- [ ] Did I discover a tool quirk? → `/memories/tools.md`
+- [ ] Did I discover a tool quirk? → the matching topical file
+  (`/memories/github.md`, `github-actions.md`, `git.md`, `r-quarto.md`,
+  `claude-code.md`, or `tools.md` when it fits none of them)
 - [ ] Did I learn a debugging pattern? → `/memories/debugging.md`
 - [ ] Did I create a *new* file under `/memories/`? → register it in
   `memories/MEMORY.md` as an index entry
@@ -289,7 +294,7 @@ add a review gate for the cases that need one.
   only — hand off that a PR adding those agent docs is still required. See the checklist
   item above and `memories/preferences.md` for the full rule.
 - ❌ Inserting a new bullet into any memory file with nested lists (including
-  `tools.md`, `preferences.md`) without checking the surrounding indentation
+  `github-actions.md`, `preferences.md`) without checking the surrounding indentation
   first. These files mix 0-indent top-level bullets with 2-/4-indent sub-bullets and
   multi-paragraph continuations; a new top-level bullet dropped in the middle
   of an existing parent's sub-list re-parents whatever follows it in Markdown

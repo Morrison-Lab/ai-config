@@ -32,6 +32,22 @@
   defaults first (no config): collect the full violation list. Disable every failing rule
   to achieve a green baseline with zero corpus churn. Re-enable rules incrementally after
   targeted fix passes. This prevents flooding CI with hundreds of pre-existing violations.
+- **MD010/no-hard-tabs fires inside fenced code blocks too, so pasted command
+  output fails lint.**
+  Lots of CLI output is tab-separated --- `git ls-remote` puts a tab between
+  the sha and the ref, as do `git ls-tree`, `git for-each-ref`, and `cut`/`awk`
+  defaults.
+  Pasting a real transcript into a ```` ``` ```` fence therefore carries those
+  literal tabs into the file and fails `MD010`, which does not exempt code
+  blocks under default config.
+  Render the gap as spaces when quoting such output; the demonstration reads
+  the same and the shas still line up.
+  Worth running `npx markdownlint-cli2` locally before pushing any doc change
+  that pastes command output --- the other content checks do not catch this,
+  since a hard tab is neither a broken link nor a long line.
+  (ai-config#725: a `git ls-remote` transcript added to `memories/git.md`
+  failed `validate` on three `MD010` hits, after the link, memory-size, and
+  line-break checks had all passed.)
 
 ## Office Open XML (.docx / .xlsx) — editing committed content
 - `.docx`/`.xlsx` are zip archives. To strip or edit content (e.g. remove a sensitive

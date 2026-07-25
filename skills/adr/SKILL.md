@@ -1,6 +1,6 @@
 ---
 name: adr
-description: "Alias for `ard` (common transposition typo). Use when asked to 'adr', 'ard this review'."
+description: "Alias for `ard` (common transposition typo). Use when asked to 'adr'."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: address-rebut-defer
-description: "Alias for `ard`. Use when asked to 'address-rebut-defer', 'address rebut defer', 'ard this review'."
+description: "Alias for `ard`. Use when asked to 'address-rebut-defer', 'address rebut defer'."
 user-invocable: true
 allowed-tools:
   - Bash

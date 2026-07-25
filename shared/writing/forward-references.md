@@ -50,7 +50,7 @@ as an "as discussed below".
 Add a pattern for it when the file contains an ordered procedure:
 
 ```bash
-rg -niE '\b(per|see|as in|described in|from) (step|item|point) [0-9]' <file>
+rg -niE '\b(per|see|as in|described in|from) (step|item|point) [0-9]+' <file>
 ```
 
 The direction test is positional, not textual: compare the pointer's own

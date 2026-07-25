@@ -728,8 +728,9 @@ by #328.)
   Run ref-moving commands unsuppressed and read their output;
   when `main` is checked out,
   use `git pull --ff-only` (or `git checkout --detach` first) instead of
-  `git branch -f`. (ai-config#691: `git branch -f main origin/main` no-op'd
-  this way while `main` was checked out, leaving the branch two commits
+  `git branch -f`. (ai-config#691: `git branch -f main origin/main` was
+  refused this way while `main` was checked out -- the error suppressed, the
+  ref left untouched -- leaving the branch two commits
   behind; caught only when `scripts/check-new-line-breaks.py` flagged a line
   in `memories/tools.md` that the working tree did not contain.)
 - **Prevention:** in a session/linked worktree, never "return to main" after a

@@ -92,8 +92,10 @@ reports the item as still open and unaddressed even though a substantive
 reply is sitting in the thread. The tell is a re-raise that repeats the
 original finding verbatim and speaks only to whether the *code* changed,
 without engaging any argument you made. Before escalating, compare your
-reply's timestamp against the review run's `started_at`: if the reply landed
-after the run began, it is a stale re-raise, not a genuine disagreement.
+reply's timestamp against the review run's `started_at` (`gh run view <id>
+--json startedAt`, or the `started_at` field each run carries in
+`get_check_runs` when `gh` is absent): if the reply landed after the run
+began, it is a stale re-raise, not a genuine disagreement.
 Reply once pointing at the earlier rebuttal (link it directly --- the next
 run will see it), and don't count that round toward the
 rebuttal-didn't-convince-them test in `fully-clean.md`.

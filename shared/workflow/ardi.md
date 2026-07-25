@@ -70,7 +70,8 @@ both PRs before either reviewer re-raised it.)
 
 **When the change affects downstream consumers, validate it against a real
 consumer repo before reporting the PR ready --- a package's own test
-fixtures are built to exercise its code, not to look like the wild.**
+fixtures are built to exercise its code, not to resemble the packages that
+will actually use it.**
 Fixtures are minimal by construction and tend to share one shape, so whole
 branches of new code can be structurally unreachable from them. A real
 consumer brings the input variety fixtures lack, and it is usually one clone

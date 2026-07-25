@@ -560,3 +560,23 @@ much more wall-clock/tokens than its own diff would justify, checking
 of problem rather than trusting the subagent's own narration that it's
 "still verifying." (Sparta `gii-mwc` session, 2026-07-19, `tools/check.sh`'s
 `comments`/`units`/`patch_coverage` steps.)
+
+**This is not only a subagent-scale failure --- it bites a single session
+running one check by hand, and the ai-config corpus's own
+`check-new-line-breaks` is one of these.**
+Its script runs `git diff --unified=0 <base_ref>...HEAD`, so a working tree
+full of uncommitted edits is invisible to it: on `main` with changes not yet
+committed, `HEAD` *is* `origin/main`, the diff is empty, and it prints
+`No lines missing semantic breaks.`
+That message is indistinguishable from a genuine pass, and it is especially
+seductive here because the check is *also* advisory (it warns and exits 0 ---
+see [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md)), so
+neither its exit code nor its output gives the game away.
+The habit that actually works: `git checkout -b`, `git add`, `git commit`,
+**then** run the diff-scoped checks, and only then push.
+(ai-config#730 and #732, 2026-07-25, in the same session: both ran the check
+against an uncommitted tree, both got a false clean, and both had the real
+violations found afterward --- #730's by the check itself once the first
+commit existed, #732's by a reviewer.
+The second time is what makes this worth recording, since the entry above
+already existed and was not applied.)

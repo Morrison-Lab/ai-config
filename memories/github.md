@@ -139,12 +139,15 @@
   - The quota is **per requesting user**, not per repo or per PR, so every
     request from the same account keeps refusing until it resets, however
     many different PRs it's spread across.
-  - **Latency is a weak tell.**
-    Refusals came back within roughly a minute of the request; a request
-    still pending well past that (~10 minutes) is more likely a genuine
-    review in progress.
-    Treat this as a hint for deciding whether to keep waiting, not as a
-    verdict --- read the posted review either way.
+  - **Latency is a weak tell, and an untested one.**
+    Every refusal came back within roughly a minute of the request.
+    A later request was still pending when last checked about ten minutes
+    in, which is the only reason to suspect a long-pending request may be
+    a real review rather than a slow refusal -- but its outcome was never
+    observed, because the PR merged first.
+    So treat a long wait as weak grounds for holding off on re-requesting,
+    not as evidence a review is coming, and read the posted review either
+    way.
   Copilot and the `@claude` reviewer fail **independently**: Copilot can be
   quota-dead while `claude-review` posts genuine verdicts at the same head,
   so a Copilot refusal is never a reason to stop checking the other one.

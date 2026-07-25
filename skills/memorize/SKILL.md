@@ -84,8 +84,14 @@ those forms — this skill is what it hands off to once memory is the answer.
 3. **Choose file**: read the target's current contents first. Append to an
    existing section/file if one fits; otherwise create a descriptively named
    file — and when you create a *new* file under `/memories/`, add a row for it
-   to `memories/MEMORY.md` (the index). Don't duplicate — if it's already
-   recorded, update in place rather than stacking a second copy, and say so.
+   to `memories/MEMORY.md` (the index).
+   Don't duplicate -- grep the target file for the subject
+   (the tool name, the API call, the error string),
+   not just the region you're appending to;
+   a long file like `memories/tools.md` can already cover it hundreds of
+   lines away.
+   If it's already recorded, update in place rather than stacking a second
+   copy, and say so.
    Delete a memory that turns out wrong instead of leaving a contradiction.
 4. **Write** a concise bullet (one line preferred), matching the file's voice;
    include the *why* if it isn't obvious. Don't record what the repo already

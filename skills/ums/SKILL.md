@@ -285,6 +285,17 @@ add a review gate for the cases that need one.
 - ❌ `git add -A` — it sweeps unrelated in-flight edits (the user's work, other
   draft skills) into your commit/PR. Stage the specific files you touched.
 - ❌ Creating `memories/repo/<repo>.md` for any repo — this pattern is retired.
+- ❌ Naming a tool, flag, or API identifier that appears **nowhere else in the
+  corpus** without anchoring it somewhere checkable. A lone mention reads
+  identically whether it is correct or hallucinated, so a later session has
+  nothing to verify it against --- and the guidance is only actionable if the
+  name is right. When the identifier is a cross-model tool, add it to
+  `tool-mappings.yml` (then regenerate) rather than leaving the memory bullet
+  as its only home; otherwise cite where you confirmed it. Having *used* it
+  successfully in the session you're writing up is good evidence, but that
+  evidence dies with the session. (ai-config#727: `mcp__github__list_commits`
+  was flagged in review as unanchored; it was genuinely verified by use, and
+  the fix was registering it as the `LIST_COMMITS` operation.)
   Put repo-specific lore in the repo's own agent docs (`.github/agents/`,
   `CLAUDE.md`, `.github/instructions/`, `.github/copilot-instructions.md`, or
   checked-in `.claude/memories/`) via a PR;

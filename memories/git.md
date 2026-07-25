@@ -5,6 +5,39 @@
 - Can't use `git push --force origin <tag>` on some GitLab instances (protected tags). The delete+recreate pattern always works.
 - `git fetch --tags` silently refuses to update a local tag that already exists if the remote moved it. Use `git fetch --tags --force` to get the latest remote tag positions. Without `--force`, you'll see stale local tags and draw wrong conclusions about what the tag includes.
 
+## Resolving a tag to a COMMIT sha (e.g. to SHA-pin a GitHub Action)
+
+- **`git ls-remote --refs` is the wrong tool for this, and fails silently.**
+  The `--refs` flag filters out *peeled* (`^{}`) entries. For a **lightweight**
+  tag that is harmless --- the one line printed is the commit. For an
+  **annotated** tag, the only line left is the **tag object's** sha, and
+  nothing in the output says so. Pin that and GitHub Actions rejects it
+  (`uses:` needs a commit), or worse, a tool silently resolves something you
+  did not intend.
+- Use the `--refs`-free form and read both lines. A glob keeps it short:
+  ```bash
+  git ls-remote https://github.com/<owner>/<repo> 'refs/tags/<tag>*'
+  # lightweight -> one line:  <commit-sha>  refs/tags/<tag>
+  # annotated   -> two lines: <tag-obj-sha> refs/tags/<tag>
+  #                           <commit-sha>  refs/tags/<tag>^{}   <- the one you want
+  ```
+- **Don't infer the object type from the ref listing --- ask git.** Fetch the
+  object into a throwaway repo and check it directly, which works even when
+  `gh` is absent and `api.github.com` is blocked by a sandbox proxy:
+  ```bash
+  cd "$(mktemp -d)" && git init -q .
+  git remote add o https://github.com/<owner>/<repo>
+  git fetch -q --depth 1 o <sha>
+  git cat-file -t <sha>          # want: commit   (a `tag` here means you peeled wrong)
+  ```
+- This is an [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)
+  case: two commands decide it exactly, so never write a pin from recollection
+  or from a ref listing you did not check the peel state of.
+  (d-morrison/altdoc#57, 2026-07-25: SHA-pinning `etiennebacher/setup-jarl`.
+  The tag was lightweight so `--refs` happened to give the right answer --- the
+  trap only bites on annotated tags, which is exactly why it is worth checking
+  every time rather than when something looks off.)
+
 ## Git — bump a submodule pin without initializing it
 - To advance a submodule pointer when the submodule isn't checked out (common in
   a remote/web session, where the configured submodule URL may be unreachable

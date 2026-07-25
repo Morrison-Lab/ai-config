@@ -56,6 +56,26 @@ wait until the synchronize-triggered review run appears in GitHub Actions,
 then mark ready as its own later step.
 (Hit on `Lacaedemon/sparta#898`, 2026-07-15.)
 
+**Check whether the race can even arise before paying for that wait --- on
+many repos it cannot, and the check is one field.** The race needs *two live
+runs*. But the paragraph above sits in tension with this fragment's own
+premise that "a draft doesn't trigger the `@claude` review bot": where that
+holds, the push's synchronize run **skips** rather than running, so there is
+nothing in flight for the `ready_for_review` run to cancel. Which way a given
+repo behaves is visible directly --- read the review job's conclusion on the
+push's own run before marking ready:
+
+- `skipped` -> no live run, mark ready immediately, no wait needed.
+- `in_progress`/`queued` -> the sparta case; wait for it to finish first.
+
+Don't generalize from either repo. sparta#898 is real, and so is the opposite;
+the deciding factor is whether that repo's review workflow gates on
+`github.event.pull_request.draft`, which is a property of the workflow, not
+something to assume. (d-morrison/altdoc#55, 2026-07-25: the draft's
+synchronize-triggered `review / claude-review` reported `skipped`, so marking
+ready seconds after the push was safe and the subsequent `ready_for_review`
+run posted a normal verdict.)
+
 So the per-issue order becomes: claim → branch → **open the draft PR now** →
 implement → mark ready-for-review → ARDI.
 

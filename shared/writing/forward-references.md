@@ -41,6 +41,31 @@ rg -niE '\b(below|later|following|subsequently|further down|next|afterward)\b[^.
 Treat every hit --- from either pattern --- as a **candidate**, not a
 confirmed finding --- see the false positives below.
 
+**Both patterns miss a whole class: an explicit numbered pointer inside a
+sequential procedure.**
+"per step 3", "see step 5", "as in step 2" carry no directional word at
+all, so neither grep above fires --- yet in a numbered list the reader
+follows in order, a pointer from step 2 to step 3 is exactly as unresolved
+as an "as discussed below".
+Add a pattern for it when the file contains an ordered procedure:
+
+```bash
+rg -niE '\b(per|see|as in|described in|from) (step|item|point) [0-9]' <file>
+```
+
+The direction test is positional, not textual: compare the pointer's own
+position to its target's.
+A pointer from step 2 to step 3 is a forward reference; the same
+`(step 3)` written in a section that *follows* step 3 --- an anti-patterns
+list at the end of the document, say --- is a back-reference and fine.
+Prefer deleting the pointer over rewording it: in a sequential procedure
+the reader reaches the target anyway, so a step that states its own
+mechanism in brief needs no cross-reference at all.
+(ai-config#691: `ums`'s step 2 said "grep before writing, per step 3";
+dropping the pointer left "grep before writing", which carries the
+mechanism on its own, while the anti-patterns entry's own `(step 3)`
+correctly stayed.)
+
 ## Confirming a hit
 
 For each candidate, check two things:

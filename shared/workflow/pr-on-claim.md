@@ -57,16 +57,23 @@ then mark ready as its own later step.
 (Hit on `Lacaedemon/sparta#898`, 2026-07-15.)
 
 **Check whether the race can even arise before paying for that wait --- on
-many repos it cannot, and the check is one field.** The race needs *two live
-runs*. But the paragraph above sits in tension with this fragment's own
+many repos it cannot, and the check is one field.**
+The race needs *two live runs*.
+But the paragraph above sits in tension with this fragment's own
 premise that "a draft doesn't trigger the `@claude` review bot": where that
 holds, the push's synchronize run **skips** rather than running, so there is
-nothing in flight for the `ready_for_review` run to cancel. Which way a given
-repo behaves is visible directly --- read the review job's conclusion on the
-push's own run before marking ready:
+nothing in flight for the `ready_for_review` run to cancel.
+Which way a given repo behaves is visible directly --- read the review job's
+conclusion on the push's own run before marking ready:
 
 - `skipped` -> no live run, mark ready immediately, no wait needed.
 - `in_progress`/`queued` -> the sparta case; wait for it to finish first.
+
+Read it with `gh pr checks <N>`, or `pull_request_read` `get_check_runs` in a
+session without `gh` (see [`tool-mappings.md`](../../tool-mappings.md)).
+Mind the casing split [`fully-clean`](fully-clean.md) warns about: REST
+returns lowercase `status`/`conclusion` (`completed`, `skipped`), while
+`gh pr checks`/GraphQL return uppercase `state` values.
 
 Don't generalize from either repo. sparta#898 is real, and so is the opposite;
 the deciding factor is whether that repo's review workflow gates on

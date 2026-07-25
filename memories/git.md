@@ -8,19 +8,37 @@
 ## Resolving a tag to a COMMIT sha (e.g. to SHA-pin a GitHub Action)
 
 - **`git ls-remote --refs` is the wrong tool for this, and fails silently.**
-  The `--refs` flag filters out *peeled* (`^{}`) entries. For a **lightweight**
-  tag that is harmless --- the one line printed is the commit. For an
-  **annotated** tag, the only line left is the **tag object's** sha, and
-  nothing in the output says so. Pin that and GitHub Actions rejects it
-  (`uses:` needs a commit), or worse, a tool silently resolves something you
-  did not intend.
-- Use the `--refs`-free form and read both lines. A glob keeps it short:
+  The `--refs` flag filters out *peeled* (`^{}`) entries.
+  For a **lightweight** tag that is harmless --- the one line printed is the
+  commit.
+  For an **annotated** tag, the only line left is the **tag object's** sha,
+  and nothing in the output says so.
+  Pin that and GitHub Actions rejects it (`uses:` needs a commit), or worse,
+  a tool silently resolves something you did not intend.
+- Ask for **both exact refspecs**, and take the `^{}` line when there is one:
   ```bash
-  git ls-remote https://github.com/<owner>/<repo> 'refs/tags/<tag>*'
+  git ls-remote https://github.com/<owner>/<repo> 'refs/tags/<tag>' 'refs/tags/<tag>^{}'
   # lightweight -> one line:  <commit-sha>  refs/tags/<tag>
   # annotated   -> two lines: <tag-obj-sha> refs/tags/<tag>
   #                           <commit-sha>  refs/tags/<tag>^{}   <- the one you want
   ```
+  Don't reach for a `'refs/tags/<tag>*'` glob instead: `*` matches any suffix,
+  so looking up `v0.0.1` in a repo that also has `v0.0.10`--`v0.0.18` returns
+  nine unrelated tags and the two-line rule above stops meaning anything.
+  The exact pair has no such failure mode --- a tag name and its own peeled
+  form are the only two refs it can ever match.
+- Real demonstration of the gap, on `git/git`'s annotated `v2.9.5`:
+  ```
+  $ git ls-remote https://github.com/git/git 'refs/tags/v2.9.5' 'refs/tags/v2.9.5^{}'
+  dcba104ffdcf2f27bc5058d8321e7a6c2fe8f27e	refs/tags/v2.9.5
+  4d4165b80d6b91a255e2847583bd4df98b5d54e1	refs/tags/v2.9.5^{}
+
+  $ git ls-remote --refs https://github.com/git/git 'refs/tags/v2.9.5'
+  dcba104ffdcf2f27bc5058d8321e7a6c2fe8f27e	refs/tags/v2.9.5
+  ```
+  `--refs` returns `dcba104` --- the **tag object** --- as its only line, with
+  nothing marking it as such.
+  The commit is `4d4165b`.
 - **Don't infer the object type from the ref listing --- ask git.** Fetch the
   object into a throwaway repo and check it directly, which works even when
   `gh` is absent and `api.github.com` is blocked by a sandbox proxy:

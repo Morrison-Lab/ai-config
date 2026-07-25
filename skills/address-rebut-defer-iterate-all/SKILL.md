@@ -1,6 +1,6 @@
 ---
 name: address-rebut-defer-iterate-all
-description: "Alias for `ardia`. Apply ARDI to every open PR/MR in the repo — drive each to a clean review verdict. Use when asked to 'address rebut defer iterate all', 'drive all MRs to clean', or 'iterate all PRs'."
+description: "Alias for `ardia`. Use when asked to 'address-rebut-defer-iterate-all', 'address rebut defer iterate all'."
 user-invocable: true
 allowed-tools:
   - Bash

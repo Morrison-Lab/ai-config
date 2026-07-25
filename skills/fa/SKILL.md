@@ -1,6 +1,6 @@
 ---
 name: fa
-description: "Alias for `fetch-all`. Run `git fetch` from origin across every git repo under a directory, reporting per-repo status (OK / updated / failed / skipped). Read-only — never merges or pulls. Use when asked to 'fa', 'fetch all', 'fetch from origin on all repos', or 'fetch every repo'."
+description: "Alias for `fetch-all`. Use when asked to 'fa'."
 user-invocable: true
 allowed-tools:
   - Bash

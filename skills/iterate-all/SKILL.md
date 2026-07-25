@@ -1,6 +1,6 @@
 ---
 name: iterate-all
-description: "Alias for `ardia`. Apply the review-until-clean loop to every open PR in the repo — drive each one to a clean review verdict in turn. Use when asked to 'iterate all', 'iterate all PRs', 'carry every open PR to clean', 'review-loop all my PRs', or to run the review-until-clean loop across the whole open-PR queue rather than a single PR."
+description: "Alias for `ardia`. Use when asked to 'iterate-all'."
 user-invocable: true
 ---
 

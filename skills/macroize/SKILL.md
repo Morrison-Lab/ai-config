@@ -1,6 +1,6 @@
 ---
 name: macroize
-description: "Alias for `use-math-macros`. Rewrite a Quarto/LaTeX manuscript's math to use the shared d-morrison/macros submodule, condensing and polishing all math. Use when asked to 'macroize', 'macroize the math', or 'use the macros submodule'."
+description: "Alias for `use-math-macros`. Use when asked to 'macroize', 'macroize the math'."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "ffr"
-description: "Codex wrapper for the ai-config Claude skill `ffr`. Alias for `fix-forward-references`. Detect and fix forward references in prose \u2014 a cross-reference or phrase ('see below', 'as discussed below') that points a reader ahead to content they haven't reached yet \u2014 by rearranging the document or rewording the reference. Use when asked to 'ffr', 'fix forward references', or 'check for forward references'. Use when Codex is asked to use `ffr`, `/ffr`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `ffr`. Alias for `fix-forward-references`. Use when asked to 'ffr'. Use when Codex is asked to use `ffr`, `/ffr`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # ffr (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "merge-when-confident"
-description: "Codex wrapper for the ai-config Claude skill `merge-when-confident`. Alias for `mwc`. Grant standing session-scoped permission to merge fully-clean PRs autonomously for the rest of the session, without asking per PR. Use when asked to 'merge when confident', 'mwc', 'merge at will', or 'maw'. Use when Codex is asked to use `merge-when-confident`, `/merge-when-confident`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `merge-when-confident`. Alias for `mwc`. Use when asked to 'merge-when-confident'. Use when Codex is asked to use `merge-when-confident`, `/merge-when-confident`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # merge-when-confident (Codex wrapper)

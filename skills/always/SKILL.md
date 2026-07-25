@@ -1,6 +1,6 @@
 ---
 name: always
-description: "Alias for `memorize` (synonym of `remember`). Persist a standing rule or preference to memory, routed by relevance to project-specific or general scope. Use when the user gives an always-apply directive — 'always …', 'never …', 'from now on …', 'I prefer …' — or says '/always'."
+description: "Alias for `memorize` (synonym of `remember`). Use when asked to 'always', 'always \u2026', 'I prefer \u2026', '/always'."
 user-invocable: true
 allowed-tools:
   - Read

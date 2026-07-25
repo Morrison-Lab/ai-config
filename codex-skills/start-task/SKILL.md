@@ -1,6 +1,6 @@
 ---
 name: "start-task"
-description: "Codex wrapper for the ai-config Claude skill `start-task`. Alias for `st` (Start Task, issue-first). Before writing code or opening a PR, ensure a tracking issue exists (search; file one if none), then branch, implement, open a PR, and ARDI to clean. Use when asked to 'start a task', 'start a new task', or 'new task'. Use when Codex is asked to use `start-task`, `/start-task`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `start-task`. Alias for `st` (Start Task, issue-first). Use when asked to 'start-task'. Use when Codex is asked to use `start-task`, `/start-task`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # start-task (Codex wrapper)

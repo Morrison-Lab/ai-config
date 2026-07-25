@@ -1,6 +1,6 @@
 ---
 name: "revive-closed"
-description: "Codex wrapper for the ai-config Claude skill `revive-closed`. Alias for `rescue-closed`. Search closed issues and closed-but-unmerged PRs for the ones worth returning to, then triage and reopen the keepers. Use when asked to 'revive closed issues', 'revive a closed PR', 'resurrect stale issues', 'salvage abandoned PRs', or 'revive-closed'. Use when Codex is asked to use `revive-closed`, `/revive-closed`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `revive-closed`. Alias for `rescue-closed`. Use when asked to 'revive closed issues', 'revive-closed'. Use when Codex is asked to use `revive-closed`, `/revive-closed`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # revive-closed (Codex wrapper)

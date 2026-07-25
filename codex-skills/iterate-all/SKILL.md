@@ -1,6 +1,6 @@
 ---
 name: "iterate-all"
-description: "Codex wrapper for the ai-config Claude skill `iterate-all`. Alias for `ardia`. Apply the review-until-clean loop to every open PR in the repo \u2014 drive each one to a clean review verdict in turn. Use when asked to 'iterate all', 'iterate all PRs', 'carry every open PR to clean', 'review-loop all my PRs', or to run the review-until-clean loop across the whole open-PR queue rather than a single PR. Use when Codex is asked to use `iterate-all`, `/iterate-all`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `iterate-all`. Alias for `ardia`. Use when asked to 'iterate-all'. Use when Codex is asked to use `iterate-all`, `/iterate-all`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # iterate-all (Codex wrapper)

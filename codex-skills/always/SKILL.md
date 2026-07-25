@@ -1,6 +1,6 @@
 ---
 name: "always"
-description: "Codex wrapper for the ai-config Claude skill `always`. Alias for `memorize` (synonym of `remember`). Persist a standing rule or preference to memory, routed by relevance to project-specific or general scope. Use when the user gives an always-apply directive \u2014 'always \u2026', 'never \u2026', 'from now on \u2026', 'I prefer \u2026' \u2014 or says '/always'. Use when Codex is asked to use `always`, `/always`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `always`. Alias for `memorize` (synonym of `remember`). Use when asked to 'always', 'always \u2026', 'I prefer \u2026', '/always'. Use when Codex is asked to use `always`, `/always`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # always (Codex wrapper)

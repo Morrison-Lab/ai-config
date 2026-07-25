@@ -1,6 +1,6 @@
 ---
 name: "ai-tells"
-description: "Codex wrapper for the ai-config Claude skill `ai-tells`. Alias for `find-ai-tells`. Scan a text (file, PR/MR diff, or pasted prose) for telltale signs of AI/LLM authorship and report each with location, severity, and a de-slopped revision; also a standing self-check on my own drafts. Use when asked to 'ai-tells', 'find AI tells', 'de-slop this', 'does this sound like AI', or 'check if this was written by AI'. Use when Codex is asked to use `ai-tells`, `/ai-tells`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `ai-tells`. Alias for `find-ai-tells`. Use when asked to 'ai-tells'. Use when Codex is asked to use `ai-tells`, `/ai-tells`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # ai-tells (Codex wrapper)

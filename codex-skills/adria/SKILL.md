@@ -1,6 +1,6 @@
 ---
 name: "adria"
-description: "Codex wrapper for the ai-config Claude skill `adria`. Alias for `ardia` (common transposition typo). Apply ARDI to every open PR/MR in the repo \u2014 drive each to a clean review verdict. Use when asked to 'adria', 'drive all MRs to clean', or 'iterate all PRs'. Use when Codex is asked to use `adria`, `/adria`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `adria`. Alias for `ardia` (common transposition typo). Use when asked to 'adria'. Use when Codex is asked to use `adria`, `/adria`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # adria (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: grab-issue
-description: "Alias for `gi`. Pick the highest-priority open issue, implement it, open an MR/PR, and ARDI to clean. Use when asked to 'grab an issue', 'grab issue', 'pick up the next issue', or 'what should I work on next?'"
+description: "Alias for `gi`. Use when asked to 'grab-issue'."
 user-invocable: true
 allowed-tools:
   - Bash

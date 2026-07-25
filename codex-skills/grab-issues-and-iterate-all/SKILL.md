@@ -1,6 +1,6 @@
 ---
 name: "grab-issues-and-iterate-all"
-description: "Codex wrapper for the ai-config Claude skill `grab-issues-and-iterate-all`. Alias for `gia` (Grab Issues + iterate-All). Clear the repo's entire work queue in two phases \u2014 first ARDIA every open PR/MR to clean, then GII every open issue. Use when asked to 'grab issues and iterate all', 'clear the whole queue', 'clean all PRs then do all the issues', or 'burn down everything'. Use when Codex is asked to use `grab-issues-and-iterate-all`, `/grab-issues-and-iterate-all`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `grab-issues-and-iterate-all`. Alias for `gia` (Grab Issues + iterate-All). Use when asked to 'grab-issues-and-iterate-all', 'grab issues and iterate all'. Use when Codex is asked to use `grab-issues-and-iterate-all`, `/grab-issues-and-iterate-all`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # grab-issues-and-iterate-all (Codex wrapper)

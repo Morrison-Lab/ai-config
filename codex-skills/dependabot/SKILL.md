@@ -1,6 +1,6 @@
 ---
 name: "dependabot"
-description: "Codex wrapper for the ai-config Claude skill `dependabot`. Alias for `chores`. Triage and wrap up dependency-bump / `chore(...)` PRs from Dependabot/Renovate: classify by bump size, confirm CI is green, merge safe patch/minor bumps, and flag risky majors with a changelog summary. Use when asked to 'handle the dependabot PRs', 'process dependabot', 'merge the bump PRs', or 'dependency updates'. Use when Codex is asked to use `dependabot`, `/dependabot`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `dependabot`. Alias for `chores`. Use when asked to 'dependabot', 'handle the dependabot PRs', 'process dependabot', 'merge the bump PRs'. Use when Codex is asked to use `dependabot`, `/dependabot`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # dependabot (Codex wrapper)

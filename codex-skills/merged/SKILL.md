@@ -1,6 +1,6 @@
 ---
 name: "merged"
-description: "Codex wrapper for the ai-config Claude skill `merged`. Alias for `wrap-up`. End-of-session wrap-up: verify the true state of every PR/issue/branch/working tree (never assume), report a linked final summary that surfaces anything still open or dangling, then run a UMS review to persist what was learned. In a multi-PR session you can name the PR that just merged (e.g. `/merged #74`) to anchor the summary on it. Use when invoked as `/merged`, or on 'wrap up', 'finish up', 'are we done?', or to close out a multi-PR/issue session. Use when Codex is asked to use `merged`, `/merged`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `merged`. Alias for `wrap-up`. Use when asked to 'merged'. In a multi-PR session you can name the PR that just merged (e.g. `/merged #74`) to anchor the summary on it. Use when Codex is asked to use `merged`, `/merged`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # merged (Codex wrapper)

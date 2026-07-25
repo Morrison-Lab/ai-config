@@ -1,6 +1,6 @@
 ---
 name: "crr"
-description: "Codex wrapper for the ai-config Claude skill `crr`. Alias for `check-rendered-refs`. Scan rendered output (HTML or a deployed/preview URL) for broken Quarto/pandoc cross-references and citations that leaked into the page as literal `?@key` text (e.g. `?@def-coef-interp-procedure`), a missing citation rendered `**key?**`, or raw `[@key]` syntax. Use when asked to 'crr', 'check rendered refs', 'check for broken crossrefs', or 'scan the HTML for `?@`'. Use when Codex is asked to use `crr`, `/crr`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `crr`. Alias for `check-rendered-refs`. Use when asked to 'crr'. Use when Codex is asked to use `crr`, `/crr`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # crr (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: model-fit
-description: "Alias for `assess-model-fit`. Shorthand trigger for assessing whether the current model is sufficient or needs escalation. Use when you want a quicker invocation of assess-model-fit."
+description: "Alias for `assess-model-fit`. Use when asked to 'model-fit'."
 user-invocable: true
 allowed-tools:
   - Bash

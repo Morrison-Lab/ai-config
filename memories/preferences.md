@@ -587,6 +587,9 @@ limits) before using up claude quota"). The `delegate-to-codex` skill (alias
 - Commits by `dem-extra1` to repos owned by `d-morrison`, `ucd-serg`, or `ucdavis` → the true author is `d-morrison` (demorrison@ucdavis.edu); set `--author="Douglas Morrison <demorrison@ucdavis.edu>"` (or amend) when the committing identity is `dem-extra1`.
 - Commits to `sparta` by `d-morrison` → the true author is `dem-extra1` (dougmor@gmail.com); set `--author="dem-extra1 <dougmor@gmail.com>"` when the committing identity is `d-morrison`.
 
+## Access to paywalled academic sources
+- The user has university journal-subscription access and can fetch most academic articles and many books on request. When a task would genuinely benefit from a peer-reviewed or otherwise paywalled source (grounding a design decision, fact-checking a claim, replacing a weak general-audience citation) rather than whatever's freely indexable, ask for the specific title/article rather than settling for a lower-quality open-access source or skipping the citation. Don't request sources speculatively -- ask when a concrete, identified gap would benefit from one. (Learned on Lacaedemon/sparta, 2026-07-24: offered mid-session while grounding a combat-mechanics design discussion in a general-audience website; a peer-reviewed alternative would have been stronger.)
+
 ## Code organization
 - One function per file, across languages (not just R) --- the exception is a trivial two-line wrapper/helper, not a general "where practical" hedge or a "major function" loophole that lets other private helpers ride along (see `shared/coding/one-function-per-file.md`).
 - Keep source files under ~100 lines of code, splitting large helpers into their own files.

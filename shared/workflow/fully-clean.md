@@ -31,6 +31,22 @@ including gaining its own independent addition that collides with yours
 before reporting a PR ready, not just trust the last green run.
 
 **Threads:** at fully-clean, every **inline** review thread is resolved, and the only conversation left open is the final all-clear exchange --- the reviewer's all-clear comment and your reply to it. (The all-clear is usually a top-level PR comment, not an inline thread.)
+Check this mechanically rather than from a memory of which threads you
+replied to. Which field name to look for depends on the surface: the GitHub
+MCP tool `pull_request_read` `get_review_comments` returns thread objects
+under a `review_threads` key with snake_case `is_resolved`/`is_outdated`,
+while a raw `gh api graphql` `reviewThreads` query --- what
+[`resolve-pr-threads`](../../skills/resolve-pr-threads/SKILL.md),
+`pr-status`, and `ard` use --- returns camelCase `isResolved`/`isOutdated`.
+Both are correct on their own surface; this is the same REST-vs-GraphQL
+casing split the check-state paragraph above already warns about, so read
+the response you actually get rather than assuming one spelling. Either way,
+sweeping for the unresolved ones is the entire check. An
+**outdated** thread (`is_outdated: true` --- the code it anchored to has
+since changed) still counts as unresolved: addressing a finding and resolving
+its thread are separate actions, and only the second clears this criterion.
+An addressed-but-unresolved thread reads as outstanding work to every later
+reviewer, which is exactly what this criterion exists to prevent.
 
 **Deadlock -> escalate to a human.** If you and the reviewer(s) can't reach consensus on an item (a rebuttal was exchanged and neither side is budging), don't loop forever and don't unilaterally override the reviewer --- request a **human reviewer**, `@`-mention them in a comment summarizing the impasse, and surface the open item.
 

@@ -316,9 +316,31 @@ Verified on GNU grep 3.11 with `LANG` and `LC_ALL` both empty, which is the
 default in at least some Claude Code containers -- so this fires by default,
 not as an exotic edge case.
 
-Three fixes, any of which works: prefix the command with `LC_ALL=C.UTF-8`,
-match the literal glyph (`grep -P '[--]'` with the real characters in the
-pattern), or do the scan in Python.
+**The fix is to fix the locale**: prefix the command with `LC_ALL=C.UTF-8`,
+or do the scan in Python.
+Either spelling of that locale works where it exists at all -- glibc
+normalizes the name, so `LC_ALL=C.utf8` behaves identically even though
+`locale -a` may list only the lowercase `C.utf8` form (both verified here).
+
+**Do not reach for a literal-glyph bracket as a locale-independent
+workaround.**
+It is not one, and it fails in the worst way -- silently, with plausible
+output.
+Under a byte-wise locale `grep -P` reads a bracket holding multi-byte
+characters as a set of individual *bytes*, so a pattern meant to match an
+em-dash or en-dash also matches any other character sharing one of those
+bytes.
+Verified against a file holding an em-dash, an en-dash, a euro sign, and an
+e-acute: a two-glyph bracket with the locale unset matched **three** lines,
+including the euro sign (`e2 82 ac`, sharing the leading `e2` with both
+dashes), while the identical pattern under `LC_ALL=C.UTF-8` matched the
+correct two.
+Injecting the bytes programmatically instead of typing them (`grep -P
+"$(printf '[\xe2\x80\x94\xe2\x80\x93]')"`) does not help, for the same
+reason -- what breaks is how the locale interprets the bracket, not how the
+bytes reached it.
+So a glyph scan has exactly two correct forms: set the locale, or leave
+`grep` behind.
 
 **Two traps beyond the error itself.**
 First, a single-byte pattern like `\x{80}` does **not** error and *does*

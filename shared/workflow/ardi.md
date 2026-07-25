@@ -68,6 +68,28 @@ share `CLAUDE.md`'s union-merge corruption risk, a follow-up merge
 simulation showed it does --- posted the correction with repro steps on
 both PRs before either reviewer re-raised it.)
 
+**A fix is not "pushed" until it is on the PR's head commit --- verify with a
+SHA comparison before telling a reviewer you pushed it.** From inside a
+session, an edited working tree and a pushed commit feel identical, so a
+round that edits the files, writes the reply, and never runs `git push`
+produces a reply asserting a fix that does not exist on the branch. Nothing
+contradicts it: CI reports green, because it correctly validated the older
+head; the next review round reviews code without the fix; and the session's
+own recollection of having made the change agrees with the reply. That makes
+it worse than an ordinary wrong claim --- it is a false statement about
+*state*, which a reviewer has no reason to doubt and no cheap way to check.
+Before posting any reply that asserts a push, compare `git rev-parse HEAD`
+against the PR's own `head.sha` (`pull_request_read` `get`); if they differ,
+push first, then reply naming the real SHA. Run the same comparison in every
+periodic check-in on a PR you are babysitting, since the failure is silent
+and survives each round until something explicitly looks for it. This is the
+[`algorithmatize-checks`](algorithmatize-checks.md) rule applied to your own
+claims: two SHAs decide it exactly, so never substitute recollection.
+(d-morrison/altdoc#54, 2026-07-25: two review fixes were edited locally and a
+PR comment said they were "addressed in the latest push"; the head sat at the
+pre-fix commit for over an hour, with 14 green checks validating a branch
+carrying neither fix, until a scheduled check-in compared the SHAs.)
+
 **When the change affects downstream consumers, validate it against a real
 consumer repo before reporting the PR ready --- a package's own test
 fixtures are built to exercise its code, not to resemble the packages that

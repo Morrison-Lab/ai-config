@@ -31,6 +31,14 @@ including gaining its own independent addition that collides with yours
 before reporting a PR ready, not just trust the last green run.
 
 **Threads:** at fully-clean, every **inline** review thread is resolved, and the only conversation left open is the final all-clear exchange --- the reviewer's all-clear comment and your reply to it. (The all-clear is usually a top-level PR comment, not an inline thread.)
+Check this mechanically rather than from a memory of which threads you
+replied to: `pull_request_read` `get_review_comments` returns `is_resolved`
+per thread, so sweeping for `is_resolved: false` is the entire check. An
+**outdated** thread (`is_outdated: true` --- the code it anchored to has
+since changed) still counts as unresolved: addressing a finding and resolving
+its thread are separate actions, and only the second clears this criterion.
+An addressed-but-unresolved thread reads as outstanding work to every later
+reviewer, which is exactly what this criterion exists to prevent.
 
 **Deadlock -> escalate to a human.** If you and the reviewer(s) can't reach consensus on an item (a rebuttal was exchanged and neither side is budging), don't loop forever and don't unilaterally override the reviewer --- request a **human reviewer**, `@`-mention them in a comment summarizing the impasse, and surface the open item.
 

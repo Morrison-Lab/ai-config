@@ -113,3 +113,25 @@ carrying a `pandoc` run that disproved the finding's implied hazard was
 posted about a minute before the follow-up review job started; that review
 reported the item "wasn't addressed in `9398d5d`" and re-posted the
 identical suggestion.)
+
+**A finding can be right while its `suggestion` block is wrong --- verify
+the suggested literal before applying it.**
+A GitHub ```` ```suggestion ```` block is one-click-appliable, which is
+exactly what makes an unverified one dangerous: the surrounding prose
+argues for a change you agree with, so the concrete replacement rides in
+on that agreement without being checked itself.
+Treat any file path, version, flag, or command inside a suggestion as a
+claim to verify, not as text to accept --- the same standard
+[`fact-check-prose`](../writing/fact-check-prose.md) applies to the diff.
+Accepting a bad literal is worse than ignoring the finding, because it
+publishes a specific wrong value under the reviewer's apparent authority.
+When the suggestion is wrong but its point stands, fix the underlying
+issue your own way and say in the reply why the suggested form was set
+aside --- silently deviating reads as having missed it.
+(ai-config#726: a review correctly flagged that a `<path>` placeholder
+didn't say where a script came from, but suggested
+`<path-to-gha-checkout>/check-new-line-breaks.py` --- one directory level
+too high, since the composite action's directory and the script inside it
+share a name. `git ls-files` in the gha checkout settled it in one command.
+Applying the suggestion verbatim would have documented a nonexistent path
+in the entry whose whole purpose is getting someone to run that script.)

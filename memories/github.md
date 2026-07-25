@@ -532,6 +532,26 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
   rendering the chapter locally (rme's own CLAUDE.md already names this
   fallback for "no preview has deployed yet"; it also applies when the
   preview exists but the sandbox can't reach it).
+  - **But try the `gh-pages` branch first --- the deployed HTML is usually
+    readable through the authenticated MCP tools even when the served site
+    isn't.** `rossjrw/pr-preview-action` commits each build to `gh-pages`
+    under `pr-preview/pr-<N>/`, so
+    `mcp__github__get_file_contents` with `ref: refs/heads/gh-pages` and
+    `path: pr-preview/pr-<N>/<page>.html` returns the exact bytes the blocked
+    URL would have served. That reaches the *real rendered artifact*, which a
+    local re-render only approximates, and it needs no Quarto toolchain.
+    Large pages exceed the tool's token cap and get spilled to a file --- grep
+    that file rather than reading it whole, and diff byte counts across two
+    fetches to confirm you're looking at a genuinely new build rather than an
+    unchanged one. Check the branch's own commit log
+    (`mcp__github__list_commits` with `sha: gh-pages` --- the `LIST_COMMITS`
+    operation in [`tool-mappings.md`](../tool-mappings.md), verified by use in
+    the session below) to see which build is actually deployed before drawing
+    conclusions; a preview comment's timestamp can precede the deploy of the
+    commit you care about.
+    (`UCD-SERG/serocalculator#392`, 2026-07-25: used this to verify six new
+    topics appeared in a rendered altdoc sidebar, counting occurrences
+    before and after the fix, after both `curl` and `WebFetch` 403'd.)
 - Consequence: you CANNOT poll PR review/CI state from a background Monitor.
   Rely on `mcp__github__subscribe_pr_activity`, which delivers review comments
   and CI *failures* — but NOT CI success, new pushes, or merge-conflict

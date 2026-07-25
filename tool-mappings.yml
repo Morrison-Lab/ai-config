@@ -196,6 +196,12 @@ operations:
     description: Read a file's contents from the repo.
     cli: gh api repos/<owner>/<repo>/contents/<path>
     github_mcp: mcp__github__get_file_contents
+  - id: LIST_COMMITS
+    description: >-
+      List a branch's commits (pass the branch or ref as sha, e.g. sha=gh-pages
+      to see which build a Pages branch currently serves).
+    cli: git log <branch> (or gh api repos/<owner>/<repo>/commits -f sha=<branch>)
+    github_mcp: mcp__github__list_commits
   - id: WRITE_FILE
     description: Create or update file(s) on a branch in a single commit.
     cli: git add <path> && git commit -m "..." && git push

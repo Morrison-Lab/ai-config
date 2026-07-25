@@ -733,6 +733,27 @@ by #328.)
   restore **only** the phantom-diff files
   (`git restore --staged --worktree <files>`) — not a blanket `reset --hard`,
   which clobbers unrelated local state (e.g. a dirty submodule pointer).
+- **The same suppression bites outside worktrees, on ref manipulation
+  generally: never `2>/dev/null` a git command that moves a branch ref.**
+  `git branch -f main origin/main` is the right way to realign `main` when
+  it is *not* checked out (per `CLAUDE.md`'s "Keep ai-config and repo
+  checkouts fresh"), but git refuses it outright when `main` **is** the
+  current branch ("cannot force update the branch checked out at ...").
+  That refusal is the signal; a `2>/dev/null` on it, or burying it mid-chain
+  in a `;`-separated compound whose later commands still succeed, throws the
+  signal away and leaves you on a stale base with everything reporting
+  success.
+  The staleness then surfaces somewhere unrelated and much later:
+  a diff-scoped CI check reporting a phantom hit in a file you never
+  touched, because the base ref, not the file, was wrong.
+  Run ref-moving commands unsuppressed and read their output;
+  when `main` is checked out,
+  use `git pull --ff-only` (or `git checkout --detach` first) instead of
+  `git branch -f`. (ai-config#691: `git branch -f main origin/main` was
+  refused this way while `main` was checked out -- the error suppressed, the
+  ref left untouched -- leaving the branch two commits
+  behind; caught only when `scripts/check-new-line-breaks.py` flagged a line
+  in `memories/tools.md` that the working tree did not contain.)
 - **Prevention:** in a session/linked worktree, never "return to main" after a
   merge — branch the next task directly off the remote
   (`git switch -c <branch> origin/main`) and leave `main` itself to the

@@ -22,6 +22,28 @@ review" below).
   CRAN Task Views for topic surveys; and the analogous ecosystems
   elsewhere (PyPI, npm, the GitHub Actions marketplace).
 
+## Placing new tooling, not just searching for existing tooling
+
+DRW also runs forward, not just backward: when the tooling you're about
+to *build* is generic CI/lint/project infrastructure rather than
+agent-behavior/config, ask whether it belongs in `d-morrison/gha`'s
+reusable-actions layer instead of ai-config's own `scripts/` --- even
+when the immediate need surfaced from ai-config's own corpus.
+`scripts/` should stay scoped to checks specific to *this* repo's own
+content (its skills/memories prose, its manifest structure); a
+capability other project repos would also want (a semantic-line-break
+drift checker, a non-ASCII-punctuation scanner) belongs in gha so every
+consumer repo benefits, not just ai-config. Building it in ai-config
+first is fine when the immediate need is local, but check gha for an
+existing equivalent before assuming none exists, and flag a port when
+none does. (ai-config#682/#684, 2026-07-24: built
+`scripts/check-new-line-breaks.py` in ai-config first, since the
+drift it caught was in ai-config's own corpus; a direct check of gha's
+`lint-markdown`/`lint-qmd` afterward confirmed neither has an
+equivalent, even though every gha-consuming Quarto/R-package repo with
+MD013 disabled for the same corpus-drift reason would benefit from the
+same diff-scoped check.)
+
 The [`prefer-upstream`](../../skills/prefer-upstream/SKILL.md) skill is
 the search procedure (where to look per ecosystem, and the
 build-vs-use decision criteria);

@@ -516,8 +516,13 @@ unblocked the PR, but was wrong: it was really the shared
 `d-morrison/gha` `check-news.yml` reusable workflow, pinned to the repo's
 frozen `@v1` tag, that was stale. A newer version (`@v2`) already had a
 configurable `no-changelog-label` input, added specifically for this
-convention by an earlier, already-closed upstream issue (gha#143) --
-confirmed by diffing the reusable workflow's file content at the two tags
+convention by an earlier, already-closed upstream issue (gha#143). The
+wrapper doesn't pass the label through to the action (which still
+unconditionally hardcodes `no changelog`, space) -- instead its own job
+carries a job-level `if:` that skips the whole job, action included,
+whenever the configured label is present, so the hardcoded check inside
+the action never runs at all for a PR carrying it. Confirmed by diffing
+the reusable workflow's file content at the two tags
 directly (`git show <tag>:<path>` / a raw fetch per tag), not by trusting a
 versioning doc's blanket claim. The correct fix was reverting the
 re-documented label and bumping the stale `@v1` pin to `@v2`, which restored

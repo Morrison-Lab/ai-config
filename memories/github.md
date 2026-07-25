@@ -186,6 +186,26 @@
   single `pull_request_read` `get` compared against that SHA — would have
   settled it in one call. See
   [`efficient-pr-babysitting`](../shared/workflow/efficient-pr-babysitting.md).)
+- **`get_check_runs` is the better of the two, but it is not authoritative:
+  it can report a job as `in_progress` minutes after that job finished.**
+  The entry above says to prefer it over `get_status`, which still holds ---
+  but read that as "less stale", not "correct". `actions_get`
+  `get_workflow_job` on the same job id returns the true
+  `status`/`conclusion`, and the two disagree often enough to matter.
+  The cross-check is cheap and decides it exactly, so run it rather than
+  reasoning about how long the job "should" have taken.
+  It is worth running in **both** directions. Concluding "still running"
+  from a stale `in_progress` only wastes a wait; the dangerous inverse is a
+  rollup that has not yet caught up with a job that has since failed, which
+  is why the cross-check belongs in the declare-clean sweep
+  ([`fully-clean`](../shared/workflow/fully-clean.md) criterion 1) and not
+  only when something looks slow.
+  Do not over-correct, either: on the same PR minutes later, an
+  `in_progress` R-CMD-check was genuinely still running, and the runs
+  endpoint confirmed it. The endpoint is unreliable, not wrong.
+  (`d-morrison/altdoc#61`, 2026-07-25: three instances in one afternoon ---
+  `test-coverage`, `docs-check` (completed `21:12:56`, still reported
+  `in_progress` after), and one true negative.)
 - **`mcp__github__actions_list` (`list_workflow_runs`) returns a full repository
   object per run -- budget accordingly, and prefer a cheaper call.** Each run in
   the response carries `repository`, `head_repository`, `actor`, and

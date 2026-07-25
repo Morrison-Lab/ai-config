@@ -63,6 +63,25 @@ its thread are separate actions, and only the second clears this criterion.
 An addressed-but-unresolved thread reads as outstanding work to every later
 reviewer, which is exactly what this criterion exists to prevent.
 
+**One finding can own two threads, so sweep by thread id rather than by
+finding.**
+When a reviewer re-raises an item you already answered, the re-raise often
+opens a **new** thread instead of continuing the original --- same file, same
+line, same finding, different `threadId`.
+Resolving the one you remember replying to therefore leaves a second thread
+behind, and it is easy to miss twice over: it is usually marked
+`is_outdated: true` (the line it anchored to has since changed), and your own
+memory of the exchange says the item was settled.
+Neither of those clears it.
+Re-read the thread list before declaring clean and resolve every entry whose
+`is_resolved` is false, whatever you recall about the finding it carries;
+reply on the second thread too, pointing at the first, so a reader landing on
+either one sees the resolution.
+(`d-morrison/altdoc#61`, 2026-07-25: the round-4 re-raise of an unused fixture
+parameter opened `PRRT_...TyfeQ` alongside the original `PRRT_...TyeRc`;
+resolving the original left the re-raise outstanding, caught only by a
+mechanical sweep of all seven threads.)
+
 **Deadlock -> escalate to a human.** If you and the reviewer(s) can't reach consensus on an item (a rebuttal was exchanged and neither side is budging), don't loop forever and don't unilaterally override the reviewer --- request a **human reviewer**, `@`-mention them in a comment summarizing the impasse, and surface the open item.
 
 **An automated reviewer's verdict on a disputed factual/technical claim is not stable across independent runs, even with identical evidence available each time.** Don't treat one round's "settled, no need to keep arguing" as durable: the very same review job, re-triggered later with no new code changes, can re-raise a claim it previously retracted --- and then retract it again on a subsequent run --- purely from re-deriving the question differently each time, not from anything changing in the PR. This means a rebuttal thread's outcome (however many rounds of citations and counter-citations) doesn't itself resolve a genuine deadlock the way a human's decision does; only escalating per the bullet above actually settles it. The one thing that DOES help going forward: fold the authoritative citation/evidence directly into the code or doc being reviewed (a comment, not just a PR conversation reply) --- a fresh reviewer run re-deriving the claim from scratch is more likely to find the citation sitting right next to what it's evaluating than to dig through prior thread history for it, though even that is not a guarantee against a bot that ignores context already in front of it. (Sparta#852, 2026-07-14: the same `@claude` review job's independent runs on this PR gave three different verdicts on the identical `gitglossary(7)`-backed pathspec claim across three re-triggers with no intervening code change to the claim itself --- "settled, accurate" -> "backwards, needs more work" -> "accurate after all, retracting my own prior finding" --- resolved only once the human merged it directly rather than by winning the argument with the bot.)

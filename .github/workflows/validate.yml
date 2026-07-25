@@ -24,17 +24,16 @@ jobs:
       - name: Check markdown (.md) style
         run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
       - name: Run semantic-line-break tool tests
-        run: |
-          python3 scripts/test_slb.py
-          python3 scripts/test_check_new_line_breaks.py
-      - name: Check new markdown lines for missing semantic breaks (advisory)
-        # Diff-scoped, non-blocking (ai-config#682): MD013 is off repo-wide
-        # (see .markdownlint-cli2.jsonc) because most of the corpus has
-        # drifted from the last semantic-line-breaks reformat. This only
-        # flags lines this PR itself adds, so it can't reflag that drift.
-        if: github.event_name == 'pull_request'
-        run: |
-          git fetch --depth=1 origin ${{ github.event.pull_request.base.sha }}
-          python3 scripts/check-new-line-breaks.py --base ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/test_slb.py
       - name: Check Quarto (.qmd) prose style
         uses: d-morrison/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
+
+  new-line-breaks:
+    # Diff-scoped, non-blocking (ai-config#682, ported to gha#300): MD013 is
+    # off repo-wide (see .markdownlint-cli2.jsonc) because most of the corpus
+    # has drifted from the last semantic-line-breaks reformat. This only
+    # flags lines a PR itself adds, so it can't reflag that drift.
+    uses: d-morrison/gha/.github/workflows/check-new-line-breaks.yml@v2
+    with:
+      globs: '**/*.md'
+      paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'

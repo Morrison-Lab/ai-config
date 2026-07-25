@@ -1,6 +1,6 @@
 ---
 name: fcp
-description: "Alias for `fact-check-prose`. Assess the accuracy and clarity of prose in a PR/MR, file, or pasted text — check factual claims, verify document-internal reasoning (formal and informal), and cross-check computed values/figures against rendered output. Use when asked to 'fcp', 'fact-check this', 'check the math', or 'verify this reasoning'."
+description: "Alias for `fact-check-prose`. Use when asked to 'fcp'."
 user-invocable: true
 allowed-tools:
   - Bash

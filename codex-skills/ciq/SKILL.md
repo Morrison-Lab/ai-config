@@ -1,6 +1,6 @@
 ---
 name: "ciq"
-description: "Codex wrapper for the ai-config Claude skill `ciq`. Alias for `check-info-quality`. Scan a target for stale, irrelevant, and misleading/out-of-context information and propose fixes. Use when asked to 'ciq', 'check info quality', or 'audit this for information quality'. Use when Codex is asked to use `ciq`, `/ciq`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `ciq`. Alias for `check-info-quality`. Use when asked to 'ciq'. Use when Codex is asked to use `ciq`, `/ciq`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # ciq (Codex wrapper)

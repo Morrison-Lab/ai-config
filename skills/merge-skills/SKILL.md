@@ -1,6 +1,6 @@
 ---
 name: merge-skills
-description: "Alias for `consolidate-skills`. Merge two or more genuinely-overlapping skills into one canonical skill plus thin alias stubs, preserving every existing invocation name. Use when asked to 'merge skills', 'merge overlapping skills', 'dedupe skills', or 'collapse duplicate skills'."
+description: "Alias for `consolidate-skills`. Use when asked to 'merge-skills'."
 user-invocable: true
 ---
 

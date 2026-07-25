@@ -1,6 +1,6 @@
 ---
 name: "address-rebut-defer-iterate-all"
-description: "Codex wrapper for the ai-config Claude skill `address-rebut-defer-iterate-all`. Alias for `ardia`. Apply ARDI to every open PR/MR in the repo \u2014 drive each to a clean review verdict. Use when asked to 'address rebut defer iterate all', 'drive all MRs to clean', or 'iterate all PRs'. Use when Codex is asked to use `address-rebut-defer-iterate-all`, `/address-rebut-defer-iterate-all`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `address-rebut-defer-iterate-all`. Alias for `ardia`. Use when asked to 'address-rebut-defer-iterate-all', 'address rebut defer iterate all'. Use when Codex is asked to use `address-rebut-defer-iterate-all`, `/address-rebut-defer-iterate-all`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # address-rebut-defer-iterate-all (Codex wrapper)

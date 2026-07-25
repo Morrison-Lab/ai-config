@@ -1,6 +1,6 @@
 ---
 name: "merge-skills"
-description: "Codex wrapper for the ai-config Claude skill `merge-skills`. Alias for `consolidate-skills`. Merge two or more genuinely-overlapping skills into one canonical skill plus thin alias stubs, preserving every existing invocation name. Use when asked to 'merge skills', 'merge overlapping skills', 'dedupe skills', or 'collapse duplicate skills'. Use when Codex is asked to use `merge-skills`, `/merge-skills`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `merge-skills`. Alias for `consolidate-skills`. Use when asked to 'merge-skills'. Use when Codex is asked to use `merge-skills`, `/merge-skills`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # merge-skills (Codex wrapper)

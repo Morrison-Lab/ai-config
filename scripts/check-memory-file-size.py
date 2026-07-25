@@ -24,9 +24,11 @@ Threshold rationale (`--max-lines`, default below):
 
 Advisory by default: always exits 0 unless `--strict` is passed. A memory
 file crossing a line count is a prompt to consider splitting, not a defect
-that should block an unrelated PR -- the same stance
-`scripts/check-new-line-breaks.py` takes, and the one
-`shared/writing/semantic-line-breaks.md` prescribes for style findings.
+that should block an unrelated PR -- the same stance the repo's other
+advisory check takes (the diff-scoped semantic-line-break check, which
+started here as `scripts/check-new-line-breaks.py` and now runs from
+`d-morrison/gha`'s reusable workflow per gha#300 / ai-config#703), and the
+one `shared/writing/semantic-line-breaks.md` prescribes for style findings.
 """
 from __future__ import annotations
 

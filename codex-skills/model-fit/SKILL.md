@@ -1,6 +1,6 @@
 ---
 name: "model-fit"
-description: "Codex wrapper for the ai-config Claude skill `model-fit`. Alias for `assess-model-fit`. Shorthand trigger for assessing whether the current model is sufficient or needs escalation. Use when you want a quicker invocation of assess-model-fit. Use when Codex is asked to use `model-fit`, `/model-fit`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `model-fit`. Alias for `assess-model-fit`. Use when asked to 'model-fit'. Use when Codex is asked to use `model-fit`, `/model-fit`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # model-fit (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "pm"
-description: "Codex wrapper for the ai-config Claude skill `pm`. Alias for `prompt-me`. Surface the single most pressing open question waiting on user input, or the top N with a numeric argument. Use when asked to 'pm', 'pm 3', 'prompt me', 'what are you waiting on me for', or '/pm [N]'. For every open question, use `pma` instead. Use when Codex is asked to use `pm`, `/pm`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `pm`. Alias for `prompt-me`. Use when asked to 'pm', 'pm 3', '/pm [N]'. Use when Codex is asked to use `pm`, `/pm`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # pm (Codex wrapper)

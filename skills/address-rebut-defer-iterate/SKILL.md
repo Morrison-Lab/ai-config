@@ -1,6 +1,6 @@
 ---
 name: address-rebut-defer-iterate
-description: "Alias for `ardi`. ARD + Iterate on a single PR/MR until the review verdict is clean; runs per-round and fully-clean exit checklists. Use when asked to 'address rebut defer iterate', 'drive this PR to clean', or 'iterate this MR'."
+description: "Alias for `ardi`. Use when asked to 'address-rebut-defer-iterate', 'address rebut defer iterate'."
 user-invocable: true
 allowed-tools:
   - Bash

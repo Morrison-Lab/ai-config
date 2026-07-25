@@ -1,6 +1,6 @@
 ---
 name: "rmc"
-description: "Codex wrapper for the ai-config Claude skill `rmc`. Alias for `resolve-conflicts`. Resolve git merge/rebase/cherry-pick conflicts by consolidating the best of BOTH branches \u2014 understand why each side changed the hunk, then reconstruct a resolution that preserves both intents instead of blindly picking `--ours`/`--theirs`. Use when asked to 'rmc', 'resolve merge conflicts', or when a merge / rebase / cherry-pick / stash pop / revert / pull reports conflicts. Use when Codex is asked to use `rmc`, `/rmc`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `rmc`. Alias for `resolve-conflicts`. Use when asked to 'rmc', 'resolve merge conflicts'. Use when Codex is asked to use `rmc`, `/rmc`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # rmc (Codex wrapper)

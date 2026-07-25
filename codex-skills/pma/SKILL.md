@@ -1,6 +1,6 @@
 ---
 name: "pma"
-description: "Codex wrapper for the ai-config Claude skill `pma`. Alias for `prompt-me-all`. Restate every open question still waiting on user input as a single, clearly numbered list, with no cap. Use when asked to 'pma', 'promptmeall', 'prompt me all', or '/pma'. For just the single most pressing question (or a top N), use `pm` instead. Use when Codex is asked to use `pma`, `/pma`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `pma`. Alias for `prompt-me-all`. Use when asked to 'pma', '/pma'. Use when Codex is asked to use `pma`, `/pma`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # pma (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: remember
-description: "Alias for `memorize`. Persist a fact or preference to memory, routed by relevance to project-specific or general scope. Use when the user says '/remember', 'remember that …', 'from now on …', 'always/never …', or 'note that …'."
+description: "Alias for `memorize`. Use when asked to 'remember', '/remember', 'remember that \u2026'."
 user-invocable: true
 allowed-tools:
   - Read

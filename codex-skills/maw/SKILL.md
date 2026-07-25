@@ -1,6 +1,6 @@
 ---
 name: "maw"
-description: "Codex wrapper for the ai-config Claude skill `maw`. Alias for `mwc`. Grant standing session-scoped permission to merge fully-clean PRs autonomously for the rest of the session, without asking per PR. Use when asked to 'maw', 'merge at will', 'merge when confident', or 'mwc'. Use when Codex is asked to use `maw`, `/maw`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `maw`. Alias for `mwc`. Use when asked to 'maw'. Use when Codex is asked to use `maw`, `/maw`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # maw (Codex wrapper)

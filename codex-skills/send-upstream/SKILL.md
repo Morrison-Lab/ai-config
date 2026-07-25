@@ -1,6 +1,6 @@
 ---
 name: "send-upstream"
-description: "Codex wrapper for the ai-config Claude skill `send-upstream`. Alias for `sup`. File an issue or open a PR on an upstream repo (fork parent, dependency, external project). Use when asked to 'send upstream', 'file upstream issue', 'upstream PR', or 'contribute this fix back'. Use when Codex is asked to use `send-upstream`, `/send-upstream`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `send-upstream`. Alias for `sup`. Use when asked to 'send-upstream'. Use when Codex is asked to use `send-upstream`, `/send-upstream`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # send-upstream (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: merge-at-will
-description: "Alias for `mwc`. Grant standing session-scoped permission to merge fully-clean PRs autonomously for the rest of the session, without asking per PR. Use when asked to 'merge at will', 'maw', 'merge when confident', or 'mwc'."
+description: "Alias for `mwc`. Use when asked to 'merge-at-will'."
 user-invocable: true
 allowed-tools:
   - Bash

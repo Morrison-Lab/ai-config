@@ -1,6 +1,6 @@
 ---
 name: "cdu"
-description: "Codex wrapper for the ai-config Claude skill `cdu`. Alias for `check-dependency-updates`. Audit a repo for stale dependencies and surface available upgrades \u2014 pinned GitHub Actions tags/SHAs, renv.lock versions, pre-commit revs, Quarto/tool versions, submodules. Use when asked to 'cdu', 'check dependency updates', 'audit dependency freshness', 'are my dependencies stale', or 'should I bump the workflow SHAs'. Use when Codex is asked to use `cdu`, `/cdu`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `cdu`. Alias for `check-dependency-updates`. Use when asked to 'cdu'. Use when Codex is asked to use `cdu`, `/cdu`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # cdu (Codex wrapper)

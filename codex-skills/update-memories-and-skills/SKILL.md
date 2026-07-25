@@ -1,6 +1,6 @@
 ---
 name: "update-memories-and-skills"
-description: "Codex wrapper for the ai-config Claude skill `update-memories-and-skills`. Alias for `ums`. Review recent session context for lessons learned, then update memory files and skill definitions. Use when asked to 'update memories and skills', 'record what we learned', or after a workflow reveals a gap. Use when Codex is asked to use `update-memories-and-skills`, `/update-memories-and-skills`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `update-memories-and-skills`. Alias for `ums`. Use when asked to 'update-memories-and-skills'. Use when Codex is asked to use `update-memories-and-skills`, `/update-memories-and-skills`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # update-memories-and-skills (Codex wrapper)

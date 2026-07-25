@@ -1,6 +1,6 @@
 ---
 name: gis
-description: "Alias for gii (Grab Issues Iteratively). Loop over open issues — grab, implement, ARDI to clean, recurse. Stacks MRs when needed. Use when asked to 'gis', 'grab issues serially', or 'work through the backlog'."
+description: "Alias for `gii` (Grab Issues Iteratively). Use when asked to 'gis', 'grab issues serially'. Stacks MRs when needed."
 user-invocable: true
 allowed-tools:
   - Bash

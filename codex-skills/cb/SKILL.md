@@ -1,6 +1,6 @@
 ---
 name: "cb"
-description: "Codex wrapper for the ai-config Claude skill `cb`. Alias for clean-branches. Audit branches \u2014 both local and remote \u2014 delete dead ones, rebase stale ones onto main, open MRs for orphaned work, and sweep up local stragglers. Use when asked to 'cb', 'clean branches', 'prune', or 'prune branches'. Use when Codex is asked to use `cb`, `/cb`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `cb`. Alias for `clean-branches`. Use when asked to 'cb'. Use when Codex is asked to use `cb`, `/cb`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # cb (Codex wrapper)

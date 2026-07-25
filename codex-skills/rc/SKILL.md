@@ -1,6 +1,6 @@
 ---
 name: "rc"
-description: "Codex wrapper for the ai-config Claude skill `rc`. Alias for `resolve-conflicts`. Resolve git merge / rebase / cherry-pick / stash-pop / revert / pull conflicts by consolidating the best of both branches rather than blindly picking `--ours`/`--theirs`. Use when asked to 'rc', 'resolve conflicts', 'resolve the merge conflicts', 'fix the conflicts', or 'consolidate the best of both branches'. Use when Codex is asked to use `rc`, `/rc`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `rc`. Alias for `resolve-conflicts`. Use when asked to 'rc'. Use when Codex is asked to use `rc`, `/rc`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # rc (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "grab-issues-in-parallel"
-description: "Codex wrapper for the ai-config Claude skill `grab-issues-in-parallel`. Alias for `gip` (Grab Issues in Parallel). Grab several provably-independent open issues and work them concurrently \u2014 one worktree-isolated subagent per issue, each implementing its issue, opening a PR, and ARDI-ing it to clean. Use when asked to 'grab issues in parallel', 'work several issues at once', 'parallelize the backlog', or 'do these issues concurrently'. Use when Codex is asked to use `grab-issues-in-parallel`, `/grab-issues-in-parallel`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `grab-issues-in-parallel`. Alias for `gip` (Grab Issues in Parallel). Use when asked to 'grab-issues-in-parallel'. Use when Codex is asked to use `grab-issues-in-parallel`, `/grab-issues-in-parallel`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # grab-issues-in-parallel (Codex wrapper)

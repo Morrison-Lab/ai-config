@@ -1,10 +1,6 @@
 ---
 name: pm
-description: >
-  Alias for `prompt-me`. Surface the single most pressing open question
-  waiting on user input, or the top N with a numeric argument. Use when
-  asked to 'pm', 'pm 3', 'prompt me', 'what are you waiting on me for', or
-  '/pm [N]'. For every open question, use `pma` instead.
+description: "Alias for `prompt-me`. Use when asked to 'pm', 'pm 3', '/pm [N]'."
 user-invocable: true
 allowed-tools: []
 ---

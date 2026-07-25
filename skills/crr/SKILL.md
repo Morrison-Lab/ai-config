@@ -1,6 +1,6 @@
 ---
 name: crr
-description: "Alias for `check-rendered-refs`. Scan rendered output (HTML or a deployed/preview URL) for broken Quarto/pandoc cross-references and citations that leaked into the page as literal `?@key` text (e.g. `?@def-coef-interp-procedure`), a missing citation rendered `**key?**`, or raw `[@key]` syntax. Use when asked to 'crr', 'check rendered refs', 'check for broken crossrefs', or 'scan the HTML for `?@`'."
+description: "Alias for `check-rendered-refs`. Use when asked to 'crr'."
 user-invocable: true
 allowed-tools:
   - Bash

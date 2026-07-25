@@ -1,6 +1,6 @@
 ---
 name: "grab-issue"
-description: "Codex wrapper for the ai-config Claude skill `grab-issue`. Alias for `gi`. Pick the highest-priority open issue, implement it, open an MR/PR, and ARDI to clean. Use when asked to 'grab an issue', 'grab issue', 'pick up the next issue', or 'what should I work on next?' Use when Codex is asked to use `grab-issue`, `/grab-issue`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `grab-issue`. Alias for `gi`. Use when asked to 'grab-issue'. Use when Codex is asked to use `grab-issue`, `/grab-issue`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # grab-issue (Codex wrapper)

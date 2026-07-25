@@ -1,6 +1,6 @@
 ---
 name: crf
-description: "Alias for `convert-repo-format`. Convert a repo from one SERG project format to another — R package, Quarto website, Quarto book, or Quarto manuscript — using the lab's template repos (`rpt`, `qwt`, `qbt`, `qmt`) as the source of truth. Use when asked to 'crf', 'convert repo format', 'convert this repo to a <format>', or 'change this repo's project type'."
+description: "Alias for `convert-repo-format`. Use when asked to 'crf'."
 user-invocable: true
 allowed-tools:
   - Bash

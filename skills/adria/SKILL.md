@@ -1,6 +1,6 @@
 ---
 name: adria
-description: "Alias for `ardia` (common transposition typo). Apply ARDI to every open PR/MR in the repo — drive each to a clean review verdict. Use when asked to 'adria', 'drive all MRs to clean', or 'iterate all PRs'."
+description: "Alias for `ardia` (common transposition typo). Use when asked to 'adria'."
 user-invocable: true
 allowed-tools:
   - Bash

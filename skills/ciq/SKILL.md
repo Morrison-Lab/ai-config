@@ -1,6 +1,6 @@
 ---
 name: ciq
-description: "Alias for `check-info-quality`. Scan a target for stale, irrelevant, and misleading/out-of-context information and propose fixes. Use when asked to 'ciq', 'check info quality', or 'audit this for information quality'."
+description: "Alias for `check-info-quality`. Use when asked to 'ciq'."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "clear-all"
-description: "Codex wrapper for the ai-config Claude skill `clear-all`. Alias for `gia` (Grab Issues + iterate-All). Clear the repo's entire work queue: open a PR for every open issue that lacks one, and drive every open PR to a clean review verdict with green CI. Use when asked to 'clear-all', 'clear all the work', 'clear everything', 'open PRs for all the issues and drive them clean', 'open a PR for every issue and make every PR green', or 'clear the whole queue'. Use when Codex is asked to use `clear-all`, `/clear-all`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `clear-all`. Alias for `gia` (Grab Issues + iterate-All). Use when asked to 'clear-all', 'clear all the work', 'clear everything', 'open PRs for all the issues and drive them clean', 'open a PR for every issue and make every PR green'. Use when Codex is asked to use `clear-all`, `/clear-all`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # clear-all (Codex wrapper)

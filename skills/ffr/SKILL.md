@@ -1,6 +1,6 @@
 ---
 name: ffr
-description: "Alias for `fix-forward-references`. Detect and fix forward references in prose — a cross-reference or phrase ('see below', 'as discussed below') that points a reader ahead to content they haven't reached yet — by rearranging the document or rewording the reference. Use when asked to 'ffr', 'fix forward references', or 'check for forward references'."
+description: "Alias for `fix-forward-references`. Use when asked to 'ffr'."
 user-invocable: true
 allowed-tools:
   - Bash

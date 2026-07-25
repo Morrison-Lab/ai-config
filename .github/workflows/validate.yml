@@ -24,9 +24,7 @@ jobs:
       - name: Check markdown (.md) style
         run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
       - name: Run semantic-line-break tool tests
-        run: |
-          python3 scripts/test_slb.py
-          python3 scripts/test_check_new_line_breaks.py
+        run: python3 scripts/test_slb.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
       - name: Check for oversized memory files (advisory)
@@ -36,14 +34,20 @@ jobs:
         # unrelated PR. See the script's docstring for the threshold's
         # rationale.
         run: python3 scripts/check-memory-file-size.py
-      - name: Check new markdown lines for missing semantic breaks (advisory)
-        # Diff-scoped, non-blocking (ai-config#682): MD013 is off repo-wide
-        # (see .markdownlint-cli2.jsonc) because most of the corpus has
-        # drifted from the last semantic-line-breaks reformat. This only
-        # flags lines this PR itself adds, so it can't reflag that drift.
-        if: github.event_name == 'pull_request'
-        run: |
-          git fetch --depth=1 origin ${{ github.event.pull_request.base.sha }}
-          python3 scripts/check-new-line-breaks.py --base ${{ github.event.pull_request.base.sha }}
       - name: Check Quarto (.qmd) prose style
         uses: d-morrison/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
+
+  new-line-breaks:
+    # Diff-scoped, non-blocking (ai-config#682, ported to gha#300): MD013 is
+    # off repo-wide (see .markdownlint-cli2.jsonc) because most of the corpus
+    # has drifted from the last semantic-line-breaks reformat. This only
+    # flags lines a PR itself adds, so it can't reflag that drift.
+    #
+    # No event_name guard: the reusable workflow's own base-ref input
+    # (github.event.pull_request.base.sha on PRs, '' otherwise) already
+    # makes a non-PR run (e.g. push to main) skip cleanly rather than
+    # scanning the whole tree -- see check-new-line-breaks.yml gha#300.
+    uses: d-morrison/gha/.github/workflows/check-new-line-breaks.yml@209bfb76bd412aa10d4d56a809d791a6dc8f10df # v2, gha#300
+    with:
+      globs: '**/*.md'
+      paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'

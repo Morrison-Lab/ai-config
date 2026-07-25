@@ -1,6 +1,6 @@
 ---
 name: "prune"
-description: "Codex wrapper for the ai-config Claude skill `prune`. Alias for `clean-branches` (aka `cb`). Audit branches in the current repo \u2014 both LOCAL and REMOTE \u2014 deleting dead ones, rebasing stale-but-alive ones onto main, and opening MRs for orphaned work, without disrupting active sessions. Use when asked to 'prune', 'prune branches', 'clean branches', or 'tidy up branches'. Use when Codex is asked to use `prune`, `/prune`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `prune`. Alias for `clean-branches` (aka `cb`). Use when asked to 'prune', 'prune branches'. Use when Codex is asked to use `prune`, `/prune`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # prune (Codex wrapper)

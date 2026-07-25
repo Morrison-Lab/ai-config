@@ -1,6 +1,6 @@
 ---
 name: "dtc"
-description: "Codex wrapper for the ai-config Claude skill `dtc`. Alias for `delegate-to-codex`. Delegate heavy read/draft/verify work to the `codex` CLI before spending Claude quota \u2014 build prompts, run codex read-only, orchestrate multi-item work via a background runner + DONE-marker poll, fall back to Claude only for what codex can't finish. Use when asked to 'dtc', 'delegate to codex', 'use codex', 'run this on codex', 'codex-first', 'do this with codex', or 'offload to codex'. Use when Codex is asked to use `dtc`, `/dtc`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `dtc`. Alias for `delegate-to-codex`. Use when asked to 'dtc'. Use when Codex is asked to use `dtc`, `/dtc`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # dtc (Codex wrapper)

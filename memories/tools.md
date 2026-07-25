@@ -88,9 +88,18 @@ these.
 - **`claude-alloc` / `codex-alloc` run agent sessions in a SLURM slice**, never
   compute on the login node directly (`claude-alloc` = Claude Code, `codex-alloc`
   = Codex CLI). Both wrap `~/bin/tui-alloc` (`~/bin` is on PATH via `~/.zshrc`).
-  - Defaults: 8 hwthreads (4 physical cores), `--mem=32G`, `--time=12:00:00`,
+  - Defaults: 8 hwthreads (4 physical cores), `--mem=32G`, `--time=24:00:00`,
     `--exclude=c1` (the GPU node). Override per-launch with `ALLOC_CPUS`,
-    `ALLOC_MEM`, `ALLOC_TIME`.
+    `ALLOC_MEM`, `ALLOC_TIME`. The walltime default was 12h until 2026-07-24
+    and was too short (it expired mid-session, killing the agent and every
+    in-slice background watcher); raised to 24h. The limit is a courtesy
+    choice, not a cluster constraint (`normal` reports `MaxTime=UNLIMITED`).
+  - **A running slice cannot be extended:** `scontrol update jobid=<id>
+    TimeLimit=...` is denied for a normal user (only operators may raise a
+    limit), so a slice keeps its launch-time walltime for its whole life ---
+    plan it up front. Anything inside the slice dies with it; a detached
+    `sbatch` job does not, which is why heavy compute goes out as a batch job
+    and a long watch loop should be re-armed after a restart.
   - **Always set `--mem`** (the launchers do): the `normal` partition uses
     `CR_CORE_MEMORY` with `DefMemPerNode=UNLIMITED`, so omitting `--mem` grabs the
     node's whole ~772G and locks everyone else out.
@@ -101,6 +110,19 @@ these.
     (`/exit`) to drop to the allocation shell (slice still held), then `exit` the
     shell to release the slice. Force-release with `scancel $SLURM_JOB_ID`; check
     for a forgotten slice with `squeue -u $USER` (job name `claude`/`codex`).
+  - **When your own array jobs saturate the cluster:** `~/bin/yield-array
+    <arrayjobid>` temporarily lowers that array's `ArrayTaskThrottle` to free
+    a slot, launches the session (default `claude-alloc`), then restores the
+    throttle on clean exit --- but NOT on a hard kill / walltime death, so undo
+    manually with `scontrol update jobid=<id> ArrayTaskThrottle=<orig>`.
+  - **zsh must live on the shared filesystem, not just the login node.**
+    `tui-alloc` runs `zsh -i` inside the srun step; zsh is at `/usr/bin/zsh` on
+    the login node but is NOT provisioned on every compute node (confirmed
+    missing on c2), so a slice landing there died with exit 127
+    (`env: 'zsh': No such file or directory`). Fixed by installing a
+    shared-`/home` zsh all nodes see via PATH (`conda install -n base -c
+    conda-forge zsh` -> `~/miniconda3/bin/zsh`); `tui-alloc` also guards by
+    dropping to `bash -i` if zsh isn't resolvable on the node.
   - Full usage/exit doc: `~/.config/tui-alloc/README.md`.
 
 ## Fact-check code comments' factual claims — a false one can survive many review rounds

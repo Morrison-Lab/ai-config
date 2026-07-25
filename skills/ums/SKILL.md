@@ -53,8 +53,7 @@ committed pass.
    - Is it a **skill update**? (workflow step missing, procedure unclear)
    - Is it a **memory note**? (tool quirk, preference, debugging insight)
    - Is it **both**? (general guidance → update skill AND preferences)
-   - Is it already recorded? (grep before writing, per step 3 -- avoid
-     duplicates)
+   - Is it already recorded? (grep before writing -- avoid duplicates)
    - Is it **cross-project or project-specific**? (`memories/preferences.md`'s
      "Memory and skill storage" rule: cross-project lessons commit to
      `d-morrison/ai-config`; a convention/gotcha tied to one repo we own

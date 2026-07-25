@@ -83,3 +83,27 @@ fragment file, before considering a fragment fix complete. (`ai-config#507`:
 fixing `forward-references.md`'s regex left `fix-forward-references/SKILL.md`'s
 own `description` field and Step 2 summary describing the old, already-fixed
 approach --- caught in a second review round.)
+
+**A bot that re-raises an item as "not addressed" may simply not have seen
+your reply --- check the timestamps before treating it as an impasse.** An
+automated reviewer gathers the PR's comments once, when its run starts. A
+rebuttal posted after that snapshot is invisible to it, so the next round
+reports the item as still open and unaddressed even though a substantive
+reply is sitting in the thread. The tell is a re-raise that repeats the
+original finding verbatim and speaks only to whether the *code* changed,
+without engaging any argument you made. Before escalating, compare your
+reply's timestamp against the review run's `started_at`: if the reply landed
+after the run began, it is a stale re-raise, not a genuine disagreement.
+Reply once pointing at the earlier rebuttal (link it directly --- the next
+run will see it), and don't count that round toward the
+rebuttal-didn't-convince-them test in `fully-clean.md`.
+
+The ordering fix is cheap: when a round is Rebut-only, post the rebuttal
+**before** anything that triggers the next review (a push, an `@claude`
+mention), so it is in the snapshot the next run reads. When a round mixes
+Address and Rebut, post the rebuttals first and push the code second, for
+the same reason. (d-morrison/altdoc#34: a `\pkg{}` rendering rebuttal
+carrying a `pandoc` run that disproved the finding's implied hazard was
+posted about a minute before the follow-up review job started; that review
+reported the item "wasn't addressed in `9398d5d`" and re-posted the
+identical suggestion.)

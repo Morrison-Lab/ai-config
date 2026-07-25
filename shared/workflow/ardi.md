@@ -67,3 +67,38 @@ churning on a claim you already know is wrong. ([d-morrison/rme#989](https://git
 share `CLAUDE.md`'s union-merge corruption risk, a follow-up merge
 simulation showed it does --- posted the correction with repro steps on
 both PRs before either reviewer re-raised it.)
+
+**When the change affects downstream consumers, validate it against a real
+consumer repo before reporting the PR ready --- a package's own test
+fixtures are built to exercise its code, not to resemble the packages that
+will actually use it.**
+Fixtures are minimal by construction and tend to share one shape, so whole
+branches of new code can be structurally unreachable from them. A real
+consumer brings the input variety fixtures lack, and it is usually one clone
+plus one command to check.
+
+Three classes of gap this catches, none of them findable in a fixture:
+
+- **Input shapes no fixture happens to contain.** A real package carries
+  metadata the fixtures never needed --- an entry of a different kind, an
+  extra tag, an unusual name --- so a branch written for it has never
+  actually run on real input.
+- **Message formatting under real counts.** Fixtures usually trip the plural
+  path; a real repo hitting the same code with exactly one item exercises
+  the singular wording, which no test asserted.
+- **The migration/upgrade path, as opposed to the fresh-install path.**
+  This is the one fixtures can never reach: a fixture is created new by the
+  test, so it always gets the current templates. An existing consumer has
+  the *old* config, and whether the feature reaches it at all is a different
+  question from whether it works. Verify the claim in the changelog by
+  running the documented migration step, rather than describing it.
+
+Do it against a throwaway copy and push nothing to the consumer; the
+deliverable is evidence in the PR, not a change there. Record what the run
+covered in a PR comment, so a reviewer can see which paths real input
+reached. (d-morrison/altdoc#34: running the new reference-index generator
+against `d-morrison/rpt` covered a `\docType{package}` topic, the singular
+form of a missing-topic warning, and the documented "existing settings files
+do not pick this up automatically" caveat --- confirmed by the page
+generating while `grep -c reference.html docs/index.html` returned `0`. None
+of the three were reachable from the repo's own fixture packages.)

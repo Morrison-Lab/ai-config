@@ -456,7 +456,7 @@ If everything is boxed, the box stops meaning "look here," so keep it reserved.
   - 🔀 **MERGE ORDER** --- several PRs are ready,
     and merging them in the wrong order would produce a wrong result.
     Labeled with a markdown heading rather than bold text;
-    see "Why 🔀 MERGE ORDER works the way it does" below.
+    see the "Why 🔀 MERGE ORDER works the way it does" section.
 - **Prefixed, no box** — informational and frequent, so a bold label with the emoji is enough:
   - 📊 **UPDATE** — status or progress.
   - ⚠️ **FLAG** — a non-blocking heads-up or risk.

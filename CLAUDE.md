@@ -107,7 +107,7 @@ Boxed (a `===` line above and below the labeled block):
   since a heading is the only "large font" lever a terminal has.
   List the PRs in the order to merge, each linked per "Link PRs in tables" above,
   naming what each one's position depends on.
-  See "Surface merge-order constraints" below for the PR-side and draft-gating surfaces.
+  The PR-side and draft-gating surfaces live in the "Surface merge-order constraints" section.
 
 Prefixed, no box (informational, frequent):
 

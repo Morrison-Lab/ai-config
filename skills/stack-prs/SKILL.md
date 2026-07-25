@@ -102,7 +102,10 @@ session) as `<base-branch>` — never guess the branch name from the PR title.
 ### 2. Open the dependent PR with `base` set to the base branch
 
 ```bash
-gh pr create --base <base-branch> --title "<title>" --body "Stacked on #<base-N> --- merge that first.
+gh pr create --base <base-branch> --title "<title>" --body "> [!IMPORTANT]
+> Merge #<base-N> first --- this PR is stacked on its branch.
+
+Stacked on #<base-N>.
 
 <description>"   # CREATE_PR
 ```
@@ -113,15 +116,15 @@ with `base: "<base-branch>"`. Note the dependency explicitly in the body
 at a glance (`ardia`'s own stacking detection uses `baseRefName`, not the body
 text — see below).
 
-A stack is the archetypal merge-order constraint, so raise it the way
-`CLAUDE.md`'s "Surface merge-order constraints" section prescribes rather than
-leaving it to the plain `Stacked on #<base-N>` line: lead the dependent PR's
-body with a `> [!IMPORTANT]` alert naming the prerequisite, and report the
-order in chat under the boxed `### 🔀 MERGE ORDER` marker. Skip that section's
-third surface, draft-gating, here --- `base` already points at the base
+A stack is the archetypal merge-order constraint, which is why the body leads
+with the `> [!IMPORTANT]` alert `CLAUDE.md`'s "Surface merge-order
+constraints" section prescribes: the plain `Stacked on #<base-N>` line reads
+as ordinary prose on a crowded PR page, and the alert does not. Report the
+order in chat under that section's boxed `### 🔀 MERGE ORDER` marker too.
+Skip its third surface, draft-gating --- `base` already points at the base
 branch, so GitHub cannot merge this PR into `main` out of order in the first
-place. The alert and the marker exist for the human's reading order, not to
-enforce a constraint the stack itself already enforces.
+place. The alert and the marker serve the human's reading order; they aren't
+enforcing a constraint the stack itself already enforces.
 
 If the dependent work is being opened up front per
 [`pr-on-claim`](../../shared/workflow/pr-on-claim.md), open it as a draft from

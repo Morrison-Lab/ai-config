@@ -527,6 +527,29 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   covers the read). It's a flake (passes most runs), so a red
   `lint-changed-files` with no R lint output and a `gh_error`/`rate limit`
   traceback is this, not a code problem. (UCD-SERG/serocalculator#503, 2026-07.)
+- **The same `lint-changed-files` shape has two silent blind spots that make a
+  green run weaker evidence than it looks --- both absent from
+  `lint-changed-lines`.** Neither produces an error; the check just passes
+  without having looked.
+  1. **Unpaginated `gh::gh()` reads only the first 30 changed files.** The
+     `/pulls/{n}/files` endpoint defaults to 30 per page and `gh::gh()` doesn't
+     follow `Link: rel="next"` unless asked, so on a larger PR every file past
+     the 30th lands in the `setdiff(all_files, changed_files)` **exclusion**
+     list.
+     Fix: pass `.limit = Inf`.
+  2. **`lintr::lint_package()` never scans repository-root scripts.** It covers
+     `R/`, `tests/`, `inst/`, `vignettes/`, `data-raw/`, and `demo/` --- so a
+     root-level `app.R` (a Shiny launcher, a deploy script) is unreachable no
+     matter how the exclusion list comes out.
+  `lint-changed-lines` computes its file set from the git diff, so it has
+  neither cutoff --- an independent argument for the branch-protection switch
+  beyond the incremental-adoption one. Don't treat a local
+  `lint_package()` run as equivalent to CI in either direction.
+  (UCD-SERG/serocalculator#392, 2026-07-25: a 38-file PR silently skipped 8
+  files, missing two real `line_length_linter` hits in its own new test file;
+  `lint-changed-lines` separately caught an `undesirable_function_linter` hit
+  in root `app.R` that a local `lint_package()` had reported clean.
+  Filed as UCD-SERG/serocalculator#608.)
 
 ## jarl (Just Another R Linter) — `jarl.toml` fields lag the published docs
 - `jarl` (`etiennebacher/jarl`, installed via `etiennebacher/setup-jarl@vX` in
@@ -642,6 +665,38 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `\usage{}` section shows `.helper_default()` verbatim — which is confusing to users
   copy-pasting the signature. Inline the literal value directly in the function
   signature instead. (d-morrison/altdoc#30.)
+
+## altdoc keeps its reference topics in TWO hand-maintained lists
+
+An altdoc site lists each reference topic in two independent places, neither
+generated from the other:
+
+1. `altdoc/reference.qmd` --- the "Package index" page body.
+2. the `Reference` section of `altdoc/quarto_website.yml` --- the sidebar nav.
+
+Adding a function to one and not the other renders perfectly cleanly: the
+topic shows on the index page but is unreachable from navigation (or the
+reverse). No check catches it --- not `docs-check`, not the docs build, not
+lint. The pkgdown -> altdoc migration makes this especially easy to hit,
+since the old `pkgdown/_pkgdown.yml` held a *single* reference list, so
+porting entries off it naturally updates only one of the two successors.
+
+Cross-check mechanically rather than by eye
+(the [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)
+rule): extract `](man/<topic>.qmd)` from `reference.qmd` and `- man/<topic>.qmd`
+from `quarto_website.yml`, assert an empty symmetric difference, and assert a
+backing `man/<topic>.Rd` exists for every entry. A stricter version flags
+exported functions in `NAMESPACE` that appear in neither list.
+
+To verify against the *rendered* output, count occurrences of a topic name in
+the built `reference.html`: an established topic appears **3** times (sidebar
+entry + index link + index text), a sidebar-missing one only **2**.
+
+(`UCD-SERG/serocalculator#392`, 2026-07-25: six new decay-curve topics were
+ported into `reference.qmd` only; caught before merge, fixed, and confirmed
+2 -> 3 occurrences each in the deployed preview.
+`UCD-SERG/serocalculator#610` proposes the cross-check as CI, possibly
+belonging in `d-morrison/gha` since every altdoc repo shares the structure.)
 
 ## Quarto HTML sites (build & layout gotchas)
 Hit while adding a mobile within-chapter TOC to `d-morrison/rme` (#929); apply to

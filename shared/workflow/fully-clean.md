@@ -30,6 +30,21 @@ including gaining its own independent addition that collides with yours
 --- so re-verify the branch still merges cleanly against current `main`
 before reporting a PR ready, not just trust the last green run.
 
+**Re-check version parity in that same sweep, not only conflict-freedom.**
+[`sync-with-main`](sync-with-main.md) already covers comparing `DESCRIPTION`
+versions *after merging `main` in*.
+The case that rule misses is the one with no merge at all: `main` advances on
+its own after your last review round and lands on the branch's exact version,
+so an R package's `version-check` job (which requires the branch to *exceed*
+`main`) goes from green to red with nothing to point at.
+There is no conflict, no failing check yet, and no warning --- the last run
+passed because `main` was still a version behind when it ran.
+So the declare-ready sweep needs both `git merge-tree` for conflicts and a
+direct version comparison; either one alone reports a PR ready that isn't.
+(`UCD-SERG/serocalculator#392`, 2026-07-25: the final pre-declaration check
+found `main` had reached `1.4.1.9016`, exactly the branch's version, minutes
+after a clean `Ready for merge` verdict on an otherwise all-green head.)
+
 **Threads:** at fully-clean, every **inline** review thread is resolved, and the only conversation left open is the final all-clear exchange --- the reviewer's all-clear comment and your reply to it. (The all-clear is usually a top-level PR comment, not an inline thread.)
 Check this mechanically rather than from a memory of which threads you
 replied to. Which field name to look for depends on the surface: the GitHub
@@ -73,3 +88,10 @@ Three consequences for driving a PR to fully clean:
 
 The mechanics of detecting a refusal (it arrives as a posted review, not an API error, so the request call's success proves nothing) are in [`memories/github.md`](../../memories/github.md)'s GitHub MCP tools section.
 (`ucdavis/rampp#111`, 2026-07-24/25: Copilot refused three times across two heads for quota while `claude-review` posted genuine verdicts at both; the PR was reported clean --- and merged --- on `claude-review`'s verdict, with Copilot's absence stated in the ready-for-merge comment rather than papered over.)
+
+**A sixth case runs the other way from all five above: the review is genuine and complete, but the workflow posts the reviewer's own tool invocation instead of the review body.**
+The comment opens with a literal `gh pr comment <N> --repo <owner>/<repo> --body "$(cat <<'EOF'` and closes with `EOF\n)"`, wrapping a real, correct verdict as unrendered text --- the model emitted a shell command as its final response and the workflow posted that string verbatim.
+Nothing is lost, and the same body usually also lands as a properly-rendered sibling comment, so the PR carries the review twice.
+Two reasons not to shrug at it: a comment opening with a raw `gh` invocation reads as a broken run, so a human is likely to discount a review that actually passed; and a verdict-detecting guard script (`check-review-execution.sh`) is now matching against a shell command rather than prose, which can misfire into a needless stub-retry and a second full review's cost.
+Read the body and extract the verdict from inside the heredoc rather than re-triggering.
+(`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`d-morrison/gha#312`](https://github.com/d-morrison/gha/issues/312), which proposes unwrapping the pattern before posting.)

@@ -421,10 +421,15 @@ are all empty (so there's no annotation to read either).
 The cause is a **job-level `concurrency:` group that resolves to the same
 string as the workflow-level one**.
 Per the Actions docs
-([`jobs.<job_id>.concurrency`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idconcurrency))
+([`jobs.<job_id>.concurrency`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idconcurrency)),
 "there can be at most one running job or workflow in a concurrency group at
 any time" -- the workflow run already holds the group, so its own job can
 never acquire it and is failed immediately.
+That sentence is verbatim from `data/reusables/actions/actions-group-concurrency.md`
+in `github/docs`, the fragment both concurrency pages include.
+It sits in that fragment's `{% ifversion actions-nga %}` branch; the `{% else %}`
+branch reads "at most one running and one pending job" instead, which supports
+the same deadlock, since only the at-most-one-*running* half is load-bearing here.
 Nothing in the docs calls this deadlock out explicitly,
 so it has to be recognized from the signature.
 

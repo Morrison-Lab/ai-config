@@ -28,13 +28,13 @@ written in prose; this one fact-checks the logic embedded in code itself.
   the same check on the way out.** When a function rescales an input (e.g.
   years → days) so it's dimensionally consistent with some internal
   computation, any of that rescaled value that gets returned or reused
-  downstream needs converting back — otherwise fixing the input-side mismatch
+  downstream needs converting back --- otherwise fixing the input-side mismatch
   just moves the same bug to the output side. Check every quantity the
   rescaling touches, not just the one the original bug report named.
   (serocalculator#552: fixing a day/year mismatch on a function's *input*
   correctly rescaled an `age_range` parameter before use, but the resulting
-  `age` column — derived from that same rescaled range — was returned
-  unconverted, so it shipped ~365× too large; caught by a follow-up review
+  `age` column --- derived from that same rescaled range --- was returned
+  unconverted, so it shipped ~365x too large; caught by a follow-up review
   round, not the same pass that fixed the input side.)
 - **Math and statistics embedded in code.** When code implements a formula,
   statistical test, or model, verify it against its source (a paper, a
@@ -43,6 +43,52 @@ written in prose; this one fact-checks the logic embedded in code itself.
   formula is right because the code compiles and runs. Re-derive or
   spot-check by hand, or construct a small worked example with a known
   answer and compare it against the code's output.
+
+## Check tests the same way, especially for assertions that cannot fail
+
+A test is code, so it gets the same correctness scrutiny as the code it
+guards --- and it has a failure mode of its own: **a vacuous assertion**,
+one that passes no matter what the implementation does. That is worse than
+no test, because it reads as coverage in a diff and in a coverage report.
+
+The common shape is an assertion over a collection that the test also
+expects to be empty. In R, `any(logical(0))` is `FALSE` and
+`all(logical(0))` is `TRUE`, so both of these always pass when `out` is
+`character(0)`:
+
+```r
+expect_false(any(grepl("bad", out)))
+expect_true(all(nzchar(out)))
+```
+
+The same trap exists everywhere: a loop-based check over an empty list, a
+`for` assertion with no iterations, a filter that matches nothing before
+the assertion runs. Python's `all([])` is `True` for the same reason.
+
+Two ways out, in order of preference:
+
+1. **Give the assertion real content to run against**, so it actually
+   evaluates --- add an element to the input that survives to the output.
+   This keeps the check and makes it meaningful.
+2. **Delete it**, when a sibling assertion already covers every failure
+   mode it was meant to catch. A redundant assertion is not harmful, but a
+   vacuous one misleads.
+
+**Then prove the test fails against the unfixed code.** Temporarily revert
+the fix (or introduce the specific defect the test targets), confirm the
+test fails with the message you expect, and restore. A test written after
+the fix has never once been observed failing, so nothing yet establishes
+that it can. Quote the observed failure in the PR --- it converts "I added a
+test" into evidence.
+
+In review, flag an assertion whose expected value makes it unfalsifiable,
+and ask for the failing-run evidence when a PR claims a test covers a
+specific regression. (d-morrison/altdoc#43: an ordering-constraint test
+asserted `expect_false(any(grepl("_GITHUB", out)))` while also expecting
+`out` to be `character(0)`, so it could never fail; fixed by adding an
+input line that survives substitution, then verified by swapping the two
+source lines into the wrong order and watching both assertions fail on the
+resulting `"* [GitHub](_GITHUB)"` residue.)
 
 ## What to report
 

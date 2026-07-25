@@ -666,7 +666,7 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   copy-pasting the signature. Inline the literal value directly in the function
   signature instead. (d-morrison/altdoc#30.)
 
-## altdoc keeps its reference topics in TWO hand-maintained lists
+## altdoc keeps its reference topics in two independent hand-maintained lists
 
 An altdoc site lists each reference topic in two independent places, neither
 generated from the other:

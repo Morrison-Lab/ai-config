@@ -66,4 +66,5 @@ run the CLI command. Full per-model reference: [tool-mappings.md](../../tool-map
 | `CREATE_BRANCH` | Create a new branch (e.g. off the default branch). | `git switch -c <branch> origin/<base>` | `mcp__github__create_branch` |
 | `DELETE_REF` | Delete a remote branch or tag ref. | `git push origin --delete <branch> (or git push origin :refs/tags/<tag>)` | (no GitHub MCP tool; use gh api -X DELETE repos/<owner>/<repo>/git/refs/heads/<branch>) |
 | `READ_FILE` | Read a file's contents from the repo. | `gh api repos/<owner>/<repo>/contents/<path>` | `mcp__github__get_file_contents` |
+| `LIST_COMMITS` | List a branch's commits (pass the branch or ref as sha, e.g. sha=gh-pages to see which build a Pages branch currently serves). | `git log <branch> (or gh api repos/<owner>/<repo>/commits -f sha=<branch>)` | `mcp__github__list_commits` |
 | `WRITE_FILE` | Create or update file(s) on a branch in a single commit. | `git add <path> && git commit -m "..." && git push` | `mcp__github__create_or_update_file (one file) / mcp__github__push_files (multiple)` |

@@ -544,9 +544,11 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     that file rather than reading it whole, and diff byte counts across two
     fetches to confirm you're looking at a genuinely new build rather than an
     unchanged one. Check the branch's own commit log
-    (`mcp__github__list_commits` with `sha: gh-pages`) to see which build is
-    actually deployed before drawing conclusions; a preview comment's
-    timestamp can precede the deploy of the commit you care about.
+    (`mcp__github__list_commits` with `sha: gh-pages` --- the `LIST_COMMITS`
+    operation in [`tool-mappings.md`](../tool-mappings.md), verified by use in
+    the session below) to see which build is actually deployed before drawing
+    conclusions; a preview comment's timestamp can precede the deploy of the
+    commit you care about.
     (`UCD-SERG/serocalculator#392`, 2026-07-25: used this to verify six new
     topics appeared in a rendered altdoc sidebar, counting occurrences
     before and after the fix, after both `curl` and `WebFetch` 403'd.)

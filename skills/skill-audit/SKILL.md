@@ -89,7 +89,7 @@ found so the reader knows the window, not just today's date.
    ls -d skills/*/ | xargs -n1 basename
    ```
    For each, read its `SKILL.md` frontmatter to tell alias stubs (body reads
-   "This is a spelled-out alias... → **[<canonical>](../<canonical>/SKILL.md)**")
+   `"This is a spelled-out alias... → **[<canonical>](../<canonical>/SKILL.md)**"`)
    from canonical skills, and note which canonical each alias redirects to.
 
 2. **Gather the usage signal.** Grep every local transcript for `Skill` tool

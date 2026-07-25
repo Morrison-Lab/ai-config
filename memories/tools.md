@@ -267,6 +267,24 @@
   single `pull_request_read` `get` compared against that SHA — would have
   settled it in one call. See
   [`efficient-pr-babysitting`](../shared/workflow/efficient-pr-babysitting.md).)
+- **`mcp__github__actions_list` (`list_workflow_runs`) returns a full repository
+  object per run -- budget accordingly, and prefer a cheaper call.** Each run in
+  the response carries `repository`, `head_repository`, `actor`, and
+  `triggering_actor` in full, so even `per_page: 1` runs ~30-60KB and a
+  `per_page: 3` call costs several thousand tokens; a large enough response
+  blows the tool-output cap and gets spilled to a file instead of returned.
+  When the question is "did CI/the review run, and how did it end",
+  `pull_request_read` `get_check_runs` answers it for a fraction of that, and
+  `actions_get` `get_workflow_run` (a single run by ID) is the right call when
+  you need one run's event/trigger/conclusion. Reserve `list_workflow_runs` for
+  when you genuinely need to enumerate runs the check-runs view can't see -- the
+  `action_required`/zero-job case in
+  [`fully-clean`](../shared/workflow/fully-clean.md) -- and when a call has
+  already spilled to a file, parse that file
+  (`python3 -c "json.load(...)"`) rather than re-listing.
+  (ai-config#687, 2026-07-24:
+  a two-run `list_workflow_runs` call to check whether a draft PR's review had
+  fired cost ~6k tokens; `get_check_runs` gave the same answer.)
 - **`gh pr view --json checks` is not a valid field.** When you need the
   combined status/check rollup from `gh pr view`, ask for `statusCheckRollup`
   instead; when you need the actual CI conclusions, use `gh pr checks` or the
@@ -1658,6 +1676,24 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   action" below), even though the PR's own review had already gone clean.
   It self-resolved with an "Acknowledge @claude mention" no-op rather than
   making any change, but still cost a wasted agent run.)
+  **The vector is not limited to comments: an issue's own body or title
+  matches too, via the `issues` trigger.** `claude.yml`'s job gate for the
+  `issues` event checks `contains(github.event.issue.body, ...)` /
+  `contains(..., .title, ...)` with the same formatting-blind substring match,
+  so **filing** an issue that merely discusses the bot dispatches a full agent
+  run -- the worst case of the four, because an issue is the artifact most
+  likely to *describe* the bot rather than address it, and because
+  `eager-pr: true` makes that run open a branch and a draft PR before doing
+  any work. Prevention on the caller side: don't list `opened` in the
+  `issues:` trigger types. `ai-config`'s `claude-bot.yml` now uses
+  `types: [assigned]` for exactly this reason (#686/#687) -- the agent runs
+  only when deliberately summoned. Note the gate treats `assigned` the same
+  way, so bare assignment is not itself sufficient; the issue text must still
+  contain the mention. (Fourth instance, ai-config#682 -> #683, 2026-07-24: an
+  issue proposing a markdown line-length check said "like the `@claude`
+  reviewer already can" inside a code span; the run opened #683, worked ~8
+  minutes, then died at the push step on the `WORKFLOW_TOKEN` gap, losing the
+  work.)
 - **Dispatched reviews now post a PR comment (gha#89, now in `v1`).** Before this fix,
   `workflow_dispatch` runs wrote output to the step summary only —
   `github.event.pull_request.number` is null for dispatch events, so the action's
@@ -2223,12 +2259,6 @@ common patterns.
   fix as two patch files since every write 403'd; the user filed their own
   issue/PR with a different fix for the same root cause and merged that
   instead.)
-- **`mcp__github__actions_list` / `list_workflow_runs` returns HUGE objects**
-  (full repo metadata embedded per run, ~30-60KB even at `per_page: 1`), which
-  blows the tool-output cap and gets saved to a file. To read a run's
-  status/conclusion cheaply, prefer `actions_get` (`get_workflow_run`, single
-  object) or parse the saved file with `python3 -c "json.load(...)"`; don't keep
-  re-listing.
 - **Input-forwarding checklist when adding an input to a gha composite action.**
   Adding a new `inputs:` entry to `<name>/action.yml` requires four coordinated updates:
   1. Expose it in the wrapping reusable workflow (`.github/workflows/<name>.yml`) under

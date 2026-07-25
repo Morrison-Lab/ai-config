@@ -285,6 +285,14 @@ add a review gate for the cases that need one.
 - ❌ `git add -A` — it sweeps unrelated in-flight edits (the user's work, other
   draft skills) into your commit/PR. Stage the specific files you touched.
 - ❌ Creating `memories/repo/<repo>.md` for any repo — this pattern is retired.
+  Put repo-specific lore in the repo's own agent docs (`.github/agents/`,
+  `CLAUDE.md`, `.github/instructions/`, `.github/copilot-instructions.md`, or
+  checked-in `.claude/memories/`) via a PR;
+  if the repo has no agent-doc infrastructure yet, this session's own local
+  project-memory mechanism (Claude Code: `~/.claude/projects/<project-path>/memory/`
+  — substitute the equivalent for a non-Claude agent) is short-lived staging
+  only — hand off that a PR adding those agent docs is still required. See the checklist
+  item above and `memories/preferences.md` for the full rule.
 - ❌ Naming a tool, flag, or API identifier that appears **nowhere else in the
   corpus** without anchoring it somewhere checkable. A lone mention reads
   identically whether it is correct or hallucinated, so a later session has
@@ -296,14 +304,6 @@ add a review gate for the cases that need one.
   evidence dies with the session. (ai-config#727: `mcp__github__list_commits`
   was flagged in review as unanchored; it was genuinely verified by use, and
   the fix was registering it as the `LIST_COMMITS` operation.)
-  Put repo-specific lore in the repo's own agent docs (`.github/agents/`,
-  `CLAUDE.md`, `.github/instructions/`, `.github/copilot-instructions.md`, or
-  checked-in `.claude/memories/`) via a PR;
-  if the repo has no agent-doc infrastructure yet, this session's own local
-  project-memory mechanism (Claude Code: `~/.claude/projects/<project-path>/memory/`
-  — substitute the equivalent for a non-Claude agent) is short-lived staging
-  only — hand off that a PR adding those agent docs is still required. See the checklist
-  item above and `memories/preferences.md` for the full rule.
 - ❌ Inserting a new bullet into any memory file with nested lists (including
   `github-actions.md`, `preferences.md`) without checking the surrounding indentation
   first. These files mix 0-indent top-level bullets with 2-/4-indent sub-bullets and

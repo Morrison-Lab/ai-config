@@ -33,7 +33,12 @@ jobs:
     # off repo-wide (see .markdownlint-cli2.jsonc) because most of the corpus
     # has drifted from the last semantic-line-breaks reformat. This only
     # flags lines a PR itself adds, so it can't reflag that drift.
-    uses: d-morrison/gha/.github/workflows/check-new-line-breaks.yml@v2
+    #
+    # No event_name guard: the reusable workflow's own base-ref input
+    # (github.event.pull_request.base.sha on PRs, '' otherwise) already
+    # makes a non-PR run (e.g. push to main) skip cleanly rather than
+    # scanning the whole tree -- see check-new-line-breaks.yml gha#300.
+    uses: d-morrison/gha/.github/workflows/check-new-line-breaks.yml@209bfb76bd412aa10d4d56a809d791a6dc8f10df # v2, gha#300
     with:
       globs: '**/*.md'
       paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'

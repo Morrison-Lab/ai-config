@@ -327,47 +327,52 @@
 - **The same deletion fires from a second, likelier trigger: two full suites
   running CONCURRENTLY in one checkout.** The mechanism is identical (the
   end-of-run cleanup prunes snapshots it did not see exercised), but the cause
-  is not a missing package — it is that the runs contend for shared resources
+  is not a missing package --- it is that the runs contend for shared resources
   (a `quarto` CLI invocation, the same temp dirs), one test *errors out early*,
   and every `expect_snapshot_file()` after the error in that file never runs, so
-  its snapshots look orphaned. **Never run two full suites at once in a repo
-  with snapshot tests**, however tempting it is to start a fresh run before an
-  earlier one finishes.
+  its snapshots look orphaned.
+  **Never run two full suites at once in a repo with snapshot tests**, however
+  tempting it is to start a fresh run before an earlier one finishes.
   The tell that it is contention and not real breakage: the two runs fail on
-  *different* tests. A genuine regression fails the same test every time, so a
-  differing failure set across concurrent runs is diagnostic on its own — check
-  it before debugging the diff. Recovery is the same `git checkout --
-  tests/testthat/_snaps/` as above, then one clean run, alone.
+  *different* tests.
+  A genuine regression fails the same test every time, so a differing failure
+  set across concurrent runs is diagnostic on its own --- check it before
+  debugging the diff.
+  Recovery is the same `git checkout -- tests/testthat/_snaps/` as above, then
+  one clean run, alone.
   (`d-morrison/altdoc#61`, 2026-07-25: two overlapping `test_local()` runs;
   one failed on a quarto render and the other on a docsify test, and the
-  docsify error silently deleted `_sidebar.md` and `index.html` — 58 lines of
+  docsify error silently deleted `_sidebar.md` and `index.html` --- 58 lines of
   committed snapshots.)
 - **`git add -A` while a suite is running sweeps testthat's scratch files into
   the commit.** A failing snapshot comparison writes its proposed replacement
   next to the original as `_snaps/**/*.new.*`, so an `add -A` issued mid-run
-  commits those alongside the real change. Stage explicit paths whenever a
-  suite is in flight, and check `git status` for `*.new.*` before committing.
+  commits those alongside the real change.
+  Stage explicit paths whenever a suite is in flight, and check `git status`
+  for `*.new.*` before committing.
   Accepting such a snapshot is just `mv` over the original, which also removes
   the stray file. (Same session as above.)
 - **A snapshot file that does not exist yet is CREATED SILENTLY, not failed.**
   testthat reports `Adding new file snapshot: ...` as a *warning* and the run
   passes, so adding a fixture and assuming its rendering is now covered asserts
-  nothing — the `expect_snapshot_file()` call has to be declared explicitly. A
-  requirement to "add a snapshot proving X" can therefore be quietly unmet while
-  the suite is green. After adding a fixture, confirm the intended snapshot file
-  actually appears under `_snaps/`. (Same session: the fixture topic proving
+  nothing --- the `expect_snapshot_file()` call has to be declared explicitly.
+  A requirement to "add a snapshot proving X" can therefore be quietly unmet
+  while the suite is green.
+  After adding a fixture, confirm the intended snapshot file actually appears
+  under `_snaps/`. (Same session: the fixture topic proving
   per-block `\dontrun{}` evaluation needed three explicit
   `expect_snapshot_file()` lines, one per generator, or nothing would have
   checked it.)
 - **Adding a topic/case to a SHARED test fixture has a wide churn radius.**
-  Every test that enumerates the fixture's contents breaks at once — in altdoc,
+  Every test that enumerates the fixture's contents breaks at once --- in altdoc,
   one new man page broke nine tests: three `.select_topics()` expectations,
   `.rd_topics()`, a `reference.yml` grouping test, and one reference-index
-  snapshot per generator. None of it indicates a defect, but budget for it
-  rather than discovering it, and read the snapshot diffs as evidence: each
-  gaining exactly one line is what proves the change did not disturb existing
-  output. Prefer a throwaway fixture built in the test when the new case does
-  not need to be shared.
+  snapshot per generator.
+  None of it indicates a defect, but budget for it rather than discovering it,
+  and read the snapshot diffs as evidence: each gaining exactly one line is
+  what proves the change did not disturb existing output.
+  Prefer a throwaway fixture built in the test when the new case does not need
+  to be shared.
 - **`if (cond) "name" = value` inside `c(...)` is parsed as an assignment
   expression, not a named `c()` element.** R's argument-tag recognition
   requires the tag to be the direct head of the argument passed to `c()` — a

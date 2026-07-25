@@ -44,6 +44,16 @@ equivalent, even though every gha-consuming Quarto/R-package repo with
 MD013 disabled for the same corpus-drift reason would benefit from the
 same diff-scoped check.)
 
+**Close the loop once the port lands: retire the local copy, don't just
+leave both.** Flagging the port isn't the finish line --- once gha ships
+the shared capability, migrate the original consumer to it and delete the
+local duplicate, or the two copies drift independently (a fix to one
+never reaches the other). (gha#300 shipped `check-new-line-breaks` as a
+composite action + reusable workflow; ai-config#702/#703 then retired
+`scripts/check-new-line-breaks.py` in favor of calling
+`d-morrison/gha/.github/workflows/check-new-line-breaks.yml@v2` from
+`validate.yml`.)
+
 The [`prefer-upstream`](../../skills/prefer-upstream/SKILL.md) skill is
 the search procedure (where to look per ecosystem, and the
 build-vs-use decision criteria);

@@ -40,7 +40,7 @@ repos:
         always_run: true
       - id: semantic-line-break-tool-tests
         name: semantic-line-break tool tests
-        entry: bash -c 'python scripts/test_slb.py && python scripts/test_check_new_line_breaks.py'
+        entry: python scripts/test_slb.py
         language: python
         pass_filenames: false
         always_run: true

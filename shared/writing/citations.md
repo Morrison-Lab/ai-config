@@ -64,13 +64,17 @@ so decide them rather than arguing (or capitulating) from recollection:
 
 - **A docs URL's canonicality: check the target page's own `redirect_from`
   frontmatter.**
-  For a docs site whose source is a public repo,
-  fetch the content file and read its frontmatter.
-  Every path listed under `redirect_from` is by definition one that
-  redirects *to* that page ---
+  This one is specific to `github/docs` (and other sites using the
+  Jekyll-inherited `redirect_from` convention),
+  not a general property of docs sites with public source ---
+  other generators use their own redirect mechanisms, so find the site's
+  before assuming this shape.
+  In `github/docs`, fetch the content file and read its frontmatter:
+  every path listed under `redirect_from` is by definition one that
+  redirects *to* that page,
   so if the reviewer's proposed "correct" URL appears in that list,
   it is a superseded path and the cited one is current.
-  A content file's path also maps directly to its URL
+  A `github/docs` content file's path also maps directly to its URL
   (`content/<path>.md` -> `/en/<path>`),
   so a successful raw fetch of the source is itself evidence the URL resolves.
 - **A quotation's fidelity: exact-substring grep, not a read-and-judge.**
@@ -81,7 +85,7 @@ so decide them rather than arguing (or capitulating) from recollection:
 
 **Then fix what the challenge was really pointing at.**
 A wrong finding can still mark a genuine weakness.
-The most common one: the quoted sentence lives in a
+One case worth checking: the quoted sentence lives in a
 **version-conditional fragment**,
 so a reader who finds the other branch first sees different wording
 and reasonably concludes the quote was misremembered.

@@ -42,7 +42,7 @@ Use this instead of the `/clear` flag above when there's still live state worth 
 Maintain a "lab notebook" for each session — a dated, append-only file written to *as work happens*, not only when pausing — so that if the session is interrupted with no clean exit (compaction, a forced `/clear`, a crash, a SLURM walltime death), the trail is already on disk and a later session (or I) can pick it up.
 The whole point is surviving an interruption that never gives you a clean stop, so the file must live on disk and be updated frequently, not held in context and flushed at the end.
 
-**Where.** In the session's project auto-memory directory, as `session-YYYY-MM-DD[-slug].md` (the `session-*.md` files the memory index already keeps).
+**Where.** In the session's project auto-memory directory, as a `session-YYYY-MM-DD[-slug].md` file, with a one-line pointer added to that directory's `MEMORY.md` like any other memory.
 One notebook per session; start it near session start and keep appending.
 
 **Cadence — frequently, and to disk right away.** Append a short, timestamped entry at each state change worth resuming from: a task or subtask started, a decision made or a question I answered, a PR/issue opened, a branch cut, a job launched (SLURM/background/CI, with its id), a blocker hit, a checkpoint reached.

@@ -101,6 +101,13 @@ Boxed (a `===` line above and below the labeled block):
 - 💡 **OFFER** — optional work I can do if they want it.
 - 🛑 **BLOCKER** — stopped; need their call.
 - ✅ **ANSWER** — the headline answer to a question they asked (put nuance below the box).
+- 🔀 **MERGE ORDER** --- several PRs are ready,
+  and merging them in the wrong order would produce a wrong result.
+  The one category labeled with a markdown **heading** (`### 🔀 MERGE ORDER`) rather than bold text,
+  since a heading is the only "large font" lever a terminal has.
+  List the PRs in the order to merge, each linked per "Link PRs in tables" above,
+  naming what each one's position depends on.
+  The PR-side and draft-gating surfaces live in the "Surface merge-order constraints" section.
 
 Prefixed, no box (informational, frequent):
 
@@ -112,6 +119,40 @@ Prefixed, no box (informational, frequent):
 Keep the markers stable so they become muscle memory.
 The set-apart ❓ **QUESTION** format also gives the `prompt-me` / `prompt-me-all` skills a reliable signal to key off when they sweep the transcript for unanswered questions later.
 The user may tune the emoji set; the full taxonomy and rationale live in `memories/preferences.md`.
+
+## Surface merge-order constraints
+
+When two or more PRs are open and merging them in the wrong order would produce a wrong result,
+say so where I'll act on it, not in ordinary prose I'll skim past.
+Three surfaces, escalating in strength; use as many as the situation earns.
+
+1. **In chat** --- the boxed `### 🔀 MERGE ORDER` marker above.
+2. **On the PRs** --- lead each affected PR's body with a `> [!IMPORTANT]` alert
+   naming that PR's position and its prerequisite,
+   e.g. "Merge [#N](url) first --- this PR is stacked on its branch."
+   Update or drop the alert once the prerequisite merges.
+3. **Draft-gating** --- hold the dependent PR as a draft until its prerequisite merges,
+   then mark it ready.
+   GitHub won't merge a draft,
+   so this makes the wrong action unavailable rather than merely discouraged.
+
+Draft-gating is the last resort, not the default, because it costs something real:
+converting a ready PR to draft **drops auto-merge and merge-queue membership**,
+and a draft doesn't trigger the `@claude` review bot (see `shared/workflow/pr-on-claim.md`),
+so drafting an unreviewed PR stalls its own ARDI loop.
+Drive the PR to fully clean first, and draft-gate only if the prerequisite still hasn't merged.
+Say in chat and on the PR that it's being held and why,
+and un-draft promptly once the prerequisite lands.
+A silent draft is never a substitute for stating the order.
+
+This fires only when order changes the outcome:
+a stacked PR whose base is another open PR,
+a PR that would conflict or show a misleading diff if the other landed first,
+a migration that must precede its consumer.
+Two PRs touching disjoint files have no constraint,
+and saying so plainly is the right answer, not an occasion for the marker.
+The rationale behind each surface lives in `memories/preferences.md`,
+alongside the rest of the taxonomy.
 
 ## Present decisions one at a time
 

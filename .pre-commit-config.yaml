@@ -38,3 +38,9 @@ repos:
         additional_dependencies: ["markdownlint-cli2@0.22.1"]
         pass_filenames: false  # globs/ignores come from .markdownlint-cli2.jsonc
         always_run: true
+      - id: semantic-line-break-tool-tests
+        name: semantic-line-break tool tests
+        entry: bash -c 'python scripts/test_slb.py && python scripts/test_check_new_line_breaks.py'
+        language: python
+        pass_filenames: false
+        always_run: true

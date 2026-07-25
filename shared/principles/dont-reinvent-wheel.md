@@ -36,7 +36,7 @@ drift checker, a non-ASCII-punctuation scanner) belongs in gha so every
 consumer repo benefits, not just ai-config. Building it in ai-config
 first is fine when the immediate need is local, but check gha for an
 existing equivalent before assuming none exists, and flag a port when
-none does. (ai-config#682/#684, 2026-07-24: built
+none does exist. (ai-config#682/#684, 2026-07-24: built
 `scripts/check-new-line-breaks.py` in ai-config first, since the
 drift it caught was in ai-config's own corpus; a direct check of gha's
 `lint-markdown`/`lint-qmd` afterward confirmed neither has an

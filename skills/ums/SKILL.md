@@ -53,7 +53,8 @@ committed pass.
    - Is it a **skill update**? (workflow step missing, procedure unclear)
    - Is it a **memory note**? (tool quirk, preference, debugging insight)
    - Is it **both**? (general guidance → update skill AND preferences)
-   - Is it already recorded? (check before writing — avoid duplicates)
+   - Is it already recorded? (grep before writing, per step 3 -- avoid
+     duplicates)
    - Is it **cross-project or project-specific**? (`memories/preferences.md`'s
      "Memory and skill storage" rule: cross-project lessons commit to
      `d-morrison/ai-config`; a convention/gotcha tied to one repo we own
@@ -63,6 +64,16 @@ committed pass.
 
 3. **Apply updates.** For each item:
    - Read the target file first (skill or memory) to understand current state
+   - **Grep that file for the item's specific subject** -- the tool name, the
+     API call, the error string -- before appending anything.
+     Reading the region you're editing is not enough: `memories/tools.md` runs
+     to thousands of lines, so an existing entry on the same subject can sit
+     hundreds of lines away in an unrelated cluster and never enter your view.
+     When one exists, extend it in place; don't add a second bullet.
+     (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
+     related `get_check_runs` guidance while an entry on the same tool already
+     sat ~2000 lines below in the write-access cluster -- caught by the review
+     bot, not by the author.)
    - Make the edit — concise bullet points, not prose
    - If updating a skill: the change should be specific enough that following
      the skill next time would avoid the mistake
@@ -263,7 +274,9 @@ add a review gate for the cases that need one.
 - ❌ Updating memories but not pushing skill changes to origin
 - ❌ Recording vague lessons ("be more careful") instead of specific ones
   ("always poll for new review after pushing — check commit SHA matches")
-- ❌ Skipping the "check existing notes" step and creating duplicates
+- ❌ Skipping the "check existing notes" step and creating duplicates --
+  specifically, reading only the region you're appending to instead of
+  grepping the whole target file for the subject (step 3)
 - ❌ Updating only preferences when a skill also needs the fix
 - ❌ `git add -A` — it sweeps unrelated in-flight edits (the user's work, other
   draft skills) into your commit/PR. Stage the specific files you touched.

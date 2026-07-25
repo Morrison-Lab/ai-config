@@ -113,6 +113,16 @@ with `base: "<base-branch>"`. Note the dependency explicitly in the body
 at a glance (`ardia`'s own stacking detection uses `baseRefName`, not the body
 text — see below).
 
+A stack is the archetypal merge-order constraint, so raise it the way
+`CLAUDE.md`'s "Surface merge-order constraints" section prescribes rather than
+leaving it to the plain `Stacked on #<base-N>` line: lead the dependent PR's
+body with a `> [!IMPORTANT]` alert naming the prerequisite, and report the
+order in chat under the boxed `### 🔀 MERGE ORDER` marker. Skip that section's
+third surface, draft-gating, here --- `base` already points at the base
+branch, so GitHub cannot merge this PR into `main` out of order in the first
+place. The alert and the marker exist for the human's reading order, not to
+enforce a constraint the stack itself already enforces.
+
 If the dependent work is being opened up front per
 [`pr-on-claim`](../../shared/workflow/pr-on-claim.md), open it as a draft from
 an empty commit exactly as that skill describes, just with `--base
@@ -152,7 +162,9 @@ In a remote/web session, use `mcp__github__update_pull_request` with `base:
 should now show only the dependent PR's own changes, since the base PR's
 commits are already on `main`. If it doesn't (the merge above was a no-op or
 missed something), re-check before proceeding. Update the PR body to drop the
-`Stacked on #<base-N>` note once this step is done.
+`Stacked on #<base-N>` note --- and the `> [!IMPORTANT]` merge-order alert
+from step 2 --- once this step is done; both describe a constraint that no
+longer exists, and a stale alert trains readers to ignore the next real one.
 
 ### 5. If the base PR is abandoned or closed unmerged
 

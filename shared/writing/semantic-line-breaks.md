@@ -31,3 +31,23 @@ blocking approval over, and not worth re-raising if the author declines.
 This is distinct from the rule above: that one governs how thoroughly to
 fix violations once a review has flagged them; this one governs the
 weight to give the finding when you are the reviewer in the first place.
+
+**What CI actually enforces is one sentence per line, not a character
+count -- don't reflow to 80 columns thinking the check demands it.**
+The 60-to-80 range above is guidance for a human writing prose.
+The automated check backing it (`check-new-line-breaks`, a reusable
+workflow in [`d-morrison/gha`](https://github.com/d-morrison/gha); formerly
+ai-config's own `scripts/check-new-line-breaks.py`, retired in ai-config#703)
+tests something narrower: for each **newly added** prose line in the diff,
+it flags the line only when that line holds more than one sentence.
+Two consequences.
+A single long line carrying exactly one sentence passes, so the URL-inflation
+exception above needs no special casing in the check.
+And a line that packs two short sentences fails even at 50 characters, which
+is the violation to actually look for before pushing.
+Fix a flagged line by breaking at the sentence boundary, not by rewrapping
+the paragraph to a narrower column.
+(ai-config#712: assuming an 80-character limit sent me measuring line lengths
+against the wrong criterion; reading the retired script's own source settled
+it, and the real check then found 7 multi-sentence lines a length check had
+passed over.)

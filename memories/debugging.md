@@ -303,6 +303,66 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   `for ((…))`, and `${2+set}` all work; **associative arrays do NOT** (4.0+).
   Parse key=value records with `while IFS='=' read -r k v; do case "$k" in …`.
 
+## `grep -P '\x{NNNN}'` fails on an unset locale -- and a `||` fallback turns that into a reported pass
+
+A non-ASCII glyph scan written as `grep -P '\x{2014}'` (the natural way to
+look for an em-dash per
+[`ascii-punctuation-in-source`](../shared/coding/ascii-punctuation-in-source.md))
+exits 2 with `grep: character code point value in \x{} or \o{} is too large`
+whenever the locale is unset or `C`.
+The cause is the locale, not the syntax: PCRE runs in non-UTF-8 mode there,
+so `\x{}` caps at `0xFF`.
+Verified on GNU grep 3.11 with `LANG` and `LC_ALL` both empty, which is the
+default in at least some Claude Code containers -- so this fires by default,
+not as an exotic edge case.
+
+**The fix is to fix the locale**: prefix the command with `LC_ALL=C.UTF-8`,
+or do the scan in Python.
+Either spelling of that locale works where it exists at all -- glibc
+normalizes the name, so `LC_ALL=C.utf8` behaves identically even though
+`locale -a` may list only the lowercase `C.utf8` form (both verified here).
+
+**Do not reach for a literal-glyph bracket as a locale-independent
+workaround.**
+It is not one, and it fails in the worst way -- silently, with plausible
+output.
+Under a byte-wise locale `grep -P` reads a bracket holding multi-byte
+characters as a set of individual *bytes*, so a pattern meant to match an
+em-dash or en-dash also matches any other character sharing one of those
+bytes.
+Verified against a file holding an em-dash, an en-dash, a euro sign, and an
+e-acute: a two-glyph bracket with the locale unset matched **three** lines,
+including the euro sign (`e2 82 ac`, sharing the leading `e2` with both
+dashes), while the identical pattern under `LC_ALL=C.UTF-8` matched the
+correct two.
+Injecting the bytes programmatically instead of typing them (`grep -P
+"$(printf '[\xe2\x80\x94\xe2\x80\x93]')"`) does not help, for the same
+reason -- what breaks is how the locale interprets the bracket, not how the
+bytes reached it.
+So a glyph scan has exactly two correct forms: set the locale, or leave
+`grep` behind.
+
+**Two traps beyond the error itself.**
+First, a single-byte pattern like `\x{80}` does **not** error and *does*
+match a line containing an em-dash -- it matches a continuation byte of that
+character's UTF-8 encoding (`e2 80 94`) rather than the character, so a
+byte-level pattern can produce right-looking output for the wrong reason and
+will also match unrelated characters sharing that byte.
+Second, and worse: the idiomatic `<check> || echo "clean"` wrapper converts
+grep's exit-2 *tool error* into a printed pass, because `||` fires on any
+non-zero status and cannot distinguish "searched, found nothing" (exit 1)
+from "never ran" (exit 2).
+That is the shell-fallback case
+[`fail-fast`](../shared/principles/fail-fast.md) warns about, in the one
+place it hurts most -- a verification step whose failure mode is a green
+result.
+When a check's own success message is the thing you would act on, branch on
+the exit status explicitly (`rc=$?; case $rc in 0) ...;; 1) ...;; *) echo
+"CHECK FAILED TO RUN"; exit 1;; esac`) rather than `||`-chaining it.
+(ai-config#712, 2026-07-24: a pre-push glyph scan reported "clean: no banned
+glyphs" without having scanned anything; caught only by re-reading the
+command's own stderr, which was sitting in the same output.)
+
 ## Verifying R-package tests: install + testthat, never `source()` the R files
 Hit on ucdavis/ettbc#14. The env had no `devtools`/`renv`, so I "verified" the new
 tests by `sys.source()`-ing every `R/*.R` file and re-running the assertions by

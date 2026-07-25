@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Alias for `sync-pr-branch`. Sync the current branch with both `main` and its own remote — fetch origin, merge origin/main and origin/<current-branch> into local, resolve conflicts, run the repo's pre-commit checks, and push. Use when invoked as `/sync`, or on "sync", "sync the branch", "sync up", or before pushing when main or the remote branch may have moved.
+description: "Alias for `sync-pr-branch`. Use when asked to 'sync', 'sync the branch', 'sync up'."
 user-invocable: true
 allowed-tools:
   - Bash

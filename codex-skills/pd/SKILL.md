@@ -1,6 +1,6 @@
 ---
 name: "pd"
-description: "Codex wrapper for the ai-config Claude skill `pd`. Alias for `pending-decisions`. Sweep a repo's (or every in-scope repo's) open issues/PRs for ones waiting on a decision from the user, then ask about each one, one at a time, most pressing first. Use when asked to 'pd', 'pending decisions', 'what decisions are you waiting on', or '/pd [owner/repo|all]'. Use when Codex is asked to use `pd`, `/pd`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `pd`. Alias for `pending-decisions`. Use when asked to 'pd', '/pd [owner/repo|all]'. Use when Codex is asked to use `pd`, `/pd`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # pd (Codex wrapper)

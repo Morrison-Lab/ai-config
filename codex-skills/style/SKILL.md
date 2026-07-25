@@ -1,6 +1,6 @@
 ---
 name: "style"
-description: "Codex wrapper for the ai-config Claude skill `style`. Alias for `use-preferred-style`. Write or revise prose in the user's preferred style \u2014 limit dependent clauses, cut filler and jargon, prefer short declarative sentences joined by coordinating conjunctions. Use when asked to '/style', 'use my style', 'apply my preferred style', or 'tighten this prose'. Use when Codex is asked to use `style`, `/style`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `style`. Alias for `use-preferred-style`. Use when asked to 'style', '/style', 'use my style', 'apply my preferred style', 'tighten this prose'. Use when Codex is asked to use `style`, `/style`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # style (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: ca
-description: "Alias for `config-ai`. Extend AI capabilities via the ai-config and/or gha repos, determining on the fly whether the right form is a skill, subagent, memory, hook, shared fragment, or a gha Action/bot-workflow tweak. Use when asked to 'ca', 'config-ai', 'extend AI capabilities', or 'add an AI capability'."
+description: "Alias for `config-ai`. Use when asked to 'ca'."
 user-invocable: true
 allowed-tools:
   - Bash

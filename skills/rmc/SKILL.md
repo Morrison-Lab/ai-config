@@ -1,6 +1,6 @@
 ---
 name: rmc
-description: "Alias for `resolve-conflicts`. Resolve git merge/rebase/cherry-pick conflicts by consolidating the best of BOTH branches — understand why each side changed the hunk, then reconstruct a resolution that preserves both intents instead of blindly picking `--ours`/`--theirs`. Use when asked to 'rmc', 'resolve merge conflicts', or when a merge / rebase / cherry-pick / stash pop / revert / pull reports conflicts."
+description: "Alias for `resolve-conflicts`. Use when asked to 'rmc', 'resolve merge conflicts'."
 user-invocable: true
 allowed-tools:
   - Bash

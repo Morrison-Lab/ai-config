@@ -1,6 +1,6 @@
 ---
 name: maw
-description: "Alias for `mwc`. Grant standing session-scoped permission to merge fully-clean PRs autonomously for the rest of the session, without asking per PR. Use when asked to 'maw', 'merge at will', 'merge when confident', or 'mwc'."
+description: "Alias for `mwc`. Use when asked to 'maw'."
 user-invocable: true
 allowed-tools:
   - Bash

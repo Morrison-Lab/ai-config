@@ -1,6 +1,6 @@
 ---
 name: done
-description: "Alias for `wrap-up`. End-of-session wrap-up: verify the true state of every PR/issue/branch/working tree (never assume), report a linked final summary that surfaces anything still open or dangling, then run a UMS review to persist what was learned. Use when invoked as `/done`, or on 'done', 'all done', 'are we done?', 'wrap up', or 'finish up'."
+description: "Alias for `wrap-up`. Use when asked to 'done', 'all done', 'are we done?'."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: giardia
-description: "Alias for `gia` (Grab Issues + iterate-All). Clear the repo's entire work queue: drive every open PR/MR to a clean review verdict with green CI, then open a PR for every open issue that lacks one (each new PR is itself driven to clean). Use when asked to 'giardia'."
+description: "Alias for `gia` (Grab Issues + iterate-All). Use when asked to 'giardia'."
 user-invocable: true
 allowed-tools:
   - Bash

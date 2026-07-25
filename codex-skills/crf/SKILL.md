@@ -1,6 +1,6 @@
 ---
 name: "crf"
-description: "Codex wrapper for the ai-config Claude skill `crf`. Alias for `convert-repo-format`. Convert a repo from one SERG project format to another \u2014 R package, Quarto website, Quarto book, or Quarto manuscript \u2014 using the lab's template repos (`rpt`, `qwt`, `qbt`, `qmt`) as the source of truth. Use when asked to 'crf', 'convert repo format', 'convert this repo to a <format>', or 'change this repo's project type'. Use when Codex is asked to use `crf`, `/crf`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `crf`. Alias for `convert-repo-format`. Use when asked to 'crf'. Use when Codex is asked to use `crf`, `/crf`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # crf (Codex wrapper)

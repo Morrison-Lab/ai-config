@@ -1,6 +1,6 @@
 ---
 name: "fa"
-description: "Codex wrapper for the ai-config Claude skill `fa`. Alias for `fetch-all`. Run `git fetch` from origin across every git repo under a directory, reporting per-repo status (OK / updated / failed / skipped). Read-only \u2014 never merges or pulls. Use when asked to 'fa', 'fetch all', 'fetch from origin on all repos', or 'fetch every repo'. Use when Codex is asked to use `fa`, `/fa`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `fa`. Alias for `fetch-all`. Use when asked to 'fa'. Use when Codex is asked to use `fa`, `/fa`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # fa (Codex wrapper)

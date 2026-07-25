@@ -1,6 +1,6 @@
 ---
 name: adri
-description: "Alias for `ardi` (common transposition typo). ARD + Iterate on a single PR/MR until the review verdict is clean; runs per-round and fully-clean exit checklists. Use when asked to 'adri', 'drive this PR to clean', or 'iterate this MR'."
+description: "Alias for `ardi` (common transposition typo). Use when asked to 'adri'."
 user-invocable: true
 allowed-tools:
   - Bash

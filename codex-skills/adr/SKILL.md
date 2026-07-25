@@ -1,6 +1,6 @@
 ---
 name: "adr"
-description: "Codex wrapper for the ai-config Claude skill `adr`. Alias for `ard` (common transposition typo). Address, Rebut, Defer, or Acknowledge: respond to every review comment on a PR/MR with exactly one disposition. Runs a round-close checklist before reporting the round done. Use when asked to 'adr', 'ard this review', or after receiving review findings. Use when Codex is asked to use `adr`, `/adr`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `adr`. Alias for `ard` (common transposition typo). Use when asked to 'adr', 'ard this review'. Use when Codex is asked to use `adr`, `/adr`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # adr (Codex wrapper)

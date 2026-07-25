@@ -1,6 +1,6 @@
 ---
 name: "prune-worktrees"
-description: "Codex wrapper for the ai-config Claude skill `prune-worktrees`. Alias for `clean-worktrees` (aka `cw`). Sweep dead git worktrees in the current repo \u2014 prune admin stubs for already-deleted dirs, then remove linked worktrees whose branch merged (or is gone) and whose tree is clean, never touching the main/current worktree, a dirty tree, or one with a live session. Use when asked to 'prune worktrees', 'prune-worktrees', 'clean worktrees', or 'clean dead worktrees'. Use when Codex is asked to use `prune-worktrees`, `/prune-worktrees`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `prune-worktrees`. Alias for `clean-worktrees` (aka `cw`). Use when asked to 'prune-worktrees'. Use when Codex is asked to use `prune-worktrees`, `/prune-worktrees`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # prune-worktrees (Codex wrapper)

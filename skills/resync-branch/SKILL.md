@@ -1,6 +1,6 @@
 ---
 name: resync-branch
-description: Alias for `sync-pr-branch`. Sync the current branch with both `main` and its own remote — fetch origin, merge origin/main and origin/<current-branch> into local, resolve conflicts, run the repo's pre-commit checks, and push. Use when invoked as `/resync-branch`, or on "resync the branch", "reconcile local and remote", "my branch and origin have diverged", or before pushing when the remote branch may have moved.
+description: "Alias for `sync-pr-branch`. Use when asked to 'resync-branch', 'my branch and origin have diverged'."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: adr
-description: "Alias for `ard` (common transposition typo). Address, Rebut, Defer, or Acknowledge: respond to every review comment on a PR/MR with exactly one disposition. Runs a round-close checklist before reporting the round done. Use when asked to 'adr', 'ard this review', or after receiving review findings."
+description: "Alias for `ard` (common transposition typo). Use when asked to 'adr', 'ard this review'."
 user-invocable: true
 allowed-tools:
   - Bash

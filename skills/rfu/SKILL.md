@@ -1,6 +1,6 @@
 ---
 name: rfu
-description: "Alias for `recover-followups`. Retrieve untracked follow-up items from closed PRs and issues. Sweeps them for promised future work, cross-references against open issues, and offers to file the ones never tracked. Use when asked to 'rfu', 'recover followups', 'find untracked followups', or 'what follow-ups slipped through?'."
+description: "Alias for `recover-followups`. Use when asked to 'rfu', 'what follow-ups slipped through?'."
 user-invocable: true
 allowed-tools:
   - Bash

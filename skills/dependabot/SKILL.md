@@ -1,6 +1,6 @@
 ---
 name: dependabot
-description: "Alias for `chores`. Triage and wrap up dependency-bump / `chore(...)` PRs from Dependabot/Renovate: classify by bump size, confirm CI is green, merge safe patch/minor bumps, and flag risky majors with a changelog summary. Use when asked to 'handle the dependabot PRs', 'process dependabot', 'merge the bump PRs', or 'dependency updates'."
+description: "Alias for `chores`. Use when asked to 'dependabot', 'handle the dependabot PRs', 'process dependabot', 'merge the bump PRs'."
 user-invocable: true
 ---
 

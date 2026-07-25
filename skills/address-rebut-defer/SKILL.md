@@ -1,6 +1,6 @@
 ---
 name: address-rebut-defer
-description: "Alias for `ard`. Address, Rebut, Defer, or Acknowledge: respond to every review comment on a PR/MR with exactly one disposition. Runs a round-close checklist before reporting the round done. Use when asked to 'address rebut defer', 'ard this review', or after receiving review findings."
+description: "Alias for `ard`. Use when asked to 'address-rebut-defer', 'address rebut defer', 'ard this review'."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: merge-main
-description: Alias for `sync-pr-branch`. Sync the current branch with both `main` and its own remote — fetch origin, merge origin/main and origin/<current-branch> into local, resolve conflicts, run the repo's pre-commit checks, and push. Use when invoked as `/merge-main`, or on "merge main in", "update the branch", "the branch is behind main", or whenever main has moved ahead of a PR branch you're working on.
+description: "Alias for `sync-pr-branch`. Use when asked to 'merge-main'."
 user-invocable: true
 allowed-tools:
   - Bash

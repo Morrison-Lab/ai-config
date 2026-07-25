@@ -1,6 +1,6 @@
 ---
 name: "merge-at-will"
-description: "Codex wrapper for the ai-config Claude skill `merge-at-will`. Alias for `mwc`. Grant standing session-scoped permission to merge fully-clean PRs autonomously for the rest of the session, without asking per PR. Use when asked to 'merge at will', 'maw', 'merge when confident', or 'mwc'. Use when Codex is asked to use `merge-at-will`, `/merge-at-will`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `merge-at-will`. Alias for `mwc`. Use when asked to 'merge-at-will'. Use when Codex is asked to use `merge-at-will`, `/merge-at-will`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # merge-at-will (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "ca"
-description: "Codex wrapper for the ai-config Claude skill `ca`. Alias for `config-ai`. Extend AI capabilities via the ai-config and/or gha repos, determining on the fly whether the right form is a skill, subagent, memory, hook, shared fragment, or a gha Action/bot-workflow tweak. Use when asked to 'ca', 'config-ai', 'extend AI capabilities', or 'add an AI capability'. Use when Codex is asked to use `ca`, `/ca`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `ca`. Alias for `config-ai`. Use when asked to 'ca'. Use when Codex is asked to use `ca`, `/ca`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # ca (Codex wrapper)

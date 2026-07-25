@@ -1,6 +1,6 @@
 ---
 name: "deconflict-sessions"
-description: "Codex wrapper for the ai-config Claude skill `deconflict-sessions`. Alias for `session-lock`. Deconflict multiple AI agent sessions working the same local repo checkout \u2014 a machine-local registry (under .git/) so parallel sessions see each other, avoid clobbering the same working tree/branch, isolate into a git worktree, and recover after a crash. Use when asked to 'deconflict sessions', 'deconflict multiple ai sessions', 'avoid stepping on another local session', or 'lock the worktree'. The LOCAL counterpart to claim-pr. Use when Codex is asked to use `deconflict-sessions`, `/deconflict-sessions`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `deconflict-sessions`. Alias for `session-lock`. Use when asked to 'deconflict-sessions', 'deconflict multiple ai sessions', 'avoid stepping on another local session'. Use when Codex is asked to use `deconflict-sessions`, `/deconflict-sessions`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # deconflict-sessions (Codex wrapper)

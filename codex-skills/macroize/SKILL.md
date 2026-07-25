@@ -1,6 +1,6 @@
 ---
 name: "macroize"
-description: "Codex wrapper for the ai-config Claude skill `macroize`. Alias for `use-math-macros`. Rewrite a Quarto/LaTeX manuscript's math to use the shared d-morrison/macros submodule, condensing and polishing all math. Use when asked to 'macroize', 'macroize the math', or 'use the macros submodule'. Use when Codex is asked to use `macroize`, `/macroize`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `macroize`. Alias for `use-math-macros`. Use when asked to 'macroize', 'macroize the math'. Use when Codex is asked to use `macroize`, `/macroize`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # macroize (Codex wrapper)

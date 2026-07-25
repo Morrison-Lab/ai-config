@@ -1,6 +1,6 @@
 ---
 name: "drive"
-description: "Codex wrapper for the ai-config Claude skill `drive`. Alias for `ardi` (\"drive to clean\"). ARD + Iterate on a single PR/MR until the review verdict is clean: read the latest review, Address/Rebut/Defer every finding, push, re-request review, repeat until zero findings. Use when asked to 'drive', 'drive this PR', 'drive to clean', or 'drive this PR to clean'. Use when Codex is asked to use `drive`, `/drive`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `drive`. Alias for `ardi` (\"drive to clean\"). Use when asked to 'drive', 'drive this PR', 'drive to clean', 'drive this PR to clean'. Use when Codex is asked to use `drive`, `/drive`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # drive (Codex wrapper)

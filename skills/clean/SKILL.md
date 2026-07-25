@@ -1,6 +1,6 @@
 ---
 name: clean
-description: "Alias for `ardi` (\"drive to clean\"). ARD + Iterate on a single PR/MR until the review verdict is clean: read the latest review, Address/Rebut/Defer every finding, push, re-request review, repeat until zero findings. Use when asked to 'clean', 'clean this PR', 'drive to clean', or 'make this PR clean'. Not for git-branch, worktree, or code cleanup — see `clean-branches` (`cb`), `clean-worktrees` (`cw`), and `tidy` / `simplify`."
+description: "Alias for `ardi` (\"drive to clean\"). Use when asked to 'clean', 'clean this PR', 'drive to clean', 'make this PR clean'. Not for git-branch, worktree, or code cleanup -- see `clean-branches` (`cb`), `clean-worktrees` (`cw`), and `tidy` / `simplify`."
 user-invocable: true
 allowed-tools:
   - Bash

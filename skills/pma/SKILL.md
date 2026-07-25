@@ -1,10 +1,6 @@
 ---
 name: pma
-description: >
-  Alias for `prompt-me-all`. Restate every open question still waiting on
-  user input as a single, clearly numbered list, with no cap. Use when
-  asked to 'pma', 'promptmeall', 'prompt me all', or '/pma'. For just the
-  single most pressing question (or a top N), use `pm` instead.
+description: "Alias for `prompt-me-all`. Use when asked to 'pma', '/pma'."
 user-invocable: true
 allowed-tools: []
 ---

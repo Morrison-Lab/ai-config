@@ -1,6 +1,6 @@
 ---
 name: "ph"
-description: "Codex wrapper for the ai-config Claude skill `ph`. Alias for `purge-hallucinations`. Audit a target (memory/instruction corpus, repo code & docs, or an explicit file / PR diff / pasted AI output) for fabricated references that don't resolve \u2014 missing files, undefined functions, non-existent action refs/versions, dead URLs, dangling `[[memory-links]]`, fake skill names/citations/flags \u2014 then interactively propose a fix for each. Use when asked to 'ph', 'purge hallucinations', 'check for hallucinations', or 'verify the references'. Use when Codex is asked to use `ph`, `/ph`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `ph`. Alias for `purge-hallucinations`. Use when asked to 'ph'. Use when Codex is asked to use `ph`, `/ph`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # ph (Codex wrapper)

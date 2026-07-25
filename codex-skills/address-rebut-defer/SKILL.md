@@ -1,6 +1,6 @@
 ---
 name: "address-rebut-defer"
-description: "Codex wrapper for the ai-config Claude skill `address-rebut-defer`. Alias for `ard`. Address, Rebut, Defer, or Acknowledge: respond to every review comment on a PR/MR with exactly one disposition. Runs a round-close checklist before reporting the round done. Use when asked to 'address rebut defer', 'ard this review', or after receiving review findings. Use when Codex is asked to use `address-rebut-defer`, `/address-rebut-defer`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `address-rebut-defer`. Alias for `ard`. Use when asked to 'address-rebut-defer', 'address rebut defer', 'ard this review'. Use when Codex is asked to use `address-rebut-defer`, `/address-rebut-defer`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # address-rebut-defer (Codex wrapper)

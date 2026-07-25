@@ -1,6 +1,6 @@
 ---
 name: "fcp"
-description: "Codex wrapper for the ai-config Claude skill `fcp`. Alias for `fact-check-prose`. Assess the accuracy and clarity of prose in a PR/MR, file, or pasted text \u2014 check factual claims, verify document-internal reasoning (formal and informal), and cross-check computed values/figures against rendered output. Use when asked to 'fcp', 'fact-check this', 'check the math', or 'verify this reasoning'. Use when Codex is asked to use `fcp`, `/fcp`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `fcp`. Alias for `fact-check-prose`. Use when asked to 'fcp'. Use when Codex is asked to use `fcp`, `/fcp`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # fcp (Codex wrapper)

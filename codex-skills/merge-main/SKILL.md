@@ -1,6 +1,6 @@
 ---
 name: "merge-main"
-description: "Codex wrapper for the ai-config Claude skill `merge-main`. Alias for `sync-pr-branch`. Sync the current branch with both `main` and its own remote \u2014 fetch origin, merge origin/main and origin/<current-branch> into local, resolve conflicts, run the repo's pre-commit checks, and push. Use when invoked as `/merge-main`, or on \"merge main in\", \"update the branch\", \"the branch is behind main\", or whenever main has moved ahead of a PR branch you're working on. Use when Codex is asked to use `merge-main`, `/merge-main`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `merge-main`. Alias for `sync-pr-branch`. Use when asked to 'merge-main'. Use when Codex is asked to use `merge-main`, `/merge-main`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # merge-main (Codex wrapper)

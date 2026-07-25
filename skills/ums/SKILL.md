@@ -293,6 +293,17 @@ add a review gate for the cases that need one.
   — substitute the equivalent for a non-Claude agent) is short-lived staging
   only — hand off that a PR adding those agent docs is still required. See the checklist
   item above and `memories/preferences.md` for the full rule.
+- ❌ Naming a tool, flag, or API identifier that appears **nowhere else in the
+  corpus** without anchoring it somewhere checkable. A lone mention reads
+  identically whether it is correct or hallucinated, so a later session has
+  nothing to verify it against --- and the guidance is only actionable if the
+  name is right. When the identifier is a cross-model tool, add it to
+  `tool-mappings.yml` (then regenerate) rather than leaving the memory bullet
+  as its only home; otherwise cite where you confirmed it. Having *used* it
+  successfully in the session you're writing up is good evidence, but that
+  evidence dies with the session. (ai-config#727: `mcp__github__list_commits`
+  was flagged in review as unanchored; it was genuinely verified by use, and
+  the fix was registering it as the `LIST_COMMITS` operation.)
 - ❌ Inserting a new bullet into any memory file with nested lists (including
   `github-actions.md`, `preferences.md`) without checking the surrounding indentation
   first. These files mix 0-indent top-level bullets with 2-/4-indent sub-bullets and

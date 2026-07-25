@@ -270,14 +270,19 @@
 - **`mcp__github__actions_list` (`list_workflow_runs`) returns a full repository
   object per run -- budget accordingly, and prefer a cheaper call.** Each run in
   the response carries `repository`, `head_repository`, `actor`, and
-  `triggering_actor` in full, so even `per_page: 3` can cost several thousand
-  tokens. When the question is "did CI/the review run, and how did it end",
+  `triggering_actor` in full, so even `per_page: 1` runs ~30-60KB and a
+  `per_page: 3` call costs several thousand tokens; a large enough response
+  blows the tool-output cap and gets spilled to a file instead of returned.
+  When the question is "did CI/the review run, and how did it end",
   `pull_request_read` `get_check_runs` answers it for a fraction of that, and
   `actions_get` `get_workflow_run` (a single run by ID) is the right call when
   you need one run's event/trigger/conclusion. Reserve `list_workflow_runs` for
   when you genuinely need to enumerate runs the check-runs view can't see -- the
   `action_required`/zero-job case in
-  [`fully-clean`](../shared/workflow/fully-clean.md). (ai-config#687, 2026-07-24:
+  [`fully-clean`](../shared/workflow/fully-clean.md) -- and when a call has
+  already spilled to a file, parse that file
+  (`python3 -c "json.load(...)"`) rather than re-listing.
+  (ai-config#687, 2026-07-24:
   a two-run `list_workflow_runs` call to check whether a draft PR's review had
   fired cost ~6k tokens; `get_check_runs` gave the same answer.)
 - **`gh pr view --json checks` is not a valid field.** When you need the
@@ -2254,12 +2259,6 @@ common patterns.
   fix as two patch files since every write 403'd; the user filed their own
   issue/PR with a different fix for the same root cause and merged that
   instead.)
-- **`mcp__github__actions_list` / `list_workflow_runs` returns HUGE objects**
-  (full repo metadata embedded per run, ~30-60KB even at `per_page: 1`), which
-  blows the tool-output cap and gets saved to a file. To read a run's
-  status/conclusion cheaply, prefer `actions_get` (`get_workflow_run`, single
-  object) or parse the saved file with `python3 -c "json.load(...)"`; don't keep
-  re-listing.
 - **Input-forwarding checklist when adding an input to a gha composite action.**
   Adding a new `inputs:` entry to `<name>/action.yml` requires four coordinated updates:
   1. Expose it in the wrapping reusable workflow (`.github/workflows/<name>.yml`) under

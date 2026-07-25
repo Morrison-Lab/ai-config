@@ -126,6 +126,47 @@
   don't assume a tool is a hallucination just because it's absent from this
   file, which is a running collection of quirks encountered, not an
   exhaustive registry.
+- **`request_copilot_review` returns success even when Copilot's quota is
+  exhausted -- the refusal arrives later, as a posted review.**
+  The tool reports no error and no output whether or not Copilot will
+  actually review; what comes back minutes later is a `COMMENTED` review
+  whose entire body is *"Copilot was unable to review this pull request
+  because the user who requested the review has reached their quota
+  limit"*.
+  So a clean return is **not** evidence the quota is back, and neither is
+  the absence of an error --- only the posted review body settles it.
+  Two further specifics:
+  - The quota is **per requesting user**, not per repo or per PR, so every
+    request from the same account keeps refusing until it resets, however
+    many different PRs it's spread across.
+  - **Latency is a weak tell, and an untested one.**
+    Every refusal came back within roughly a minute of the request.
+    A later request was still pending when last checked about ten minutes
+    in, which is the only reason to suspect a long-pending request may be
+    a real review rather than a slow refusal -- but its outcome was never
+    observed, because the PR merged first.
+    So treat a long wait as weak grounds for holding off on re-requesting,
+    not as evidence a review is coming, and read the posted review either
+    way.
+  Copilot and the `@claude` reviewer fail **independently**: Copilot can be
+  quota-dead while `claude-review` posts genuine verdicts at the same head,
+  so a Copilot refusal is never a reason to stop checking the other one.
+  (`ucdavis/rampp#111`, 2026-07-24/25: three refusals across two heads while
+  `claude-review` reviewed both normally, and Copilot itself had worked on
+  the same PR two days earlier.)
+- **A branch ruleset can block Copilot from pushing a fix while leaving my
+  own push to the same branch unaffected.**
+  When Copilot reports it prepared a change but could not apply it ---
+  e.g. *"Cannot update this protected ref"* --- don't infer the branch is
+  write-protected for this session too: try the push.
+  The corollary matters more for review triage: a Copilot-identified issue
+  still sitting unfixed may be unfixed because its push was rejected,
+  **not** because the fix was wrong, disputed, or deliberately dropped.
+  Re-check such a finding on its own merits rather than reading "Copilot
+  left it alone" as a signal it was already settled.
+  (`ucdavis/rampp#111`: Copilot had prepared the `DESCRIPTION` version bump
+  that `version-check` was failing on and was rejected with that error; the
+  identical fix pushed fine from this session as `0c72d81`.)
 - **`get_status` can return "pending / 0 checks" even after CI has finished.**
   Use `get_check_runs` for the authoritative CI state — it returns the real
   job conclusions (`success`, `failure`, `skipped`). `get_status` aggregates

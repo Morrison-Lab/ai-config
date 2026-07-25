@@ -88,6 +88,12 @@ these.
 - **`claude-alloc` / `codex-alloc` run agent sessions in a SLURM slice**, never
   compute on the login node directly (`claude-alloc` = Claude Code, `codex-alloc`
   = Codex CLI). Both wrap `~/bin/tui-alloc` (`~/bin` is on PATH via `~/.zshrc`).
+  - **Session-in-a-slice vs. login-node + per-job compute --- pick by workload.**
+    Running the whole session in a slice is safe-by-default, but it ties the session's life to the walltime: when the slice expires, the agent and every in-slice watcher die (the crash the session-notebook rule exists to survive).
+    For an **orchestration-heavy session** (git/gh, PR babysitting, doc/memory work --- little actual compute), prefer launching Claude Code **on the login node** and dispatching each real compute step with `srun`/`sbatch`: the session then runs outside SLURM, so no walltime can crash it, it doesn't hold cores/memory idle for hours, and it sidesteps the nested-SLURM env-leak gotcha (the `sbatch`-from-inside-a-slice `SLURM_*` leak).
+    Reserve `claude-alloc` for **compute-heavy** sessions (R tests, renders, simulations start to finish), where wrapping the session once beats `srun`-ing every step.
+    The agent's Bash tool can't hold its own persistent interactive `salloc` across calls anyway (each call is a fresh shell), so "the agent manages its own slice" isn't an option --- it's either a user-launched slice (`claude-alloc`) or per-command `srun`/`sbatch`.
+    A login-node session's own footprint (git/gh/grep/edits/orchestration) is light and fine on the head node; only real compute must be dispatched.
   - Defaults: 8 hwthreads (4 physical cores), `--mem=32G`, `--time=24:00:00`,
     `--exclude=c1` (the GPU node). Override per-launch with `ALLOC_CPUS`,
     `ALLOC_MEM`, `ALLOC_TIME`. The walltime default was 12h until 2026-07-24

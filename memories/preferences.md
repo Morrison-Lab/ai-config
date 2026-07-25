@@ -225,6 +225,11 @@
 - **AI memories, skills, and commands never stay local-only.** When I capture a durable learning, commit it to the right repo via PR — GENERAL/cross-project learnings go to `d-morrison/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
   A memory kept only under `~/.claude/projects/<path>/memory/` or `~/.codex/memories/` is invisible to other sessions, machines, and humans, and rots silently — so migrate it.
   Capturing a learning isn't done until it's committed where the right audience will see it.
+- **A migrate-then-delete cleanup (copy content into a repo, THEN delete the local source) must verify the copy is both COMPLETE and CURRENT before deleting --- not just that it exists.**
+  A migration commits a point-in-time snapshot, but the local source keeps evolving, so a copy made days earlier can be missing later edits --- or carry a policy the source has since reversed.
+  Diff each file against the merged target before deleting it.
+  And fact-check the migrated CONTENT against current repo state, because copying preserves stale claims verbatim: a memory paragraph can describe a bug as still-open (naming a since-removed function) when a later PR already fixed it and closed the issue.
+  (ucdavis/bcs#427, 2026-07-24: of 7 migrated memory files, 4 had newer local content the repo lacked --- one carried a superseded `--exclude=c1` policy --- and a "still-open #371" paragraph was wholly obsolete, since #377 had fixed it and closed #371. Diffed every file and checked the issue/code state before deleting the 15 local copies.)
 - In Codex sessions, treat `d-morrison/ai-config` as the canonical home for cross-project memories even if a local `~/.codex/memories/` store is present.
   The local store is not the durable source of truth; if ai-config access is missing from the environment, restore access first rather than writing the memory only locally.
 - When committing, stage the SPECIFIC files you touched — NEVER `git add -A`.

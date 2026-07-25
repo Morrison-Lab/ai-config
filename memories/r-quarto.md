@@ -821,6 +821,40 @@ source build that needs XQuartz libs the runner lacks; self-healed when the
 binary appeared ~7h later, so the right move was retry-later
 (`rerun_failed_jobs`), not a code change.
 
+## Editing a generated `README.md` when the R toolchain is unavailable
+
+`README.md` is generated from `README.Rmd`, and the standing rule is not to
+hand-edit it. But a remote/web session often has neither `rmarkdown` nor
+`knitr` installed, so `rmarkdown::render()` isn't an option -- while `pandoc`
+usually *is* on `PATH`. For a prose-only edit (no R code in the changed
+chunk), the rendered form can be reproduced directly. Copy the affected
+paragraph out of `README.Rmd` into a scratch file -- `para.md` below -- keeping
+its source line breaks exactly, then run:
+
+```bash
+pandoc para.md -f markdown -t gfm --wrap=auto --columns=72
+```
+
+**Validate the invocation before trusting it: run it against the UNMODIFIED
+paragraph first and confirm it reproduces the currently-committed `README.md`
+text byte-for-byte.** That check is what turns a guess about wrap width into
+evidence -- if the flags are wrong, the unmodified text won't round-trip, and
+you find out before writing anything. Only then apply the same command to the
+corrected source and commit its output.
+
+Two scope limits. This works only where the edit touches no evaluated R code
+(otherwise the chunk output matters and pandoc alone can't produce it), and
+the repo's own `check-readme` job is still the real verification -- say so in
+the PR rather than claiming the render was run. Note that `check-readme` (as
+configured in `UCD-SERG/serocalculator`) only asserts that
+`rmarkdown::render("README.Rmd")` *succeeds*; it does not diff the result
+against the committed `README.md`, so a stale README is not hard-gated and
+staying in sync is on the author.
+
+(`UCD-SERG/serocalculator#605`, 2026-07-25: a one-sentence README link fix,
+verified this way and merged; the reviewer independently confirmed the two
+files stayed consistent.)
+
 ## Rex + base regex engines in R
 
 - `rex::rex()` patterns often emit PCRE constructs; do not pass those directly to APIs that use POSIX regex defaults (for example `list.files(pattern = ...)`). List/filter in two steps and match with `grepl(..., perl = TRUE)` (and similarly `gregexpr`/`gsub` with `perl = TRUE`) when using rex-built patterns.

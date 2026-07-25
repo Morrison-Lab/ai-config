@@ -251,6 +251,17 @@
   reviewer already can" inside a code span; the run opened #683, worked ~8
   minutes, then died at the push step on the `WORKFLOW_TOKEN` gap, losing the
   work.)
+  **Once fired, a remote/web session cannot call it back -- so prevention is
+  the only control.** `cancel_workflow_run` 403s exactly like
+  `rerun_failed_jobs` does (see `memories/github.md`), and no MCP tool edits
+  an existing comment, so the mention can't be defused after the fact either.
+  Editing would not help regardless: the caller stubs trigger on
+  `issue_comment: [created]`, so an already-fired comment cannot re-fire, and
+  a later edit changes nothing. Don't spend retries discovering this. (Fifth
+  instance, `UCD-SERG/serocalculator#605`, 2026-07-25: a comment reporting a
+  CI blocker said "another `@claude` review (about $1.24)" -- backticked and
+  purely descriptive -- and spawned a $0.43 run that correctly no-op'd.
+  Both a cancel attempt and a search for a comment-edit tool came up empty.)
 - **Dispatched reviews now post a PR comment (gha#89, now in `v1`).** Before this fix,
   `workflow_dispatch` runs wrote output to the step summary only —
   `github.event.pull_request.number` is null for dispatch events, so the action's
@@ -438,7 +449,6 @@
   dispatch call, including in `.github/workflows/claude-review.yml`, but the
   push to `claude/issue-285-...` 403'd on exactly that file; re-implemented
   and pushed from the Claude Code web session instead.)
-
 ## d-morrison/gha reusable workflows
 Check `d-morrison/gha` before writing bespoke CI — it has reusable workflows for
 common patterns.

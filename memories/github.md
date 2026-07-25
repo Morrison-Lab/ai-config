@@ -56,7 +56,9 @@
   absent from one check — `ToolSearch` for what you need before deciding it's
   missing (and don't assume the `github_ci` server is present either).
 - **`mcp__github__actions_run_trigger` can't re-run CI jobs in these sessions —
-  it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`) returns
+  it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`, and
+  `cancel_workflow_run` -- the whole `actions: write` family, so you can neither
+  restart a run nor stop one) returns
   `403 Resource not accessible by integration`: the integration token lacks the
   `actions: write` the re-run API needs. So a flaky CI failure can't be re-kicked
   via MCP — **push a commit to re-trigger the whole workflow** (the normal path
@@ -418,6 +420,35 @@
   mode before flagging this to the user. (gha#204 session, 2026-07-03: `rme`
   succeeded immediately after the user switched modes; `epi204`/`epi202` then
   failed with the real cross-tier error instead.)
+- **The MCP write tools silently drop `<https://...>` angle-bracket autolinks
+  from PR and issue bodies.** A body posted through `create_pull_request`,
+  `update_pull_request`, or `issue_write` comes back with the whole
+  `<...>` span gone, leaving a double space where the URL was --
+  "pointed readers at&nbsp;&nbsp;for the in-development documentation."
+  Presumably the angle brackets are treated as an HTML tag and stripped
+  somewhere in the write path; whatever the mechanism, the URL never reaches
+  GitHub. It is silent (the call succeeds) and easy to miss, because nothing
+  in the tool result flags it and the sentence still reads as a sentence.
+  Especially costly when the URL *is* the subject -- a PR about a broken link
+  losing exactly that link.
+  **Backticks do NOT protect it.** The sanitizer runs over the raw body
+  string with no regard for Markdown context, so an angle-bracket span inside
+  a code span is stripped exactly like a bare one, leaving an empty pair of
+  backticks. This is the same formatting-blind-substring failure mode as the
+  bot-mention gate in `memories/github-actions.md` -- a pass that inspects
+  raw text while the author reasons in rendered Markdown.
+  **Write the URL with no angle brackets at all**: a `[text](url)` link, or
+  the bare `https://...` (GitHub auto-links it in a PR body anyway). Then
+  re-read the stored body after posting when a URL matters -- the call
+  succeeds either way, so the tool result never tells you.
+  Note this is a quirk of the MCP write path, not of GitHub or of Markdown
+  files: angle-bracket autolinks in a committed `README.md` render fine and
+  should be left alone.
+  (`UCD-SERG/serocalculator#605` and its issue #604, 2026-07-25: both bodies
+  lost the same URL this way. The backticked-is-safe assumption was then
+  disproved by this very bullet's own PR, `ai-config#724`, whose description
+  lost an angle-bracket span from inside a code span in the heading that
+  introduced this entry.)
 - `d-morrison/gha`'s `CLAUDE.md` carries its own `gh`->MCP substitution table
   (the "GitHub access in remote / web sessions" section), scoped to that repo.
   `d-morrison/ai-config` has its own cross-model registry at

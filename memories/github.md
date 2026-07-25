@@ -264,6 +264,19 @@
   href-based cross-check against the commit permalink URL, repeated across
   three independent fetches, confirmed the same 40-char value each time
   before it was used in the fix.)
+- **Read a commit SHA back from git before citing it in a comment; never
+  write one from memory.** The bullet above covers a SHA *garbled in
+  transit* by WebFetch; this is the adjacent failure of never having looked
+  it up at all. A PR reply that names "the commit that fixed this" is a
+  checkable reference, and an invented one sends every later reader to
+  nothing. `git rev-parse --short HEAD` immediately after the push costs one
+  call. Correct a wrong one on the thread promptly rather than at leisure:
+  an automated reviewer gathers comments when its run starts, so a
+  fabricated SHA left standing gets copied into the reviewer's own verdict
+  and becomes a second durable artifact to chase. (ai-config#696: a reply
+  cited `0d2ec06`, which existed nowhere on the branch -- the real commit
+  was `30ac111` -- and the `@claude` reviewer quoted `0d2ec06` back in its
+  next review before the correction landed.)
 - **In a fresh web/remote container, local `origin/*` refs can be stale or
   phantom — verify true remote state via MCP, not local refs.** The clone's
   `remotes/origin/main` may lag the real default branch by already-merged

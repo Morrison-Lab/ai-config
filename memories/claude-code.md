@@ -185,9 +185,18 @@
   churn only shows up in the diff size. Do a targeted regex replacement of
   the `description:` entry through to the next top-level key instead, and
   emit the value via `json.dumps` (a valid YAML double-quoted scalar, and
-  the style several skills already use). Use a lambda as the `re.sub`
-  replacement, or JSON's own `\uXXXX` escapes get read as regex group
-  templates and raise `bad escape \u`. (ai-config#700: the safe_dump
+  the style several skills already use). Pass the replacement as a **lambda**
+  rather than a string: `re.sub` parses a string replacement as a template
+  and interprets its backslash escapes, and `\u` is not one of the escapes
+  that template accepts, so a `json.dumps` result containing `\uXXXX` raises
+  `re.error: bad escape \u`. (Distinct from a group-reference failure, which
+  reports `invalid group reference` instead -- `\1` and `\q` produce
+  different errors, confirming `\u` fails as an unrecognized escape, not as
+  a mis-parsed group.) A lambda skips template parsing entirely, so its
+  return value is used verbatim. This only bites when the value actually
+  contains non-ASCII -- `json.dumps` defaults to `ensure_ascii=True` and
+  emits `\uXXXX` only then -- but the lambda costs nothing and removes the
+  conditional. (ai-config#700: the safe_dump
   approach turned a 63-line change into 427 insertions across 63 files
   before being reverted and redone surgically.)
 

@@ -203,6 +203,45 @@ explains `blocked`, and it clears on its own once they finish. Only dig into
 branch-protection settings if `blocked` persists after every check is
 `completed`.
 
+## A CI job that STALLS looks identical to one that's merely slow -- diff the log twice, don't judge from one sample
+
+- Signature: a required check sits `in_progress` far past its normal
+  runtime, so the PR stays `mergeable_state: blocked` (the entry above)
+  with nothing red to point at. Reading the job's log tail once shows
+  plausible in-flight work (package resolution, a build step) and recent
+  timestamps, which reads as "slow, still going."
+- Mechanism: a single log sample cannot distinguish progress from a hang.
+  The timestamps on the last lines are when those lines were WRITTEN, not
+  when you read them -- a job frozen 20 minutes ago still shows the
+  timestamp of its last successful write, which looked "recent" at the
+  moment it stalled.
+- Fix/check: two mechanical comparisons, not a judgment call.
+  1. **Baseline the duration.** `actions_list` `list_workflow_runs` on
+     that workflow gives the recent runs' start/update times; compute
+     durations and compare. A 40-minute run against a 2-6 minute norm is
+     a signal on its own.
+  2. **Sample the log twice, minutes apart, and compare BOTH the last
+     timestamp and the byte length** (`get_job_logs`'s `original_length`).
+     Identical on both = no output at all in the interval = stalled.
+     A slow-but-live job advances at least one of them.
+  Also check whether the same branch's PREVIOUS run of that workflow
+  passed -- if it did, the job is at fault, not the diff.
+- Caveat: GitHub's live-log API can buffer for in-progress jobs, so a
+  static log is strong evidence, not proof. Weigh it with the duration
+  baseline rather than alone.
+- Remedy may be out of reach: in a Claude Code remote/web session the
+  GitHub token is typically denied Actions write --- both
+  `cancel_workflow_run` and `rerun_workflow_run` return
+  `403 Resource not accessible by integration`. Don't burn rounds
+  retrying; report the stalled run and ask the human to hit Re-run, and
+  offer the empty-commit retrigger as the alternative (noting its cost:
+  it re-runs the whole matrix, and it only displaces the stuck run if
+  that workflow actually sets `cancel-in-progress`).
+  (UCD-SERG/serocalculator#598, 2026-07-25: `lint-changed-lines` stalled
+  ~40 min against a 2-6 min norm; the same branch's prior run of it had
+  passed in 4:33. Reported as slow-not-hung at first on a single log
+  read, corrected only after a second read showed a byte-identical log.)
+
 ## Test implicit path coverage when a change affects more branches than described
 When a code block is placed in a shared path (e.g. the non-append `else:` branch
 of an order dispatcher), it implicitly covers every non-append command type —
@@ -655,6 +694,66 @@ occurrence, not the flagged one.)
 - (ucdavis/bcs, 2026-07-18: 24 preview dirs put `gh-pages` at 1.05 GB; PR
   #375's preview and the post-merge production deploy both sat unserved on
   the branch while the URL 404'd; one dispatch dropped the tree to 0.09 GB.)
+
+## Quarto `_metadata.yml` gets NO knitr pass -- inline R there renders as "Invalid Date"
+
+- Signature: a Quarto document's title block shows a literal
+  `Invalid Date` where a date should be. Affects every format the file
+  renders to (HTML title block, revealjs title slide, docx), so it is not
+  a format-specific quirk.
+- Mechanism: knitr evaluates inline R (`` `r expr` ``) in the document
+  body and in the document's **own** YAML front matter. A directory-level
+  `_metadata.yml` is a plain YAML file that Quarto merges into the
+  document metadata directly, with no knitr pass -- so
+  ``date: '`r Sys.Date()`'`` reaches Quarto's date handling as a literal
+  backtick string, fails to parse, and renders as `Invalid Date`.
+- Fix: use Quarto's own resolved keywords, which need no R evaluation --
+  `date: today` (or `now` / `last-modified`). `today` resolves to the same
+  current date `Sys.Date()` was meant to produce; how it is *displayed* is
+  a separate question, controlled by `date-format`. Leave a comment
+  next to it, or the inline-R form gets reintroduced by the next person who
+  "fixes" the hardcoded-looking value.
+- The per-format display defaults differ, which is easy to mistake for a
+  bug when comparing two outputs of the same document. With no
+  `date-format` set, the same `date: today` renders as a locale long date
+  in HTML (`July 25, 2026`) but as ISO in revealjs (`2026-07-25`) --
+  observed on one render of the reprex below under Quarto 1.10.18
+  (2026-07-25), not looked up as a documented guarantee.
+  Set `date-format: iso`
+  explicitly if you need them to agree. Note that the `dcterms.date` meta
+  tag is always ISO in both, so grepping the raw HTML for `\d{4}-\d\d-\d\d`
+  finds a match even when the visible date is not ISO -- read the title
+  block's own text, not just any date-shaped string in the file.
+- Reprex (fast, no package deps): put the date in a `vignettes/_metadata.yml`,
+  add a trivial `.qmd` beside it, `quarto render`, then
+  `grep -c 'Invalid Date'` the outputs. The same throwaway-`.qmd`-beside-the-
+  real-`_metadata.yml` trick verifies a fix against the REAL metadata file
+  without needing the package's own render dependencies.
+  (UCD-SERG/serocalculator#597/#598, 2026-07-25.)
+
+## Verify a rendered docs site via the `gh-pages` blob, not the Pages URL (which 403s WebFetch)
+
+- Signature: you want to confirm a docs/render fix actually landed on a
+  deployed site (a PR preview, `/dev/`), but `WebFetch` on the
+  `*.github.io` URL returns `403 Forbidden`, and `curl` to it can fail
+  outright at the transport layer.
+- Mechanism: GitHub Pages rejects these fetches (apparently anti-scraping).
+  The deployed bytes are still a plain file in the repo -- Pages serves the
+  `gh-pages` branch -- so they are reachable through the raw-blob host,
+  which does not 403 for public repos.
+- Fix/check: map the site URL to its branch path and raw-fetch it:
+  `https://raw.githubusercontent.com/<owner>/<repo>/gh-pages/<path-after-the-site-root>`
+  -- e.g. a preview at `<site>/pr-preview/pr-598/vignettes/x.html` is
+  `.../gh-pages/pr-preview/pr-598/vignettes/x.html`. Then grep the HTML for
+  the thing you're verifying.
+- This is strictly better than the "403 on the docs page, so raw-fetch its
+  `.qmd` source instead" fallback in `d-morrison/gha`'s `CLAUDE.md`: the
+  source only tells you what SHOULD render, while the `gh-pages` blob is the
+  actual rendered artifact the reader sees, so it verifies the whole
+  toolchain end to end.
+  (UCD-SERG/serocalculator#598, 2026-07-25: confirmed the fixed title slide
+  read `2026-07-25` with zero `Invalid Date` on the real PR preview, after
+  both `WebFetch` and `curl` to the Pages URL failed.)
 
 ## Dead rdrr.io self-links on an altdoc docs site = downlit couldn't discover the site
 

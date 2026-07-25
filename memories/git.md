@@ -30,11 +30,11 @@
 - Real demonstration of the gap, on `git/git`'s annotated `v2.9.5`:
   ```
   $ git ls-remote https://github.com/git/git 'refs/tags/v2.9.5' 'refs/tags/v2.9.5^{}'
-  dcba104ffdcf2f27bc5058d8321e7a6c2fe8f27e	refs/tags/v2.9.5
-  4d4165b80d6b91a255e2847583bd4df98b5d54e1	refs/tags/v2.9.5^{}
+  dcba104ffdcf2f27bc5058d8321e7a6c2fe8f27e  refs/tags/v2.9.5
+  4d4165b80d6b91a255e2847583bd4df98b5d54e1  refs/tags/v2.9.5^{}
 
   $ git ls-remote --refs https://github.com/git/git 'refs/tags/v2.9.5'
-  dcba104ffdcf2f27bc5058d8321e7a6c2fe8f27e	refs/tags/v2.9.5
+  dcba104ffdcf2f27bc5058d8321e7a6c2fe8f27e  refs/tags/v2.9.5
   ```
   `--refs` returns `dcba104` --- the **tag object** --- as its only line, with
   nothing marking it as such.

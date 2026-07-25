@@ -101,6 +101,29 @@ with tempfile.TemporaryDirectory() as tmp:
     check("excludes the MEMORY.md index", "MEMORY.md: " not in out)
     check("excludes session/ notes", "session/notes.md: " not in out)
 
+    # Prove the session/ exclusion is load-bearing rather than dead code:
+    # a DEFAULT git pathspec wildcard matches `/`, so `git ls-files --
+    # "memories/*.md"` does return nested paths and the prefix filter is what
+    # removes them. (It is the explicit `:(glob)` magic that stops `*` from
+    # matching `/` -- not the default.) Asserting both halves means a future
+    # reader does not have to take either claim on trust.
+    listed = subprocess.run(
+        ["git", "ls-files", "--", "memories/*.md"],
+        cwd=repo, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    check(
+        "default pathspec DOES return nested session/ paths",
+        "memories/session/notes.md" in listed,
+    )
+    globbed = subprocess.run(
+        ["git", "ls-files", "--", ":(glob)memories/*.md"],
+        cwd=repo, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    check(
+        ":(glob) magic is what stops * from matching /",
+        "memories/session/notes.md" not in globbed,
+    )
+
 # The real corpus must stay under the shipped default, or the check ships red.
 findings = cmfs.oversized_files("memories", cmfs.DEFAULT_MAX_LINES)
 check(

@@ -41,6 +41,21 @@ DEFAULT_MAX_LINES = 1200
 
 # `MEMORY.md` is the index, not a memory file; `session/` holds
 # conversation-scoped notes that are never meant to persist or be split.
+#
+# The `session/` prefix filter is load-bearing, NOT redundant with the
+# `<dir>/*.md` pathspec below. In a DEFAULT git pathspec a wildcard does
+# match `/`; it is the explicit `:(glob)` magic that stops it, not the
+# default. So `memories/*.md` returns nested files too:
+#
+#   $ git ls-files -- "memories/*.md"
+#   memories/session/notes.md
+#   memories/top.md
+#   $ git ls-files -- ":(glob)memories/*.md"
+#   memories/top.md
+#
+# Without this filter, session notes would be scanned and flagged.
+# `test_check_memory_file_size.py` asserts the `git ls-files` half of this
+# directly, so the claim is checked rather than trusted.
 _EXCLUDED_NAMES = ("MEMORY.md",)
 _EXCLUDED_PREFIXES = ("memories/session/",)
 

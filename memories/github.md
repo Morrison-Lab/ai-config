@@ -538,6 +538,32 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
 - The git proxy proxies ONLY git operations — there is no `gh`/`glab` and no
   GitHub REST API reachable from a Bash/Monitor script. Use `mcp__github__*`
   tools for any API need.
+  - **For a repo outside the session's GitHub scope, `mcp__github__*` is not a
+    fallback either — but git operations still are.**
+    The proxy answers `403` for an out-of-scope repo with a body that names the
+    scope as the reason, rather than a generic denial:
+    ```
+    $ curl -sS https://api.github.com/repos/actions/checkout
+    {"message":"GitHub access to this repository is not enabled for this
+     session. Use add_repo to request access. ..."}
+    ```
+    The session's own repo-scope rule limits the MCP tools to that same list,
+    so switching to them is not a way around it.
+    But `git ls-remote https://github.com/<owner>/<repo>` works against any
+    public repo whatever the scope is, because it is a git operation and the
+    proxy passes those through unchanged.
+    That answers every ref question the REST API would have — which tags and
+    branches exist, and which shas they point at — and that is usually the
+    whole reason an out-of-scope repo came up.
+    So the ladder is: MCP tools, then `add_repo` if the repo genuinely needs
+    API or write access, then `git ls-remote` for anything that is only a ref
+    lookup.
+    See [`git.md`](git.md)'s "Resolving a tag to a COMMIT sha" for the exact
+    refspec form to ask for.
+    (d-morrison/altdoc#65, 2026-07-26: SHA-pinning seven third-party actions
+    needed tag shas from `actions/`, `r-lib/`, `r-hub/`, `quarto-dev/`, and
+    `JamesIves/`, none of them in session scope, and `add_repo` would have been
+    five pointless scope grants for five ref lookups.)
 - **The proxy allows branch creation/push but BLOCKS branch deletion.** Pushing a
   *new* branch (even one other than the harness-assigned `claude/...`) works, but a
   delete push — `git push origin --delete <b>` or `git push origin :<b>` — is rejected.

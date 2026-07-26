@@ -48,6 +48,25 @@
   git fetch -q --depth 1 o <sha>
   git cat-file -t <sha>          # want: commit   (a `tag` here means you peeled wrong)
   ```
+- **The commit sha is only half of a pin — the trailing version comment is a
+  claim too, and the tag you looked up does not tell you what to write.**
+  Pinning `actions/checkout@v4` and commenting `# v4` restates the input and
+  tells a reader nothing.
+  The comment earns its place by naming the release the pin actually sits on,
+  which means finding every tag that points at the same commit:
+  ```bash
+  git ls-remote --tags https://github.com/<owner>/<repo> |
+    awk -v s="<commit-sha>" '$1==s {print $2}'
+  ```
+  The major tag, any minor alias, and the exact release all come back together,
+  so the most specific one is visible rather than guessed at.
+  Guessing is the failure worth naming: a version comment is a factual claim
+  sitting next to an opaque sha, so a wrong one is both undetectable at a
+  glance and exactly what a later reader will trust.
+  (d-morrison/altdoc#65, 2026-07-26: `quarto-dev/quarto-actions@v2` resolved to
+  a commit carrying `v2`, `v2.2`, and `v2.2.0` — only `# v2.2.0` was worth
+  writing, and no amount of reasoning about the `@v2` in the workflow would
+  have produced it.)
 - This is an [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)
   case: two commands decide it exactly, so never write a pin from recollection
   or from a ref listing you did not check the peel state of.

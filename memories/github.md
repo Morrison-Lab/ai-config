@@ -55,6 +55,27 @@
   which can connect asynchronously after session start. Don't conclude a tool is
   absent from one check — `ToolSearch` for what you need before deciding it's
   missing (and don't assume the `github_ci` server is present either).
+- **An angle-bracket placeholder can vanish from a PR or issue body posted
+  through these tools, backticks and all.**
+  A PR body written with `` `git ls-remote https://github.com/<owner>/<repo>` ``
+  came back from the API as `git ls-remote https://github.com//`, with both
+  placeholders gone.
+  A code span does not protect them, so the usual instinct that backticks make
+  text literal is wrong here.
+  What is lost is the *stored* body, not one rendering of it, so re-reading or
+  re-rendering will not bring it back.
+  The blast radius is narrower than it first looks, and worth knowing precisely:
+  only text sent as a body through the API is affected.
+  A `<placeholder>` inside a file committed in the same PR is untouched, so a
+  memory entry documenting a command survives while the PR description quoting
+  that same command does not.
+  Write placeholders in a body without brackets --- `OWNER/REPO`, `PATH`, `N`
+  --- and re-read the body after posting whenever the exact text matters.
+  This is the "Postcondition gate" bullet at the top of this file made concrete:
+  nothing errors, the object is created exactly as asked, and only reading the
+  stored result back shows the content is not what was sent.
+  (ai-config#734, 2026-07-26: caught only because the mangled URL happened to be
+  re-read during an unrelated check.)
 - **`mcp__github__actions_run_trigger` can't re-run CI jobs in these sessions —
   it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`, and
   `cancel_workflow_run` -- the whole `actions: write` family, so you can neither

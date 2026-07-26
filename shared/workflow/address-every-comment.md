@@ -135,3 +135,26 @@ too high, since the composite action's directory and the script inside it
 share a name. `git ls-files` in the gha checkout settled it in one command.
 Applying the suggestion verbatim would have documented a nonexistent path
 in the entry whose whole purpose is getting someone to run that script.)
+
+**The same check applies to a fix a reviewer describes in prose rather than
+in a `suggestion` block, and the sharpest test is the reviewer's own
+example.**
+A finding that ships a concrete repro case has handed you a test fixture:
+run the proposed fix against that very case before adopting it.
+A reviewer reasoning about a fix in the abstract can propose one that is
+directionally right and still insufficient -- it closes the failure mode
+they named while leaving the case they cited broken -- and adopting it
+verbatim converts their partial diagnosis into your shipped bug, with the
+review thread reading as though the item were settled.
+When the proposed fix falls short, prefer eliminating the failure mode
+outright over layering another patch onto it, and post the evidence
+(the fix applied to their example, and what it still produces) rather than
+just asserting it was insufficient.
+(gha#318, 2026-07-26: a review correctly found that a heredoc-terminator
+regex lacked an end-of-line anchor, and suggested adding one.
+Tested against the reviewer's own indented-`EOF` example, the suggested
+anchor still truncated the body, because the terminator's leading `[ \t]*`
+accepted a space-indented closing line real bash rejects.
+Matching whole lines against the tag -- how bash itself ends a heredoc --
+removed the whole lazy-quantifier/anchor failure mode instead of narrowing
+it; the reply carried the failing output of the suggested form.)

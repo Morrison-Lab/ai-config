@@ -580,3 +580,34 @@ violations found afterward --- #730's by the check itself once the first
 commit existed, #732's by a reviewer.
 The second time is what makes this worth recording, since the entry above
 already existed and was not applied.)
+
+## Picking the diff range when self-checking a PR: `..` vs `...` vs the working tree
+
+Three forms answer three different questions, and reaching for the wrong one
+produces a confident, wrong read of your own PR.
+
+- `git diff origin/main..HEAD` (two dots) compares the two **tips**.
+  When your branch is behind `main`, main's newer commits show up as
+  **deletions** -- files your PR never touched look removed by it.
+- `git diff origin/main...HEAD` (three dots) compares against the **merge
+  base**, which is the PR's actual diff and what GitHub shows.
+  Use this to reason about what the PR changes.
+- `git diff origin/main` (no second ref) compares the **working tree**, so it
+  includes uncommitted edits; both `..` and `...` see only committed work.
+
+Both mistakes hit the same session (gha#318, 2026-07-26).
+The two-dot form made #317's changelog fragment -- merged to `main` after the
+branch was cut -- appear deleted by the PR, and it was nearly reported to the
+user as a finding before `...` showed the real four-file diff.
+Later, a non-ASCII/em-dash self-check run as `git diff origin/main...HEAD |
+grep` printed clean while the em-dashes sat uncommitted in the working tree;
+`git diff origin/main` found them immediately.
+
+That second failure is the by-hand instance of the diff-scoped-no-op section
+above, with a second fix available: when the edits are deliberately still
+uncommitted, use the worktree-comparing `git diff origin/main` rather than
+committing first just to make a check see them.
+After you merge `main` into the branch, the merge base becomes `origin/main`
+and all three forms agree on committed content -- which is exactly when it is
+easiest to stop thinking about the distinction and get bitten by the next
+stale-branch case.

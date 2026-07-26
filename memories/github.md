@@ -535,9 +535,51 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
   - Check existing: `glab api "/projects/<ID>/job_token_scope/allowlist"`
 
 ## GitHub access from bash in remote/web sessions
-- The git proxy proxies ONLY git operations — there is no `gh`/`glab` and no
-  GitHub REST API reachable from a Bash/Monitor script. Use `mcp__github__*`
-  tools for any API need.
+- There is no `gh`/`glab` CLI in these sessions, so `mcp__github__*` is the
+  normal path for anything the API would answer.
+  - **The REST API itself is not necessarily unreachable from bash, though ---
+    it can be scope-limited instead, so test rather than assume.**
+    This entry asserted flatly that no REST API was reachable from a
+    Bash/Monitor script until 2026-07-26, when a session found otherwise.
+    A plain `curl` to `api.github.com` went through the agent proxy and
+    answered normally for a repo in that session's GitHub scope:
+    ```
+    $ curl -sS -o /dev/null -w '%{http_code}\n' \
+        https://api.github.com/repos/d-morrison/altdoc
+    200
+    ```
+    For a repo outside the scope it returned `403`, with a body naming the
+    scope as the reason rather than a generic denial:
+    ```
+    $ curl -sS https://api.github.com/repos/actions/checkout
+    {"message":"GitHub access to this repository is not enabled for this
+     session. Use add_repo to request access. ..."}
+    ```
+    Sandbox policy varies, so the older claim may well have been true of the
+    environment it was written in --- which is the point: check the behavior
+    in the sandbox you are actually in.
+    The consequence bullet below, that a background Monitor cannot poll PR
+    state, rests on the same assumption and deserves the same re-check before
+    you rely on it either way.
+  - **For a repo outside the scope, `mcp__github__*` is not a fallback either
+    --- but git operations are.**
+    The scope limits the MCP tools to the same repo list, so switching to them
+    does not get around a `403`.
+    `git ls-remote https://github.com/<owner>/<repo>` works against any public
+    repo whatever the scope is, because it is a git operation and the proxy
+    passes those through unchanged.
+    That answers every ref question the REST API would have --- which tags and
+    branches exist, and which shas they point at --- and that is usually the
+    whole reason an out-of-scope repo came up.
+    So the ladder is: MCP tools, then `add_repo` if the repo genuinely needs
+    API or write access, then `git ls-remote` for anything that is only a ref
+    lookup.
+    See [`git.md`](git.md)'s "Resolving a tag to a COMMIT sha" for the exact
+    refspec form to ask for.
+    (d-morrison/altdoc#65, 2026-07-26: SHA-pinning seven third-party actions
+    needed tag shas from `actions/`, `r-lib/`, `r-hub/`, `quarto-dev/`, and
+    `JamesIves/`, none of them in session scope, and `add_repo` would have been
+    five pointless scope grants for five ref lookups.)
 - **The proxy allows branch creation/push but BLOCKS branch deletion.** Pushing a
   *new* branch (even one other than the harness-assigned `claude/...`) works, but a
   delete push — `git push origin --delete <b>` or `git push origin :<b>` — is rejected.

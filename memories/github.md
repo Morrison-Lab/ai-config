@@ -60,8 +60,13 @@
   A PR body written with `` `git ls-remote https://github.com/<owner>/<repo>` ``
   came back from the API as `git ls-remote https://github.com//`, with both
   placeholders gone.
-  A code span does not protect them, so the usual instinct that backticks make
-  text literal is wrong here.
+  **No markdown construct protects them.**
+  A controlled test posted the same string four ways in one body --- plain
+  prose, an inline code span, an indented code block, and a fenced code block
+  --- and all four came back stripped, so the removal happens to the raw body
+  text and never reaches markdown parsing.
+  The instinct that backticks make text literal is therefore wrong twice over
+  here: neither the span nor the fence helps.
   What is lost is the *stored* body, not one rendering of it, so re-reading or
   re-rendering will not bring it back.
   The blast radius is narrower than it first looks, and worth knowing precisely:

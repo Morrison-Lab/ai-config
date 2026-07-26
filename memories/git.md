@@ -56,10 +56,18 @@
   which means finding every tag that points at the same commit:
   ```bash
   git ls-remote --tags https://github.com/<owner>/<repo> |
-    awk -v s="<commit-sha>" '$1==s {print $2}'
+    awk -v s="<commit-sha>" '$1==s {sub(/\^[{][}]$/,"",$2); print $2}'
   ```
   The major tag, any minor alias, and the exact release all come back together,
   so the most specific one is visible rather than guessed at.
+  Two details in that one-liner, both load-bearing.
+  The `sub()` is needed because an **annotated** tag's line matching the commit
+  is the peeled one, so `$2` arrives as `refs/tags/v2.9.5^{}` and reading the
+  version straight off it writes a comment with a `^{}` glued to the end.
+  And the suffix has to be matched as `\^[{][}]` rather than `\^{}`: mawk,
+  which is `awk` on Debian and Ubuntu, parses a bare `{}` as an interval
+  expression and dies with `regular expression compile failed (bad interval
+  expression)` --- bracketing each brace makes it a literal in every awk.
   Guessing is the failure worth naming: a version comment is a factual claim
   sitting next to an opaque sha, so a wrong one is both undetectable at a
   glance and exactly what a later reader will trust.

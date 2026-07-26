@@ -48,7 +48,7 @@
   git fetch -q --depth 1 o <sha>
   git cat-file -t <sha>          # want: commit   (a `tag` here means you peeled wrong)
   ```
-- **The commit sha is only half of a pin — the trailing version comment is a
+- **The commit sha is only half of a pin --- the trailing version comment is a
   claim too, and the tag you looked up does not tell you what to write.**
   Pinning `actions/checkout@v4` and commenting `# v4` restates the input and
   tells a reader nothing.
@@ -72,7 +72,7 @@
   sitting next to an opaque sha, so a wrong one is both undetectable at a
   glance and exactly what a later reader will trust.
   (d-morrison/altdoc#65, 2026-07-26: `quarto-dev/quarto-actions@v2` resolved to
-  a commit carrying `v2`, `v2.2`, and `v2.2.0` — only `# v2.2.0` was worth
+  a commit carrying `v2`, `v2.2`, and `v2.2.0` --- only `# v2.2.0` was worth
   writing, and no amount of reasoning about the `@v2` in the workflow would
   have produced it.)
 - This is an [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)

@@ -659,12 +659,12 @@ $ git ls-files -- '*.md' | wc -l
 28
 $ git ls-files -- '**/*.md' | wc -l
 23
-$ git ls-files -- '**/*.md' | grep -v /     # root-level hits
-(none)
+$ git ls-files -- '**/*.md' | grep -v /     # any root-level hits?
 ```
 
-The five files the second form loses are `NEWS.md`, `README.md`, `CLAUDE.md`,
-`AGENTS.md`, and `LICENSE.md` -- in most repos, the ones that matter most.
+The third command prints nothing at all: `**/*.md` matches no root-level file.
+The five it loses are `NEWS.md`, `README.md`, `CLAUDE.md`, `AGENTS.md`, and
+`LICENSE.md` -- in most repos, the ones that matter most.
 
 **Why this is worth a section rather than a footnote: the wrong form fails
 silently.** `*.md` reads as non-recursive to anyone carrying shell intuition,
@@ -682,15 +682,18 @@ Two files, one at the root and one nested, in the same repo:
 
 ```console
 $ npx markdownlint-cli2 '**/*.md'      # globby
-Linting: 2 file(s)                     # root.md AND sub/nested.md
+Linting: 2 file(s)
 
 $ git ls-files -- '**/*.md'            # git pathspec
-sub/nested.md                          # root.md dropped
+sub/nested.md
 
 $ git ls-files -- '*.md'               # git pathspec
 root.md
 sub/nested.md
 ```
+
+Globby's `**/*.md` finds both files; the identical pathspec finds only the
+nested one, and `*.md` is the pathspec that matches what globby matched.
 
 This corpus relies on both conventions at once, correctly: its own
 `.markdownlint-cli2.jsonc` sets `"globs": ["**/*.md"]`, which is right because

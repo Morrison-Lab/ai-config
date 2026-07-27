@@ -264,3 +264,42 @@ just after a merge with conflicts. (gha#208: an out-of-band merge from
 landed a new item 7 directly against the PR's own item 6 with no blank
 line; `lint-markdown`'s MD022 failed with no conflict marker anywhere in
 the diff to point at.)
+
+**The same splice happens to LIST ITEMS, and there `markdownlint` most
+likely does NOT catch it --- so nothing turns red at all.** The case above
+is a heading spliced against preceding text, which MD022 decides. The
+changelog case is a *bullet* spliced onto the previous item's continuation
+line:
+
+```markdown
+  `data-raw/precompute-true-effects-chunk.R` (#429).
+* The `docs` workflow's "Build site" step no longer times out intermittently.
+```
+
+That is a valid **tight** list item, so a list in which every other entry is
+blank-line separated silently starts mixing tight and loose items and renders
+inconsistently. `markdownlint`'s blanks-around-lists rule governs the
+boundaries *of* a list, not the gaps *between* its items, and no default rule
+enforces consistent looseness within one list --- so unlike the heading case,
+CI stays green and only a human reading the merged section notices.
+
+Check it mechanically instead of by eye; one line decides it:
+
+```bash
+awk 'prev !~ /^[[:space:]]*$/ && /^\* / {print FILENAME":"NR": "$0} {prev=$0}' NEWS.md
+```
+
+Use `[[:space:]]*` rather than a bare `/^$/` --- a whitespace-only preceding
+line is not a violation and produces false positives.
+
+Two consequences. Run this after any merge into a changelog or other growing
+bulleted list, alongside the heading check above. And note that a
+`merge=union` driver on such a file (see
+[`configure-gitattributes`](../../skills/configure-gitattributes/SKILL.md))
+*increases* the rate of this defect, since union resolves an append collision
+by keeping both sides with no conflict to review --- so confirm a detector is
+wired into CI before enabling one, not after.
+(ucdavis/bcs#422/#430, 2026-07-26: a clean three-way merge spliced one PR's
+`## Bug fixes` bullet against another's; the check above then found **four**
+pre-existing instances in the same `NEWS.md`, in a repo that had no Markdown
+linting at all.)

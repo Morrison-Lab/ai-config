@@ -98,7 +98,13 @@ run_one() {
     -o "$WORK/out/$id.json" --output-schema "$WORK/schema.json" \
     - < "$WORK/prompt_$id.txt" > "$WORK/out/$id.codexlog" 2>&1
   rc=$?; sz=$(wc -c < "$WORK/out/$id.json" 2>/dev/null || echo 0)
-  grep -qiE "rate limit|quota|usage limit|429|too many requests" "$WORK/out/$id.codexlog" && flag="RATELIMIT"
+  # Only look for a rate limit when the run actually failed. Grepping the log
+  # unconditionally false-positives on any incidental mention -- a warning
+  # about approaching the limit, or prompt text quoting these words -- which
+  # sends a successfully-completed item back through Claude for nothing.
+  if [ "$rc" -ne 0 ] || [ "$sz" -eq 0 ]; then
+    grep -qiE "rate limit|quota|usage limit|429|too many requests" "$WORK/out/$id.codexlog" && flag="RATELIMIT"
+  fi
   echo "$id rc=$rc bytes=$sz $flag" >> "$WORK/status.log"
 }
 for id in <ids…>; do

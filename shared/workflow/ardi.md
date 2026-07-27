@@ -68,66 +68,6 @@ share `CLAUDE.md`'s union-merge corruption risk, a follow-up merge
 simulation showed it does --- posted the correction with repro steps on
 both PRs before either reviewer re-raised it.)
 
-**Verify a blocker you assert in a PR body or a reply, with the same rigor
-you apply to a reviewer's claims --- a stated blocker becomes a premise
-other people build on.**
-The reviewer-facing checks above all point outward: verify the suggestion,
-verify the literal, verify the push landed.
-The inward case is easier to miss, because a limit you hit yourself feels
-like an observation rather than a claim.
-It is still a claim, and writing it into a PR body publishes it as
-settled fact: a reviewer reading "the pinned tool is unavailable in this
-sandbox" will reason from it, recommend a follow-up around it, and never
-re-test it, so one unverified sentence quietly redirects the review.
-Before asserting that something is unavailable, blocked, or impossible
-here, actually attempt it once --- an install, a fetch, a single command
---- and say what you tried.
-A negative result from one incidental symptom (a failed version query, a
-single 403) is evidence the thing is not *already set up*, not evidence
-it cannot be.
-When a blocker you published turns out to be false, correct it where it
-was published, not only in the thread that surfaced it.
-(d-morrison/altdoc#76, 2026-07-27: the PR body said roxygen2 8.0.0 --- the
-version `DESCRIPTION` pins --- was unavailable, inferred from one failed
-`packageVersion()` call with no install attempted. The review built a
-"this may need a follow-up" recommendation on top of it. A single
-`install.packages()` disproved it, and the regeneration landed in the same
-round the finding did.)
-
-**An instruction's own suggested code is not exempt from the
-project-conventions self-review above.**
-The self-review rule assumes you wrote the diff; a snippet handed to you
-in an issue, a task description, or a design doc slips past it, because
-adopting someone else's suggestion does not feel like authoring.
-It is authoring --- once pushed, it is your diff, and the project's
-conventions bind it exactly as they bind anything you wrote yourself.
-Run the same convention check over borrowed code before pushing it,
-especially when the suggestion is a plausible-looking one-liner and the
-convention it breaks is documented rather than linted.
-(d-morrison/altdoc#73: the issue proposed ending a function with a bare
-trailing `hashes`, which reads as a fix for the fragility it names but is
-still an implicit return, so a statement added after it silently becomes
-the return value. The lab manual asks for an explicit `return()`
-regardless. Review caught it; the project's own stated convention would
-have, one step earlier.)
-
-**When the code path under test has a staging or transform step between
-input and output, a passing unit suite is not evidence it works ---
-exercise the real path once.**
-Fixtures instantiate the shape the test author had in mind, so a wrong
-assumption about *where* the code runs is invisible to every one of them:
-the tests and the bug share the assumption.
-This is the same gap the downstream-consumer rule below covers, one level
-in --- there the missing variety is the consumer's input, here it is the
-pipeline's own directory layout, timing, or intermediate representation.
-One real invocation is usually cheap, and it tests the assumption the
-fixtures encode rather than re-confirming it.
-(d-morrison/altdoc#76: a guard checked for the copied logo under `docs/`,
-but the `quarto_website` path stages into `_quarto/` first, so the logo
-line was dropped on every render of the one generator the feature wired
-up. Seventeen unit assertions passed throughout; one throwaway render
-found it immediately.)
-
 **A fix is not "pushed" until it is on the PR's head commit --- verify with a
 SHA comparison before telling a reviewer you pushed it.** From inside a
 session, an edited working tree and a pushed commit feel identical, so a
@@ -184,3 +124,63 @@ form of a missing-topic warning, and the documented "existing settings files
 do not pick this up automatically" caveat --- confirmed by the page
 generating while `grep -c reference.html docs/index.html` returned `0`. None
 of the three were reachable from the repo's own fixture packages.)
+
+**Verify a blocker you assert in a PR body or a reply, with the same rigor
+you apply to a reviewer's claims --- a stated blocker becomes a premise
+other people build on.**
+The reviewer-facing checks above all point outward: verify the suggestion,
+verify the literal, verify the push landed.
+The inward case is easier to miss, because a limit you hit yourself feels
+like an observation rather than a claim.
+It is still a claim, and writing it into a PR body publishes it as
+settled fact: a reviewer reading "the pinned tool is unavailable in this
+sandbox" will reason from it, recommend a follow-up around it, and never
+re-test it, so one unverified sentence quietly redirects the review.
+Before asserting that something is unavailable, blocked, or impossible
+here, actually attempt it once --- an install, a fetch, a single command
+--- and say what you tried.
+A negative result from one incidental symptom (a failed version query, a
+single 403) is evidence the thing is not *already set up*, not evidence
+it cannot be.
+When a blocker you published turns out to be false, correct it where it
+was published, not only in the thread that surfaced it.
+(d-morrison/altdoc#76, 2026-07-27: the PR body said roxygen2 8.0.0 --- the
+version `DESCRIPTION` pins --- was unavailable, inferred from one failed
+`packageVersion()` call with no install attempted. The review built a
+"this may need a follow-up" recommendation on top of it. A single
+`install.packages()` disproved it, and the regeneration landed in the same
+round the finding did.)
+
+**An instruction's own suggested code is not exempt from the
+project-conventions self-review above.**
+The self-review rule assumes you wrote the diff; a snippet handed to you
+in an issue, a task description, or a design doc slips past it, because
+adopting someone else's suggestion does not feel like authoring.
+It is authoring --- once pushed, it is your diff, and the project's
+conventions bind it exactly as they bind anything you wrote yourself.
+Run the same convention check over borrowed code before pushing it,
+especially when the suggestion is a plausible-looking one-liner and the
+convention it breaks is documented rather than linted.
+(d-morrison/altdoc#73: the issue proposed ending a function with a bare
+trailing `hashes`, which reads as a fix for the fragility it names but is
+still an implicit return, so a statement added after it silently becomes
+the return value. The lab manual asks for an explicit `return()`
+regardless. Review caught it; the project's own stated convention would
+have, one step earlier.)
+
+**When the code path under test has a staging or transform step between
+input and output, a passing unit suite is not evidence it works ---
+exercise the real path once.**
+Fixtures instantiate the shape the test author had in mind, so a wrong
+assumption about *where* the code runs is invisible to every one of them:
+the tests and the bug share the assumption.
+This is the same gap the downstream-consumer rule above covers, one level
+in --- there the missing variety is the consumer's input, here it is the
+pipeline's own directory layout, timing, or intermediate representation.
+One real invocation is usually cheap, and it tests the assumption the
+fixtures encode rather than re-confirming it.
+(d-morrison/altdoc#76: a guard checked for the copied logo under `docs/`,
+but the `quarto_website` path stages into `_quarto/` first, so the logo
+line was dropped on every render of the one generator the feature wired
+up. Seventeen unit assertions passed throughout; one throwaway render
+found it immediately.)

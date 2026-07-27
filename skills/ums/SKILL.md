@@ -83,6 +83,29 @@ committed pass.
 4. **Commit and push — via a branch + PR, not direct to `main`, in whichever
    repo step 2 routed the item to.**
 
+   **Do this in an isolated `git worktree`, not the shared ai-config checkout
+   directly** -- `memories/preferences.md`'s "Run a local session in an
+   isolated git worktree by DEFAULT" rule applies here too, and this step's
+   own commands below (which `cd` straight into the shared checkout) are the
+   exception that rule warns about, not a carve-out from it.
+   The shared checkout is routinely in concurrent use by other sessions also
+   running UMS; a `git checkout <branch>` from another session mid-command
+   can silently redirect *your* `git commit`/`git push` onto *their* branch
+   (and vice versa), and a local `git status`/`git log` read moments later
+   can already reflect a third session's activity, not your own.
+   If a push is rejected non-fast-forward, fetch first and diff before
+   assuming a real conflict -- the branch may have picked up another
+   session's commit that needs separating out (`git revert <their-commit>`)
+   rather than force-pushing over it; verify the PR's real, current content
+   via `gh api repos/<owner>/<repo>/pulls/<N>/files` or `git ls-remote`/`git
+   show origin/<branch>:<path>` (the GitHub-side truth), not the local
+   checkout, which may have already moved again.
+   (ai-config#748: a UMS commit collided with another concurrent session's
+   UMS commit on a shared branch name this way -- both sessions' content
+   ended up interleaved on one branch before separating back out, resolved
+   without data loss only because both sides fetched-before-pushing and
+   diffed before force-acting.)
+
    **Cross-project items** (skills, cross-project memory notes): both live in
    the ai-config repo. Discover its path with
    `git -C ~/.claude/skills/ums rev-parse --show-toplevel` — point

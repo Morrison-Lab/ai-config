@@ -613,8 +613,8 @@ reasoning that gha serves multiple orgs, not just the user's own repos -- but
 the user's actual intent was for their own `ai-config` plugin to install by
 default (with a `use-ai-config: false` opt-out), since gha's multi-tenancy is
 about not forcing the owner's conventions on *other* orgs, not about
-withholding the owner's own defaults from their own tooling. The user
-extended the already-merged-ready PR themselves (a follow-up commit + PR
+withholding the owner's own defaults from their own tooling.
+The user extended the already-merged-ready PR themselves (a follow-up commit + PR
 comment) to flip it to on-by-default before merging.
 **How to apply:** when scoping a new default for a repo like this, explicitly
 float "on by default for the owner, opt-out for others" as a distinct option

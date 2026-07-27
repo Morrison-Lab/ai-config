@@ -27,6 +27,13 @@ Don't suggest it when there's still live state only this conversation holds: a b
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) — anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
 If UMS hasn't run recently, say so in the same flag rather than assuming it's safe.
 
+**Run `wrap-up`'s state sweep *before* flagging a stopping point, not after the user asks for one.**
+The paragraph above says not to flag while live state remains; it doesn't say how to know.
+Answering that from memory only covers the PRs and branches *this conversation* created, which is exactly the blind spot: a bot-opened PR, a leftover branch from the harness or an earlier session in the same container, or another session's PR in the same repo never entered the conversation, so nothing about them feels outstanding.
+Run the sweep --- open PRs and issues per repo, `git status`, local branches, worktrees --- and let its output decide, the same way [`fully-clean`](shared/workflow/fully-clean.md) insists a PR's readiness comes from a fresh query rather than a cached verdict.
+(gha#318/ai-config#733/#736, 2026-07-26: a clean stopping point was flagged twice on the strength of "my three PRs are merged."
+The `wrap-up` sweep the user then asked for found a stale draft PR (`gha#316`, a bot claim-commit for an issue closed hours earlier) and an unused harness-assigned branch still sitting in the `gha` checkout.)
+
 **When flagging a good moment to `/clear`, offer archiving as the default alternative.** Whenever there's a meaningful chance I'd want to come back to this conversation later, recommend leaving the session alone and starting a fresh one for the next task, instead of `/clear`ing it -- the old session stays fully retrievable (nothing to lose), at the cost of a small navigation step to reopen it. Reserve a bare `/clear` recommendation for when nothing in the session is worth revisiting; when in doubt, default to the archive-and-start-new option since it's strictly safer.
 
 ## Flag good moments to run `compress-session`, too

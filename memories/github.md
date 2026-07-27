@@ -394,7 +394,20 @@
 - `mcp__github__pull_request_review_write` with `method: resolve_thread`
   requires **only `threadId`** (node ID, e.g. `PRRT_kwDO...`); `owner`,
   `repo`, and `pullNumber` are ignored for that method. Thread node IDs come
-  from `get_review_comments`.
+  from `get_review_comments` --- **fetch them, never reconstruct one.** They
+  are opaque base64, so a plausible-looking id assembled from a remembered
+  prefix plus the suffix of a *different* thread fails with "Could not
+  resolve to a node with the global id"; that error means the id was
+  invented, not that the thread is gone. On a PR with many threads, the
+  temptation is to skip a re-fetch because the list was read a few calls
+  ago --- but a new review round appends threads, so the ones you need are
+  exactly the ones not in that earlier read. When only the newest threads
+  are wanted, `get_review_comments` takes an `after` cursor: pass the
+  `endCursor` from the previous listing and get just what has appeared
+  since, rather than re-fetching every thread. (Note `page` does not do
+  this --- pagination here is cursor-based, so `page: 2` returns the first
+  page again.) (Guessed twice in one `d-morrison/altdoc#78` session,
+  2026-07-27, costing two failed calls before fetching properly.)
 - **`mergeable_state` glossary — `unstable` is NOT a merge conflict.** GitHub's
   `pull_request_read` `get` returns `mergeable_state` alongside `mergeable`;
   the common values: `clean` (mergeable, all checks passing), `unstable`

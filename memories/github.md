@@ -56,7 +56,7 @@
   absent from one check — `ToolSearch` for what you need before deciding it's
   missing (and don't assume the `github_ci` server is present either).
 - **An angle-bracket placeholder can vanish from a PR or issue body posted
-  through these tools, backticks and all.**
+  through these tools, and no markdown construct protects it.**
   A PR body written with `` `git ls-remote https://github.com/<owner>/<repo>` ``
   came back from the API as `git ls-remote https://github.com//`, with both
   placeholders gone.

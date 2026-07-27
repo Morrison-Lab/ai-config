@@ -674,6 +674,29 @@ The linter still runs, still reports success, and still prints a file count --
 just a smaller one -- so the repo's most important files stop being checked
 with no signal that anything changed.
 
+**The rule is "know which matcher you are feeding", not "never write
+`**/*.md`".**
+The same pattern behaves oppositely in the two engines, so a blanket ban would
+break the globby-based configs it does not apply to.
+Two files, one at the root and one nested, in the same repo:
+
+```console
+$ npx markdownlint-cli2 '**/*.md'      # globby
+Linting: 2 file(s)                     # root.md AND sub/nested.md
+
+$ git ls-files -- '**/*.md'            # git pathspec
+sub/nested.md                          # root.md dropped
+
+$ git ls-files -- '*.md'               # git pathspec
+root.md
+sub/nested.md
+```
+
+This corpus relies on both conventions at once, correctly: its own
+`.markdownlint-cli2.jsonc` sets `"globs": ["**/*.md"]`, which is right because
+`markdownlint-cli2` resolves globs with globby, while a gha workflow input
+consumed by `git ls-files` needs `*.md` for the same coverage.
+
 **Settle it by measuring, not by reasoning about glob semantics.**
 Both forms through `git ls-files`, compare the counts, and look specifically
 for root-level hits with `grep -v /`.

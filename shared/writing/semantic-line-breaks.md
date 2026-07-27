@@ -72,3 +72,22 @@ NLB_BASE_REF=origin/main \
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)
+
+**Run it AFTER committing, not before: it diffs `<base>...HEAD`, so
+uncommitted work is invisible to it and a pre-commit run reports clean
+vacuously.**
+This is a nastier version of the advisory-exit-0 trap above, because here
+the output is a positive all-clear rather than a warning nobody reads.
+With nothing committed yet, `HEAD` still equals the base ref, so the diff is
+empty and the script says `No lines missing semantic breaks` --- a true
+statement about an empty diff, easily misread as a verdict on the work in
+the tree.
+The tell is that it passes instantly on a diff you know is large.
+So commit first, then run it, then amend or add a fixup for whatever it
+names.
+And when quoting the result as evidence (a PR body's verification section),
+re-run it against the pushed head rather than reusing an earlier run's
+output.
+(ai-config#752, 2026-07-27: the pre-commit run reported clean and that claim
+went into the PR body; the same content flagged 7 lines the moment it was
+run again after committing.)

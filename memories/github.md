@@ -412,6 +412,11 @@
   `send_later`'s durable server-side triggers — so this is a degraded
   substitute, not an equivalent; say so rather than treating it as a full
   replacement. (gha#193 PR-babysitting session, 2026-07-03.)
+  **It is degraded in a sharper way than "dies with the session" suggests:**
+  a `CronCreate` job can vanish from the store *before its fire time*, with
+  no error and nothing to surface the loss. See the `CronCreate`-silent-loss
+  entry in [`claude-code.md`](claude-code.md) for the observations and the
+  `CronList` re-verification habit that catches it.
 - **`add_repo` refuses a cross-owner add once the session already has a repo from a
   different owner** ("cross-tier adds are not supported in v1: requested `<owner>/<repo>`
   but session already has repos from owner(s) `[...]`") — it does NOT fall back to a

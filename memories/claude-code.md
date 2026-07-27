@@ -289,8 +289,10 @@ best-effort. (Sparta gii-ffdb93 session, 2026-07-14.)
 
 ## `CronCreate`'s job store can silently lose a scheduled job mid-session, so it is a weak fallback for a check-in you have promised a time for
 
-The entry above recommends `CronCreate` as the fallback when `send_later`
-disappears.
+The `send_later`-can-become-unavailable-mid-session bullet in
+[`memories/github.md`](github.md), under its "GitHub MCP tools (Claude Code
+remote/web sessions)" heading, recommends `CronCreate` as the fallback when
+`send_later` disappears.
 It works, but its jobs are in-memory and session-only by design, and they can
 vanish **before their fire time** with no error and no notification.
 
@@ -318,8 +320,13 @@ So:
 
 - Prefer `mcp__Claude_Code_Remote__send_later` whenever its server is
   reachable.
-  Its own docs say delivery survives container restarts; `CronCreate`'s say
-  the opposite in as many words ("session-only, gone when Claude exits").
+  The two tools' own descriptions say opposite things about durability:
+  `send_later`'s reads "Delivery survives container restarts", while
+  `CronCreate`'s has a "Session-only" section saying jobs live only in the
+  current session, nothing is written to disk, and "the job is gone when
+  Claude exits".
+  Read them in the tool schemas themselves rather than inferring durability
+  from this corpus.
 - When you do fall back to `CronCreate`, say so in the same breath as the
   time: name it as a session-only, best-effort check-in rather than letting
   "I'll check back at 16:38" read as a guarantee.

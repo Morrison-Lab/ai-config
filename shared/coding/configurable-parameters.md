@@ -58,9 +58,16 @@ class of change no longer needs a repo-wide clip sweep.)
 
 ## Turning an extension point on by default: add a toggle, don't flip its default
 
-A list-valued extension point --- a plugin list, a hook registry, an
-extra-arguments input, a `...` of extras --- usually ships empty, with
-callers passing whatever they want added.
+A list-valued extension point --- a plugin list, a hook registry, a named
+extra-arguments list --- usually ships empty, with callers passing whatever
+they want added.
+The trap below needs a **named** parameter carrying a default that a caller's
+own value displaces.
+A true varargs mechanism (R's `...`, Python's `*args`) is exempt, and is
+worth recognizing as the shape that already behaves the way this section
+argues for: it has no default to lose, so whatever a caller passes can only
+add to what the callee supplies.
+
 When some built-in entry should later be included *by default*, the tempting
 move is to change that input's default from empty to the built-in value.
 Don't.

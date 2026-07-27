@@ -344,6 +344,21 @@
   one failed on a quarto render and the other on a docsify test, and the
   docsify error silently deleted `_sidebar.md` and `index.html` --- 58 lines of
   committed snapshots.)
+- **A third trigger, and the easiest to hit deliberately: running the suite
+  with `NOT_CRAN` unset.**
+  Same mechanism again, but here nothing is missing or contended --- every
+  `skip_on_cran()` test simply skips, so the cleanup prunes their snapshots as
+  unexercised.
+  This is the trigger that fires on a perfectly healthy machine with every
+  package installed and nothing else running, which is what makes it the one
+  most likely to be mistaken for a real change.
+  Set `NOT_CRAN=true` rather than merely restoring afterward, since it also
+  means the run exercised the tests it appeared to: in altdoc the skip count
+  went from 25 to 3 under it, and the surviving 3 were genuine venv-gated
+  mkdocs skips.
+  (2026-07-27, driving altdoc#64: a single `test_dir()` run deleted 27 tracked
+  `_snaps/**` files, announced only as a routine `Deleting unused snapshots:`
+  line, and caught by `git status --short` before staging.)
 - **`git add -A` while a suite is running sweeps testthat's scratch files into
   the commit.** A failing snapshot comparison writes its proposed replacement
   next to the original as `_snaps/**/*.new.*`, so an `add -A` issued mid-run
@@ -963,3 +978,30 @@ files stayed consistent.)
 
 - `rex::rex()` patterns often emit PCRE constructs; do not pass those directly to APIs that use POSIX regex defaults (for example `list.files(pattern = ...)`). List/filter in two steps and match with `grepl(..., perl = TRUE)` (and similarly `gregexpr`/`gsub` with `perl = TRUE`) when using rex-built patterns.
 - `rex` shortcut symbols (`any_spaces`, `spaces`, `capture`, etc.) are not exported as `rex::name`; either keep them unqualified within `rex::rex(...)` and register shortcuts for R CMD check, or build explicit fragments with exported APIs (`rex::regex`, `rex::escape`) so static analysis does not depend on shortcut registration side effects.
+
+## R does not fall back to a callee's default for a forwarded missing argument
+
+When a function forwards an argument it never received, R propagates the
+missingness into the callee and errors when the value is forced, so the
+callee's own default does **not** apply:
+
+```r
+g <- function(path = ".") paste("saw:", path)
+f <- function(source_file, target_dir, path) g(path)
+f("a", "b")
+#> Error: argument "path" is missing, with no default
+```
+
+This matters when writing or reviewing argument guards.
+Seeing `path = "."` on the callee makes an unguarded forward look safe, so a
+missing guard reads as deliberate rather than as an oversight.
+
+The invalid-value case is worse than the missing one, and easier to miss,
+because it produces no raw R error at all.
+In altdoc, `.rd2qmd(rd, dir, path = "foo")` reached `.doc_type("foo")`, found
+no settings file under a directory that does not exist, and aborted with
+`No documentation tool detected. Please run the setup_docs() function.`
+That message is confident, actionable, and pointing at the wrong problem.
+Check both the missing and the invalid case when guarding a forwarded
+argument, not only the one the issue reports.
+(d-morrison/altdoc#64.)

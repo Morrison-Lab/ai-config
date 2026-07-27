@@ -184,3 +184,26 @@ but the `quarto_website` path stages into `_quarto/` first, so the logo
 line was dropped on every render of the one generator the feature wired
 up. Seventeen unit assertions passed throughout; one throwaway render
 found it immediately.)
+
+**When new code branches on a third-party tool's behavior, read that tool's
+own config or docs for the specific behavior --- don't infer it from what
+the tool broadly does.**
+The bullet above covers your own pipeline's layout; this one covers the
+tools that pipeline drives.
+An inference of the form "it builds HTML, so link to `.html`" is exactly
+the shape that feels too obvious to check, and a tool's defaults routinely
+contradict it.
+Two properties make this worse than an ordinary wrong guess.
+The inference usually lands in a branch your own fixtures cannot reach ---
+you have no fixture for someone else's renderer --- so the test suite
+agrees with you.
+And it produces output that is well-formed and plausible (a link, a path, a
+flag), so a reviewer skimming the diff has nothing to catch, and the
+failure surfaces only in a consumer's published site.
+Name the setting you are relying on, and check its actual default before
+writing the branch.
+(d-morrison/altdoc#78, 2026-07-27: a generator-to-extension map gave mkdocs
+`.html`, reasoning that mkdocs compiles Markdown to HTML. Its
+`use_directory_urls` default is `TRUE`, so it serves `/man/foo/` and never
+`/man/foo.html` --- every reference link the feature emitted for that
+generator would have 404'd. Caught in review, not by the 39 tests.)

@@ -72,6 +72,32 @@ one file over. Grep the diff for the flagged phrase before considering the
 finding closed. (ai-config#373: fixed "routing/dispatch site" in the skill
 per review, but the CHANGELOG entry still said it until a follow-up commit.)
 
+**The same sync is needed when the review fix is to CODE BEHAVIOR rather than
+to wording --- and that case is easier to miss, because nothing about fixing a
+bug points at the changelog.**
+The rule above fires on a recognizable trigger: a reviewer quotes a phrase, so
+you go looking for that phrase.
+A behavior finding gives you no phrase to grep.
+You change the code, update the PR body's description of what it now does, and
+the `NEWS.md`/`CHANGELOG.md` entry --- written before the review, in prose that
+described the *old* behavior correctly --- goes on asserting it.
+Every later round then reviews a diff whose changelog contradicts its own code,
+and no reviewer flags it, since each file reads plausibly on its own.
+The shipped result is worse than a stale paraphrase: a user reading the release
+notes is told the opposite of what the release does.
+So after any Address that changes behavior, re-read the PR's changelog entry
+against the new behavior --- not just the code and the PR body.
+Fold it into the same pre-push self-review pass [`ardi`](ardi.md) already
+requires; a changelog entry is a claim about the diff, so
+[`fact-check-prose`](../writing/fact-check-prose.md) applies to it exactly as
+it applies to any other prose in the PR.
+(d-morrison/altdoc#78, 2026-07-27: review round 2 established that mkdocs
+serves `/man/foo/`, not `/man/foo.html`; the code and the PR body were
+corrected that round, while `NEWS.md` kept saying links point at `.html` under
+"`mkdocs` and `quarto_website`" through two further clean review rounds.
+Caught by a `main`-sync merge conflict that happened to land in that entry ---
+not by any review, and not by any check.)
+
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
 
 **This generalizes to a skill's own inline restatement of a fragment it

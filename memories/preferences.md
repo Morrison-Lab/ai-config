@@ -600,6 +600,28 @@ limits) before using up claude quota"). The `delegate-to-codex` skill (alias
 ## Access to paywalled academic sources
 - The user has university journal-subscription access and can fetch most academic articles and many books on request. When a task would genuinely benefit from a peer-reviewed or otherwise paywalled source (grounding a design decision, fact-checking a claim, replacing a weak general-audience citation) rather than whatever's freely indexable, ask for the specific title/article rather than settling for a lower-quality open-access source or skipping the citation. Don't request sources speculatively -- ask when a concrete, identified gap would benefit from one. (Learned on Lacaedemon/sparta, 2026-07-24: offered mid-session while grounding a combat-mechanics design discussion in a general-audience website; a peer-reviewed alternative would have been stronger.)
 
+## Default new capabilities on for the owner's own repos, opt-out elsewhere
+
+When adding an optional capability to a repo the user personally owns and
+treats as shared infrastructure for their *own* other repos (e.g.
+`d-morrison/gha`'s reusable workflows, consumed by d-morrison/UCD-SERG/ucdavis
+repos alike), don't default to pure opt-in just because the repo has
+external, non-owner consumers.
+**Why:** built a `plugin-marketplaces`/`plugins` passthrough on `gha`'s
+`claude.yml`/`claude-code-review.yml` as opt-in-only (empty by default),
+reasoning that gha serves multiple orgs, not just the user's own repos -- but
+the user's actual intent was for their own `ai-config` plugin to install by
+default (with a `use-ai-config: false` opt-out), since gha's multi-tenancy is
+about not forcing the owner's conventions on *other* orgs, not about
+withholding the owner's own defaults from their own tooling.
+The user extended the already-merged-ready PR themselves (a follow-up commit + PR
+comment) to flip it to on-by-default before merging.
+**How to apply:** when scoping a new default for a repo like this, explicitly
+float "on by default for the owner, opt-out for others" as a distinct option
+from "opt-in only" rather than assuming opt-in is automatically the
+safer/preferred choice merely because the repo has external consumers.
+(d-morrison/gha#321, closing #319, 2026-07-26/27.)
+
 ## Code organization
 - One function per file, across languages (not just R) --- the exception is a trivial two-line wrapper/helper, not a general "where practical" hedge or a "major function" loophole that lets other private helpers ride along (see `shared/coding/one-function-per-file.md`).
 - Keep source files under ~100 lines of code, splitting large helpers into their own files.

@@ -305,3 +305,26 @@ wired into CI before enabling one, not after.
 `## Bug fixes` bullet against another's; the check above then found **four**
 pre-existing instances in the same `NEWS.md`, in a repo that had no Markdown
 linting at all.)
+
+**A commit claiming "I've pulled main and resolved the merge conflicts" can be
+lying --- verify it actually merged before trusting the claim.** A genuine
+conflict-resolution commit is the second parent of a merge commit (two
+parents); a commit that just hand-edits files to *look* resolved, without
+running a real `git merge`, is an ordinary single-parent commit --- and it
+never actually incorporates whatever new state of `main` prompted the
+"resolve conflicts" request in the first place. This is easy to miss because
+GitHub's own `mergeable`/`mergeStateStatus` fields don't distinguish the two:
+both look identical from the PR page until you check the commit graph.
+Verify with `git show -s --format="%P" <commit>` --- one hash means no real
+merge happened, regardless of what the commit message says. If a branch
+needed conflict resolution more than once and each attempt claimed success
+but the PR still shows `CONFLICTING`, check every "resolved conflicts" commit
+in its history this way before trying yet another resolution attempt on top
+of a foundation that was never actually re-merged.
+(`Lacaedemon/sparta#1070`, 2026-07-27: an automated PR-authoring agent pushed
+two consecutive commits both titled "Resolve merge conflicts", each claiming
+to have pulled `main`; both were single-parent commits that never touched
+`main`'s actual current state, so the PR kept showing `CONFLICTING` no matter
+how many times the agent "fixed" it. A real `git merge origin/main` --- the
+first one actually run against this branch in three attempts --- surfaced
+the genuine conflicts and resolved them for good.)

@@ -137,13 +137,13 @@ That makes it checkable by reading, which matters doubly where the reviewer
 cannot open the PDF at all.
 
 (ucdavis/bcs#422: a manuscript claimed a scoping review "found IP weighting
-with pooled logistic regression to be the dominant estimation strategy". The
-paper reports the hazard ratio as the most common effect measure, estimated by
-Cox in 61% of studies against pooled logistic regression's 35%, with
-confounding handled predominantly by conditioning --- roughly the opposite.
+with pooled logistic regression to be the dominant estimation strategy".
+The paper reports the hazard ratio as the most common effect measure,
+estimated by Cox in 61% of studies against pooled logistic regression's 35%,
+with confounding handled predominantly by conditioning --- roughly the opposite.
 It survived three review rounds.
 An earlier pass had verified that same
 `references.bib` against the PDFs' title pages and corrected two wrong author
-lists, so the citations *were* checked --- just not for this. The reviewer that
-flagged it named the reason precisely: "this claim is about the paper's
-findings, not its metadata".)
+lists, so the citations *were* checked --- just not for this.
+The reviewer that flagged it named the reason precisely:
+"this claim is about the paper's findings, not its metadata".)

@@ -117,8 +117,9 @@ that fetch alone.
 **Verifying a source's TITLE PAGE verifies its metadata, not its findings.**
 A distinct instance of the same mismatch, and an easy one to miss because the
 verification genuinely happened: checking a PDF's first page confirms authors,
-year, journal, and title --- everything a bibliography entry needs. It confirms
-nothing about what the paper *found*. So a bibliography swept clean by a
+year, journal, and title --- everything a bibliography entry needs.
+It confirms nothing about what the paper *found*.
+So a bibliography swept clean by a
 title-page pass can sit under prose making confident, wrong claims about those
 same papers' results, and the sweep's success is what makes the prose feel
 checked.
@@ -131,15 +132,17 @@ Classify each citation-backed claim before deciding what to read:
   requires the sentence containing the number.
 
 Quote the supporting sentence in the PR or a comment when a findings claim
-lands. That makes it checkable by reading, which matters doubly where the
-reviewer cannot open the PDF at all.
+lands.
+That makes it checkable by reading, which matters doubly where the reviewer
+cannot open the PDF at all.
 
 (ucdavis/bcs#422: a manuscript claimed a scoping review "found IP weighting
 with pooled logistic regression to be the dominant estimation strategy". The
 paper reports the hazard ratio as the most common effect measure, estimated by
 Cox in 61% of studies against pooled logistic regression's 35%, with
-confounding handled predominantly by conditioning --- roughly the opposite. It
-survived three review rounds. An earlier pass had verified that same
+confounding handled predominantly by conditioning --- roughly the opposite.
+It survived three review rounds.
+An earlier pass had verified that same
 `references.bib` against the PDFs' title pages and corrected two wrong author
 lists, so the citations *were* checked --- just not for this. The reviewer that
 flagged it named the reason precisely: "this claim is about the paper's

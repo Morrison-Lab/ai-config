@@ -287,6 +287,61 @@ via the harness's own task-completion notification, not a separately-scheduled w
 condition being waited on is itself observable via a command, and treat `ScheduleWakeup` as
 best-effort. (Sparta gii-ffdb93 session, 2026-07-14.)
 
+## `CronCreate`'s job store can silently lose a scheduled job mid-session, so it is a weak fallback for a check-in you have promised a time for
+
+The `send_later`-can-become-unavailable-mid-session bullet in
+[`memories/github.md`](github.md), under its "GitHub MCP tools (Claude Code
+remote/web sessions)" heading, recommends `CronCreate` as the fallback when
+`send_later` disappears.
+It works, but its jobs are in-memory and session-only by design, and they can
+vanish **before their fire time** with no error and no notification.
+
+Observed twice in one remote/web session (gha#318 / ai-config#733,
+2026-07-26).
+A job created at 14:15 PDT to fire at 15:22 was already absent at 15:35 ---
+`CronDelete` returned `No scheduled job with id`, and `CronList` returned
+`No scheduled jobs`.
+A second job created at 15:35 to fire at 16:38 was likewise gone by 15:50,
+well before it could have fired.
+Creation itself is fine: a probe job created immediately afterward appeared in
+`CronList` at once, so this is loss after the fact, not a failed write.
+The cause is not confirmable from inside the conversation.
+The strongest correlate is that the session's MCP servers disconnected and
+reconnected several times in between, which fits an in-memory store being
+reset, but that is inference, not something the tools report.
+
+What makes this worse than an ordinary flaky tool: both jobs had already been
+reported to the user as a specific clock time, per `CLAUDE.md`'s "State the
+actual time when reporting a scheduled check-in" rule.
+Stating a time implies a commitment the mechanism silently dropped, and
+nothing surfaces the loss --- the check-in simply never arrives.
+
+So:
+
+- Prefer `mcp__Claude_Code_Remote__send_later` whenever its server is
+  reachable.
+  The two tools' own descriptions say opposite things about durability:
+  `send_later`'s reads "Delivery survives container restarts", while
+  `CronCreate`'s has a "Session-only" section saying jobs live only in the
+  current session, nothing is written to disk, and "the job is gone when
+  Claude exits".
+  Read them in the tool schemas themselves rather than inferring durability
+  from this corpus.
+- When you do fall back to `CronCreate`, say so in the same breath as the
+  time: name it as a session-only, best-effort check-in rather than letting
+  "I'll check back at 16:38" read as a guarantee.
+- Re-verify with `CronList` before relying on a job you armed earlier ---
+  a one-call check that decides it exactly, rather than trusting the
+  creation receipt.
+  This is [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)
+  applied to your own scheduling: the store either lists the job or it does
+  not.
+- Where the thing being waited on is observable by a command, a
+  `Monitor`/background-Bash wait is sturdier than any scheduler, for the same
+  reason the `ScheduleWakeup` entry above gives --- it reports through the
+  harness's own task-completion path instead of a separate delivery
+  mechanism.
+
 ## Monitor scripts: don't pipe a `grep -q` into another `grep` -- `-q` suppresses stdout too
 
 `grep -q` is silent by design -- it exits 0/1 and prints nothing, even on a match (unlike `-l`,

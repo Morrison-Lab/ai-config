@@ -609,7 +609,7 @@ repos alike), don't default to pure opt-in just because the repo has
 external, non-owner consumers.
 **Why:** built a `plugin-marketplaces`/`plugins` passthrough on `gha`'s
 `claude.yml`/`claude-code-review.yml` as opt-in-only (empty by default),
-reasoning that gha serves multiple orgs, not just the user's own repos — but
+reasoning that gha serves multiple orgs, not just the user's own repos -- but
 the user's actual intent was for their own `ai-config` plugin to install by
 default (with a `use-ai-config: false` opt-out), since gha's multi-tenancy is
 about not forcing the owner's conventions on *other* orgs, not about

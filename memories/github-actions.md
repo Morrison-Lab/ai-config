@@ -1074,3 +1074,32 @@ rule), and note the first genuine end-to-end run happens on the next PR after
 merge. (ucdavis/win#75, 2026-07-16 — the migration PR itself could never be
 bot-reviewed; win#69's post-merge sync then ran the migrated workflow live and
 it worked, including `check-latex-macros` and the cost report.)
+
+**A manual self-review is not the only remedy: the AGENT workflow
+(`claude.yml`) carries no self-modification guard, so mentioning the bot in a
+comment does produce a genuine external review of a PR that trips the
+reviewer's guard.**
+The guard lives in `claude-code-review.yml`, which gates on the caller's own
+review-workflow path.
+`claude.yml` is a separate reusable workflow with no equivalent check.
+So on a guard-tripping PR, post the mention deliberately and let the agent
+review it, which yields an actual external verdict at the current head.
+A self-review by definition cannot, and
+[`fully-clean`](../shared/workflow/fully-clean.md)'s criterion 2 prefers an
+external verdict whenever one is reachable.
+
+Two things to know before relying on it.
+The mention is matched with `contains(github.event.comment.body, '@claude')`,
+which has **no notion of code spans**, so writing the literal string inside
+backticks or ordinary prose fires the workflow just the same.
+That makes it easy to trigger a full agent run by accident while merely
+*describing* the reviewer.
+The agent's reply also arrives as a plain PR comment rather than a check run,
+so it satisfies the review criterion without turning any check green, and
+`claude-review` stays a skip either way.
+(d-morrison/altdoc#71, 2026-07-27: a self-review comment that named the
+reviewer woke the agent unintentionally, and it posted a substantive review of
+the diff, checking `"${REF_ARGS[@]}"` expansion under `set -u`, the per-event
+`author_association` fields, and `required: false` secret semantics, on a PR
+whose `claude-review` job had skipped in 8 seconds.
+Worth doing on purpose next time rather than by accident.)

@@ -963,3 +963,59 @@ files stayed consistent.)
 
 - `rex::rex()` patterns often emit PCRE constructs; do not pass those directly to APIs that use POSIX regex defaults (for example `list.files(pattern = ...)`). List/filter in two steps and match with `grepl(..., perl = TRUE)` (and similarly `gregexpr`/`gsub` with `perl = TRUE`) when using rex-built patterns.
 - `rex` shortcut symbols (`any_spaces`, `spaces`, `capture`, etc.) are not exported as `rex::name`; either keep them unqualified within `rex::rex(...)` and register shortcuts for R CMD check, or build explicit fragments with exported APIs (`rex::regex`, `rex::escape`) so static analysis does not depend on shortcut registration side effects.
+
+## testthat prunes committed snapshots when the tests that produce them skip
+
+Running an R package's suite locally with `testthat::test_dir()` (or
+`devtools::test()`) while `NOT_CRAN` is unset makes every `skip_on_cran()`-gated
+test skip.
+testthat then treats those tests' snapshot files as **unused** and deletes them
+from `tests/testthat/_snaps/`, reporting it as a routine
+`Deleting unused snapshots:` line at the end of the run rather than as a
+warning.
+
+Nothing fails, and the deletions are real edits to tracked files.
+In altdoc this removed 27 committed `_snaps/**` files in a single run.
+Committing that alongside a real change silently deletes another PR's snapshot
+fixtures.
+
+Two habits, either of which is enough:
+
+- Run the suite with `NOT_CRAN=true` set, so the gated tests actually run and
+  their snapshots stay claimed.
+- Run `git status --short` after any local suite run and restore stray
+  deletions (`git checkout -- tests/testthat/_snaps/`).
+
+Prefer the `NOT_CRAN=true` form over merely restoring afterward, since it also
+means the run exercised the tests it appeared to.
+In altdoc the skip count went from 25 to 3 under it.
+The remaining 3 were genuine venv-gated mkdocs skips, which is itself the
+signal `d-morrison/altdoc#70` is about.
+(2026-07-27, driving altdoc#64.)
+
+## R does not fall back to a callee's default for a forwarded missing argument
+
+When a function forwards an argument it never received, R propagates the
+missingness into the callee and errors when the value is forced, so the
+callee's own default does **not** apply:
+
+```r
+g <- function(path = ".") paste("saw:", path)
+f <- function(source_file, target_dir, path) g(path)
+f("a", "b")
+#> Error: argument "path" is missing, with no default
+```
+
+This matters when writing or reviewing argument guards.
+Seeing `path = "."` on the callee makes an unguarded forward look safe, so a
+missing guard reads as deliberate rather than as an oversight.
+
+The invalid-value case is worse than the missing one, and easier to miss,
+because it produces no raw R error at all.
+In altdoc, `.rd2qmd(rd, dir, path = "foo")` reached `.doc_type("foo")`, found
+no settings file under a directory that does not exist, and aborted with
+`No documentation tool detected. Please run the setup_docs() function.`
+That message is confident, actionable, and pointing at the wrong problem.
+Check both the missing and the invalid case when guarding a forwarded
+argument, not only the one the issue reports.
+(d-morrison/altdoc#64.)

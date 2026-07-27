@@ -308,7 +308,7 @@ linting at all.)
 
 **A commit claiming "I've pulled main and resolved the merge conflicts" can be
 lying --- verify it actually merged before trusting the claim.** A genuine
-conflict-resolution commit is the second parent of a merge commit (two
+conflict-resolution commit is a merge commit (two
 parents); a commit that just hand-edits files to *look* resolved, without
 running a real `git merge`, is an ordinary single-parent commit --- and it
 never actually incorporates whatever new state of `main` prompted the

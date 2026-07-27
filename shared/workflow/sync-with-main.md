@@ -286,11 +286,13 @@ CI stays green and only a human reading the merged section notices.
 Check it mechanically instead of by eye; one line decides it:
 
 ```bash
-awk 'prev !~ /^[[:space:]]*$/ && /^\* / {print FILENAME":"NR": "$0} {prev=$0}' NEWS.md
+awk 'prev !~ /^[[:space:]]*$/ && /^[*+\-] / {print FILENAME":"NR": "$0} {prev=$0}' NEWS.md
 ```
 
 Use `[[:space:]]*` rather than a bare `/^$/` --- a whitespace-only preceding
 line is not a violation and produces false positives.
+The pattern `[*+\-]` covers all three common Markdown unordered-list markers;
+`^\* ` alone would miss `-` and `+` bullets.
 
 Two consequences. Run this after any merge into a changelog or other growing
 bulleted list, alongside the heading check above. And note that a

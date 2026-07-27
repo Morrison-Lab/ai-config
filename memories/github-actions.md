@@ -1084,9 +1084,9 @@ review-workflow path.
 `claude.yml` is a separate reusable workflow with no equivalent check.
 So on a guard-tripping PR, post the mention deliberately and let the agent
 review it, which yields an actual external verdict at the current head.
-A self-review by definition cannot, and
 [`fully-clean`](../shared/workflow/fully-clean.md)'s criterion 2 prefers an
-external verdict whenever one is reachable.
+external verdict whenever one is reachable, and a self-review cannot satisfy
+it.
 
 Two things to know before relying on it.
 The mention is matched with `contains(github.event.comment.body, '@claude')`,

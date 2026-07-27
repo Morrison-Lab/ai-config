@@ -638,3 +638,59 @@ After you merge `main` into the branch, the merge base becomes `origin/main`
 and all three forms agree on committed content -- which is exactly when it is
 easiest to stop thinking about the distinction and get bitten by the next
 stale-branch case.
+
+## A pattern resolved by `git ls-files` is a pathspec, not a shell glob -- `*.md` is recursive and `**/*.md` drops root-level files
+
+Any tool that selects files by handing a pattern to `git ls-files -- <pattern>`
+takes a **git pathspec**, and git's pathspec matching differs from shell and
+globby matching in one load-bearing way: `*` matches `/` too.
+
+The consequences invert the usual intuition:
+
+- `*.md` matches at **any depth**, root-level files included.
+  It is already recursive.
+- `**/*.md` requires **at least one `/`**, so it matches nothing at the repo
+  root.
+
+Measured on `ucdavis/bcs`:
+
+```console
+$ git ls-files -- '*.md' | wc -l
+28
+$ git ls-files -- '**/*.md' | wc -l
+23
+$ git ls-files -- '**/*.md' | grep -v /     # root-level hits
+(none)
+```
+
+The five files the second form loses are `NEWS.md`, `README.md`, `CLAUDE.md`,
+`AGENTS.md`, and `LICENSE.md` -- in most repos, the ones that matter most.
+
+**Why this is worth a section rather than a footnote: the wrong form fails
+silently.** `*.md` reads as non-recursive to anyone carrying shell intuition,
+so "correcting" it to `**/*.md` looks like a straightforward fix.
+Nothing turns red when it lands.
+The linter still runs, still reports success, and still prints a file count --
+just a smaller one -- so the repo's most important files stop being checked
+with no signal that anything changed.
+
+**Settle it by measuring, not by reasoning about glob semantics.**
+Both forms through `git ls-files`, compare the counts, and look specifically
+for root-level hits with `grep -v /`.
+One command decides it, which is the
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) rule
+applied to a question that otherwise invites a confident wrong answer.
+
+This is not specific to one repo.
+`d-morrison/gha`'s `lint-markdown` and `lint-yaml` both resolve their `globs`
+input this way (`_pathspec.mjs` / `_pathspec.py`, `trackedFiles()`) and
+document it as "git pathspecs ... recursive by default", so every consuming
+repo inherits the same trap.
+
+(`ucdavis/bcs#445`, 2026-07-27: a review of the PR wiring `lint-markdown`
+suggested changing `globs: '*.md'` to `'**/*.md'` "for recursive matching",
+reasoning correctly from globby semantics and incorrectly assuming they
+applied here.
+Running both forms before replying is what caught it; applying the suggestion
+would have silently un-gated all five root-level files, including the
+`NEWS.md` whose merge-splice defect motivated the PR.)

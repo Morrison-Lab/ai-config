@@ -56,9 +56,56 @@ retiming 8 of them that had baked in the old geometry;
 Lacaedemon/sparta#964 later moved to per-battle map definitions so this
 class of change no longer needs a repo-wide clip sweep.)
 
+## Turning an extension point on by default: add a toggle, don't flip its default
+
+A list-valued extension point --- a plugin list, a hook registry, a named
+extra-arguments list --- usually ships empty, with callers passing whatever
+they want added.
+The trap below needs a **named** parameter carrying a default that a caller's
+own value displaces.
+A true varargs mechanism (R's `...`, Python's `*args`) is exempt, and is
+worth recognizing as the shape that already behaves the way this section
+argues for: it has no default to lose, so whatever a caller passes can only
+add to what the callee supplies.
+
+When some built-in entry should later be included *by default*, the tempting
+move is to change that input's default from empty to the built-in value.
+Don't.
+A caller-supplied value **replaces** the default rather than adding to it ---
+the ordinary semantics of function arguments, CLI flags, and CI/workflow
+inputs alike --- so the first caller who uses the extension point for its
+original purpose, adding an entry of their own, silently loses the built-in
+one.
+Nothing errors, and nothing in the caller's own config hints that a default
+went missing.
+
+Add a separate toggle instead (a boolean, defaulting on) and compose the two
+where they are consumed: the toggle decides whether the built-in entry is
+included, and the list input keeps meaning "further entries, on top of
+whatever the toggle contributed".
+A caller can then opt out, add extras, or both, independently.
+
+Restate the composition in the list input's own description, not just the
+toggle's.
+Its meaning shifts from "the entries" to "further entries", and a reader who
+finds only one of the two docs will otherwise assume they conflict.
+Drop any example in that description that names the now-default entry --- the
+default is the worst possible illustration of an *extra*.
+
+(d-morrison/gha#321, 2026-07-27: `claude.yml` and `claude-code-review.yml`
+gained opt-in `plugin-marketplaces` / `plugins` inputs, then needed one plugin
+installed by default.
+Flipping those defaults would have meant a consumer adding their own
+marketplace silently dropped the default one, since `workflow_call` inputs
+replace rather than append.
+A `use-ai-config` boolean composed with both instead.)
+
 ## In review
 
 Flag a new hard-coded tunable in a diff as a standard review finding, the
 same weight as the other `shared/coding` rules: name the value, confirm it
 isn't one of the two exemptions above, and ask for it to become a
 parameter/field/data value with the current value as its default.
+Flag the inverse too: a diff that turns an existing extension point on by
+default by changing its own default value, where the section above calls for
+a separate toggle.

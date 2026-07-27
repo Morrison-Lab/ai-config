@@ -614,6 +614,27 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `lint-changed-lines` separately caught an `undesirable_function_linter` hit
   in root `app.R` that a local `lint_package()` had reported clean.
   Filed as UCD-SERG/serocalculator#608.)
+- **`air format . --check` passing is NOT the claim "no line exceeds
+  `air.toml`'s `line-width`" --- air does not reflow string literals.**
+  A long `cli::cli_abort()` / `cli_alert_*()` message, a URL, or any other
+  single string token stays exactly as written, so a 98-character line sails
+  through a green `--check` in a repo configured at `line-width = 80`.
+  The formatter's guarantee is "this file is already in the shape air would
+  produce", which is weaker than the width setting suggests.
+  Check the width separately, since one line decides it:
+  ```bash
+  awk 'length > 80 {print FILENAME":"FNR": "length" chars"}' $(git ls-files '*.R')
+  ```
+  Fix a flagged string by splitting it across implicit-concatenation
+  arguments (`cli`'s `...` joins them) rather than widening `line-width`.
+  This is another green-check-does-not-mean-clean-content case, alongside
+  `check-new-line-breaks` in
+  [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md) and the
+  review-job cases in [`fully-clean`](../shared/workflow/fully-clean.md).
+  Note that `lintr`'s `line_length_linter` DOES catch these, so a repo
+  running air without lintr (d-morrison/altdoc) has no gate at all.
+  (d-morrison/altdoc#78, 2026-07-27: two `cli` strings in new code ran to 93
+  and 98 characters with `air format . --check` clean throughout.)
 
 ## jarl (Just Another R Linter) — `jarl.toml` fields lag the published docs
 - `jarl` (`etiennebacher/jarl`, installed via `etiennebacher/setup-jarl@vX` in

@@ -338,6 +338,12 @@
   A genuine regression fails the same test every time, so a differing failure
   set across concurrent runs is diagnostic on its own --- check it before
   debugging the diff.
+  Recovery is the same `git checkout -- tests/testthat/_snaps/` as above, then
+  one clean run, alone.
+  (`d-morrison/altdoc#61`, 2026-07-25: two overlapping `test_local()` runs;
+  one failed on a quarto render and the other on a docsify test, and the
+  docsify error silently deleted `_sidebar.md` and `index.html` --- 58 lines of
+  committed snapshots.)
 - **A third trigger, and the easiest to hit deliberately: running the suite
   with `NOT_CRAN` unset.**
   Same mechanism again, but here nothing is missing or contended --- every
@@ -353,12 +359,6 @@
   (2026-07-27, driving altdoc#64: a single `test_dir()` run deleted 27 tracked
   `_snaps/**` files, announced only as a routine `Deleting unused snapshots:`
   line, and caught by `git status --short` before staging.)
-  Recovery is the same `git checkout -- tests/testthat/_snaps/` as above, then
-  one clean run, alone.
-  (`d-morrison/altdoc#61`, 2026-07-25: two overlapping `test_local()` runs;
-  one failed on a quarto render and the other on a docsify test, and the
-  docsify error silently deleted `_sidebar.md` and `index.html` --- 58 lines of
-  committed snapshots.)
 - **`git add -A` while a suite is running sweeps testthat's scratch files into
   the commit.** A failing snapshot comparison writes its proposed replacement
   next to the original as `_snaps/**/*.new.*`, so an `add -A` issued mid-run

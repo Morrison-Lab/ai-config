@@ -623,7 +623,7 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   produce", which is weaker than the width setting suggests.
   Check the width separately, since one line decides it:
   ```bash
-  awk 'length > 80 {print FILENAME":"NR": "length" chars"}' $(git ls-files '*.R')
+  awk 'length > 80 {print FILENAME":"FNR": "length" chars"}' $(git ls-files '*.R')
   ```
   Fix a flagged string by splitting it across implicit-concatenation
   arguments (`cli`'s `...` joins them) rather than widening `line-width`.

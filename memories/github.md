@@ -398,16 +398,29 @@
   are opaque base64, so a plausible-looking id assembled from a remembered
   prefix plus the suffix of a *different* thread fails with "Could not
   resolve to a node with the global id"; that error means the id was
-  invented, not that the thread is gone. On a PR with many threads, the
+  invented, not that the thread is gone.
+  On a PR with many threads, the
   temptation is to skip a re-fetch because the list was read a few calls
   ago --- but a new review round appends threads, so the ones you need are
-  exactly the ones not in that earlier read. When only the newest threads
+  exactly the ones not in that earlier read.
+  When only the newest threads
   are wanted, `get_review_comments` takes an `after` cursor: pass the
   `endCursor` from the previous listing and get just what has appeared
-  since, rather than re-fetching every thread. (Note `page` does not do
-  this --- pagination here is cursor-based, so `page: 2` returns the first
-  page again.) (Guessed twice in one `d-morrison/altdoc#78` session,
-  2026-07-27, costing two failed calls before fetching properly.)
+  since, rather than re-fetching every thread.
+  **`page` does not do this for this method**, so `page: 2` returns the
+  first page again.
+  The tool's own schema is the authority, not the REST
+  endpoint [`tool-mappings.md`](../tool-mappings.md) lists as the `gh`
+  equivalent: `after` is documented as "used only by the
+  `get_review_comments` method", and that method's own description says
+  "use cursor-based pagination (`perPage`, `after`)", while `page` is a
+  generic parameter shared with the REST-backed methods on the same tool.
+  The `PRRT_`-prefixed thread ids corroborate it --- those are GraphQL
+  global node ids, which the REST comments endpoint does not return.
+  So one `pull_request_read` tool spans both pagination models depending
+  on `method`; don't generalize either one across it.
+  (Guessed twice in one `d-morrison/altdoc#78` session, 2026-07-27,
+  costing two failed calls before fetching properly.)
 - **`mergeable_state` glossary — `unstable` is NOT a merge conflict.** GitHub's
   `pull_request_read` `get` returns `mergeable_state` alongside `mergeable`;
   the common values: `clean` (mergeable, all checks passing), `unstable`

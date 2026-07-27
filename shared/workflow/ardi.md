@@ -229,11 +229,13 @@ Either side alone is unfalsifiable, since the case that reveals the bug is
 the *comparison*.
 Then prove it: revert the fix and confirm the new test actually fails.
 A regression test never seen to fail is a guess about what it covers.
-(d-morrison/altdoc#78, 2026-07-27: twice. A `.pdf` vignette test asserted
+(d-morrison/altdoc#78, 2026-07-27: twice.
+A `.pdf` vignette test asserted
 the entry's extension but never its label, so an extension leaking into the
 label passed; and a nested-article test built no source tree, so top-level
 and nested resolved identically and a nested-only title bug was pinned as
-expected output. Both were found by review reading the test, not the code.)
+expected output.
+Both were found by review reading the test, not the code.)
 
 **A systematic audit done by skimming is worse than the one-at-a-time
 version it replaces.**
@@ -252,7 +254,7 @@ function, not for a pattern in its file --- a file with several functions
 will hand you the first match, which is often not the one you mean.
 Name the function in whatever you write down, so the claim stays checkable.
 (d-morrison/altdoc#78, 2026-07-27: a commit written to get ahead of a
-one-finding-per-round loop claimed mkdocs' sidebar matched only `\.md`. It
-matches `\.md$|\.pdf$`; the grep had returned a different function 120
-lines above the sidebar builder in the same file. Caught by the very next
-review round.)
+one-finding-per-round loop claimed mkdocs' sidebar matched only `\.md`.
+It matches `\.md$|\.pdf$`; the grep had returned a different function 120
+lines above the sidebar builder in the same file.
+Caught by the very next review round.)

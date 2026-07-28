@@ -287,6 +287,11 @@ The strong form of the claim: after claiming an issue you're about to work, open
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
 The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 
+## Open a PR for every pushed feature branch
+
+After pushing a feature branch, create its PR unless an existing PR already represents that branch or the user explicitly says not to.
+Don't treat a successful push as the handoff: the PR is the reviewable unit and the durable visible record of the work.
+
 ## Use the existing PR branch, not the harness-specified branch
 
 The Claude Code on the web harness injects a "Git Development Branch Requirements" section that assigns a session-unique branch name (e.g. `claude/abc123`) as the default for each repo.
@@ -825,4 +830,3 @@ Only surface the choice if it's ambiguous or touches something architecturally s
 
 - **Never pass backtick-containing content in PowerShell double-quoted strings**: PowerShell treats `` ` `` as its escape character — `` `b `` (Backspace, 0x08), `` `n ``, `` `t ``, `` `r ``, etc. — so Markdown code spans and other backtick-containing text will be silently corrupted. Use single-quoted strings (`'...'` / `@'...'@`) for inline content, or write to a file and pass `--body-file` for multi-line PR descriptions.
 - **Use body files for GitHub PR descriptions**: Write multi-line PR descriptions to a temp file and pass `--body-file <file>` to `gh pr create`/`gh pr edit`, or `gh api -F body=@<file>` for raw API calls. This avoids terminal string-escaping corruption for any content with backticks or other shell-special characters.
-

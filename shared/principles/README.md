@@ -41,6 +41,10 @@ We build code and prose that is:
 - **Efficient** — economical with compute, memory, and people's time
   (CI minutes, review rounds); performance tuning beyond that needs a
   demonstrated hot spot, not speculation.
+  The [`measure-performance`](../../skills/measure-performance/SKILL.md)
+  skill is how that hot spot gets demonstrated: profile first, then
+  microbenchmark only what the profile implicated, then confirm the win
+  survives end to end.
 - **Maintainable** — the next change is cheap: one home per fact, small
   units, no accumulated complexity debt.
 - **Extensible** — new capability slots in without rework, because the

@@ -40,7 +40,7 @@ jobs:
         # rationale.
         run: python3 scripts/check-memory-file-size.py
       - name: Check Quarto (.qmd) prose style
-        uses: d-morrison/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
+        uses: Morrison-Lab/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
 
   new-line-breaks:
     # Diff-scoped, non-blocking (ai-config#682, ported to gha#300): MD013 is
@@ -52,7 +52,7 @@ jobs:
     # (github.event.pull_request.base.sha on PRs, '' otherwise) already
     # makes a non-PR run (e.g. push to main) skip cleanly rather than
     # scanning the whole tree -- see check-new-line-breaks.yml gha#300.
-    uses: d-morrison/gha/.github/workflows/check-new-line-breaks.yml@209bfb76bd412aa10d4d56a809d791a6dc8f10df # v2, gha#300
+    uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76bd412aa10d4d56a809d791a6dc8f10df # v2, gha#300
     with:
       globs: '**/*.md'
       paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'

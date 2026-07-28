@@ -425,27 +425,40 @@ shallow clone: single-tree reads (`git show origin/main:<file>`,
 `git cat-file`) --- they read the fetched tip's tree directly, no merge-base
 needed.
 
-**The same truncation silently breaks any classifier built on file history,
-and that failure is quieter than the merge-base one.**
+**The same truncation degrades classifiers built on file history, and how
+badly depends on which question you ask -- so test the query rather than
+assuming either that it works or that it doesn't.**
 A bogus merge-base announces itself, with thousands of phantom insertions or a
 merge that explodes into conflicts.
-A history *query* just comes back empty.
-`git log --diff-filter=D -- <path>` returns nothing for a file the repo really
-did delete, and nothing is equally the right answer for a path the repo never
-had, so "was this ours once?" goes unanswered while appearing to be answered.
-Anything keyed on that reasoning inverts in exactly the environment where it
-runs: a web container is where such a check would be used, and is also where
-its evidence is missing.
-So confirm the clone has any history at all before writing a check that reads
-it (`git rev-parse --is-shallow-repository`), and prefer a signal carried by
-the file itself over one carried by the commit graph.
-(ai-config#765, 2026-07-28: telling our own deleted skills apart from
-Anthropic-provided built-ins under `~/.claude/skills/` looked like a history
-lookup, but the container's checkout was 50 commits deep and returned zero
-`--diff-filter=D` hits for every candidate of either kind.
-The tool reports that category for a human to judge instead of guessing, and
-the one usable signal turned out to be in the files themselves: the built-ins
-carry `license: Proprietary. LICENSE.txt has complete terms`.)
+A history *query* just comes back empty, and empty is also a legitimate answer,
+so it cannot be told apart from a real negative by looking at it.
+
+Two questions that appear interchangeable behave very differently on a
+50-commit clone of this corpus:
+
+- `git log --diff-filter=D -- <path>` ("was this ever deleted?") returned
+  **zero for every candidate**, ours and foreign alike.
+  A deletion that happened before the shallow window is simply not in it, so
+  this question is unanswerable here while appearing answered.
+- `git log --all -- <path>` ("has the repo ever touched this?") **did**
+  discriminate: zero for all seven Anthropic built-ins, against 6 for `ums`,
+  3 for `ardi` and 1 for `config-ai`.
+  An actively maintained file gets touched inside almost any window, which is
+  what makes the weaker question survive truncation.
+
+The residual risk in the second form is a file that is genuinely ours but has
+not been touched within the window, which reports as never-ours.
+So the rule is not "history is useless when shallow" but: check
+`git rev-parse --is-shallow-repository`, then **run the query against known
+controls of both classes** before trusting it, and prefer a signal carried by
+the file itself when one exists.
+(ai-config#765/#770, 2026-07-28: separating our own deleted skills from
+Anthropic-provided built-ins under `~/.claude/skills/`.
+The `--diff-filter=D` form was measured first and its blanket zero suggested
+history was unusable here; a bare `git log --all` over the same candidates in
+the same shallow clone separated the two cleanly.
+The file-borne signal that needs no history at all: the built-ins carry
+`license: Proprietary. LICENSE.txt has complete terms`.)
 
 `git fetch --depth N origin <branch>` deepens enough history to make
 a real merge-base available if you must merge. (Hit resolving

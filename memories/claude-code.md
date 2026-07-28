@@ -29,6 +29,11 @@
   site: `jarl.etiennebacher.com/reference/config-file` 403'd, but
   `WebSearch` surfaced `docs/reference/config-file.md` as the underlying
   file, which raw-fetched with the full field-by-field config reference.)
+- **A 404 from `raw.githubusercontent.com` is often a filename-case mismatch, not a missing file.**
+  The rendered URL's slug is lowercased by the site generator while the source file's own name may not be.
+  Advanced R serves `function-operators.html` from `Function-operators.Rmd`, so the obvious raw URL 404s and the capitalized one returns the chapter.
+  Retry with the repo's own capitalization before concluding the source lives at some other path.
+  (ai-config#760, 2026-07-28: `adv-r.hadley.nz` 403'd through the proxy, and the first raw attempt 404'd purely on the leading capital.)
 - **`docs.github.com` itself can be blocked outright by a remote session's
   network policy** (proxy 403 on every page, and `api.github.com` too —
   both at the curl/WebFetch level; the GitHub MCP tools route through
@@ -418,7 +423,62 @@ hundreds of files / thousands of insertions that aren't real, and a real
 merge/diff-vs-main operations on a shallow clone. What *is* reliable on a
 shallow clone: single-tree reads (`git show origin/main:<file>`,
 `git cat-file`) --- they read the fetched tip's tree directly, no merge-base
-needed. `git fetch --depth N origin <branch>` deepens enough history to make
+needed.
+
+**The same truncation degrades classifiers built on file history, and how
+badly depends on which question you ask -- so test the query rather than
+assuming either that it works or that it doesn't.**
+A bogus merge-base announces itself, with thousands of phantom insertions or a
+merge that explodes into conflicts.
+A history *query* just comes back empty, and empty is also a legitimate answer,
+so it cannot be told apart from a real negative by looking at it.
+
+Two questions that appear interchangeable behave very differently on a
+shallow clone of this corpus:
+
+- `git log --diff-filter=D -- <path>` ("was this ever deleted?") returned
+  **zero for every candidate**, ours and foreign alike, at depth 50.
+  A deletion that happened before the shallow window is simply not in it, so
+  this question is unanswerable here while appearing answered.
+- `git log --all -- <path>` ("has the repo ever touched this?") **did**
+  discriminate, on the same clone at depth 55: zero for all seven Anthropic
+  built-ins, against 6 for `ums`, 3 for `ardi` and 1 for `config-ai`.
+  An actively maintained file gets touched inside almost any window, which is
+  what makes the weaker question survive truncation.
+
+The five commits gained between those two measurements are not what produced
+the discrimination, which is the obvious objection and worth foreclosing:
+none of them touches `skills/ums`, `skills/ardi` or `skills/config-ai`, and
+every commit behind those three counts predates all five.
+The second form would have separated the two classes at depth 50 as well.
+
+The residual risk in the second form is a file that is genuinely ours but has
+not been touched within the window, which reports as never-ours.
+So the rule is not "history is useless when shallow" but: check
+`git rev-parse --is-shallow-repository`, then **run the query against known
+controls of both classes** before trusting it, and prefer a signal carried by
+the file itself when one exists.
+Note what "both classes" costs here, because this corpus could not supply it:
+there was no deleted-but-still-installed skill to test against, so the
+observed separation only shows the query telling *never ours* from *ours and
+actively maintained*, never the class it claims to catch.
+That is the same gap the residual risk above names, arrived at from the other
+direction, and it is why the query is worth reporting to a human rather than
+trusting.
+[`ardi.md`](../shared/workflow/ardi.md)'s "test the class it distinguishes"
+bullet is the review-time counterpart to this entry: this one says why a
+history query fails on a truncated clone, that one says to confirm a true
+positive of the class exists in what you tested before claiming the mechanism
+separates the cases at all.
+(ai-config#765/#770, 2026-07-28: separating our own deleted skills from
+Anthropic-provided built-ins under `~/.claude/skills/`.
+The `--diff-filter=D` form was measured first and its blanket zero suggested
+history was unusable here; a bare `git log --all` over the same candidates in
+the same shallow clone separated the two cleanly.
+The file-borne signal that needs no history at all: the built-ins carry
+`license: Proprietary. LICENSE.txt has complete terms`.)
+
+`git fetch --depth N origin <branch>` deepens enough history to make
 a real merge-base available if you must merge. (Hit resolving
 UCD-SERG/serocalculator#503's altdoc chain, 2026-07: a `--depth 1` altdoc
 clone made `recursive-qmd-search..origin/main` show 272 files / 14k
@@ -608,3 +668,33 @@ outlives its turn — verify state from the outside, don't just ask again.
 the same session, one implementing a casualty-reflow feature and one a
 maneuver feature, each running the project's own `tools/check.sh` full
 suite — direct process verification via PowerShell resolved both.)
+
+## A harness pass can replace `~/.claude` skill symlinks with stale copies AFTER `SessionStart`
+
+`bootstrap.sh` symlinks this repo into `~/.claude`, so a `git pull` normally
+refreshes what the Skill tool loads.
+In a web container a later provisioning pass can overwrite a subset of
+`~/.claude/skills/*` with real directories holding older content, and those
+copies then shadow the repo for the rest of the session.
+
+The ordering is the part worth remembering, because it decides where a repair
+can live.
+The clobber lands *after* the `SessionStart` hook, so a check wired there runs
+before the damage and reports a clean install every single time.
+Run it from `UserPromptSubmit` instead, guarded to once per session on the
+payload's `session_id`, which is late enough that startup has settled.
+
+Upstream, the copies are stale because `upload_skills.sh` is idempotent by
+**skipping** any skill already present in the workspace rather than adding a
+version, so a workspace copy stays frozen at whatever revision was first
+uploaded (ai-config#769).
+That also predicts the shape of the drift: the stale set is exactly the
+long-standing skills, while anything added since the last upload is still a
+working symlink.
+
+Detect and repair it with `python3 ~/.claude/scripts/check-install.py --fix`
+rather than by hand; ai-config#765 added it, and the repo's own
+`UserPromptSubmit` hook runs it.
+(ai-config#755/#765, 2026-07-28: 42 of 172 skills were stale in one container,
+`ardi` at 80 lines against 403 and `ums` at 94 against 365, so the session was
+running materially older versions of its own review procedures.)

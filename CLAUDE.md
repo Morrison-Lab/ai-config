@@ -18,6 +18,13 @@ Still run UMS before `/clear` too, as a final catch-all for anything accumulated
 
 **In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."** "As learnings accumulate" is easy to defer indefinitely during heads-down execution across several PRs, since no single moment feels like the obvious trigger — a merge is a natural, unmissable boundary to pause at instead. (Corrected in a sparta `gii-mwc` session, 2026-07-19: three PRs merged back-to-back with real, worth-saving learnings at each one — a subagent-resume/restart pattern, a diff-scoped-check no-op, a stale benchmark baseline — and UMS never ran until the user asked why `/clear` was suggested with UMS still outstanding, which is exactly the failure mode this fragment exists to prevent.)
 
+**A PR's clean review verdict is a proactive-UMS checkpoint in its own right, and it fires strictly earlier than the merge -- run the pass there rather than holding it until the PR lands.**
+The bullet above picked the merge because it is unmissable, and it is; the problem is that it may never arrive on this session's clock.
+Merging is human-gated: [`ardi`](shared/workflow/ardi.md)'s terminal action is to report the PR ready, never to merge it.
+So a clean-but-unmerged PR can sit for hours, for days, or across a `/clear`, and the review lifecycle's learnings sit with it in conversation state that may not survive the wait.
+Waiting buys nothing either, because by the time the verdict is clean every finding has already been Addressed, Rebutted, or Deferred -- the review has taught everything it is going to teach, and the merge adds only whatever the merge itself surfaces.
+So run UMS when the verdict comes back clean, and treat the merge-time pass as a top-up rather than the trigger.
+
 ## Flag good moments to `/clear` in long-running sessions
 
 Proactively tell me — don't wait to be asked — when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
@@ -79,6 +86,28 @@ In every session — at session start, and again periodically during long sessio
    On Windows, Git Bash `ln -s` silently falls back to **real copies**, so a pull does NOT propagate there — copy-sync every file whose repo version changed into `~/.claude`.
    Before overwriting, check for edits made directly in `~/.claude` (a diff that adds prose the repo lacks) and upstream the genuine ones into the repo first; never clobber an un-upstreamed local edit.
    Don't rely on mtime to spot local edits — git operations reset mtimes on checkout, so it false-positives right after a `pull`, the case this check most needs to handle correctly.
+   **Don't read "symlink-capable system" as "therefore all four children are symlinks" -- verify per child, because the split can fall inside one `~/.claude`.**
+   In a remote/web container, a subset of `~/.claude/skills/` ends up as real directories holding older content, which shadow the repo for the whole session.
+   `shared/`, `memories/`, `commands/`, and `CLAUDE.md` symlink normally in the same container, which is what makes this hard to spot: the child that silently doesn't refresh is the one carrying the procedures you are about to follow.
+   `git pull` cannot fix it, because the loaded file is a copy rather than a link.
+   Don't sweep this by hand.
+   Run the instrument, which compares whole trees rather than `SKILL.md` alone and repairs what it finds, backing up every displaced copy:
+   ```bash
+   python3 ~/.claude/scripts/check-install.py          # report
+   python3 ~/.claude/scripts/check-install.py --fix     # repair
+   ```
+   It reports `stale` (a real copy that has drifted -- the active defect), `unlinked` (a real copy that matches today but won't track the next pull), `missing`, `misdirected`, and `foreign`.
+   **`foreign` is reported but never removed, and is not a synonym for "deleted from the repo".**
+   The category mixes skills we deleted with Anthropic-provided built-ins that were never ours (`docx`, `pdf`, `pptx`, `xlsx`, `skill-creator`), and deleting those would remove working harness functionality.
+   Git history cannot separate the two, because remote containers check the repo out **shallow** -- `git log --diff-filter=D -- skills/<name>` returns nothing for either case -- so the call stays human.
+   The repo's `UserPromptSubmit` hook runs the repair once per session, so this is normally already done by the time you would think to check.
+   **The clobber happens after `bootstrap.sh`, not before it, so don't diagnose this as bootstrap skipping a pre-seeded copy.**
+   Measured in one container: at `07:25:00.084` bootstrap reported 527 `already linked` and zero skips, so every skill was still a symlink; `~/.claude/skills` was then modified at `07:25:01.608`, leaving 53 real directories.
+   The upstream cause is `upload_skills.sh`, which is idempotent by **skipping** any skill already in the workspace (`skip (exists)`) rather than adding a version, so the workspace copy the harness syncs down stays frozen at whatever revision was first uploaded.
+   That is why a repair wired into `SessionStart` would run before the damage and report a clean install every time.
+   (ai-config#755, 2026-07-28: 42 of 172 skills were stale in a web session, most at under half their real length -- `ardi` 80 lines vs 403, `ums` 94 vs 365, `ard` 134 vs 308 -- plus 3 latent unlinked copies the old `SKILL.md`-only sweep counted as identical.
+   Caught only because a `ums` step contradicted a change known to have merged.
+   The damage stayed small because `CLAUDE.md` itself was symlinked and restates most operative rules inline, which is the concrete argument for keeping local restatements alongside citations rather than trimming to bare pointers.)
 3. **The working repo's main checkout.** Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) — it goes stale as the session's own PRs and other sessions' PRs merge.
    **The same "diverged" failure from point 1 above can hit any repo's `main`, not just ai-config's own** — a fresh container's checkout isn't guaranteed fresh for every repo it holds. Apply the same recovery: confirm the working tree is clean, then check whether the local tip's commit is actually reachable from `origin/main` (`git merge-base --is-ancestor <local-tip> origin/main`) before force-realigning with `git checkout -B main origin/main`. Don't rely on a commit-message grep alone to decide safety — the same message can appear under a *different hash* after a squash-merge or rebase (so the grep matches but the underlying commits differ, the milder case in point 1), and `git log origin/main` only reflects whatever your local remote-tracking ref last fetched (so a check run before fetching in this session can miss commits that already landed). Re-run `git fetch origin main` immediately beforehand and use the hash-based ancestry check as the authoritative signal. A clean working tree plus a non-ancestor local `main` tip is still safe to realign in the common case (the checkout is stale, not carrying real work), since realigning only moves a local branch ref — the discarded commits stay recoverable via `git reflog` regardless. (Hit in both `ai-config` and `gha` checkouts in the same session, 2026-07-06: `gha`'s local `main` tip commit didn't match `origin/main` by hash *or* message at all — unlike the milder "same content, rewritten hash" case documented in point 1 — but was still just a stale checkout snapshot with nothing of value, confirmed once the working tree was verified clean.)
 4. **The `.ai-config` submodule pin, in any repo that vendors ai-config as a git submodule** (check `.gitmodules` for a `.ai-config` entry — not every repo has one; most consume ai-config only via the Plugin Marketplace, which doesn't need this). Compare the pinned commit against ai-config's current `origin/main`: `git rev-parse HEAD:.ai-config` for the pin's SHA, then `git -C <path-to-a-local-ai-config-clone> rev-list --count <pin>..origin/main` for how far behind it is.
@@ -346,6 +375,10 @@ Step 3 (own-repo fallback) is not covered by `sup`; use `gh issue create` in the
 When a PR/MR you were working on **merges**, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout `main`, pull, `git branch -d`), confirm any deferred items have follow-up issues, then run **UMS** to capture what the PR's review lifecycle taught — recurring review findings, corrections, and guidance given along the way.
 A merge is the natural checkpoint to bank lessons before the context is lost.
 
+This is not the *first* checkpoint, though, and it should rarely be the one carrying the whole backlog.
+Per "Run UMS proactively" above, the pass already ran when the review verdict came back clean, so `post-merge`'s UMS covers what the merge itself taught -- a conflict resolved on the way in, a check that only fires on `main`, a squash that reshaped the history.
+Run it regardless: a short pass that finds nothing new is the expected outcome when the verdict-time pass did its job, not a reason to skip the step.
+
 "merge it" / "merge this" / "merge the PR" as bare directives (no slash) trigger the `merge-it` skill: when the PR isn't merged yet, it merges the ready PR (squash by default) **then** chains straight into `post-merge` (tidy + UMS); when the PR is already merged it goes directly to `post-merge`.
 Either way the post-merge wrap-up — including the UMS follow-up PR — runs **automatically, without asking**.
 If the phrase is clearly part of ordinary prose rather than a standalone directive, treat it as such.
@@ -512,13 +545,18 @@ Apply this in review too: error handling that hides failure is a review finding,
 Follow the KISS principle (keep it simple, stupid) in code and prose alike:
 prefer the simplest construct that does the job, and treat added complexity
 as a cost that needs justification.
-The specific coding rules below (avoid nesting, no map-site lambdas, prefer
-packaged functions, per-operation grouping, tidy code, one function per
-file, decompose to functions) and the review-side
+The specific coding rules below --- every fragment under `shared/coding/`,
+indexed by the principle it serves in the catalog above --- and the
+review-side
 `challenge-unnecessary-complexity` policy are special cases of this
 principle — they exist because a bare "keep it simple" isn't concretely
 reviewable, but when a case arises that none of them covers, apply KISS
 directly rather than treating the enumerated rules as exhaustive.
+
+## Coding: use the least-flexible construct that does the job
+
+<!-- Not yet shared with the lab manual; edit shared/coding/least-flexible-tool.md, not here. -->
+@shared/coding/least-flexible-tool.md
 
 ## Coding style: avoid nesting; follow the lab manual
 
@@ -537,10 +575,30 @@ Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding a
 <!-- Shared with the lab manual; edit shared/coding/prefer-packaged-functions.md, not here. -->
 @shared/coding/prefer-packaged-functions.md
 
+## Coding: memoise pure, expensive, repeatedly-called functions
+
+<!-- Not yet shared with the lab manual; edit shared/coding/use-memoisation.md, not here. -->
+@shared/coding/use-memoisation.md
+
 ## Coding: prefer per-operation grouping over persistent grouping (dplyr)
 
 <!-- Shared with the lab manual; edit shared/coding/per-operation-grouping.md, not here. -->
 @shared/coding/per-operation-grouping.md
+
+## Coding: prefer type-stable calls; never `sapply()` outside the console
+
+<!-- Not yet shared with the lab manual; edit shared/coding/type-stable-outputs.md, not here. -->
+@shared/coding/type-stable-outputs.md
+
+## Coding: preallocate, `seq_along()`, and `[[i]]` in for loops
+
+<!-- Not yet shared with the lab manual; edit shared/coding/loop-hygiene.md, not here. -->
+@shared/coding/loop-hygiene.md
+
+## Coding: restore global state your function changes
+
+<!-- Not yet shared with the lab manual; edit shared/coding/restore-global-state.md, not here. -->
+@shared/coding/restore-global-state.md
 
 ## Coding: avoid hard-coding data with an external source of truth
 

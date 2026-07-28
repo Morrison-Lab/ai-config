@@ -32,6 +32,10 @@ We build code and prose that is:
 - **Reliable** — behaves correctly on every run, not just the demo run:
   edge cases handled, failures surfaced early and clearly rather than
   silently swallowed, and no flaky tests or race-prone automation.
+  [`loop-hygiene`](../coding/loop-hygiene.md) covers three common
+  `for`-loop defects in R, two of which surface only on input a fixture
+  rarely contains (an empty vector, a classed vector) while the third
+  degrades quadratically as the input grows.
 - **Secure and private** — no leaked secrets or PHI (the `check-phi`
   capability in
   [`d-morrison/gha`](https://github.com/d-morrison/gha) scans for it),
@@ -41,6 +45,12 @@ We build code and prose that is:
 - **Efficient** — economical with compute, memory, and people's time
   (CI minutes, review rounds); performance tuning beyond that needs a
   demonstrated hot spot, not speculation.
+  The [`measure-performance`](../../skills/measure-performance/SKILL.md)
+  skill is how that hot spot gets demonstrated: profile first, then
+  microbenchmark only what the profile implicated, then confirm the win
+  survives end to end.
+  [`use-memoisation`](../coding/use-memoisation.md) is that trade in
+  miniature: it buys speed with memory, so it needs the hot spot too.
 - **Maintainable** — the next change is cheap: one home per fact, small
   units, no accumulated complexity debt.
 - **Extensible** — new capability slots in without rework, because the
@@ -67,6 +77,8 @@ KISS directly.
 Operationalized by:
 [`challenge-unnecessary-complexity`](../workflow/challenge-unnecessary-complexity.md)
 (the review side),
+[`least-flexible-tool`](../coding/least-flexible-tool.md) (the general
+form: prefer the construct that can do least),
 [`avoid-nesting`](../coding/avoid-nesting.md),
 [`tidy-code`](../coding/tidy-code.md), and
 [`per-operation-grouping`](../coding/per-operation-grouping.md).
@@ -110,7 +122,10 @@ external source we could depend on, fork, or contribute to instead.
 Full statement: [`dont-reinvent-wheel`](dont-reinvent-wheel.md).
 Operationalized by:
 [`prefer-packaged-functions`](../coding/prefer-packaged-functions.md)
-(the R-function special case), the
+(the R-function special case),
+[`use-memoisation`](../coding/use-memoisation.md) (one instance of it:
+cache with `memoise::memoise()`, don't hand-roll a cache environment),
+the
 [`prefer-upstream`](../../skills/prefer-upstream/SKILL.md) skill (the
 search procedure), and the
 [`scout-peers`](../../skills/scout-peers/SKILL.md) skill (license-gated
@@ -167,6 +182,12 @@ In review: flag `<<-`, functions that read or write globals they don't
 own, and computation interleaved with I/O that a pure core plus a thin
 I/O shell would separate.
 
+Operationalized by:
+[`restore-global-state`](../coding/restore-global-state.md) --- when a
+mutation is genuinely required, register the restore beside it
+(`on.exit(add = TRUE)`, or the `withr::local_*()` family) so it runs on
+every exit path, including the ones that throw.
+
 ## Self-documenting code
 
 Let naming and structure carry the intent: descriptive object and
@@ -191,7 +212,13 @@ never — as silently wrong output.
 
 Full statement: [`fail-fast`](fail-fast.md), including the review-side
 check (flag swallowed errors, silent fallbacks, and CI steps that
-can't fail).
+can't fail) and the rule that a handler must select a condition by its
+class rather than by matching its message text.
+
+Operationalized by:
+[`type-stable-outputs`](../coding/type-stable-outputs.md) --- the same
+principle applied to shape rather than to errors, since a type-unstable
+call returns a plausible object of the wrong kind instead of failing.
 
 ## Algorithmatize checks — instruments over judgment
 

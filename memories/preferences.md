@@ -8,6 +8,13 @@
   A PR can merge between a "status?" call and a follow-up in the same session — running `gh pr checks` on a merged PR returns stale data and delays noticing the merge.
   If state is MERGED, trigger post-merge instead of reporting CI details. (Learned on ucdavis/bcs#266.)
   Same principle for tool availability: before telling a user a capability doesn't exist in the current session (e.g. "no `subscribe_pr_activity` tool here"), run a live check (`ToolSearch`, or the equivalent discovery mechanism) rather than reciting what a memory entry or a prior session documented — a local CLI session's tool roster isn't fixed, and reciting stale documentation as current fact is the exact failure this rule exists to prevent. (Sparta gii-ffdb93 session, 2026-07-14: initially told the user no GitHub MCP server was available in local sessions based on documented prior-session behavior, without running `ToolSearch` first. The user's pushback "can't you use the GitHub mcp server?" was the correct challenge, and a live check would have shown the tool was in fact reachable — that check should have been run before stating unavailability as fact, not after being questioned.)
+- Default to the most recent available package version.
+  Use an older or pinned version only when compatibility, reproducibility,
+  or another concrete project constraint gives a reason;
+  state that reason before choosing it.
+- When the user corrects my behavior or identifies a workflow gap, invoke UMS
+  immediately and persist the lesson before resuming the main task. Do not wait
+  for the user to say `ums` or to remind me again.
 - Apply critical thinking to every claim, including the user's own statements and anything found in an authoritative-looking source (official docs, a spec, a paper, a PR description) — don't take a claim as true just because it was asserted confidently or by someone/something with authority.
   This generalizes the "NEVER assume; ALWAYS verify" rule above (which targets operational state drift) and `shared/writing/fact-check-prose.md`'s "don't accept a plausible-sounding claim without checking it" (which targets prose review) to every claim, in every context, not just those two.
   Before treating a claim as settled, check it: cross-reference another source, re-derive it, run a small test, or reason through whether it's actually consistent with what else is known — rather than repeating it back as fact.
@@ -599,6 +606,28 @@ limits) before using up claude quota"). The `delegate-to-codex` skill (alias
 
 ## Access to paywalled academic sources
 - The user has university journal-subscription access and can fetch most academic articles and many books on request. When a task would genuinely benefit from a peer-reviewed or otherwise paywalled source (grounding a design decision, fact-checking a claim, replacing a weak general-audience citation) rather than whatever's freely indexable, ask for the specific title/article rather than settling for a lower-quality open-access source or skipping the citation. Don't request sources speculatively -- ask when a concrete, identified gap would benefit from one. (Learned on Lacaedemon/sparta, 2026-07-24: offered mid-session while grounding a combat-mechanics design discussion in a general-audience website; a peer-reviewed alternative would have been stronger.)
+
+## Default new capabilities on for the owner's own repos, opt-out elsewhere
+
+When adding an optional capability to a repo the user personally owns and
+treats as shared infrastructure for their *own* other repos (e.g.
+`d-morrison/gha`'s reusable workflows, consumed by d-morrison/UCD-SERG/ucdavis
+repos alike), don't default to pure opt-in just because the repo has
+external, non-owner consumers.
+**Why:** built a `plugin-marketplaces`/`plugins` passthrough on `gha`'s
+`claude.yml`/`claude-code-review.yml` as opt-in-only (empty by default),
+reasoning that gha serves multiple orgs, not just the user's own repos -- but
+the user's actual intent was for their own `ai-config` plugin to install by
+default (with a `use-ai-config: false` opt-out), since gha's multi-tenancy is
+about not forcing the owner's conventions on *other* orgs, not about
+withholding the owner's own defaults from their own tooling.
+The user extended the already-merged-ready PR themselves (a follow-up commit + PR
+comment) to flip it to on-by-default before merging.
+**How to apply:** when scoping a new default for a repo like this, explicitly
+float "on by default for the owner, opt-out for others" as a distinct option
+from "opt-in only" rather than assuming opt-in is automatically the
+safer/preferred choice merely because the repo has external consumers.
+(d-morrison/gha#321, closing #319, 2026-07-26/27.)
 
 ## Code organization
 - One function per file, across languages (not just R) --- the exception is a trivial two-line wrapper/helper, not a general "where practical" hedge or a "major function" loophole that lets other private helpers ride along (see `shared/coding/one-function-per-file.md`).

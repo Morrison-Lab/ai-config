@@ -79,6 +79,24 @@
   but a plain-CRAN source install of knitr/rmarkdown/DT succeeded, letting all
   three of `CONTRIBUTING.md`'s documented renders — both PDF demos and the full
   HTML site — run locally before push.)
+  **One mechanism now pinned down, and it is not the build sandbox: P3M can
+  fail to serve an index at all.**
+  The paragraph above guesses at a timeout or resource limit inside P3M's
+  source build.
+  At least one instance is simpler and earlier than that --- no build is ever
+  attempted, because the repository index 404s:
+  `unable to access index for repository https://p3m.dev/cran/__linux__/noble/latest/src/contrib:
+  cannot open URL '.../PACKAGES'`, followed by `packages 'bench', 'profvis'
+  are not available for this version of R`, which reads as an R-version
+  incompatibility and is nothing of the kind.
+  The tell is that the failure is instant rather than slow, and that the
+  named packages are ordinary ones no snapshot would genuinely lack.
+  Switching `repos` to `https://cloud.r-project.org` installed both plus
+  about 30 dependencies in roughly a minute.
+  So treat "not available for this version of R" from a P3M repo as a
+  reachability symptom first and a compatibility claim second.
+  (ai-config#762, 2026-07-28: R 4.6.1 on noble; needed `bench` and `profvis`
+  to verify a new skill's commands rather than assert them.)
 - **A fresh `git worktree` gets its own renv library cache, keyed by the
   worktree's absolute path** (`/root/.cache/R/renv/library/<repo>-<worktree-dirname>-<hash>/...`),
   separate from the main checkout's already-populated cache. Its own
@@ -614,6 +632,27 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `lint-changed-lines` separately caught an `undesirable_function_linter` hit
   in root `app.R` that a local `lint_package()` had reported clean.
   Filed as UCD-SERG/serocalculator#608.)
+- **`air format . --check` passing is NOT the claim "no line exceeds
+  `air.toml`'s `line-width`" --- air does not reflow string literals.**
+  A long `cli::cli_abort()` / `cli_alert_*()` message, a URL, or any other
+  single string token stays exactly as written, so a 98-character line sails
+  through a green `--check` in a repo configured at `line-width = 80`.
+  The formatter's guarantee is "this file is already in the shape air would
+  produce", which is weaker than the width setting suggests.
+  Check the width separately, since one line decides it:
+  ```bash
+  awk 'length > 80 {print FILENAME":"FNR": "length" chars"}' $(git ls-files '*.R')
+  ```
+  Fix a flagged string by splitting it across implicit-concatenation
+  arguments (`cli`'s `...` joins them) rather than widening `line-width`.
+  This is another green-check-does-not-mean-clean-content case, alongside
+  `check-new-line-breaks` in
+  [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md) and the
+  review-job cases in [`fully-clean`](../shared/workflow/fully-clean.md).
+  Note that `lintr`'s `line_length_linter` DOES catch these, so a repo
+  running air without lintr (d-morrison/altdoc) has no gate at all.
+  (d-morrison/altdoc#78, 2026-07-27: two `cli` strings in new code ran to 93
+  and 98 characters with `air format . --check` clean throughout.)
 
 ## jarl (Just Another R Linter) — `jarl.toml` fields lag the published docs
 - `jarl` (`etiennebacher/jarl`, installed via `etiennebacher/setup-jarl@vX` in
@@ -703,6 +742,11 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `.Rd` by hand. (Corrected 2026-07-20: on serocalculator#562 I hand-edited two
   `.Rd` files instead of installing roxygen2 and running `document()`; the
   user's rule is to run the generator.)
+  - **Match the package's pinned roxygen2 version before trusting generated output.**
+    Different roxygen2 versions can rewrite the same `.Rd` differently,
+    so a local version that differs from the one CI uses can produce a misleading diff.
+    Install and verify the version recorded by the project's lockfile (or otherwise used by CI),
+    regenerate, and inspect the resulting diff before pushing. (ucdavis/bcs#448, 2026-07-28.)
 - **Hand-editing `.Rd` is a genuine last resort, only when installing the
   toolchain truly fails** (offline / locked-down sandbox). If forced to it, keep
   the edit safe: roxygen copies `@format`/`@param`/`@return` prose verbatim into
@@ -1005,3 +1049,109 @@ That message is confident, actionable, and pointing at the wrong problem.
 Check both the missing and the invalid case when guarding a forwarded
 argument, not only the one the issue reports.
 (d-morrison/altdoc#64.)
+
+## A container with no R at all is not a blocker: apt for R, P3M for the packages, a tarball for Quarto
+
+The bullets above assume R already exists and only its *packages* are
+missing --- the renv-session case.
+A remote/web container can have no R, no Quarto, and no `gh`, which reads as
+"tests cannot run here, push and let CI check it."
+It is worth about ten minutes to disprove instead, and the difference is
+large: pushing test assertions you have never executed versus deriving them
+from a real run.
+
+The recipe that worked end to end (Ubuntu 24.04 noble container, root):
+
+```bash
+# The version apt gives you depends on a precondition worth checking first:
+#   grep -r cran /etc/apt/sources.list.d/
+# This container already had CRAN's own repo wired up
+# (/etc/apt/sources.list.d/cran-r.list -> cloud.r-project.org, noble-cran40),
+# which is where the R 4.6.1 below came from. Ubuntu's own noble repo carries
+# a much older R, so on an image without that file, add the CRAN repo rather
+# than assuming a version.
+apt-get install -y --no-install-recommends r-base-core   # R 4.6.1, here
+
+# P3M rather than the default mirror, per the rest of this file --- the very
+# next paragraph is what happens when something in the list needs compiling.
+Rscript -e 'options(repos = c(P3M = "https://packagemanager.posit.co/cran/__linux__/noble/latest")); install.packages(c("cli", "desc", "fs", "testthat", "pkgload"))'
+
+curl -sSLo q.tar.gz https://github.com/quarto-dev/quarto-cli/releases/download/v1.8.27/quarto-1.8.27-linux-amd64.tar.gz
+tar xzf q.tar.gz && ln -sf "$PWD"/quarto-*/bin/quarto /usr/local/bin/quarto
+```
+
+**The P3M-vs-CRAN-direct choice runs in both directions.**
+The "before accepting uninstallable, try CRAN-direct" bullet above records
+source-CRAN succeeding where P3M's fallback did not.
+The same session hit the mirror image: a plain CRAN source install of
+`quarto` and `rmarkdown` failed building their `sass` dependency
+(`make: *** [Makefile:4: sass.ts] Error 3`), while P3M's noble binaries
+installed all four packages in one call with no compilation.
+So neither repo is the reliable one --- when the first fails on a build
+step, switch and retry before concluding a package is unavailable.
+(`d-morrison/altdoc` #82/#83/#84, 2026-07-28: this turned "assert the output
+tree and hope" into rendering each generator, listing its published `docs/`
+tree, and deriving the assertions from what was actually there.)
+
+## testthat run by hand: two defaults that make a broken run look like a clean one
+
+Both bite a **bare `Rscript` call** --- which is what a sandbox run is --- and
+each fails in the direction that reads as success.
+
+`devtools::test()` sets `NOT_CRAN = "true"`, and so does a
+`rcmdcheck`-driven CI run: `d-morrison/altdoc`'s `R-CMD-check` reports
+`FAIL 0 | WARN 1 | SKIP 6 | PASS 406`, and none of those six skips is
+`On CRAN`, so its `skip_on_cran()`-guarded render tests genuinely run there.
+But do not read that as "`R CMD check` protects you": CRAN's own runs leave
+`NOT_CRAN` unset, which is the entire point of the function.
+What sets it is the harness around the check, not the check.
+
+**`skip_on_cran()` skips unless `NOT_CRAN` is set.**
+A file whose every test opens with it reports `failed: 0  error: 0` and exits
+`0` --- green by every signal except the one that matters.
+The tell is the skip count: `skipped: 20  passed: 0` is not a pass, it is a
+file that never ran.
+Set `NOT_CRAN=true` on the command, and read `passed` rather than `failed`
+before believing a run.
+
+It is not a plain env-var test, and the difference explains why the trap is
+specific to scripted runs.
+`testthat:::on_cran()` is:
+
+```r
+env <- Sys.getenv("NOT_CRAN")
+if (identical(env, "")) !interactive() else !isTRUE(as.logical(env))
+```
+
+So with the variable unset, an interactive console *runs* the tests while a
+non-interactive `Rscript` skips them --- reproducing it by hand in a REPL
+will therefore not show you the bug.
+
+**`test_file()` / `test_local()` abort on the first failure --- but
+`formals()` will not tell you so.**
+Neither signature carries a literal default: in testthat 3.3.2 both
+`formals(testthat::test_file)$stop_on_failure` and the `test_local()`
+equivalent are `NULL`, and the aborting behavior comes from `test_dir()`,
+whose own default is `TRUE`.
+So inspecting the signature and concluding the argument is unset, or that the
+two functions differ, is the wrong reading ---
+a review of this entry made exactly that inference from the documentation,
+and `formals()` is what settles it.
+What the behavior actually is: one failing expectation aborts a manual
+`test_local(".")` with a bare `Error: Test failures.` and no summary, which
+reads as the harness crashing rather than as a test result.
+Pass `stop_on_failure = FALSE` explicitly and consume the returned data frame
+(`as.data.frame(...)`, then `sum(r$failed)` and `r$test[r$failed > 0]`) to
+get which test failed rather than only that something did.
+
+**A hand-rolled harness invents failures; use the real loader.**
+`source()`-ing every file in `R/` into the global environment is the obvious
+way to reach dot-prefixed internals without installing the package, and it
+produced five spurious errors that vanished under `pkgload::load_all(".")`
+--- tests reaching code that resolves paths through `system.file()` need the
+package's own installed structure.
+`pkgload` is a small dependency and worth installing before trusting any
+failure a `source()` harness reports.
+Either way, baseline a failure against unmodified `main` (`git stash`,
+re-run, `git stash pop`) before treating it as yours: two of this session's
+apparently-new failures were pre-existing and environmental.

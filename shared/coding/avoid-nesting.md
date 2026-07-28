@@ -12,6 +12,32 @@ This is a readability/maintainability default, not an absolute rule --- keep the
 nesting when flattening it would be more convoluted (a trivial one-argument
 wrapper, or a closure that genuinely needs the enclosing scope).
 
+## Prefer more, simpler steps over fewer, denser ones
+
+The named-intermediate rule above operates within one expression.
+The same trade runs one level up, across a pipeline: given a choice, do less
+per step and take more steps.
+
+Advanced R makes the observation while comparing a purrr pipeline against
+the base-R and `for`-loop versions of the same task, in
+[Purrr style](https://adv-r.hadley.nz/functionals.html#purrr-style):
+
+> It's interesting to note that as you move from purrr to base apply
+> functions to for loops you tend to do more and more in each iteration.
+> In purrr we iterate 3 times (`map()`, `map()`, `map_dbl()`), with apply
+> functions we iterate twice (`lapply()`, `vapply()`), and with a for loop
+> we iterate once.
+> I prefer more, but simpler, steps because I think it makes the code easier
+> to understand and later modify.
+
+The gain is the same one named intermediates buy: each step is separately
+readable, separately testable, and separately replaceable, and a change
+lands in one step rather than in the middle of a compound one.
+Cost only shows up when a step is traversed enough times for the extra
+passes to matter --- which is a claim to settle with
+[`measure-performance`](../../skills/measure-performance/SKILL.md), not by
+assumption.
+
 ## Lambdas in map()/apply-family calls
 
 The nested-definition rule applies to `purrr::map*()` / `pmap*()` /

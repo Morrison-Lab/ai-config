@@ -16,6 +16,13 @@ as a self-authored merge). Drive to fully clean, report ready, and leave the
 merge --- and any other destructive one-off, e.g. a `gh workflow run` that
 force-pushes --- for explicit human authorization.
 
+Because the loop ends there, **the clean verdict is also where `ums` runs** ---
+don't hold the pass for the merge, which is on the human's clock rather than
+this session's and may land after a `/clear` or not at all.
+See `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate";
+the merge-time pass in `post-merge` then only has to cover what the merge
+itself taught.
+
 The one exception: if the human has explicitly granted the `mwc`
 (merge-when-confident) session permission, that grant is a live human
 instruction, not a self-authored one, so baking a self-merge step into a
@@ -184,3 +191,128 @@ but the `quarto_website` path stages into `_quarto/` first, so the logo
 line was dropped on every render of the one generator the feature wired
 up. Seventeen unit assertions passed throughout; one throwaway render
 found it immediately.)
+
+**When new code branches on a third-party tool's behavior, read that tool's
+own config or docs for the specific behavior --- don't infer it from what
+the tool broadly does.**
+The bullet above covers your own pipeline's layout; this one covers the
+tools that pipeline drives.
+An inference of the form "it builds HTML, so link to `.html`" is exactly
+the shape that feels too obvious to check, and a tool's defaults routinely
+contradict it.
+Two properties make this worse than an ordinary wrong guess.
+The inference usually lands in a branch your own fixtures cannot reach ---
+you have no fixture for someone else's renderer --- so the test suite
+agrees with you.
+And it produces output that is well-formed and plausible (a link, a path, a
+flag), so a reviewer skimming the diff has nothing to catch, and the
+failure surfaces only in a consumer's published site.
+Name the setting you are relying on, and check its actual default before
+writing the branch.
+(d-morrison/altdoc#78, 2026-07-27: a generator-to-extension map gave mkdocs
+`.html`, reasoning that mkdocs compiles Markdown to HTML. Its
+`use_directory_urls` default is `TRUE`, so it serves `/man/foo/` and never
+`/man/foo.html` --- every reference link the feature emitted for that
+generator would have 404'd. Caught in review, not by the 39 tests.)
+
+**A regression test written alongside a fix can lock the bug in rather than
+catch it --- assert the two paths that diverge, not the one you just
+touched.**
+A test authored in the same pass as the code tends to record what the code
+*does*, because you run it, see it pass, and move on.
+That is usually harmless.
+It becomes a lock when the fixture is thin enough that the buggy and the
+correct path produce the *same* output: the assertion then encodes the
+degraded result as intent, and every later reviewer reads a green suite as
+evidence the behavior was chosen.
+The next round's finding lands on your test, not just your code.
+
+The tell is the same each time: **a fixture missing the input variety that
+makes the two paths differ.**
+So when a bug is an asymmetry --- nested versus top-level, second render
+versus first, one generator versus another --- build the fixture so both
+sides are present and assert them together.
+Either side alone is unfalsifiable, since the case that reveals the bug is
+the *comparison*.
+Then prove it: revert the fix and confirm the new test actually fails.
+A regression test never seen to fail is a guess about what it covers.
+(d-morrison/altdoc#78, 2026-07-27: twice.
+A `.pdf` vignette test asserted
+the entry's extension but never its label, so an extension leaking into the
+label passed; and a nested-article test built no source tree, so top-level
+and nested resolved identically and a nested-only title bug was pinned as
+expected output.
+Both were found by review reading the test, not the code.)
+
+**A systematic audit done by skimming is worse than the one-at-a-time
+version it replaces.**
+Batching a check --- "rather than wait for the next round to find divergence
+number four, compare all four at once" --- is the right instinct, and it
+inverts if each lookup gets less care than it would have alone.
+Two things make the batched form more dangerous, not less.
+Its output is usually a claim recorded somewhere durable (a comment, a
+doc, a table), so an error is published rather than merely held; and it
+arrives labelled *audited*, which is precisely the word that stops the next
+reader from checking.
+A wrong comment in a block written to prevent a specific future change
+invites that change while appearing to forbid it.
+Concretely: when the thing being audited is a function, grep for the
+function, not for a pattern in its file --- a file with several functions
+will hand you the first match, which is often not the one you mean.
+Name the function in whatever you write down, so the claim stays checkable.
+(d-morrison/altdoc#78, 2026-07-27: a commit written to get ahead of a
+one-finding-per-round loop claimed mkdocs' sidebar matched only `\.md`.
+It matches `\.md$|\.pdf$`; the grep had returned a different function 120
+lines above the sidebar builder in the same file.
+Caught by the very next review round.)
+
+**Adding an explanation supersedes whatever the file already said about the
+same thing, so re-read the older passage --- your own diff is the likeliest
+source of a contradiction nobody flags.**
+The sync rules in
+[`address-every-comment`](address-every-comment.md) all fire on an external
+trigger: a reviewer quotes a phrase, or behavior changes and a changelog goes
+stale.
+This one has no trigger at all.
+You add a paragraph explaining that something was misunderstood, and the note
+recording the original misunderstanding sits a few lines below, still stating
+it as fact.
+Nothing conflicts, no check fires, and both passages read plausibly on their
+own --- but a reader who reaches the older one first comes away with exactly
+the belief the new text was written to remove.
+
+The tell is a diff that adds an explanation, a correction, or a "what this
+actually means" paragraph near existing prose.
+Re-read the surrounding passage as a whole rather than diffing your addition
+in isolation, and treat a historical record ("we observed N of X") as a claim
+your explanation may have just falsified.
+When the older passage recorded a *different* session's observation, correct
+it with reasoning that stands on its own rather than restating it as though
+you had seen it --- an inference presented as an observation is the same
+defect one level up.
+(ai-config#770, 2026-07-28: an added explanation established that seven
+reported orphans were misclassifications, while the note two lines below went
+on calling them "already deleted from the repo."
+Caught by review, in the same hunk as the text that contradicted it.)
+
+**And when the explanation you add is a *mechanism* claim, test the class it
+distinguishes, not just the sample in front of you.**
+The bullet above is about contradicting old text; this is about the new text
+being unfalsifiable on the evidence you gathered.
+A classifier validated on a population containing no positive instance of the
+class it is supposed to catch will report a clean result either way, so
+"it returned zero" is not evidence it works --- it is the same
+missing-input-variety tell the regression-test bullet above describes, moved
+from a fixture to a diagnostic.
+Ask what a true positive would look like, confirm one exists in what you
+tested, and if none does, say so instead of claiming the mechanism separates
+the cases.
+(ai-config#770, same day: a `git log -- skills/<name>` probe was said to
+separate "deleted from the repo" from "never ours" *exactly*, on the evidence
+that it reported zero false orphans.
+The repo contained no deleted-but-still-installed skill at all, so there was
+nothing for it to get wrong; and `git rev-parse --is-shallow-repository`
+returned `true`, meaning anything deleted before the shallow boundary would
+have been silently misread as harness-provided.
+The claim went into a PR reply before either check was run, and ai-config#765
+had independently reached the correct conclusion.)

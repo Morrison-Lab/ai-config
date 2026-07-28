@@ -26,6 +26,14 @@ committed pass.
   or for `/clear` to accumulate a backlog — and don't gate it on approval or
   on a PR merging: capture the learning the moment it appears, even while the
   PR that taught it is still open and unreviewed.
+  **A user correction is a mandatory immediate trigger.** Persist the lesson
+  before resuming the main task; never wait for the user to invoke UMS or
+  remind you a second time.
+- **When a PR reaches a clean review verdict** -- the concrete checkpoint the
+  bullet above leaves implicit, and the one the `ardi` loop exits on.
+  Run the pass there rather than at the merge: the merge is human-gated and
+  may land long after this session ends, while the verdict is the moment the
+  review lifecycle has finished teaching.
 - User says "ums", "update memories and skills", "record what we learned"
 - **At the start of `/clear`** — a backstop, not the primary trigger: catch
   anything accumulated since the last proactive pass before context is lost
@@ -83,6 +91,32 @@ committed pass.
 4. **Commit and push — via a branch + PR, not direct to `main`, in whichever
    repo step 2 routed the item to.**
 
+   **Do this in an isolated `git worktree`, not the shared ai-config checkout
+   directly** -- `memories/preferences.md`'s "Run a local session in an
+   isolated git worktree by DEFAULT" rule applies here too.
+   The shared checkout is routinely in concurrent use by other sessions also
+   running UMS; a `git checkout <branch>` from another session mid-command
+   can silently redirect *your* `git commit`/`git push` onto *their* branch
+   (and vice versa), and a local `git status`/`git log` read moments later
+   can already reflect a third session's activity, not your own.
+   Every code block below creates (or reuses) a worktree first, then runs
+   every `git add`/`commit`/`push` from inside it -- never `cd` straight
+   into the shared checkout itself to make a change.
+
+   **If a push is rejected non-fast-forward:** fetch first and diff before
+   assuming a real conflict -- the branch may have picked up another
+   session's commit that needs separating out (`git revert <their-commit>`)
+   rather than force-pushing over it.
+   Verify the PR's real, current content via `gh api
+   repos/<owner>/<repo>/pulls/<N>/files` or `git ls-remote`/`git show
+   origin/<branch>:<path>` (the GitHub-side truth), not the local checkout,
+   which may have already moved again.
+   (ai-config#748: a UMS commit collided with another concurrent session's
+   UMS commit on a shared branch name this way -- both sessions' content
+   ended up interleaved on one branch before separating back out, resolved
+   without data loss only because both sides fetched-before-pushing and
+   diffed before force-acting.)
+
    **Cross-project items** (skills, cross-project memory notes): both live in
    the ai-config repo. Discover its path with
    `git -C ~/.claude/skills/ums rev-parse --show-toplevel` — point
@@ -104,9 +138,18 @@ committed pass.
    tree had in-flight work; unstage it rather than bundling it. (Avoid
    `git add -p` here: it needs a terminal and hangs in non-interactive sessions.)
 
-   *Already on the open PR's branch* (e.g. mid-ARDI): commit + push to it.
+   Every path below starts by resolving `$repo`, the shared checkout's path
+   (read-only -- discovering the path doesn't touch the shared working
+   directory), then creates or reuses a **worktree** off it and does every
+   write from inside that worktree instead.
+
+   *Already on the open PR's branch* (e.g. mid-ARDI): reuse a worktree for
+   it, creating one if this is the first push in the worktree-ified flow.
    ```bash
-   cd "$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   wt="../ai-config-worktrees/<branch>"
+   git -C "$repo" worktree add "$wt" "<branch>" 2>/dev/null || true   # no-op if it already exists
+   cd "$wt"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
    git push origin HEAD                   # PUSH
@@ -117,8 +160,10 @@ committed pass.
 
    *Same-repo case* (this checkout's `origin` IS the repo you're targeting):
    ```bash
-   cd "$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
-   git fetch origin main && git checkout -b "ums-<topic>" origin/main   # FETCH + CREATE_BRANCH
+   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   git -C "$repo" fetch origin main   # FETCH
+   git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" origin/main   # CREATE_BRANCH
+   cd "../ai-config-worktrees/ums-<topic>"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
    git push -u origin HEAD   # PUSH — PR creation is handled by the post-push verification step below
@@ -128,15 +173,16 @@ committed pass.
    upstream repo you're targeting): don't branch from a bare `origin/main`
    here -- the fork's `main` can be stale relative to upstream's default
    branch. Fetch the intended **upstream** repo explicitly (not just look up
-   its default-branch name) and branch from that fetched ref:
+   its default-branch name) and branch the worktree from that fetched ref:
    ```bash
-   cd "$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
+   repo="$(git -C ~/.claude/skills/ums rev-parse --show-toplevel)"
    base="$(gh repo view "<upstream-owner>/<repo>" --json defaultBranchRef -q .defaultBranchRef.name)" \
-     && git fetch "https://github.com/<upstream-owner>/<repo>.git" "$base" \
-     && git checkout -b "ums-<topic>" FETCH_HEAD
+     && git -C "$repo" fetch "https://github.com/<upstream-owner>/<repo>.git" "$base" \
+     && git -C "$repo" worktree add -b "ums-<topic>" "../ai-config-worktrees/ums-<topic>" FETCH_HEAD
    # chained with && on purpose -- a failed lookup or fetch must stop the
-   # checkout, or it silently reuses an older FETCH_HEAD from a prior fetch,
-   # recreating the stale-base problem this block exists to prevent
+   # worktree creation, or it silently reuses an older FETCH_HEAD from a
+   # prior fetch, recreating the stale-base problem this block exists to prevent
+   cd "../ai-config-worktrees/ums-<topic>"
    git add "skills/<name>/SKILL.md" "memories/<file>.md"   # the files you touched
    git commit -m "ums: <brief summary>"   # COMMIT
    git push -u origin HEAD   # PUSH -- to your fork; PR creation is handled by the post-push verification step below
@@ -144,6 +190,10 @@ committed pass.
    **CAUTION:** if a compound `add && commit && push` is **denied**, *nothing*
    was committed — verify with `git status` / `git log` before any `git reset
    --hard`, or you'll silently discard the still-uncommitted edits.
+
+   **After the PR merges**, remove the worktree so it doesn't accumulate:
+   `git -C "$repo" worktree remove "../ai-config-worktrees/<branch>"` (the
+   `post-merge` skill's own tidy step does this automatically).
 
    **After every push in UMS, verify PR state for the current branch in the intended base repo.** `gh pr list --head <owner>:<branch>` silently returns
    empty for an owner-qualified head — it only matches a bare branch name,

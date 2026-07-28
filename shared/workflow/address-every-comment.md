@@ -72,6 +72,32 @@ one file over. Grep the diff for the flagged phrase before considering the
 finding closed. (ai-config#373: fixed "routing/dispatch site" in the skill
 per review, but the CHANGELOG entry still said it until a follow-up commit.)
 
+**The same sync is needed when the review fix is to CODE BEHAVIOR rather than
+to wording --- and that case is easier to miss, because nothing about fixing a
+bug points at the changelog.**
+The rule above fires on a recognizable trigger: a reviewer quotes a phrase, so
+you go looking for that phrase.
+A behavior finding gives you no phrase to grep.
+You change the code, update the PR body's description of what it now does, and
+the `NEWS.md`/`CHANGELOG.md` entry --- written before the review, in prose that
+described the *old* behavior correctly --- goes on asserting it.
+Every later round then reviews a diff whose changelog contradicts its own code,
+and no reviewer flags it, since each file reads plausibly on its own.
+The shipped result is worse than a stale paraphrase: a user reading the release
+notes is told the opposite of what the release does.
+So after any Address that changes behavior, re-read the PR's changelog entry
+against the new behavior --- not just the code and the PR body.
+Fold it into the same pre-push self-review pass [`ardi`](ardi.md) already
+requires; a changelog entry is a claim about the diff, so
+[`fact-check-prose`](../writing/fact-check-prose.md) applies to it exactly as
+it applies to any other prose in the PR.
+(d-morrison/altdoc#78, 2026-07-27: review round 2 established that mkdocs
+serves `/man/foo/`, not `/man/foo.html`; the code and the PR body were
+corrected that round, while `NEWS.md` kept saying links point at `.html` under
+"`mkdocs` and `quarto_website`" through two further clean review rounds.
+Caught by a `main`-sync merge conflict that happened to land in that entry ---
+not by any review, and not by any check.)
+
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
 
 **This generalizes to a skill's own inline restatement of a fragment it
@@ -158,3 +184,76 @@ accepted a space-indented closing line real bash rejects.
 Matching whole lines against the tag -- how bash itself ends a heredoc --
 removed the whole lazy-quantifier/anchor failure mode instead of narrowing
 it; the reply carried the failing output of the suggested form.)
+
+**And the mirror case: a finding can be wrong on its stated grounds while
+still pointing at something real.**
+The two bullets above check the reviewer's *fix*; this one checks their
+*premise*.
+A confidently reasoned factual claim -- this pattern is valid, that value is
+in range, this call is safe -- invites one of two lazy responses: accept it
+because it sounds authoritative, or dismiss the whole item once you notice
+the claim is false.
+Both lose information, because a reviewer usually arrives at a wrong premise
+while looking at something that genuinely bothered them.
+
+So reproduce the claim before answering it, and answer the concern
+separately from the premise.
+When the premise turns out to be false, say so with the command and its
+output rather than by assertion, and then address what prompted it anyway --
+a reader who tested your example and got a different result has a real
+problem even if their explanation of it was wrong.
+Expect the corrected mechanism to be more useful than the original text:
+a premise worth disputing usually sits on something you had not fully
+explained.
+(ai-config#756, 2026-07-28: a review held that `[\x{2014}]` is valid PCRE
+and so could not produce the "code point value too large" error the fragment
+described, and proposed an out-of-range `[\x{110000}]` instead.
+Running it showed the original failing exactly as written -- the cause is
+the locale, since PCRE in non-UTF mode rejects any `\x{}` above `0xFF`, and
+the same command succeeds under `LC_ALL=C.UTF-8`.
+The proposed replacement would have been worse, failing unconditionally and
+hiding that environment-dependence, which is the whole reason the swallowed
+error is dangerous.
+The reviewer's actual worry -- that a reader might not reproduce it -- was
+right, and sharper than stated.)
+
+**When a finding cites a source, read the cited source before reproducing
+anything -- it is the cheaper instrument, and it is the one that can show the
+finding backwards rather than merely unsupported.**
+The bullet above says to reproduce the claim.
+That is right, and it is the second thing to do when a citation is on the
+table, because reproduction tests the *behavior* while the citation tests the
+*reasoning*, and only the second can catch a finding whose own evidence
+contradicts it.
+A citation is also the most persuasive part of a review and the least likely
+to be checked: a linked changelog entry reads as settled fact, so the finding
+inherits authority it never earned, and a one-click `suggestion` block turns
+that borrowed authority into an applied edit.
+
+Grep the cited document for the mechanism the finding names.
+One command usually decides it, which makes this an
+[`algorithmatize-checks`](algorithmatize-checks.md) case rather than a
+judgment call, and a fabricated mechanism produces a clean zero-hit result
+that is hard to argue with.
+Then quote the entry in the reply rather than paraphrasing the disagreement,
+and reproduce the behavior as the independent second leg.
+
+Do not stop at winning the point.
+A finding that misread a source usually did so because the claim it
+questioned had nothing checkable next to it, so fold the citation into the
+file itself, per [`fully-clean`](fully-clean.md)'s note that a fresh review
+run re-derives from scratch and will not read the thread.
+(ai-config#762, 2026-07-28: a review held that
+`htmlwidgets::saveWidget(selfcontained = TRUE)` no longer needs pandoc,
+citing htmlwidgets 1.6.0 as having "switched to `base64enc::dataURI()`", and
+supplied a suggestion block deleting the `rmarkdown::pandoc_available()`
+gate.
+`grep -inE 'pandoc|base64'` over that NEWS file returned six pandoc hits and
+zero base64 hits, and the 1.6.0 entry says the path "now uses the
+`{rmarkdown}` package to discover and call pandoc" -- so the citation
+established the opposite of the finding, and incidentally made the gate the
+*same lookup* htmlwidgets performs rather than a proxy for it.
+Applying the suggestion would have removed the only warning before a hard
+error, in the one step that exists for running headless.
+The reviewer accepted the rebuttal on the next round and called its own prior
+claim a hallucination.)

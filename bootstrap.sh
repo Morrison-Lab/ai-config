@@ -46,7 +46,7 @@ link_one() {
   # built-in already in ~/.claude (e.g. skills/) is skipped — it can't shadow
   # the built-in in remote sessions. Rename ours if that's not what you want.
   if [ -e "$dest" ]; then
-    printf 'skip  %s (real path exists at %s — move or merge manually, then rerun)\n' "$name" "$dest"
+    printf 'skip  %s (real path exists at %s -- run scripts/check-install.py --fix to replace it with a link, or merge manually)\n' "$name" "$dest"
     return
   fi
 

@@ -104,6 +104,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | [`r-pkg-news`](skills/r-pkg-news/SKILL.md) | | Draft a new NEWS.md entry for an R package |
 | [`r-pkg-cran-checklist`](skills/r-pkg-cran-checklist/SKILL.md) | | Walk through the standard CRAN submission checklist |
 | [`reproducibility-audit`](skills/reproducibility-audit/SKILL.md) | | Audit a project for reproducibility gaps: hidden deps, hardcoded paths, undocumented prerequisites, output traceability |
+| [`measure-performance`](skills/measure-performance/SKILL.md) | `perf`, `benchmark` | Profile R code to find the real bottleneck, microbenchmark only that, then confirm the win survives end to end |
 
 ### Session management
 
@@ -125,7 +126,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 
 ## Full skill list
 
-All 171+ canonical skills are in [`skills/`](https://github.com/d-morrison/ai-config/tree/main/skills)
+All 175+ canonical skills are in [`skills/`](https://github.com/d-morrison/ai-config/tree/main/skills)
 on GitHub. Generated Codex wrappers live in
 [`codex-skills/`](https://github.com/d-morrison/ai-config/tree/main/codex-skills).
 Each canonical `SKILL.md` has a `description` field that lists the trigger

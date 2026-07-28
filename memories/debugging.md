@@ -316,6 +316,10 @@ rg -U      "test the class it\s+distinguishes"       -> 1 match
 grep -rn  "test the class it"                        -> 1 hit
 ```
 
+Those ran on GNU grep 3.11.
+`-P` and `-z` are GNU extensions rather than POSIX, so on a BSD/macOS `grep`
+reach for `rg -U` or the one-line fragment, which need neither.
+
 `git show <sha> -- <path>` and reading the hunk is the other reliable form,
 and it is the one to reach for when verifying that a citation resolves.
 (ai-config#771, 2026-07-28: a cross-referenced bullet in

@@ -639,6 +639,37 @@ and all three forms agree on committed content -- which is exactly when it is
 easiest to stop thinking about the distinction and get bitten by the next
 stale-branch case.
 
+**A reviewer can make this mistake against your PR, and the finding it
+produces is far more convincing than the self-check version above.**
+The cases above are you misreading your own diff, where the fix is just to
+rerun the command.
+Here someone else runs `git diff --stat origin/main HEAD` and reports, in
+detail, that your branch deletes files you never touched.
+Three things make it hard to dismiss.
+It arrives itemized, as a table of real paths with real line counts, because
+every one of those files genuinely does differ between the two tips.
+It is internally consistent, so a count or an index that moved in the same
+upstream commit corroborates the "deletions" and reads as deliberate intent.
+And it invites a destructive repair: reverting those files from your branch
+would actually revert whatever merged to `main` while your PR was open.
+
+Check the base before believing the finding, and answer with the merge-base
+diff rather than by arguing.
+GitHub's own Changed Files panel is the tell, since it always diffs the merge
+base, so a reviewer's file list that disagrees with the panel is a diff-range
+artifact until shown otherwise rather than a defect in your branch.
+Merging `main` in makes the two agree, which lets the rebuttal end with the
+reviewer's own command reproducing the panel's numbers.
+(ai-config#765, 2026-07-28: a review reported 20 changed files and 822
+deletions against a 7-file PR, listed three skills, three Codex wrappers, a
+shared fragment and four memory files as deleted, and asked whether to revert
+them.
+All of it was four commits that reached `main` after the branch was cut.
+`skills.qmd`'s count reading `171+` against main's `175+` was the
+corroborating detail, and it had moved in the same commit that added the
+skills.
+The next review round retracted the finding once `main` was merged in.)
+
 ## A `git diff` self-check is blind to untracked files, whatever range you pick
 
 The section above chooses between `..`, `...`, and the bare worktree form.

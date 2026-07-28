@@ -904,3 +904,38 @@ If you do need regex matching (`fixed = FALSE`), replacement escapes can still
 apply, so validate any claim about replacement behavior against a runnable
 example before recording a generalized rule.
 (Correction logged from review on d-morrison/ai-config#641, 2026-07-22.)
+
+## When a diagnosis asserts an ordering, measure the ordering
+
+A bug report that explains itself in terms of *sequence* -- "X skips it
+because Y already put it there", "the cleanup runs before the writer" -- has
+smuggled in a claim that is usually cheap to test and rarely tested.
+The explanation sounds mechanical, it accounts for the symptom, and every
+detail in it is individually true, so the sequence goes unchecked and the
+proposed fix targets a step that was never at fault.
+
+Two sources usually settle it outright.
+A tool's own log is a timestamped record of what it saw: counts of what it
+did and did not act on discriminate between orderings, so read what it
+*reported* rather than reasoning about what it would have done.
+And `stat -c '%y'` on the artifacts gives an independent clock.
+Prefer a count that could not hold under the proposed story: "zero skips" is
+decisive in a way that "it looks linked" is not.
+
+Beware inherited mtimes when using the second source alone.
+A file materialized from a bundle can carry the bundle's timestamp, so an
+artifact can look older than the event that created it, and the log-based
+check is what disambiguates.
+
+(ai-config#765, 2026-07-28: an issue attributed stale skills to `bootstrap.sh`
+skipping pre-seeded copies.
+Its log showed 527 `already linked` and zero relevant skips, so every entry was
+still a symlink when it ran -- 53 pre-seeded directories would have produced 53
+skip lines.
+The clobber came a second later, from a different pass.
+Implementing the suggested fix would have changed a code path that was never
+reached, and the repair would have been wired to a hook that runs before the
+damage.
+The affected directories' mtimes read *earlier* than the bootstrap run because
+they were copied from a bundle, which is why the log, not the mtimes, was the
+deciding evidence.)

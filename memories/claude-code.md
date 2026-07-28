@@ -423,7 +423,31 @@ hundreds of files / thousands of insertions that aren't real, and a real
 merge/diff-vs-main operations on a shallow clone. What *is* reliable on a
 shallow clone: single-tree reads (`git show origin/main:<file>`,
 `git cat-file`) --- they read the fetched tip's tree directly, no merge-base
-needed. `git fetch --depth N origin <branch>` deepens enough history to make
+needed.
+
+**The same truncation silently breaks any classifier built on file history,
+and that failure is quieter than the merge-base one.**
+A bogus merge-base announces itself, with thousands of phantom insertions or a
+merge that explodes into conflicts.
+A history *query* just comes back empty.
+`git log --diff-filter=D -- <path>` returns nothing for a file the repo really
+did delete, and nothing is equally the right answer for a path the repo never
+had, so "was this ours once?" goes unanswered while appearing to be answered.
+Anything keyed on that reasoning inverts in exactly the environment where it
+runs: a web container is where such a check would be used, and is also where
+its evidence is missing.
+So confirm the clone has any history at all before writing a check that reads
+it (`git rev-parse --is-shallow-repository`), and prefer a signal carried by
+the file itself over one carried by the commit graph.
+(ai-config#765, 2026-07-28: telling our own deleted skills apart from
+Anthropic-provided built-ins under `~/.claude/skills/` looked like a history
+lookup, but the container's checkout was 50 commits deep and returned zero
+`--diff-filter=D` hits for every candidate of either kind.
+The tool reports that category for a human to judge instead of guessing, and
+the one usable signal turned out to be in the files themselves: the built-ins
+carry `license: Proprietary. LICENSE.txt has complete terms`.)
+
+`git fetch --depth N origin <branch>` deepens enough history to make
 a real merge-base available if you must merge. (Hit resolving
 UCD-SERG/serocalculator#503's altdoc chain, 2026-07: a `--depth 1` altdoc
 clone made `recursive-qmd-search..origin/main` show 272 files / 14k
@@ -613,3 +637,33 @@ outlives its turn — verify state from the outside, don't just ask again.
 the same session, one implementing a casualty-reflow feature and one a
 maneuver feature, each running the project's own `tools/check.sh` full
 suite — direct process verification via PowerShell resolved both.)
+
+## A harness pass can replace `~/.claude` skill symlinks with stale copies AFTER `SessionStart`
+
+`bootstrap.sh` symlinks this repo into `~/.claude`, so a `git pull` normally
+refreshes what the Skill tool loads.
+In a web container a later provisioning pass can overwrite a subset of
+`~/.claude/skills/*` with real directories holding older content, and those
+copies then shadow the repo for the rest of the session.
+
+The ordering is the part worth remembering, because it decides where a repair
+can live.
+The clobber lands *after* the `SessionStart` hook, so a check wired there runs
+before the damage and reports a clean install every single time.
+Run it from `UserPromptSubmit` instead, guarded to once per session on the
+payload's `session_id`, which is late enough that startup has settled.
+
+Upstream, the copies are stale because `upload_skills.sh` is idempotent by
+**skipping** any skill already present in the workspace rather than adding a
+version, so a workspace copy stays frozen at whatever revision was first
+uploaded (ai-config#769).
+That also predicts the shape of the drift: the stale set is exactly the
+long-standing skills, while anything added since the last upload is still a
+working symlink.
+
+Detect and repair it with `python3 ~/.claude/scripts/check-install.py --fix`
+rather than by hand; ai-config#765 added it, and the repo's own
+`UserPromptSubmit` hook runs it.
+(ai-config#755/#765, 2026-07-28: 42 of 172 skills were stale in one container,
+`ardi` at 80 lines against 403 and `ums` at 94 against 365, so the session was
+running materially older versions of its own review procedures.)

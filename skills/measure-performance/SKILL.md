@@ -108,9 +108,17 @@ In a headless session, save the widget and open it later:
 htmlwidgets::saveWidget(p, "profile.html", selfcontained = TRUE)
 ```
 
-`selfcontained = TRUE` needs pandoc; drop it to `FALSE` if
-`rmarkdown::pandoc_available()` is `FALSE`, which writes a sidecar
-dependencies directory next to the HTML.
+`selfcontained = TRUE` needs pandoc, and htmlwidgets discovers it through
+`{rmarkdown}`: as of htmlwidgets 1.6.0 that path "now uses the `{rmarkdown}`
+package to discover and call pandoc"
+([NEWS](https://github.com/ramnathv/htmlwidgets/blob/master/NEWS.md)).
+`rmarkdown::pandoc_available()` is therefore the gate that matches what
+htmlwidgets itself consults, rather than a proxy for it.
+Without pandoc the call aborts rather than degrading quietly, with
+`Saving a widget with selfcontained = TRUE requires pandoc.` (verified on
+htmlwidgets 1.6.4).
+Drop the argument to `FALSE` in that case, which writes a sidecar
+dependencies directory next to the HTML instead.
 
 When there is no way to view HTML at all, take the text summary instead:
 

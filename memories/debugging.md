@@ -288,6 +288,42 @@ the real sentence, at which point the fix changed from "add a paragraph" to
 "correct the URL," and the originally-planned addition would have been a
 duplicate.)
 
+**A second mechanism produces the same false absence, and this one is
+structural rather than a wrong guess: the phrase spans a line break.**
+The case above is grepping the wrong *string*.
+This is grepping a right string that a line-scoped tool cannot see, because
+`grep` matches within a line and the text does not stay on one.
+Any corpus following
+[`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md) breaks
+prose at clause boundaries by construction, so a quoted phrase longer than a
+few words straddles a newline as a matter of course rather than by bad luck.
+
+It is the more dangerous of the two, because the pattern is quoted **from the
+target** and is therefore known to be correct.
+That removes the doubt a guessed spelling would leave, so a zero-hit result
+reads as proof of absence rather than as a reason to look again -- and the
+conclusion it invites is that someone else's citation is dangling.
+
+Use a tool that is not line-scoped, or match a fragment short enough to sit on
+one line.
+All four measured against the same file, where the sentence breaks after
+"test the class it":
+
+```
+grep -rn  "test the class it distinguishes"          -> 0 hits    (the trap)
+grep -rlzP "test the class it\s+distinguishes"       -> 1 file
+rg -U      "test the class it\s+distinguishes"       -> 1 match
+grep -rn  "test the class it"                        -> 1 hit
+```
+
+`git show <sha> -- <path>` and reading the hunk is the other reliable form,
+and it is the one to reach for when verifying that a citation resolves.
+(ai-config#771, 2026-07-28: a cross-referenced bullet in
+`shared/workflow/ardi.md` was checked before citing it; the repo-wide grep
+returned nothing and the citation was one step from being reported back to
+its author as dangling.
+The sentence was present verbatim the whole time.)
+
 ## Writing robust bash scripts (recurring review findings)
 Lessons the reviewer flagged across the `session-lock` PR (d-morrison/ai-config#38) —
 pre-empt these when authoring shell, especially under `set -euo pipefail`:

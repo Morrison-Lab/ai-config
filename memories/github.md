@@ -812,8 +812,11 @@ Two consequences worth knowing before diagnosing this:
   the issue links fail.
   Every open PR inherits the failure, which invites blaming whichever PR you
   happen to be looking at.
-  Confirm by comparing the affected files against `main` --- identical link
-  counts and untouched files mean the transfer, not the diff.
+  Confirm by checking whether the failing files appear in the PR's own
+  changed-file list at all: a file the diff never touched cannot be the
+  cause.
+  An identical count of old-owner links on `main` and on the branch
+  corroborates it.
 - **Do not infer that the issues were lost.**
   A 404 on the old owner says nothing about the new one.
   Request the new-owner URL before concluding anything; the fix is usually a

@@ -173,6 +173,15 @@ list.
 In a session that loads skills or plugins from the repo, a new one appearing
 in the session's own skill listing is the same signal arriving for free.
 
+This is a *timing* gap, and it composes with the *scope* gap rather than
+replacing it.
+[`check-open-prs-before-duplicating`](check-open-prs-before-duplicating.md)
+covers work that is still in flight, unmerged, and therefore invisible to
+any check against `main`; run that one too, since a duplicate is just as
+wasted whether the collision has landed yet or not.
+Both checks share the same weakness --- each runs once, at the start, and
+answers for the moment it ran.
+
 Dropping the planned work is the cheap outcome, so record why in the issue
 and the PR body rather than deleting it silently --- otherwise the next
 person re-proposes it.

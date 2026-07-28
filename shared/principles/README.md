@@ -41,6 +41,12 @@ We build code and prose that is:
 - **Efficient** — economical with compute, memory, and people's time
   (CI minutes, review rounds); performance tuning beyond that needs a
   demonstrated hot spot, not speculation.
+  The [`measure-performance`](../../skills/measure-performance/SKILL.md)
+  skill is how that hot spot gets demonstrated: profile first, then
+  microbenchmark only what the profile implicated, then confirm the win
+  survives end to end.
+  [`use-memoisation`](../coding/use-memoisation.md) is that trade in
+  miniature: it buys speed with memory, so it needs the hot spot too.
 - **Maintainable** — the next change is cheap: one home per fact, small
   units, no accumulated complexity debt.
 - **Extensible** — new capability slots in without rework, because the
@@ -110,7 +116,10 @@ external source we could depend on, fork, or contribute to instead.
 Full statement: [`dont-reinvent-wheel`](dont-reinvent-wheel.md).
 Operationalized by:
 [`prefer-packaged-functions`](../coding/prefer-packaged-functions.md)
-(the R-function special case), the
+(the R-function special case),
+[`use-memoisation`](../coding/use-memoisation.md) (one instance of it:
+cache with `memoise::memoise()`, don't hand-roll a cache environment),
+the
 [`prefer-upstream`](../../skills/prefer-upstream/SKILL.md) skill (the
 search procedure), and the
 [`scout-peers`](../../skills/scout-peers/SKILL.md) skill (license-gated

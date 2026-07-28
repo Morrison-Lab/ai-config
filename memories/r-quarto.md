@@ -1080,8 +1080,8 @@ each fails in the direction that reads as success.
 `FAIL 0 | WARN 1 | SKIP 6 | PASS 406`, and none of those six skips is
 `On CRAN`, so its `skip_on_cran()`-guarded render tests genuinely run there.
 But do not read that as "`R CMD check` protects you": CRAN's own runs leave
-`NOT_CRAN` unset, which is the entire point of the function. What sets it is
-the harness around the check, not the check.
+`NOT_CRAN` unset, which is the entire point of the function.
+What sets it is the harness around the check, not the check.
 
 **`skip_on_cran()` skips unless `NOT_CRAN` is set.**
 A file whose every test opens with it reports `failed: 0  error: 0` and exits
@@ -1092,7 +1092,8 @@ Set `NOT_CRAN=true` on the command, and read `passed` rather than `failed`
 before believing a run.
 
 It is not a plain env-var test, and the difference explains why the trap is
-specific to scripted runs. `testthat:::on_cran()` is:
+specific to scripted runs.
+`testthat:::on_cran()` is:
 
 ```r
 env <- Sys.getenv("NOT_CRAN")
@@ -1108,8 +1109,9 @@ will therefore not show you the bug.
 Neither signature carries a literal default: in testthat 3.3.2 both
 `formals(testthat::test_file)$stop_on_failure` and the `test_local()`
 equivalent are `NULL`, and the aborting behavior comes from `test_dir()`,
-whose own default is `TRUE`. So inspecting the signature and concluding the
-argument is unset, or that the two functions differ, is the wrong reading ---
+whose own default is `TRUE`.
+So inspecting the signature and concluding the argument is unset, or that the
+two functions differ, is the wrong reading ---
 a review of this entry made exactly that inference from the documentation,
 and `formals()` is what settles it.
 What the behavior actually is: one failing expectation aborts a manual

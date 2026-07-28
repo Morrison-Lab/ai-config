@@ -389,6 +389,15 @@ confirm each box before declaring "clean":
 Post an unclaim comment (`COMMENT_PR` — `gh pr comment <N> --body "Done — PR is free."`) to
 unblock any parallel sessions that backed off in step 1.
 
+**Then run `ums`, before reporting ready.**
+The clean verdict is the proactive-UMS checkpoint for this PR, not the merge;
+see `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate".
+The loop's whole point is that it ends here and hands the merge to a human,
+so a pass deferred to the merge is deferred to a moment this session may
+never see.
+Everything the review lifecycle taught -- recurring findings, corrections,
+guidance given along the way -- is complete as of the verdict.
+
 Always provide a clickable link to the MR/PR in the final message.
 
 Report the final verdict and round count. Don't merge unless asked.

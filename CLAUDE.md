@@ -18,6 +18,13 @@ Still run UMS before `/clear` too, as a final catch-all for anything accumulated
 
 **In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."** "As learnings accumulate" is easy to defer indefinitely during heads-down execution across several PRs, since no single moment feels like the obvious trigger — a merge is a natural, unmissable boundary to pause at instead. (Corrected in a sparta `gii-mwc` session, 2026-07-19: three PRs merged back-to-back with real, worth-saving learnings at each one — a subagent-resume/restart pattern, a diff-scoped-check no-op, a stale benchmark baseline — and UMS never ran until the user asked why `/clear` was suggested with UMS still outstanding, which is exactly the failure mode this fragment exists to prevent.)
 
+**A PR's clean review verdict is a proactive-UMS checkpoint in its own right, and it fires strictly earlier than the merge -- run the pass there rather than holding it until the PR lands.**
+The bullet above picked the merge because it is unmissable, and it is; the problem is that it may never arrive on this session's clock.
+Merging is human-gated: [`ardi`](shared/workflow/ardi.md)'s terminal action is to report the PR ready, never to merge it.
+So a clean-but-unmerged PR can sit for hours, for days, or across a `/clear`, and the review lifecycle's learnings sit with it in conversation state that may not survive the wait.
+Waiting buys nothing either, because by the time the verdict is clean every finding has already been Addressed, Rebutted, or Deferred -- the review has taught everything it is going to teach, and the merge adds only whatever the merge itself surfaces.
+So run UMS when the verdict comes back clean, and treat the merge-time pass as a top-up rather than the trigger.
+
 ## Flag good moments to `/clear` in long-running sessions
 
 Proactively tell me — don't wait to be asked — when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
@@ -345,6 +352,10 @@ Step 3 (own-repo fallback) is not covered by `sup`; use `gh issue create` in the
 
 When a PR/MR you were working on **merges**, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout `main`, pull, `git branch -d`), confirm any deferred items have follow-up issues, then run **UMS** to capture what the PR's review lifecycle taught — recurring review findings, corrections, and guidance given along the way.
 A merge is the natural checkpoint to bank lessons before the context is lost.
+
+This is not the *first* checkpoint, though, and it should rarely be the one carrying the whole backlog.
+Per "Run UMS proactively" above, the pass already ran when the review verdict came back clean, so `post-merge`'s UMS covers what the merge itself taught -- a conflict resolved on the way in, a check that only fires on `main`, a squash that reshaped the history.
+Run it regardless: a short pass that finds nothing new is the expected outcome when the verdict-time pass did its job, not a reason to skip the step.
 
 "merge it" / "merge this" / "merge the PR" as bare directives (no slash) trigger the `merge-it` skill: when the PR isn't merged yet, it merges the ready PR (squash by default) **then** chains straight into `post-merge` (tidy + UMS); when the PR is already merged it goes directly to `post-merge`.
 Either way the post-merge wrap-up — including the UMS follow-up PR — runs **automatically, without asking**.

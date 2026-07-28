@@ -26,6 +26,9 @@ committed pass.
   or for `/clear` to accumulate a backlog — and don't gate it on approval or
   on a PR merging: capture the learning the moment it appears, even while the
   PR that taught it is still open and unreviewed.
+  **A user correction is a mandatory immediate trigger.** Persist the lesson
+  before resuming the main task; never wait for the user to invoke UMS or
+  remind you a second time.
 - **When a PR reaches a clean review verdict** -- the concrete checkpoint the
   bullet above leaves implicit, and the one the `ardi` loop exits on.
   Run the pass there rather than at the merge: the merge is human-gated and

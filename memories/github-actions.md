@@ -1053,6 +1053,17 @@ not block `claude-review`.)
   still-running rather than allow-listing only `PENDING`/`IN_PROGRESS` —
   `QUEUED` slipping through an allow-list caused a premature "settled" false
   positive in one session (`Lacaedemon/sparta`, 2026-07-03).
+- **A check's wall-clock duration is not its runtime — compare `started_at`
+  against the first line of its own log before diagnosing a "hung" job.** A
+  check run's `started_at` is set when the check is **queued**, before a runner
+  picks it up -- distinct from `created_at`, which the Check Runs API reports
+  separately -- so a starved runner makes an ordinary job look stuck for an
+  hour. In ucdavis/bcs#453 a
+  `Spellcheck` job showed `started_at` 19:29 with no completion by 20:05,
+  against a 3-minute norm; its log's first timestamp was 20:33, and it then ran
+  in 3m14s and failed on a real finding. The duration was queue starvation and
+  the failure was unrelated — so "this has been running for 36 minutes" is a
+  reason to read the log's own timestamps, not a diagnosis (2026-07-28).
 
 ## Changelog section ordering in d-morrison/gha
 
@@ -1103,3 +1114,71 @@ the diff, checking `"${REF_ARGS[@]}"` expansion under `set -u`, the per-event
 `author_association` fields, and `required: false` secret semantics, on a PR
 whose `claude-review` job had skipped in 8 seconds.
 Worth doing on purpose next time rather than by accident.)
+
+**A third remedy, when the workflow edit is redundant with something already
+merged: the guard keys on the PR's changed-FILE list, so a `main`-merge that
+absorbs the edit clears it mid-PR.**
+The "cannot clear before merge" note above is about the *same* diff, and it
+holds — re-triggering never helps.
+But when that workflow change lands on `main` via a different PR, merging
+`main` back in resolves those lines and drops the file out of this PR's diff
+entirely, so the next review run stops skipping and produces a real verdict.
+Worth reaching for before writing a manual self-review, since it costs one
+merge and yields an actual external verdict.
+(ucdavis/bcs#450, 2026-07-28: its workflow-rename commit was superseded by
+\#453; the `main`-merge shrank #450's diff back to its own five files and
+re-enabled a genuine bot review that had been unobtainable for hours.)
+
+## A repo/org rename breaks Actions `uses:` refs -- and repointing the owner is not the fix
+
+`d-morrison/gha` moved to `Morrison-Lab/gha` (2026-07-28), and the same shape
+recurs for any renamed owner.
+GitHub Actions does **not** follow repository-rename redirects when resolving a
+`uses:` ref, so every caller naming the old owner fails at run preparation,
+before any job starts.
+Git and plain HTTP *do* follow the redirect, so clones, submodules, and raw
+fetches keep working -- which is why the breakage looks selective and arrives
+with no warning from the repo that moved.
+
+Three things to know, in the order they bite.
+
+- **A tag can RESOLVE while its own contents still name the old owner.**
+  Repointing the caller's owner is not sufficient on its own.
+  `Morrison-Lab/gha@v1` resolved fine as a tag, but that tag's
+  `claude-code-review.yml:155` and `claude.yml:288` still called
+  `d-morrison/gha/.github/actions/checkout-submodules@v1`, so both workflows
+  failed identically after the "fix".
+  Read what the pinned tag *contains* --
+  `curl -sS https://raw.githubusercontent.com/<new-owner>/<repo>/<tag>/<path> | grep -n 'uses:'`
+  -- rather than confirming only that the pin resolves.
+  Where a `@v2` exists with updated internals the fix is owner **and** tag, and
+  a major bump means checking each caller's inputs against the new
+  `workflow_call` signature instead of swapping the string blind.
+- **A workflow run that completes as `failure` with ZERO jobs is the signature
+  of an unresolvable reusable-workflow ref**, not a real test failure.
+  `get_job_logs` with `failed_only: true` answers "no failed jobs found"
+  because no job was ever created.
+  This is the same zero-job shape as the `startup_failure` permission error
+  documented earlier in this file, so the two are told apart by cause rather
+  than by appearance: check the ref's owner and tag before the permission
+  ceilings when a repo has just been renamed.
+  The *action*-level case looks different and names itself -- a job that does
+  start, then dies in ~3s with
+  `##[error]Unable to resolve action. Repository not found: <old-owner>/<repo>`.
+- **Sweep by grep, and re-grep after every fix.**
+  A partial rename leaves the repo worse off than before, because the workflows
+  that do run make it look repaired.
+  `git grep "<old-owner>/<repo>" -- .github/` returning nothing is the check; a
+  memory of which files you edited is not.
+
+Before any blanket find-and-replace, establish **which** repos actually moved --
+see `github.md`'s note on `raw.githubusercontent.com` following rename
+redirects, which is the probe that answers it.
+In the ucdavis/bcs sweep exactly two of nine `d-morrison/*` references had
+moved, so a blanket replace would have broken the other seven.
+Historical references in a changelog are a separate case: they record what was
+true when written, so leave them alone.
+
+(ucdavis/bcs#451/#453, 2026-07-28.
+The first fix repointed all 15 `uses:` refs but kept `@v1`, and `claude-review`
+went on failing in 3 seconds with the action-level error above.)

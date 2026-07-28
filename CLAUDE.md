@@ -570,6 +570,11 @@ Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding a
 <!-- Shared with the lab manual; edit shared/coding/prefer-packaged-functions.md, not here. -->
 @shared/coding/prefer-packaged-functions.md
 
+## Coding: memoise pure, expensive, repeatedly-called functions
+
+<!-- Not yet shared with the lab manual; edit shared/coding/use-memoisation.md, not here. -->
+@shared/coding/use-memoisation.md
+
 ## Coding: prefer per-operation grouping over persistent grouping (dplyr)
 
 <!-- Shared with the lab manual; edit shared/coding/per-operation-grouping.md, not here. -->

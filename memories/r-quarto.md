@@ -1160,9 +1160,8 @@ apparently-new failures were pre-existing and environmental.
 
 `cli_ul()`, `cli_alert_*()`, `cli_abort()` and the rest run each string
 through cli's glue engine, so any `{` a caller did not intend as markup is
-interpreted.
-The trap is that the two cases do **not** behave alike, and the harmless-looking
-one is the dangerous one.
+interpreted --- and the two cases do **not** behave alike, with the
+harmless-looking one being the dangerous one.
 Verified against cli 3.6.6:
 
 ```r
@@ -1170,42 +1169,32 @@ cli::cli_ul("a \\name{} b")   #> * a \name b        <- no error, braces DELETED
 cli::cli_ul("a {foo} b")      #> Error: Could not evaluate cli `{}` expression: `foo`.
 ```
 
-An **empty** `{}` does not raise --- glue evaluates the empty expression,
-interpolates nothing, and the braces vanish from the output.
-A **non-empty** `{foo}` hard-errors on the missing object.
-
-So the failure mode depends on what the untrusted text happens to contain.
-An empty pair silently corrupts a message (a user reads `\name` where the
-source said `\name{}`) with nothing to signal it; a populated pair takes down
-the whole call.
-Reasoning about which one applies is easy to get backwards --- a review of
-`d-morrison/altdoc#87` predicted the crash for the empty form specifically,
-and the opposite is true.
+An **empty** `{}` does not raise: glue evaluates the empty expression and the
+braces vanish from the output, silently corrupting the message (a user reads
+`\name` where the source said `\name{}`).
+A **non-empty** `{foo}` hard-errors on the missing object, taking down the
+whole call.
+Which one applies is easy to get backwards --- a review of
+`d-morrison/altdoc#87` predicted the crash for the empty form, and the
+opposite is true.
 
 This matters wherever a message carries text the code did not author:
-a `conditionMessage()` forwarded from a caught condition, a file path, a URL
-from `DESCRIPTION` or `pkgdown.yml`, a user-supplied name.
-Escape braces (double them) before handing such text to cli, or use
-`cli::cli_verbatim()` per item when the surrounding formatting allows it.
+a forwarded `conditionMessage()`, a file path, a URL from `DESCRIPTION` or
+`pkgdown.yml`, a user-supplied name.
+Escape braces (double them) first, or use `cli::cli_verbatim()` per item
+when the surrounding formatting allows it.
 
 Two consequences for testing it.
 A regression test built on the *empty* form passes vacuously against
-unescaped code, since that path never errored --- pick a fixture whose text
-carries a populated brace (`https://x.org/{version}/` reaching a URL check
-works) so the test actually fails without the fix.
-And assert the brace survives somewhere, not just that no error was raised,
-or the silent-deletion half goes uncovered.
+unescaped code, since that path never errored --- pick a fixture carrying a
+populated brace (`https://x.org/{version}/` reaching a URL check works).
+And assert the brace survives somewhere, not merely that nothing raised.
 
-Where to look for it depends on the caller, and the obvious guess is wrong.
-The cli functions do not hand back the text they formatted: `cli_ul()`
-returns the element's **id** --- a character scalar like `"cli-10293-1"` ---
-so a test that inspects its return value gets something plausible-looking
-that never contained the message at all.
-Assert against whichever of these the code under test actually offers:
-
-- the **enclosing function's** return value, when it hands back the same
-  strings it printed (`check_altdoc()` returns its findings invisibly, which
-  is what altdoc#87's test uses);
-- `testthat::expect_output()` on the printed output, when nothing is
-  returned;
-- `conditionMessage()` on the caught condition, for `cli_abort()`.
+Where to look is not where you would guess: cli does not hand back the text
+it formatted, and `cli_ul()` returns the element **id** (`"cli-10293-1"`), so
+inspecting its return value yields a plausible scalar that never held the
+message.
+Use the enclosing function's return value when it hands back the strings it
+printed (altdoc#87 asserts on `check_altdoc()`'s invisible findings),
+`testthat::expect_output()` when nothing is returned, or
+`conditionMessage()` for `cli_abort()`.

@@ -22,6 +22,28 @@ review" below).
   CRAN Task Views for topic surveys; and the analogous ecosystems
   elsewhere (PyPI, npm, the GitHub Actions marketplace).
 
+Advanced R makes the same move a formal step of its optimization procedure
+--- [Checking for existing
+solutions](https://adv-r.hadley.nz/perf-improve.html#already-solved) sits
+between organizing the code and changing any of it --- and adds a practical
+warning about why the search is hard:
+
+> the challenge is describing your bottleneck in a way that helps you find
+> related problems and solutions.
+> Knowing the name of the problem or its synonyms will make this search much
+> easier.
+> But because you don't know what it's called, it's hard to search for it!
+
+So a search that came up empty is weak evidence when the thing being
+searched for has an established name you happen not to know.
+Ask someone before concluding nothing exists, and record what you searched
+for --- the terms are what the next reader needs in order to extend the
+search rather than repeat it.
+The section also asks for something the build-vs-use decision below needs:
+record *every* candidate found, not only the ones that look best at first
+glance, since a slower or partial option can turn out to be the easier one
+to build on.
+
 ## Placing new tooling, not just searching for existing tooling
 
 DRW also runs forward, not just backward: when the tooling you're about

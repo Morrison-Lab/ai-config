@@ -13,6 +13,9 @@ never — as silently wrong output.
   A bare `except:` in Python, an R
   `tryCatch(..., error = function(e) NULL)`, or a shell `|| true` hides
   the failure without fixing it.
+  R's `try()`, `suppressWarnings()`, and `suppressMessages()` belong in
+  the same category: each mutes a whole class of condition rather than
+  the one you know about.
 - When a fallback is genuinely wanted — graceful degradation at a
   system boundary, a retry for a known-transient failure — make it
   explicit and observable: message the degradation, bound the retries,
@@ -24,6 +27,67 @@ never — as silently wrong output.
   attempts feeding a single resolve-outcome step that still fails the
   job when neither attempt succeeded) — the failure is deferred and
   handled, not ignored.
+
+## Catch conditions by class, never by message text
+
+The rule above bans swallowing every error.
+Its natural consequence is that code sometimes needs to handle exactly
+*one* failure and let the rest through --- and the way that is reached for
+in R, matching on the error's message, quietly reintroduces the problem.
+
+[Advanced R, "Custom
+conditions"](https://adv-r.hadley.nz/conditions.html#custom-conditions):
+
+> if you want to detect a specific type of error, you can only work with the
+> text of the error message.
+> This is error prone, not only because the message might change over time,
+> but also because messages can be translated into other languages.
+
+A message-matching handler fails in the direction that hurts.
+When the wording drifts or the session runs under another locale, the match
+stops firing and the error escapes the handler that was supposed to own it
+--- or, worse, a substring match starts catching an unrelated error and
+routing it into recovery meant for something else.
+
+Signal a classed condition instead, and put the machine-readable detail in
+fields rather than in the sentence:
+
+```r
+rlang::abort(
+  "Path `blah.csv` not found",
+  class = "error_not_found",
+  path  = "blah.csv"
+)
+
+tryCatch(
+  read_thing(p),
+  error_not_found = function(cnd) use_default(cnd$path)
+)
+```
+
+The handler now keys on `error_not_found`, which is part of the interface,
+while the sentence stays free to be rewritten or translated.
+Unrelated errors are unaffected and keep propagating, which is the property
+message matching cannot offer.
+(Verified on rlang 1.3.0: the condition's class chain is
+`error_not_found` / `rlang_error` / `error` / `condition`.
+Note the book shows an older calling convention, passing the class as the
+first argument; current `rlang::abort()` takes `message` first and `class`
+as a named argument.)
+
+This is also why `try()`, `suppressWarnings()`, and `suppressMessages()`
+are listed above as swallowing rather than handling.
+The book's own objection is precisely their lack of a class to aim at:
+
+> These functions are heavy handed as you can't use them to suppress a
+> single type of condition that you know about, while allowing everything
+> else to pass through.
+
+When a specific condition genuinely should be ignored, name it ---
+`withCallingHandlers()` plus `rlang::cnd_muffle()` on that class, or
+`tryCatch()` on that class --- rather than muting the whole category.
+See [Ignoring
+conditions](https://adv-r.hadley.nz/conditions.html#ignoring-conditions).
 
 ## In a check you run by hand
 
@@ -91,6 +155,8 @@ Flag error handling that hides failure — swallowed exceptions, silent
 defaults substituted on failure, unbounded retries, `continue-on-error`
 without a downstream outcome check — the same weight as any other
 standing review check.
+Flag a handler that identifies a condition by matching its message text,
+too, and ask for a class.
 Ask for the explicit form: an early validation, a loud error, or a
 documented, observable fallback.
 

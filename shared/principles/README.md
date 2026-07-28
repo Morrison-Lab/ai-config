@@ -32,6 +32,10 @@ We build code and prose that is:
 - **Reliable** — behaves correctly on every run, not just the demo run:
   edge cases handled, failures surfaced early and clearly rather than
   silently swallowed, and no flaky tests or race-prone automation.
+  [`loop-hygiene`](../coding/loop-hygiene.md) covers three common
+  `for`-loop defects in R, two of which surface only on input a fixture
+  rarely contains (an empty vector, a classed vector) while the third
+  degrades quadratically as the input grows.
 - **Secure and private** — no leaked secrets or PHI (the `check-phi`
   capability in
   [`d-morrison/gha`](https://github.com/d-morrison/gha) scans for it),
@@ -73,6 +77,8 @@ KISS directly.
 Operationalized by:
 [`challenge-unnecessary-complexity`](../workflow/challenge-unnecessary-complexity.md)
 (the review side),
+[`least-flexible-tool`](../coding/least-flexible-tool.md) (the general
+form: prefer the construct that can do least),
 [`avoid-nesting`](../coding/avoid-nesting.md),
 [`tidy-code`](../coding/tidy-code.md), and
 [`per-operation-grouping`](../coding/per-operation-grouping.md).
@@ -176,6 +182,12 @@ In review: flag `<<-`, functions that read or write globals they don't
 own, and computation interleaved with I/O that a pure core plus a thin
 I/O shell would separate.
 
+Operationalized by:
+[`restore-global-state`](../coding/restore-global-state.md) --- when a
+mutation is genuinely required, register the restore beside it
+(`on.exit(add = TRUE)`, or the `withr::local_*()` family) so it runs on
+every exit path, including the ones that throw.
+
 ## Self-documenting code
 
 Let naming and structure carry the intent: descriptive object and
@@ -200,7 +212,13 @@ never — as silently wrong output.
 
 Full statement: [`fail-fast`](fail-fast.md), including the review-side
 check (flag swallowed errors, silent fallbacks, and CI steps that
-can't fail).
+can't fail) and the rule that a handler must select a condition by its
+class rather than by matching its message text.
+
+Operationalized by:
+[`type-stable-outputs`](../coding/type-stable-outputs.md) --- the same
+principle applied to shape rather than to errors, since a type-unstable
+call returns a plausible object of the wrong kind instead of failing.
 
 ## Algorithmatize checks — instruments over judgment
 

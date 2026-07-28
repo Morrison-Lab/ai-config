@@ -545,13 +545,18 @@ Apply this in review too: error handling that hides failure is a review finding,
 Follow the KISS principle (keep it simple, stupid) in code and prose alike:
 prefer the simplest construct that does the job, and treat added complexity
 as a cost that needs justification.
-The specific coding rules below (avoid nesting, no map-site lambdas, prefer
-packaged functions, per-operation grouping, tidy code, one function per
-file, decompose to functions) and the review-side
+The specific coding rules below --- every fragment under `shared/coding/`,
+indexed by the principle it serves in the catalog above --- and the
+review-side
 `challenge-unnecessary-complexity` policy are special cases of this
 principle — they exist because a bare "keep it simple" isn't concretely
 reviewable, but when a case arises that none of them covers, apply KISS
 directly rather than treating the enumerated rules as exhaustive.
+
+## Coding: use the least-flexible construct that does the job
+
+<!-- Not yet shared with the lab manual; edit shared/coding/least-flexible-tool.md, not here. -->
+@shared/coding/least-flexible-tool.md
 
 ## Coding style: avoid nesting; follow the lab manual
 
@@ -579,6 +584,21 @@ Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding a
 
 <!-- Shared with the lab manual; edit shared/coding/per-operation-grouping.md, not here. -->
 @shared/coding/per-operation-grouping.md
+
+## Coding: prefer type-stable calls; never `sapply()` outside the console
+
+<!-- Not yet shared with the lab manual; edit shared/coding/type-stable-outputs.md, not here. -->
+@shared/coding/type-stable-outputs.md
+
+## Coding: preallocate, `seq_along()`, and `[[i]]` in for loops
+
+<!-- Not yet shared with the lab manual; edit shared/coding/loop-hygiene.md, not here. -->
+@shared/coding/loop-hygiene.md
+
+## Coding: restore global state your function changes
+
+<!-- Not yet shared with the lab manual; edit shared/coding/restore-global-state.md, not here. -->
+@shared/coding/restore-global-state.md
 
 ## Coding: avoid hard-coding data with an external source of truth
 

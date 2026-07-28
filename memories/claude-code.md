@@ -29,6 +29,11 @@
   site: `jarl.etiennebacher.com/reference/config-file` 403'd, but
   `WebSearch` surfaced `docs/reference/config-file.md` as the underlying
   file, which raw-fetched with the full field-by-field config reference.)
+- **A 404 from `raw.githubusercontent.com` is often a filename-case mismatch, not a missing file.**
+  The rendered URL's slug is lowercased by the site generator while the source file's own name may not be.
+  Advanced R serves `function-operators.html` from `Function-operators.Rmd`, so the obvious raw URL 404s and the capitalized one returns the chapter.
+  Retry with the repo's own capitalization before concluding the source lives at some other path.
+  (ai-config#760, 2026-07-28: `adv-r.hadley.nz` 403'd through the proxy, and the first raw attempt 404'd purely on the leading capital.)
 - **`docs.github.com` itself can be blocked outright by a remote session's
   network policy** (proxy 403 on every page, and `api.github.com` too —
   both at the curl/WebFetch level; the GitHub MCP tools route through

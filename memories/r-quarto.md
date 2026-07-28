@@ -1155,3 +1155,43 @@ failure a `source()` harness reports.
 Either way, baseline a failure against unmodified `main` (`git stash`,
 re-run, `git stash pop`) before treating it as yours: two of this session's
 apparently-new failures were pre-existing and environmental.
+
+## `{cli}` glue-interpolates every message string, and the two brace forms fail differently
+
+`cli_ul()`, `cli_alert_*()`, `cli_abort()` and the rest run each string
+through cli's glue engine, so any `{` a caller did not intend as markup is
+interpreted.
+The trap is that the two cases do **not** behave alike, and the harmless-looking
+one is the dangerous one.
+Verified against cli 3.6.6:
+
+```r
+cli::cli_ul("a \\name{} b")   #> * a \name b        <- no error, braces DELETED
+cli::cli_ul("a {foo} b")      #> Error: Could not evaluate cli `{}` expression: `foo`.
+```
+
+An **empty** `{}` does not raise --- glue evaluates the empty expression,
+interpolates nothing, and the braces vanish from the output.
+A **non-empty** `{foo}` hard-errors on the missing object.
+
+So the failure mode depends on what the untrusted text happens to contain.
+An empty pair silently corrupts a message (a user reads `\name` where the
+source said `\name{}`) with nothing to signal it; a populated pair takes down
+the whole call.
+Reasoning about which one applies is easy to get backwards --- a review of
+`d-morrison/altdoc#87` predicted the crash for the empty form specifically,
+and the opposite is true.
+
+This matters wherever a message carries text the code did not author:
+a `conditionMessage()` forwarded from a caught condition, a file path, a URL
+from `DESCRIPTION` or `pkgdown.yml`, a user-supplied name.
+Escape braces (double them) before handing such text to cli, or use
+`cli::cli_verbatim()` per item when the surrounding formatting allows it.
+
+Two consequences for testing it.
+A regression test built on the *empty* form passes vacuously against
+unescaped code, since that path never errored --- pick a fixture whose text
+carries a populated brace (`https://x.org/{version}/` reaching a URL check
+works) so the test actually fails without the fix.
+And assert the brace survives into the **returned** value, not just that no
+error was raised, or the silent-deletion half goes uncovered.

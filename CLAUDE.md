@@ -90,13 +90,20 @@ In every session — at session start, and again periodically during long sessio
    A remote/web container pre-seeds `~/.claude/skills/` with its own copies before `bootstrap.sh` runs, and bootstrap **skips** a name that already exists rather than replacing it, so those copies survive as real directories and shadow the repo for the whole session.
    `shared/`, `memories/`, `commands/`, and `CLAUDE.md` symlink normally in the same container, which is what makes this hard to spot: the child that silently doesn't refresh is the one carrying the procedures you are about to follow.
    `git pull` cannot fix it, and the bootstrap log actively misleads, printing `link <name> -> ...` for entries it skipped.
-   So sweep by content rather than trusting the log or the platform:
+   So sweep by content rather than trusting the log or the platform.
+   Anchor it on `~/.claude/shared`, which is symlinked even when `skills/` is not, so the sweep works from any directory and aborts instead of reporting a clean result it never computed; and print a count, since bare silence would otherwise mean either "all fresh" or "examined nothing" -- the ambiguity [`fail-fast`](shared/principles/fail-fast.md) warns about:
    ```bash
-   for d in ~/.claude/skills/*/; do n=$(basename "$d")
-     [ -f "skills/$n/SKILL.md" ] &&
-       { diff -q "$d/SKILL.md" "skills/$n/SKILL.md" >/dev/null || echo "STALE: $n"; }
+   repo=$(git -C ~/.claude/shared rev-parse --show-toplevel) || exit 1
+   n=0
+   for d in ~/.claude/skills/*/; do
+     s=$(basename "$d"); r="$repo/skills/$s/SKILL.md"; n=$((n+1))
+     if   [ ! -f "$r" ];                           then echo "ORPHAN: $s"
+     elif ! diff -q "$d/SKILL.md" "$r" >/dev/null; then echo "STALE:  $s"
+     fi
    done
+   echo "checked $n installed skills"
    ```
+   `STALE` is a loaded copy that has drifted from the repo; `ORPHAN` is a skill still installed after being deleted from the repo, which a version comparison alone skips in silence.
    When a skill is stale, read the repo's `skills/<name>/SKILL.md` directly and follow that instead of the loaded copy.
    (ai-config#755, 2026-07-28: 42 of 172 skills were stale in a web session, most at under half their real length -- `ardi` 80 lines vs 403, `ums` 94 vs 365, `ard` 134 vs 308 -- plus 7 installed skills already deleted from the repo.
    Caught only because a `ums` step contradicted a change known to have merged.

@@ -1,6 +1,6 @@
 ---
 name: sync-pr-branch
-description: Sync an active PR branch with both `main` and its own remote — fetch origin, verify its PR has not already merged, merge origin/main into the branch, merge origin/<current-branch> into local (reconciling commits pushed elsewhere, e.g. by the @claude bot or another machine), then resolve conflicts, run the repo's pre-commit checks, and push. Use before triggering a review or pushing fixes, on "sync", "update the branch", "merge main in", "resync the branch", "reconcile local and remote", "the branch is behind main", or whenever main or the remote branch has moved ahead.
+description: Sync an active PR branch with both `main` and its own remote -- fetch origin, verify its PR has not already merged, merge origin/main into the branch, merge origin/<current-branch> into local (reconciling commits pushed elsewhere, e.g. by the @claude bot or another machine), then resolve conflicts, run the repo's pre-commit checks, and push. Use before triggering a review or pushing fixes, on "sync", "update the branch", "merge main in", "resync the branch", "reconcile local and remote", "the branch is behind main", or whenever main or the remote branch has moved ahead.
 user-invocable: true
 allowed-tools:
   - Bash
@@ -55,7 +55,9 @@ Synonyms: `sync`, `resync-branch`, `merge-main` — all route here.
    If its PR is `MERGED` (or has a non-null `mergedAt`), stop: do **not** merge
    or push the old branch. Update the local checkout from `origin/main` and
    start a new branch for any genuinely new work. If no PR exists, or its PR
-   remains open, continue.
+   remains open, continue. A `CLOSED` (unmerged) PR is treated like no PR, but
+   flag it to the user before proceeding because the branch may still carry
+   genuine work.
 
 3. **Merge `origin/main` into the branch.** A merge commit (not a rebase)
    matches GitHub's "Update branch" button and preserves PR history. **Never**

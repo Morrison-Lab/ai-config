@@ -41,6 +41,10 @@ We build code and prose that is:
 - **Efficient** — economical with compute, memory, and people's time
   (CI minutes, review rounds); performance tuning beyond that needs a
   demonstrated hot spot, not speculation.
+  The [`measure-performance`](../../skills/measure-performance/SKILL.md)
+  skill is how that hot spot gets demonstrated: profile first, then
+  microbenchmark only what the profile implicated, then confirm the win
+  survives end to end.
   [`use-memoisation`](../coding/use-memoisation.md) is that trade in
   miniature: it buys speed with memory, so it needs the hot spot too.
 - **Maintainable** — the next change is cheap: one home per fact, small

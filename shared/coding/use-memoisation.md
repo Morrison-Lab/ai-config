@@ -71,4 +71,5 @@ Flag these with the same weight as the other coding rules:
 - An unbounded-by-construction cache with no `max_size` or `max_age`.
 
 A missed memoisation is a finding too, but a mild one: raise it when the function is demonstrably hot, not on suspicion.
+The [`measure-performance`](../../skills/measure-performance/SKILL.md) skill is what demonstrates it, and its `mem_alloc` column prices the memory half of the trade.
 Premature memoisation is premature optimization, and it costs memory and a purity obligation to boot.

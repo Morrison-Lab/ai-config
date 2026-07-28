@@ -122,8 +122,13 @@ Two habits make it pay off beyond the one check:
 (ai-config#774, 2026-07-28: a fragment stated that R's `[[` errors on a
 missing name in a list, offered as the strict counterpart to `[`.
 The book's own out-of-bounds table contradicted it, and one call settled it
---- `list(a = 1)[["b"]]` returns `NULL`; only an out-of-bounds *integer*
-index errors.
+--- on R 4.6.1, `list(a = 1)[["b"]]` returns `NULL`, and only an
+out-of-bounds *integer* index errors.
+Stamping the version here is the habit this section asks for, not a hedge
+about base R: `[[` is about as stable as R gets, and recording what you ran
+it on costs a parenthetical either way.
+The stamp is worth least exactly where you are most sure, which is why it
+is easiest to skip there.
 The claim had been written precisely because it felt obvious.
 The same pass executed the other five behavioural claims in the diff, all of
 which held, and the reviewer independently confirmed each one --- so the

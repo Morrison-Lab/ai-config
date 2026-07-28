@@ -644,12 +644,14 @@ stale-branch case.
 The section above chooses between `..`, `...`, and the bare worktree form.
 None of the three sees a file git is not tracking yet.
 So a self-check driven by `git diff` skips a PR's brand-new file entirely, and a new file is usually the one carrying the most unreviewed added lines.
-`git add -N <path>` (or a plain `git add`) is what makes it visible; `git status --short` marks with `??` exactly what a diff-based check is currently ignoring.
+`git add -N <path>` (or a plain `git add`) is what makes it visible;
+`git status --short` marks with `??` exactly what a diff-based check is currently ignoring.
 
 The failure runs in the direction that reads as a pass, so print a count of what the check examined rather than only its hits, per [`fail-fast`](../shared/principles/fail-fast.md)'s by-hand-check rule.
 A scan reporting `0 banned-punctuation hits` looks identical whether it read the whole diff or nothing at all.
 (ai-config#760, 2026-07-28: a pre-push scan for banned punctuation and multi-sentence lines printed `examined 11 added lines, 0 hits` on a PR whose new fragment ran to 85 lines.
-The count was the only thing that gave it away; staging first and re-running scanned all 85.)
+The count was the only thing that gave it away;
+staging first and re-running scanned all 85.)
 
 ## A pattern resolved by `git ls-files` is a pathspec, not a shell glob -- `*.md` is recursive and `**/*.md` drops root-level files
 

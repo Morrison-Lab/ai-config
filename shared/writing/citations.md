@@ -147,3 +147,34 @@ An earlier pass had verified that same
 lists, so the citations *were* checked --- just not for this.
 The reviewer that flagged it named the reason precisely:
 "this claim is about the paper's findings, not its metadata".)
+
+## A permalink that resolves can still cite the wrong content
+
+The same metadata-versus-content split has a link-checking form, and there
+the false signal is stronger: an HTTP `200` feels like verification.
+It is not.
+`200` proves only that *something* is served at that URL, never that what is
+served supports the claim the citation makes.
+
+This bites hardest when pinning a commit for provenance ("derived from
+`<repo>` at `<sha>`").
+The instinct is to pick a commit near the change that removed the file, and
+that is exactly the wrong neighbourhood: a removal is often the *second* step
+of a migration whose first step already gutted the file.
+Pin to the last commit whose **content** matches, and confirm by reading the
+file at that SHA, not by checking that the URL loads.
+
+The generalization, for any automated link sweep: a status code answers
+"reachable", and reachability is not accuracy.
+Anything asserting provenance, a quotation, or a specific claim needs the
+target opened.
+
+(UCD-SERG/serocalculator#619, 2026-07-28: a workflow comment was repinned from
+a deleted-on-`main` file to `5d1efae04f`, verified `200`, and shipped.
+Review fetched the file at that SHA and found it had already been reduced to a
+one-line delegator by the first half of the same migration, hours before the
+deletion --- so the citation resolved while pointing at nothing resembling
+what the file was derived from.
+`1865ad02a6`, the last commit carrying the standalone workflow, was the right
+pin.
+The PR's whole purpose was citation accuracy.)

@@ -155,6 +155,46 @@ independently-authored `fact-check-prose` this way --- distinct enough to
 keep both, resolved by adding an explicit boundary in each skill's
 Relationship section rather than consolidating.)
 
+**The same collision can land before you write a line, and then it produces
+no conflict at all --- just duplicated work nobody flags.**
+The bullet above catches a duplicate at merge time, via a conflict.
+When `main` gains the colliding content while your change is still *planned*
+rather than written, there is nothing to conflict with: you write the
+duplicate, push it, and the review has to argue you out of content that was
+already redundant on arrival.
+So re-run the dupe check after any fetch that brings in new commits, not
+only at merge --- a plan researched an hour ago was researched against a
+different `main`.
+
+The cheap version is to read what actually arrived rather than only the
+count: `git log --oneline <old>..origin/main` plus `git diff --stat` over
+the same range, then ask whether any of it covers something still on your
+list.
+In a session that loads skills or plugins from the repo, a new one appearing
+in the session's own skill listing is the same signal arriving for free.
+
+This is a *timing* gap, and it composes with the *scope* gap rather than
+replacing it.
+[`check-open-prs-before-duplicating`](check-open-prs-before-duplicating.md)
+covers work that is still in flight, unmerged, and therefore invisible to
+any check against `main`; run that one too, since a duplicate is just as
+wasted whether the collision has landed yet or not.
+Both checks share the same weakness --- each runs once, at the start, and
+answers for the moment it ran.
+
+Dropping the planned work is the cheap outcome, so record why in the issue
+and the PR body rather than deleting it silently --- otherwise the next
+person re-proposes it.
+(ai-config#774, 2026-07-28: a planned `profile-before-optimising` fragment
+was mooted by `skills/measure-performance`, which merged via #762 during the
+session and covered the same two chapters --- including the specific gap the
+fragment was meant to fill.
+It surfaced only because the new skill appeared in the session's skill list
+after a routine fast-forward; the plan had been written before it existed.
+Dropped before implementation, with the reasoning recorded in both the issue
+and the PR body, and the neighbouring fragments cross-linked to the skill
+instead.)
+
 **Two PRs that each append a new terminal numbered subsection to the same
 file (e.g. `### 5. ...` in a `CLAUDE.md` review-guidelines list) will
 conflict on merge even when neither side's content actually disagrees.**

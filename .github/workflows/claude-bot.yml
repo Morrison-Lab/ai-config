@@ -24,7 +24,7 @@ jobs:
       issues: write
       id-token: write
       actions: write
-    uses: d-morrison/gha/.github/workflows/claude.yml@v1
+    uses: Morrison-Lab/gha/.github/workflows/claude.yml@v1
     secrets: inherit
     with:
       setup-r: false

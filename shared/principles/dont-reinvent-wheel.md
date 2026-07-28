@@ -105,6 +105,40 @@ re-building the functionality from scratch:
 Re-building from scratch is the last resort, for when nothing close
 enough exists or every existing option is unfit.
 
+## Check the upstream's CURRENT state before writing a fix for it
+
+DRW's search step is usually framed around features.
+It applies just as much to **bug fixes in someone else's repo**, where the
+thing already built may be the fix itself.
+
+The trap is specific to how a consumer sees an upstream: you read the
+version you are pinned to.
+A repo consuming `@v2` (or any moving tag, or a vendored copy) reads a
+*snapshot*, and reasoning from it as though it were `main` produces a
+confident patch for a bug fixed weeks ago.
+Nothing in the snapshot signals that it is stale.
+
+So before diagnosing, reproducing, or patching an upstream bug: fetch
+that repo's default branch and grep for the symptom.
+Two lines, and the usual outcome is either "already fixed, just slide the
+tag" or a much better-informed patch.
+
+Two further reasons this is worth the check rather than a formality.
+The upstream fix has usually been through that repo's own review, so it
+covers cases an outside patch written from the symptom will miss.
+And when it *is* already fixed on `main` but not in the tag you consume,
+the real deliverable is a tag slide or pin bump --- a different, smaller
+action than the patch you were about to write.
+
+(`UCD-SERG/serocalculator#614`, 2026-07-27: a raw `gh pr comment` heredoc
+posted as a review body was diagnosed against the `@v2` snapshot, then
+reproduced and patched locally. `d-morrison/gha`'s `main` already carried
+the fix (`gha#318`), and it handled three cases the local patch did not:
+`<<-` heredocs, unquoted tags, and CRLF transcripts --- that last one a
+bug the local patch would have shipped, since normalizing `\r` only for
+the terminator comparison leaves stray carriage returns in the posted
+body. `v2` had since been slid, so consumers already had it.)
+
 ## When rolling our own is right
 
 This is a default, not an absolute rule.

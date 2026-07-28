@@ -20,7 +20,7 @@ jobs:
   build:
     permissions:
       contents: read
-    uses: d-morrison/gha/.github/workflows/preview.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/preview.yml@v2
     # This site is pure markdown, not an R package, so turn off the R/renv
     # machinery the preview family defaults on for R-package consumers.
     with:

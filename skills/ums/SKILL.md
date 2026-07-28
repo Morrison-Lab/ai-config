@@ -34,6 +34,19 @@ committed pass.
   Run the pass there rather than at the merge: the merge is human-gated and
   may land long after this session ends, while the verdict is the moment the
   review lifecycle has finished teaching.
+- **Even when a new request arrives at that same moment** -- the mechanism
+  that actually skips the two checkpoints above.
+  A merge or clean verdict is when you report back, so it is also when the
+  next instruction lands, and that instruction reads as the live task while
+  the owed pass quietly evaporates: never refused, never deferred out loud,
+  just never performed.
+  A new request does not cancel a checkpoint.
+  Run the pass first (it is short), or say in the same reply that it is owed
+  and when it will run.
+  Deferring out loud is fine; dropping it silently is the failure.
+  Watch for it too when a skill *ends* in a UMS step (`post-merge`, `ardi`,
+  `wrap-up`): reporting that skill complete asserts its final step ran, so
+  confirm the pass happened rather than only the steps before it.
 - User says "ums", "update memories and skills", "record what we learned"
 - **At the start of `/clear`** — a backstop, not the primary trigger: catch
   anything accumulated since the last proactive pass before context is lost

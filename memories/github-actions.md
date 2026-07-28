@@ -1055,8 +1055,10 @@ not block `claude-review`.)
   positive in one session (`Lacaedemon/sparta`, 2026-07-03).
 - **A check's wall-clock duration is not its runtime — compare `started_at`
   against the first line of its own log before diagnosing a "hung" job.** A
-  check run's `started_at` is when the check was created, so a starved runner
-  makes an ordinary job look stuck for an hour. In ucdavis/bcs#453 a
+  check run's `started_at` is set when the check is **queued**, before a runner
+  picks it up -- distinct from `created_at`, which the Check Runs API reports
+  separately -- so a starved runner makes an ordinary job look stuck for an
+  hour. In ucdavis/bcs#453 a
   `Spellcheck` job showed `started_at` 19:29 with no completion by 20:05,
   against a 3-minute norm; its log's first timestamp was 20:33, and it then ran
   in 3m14s and failed on a real finding. The duration was queue starvation and
@@ -1147,15 +1149,15 @@ Three things to know, in the order they bite.
   `d-morrison/gha/.github/actions/checkout-submodules@v1`, so both workflows
   failed identically after the "fix".
   Read what the pinned tag *contains* --
-  `curl -sS raw.githubusercontent.com/<new-owner>/<repo>/<tag>/<path> | grep -n 'uses:'`
+  `curl -sS https://raw.githubusercontent.com/<new-owner>/<repo>/<tag>/<path> | grep -n 'uses:'`
   -- rather than confirming only that the pin resolves.
   Where a `@v2` exists with updated internals the fix is owner **and** tag, and
   a major bump means checking each caller's inputs against the new
   `workflow_call` signature instead of swapping the string blind.
 - **A workflow run that completes as `failure` with ZERO jobs is the signature
   of an unresolvable reusable-workflow ref**, not a real test failure.
-  `get_job_logs --failed_only` answers "no failed jobs found" because no job was
-  ever created.
+  `get_job_logs` with `failed_only: true` answers "no failed jobs found"
+  because no job was ever created.
   This is the same zero-job shape as the `startup_failure` permission error
   documented earlier in this file, so the two are told apart by cause rather
   than by appearance: check the ref's owner and tag before the permission

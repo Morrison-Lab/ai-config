@@ -16,13 +16,16 @@ a product one.
 1. **Say something in chat.** Surface the mistake as a one-line `⚠️ FLAG`
    (per `CLAUDE.md`'s chat-output-tagging convention) so the user sees it
    now — but don't stop there; chat is not durable.
+   The flag is a heads-up, not a request.
+   Ending it with an offer ("worth an issue --- say the word and I'll file
+   it") is the failure this rule exists to prevent, dressed as courtesy.
 2. **Dupe-check the tracker.** Search the target repo's issues first (the
    same search step [`issue-first`](issue-first.md) runs); when an open
    issue already covers the mistake, comment there with the new evidence
    instead of filing a duplicate.
-3. **File the issue immediately** — in the same work stride as noticing it,
-   not batched for a wrap-up step, mirroring `CLAUDE.md`'s "run UMS
-   proactively" timing rule.
+3. **File the issue immediately, without waiting for approval.**
+   Do it in the same work stride as noticing it, not batched for a wrap-up
+   step, mirroring `CLAUDE.md`'s "run UMS proactively" timing rule.
    Write it to stand alone: what is wrong, where (file/line or URL), why
    it's wrong, and — for a bug — a reprex where feasible, per
    [`issue-first`](issue-first.md).
@@ -30,6 +33,44 @@ a product one.
    step 1's flag, or as one combined flag-plus-link message when filing is
    quick — and in a PR comment when the mistake surfaced while working a
    PR, so the record is discoverable from both sides.
+
+## Filing is not gated on approval
+
+The rule above rules out *deferring* a report to a wrap-up step.
+It has to rule out the adjacent move too, because that one looks like
+compliance: flag the mistake now, and file it once the user says go.
+
+That is not filing.
+An offer to file is worth exactly what an unfiled observation is worth ---
+both live only in the conversation, and both die with it.
+So the offer does not even buy the caution it appears to buy; it just moves
+the work onto the user that this rule exists to take off them.
+
+Two asymmetries decide it:
+
+- **A duplicate issue is cheap and a lost observation is not.**
+  Filing something already tracked costs a close, or a comment on the
+  existing issue.
+  Not filing costs the observation outright, once the session ends.
+- **Only the user can tell you a thing is not worth tracking, and they can
+  tell you that after it is filed.**
+  Waiting to ask converts a reversible action into a blocking one.
+
+**Step 2's dupe-check is not an exception to this.**
+It decides **where** the report lands --- a new issue, or a comment carrying
+the new evidence onto an open one --- not **whether** to make it.
+Those are different questions, and only the first has a discretionary
+answer.
+
+(Corrected in an ai-config session, 2026-07-28: a sweep found 49 of 179
+installed skills stale or orphaned, and the finding was reported as "worth a
+tracking issue separately --- say the word and I'll file it".
+The user's correction was "always file issues as soon as you notice them" /
+"don't wait for my approval".
+The dupe-check then showed it was already tracked by #755 and #769, so the
+correct action was a comment with the new evidence rather than a new issue
+--- which is step 2 doing its job, and is exactly the decision the offer had
+deferred instead of making.)
 
 ## Where to file
 

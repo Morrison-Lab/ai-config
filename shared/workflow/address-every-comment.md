@@ -184,3 +184,35 @@ accepted a space-indented closing line real bash rejects.
 Matching whole lines against the tag -- how bash itself ends a heredoc --
 removed the whole lazy-quantifier/anchor failure mode instead of narrowing
 it; the reply carried the failing output of the suggested form.)
+
+**And the mirror case: a finding can be wrong on its stated grounds while
+still pointing at something real.**
+The two bullets above check the reviewer's *fix*; this one checks their
+*premise*.
+A confidently reasoned factual claim -- this pattern is valid, that value is
+in range, this call is safe -- invites one of two lazy responses: accept it
+because it sounds authoritative, or dismiss the whole item once you notice
+the claim is false.
+Both lose information, because a reviewer usually arrives at a wrong premise
+while looking at something that genuinely bothered them.
+
+So reproduce the claim before answering it, and answer the concern
+separately from the premise.
+When the premise turns out to be false, say so with the command and its
+output rather than by assertion, and then address what prompted it anyway --
+a reader who tested your example and got a different result has a real
+problem even if their explanation of it was wrong.
+Expect the corrected mechanism to be more useful than the original text:
+a premise worth disputing usually sits on something you had not fully
+explained.
+(ai-config#756, 2026-07-28: a review held that `[\x{2014}]` is valid PCRE
+and so could not produce the "code point value too large" error the fragment
+described, and proposed an out-of-range `[\x{110000}]` instead.
+Running it showed the original failing exactly as written -- the cause is
+the locale, since PCRE in non-UTF mode rejects any `\x{}` above `0xFF`, and
+the same command succeeds under `LC_ALL=C.UTF-8`.
+The proposed replacement would have been worse, failing unconditionally and
+hiding that environment-dependence, which is the whole reason the swallowed
+error is dangerous.
+The reviewer's actual worry -- that a reader might not reproduce it -- was
+right, and sharper than stated.)

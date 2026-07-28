@@ -257,3 +257,37 @@ Applying the suggestion would have removed the only warning before a hard
 error, in the one step that exists for running headless.
 The reviewer accepted the rebuttal on the next round and called its own prior
 claim a hallucination.)
+
+**When a reviewer hedges a finding because it depends on code it cannot
+see, check whether *you* can see it --- the hedge is an invitation, not a
+verdict.**
+Automated reviewers work from the diff, so a finding that turns on a
+reusable workflow, a dependency's internals, or another repo's behavior
+arrives with language like "moderate rather than high confidence",
+"depends on behavior not visible in this diff", or "worth the author
+confirming intent".
+That hedge is a fact about the *reviewer's* visibility, not about how
+likely the finding is.
+You frequently have access it lacks: the repo cloned locally, a pinned
+dependency vendored in, or permission to fetch the source.
+
+Reading it converts a maybe into a settled yes or no, and that changes
+the disposition.
+Confirmed, it earns a fix or a precisely-scoped follow-up issue with the
+mechanism recorded; disproved, it earns a Rebut with evidence instead of
+a vague "I think this is fine".
+Either way the next reader is spared re-deriving it.
+Quote the specific lines you checked, since a follow-up issue that merely
+repeats the reviewer's hedge is barely more useful than the review
+comment it came from.
+
+(`UCD-SERG/serodynamics#274`, 2026-07-28: a review flagged possible
+duplicate review dispatch at moderate confidence, explicitly because the
+reusable workflow in `d-morrison/gha` was not visible to it.
+That repo was cloned locally.
+Reading both matchers showed the reusable fires on `@claude[[:space:]]+review`
+and the local job on a punctuation-tolerant superset, so the plainest
+phrasing --- `@claude review` --- matches both and dispatches twice.
+The follow-up issue could then record the exact overlap table and note
+that the upstream gap motivating the local job had since been closed,
+making "broaden upstream, delete the local job" a real option.)

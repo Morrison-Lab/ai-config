@@ -183,6 +183,18 @@
 - When finishing work on an MR/PR (clean review, ready to merge, etc.), always provide a clickable link to the MR/PR in the chat message.
 - When discovering bugs in upstream/shared infrastructure (e.g., HACtions templates), always file an issue immediately — don't ask first.
 - More generally: always post a follow-up issue without asking first, in any repo we own or are a member of (a filed issue is cheap to close later if it turns out not to be helpful, so there's no real downside to erring toward filing). The opposite default applies to a repo we're NOT a member of — never post there autonomously; draft it and ask the user for permission first, per the fuller upstream-contribution escalation path (`shared/workflow/upstream-issues.md`).
+- Generalizing the bullets above: when a small, obvious, low-risk follow-up falls
+  out of work already in progress (a two-line comment fix, a stale link, an
+  accompanying NEWS bullet), just do it and report it, rather than describing it
+  and asking "want me to?".
+  The asking costs a round-trip per trivial change and makes me repeat the same
+  answer.
+  Keep asking when the choice is genuinely load-bearing: a tradeoff with no
+  obviously right answer, a hard-to-reverse action, or something touching
+  shared/outward-facing state.
+  The test is "small and obvious", not "quick".
+  (Given 2026-07-28 as "always yes", after a run of offers that were each
+  accepted.)
 - When I detect a concrete follow-up while working — even outside a formal review/defer loop — file the follow-up issue before reporting back, rather than just mentioning it in chat. Same owned/member-vs-external split as the bullet above: file directly in a repo we own or are a member of; in an external repo, draft it and ask the user first (`shared/workflow/upstream-issues.md`).
 - Before acting on a request, review the relevant ai-config memories first so existing standing rules and prior lessons shape the response.
 - When the user points out a mistake I made, fix that mistake immediately and then record the learning for future runs, without waiting for extra prompting.

@@ -458,6 +458,18 @@ So the rule is not "history is useless when shallow" but: check
 `git rev-parse --is-shallow-repository`, then **run the query against known
 controls of both classes** before trusting it, and prefer a signal carried by
 the file itself when one exists.
+Note what "both classes" costs here, because this corpus could not supply it:
+there was no deleted-but-still-installed skill to test against, so the
+observed separation only shows the query telling *never ours* from *ours and
+actively maintained*, never the class it claims to catch.
+That is the same gap the residual risk above names, arrived at from the other
+direction, and it is why the query is worth reporting to a human rather than
+trusting.
+[`ardi.md`](../shared/workflow/ardi.md)'s "test the class it distinguishes"
+bullet is the review-time counterpart to this entry: this one says why a
+history query fails on a truncated clone, that one says to confirm a true
+positive of the class exists in what you tested before claiming the mechanism
+separates the cases at all.
 (ai-config#765/#770, 2026-07-28: separating our own deleted skills from
 Anthropic-provided built-ins under `~/.claude/skills/`.
 The `--diff-filter=D` form was measured first and its blanket zero suggested

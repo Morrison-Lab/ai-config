@@ -100,6 +100,59 @@ marketplace silently dropped the default one, since `workflow_call` inputs
 replace rather than append.
 A `use-ai-config` boolean composed with both instead.)
 
+## Default a useful feature on
+
+A feature worth building is worth defaulting on.
+Ship it opt-*out*, with a toggle that turns it off, rather than opt-in.
+
+The reason is who the two defaults actually serve.
+An opt-in feature reaches only the people who read a changelog looking for
+new inputs to enable, and those are rarely the people it would help most --
+so the work lands in the repo and never reaches a consumer.
+An opt-out feature reaches everyone immediately, and the one consumer it does
+not suit spends a single line turning it off.
+
+This rule and the toggle-mechanism rule immediately preceding it are easy to
+read as contradicting each other.
+They compose instead, because they answer different questions:
+
+- **That rule picks the mechanism.**
+  Use a separate boolean toggle, never a flipped default on a list-valued
+  input, since a caller's list *replaces* the default rather than adding to
+  it.
+- **This rule picks that toggle's value.**
+  Default it to on.
+
+The worked example there already follows both: gha#321 added a `use-ai-config`
+boolean, defaulting on, beside the list inputs it composes with.
+
+### What has to be true first
+
+The default is a default, not a license.
+Three things gate it:
+
+- **The feature has to be safe on.**
+  Additive or advisory qualifies.
+  Anything that can fail a build, spend money, or take a destructive action
+  does not, and stays opt-in however useful it is.
+- **"Useful" wants a measurement, not an assumption.**
+  A check that fires constantly is worse on by default than off, because it
+  trains every reader to ignore it (see
+  [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)).
+- **Turning it on is a behavior change for existing consumers**, who get it
+  without asking, so it belongs under a changelog's `changed` heading rather
+  than `added`.
+
+(d-morrison/gha#336, 2026-07-28: a new clause-break check for
+`check-new-line-breaks` was proposed opt-in, on the strength of a real noise
+measurement -- but the measurement that justified caution was for a *blanket
+punctuation* rule flagging 50.5% of already-conforming lines, while the check
+actually built flags 1.1%.
+The maintainer's correction was "in general, useful features should be
+opt-out", and the 1.1% is what made that safe.
+The check is also warn-only unless a caller sets `fail`, which is the
+safe-on condition above doing its work.)
+
 ## In review
 
 Flag a new hard-coded tunable in a diff as a standard review finding, the
@@ -109,3 +162,7 @@ parameter/field/data value with the current value as its default.
 Flag the inverse too: a diff that turns an existing extension point on by
 default by changing its own default value, where the section above calls for
 a separate toggle.
+Flag a new feature shipped **opt-in** as well, when it is additive or
+advisory and nothing in the three gates above rules out defaulting it on --
+an unused feature helps nobody, and the fix is one changed default plus a
+`changed` changelog entry.

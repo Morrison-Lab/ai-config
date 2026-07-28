@@ -765,3 +765,48 @@ applied here.
 Running both forms before replying is what caught it; applying the suggestion
 would have silently un-gated all five root-level files, including the
 `NEWS.md` whose merge-splice defect motivated the PR.)
+
+## Citing evidence that lives in a PR's own superseded commits
+
+When durable guidance (a `CLAUDE.md` rule, a memory entry, a doc) cites a real
+incident as its worked example, ask where a later reader would go to check it.
+An incident that happened on an **earlier commit of the very PR adding the
+guidance** is the hard case: it is real, and it is invisible to every obvious
+probe.
+
+A reviewer checking `git show HEAD:<file>` finds nothing, because the later
+commit fixed the thing away.
+A reviewer checking the *linked prior PR* -- the one the guidance is about --
+finds nothing either, because the incident was never there.
+Both probes are reasonable, and both come back empty, so a true claim reads as
+fabricated.
+
+Cite the SHA, so the claim is reachable rather than merely true.
+Naming the commit (and, where it exists, the CI job id) converts an
+unverifiable anecdote into something a reader can run `git show` against.
+
+**Whether that citation survives the merge depends on the repo's merge
+strategy, so check it before relying on a branch SHA.**
+A repo that creates real merge commits keeps the PR's individual commits as
+ancestors of `main`, so the short SHA stays reachable forever.
+A repo that **squash-merges** does not: the branch commits never become
+ancestors, and a cited SHA goes dead the moment the branch is deleted.
+Two repos in the same session differed on exactly this --- `ucdavis/bcs` merges
+(`git log` shows `Merge pull request #453 ...`, and the cited `082f369` remains
+reachable), while `Morrison-Lab/ai-config` squashes (after #795 merged,
+`git merge-base --is-ancestor <branch-commit> origin/main` returned false for
+both commits, though the *content* was present on `main`).
+So in a squash-merge repo, cite something durable instead: the PR or issue
+number, a permalink to the file at a merged commit, or the CI job URL, none of
+which the squash discards.
+
+That same asymmetry is why a post-merge check should verify **content** rather
+than ancestry in a squash repo --- `git show origin/main:<path> | grep` answers
+the question ancestry cannot.
+
+(ucdavis/bcs#456, 2026-07-28: a review called a `wordlist NEWS.md:3` spellcheck
+failure "fabricated rather than drawn from a real incident".
+It had happened two commits earlier on that same PR, at `082f369`, and had
+already been reworded away.
+Rebutted with the commit and the job log, then fixed properly by naming the SHA
+in the guidance itself.)

@@ -205,3 +205,25 @@ command if neither launcher actually works. (ai-config#635,
 again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content
 in the file.)
+
+## `scripts/semantic-line-breaks.py` rewrites the whole file, not the part you added
+
+It is an in-place reformatter over every prose paragraph in each file it is
+given --- no `--check`, no `--dry-run`, no diff scoping (`main()` takes bare
+paths and calls `path.write_text()`).
+Running it on a mature file to tidy a few lines you just appended therefore
+reflows everything else too: on `memories/r-quarto.md` a 65-line addition
+came back as `273 insertions(+), 923 deletions(-)`, burying the actual change
+and rewriting `git blame` for content nobody touched.
+
+Two consequences.
+Format new prose by hand and reserve the script for a file you intend to
+convert wholesale.
+And if you do run it by reflex, `git checkout -- <file>` and re-apply just
+your own text --- the reformat is not worth keeping as a side effect of an
+unrelated change.
+
+Note the contrast with its CI counterpart, `check-new-line-breaks` in
+[`d-morrison/gha`](https://github.com/d-morrison/gha), which is diff-scoped
+by design so a corpus's pre-existing drift is never reflagged.
+The checker got that treatment and the formatter did not.

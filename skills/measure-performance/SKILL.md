@@ -276,6 +276,11 @@ and `timeit`.
   -- check for an existing, usually C-backed, packaged implementation before
   hand-optimizing.
   A found package beats a won benchmark.
+- [`use-memoisation`](../../shared/coding/use-memoisation.md) -- one of the
+  fixes this skill's profile can point at, and the fragment that says to raise
+  a missed memoisation only when the function is "demonstrably hot".
+  Step 3 is what demonstrates it, and step 6's `mem_alloc` column is where the
+  memory half of the trade shows up.
 - [`reprexes`](../reprexes/SKILL.md) -- reduces a slow workload to the
   minimal self-contained snippet step 5 benchmarks.
 - [`test`](../test/SKILL.md) and [`r-pkg-check`](../r-pkg-check/SKILL.md) --

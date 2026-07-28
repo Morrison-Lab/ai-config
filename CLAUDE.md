@@ -31,7 +31,8 @@ It has to rule out the adjacent move as well, because that one reads as complian
 
 An offer to run UMS is worth exactly what an unrecorded learning is worth, since both live only in the conversation and both die with it.
 The two asymmetries that decide it are already written down, for issues rather than for learnings, in [`report-mistakes-proactively`](shared/workflow/report-mistakes-proactively.md)'s "Filing is not gated on approval" section: a redundant entry is cheap while a lost one is not, and only the user can say a thing is not worth keeping --- which they can do after it is written, not only before.
-Read that section rather than re-deriving the argument here; the pattern is identical and only the artifact differs.
+Read that section rather than re-deriving the argument here.
+The pattern is identical, and only the artifact differs.
 
 What stays genuinely worth asking is **where** a learning belongs when the destination is unclear, never **whether** to record it --- the same split that fragment draws around its own dupe-check step.
 Write it down first, then ask.

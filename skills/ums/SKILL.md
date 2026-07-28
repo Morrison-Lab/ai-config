@@ -26,6 +26,11 @@ committed pass.
   or for `/clear` to accumulate a backlog — and don't gate it on approval or
   on a PR merging: capture the learning the moment it appears, even while the
   PR that taught it is still open and unreviewed.
+- **When a PR reaches a clean review verdict** -- the concrete checkpoint the
+  bullet above leaves implicit, and the one the `ardi` loop exits on.
+  Run the pass there rather than at the merge: the merge is human-gated and
+  may land long after this session ends, while the verdict is the moment the
+  review lifecycle has finished teaching.
 - User says "ums", "update memories and skills", "record what we learned"
 - **At the start of `/clear`** — a backstop, not the primary trigger: catch
   anything accumulated since the last proactive pass before context is lost

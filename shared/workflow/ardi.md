@@ -16,6 +16,13 @@ as a self-authored merge). Drive to fully clean, report ready, and leave the
 merge --- and any other destructive one-off, e.g. a `gh workflow run` that
 force-pushes --- for explicit human authorization.
 
+Because the loop ends there, **the clean verdict is also where `ums` runs** ---
+don't hold the pass for the merge, which is on the human's clock rather than
+this session's and may land after a `/clear` or not at all.
+See `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate";
+the merge-time pass in `post-merge` then only has to cover what the merge
+itself taught.
+
 The one exception: if the human has explicitly granted the `mwc`
 (merge-when-confident) session permission, that grant is a live human
 instruction, not a self-authored one, so baking a self-merge step into a

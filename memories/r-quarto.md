@@ -1026,3 +1026,68 @@ That message is confident, actionable, and pointing at the wrong problem.
 Check both the missing and the invalid case when guarding a forwarded
 argument, not only the one the issue reports.
 (d-morrison/altdoc#64.)
+
+## A container with no R at all is not a blocker: apt for R, P3M for the packages, a tarball for Quarto
+
+The bullets above assume R already exists and only its *packages* are
+missing --- the renv-session case.
+A remote/web container can have no R, no Quarto, and no `gh`, which reads as
+"tests cannot run here, push and let CI check it."
+It is worth about ten minutes to disprove instead, and the difference is
+large: pushing test assertions you have never executed versus deriving them
+from a real run.
+
+The recipe that worked end to end (Ubuntu 24.04 noble container, root):
+
+```bash
+apt-get install -y --no-install-recommends r-base-core   # R 4.6.1
+Rscript -e 'install.packages(c("cli", "desc", "fs", "testthat", "pkgload"))'
+curl -sSLo q.tar.gz https://github.com/quarto-dev/quarto-cli/releases/download/v1.8.27/quarto-1.8.27-linux-amd64.tar.gz
+tar xzf q.tar.gz && ln -sf "$PWD"/quarto-*/bin/quarto /usr/local/bin/quarto
+```
+
+**The P3M-vs-CRAN-direct choice runs in both directions.**
+The "before accepting uninstallable, try CRAN-direct" bullet above records
+source-CRAN succeeding where P3M's fallback did not.
+The same session hit the mirror image: a plain CRAN source install of
+`quarto` and `rmarkdown` failed building their `sass` dependency
+(`make: *** [Makefile:4: sass.ts] Error 3`), while P3M's noble binaries
+installed all four packages in one call with no compilation.
+So neither repo is the reliable one --- when the first fails on a build
+step, switch and retry before concluding a package is unavailable.
+(`d-morrison/altdoc` #82/#83/#84, 2026-07-28: this turned "assert the output
+tree and hope" into rendering each generator, listing its published `docs/`
+tree, and deriving the assertions from what was actually there.)
+
+## testthat run by hand: two defaults that make a broken run look like a clean one
+
+Both bite only outside `R CMD check` / `devtools::test()`, which is exactly
+where a sandbox run lives, and each fails in the direction that reads as
+success.
+
+**`skip_on_cran()` skips unless `NOT_CRAN` is set.**
+A file whose every test opens with it reports `failed: 0  error: 0` and exits
+`0` --- green by every signal except the one that matters.
+The tell is the skip count: `skipped: 20  passed: 0` is not a pass, it is a
+file that never ran.
+Set `NOT_CRAN=true` on the command, and read `passed` rather than `failed`
+before believing a run.
+
+**`test_file()` / `test_local()` default to `stop_on_failure = TRUE`.**
+One failing expectation aborts with a bare `Error: Test failures.` and no
+summary, which reads as the harness crashing rather than as a test result.
+Pass `stop_on_failure = FALSE` and consume the returned data frame
+(`as.data.frame(...)`, then `sum(r$failed)` and `r$test[r$failed > 0]`) to
+get which test failed rather than only that something did.
+
+**A hand-rolled harness invents failures; use the real loader.**
+`source()`-ing every file in `R/` into the global environment is the obvious
+way to reach dot-prefixed internals without installing the package, and it
+produced five spurious errors that vanished under `pkgload::load_all(".")`
+--- tests reaching code that resolves paths through `system.file()` need the
+package's own installed structure.
+`pkgload` is a small dependency and worth installing before trusting any
+failure a `source()` harness reports.
+Either way, baseline a failure against unmodified `main` (`git stash`,
+re-run, `git stash pop`) before treating it as yours: two of this session's
+apparently-new failures were pre-existing and environmental.

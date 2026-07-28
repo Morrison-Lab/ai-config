@@ -1040,8 +1040,19 @@ from a real run.
 The recipe that worked end to end (Ubuntu 24.04 noble container, root):
 
 ```bash
-apt-get install -y --no-install-recommends r-base-core   # R 4.6.1
-Rscript -e 'install.packages(c("cli", "desc", "fs", "testthat", "pkgload"))'
+# The version apt gives you depends on a precondition worth checking first:
+#   grep -r cran /etc/apt/sources.list.d/
+# This container already had CRAN's own repo wired up
+# (/etc/apt/sources.list.d/cran-r.list -> cloud.r-project.org, noble-cran40),
+# which is where the R 4.6.1 below came from. Ubuntu's own noble repo carries
+# a much older R, so on an image without that file, add the CRAN repo rather
+# than assuming a version.
+apt-get install -y --no-install-recommends r-base-core   # R 4.6.1, here
+
+# P3M rather than the default mirror, per the rest of this file --- the very
+# next paragraph is what happens when something in the list needs compiling.
+Rscript -e 'options(repos = c(P3M = "https://packagemanager.posit.co/cran/__linux__/noble/latest")); install.packages(c("cli", "desc", "fs", "testthat", "pkgload"))'
+
 curl -sSLo q.tar.gz https://github.com/quarto-dev/quarto-cli/releases/download/v1.8.27/quarto-1.8.27-linux-amd64.tar.gz
 tar xzf q.tar.gz && ln -sf "$PWD"/quarto-*/bin/quarto /usr/local/bin/quarto
 ```
@@ -1061,9 +1072,16 @@ tree, and deriving the assertions from what was actually there.)
 
 ## testthat run by hand: two defaults that make a broken run look like a clean one
 
-Both bite only outside `R CMD check` / `devtools::test()`, which is exactly
-where a sandbox run lives, and each fails in the direction that reads as
-success.
+Both bite a **bare `Rscript` call** --- which is what a sandbox run is --- and
+each fails in the direction that reads as success.
+
+`devtools::test()` sets `NOT_CRAN = "true"`, and so does a
+`rcmdcheck`-driven CI run: `d-morrison/altdoc`'s `R-CMD-check` reports
+`FAIL 0 | WARN 1 | SKIP 6 | PASS 406`, and none of those six skips is
+`On CRAN`, so its `skip_on_cran()`-guarded render tests genuinely run there.
+But do not read that as "`R CMD check` protects you": CRAN's own runs leave
+`NOT_CRAN` unset, which is the entire point of the function. What sets it is
+the harness around the check, not the check.
 
 **`skip_on_cran()` skips unless `NOT_CRAN` is set.**
 A file whose every test opens with it reports `failed: 0  error: 0` and exits
@@ -1073,10 +1091,31 @@ file that never ran.
 Set `NOT_CRAN=true` on the command, and read `passed` rather than `failed`
 before believing a run.
 
-**`test_file()` / `test_local()` default to `stop_on_failure = TRUE`.**
-One failing expectation aborts with a bare `Error: Test failures.` and no
-summary, which reads as the harness crashing rather than as a test result.
-Pass `stop_on_failure = FALSE` and consume the returned data frame
+It is not a plain env-var test, and the difference explains why the trap is
+specific to scripted runs. `testthat:::on_cran()` is:
+
+```r
+env <- Sys.getenv("NOT_CRAN")
+if (identical(env, "")) !interactive() else !isTRUE(as.logical(env))
+```
+
+So with the variable unset, an interactive console *runs* the tests while a
+non-interactive `Rscript` skips them --- reproducing it by hand in a REPL
+will therefore not show you the bug.
+
+**`test_file()` / `test_local()` abort on the first failure --- but
+`formals()` will not tell you so.**
+Neither signature carries a literal default: in testthat 3.3.2 both
+`formals(testthat::test_file)$stop_on_failure` and the `test_local()`
+equivalent are `NULL`, and the aborting behavior comes from `test_dir()`,
+whose own default is `TRUE`. So inspecting the signature and concluding the
+argument is unset, or that the two functions differ, is the wrong reading ---
+a review of this entry made exactly that inference from the documentation,
+and `formals()` is what settles it.
+What the behavior actually is: one failing expectation aborts a manual
+`test_local(".")` with a bare `Error: Test failures.` and no summary, which
+reads as the harness crashing rather than as a test result.
+Pass `stop_on_failure = FALSE` explicitly and consume the returned data frame
 (`as.data.frame(...)`, then `sum(r$failed)` and `r$test[r$failed > 0]`) to
 get which test failed rather than only that something did.
 

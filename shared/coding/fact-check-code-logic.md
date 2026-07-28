@@ -90,6 +90,46 @@ input line that survives substitution, then verified by swapping the two
 source lines into the wrong order and watching both assertions fail on the
 resulting `"* [GitHub](_GITHUB)"` residue.)
 
+## When the runtime is available, run the claim instead of reasoning about it
+
+Every check above can be done by reading.
+Most of them can be *settled* by execution, and when the language runtime is
+present in the session, execution is both cheaper and stronger than the
+careful reading it replaces.
+This is [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
+pointed at your own diff: a claim about what a function returns is decidable
+by calling it, so calling it is the check.
+
+The claims worth executing are the ones that feel too settled to bother
+with --- what a call returns on an edge input, which of two forms errors, a
+printed value quoted in a comment or a doc.
+Confidence is not the filter, because a claim you are confident about is
+exactly the one you will publish without support.
+So the filter is simply: *is this checkable here, right now?*
+Install the package if it is missing rather than downgrading the claim to a
+hedge; one `install.packages()` usually costs less than a review round.
+
+Two habits make it pay off beyond the one check:
+
+- **Paste the verified output into the fragment or comment**, so the next
+  reader inherits the evidence rather than re-deriving it.
+- **Say what you ran and what version you ran it on.** Behaviour is
+  version-dependent, so "verified on rlang 1.3.0" survives contact with a
+  future reader in a way "verified" does not --- the same reasoning
+  [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md)
+  applies to prose.
+
+(ai-config#774, 2026-07-28: a fragment stated that R's `[[` errors on a
+missing name in a list, offered as the strict counterpart to `[`.
+The book's own out-of-bounds table contradicted it, and one call settled it
+--- `list(a = 1)[["b"]]` returns `NULL`; only an out-of-bounds *integer*
+index errors.
+The claim had been written precisely because it felt obvious.
+The same pass executed the other five behavioural claims in the diff, all of
+which held, and the reviewer independently confirmed each one --- so the
+cost of being wrong here was one wrong sentence caught before review rather
+than a finding.)
+
 ## What to report
 
 For each issue found, state:

@@ -158,6 +158,32 @@ version `DESCRIPTION` pins --- was unavailable, inferred from one failed
 `install.packages()` disproved it, and the regeneration landed in the same
 round the finding did.)
 
+**A blocker that was true when you published it can stop being true while
+the PR is open, and withdrawing it is your job, not the reviewer's.**
+The bullet above covers a blocker that was never true.
+This is the harder case, because the caveat was correct and diligent when
+written, so nothing about it reads as a defect later --- and a sentence
+saying "this could not be checked" is one nobody re-checks, least of all
+the reviewer, who has no way to know the environment moved.
+It keeps steering the review regardless: a verdict can repeat the caveat
+back as an accepted limitation, which makes the stale claim look
+corroborated.
+So when the cause of a blocker changes --- a host unblocked, a tool
+installed, a quota reset, a dependency published --- re-run the check and
+withdraw the caveat where it was published, saying explicitly that it is
+withdrawn rather than quietly deleting the sentence.
+A reader who saw the original needs to know it was retested, not be left
+wondering whether it was ever true.
+(ai-config#774, 2026-07-28: the PR body said four `adv-r.hadley.nz` anchors
+could not be verified because the host was egress-blocked, which was
+accurate when written.
+The host was unblocked mid-session, and all 16 URLs then verified 200 with
+every anchor resolving.
+The review had already absorbed the caveat --- it listed those anchors as
+"unverified per the PR body's own caveat ... not a new finding" --- so
+leaving it would have shipped a limitation that no longer existed, blessed
+by a reviewer who could not have known.)
+
 **An instruction's own suggested code is not exempt from the
 project-conventions self-review above.**
 The self-review rule assumes you wrote the diff; a snippet handed to you

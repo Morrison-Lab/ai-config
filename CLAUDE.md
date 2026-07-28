@@ -23,7 +23,7 @@ The bullet above picked the merge because it is unmissable, and it is; the probl
 Merging is human-gated: [`ardi`](shared/workflow/ardi.md)'s terminal action is to report the PR ready, never to merge it.
 So a clean-but-unmerged PR can sit for hours, for days, or across a `/clear`, and the review lifecycle's learnings sit with it in conversation state that may not survive the wait.
 Waiting buys nothing either, because by the time the verdict is clean every finding has already been Addressed, Rebutted, or Deferred -- the review has taught everything it is going to teach, and the merge adds only whatever the merge itself surfaces.
-So run UMS when the verdict comes back clean, and treat the merge-time pass below as a top-up rather than the trigger.
+So run UMS when the verdict comes back clean, and treat the merge-time pass as a top-up rather than the trigger.
 
 ## Flag good moments to `/clear` in long-running sessions
 

@@ -216,3 +216,44 @@ hiding that environment-dependence, which is the whole reason the swallowed
 error is dangerous.
 The reviewer's actual worry -- that a reader might not reproduce it -- was
 right, and sharper than stated.)
+
+**When a finding cites a source, read the cited source before reproducing
+anything -- it is the cheaper instrument, and it is the one that can show the
+finding backwards rather than merely unsupported.**
+The bullet above says to reproduce the claim.
+That is right, and it is the second thing to do when a citation is on the
+table, because reproduction tests the *behavior* while the citation tests the
+*reasoning*, and only the second can catch a finding whose own evidence
+contradicts it.
+A citation is also the most persuasive part of a review and the least likely
+to be checked: a linked changelog entry reads as settled fact, so the finding
+inherits authority it never earned, and a one-click `suggestion` block turns
+that borrowed authority into an applied edit.
+
+Grep the cited document for the mechanism the finding names.
+One command usually decides it, which makes this an
+[`algorithmatize-checks`](algorithmatize-checks.md) case rather than a
+judgment call, and a fabricated mechanism produces a clean zero-hit result
+that is hard to argue with.
+Then quote the entry in the reply rather than paraphrasing the disagreement,
+and reproduce the behavior as the independent second leg.
+
+Do not stop at winning the point.
+A finding that misread a source usually did so because the claim it
+questioned had nothing checkable next to it, so fold the citation into the
+file itself, per [`fully-clean`](fully-clean.md)'s note that a fresh review
+run re-derives from scratch and will not read the thread.
+(ai-config#762, 2026-07-28: a review held that
+`htmlwidgets::saveWidget(selfcontained = TRUE)` no longer needs pandoc,
+citing htmlwidgets 1.6.0 as having "switched to `base64enc::dataURI()`", and
+supplied a suggestion block deleting the `rmarkdown::pandoc_available()`
+gate.
+`grep -inE 'pandoc|base64'` over that NEWS file returned six pandoc hits and
+zero base64 hits, and the 1.6.0 entry says the path "now uses the
+`{rmarkdown}` package to discover and call pandoc" -- so the citation
+established the opposite of the finding, and incidentally made the gate the
+*same lookup* htmlwidgets performs rather than a proxy for it.
+Applying the suggestion would have removed the only warning before a hard
+error, in the one step that exists for running headless.
+The reviewer accepted the rebuttal on the next round and called its own prior
+claim a hallucination.)

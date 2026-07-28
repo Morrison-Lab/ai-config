@@ -99,7 +99,7 @@ In every session — at session start, and again periodically during long sessio
      s=$(basename "$d"); r="$repo/skills/$s/SKILL.md"; n=$((n+1))
      if [ -f "$r" ]; then
        diff -q "$d/SKILL.md" "$r" >/dev/null || echo "STALE:  $s"
-     elif [ -n "$(git -C "$repo" log --oneline --all -- "skills/$s")" ]; then
+     elif [ -n "$(git -C "$repo" log --oneline --all -1 -- "skills/$s")" ]; then
        echo "ORPHAN: $s"
      fi
    done
@@ -109,11 +109,13 @@ In every session — at session start, and again periodically during long sessio
    **The git-history test in the `elif` is what makes `ORPHAN` mean anything.**
    "Absent from the repo's `skills/`" has two causes that are indistinguishable on disk: a skill this repo deleted, and a skill this repo never owned.
    `~/.claude/skills/` also holds harness- and plugin-provided skills, so a bare not-in-the-repo test reports every one of those as `ORPHAN`, and the label invites deleting something that was never ours to delete.
-   Asking whether the path has any history in the repo separates the two exactly, at the cost of one `git log` per miss.
+   Asking whether the path has any history in the repo separates the two exactly, at the cost of one `git log -1` per miss.
    (ai-config#762, 2026-07-28: the sweep reported 7 orphans -- `docx`, `pdf`, `pptx`, `xlsx`, `skill-creator`, `morning`, `session-start-hook` -- and every one was a false positive, each a harness-provided real directory with zero commits in `git log --all -- skills/<name>`, against 55 for `ums` and 37 for `ardi`.
    The 42 `STALE` hits in the same run were all genuine, so the sweep's real value was never in doubt -- only the orphan half of its output was noise.)
    When a skill is stale, read the repo's `skills/<name>/SKILL.md` directly and follow that instead of the loaded copy.
-   (ai-config#755, 2026-07-28: 42 of 172 skills were stale in a web session, most at under half their real length -- `ardi` 80 lines vs 403, `ums` 94 vs 365, `ard` 134 vs 308 -- plus 7 installed skills already deleted from the repo.
+   (ai-config#755, 2026-07-28: 42 of 172 skills were stale in a web session, most at under half their real length -- `ardi` 80 lines vs 403, `ums` 94 vs 365, `ard` 134 vs 308 -- plus 7 the sweep reported as orphans.
+   Those 7 were not deletions; they were the misclassification diagnosed just above, which ai-config#762 identified the same day.
+   Three things settle it: the count matches exactly, the names are all harness-provided, and the corrected sweep now reports zero orphans against this repo, so there is no genuinely-deleted-but-still-installed skill for the earlier run to have found.
    Caught only because a `ums` step contradicted a change known to have merged.
    The damage stayed small because `CLAUDE.md` itself was symlinked and restates most operative rules inline, which is the concrete argument for keeping local restatements alongside citations rather than trimming to bare pointers.)
 3. **The working repo's main checkout.** Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) — it goes stale as the session's own PRs and other sessions' PRs merge.

@@ -325,8 +325,11 @@ The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 
 ## Open a PR for every pushed feature branch
 
-After pushing a feature branch, create its PR unless an existing PR already represents that branch or the user explicitly says not to.
-Don't treat a successful push as the handoff: the PR is the reviewable unit and the durable visible record of the work.
+After pushing a feature branch, create its PR
+unless an existing PR already represents that branch
+or the user explicitly says not to.
+Don't treat a successful push as the handoff:
+the PR is the reviewable unit and the durable visible record of the work.
 
 ## Use the existing PR branch, not the harness-specified branch
 

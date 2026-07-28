@@ -124,6 +124,15 @@ In every session — at session start, and again periodically during long sessio
    python3 ~/.claude/scripts/check-install.py --fix     # repair
    ```
    It reports `stale` (a real copy that has drifted -- the active defect), `unlinked` (a real copy that matches today but won't track the next pull), `missing`, `misdirected`, and `foreign`.
+   **`~/.claude/scripts/` can itself be absent, and then that command is unreachable in exactly the container it diagnoses -- run the repo's own copy instead of concluding there is no instrument.**
+   The path above assumes `~/.claude` links back to the checkout; a container can ship `~/.claude` holding **only** a real-copy `skills/`, with no `scripts/`, `shared/`, `memories/`, `commands/`, or `CLAUDE.md` at all, which is a strictly worse shape than the partial split described above.
+   `$HOME` need not be anywhere near the checkout either (`/root` versus `/home/user/ai-config`), so a `~`-relative path is the wrong instrument for finding the repo at all.
+   Run `python3 <ai-config-checkout>/scripts/check-install.py` against the checkout the session actually has.
+   **Point 1 is a precondition for this one, not merely an earlier item in a list.**
+   The instrument compares installed copies against the checkout, so a checkout that has not been pulled makes every report suspect -- both by measuring drift against stale reference content, and by hiding the script itself when it landed in a commit you do not have yet.
+   Pull first, then measure, and re-read any figure taken before the pull as unreliable rather than merely approximate.
+   (2026-07-28, an altdoc `gii` session: `~/.claude` held one real-copy `skills/` and nothing else, and the local checkout was 13 commits behind -- so `scripts/check-install.py` did not exist on disk at either path and a hand sweep against the stale checkout was run instead, reporting counts that changed once the pull landed.
+   That hand sweep was also the approach this very entry had already retired, which is the failure mode the staleness causes rather than a separate mistake.)
    **`foreign` is reported but never removed, and is not a synonym for "deleted from the repo".**
    The category mixes skills we deleted with Anthropic-provided built-ins that were never ours (`docx`, `pdf`, `pptx`, `xlsx`, `skill-creator`), and deleting those would remove working harness functionality.
    Git history cannot separate the two, because remote containers check the repo out **shallow** -- `git log --diff-filter=D -- skills/<name>` returns nothing for either case -- so the call stays human.

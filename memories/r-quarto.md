@@ -1155,3 +1155,46 @@ failure a `source()` harness reports.
 Either way, baseline a failure against unmodified `main` (`git stash`,
 re-run, `git stash pop`) before treating it as yours: two of this session's
 apparently-new failures were pre-existing and environmental.
+
+## `{cli}` glue-interpolates every message string, and the two brace forms fail differently
+
+`cli_ul()`, `cli_alert_*()`, `cli_abort()` and the rest run each string
+through cli's glue engine, so any `{` a caller did not intend as markup is
+interpreted --- and the two cases do **not** behave alike, with the
+harmless-looking one being the dangerous one.
+Verified against cli 3.6.6:
+
+```r
+cli::cli_ul("a \\name{} b")   #> * a \name b        <- no error, braces DELETED
+cli::cli_ul("a {foo} b")      #> Error: Could not evaluate cli `{}` expression: `foo`.
+```
+
+An **empty** `{}` does not raise: glue evaluates the empty expression and the
+braces vanish from the output, silently corrupting the message (a user reads
+`\name` where the source said `\name{}`).
+A **non-empty** `{foo}` hard-errors on the missing object, taking down the
+whole call.
+Which one applies is easy to get backwards --- a review of
+`d-morrison/altdoc#87` predicted the crash for the empty form, and the
+opposite is true.
+
+This matters wherever a message carries text the code did not author:
+a forwarded `conditionMessage()`, a file path, a URL from `DESCRIPTION` or
+`pkgdown.yml`, a user-supplied name.
+Escape braces (double them) first, or use `cli::cli_verbatim()` per item
+when the surrounding formatting allows it.
+
+Two consequences for testing it.
+A regression test built on the *empty* form passes vacuously against
+unescaped code, since that path never errored --- pick a fixture carrying a
+populated brace (`https://x.org/{version}/` reaching a URL check works).
+And assert the brace survives somewhere, not merely that nothing raised.
+
+Where to look is not where you would guess: cli does not hand back the text
+it formatted, and `cli_ul()` returns the element **id** (`"cli-10293-1"`), so
+inspecting its return value yields a plausible scalar that never held the
+message.
+Use the enclosing function's return value when it hands back the strings it
+printed (altdoc#87 asserts on `check_altdoc()`'s invisible findings),
+`testthat::expect_output()` when nothing is returned, or
+`conditionMessage()` for `cli_abort()`.

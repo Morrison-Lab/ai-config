@@ -91,3 +91,24 @@ output.
 (ai-config#752, 2026-07-27: the pre-commit run reported clean and that claim
 went into the PR body; the same content flagged 7 lines the moment it was
 run again after committing.)
+
+**When hand-reformatting a line the check flagged, copy the raw line rather
+than the check's own report of it.**
+The script strips a bullet marker or blockquote prefix before handing the
+text to its sentence splitter, which is right for counting sentences and
+wrong for reproducing the line.
+So a reformat built from that output quietly loses the `- ` or `> ` the
+original carried: a changelog entry stops being a list item while every
+sentence inside it stays intact.
+
+Nothing catches that on its own.
+Re-running the check passes, because it re-strips a marker that is no longer
+there to strip, and the reformatted prose reads correctly to a human.
+The one instrument that decides it is a word-level diff of the two texts with
+whitespace normalized away --- a dropped marker shows up as a missing token,
+and so does any punctuation the reformat rewrote in passing.
+Treat both as real findings rather than noise, since the whole premise of a
+reformat is that only line wrapping changed.
+(ai-config#779, 2026-07-28: a demo reformat of one of gha's changelog
+fragments dropped its leading `- ` and rewrote an em dash as `---`.
+The check reported the result clean; the word diff found both.)

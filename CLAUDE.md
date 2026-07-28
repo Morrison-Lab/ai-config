@@ -25,6 +25,18 @@ So a clean-but-unmerged PR can sit for hours, for days, or across a `/clear`, an
 Waiting buys nothing either, because by the time the verdict is clean every finding has already been Addressed, Rebutted, or Deferred -- the review has taught everything it is going to teach, and the merge adds only whatever the merge itself surfaces.
 So run UMS when the verdict comes back clean, and treat the merge-time pass as a top-up rather than the trigger.
 
+**Offering to run UMS is not running it.**
+Everything above rules out *deferring* the pass to a wrap-up step.
+It has to rule out the adjacent move as well, because that one reads as compliance rather than evasion: surface the learning now, and run the pass once the user says go.
+
+An offer to run UMS is worth exactly what an unrecorded learning is worth, since both live only in the conversation and both die with it.
+The two asymmetries that decide it are already written down, for issues rather than for learnings, in [`report-mistakes-proactively`](shared/workflow/report-mistakes-proactively.md)'s "Filing is not gated on approval" section: a redundant entry is cheap while a lost one is not, and only the user can say a thing is not worth keeping --- which they can do after it is written, not only before.
+Read that section rather than re-deriving the argument here; the pattern is identical and only the artifact differs.
+
+What stays genuinely worth asking is **where** a learning belongs when the destination is unclear, never **whether** to record it --- the same split that fragment draws around its own dupe-check step.
+Write it down first, then ask.
+(Corrected 2026-07-28: a flag reading "worth running `ums` before this session ends" named a real, specific learning and still produced no pass, until the user said "you should have run ums already.")
+
 ## Flag good moments to `/clear` in long-running sessions
 
 Proactively tell me — don't wait to be asked — when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.

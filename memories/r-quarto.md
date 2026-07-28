@@ -79,6 +79,24 @@
   but a plain-CRAN source install of knitr/rmarkdown/DT succeeded, letting all
   three of `CONTRIBUTING.md`'s documented renders — both PDF demos and the full
   HTML site — run locally before push.)
+  **One mechanism now pinned down, and it is not the build sandbox: P3M can
+  fail to serve an index at all.**
+  The paragraph above guesses at a timeout or resource limit inside P3M's
+  source build.
+  At least one instance is simpler and earlier than that --- no build is ever
+  attempted, because the repository index 404s:
+  `unable to access index for repository https://p3m.dev/cran/__linux__/noble/latest/src/contrib:
+  cannot open URL '.../PACKAGES'`, followed by `packages 'bench', 'profvis'
+  are not available for this version of R`, which reads as an R-version
+  incompatibility and is nothing of the kind.
+  The tell is that the failure is instant rather than slow, and that the
+  named packages are ordinary ones no snapshot would genuinely lack.
+  Switching `repos` to `https://cloud.r-project.org` installed both plus
+  about 30 dependencies in roughly a minute.
+  So treat "not available for this version of R" from a P3M repo as a
+  reachability symptom first and a compatibility claim second.
+  (ai-config#762, 2026-07-28: R 4.6.1 on noble; needed `bench` and `profvis`
+  to verify a new skill's commands rather than assert them.)
 - **A fresh `git worktree` gets its own renv library cache, keyed by the
   worktree's absolute path** (`/root/.cache/R/renv/library/<repo>-<worktree-dirname>-<hash>/...`),
   separate from the main checkout's already-populated cache. Its own

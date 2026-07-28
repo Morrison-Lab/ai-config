@@ -608,7 +608,7 @@ commit existed, #732's by a reviewer.
 The second time is what makes this worth recording, since the entry above
 already existed and was not applied.)
 
-## Picking the diff range when self-checking a PR: `..` vs `...` vs the working tree
+## Picking the diff range: `..` vs `...` vs the working tree
 
 Three forms answer three different questions, and reaching for the wrong one
 produces a confident, wrong read of your own PR.

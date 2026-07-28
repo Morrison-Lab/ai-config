@@ -434,17 +434,23 @@ A history *query* just comes back empty, and empty is also a legitimate answer,
 so it cannot be told apart from a real negative by looking at it.
 
 Two questions that appear interchangeable behave very differently on a
-50-commit clone of this corpus:
+shallow clone of this corpus:
 
 - `git log --diff-filter=D -- <path>` ("was this ever deleted?") returned
-  **zero for every candidate**, ours and foreign alike.
+  **zero for every candidate**, ours and foreign alike, at depth 50.
   A deletion that happened before the shallow window is simply not in it, so
   this question is unanswerable here while appearing answered.
 - `git log --all -- <path>` ("has the repo ever touched this?") **did**
-  discriminate: zero for all seven Anthropic built-ins, against 6 for `ums`,
-  3 for `ardi` and 1 for `config-ai`.
+  discriminate, on the same clone at depth 55: zero for all seven Anthropic
+  built-ins, against 6 for `ums`, 3 for `ardi` and 1 for `config-ai`.
   An actively maintained file gets touched inside almost any window, which is
   what makes the weaker question survive truncation.
+
+The five commits gained between those two measurements are not what produced
+the discrimination, which is the obvious objection and worth foreclosing:
+none of them touches `skills/ums`, `skills/ardi` or `skills/config-ai`, and
+every commit behind those three counts predates all five.
+The second form would have separated the two classes at depth 50 as well.
 
 The residual risk in the second form is a file that is genuinely ours but has
 not been touched within the window, which reports as never-ours.

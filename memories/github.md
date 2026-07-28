@@ -783,3 +783,48 @@ label-name fix round-tripped through a wrong "redocument the label" patch
 before the actual `@v1`→`@v2` pin bump was found; `gha#304`'s own review then
 caught two more stale `@v1` references in sibling docs pages and the
 contradicting pending changelog fragment, all in the same repo-wide sweep.)
+
+## A repository transfer redirects `pull` paths but NOT `issues` paths
+
+When a repo moves between owners (`d-morrison/gha` -> `Morrison-Lab/gha`),
+GitHub's redirect does not cover every path shape, and the split is not
+documented anywhere obvious.
+Measured directly after one such move:
+
+| Old-owner URL | Result |
+| --- | --- |
+| `.../gha` (repo root) | 301 -> new owner |
+| `.../gha/tree/main/examples` | 301 -> new owner |
+| `.../gha/blob/main/README.md` | 301 -> new owner |
+| `.../gha/pull/34` | 301 -> new owner |
+| `.../gha/issues/325` | **404** |
+
+The issues themselves are fine --- the same numbers return 200 under the new
+owner.
+Only the redirect is missing, so every prose link of the form
+`https://github.com/<old-owner>/<repo>/issues/N` becomes a hard 404 the
+moment the transfer completes.
+
+Two consequences worth knowing before diagnosing this:
+
+- **A link checker goes red repo-wide, on `main`, with no diff to blame.**
+  lychee's usual config accepts 301, so the redirecting links pass and only
+  the issue links fail.
+  Every open PR inherits the failure, which invites blaming whichever PR you
+  happen to be looking at.
+  Confirm by comparing the affected files against `main` --- identical link
+  counts and untouched files mean the transfer, not the diff.
+- **Do not infer that the issues were lost.**
+  A 404 on the old owner says nothing about the new one.
+  Request the new-owner URL before concluding anything; the fix is usually a
+  plain rewrite rather than recreating or remapping anything.
+  (This exact inference was made, published in a review, and had to be
+  retracted --- gha#351, 2026-07-28.)
+
+`uses:` resolution is a separate question from link resolution and behaves
+differently again: Actions stopped resolving
+`uses: <old-owner>/<repo>/.github/workflows/x.yml@v2` after the same
+transfer, failing affected runs with `startup_failure` and **zero jobs**.
+Note that a run started shortly before the cutover can still succeed, so two
+attempts of the *same run* can disagree --- which is the cheapest available
+proof that the cause is environmental rather than in the diff.

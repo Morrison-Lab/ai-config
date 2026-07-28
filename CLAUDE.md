@@ -87,25 +87,25 @@ In every session — at session start, and again periodically during long sessio
    Before overwriting, check for edits made directly in `~/.claude` (a diff that adds prose the repo lacks) and upstream the genuine ones into the repo first; never clobber an un-upstreamed local edit.
    Don't rely on mtime to spot local edits — git operations reset mtimes on checkout, so it false-positives right after a `pull`, the case this check most needs to handle correctly.
    **Don't read "symlink-capable system" as "therefore all four children are symlinks" -- verify per child, because the split can fall inside one `~/.claude`.**
-   A remote/web container pre-seeds `~/.claude/skills/` with its own copies before `bootstrap.sh` runs, and bootstrap **skips** a name that already exists rather than replacing it, so those copies survive as real directories and shadow the repo for the whole session.
+   In a remote/web container, a subset of `~/.claude/skills/` ends up as real directories holding older content, which shadow the repo for the whole session.
    `shared/`, `memories/`, `commands/`, and `CLAUDE.md` symlink normally in the same container, which is what makes this hard to spot: the child that silently doesn't refresh is the one carrying the procedures you are about to follow.
-   `git pull` cannot fix it, and the bootstrap log actively misleads, printing `link <name> -> ...` for entries it skipped.
-   So sweep by content rather than trusting the log or the platform.
-   Anchor it on `~/.claude/shared`, which is symlinked even when `skills/` is not, so the sweep works from any directory and aborts instead of reporting a clean result it never computed; and print a count, since bare silence would otherwise mean either "all fresh" or "examined nothing" -- the ambiguity [`fail-fast`](shared/principles/fail-fast.md) warns about:
+   `git pull` cannot fix it, because the loaded file is a copy rather than a link.
+   Don't sweep this by hand.
+   Run the instrument, which compares whole trees rather than `SKILL.md` alone and repairs what it finds, backing up every displaced copy:
    ```bash
-   repo=$(git -C ~/.claude/shared rev-parse --show-toplevel) || exit 1
-   n=0
-   for d in ~/.claude/skills/*/; do
-     s=$(basename "$d"); r="$repo/skills/$s/SKILL.md"; n=$((n+1))
-     if   [ ! -f "$r" ];                           then echo "ORPHAN: $s"
-     elif ! diff -q "$d/SKILL.md" "$r" >/dev/null; then echo "STALE:  $s"
-     fi
-   done
-   echo "checked $n installed skills"
+   python3 ~/.claude/scripts/check-install.py          # report
+   python3 ~/.claude/scripts/check-install.py --fix     # repair
    ```
-   `STALE` is a loaded copy that has drifted from the repo; `ORPHAN` is a skill still installed after being deleted from the repo, which a version comparison alone skips in silence.
-   When a skill is stale, read the repo's `skills/<name>/SKILL.md` directly and follow that instead of the loaded copy.
-   (ai-config#755, 2026-07-28: 42 of 172 skills were stale in a web session, most at under half their real length -- `ardi` 80 lines vs 403, `ums` 94 vs 365, `ard` 134 vs 308 -- plus 7 installed skills already deleted from the repo.
+   It reports `stale` (a real copy that has drifted -- the active defect), `unlinked` (a real copy that matches today but won't track the next pull), `missing`, `misdirected`, and `foreign`.
+   **`foreign` is reported but never removed, and is not a synonym for "deleted from the repo".**
+   The category mixes skills we deleted with Anthropic-provided built-ins that were never ours (`docx`, `pdf`, `pptx`, `xlsx`, `skill-creator`), and deleting those would remove working harness functionality.
+   Git history cannot separate the two, because remote containers check the repo out **shallow** -- `git log --diff-filter=D -- skills/<name>` returns nothing for either case -- so the call stays human.
+   The repo's `UserPromptSubmit` hook runs the repair once per session, so this is normally already done by the time you would think to check.
+   **The clobber happens after `bootstrap.sh`, not before it, so don't diagnose this as bootstrap skipping a pre-seeded copy.**
+   Measured in one container: at `07:25:00.084` bootstrap reported 527 `already linked` and zero skips, so every skill was still a symlink; `~/.claude/skills` was then modified at `07:25:01.608`, leaving 53 real directories.
+   The upstream cause is `upload_skills.sh`, which is idempotent by **skipping** any skill already in the workspace (`skip (exists)`) rather than adding a version, so the workspace copy the harness syncs down stays frozen at whatever revision was first uploaded.
+   That is why a repair wired into `SessionStart` would run before the damage and report a clean install every time.
+   (ai-config#755, 2026-07-28: 42 of 172 skills were stale in a web session, most at under half their real length -- `ardi` 80 lines vs 403, `ums` 94 vs 365, `ard` 134 vs 308 -- plus 3 latent unlinked copies the old `SKILL.md`-only sweep counted as identical.
    Caught only because a `ums` step contradicted a change known to have merged.
    The damage stayed small because `CLAUDE.md` itself was symlinked and restates most operative rules inline, which is the concrete argument for keeping local restatements alongside citations rather than trimming to bare pointers.)
 3. **The working repo's main checkout.** Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) — it goes stale as the session's own PRs and other sessions' PRs merge.

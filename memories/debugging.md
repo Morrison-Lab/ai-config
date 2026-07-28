@@ -608,6 +608,45 @@ email is genuinely wrong. (ai-config#314 was the opposite: two SSH-signed
 `noreply@anthropic.com` commits flagged "N" back-to-back, but both were already
 correct — a false positive, not a real signing gap.)
 
+## stop-hook-git-check also false-positives on GitHub's own merge commits
+A second false positive from the same hook, distinct from the SSH-signing one
+above: it flags the **merge commit GitHub creates when a PR is merged**.
+That commit's committer is `GitHub <noreply@github.com>` by construction, which
+trips the `%ce != noreply@anthropic.com` test.
+
+The trigger is a specific, common state.
+After a PR merges, restarting the designated branch from the updated `main`
+(`git checkout -B <branch> origin/main`) leaves the local branch at `main`'s
+merge commit while `origin/<branch>` still points at the pre-merge tip.
+The hook's range is `origin/<branch>..HEAD`, so it holds exactly one commit --
+GitHub's -- and the hook asks you to `--amend --reset-author` it.
+
+**Do not.**
+That commit is already merged and byte-identical to `origin/main`; amending it
+mints a new SHA, diverges the branch from `main`, and publishing it means
+force-pushing over shared history.
+Two tells separate this from a real signing gap: the flagged commit has two
+parents (`git log -1 --format=%p`), and `git rev-list origin/main..HEAD --count`
+is `0`.
+
+The fix is `--no-merges` on **both** of the hook's checks, since a merge commit
+is never Claude-authored, and one pulled in by resetting onto `main` is not
+unpushed local work:
+
+```bash
+unverifiable=$(git log --no-merges --format='%h %G? %ce' "$upstream..HEAD" ...)
+unpushed=$(git rev-list --no-merges "$upstream..HEAD" --count ...)
+```
+
+Patching only the first converts the warning into a bogus "1 unpushed commit"
+for the very same commit, so both lines are load-bearing.
+The hook is provisioned by the CCR sandbox rather than by this repo, so the
+patch has to be applied wherever that image is built; a session cannot fix it
+for the next session, and editing `~/.claude/` is blocked by the permission
+classifier anyway.
+(UCD-SERG/serocalculator#618, 2026-07-27: fired on every turn for the rest of
+the session once the PR merged.)
+
 ## Reproduce heavy-tool project bugs minimally
 The Quarto
 `safeMoveSync`/`renderProject` `rename '<stem>.html' -> No such file` collision

@@ -24,6 +24,8 @@
 #
 # Never fatal. A broken check must not take a session down with it.
 
+# -e is deliberately omitted: see "Never fatal" in the header above. A failing
+# command here must not abort the hook and take the session's prompt with it.
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,6 +42,11 @@ session_id="$(printf '%s' "$payload" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id",""))' \
   2>/dev/null || true)"
 
+# Known limitation of the `shared` fallback: if two sessions in one container
+# both fail to parse a session_id, they share this marker and only the first
+# gets repaired. Accepted because the fallback is already the unexpected path,
+# and the cost is a missed repair rather than a wrong one -- the next session
+# that does parse an id repairs the install for everyone.
 marker="${TMPDIR:-/tmp}/ai-config-install-checked-${session_id:-shared}"
 [ -e "$marker" ] && exit 0
 : > "$marker"

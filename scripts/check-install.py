@@ -224,7 +224,13 @@ def backup_and_replace(entry: Entry, backup_root: Path, use_symlinks: bool) -> s
     Never deletes: the displaced copy is moved under `backup_root` so a
     pre-seeded entry that turns out to have been wanted is recoverable.
     """
-    assert entry.repo_path is not None
+    # Not an assert: `python -O` strips those, and a None repo_path reaching
+    # shutil.move()/os.symlink() below would surface as a confusing TypeError
+    # deep in the call rather than naming the entry that caused it.
+    if entry.repo_path is None:
+        raise ValueError(
+            f"backup_and_replace called on non-repairable entry: {entry.label!r}"
+        )
 
     if entry.install_path.is_symlink() or entry.install_path.exists():
         destination = backup_root / (entry.group or "_root") / entry.name

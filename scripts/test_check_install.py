@@ -137,8 +137,15 @@ with tempfile.TemporaryDirectory() as tmp:
     result = run_cli(repo, consumer)
 
     check("read-only run exits 0 by default", result.returncode == 0)
-    check("summary always prints a count",
-          "checked 10 installed entries" in result.stdout)
+    # Derived rather than hardcoded, so adding a fixture entry cannot break
+    # this on an otherwise unrelated change. The number itself still has to be
+    # asserted: a bare "checked ... installed entries" substring also passes on
+    # a run that examined nothing (an empty repo prints "checked 0 installed
+    # entries"), and that vacuous case is exactly what this guards against.
+    expected = len(ci.collect(repo, consumer))
+    check("summary prints a real, non-vacuous count",
+          expected > 0
+          and f"checked {expected} installed entries" in result.stdout)
     check("summary names each defect count",
           "1 stale" in result.stdout and "2 missing" in result.stdout
           and "1 unlinked" in result.stdout and "2 foreign" in result.stdout)

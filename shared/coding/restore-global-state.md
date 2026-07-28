@@ -89,7 +89,7 @@ computed has no state to restore, is testable without a fixture, and is
 safe to call concurrently.
 Reach for this rule when a boundary genuinely requires the mutation --- a
 file written, a directory entered, a plotting device configured --- not as
-a licence to mutate freely and tidy up after.
+a license to mutate freely and tidy up after.
 
 ## In review
 

@@ -112,8 +112,8 @@ so the work lands in the repo and never reaches a consumer.
 An opt-out feature reaches everyone immediately, and the one consumer it does
 not suit spends a single line turning it off.
 
-This sits directly above the section before it, and the two are easy to read
-as contradicting each other.
+This rule and the toggle-mechanism rule immediately preceding it are easy to
+read as contradicting each other.
 They compose instead, because they answer different questions:
 
 - **That rule picks the mechanism.**
@@ -128,7 +128,7 @@ boolean, defaulting on, beside the list inputs it composes with.
 
 ### What has to be true first
 
-The default is a default, not a licence.
+The default is a default, not a license.
 Three things gate it:
 
 - **The feature has to be safe on.**

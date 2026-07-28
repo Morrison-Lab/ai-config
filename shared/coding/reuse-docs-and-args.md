@@ -45,6 +45,43 @@ This is a default, not an absolute rule — name an argument explicitly (instead
 of leaving it inside `...`) when the wrapper needs to inspect, validate, or
 transform that specific value before forwarding it.
 
+### What `...` costs
+
+Advanced R names two downsides, and they are the reason the escape hatch
+above is worth using more often than it first appears
+([`...` (dot-dot-dot)](https://adv-r.hadley.nz/functions.html#fun-dot-dot-dot)):
+
+> * When you use it to pass arguments to another function, you have to
+>   carefully explain to the user where those arguments go.
+>   This makes it hard to understand what you can do with functions like
+>   `lapply()` and `plot()`.
+>
+> * A misspelled argument will not raise an error.
+>   This makes it easy for typos to go unnoticed.
+
+The second is the sharp one, because `...` removes a check the language
+otherwise performs for free.
+A named parameter catches a typo; `...` swallows it:
+
+```r
+sum(1, 2, NA, na_rm = TRUE)   #> NA   -- the typo is silently absorbed
+sum(1, 2, NA, na.rm = TRUE)   #> 3
+
+f <- function(x, verbose = FALSE) x
+f(1, verbse = TRUE)           #> Error: unused argument (verbse = TRUE)
+
+g <- function(x, ...) x
+g(1, verbse = TRUE)           #> 1    -- no error
+```
+
+`@inheritDotParams` answers the first downside, since the forwarded
+arguments then appear in the wrapper's own docs rather than only in the
+callee's.
+Nothing answers the second, so weigh it: when an argument is one a caller
+will plausibly mistype and getting it wrong changes results silently ---
+`na.rm` is the archetype --- name it in the signature and forward it
+explicitly, even though `...` would carry it.
+
 ## In R, never use `@noRd`; use `@keywords internal`
 
 Document **every** function with a generated `.Rd` page, internal ones

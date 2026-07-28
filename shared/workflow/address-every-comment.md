@@ -291,3 +291,43 @@ phrasing --- `@claude review` --- matches both and dispatches twice.
 The follow-up issue could then record the exact overlap table and note
 that the upstream gap motivating the local job had since been closed,
 making "broaden upstream, delete the local job" a real option.)
+
+**Timestamp the evidence before rebutting a finding with it --- during a live
+incident, a log from twenty minutes ago describes a different system.**
+The bullets above all say to verify a finding rather than accept it, and they
+assume verification is a fixed target: read the source, run the command,
+reproduce the case.
+That assumption quietly fails while something is actively breaking, because
+the evidence you gather is a *measurement*, and measurements expire.
+Re-reading an existing CI log feels like verification --- it is concrete, it
+is specific, it is right there --- but it only tells you what was true when
+that job ran.
+
+The tell is a rebuttal whose evidence you did not generate yourself in this
+turn.
+A log you fetched, a check-run conclusion you read, a status you were told
+about: each carries a timestamp, and the question is whether anything could
+have changed since.
+When the finding is *about* an outage, a migration, a permission change, or
+anything else in flight, the answer is almost always yes.
+
+So prefer evidence you can regenerate now over evidence you can only cite.
+Re-running the failing thing is usually cheap and settles it outright --- and
+in the best case it produces the cleanest possible proof, two attempts of the
+same run on the same commit disagreeing, which no amount of reading could
+have given you.
+When regenerating is genuinely not possible, say how old the evidence is in
+the rebuttal itself, so the reader can weigh it.
+
+This matters more than an ordinary wrong rebuttal because of who it lands on.
+Telling an author their diagnosis is contradicted by the logs is a strong
+claim that invites them to stop investigating.
+Getting it wrong can stall a correct fix for the exact bug still breaking
+everything.
+(gha#351, 2026-07-28: a PR correctly diagnosed that Actions had stopped
+resolving `uses:` after a repo transfer.
+Its premise was disputed on the strength of two run logs showing the
+workflow resolving fine --- logs from 45 and 30 minutes before the PR was
+opened, spanning the cutover.
+Re-running one of those very workflows reproduced `startup_failure`
+immediately, and the retraction had to be published in the same thread.)

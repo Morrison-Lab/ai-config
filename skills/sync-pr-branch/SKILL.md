@@ -1,6 +1,6 @@
 ---
 name: sync-pr-branch
-description: Sync the current branch with both `main` and its own remote — fetch origin, merge origin/main into the branch, merge origin/<current-branch> into local (reconciling commits pushed elsewhere, e.g. by the @claude bot or another machine), then resolve conflicts, run the repo's pre-commit checks, and push. Use before triggering a review or pushing fixes, on "sync", "update the branch", "merge main in", "resync the branch", "reconcile local and remote", "the branch is behind main", or whenever main or the remote branch has moved ahead.
+description: Sync an active PR branch with both `main` and its own remote -- fetch origin, verify its PR has not already merged, merge origin/main into the branch, merge origin/<current-branch> into local (reconciling commits pushed elsewhere, e.g. by the @claude bot or another machine), then resolve conflicts, run the repo's pre-commit checks, and push. Use before triggering a review or pushing fixes, on "sync", "update the branch", "merge main in", "resync the branch", "reconcile local and remote", "the branch is behind main", or whenever main or the remote branch has moved ahead.
 user-invocable: true
 allowed-tools:
   - Bash
@@ -44,7 +44,22 @@ Synonyms: `sync`, `resync-branch`, `merge-main` — all route here.
    If `BR` is empty (detached HEAD) or `main`/`master`, stop and tell the user
    — this skill is for a feature/PR branch, not `main` itself.
 
-2. **Merge `origin/main` into the branch.** A merge commit (not a rebase)
+2. **Verify the branch's PR is still active before changing or pushing it.**
+   A branch may have been merged or closed while this checkout was stale;
+   pushing it again can recreate a deleted head branch with no PR, or make a
+   merged diff look like new work. Query every PR for the branch, including
+   closed ones:
+   ```bash
+   gh pr list --head "$BR" --state all --json number,state,mergedAt,url
+   ```
+   If its PR is `MERGED` (or has a non-null `mergedAt`), stop: do **not** merge
+   or push the old branch. Update the local checkout from `origin/main` and
+   start a new branch for any genuinely new work. If no PR exists, or its PR
+   remains open, continue. A `CLOSED` (unmerged) PR is treated like no PR, but
+   flag it to the user before proceeding because the branch may still carry
+   genuine work.
+
+3. **Merge `origin/main` into the branch.** A merge commit (not a rebase)
    matches GitHub's "Update branch" button and preserves PR history. **Never**
    rebase or squash-rewrite a *published* branch unless the user explicitly
    asks.
@@ -52,7 +67,7 @@ Synonyms: `sync`, `resync-branch`, `merge-main` — all route here.
    git merge origin/main   # MERGE_BRANCH
    ```
 
-3. **Merge `origin/<current-branch>` into local** — reconcile any commits that
+4. **Merge `origin/<current-branch>` into local** — reconcile any commits that
    reached the remote from elsewhere:
    ```bash
    git merge "origin/$BR"   # MERGE_BRANCH
@@ -60,20 +75,20 @@ Synonyms: `sync`, `resync-branch`, `merge-main` — all route here.
    "Already up to date" just means local was already ahead of or equal to the
    remote — fine, carry on.
 
-4. **(As you see fit) re-merge `origin/main`.** If step 3 pulled in new
-   commits, those may predate the `main` you merged in step 2. When that's the
+5. **(As you see fit) re-merge `origin/main`.** If step 4 pulled in new
+   commits, those may predate the `main` you merged in step 3. When that's the
    case, merge `main` once more so the final tree is current with both inputs:
    ```bash
    git merge origin/main   # MERGE_BRANCH
    ```
-   Skip this when step 3 was a no-op — it would just be an empty merge.
+   Skip this when step 4 was a no-op — it would just be an empty merge.
 
-5. **Resolve any conflicts fully** in the working tree (from any of steps 2–4)
+6. **Resolve any conflicts fully** in the working tree (from any of steps 3–5)
    — consolidate the best of both sides, don't blind-pick `--ours`/`--theirs`.
    See the `resolve-conflicts` skill (alias `rc`) for the how-to. Don't push a
    half-resolved merge.
 
-6. **Run the repo's pre-commit checks before committing a conflict
+7. **Run the repo's pre-commit checks before committing a conflict
    resolution.** Run whatever the current repo's checks are — build, lint,
    test, spellcheck — and only proceed once they pass. If the repo ships
    `render` / `lint` / `spell` / `test` skills, use them. A clean,
@@ -89,21 +104,21 @@ Synonyms: `sync`, `resync-branch`, `merge-main` — all route here.
    (Or use that repo's `quarto-preflight` / `render` / `lint` / `spell` skills.)
    </details>
 
-7. **Push the branch back to origin:**
+8. **Push the branch back to origin:**
    ```bash
    git push origin HEAD   # PUSH
    ```
-   Because step 3 already merged the remote tip, this is a fast-forward of the
+   Because step 4 already merged the remote tip, this is a fast-forward of the
    remote and won't be rejected. If it *is* rejected, the remote moved again
    between fetch and push — re-run from step 1.
 
 ## Notes
 
-- If everything is already up to date (steps 2–4 all no-ops, clean tree), say
+- If everything is already up to date (steps 3–5 all no-ops, clean tree), say
   so and stop — nothing to push.
-- Order matters only loosely: merging `origin/main` first (step 2) then the
-  remote branch (step 3) is the canonical flow, but the reverse converges to
-  the same tree. Optional step 4 papers over whichever you did first.
+- Order matters only loosely: merging `origin/main` first (step 3) then the
+  remote branch (step 4) is the canonical flow, but the reverse converges to
+  the same tree. Optional step 5 papers over whichever you did first.
 - This skill is the sync-with-main step of an `ardi` round (step 4). When
   iterating, run it before each review trigger.
 - Only merge **`origin/main`** and **`origin/<this branch>`** — never another

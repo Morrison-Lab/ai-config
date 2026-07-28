@@ -1,4 +1,4 @@
-# Caller for d-morrison/gha's reusable Claude PR review workflow.
+# Caller for Morrison-Lab/gha's reusable Claude PR review workflow.
 name: Claude Code Review
 
 on:
@@ -44,7 +44,7 @@ jobs:
       issues: write
       id-token: write
       actions: read   # lets the reviewer read CI status (github_ci MCP server)
-    uses: d-morrison/gha/.github/workflows/claude-code-review.yml@v1
+    uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v1
     secrets: inherit
     with:
       pr-number: ${{ inputs.pr_number }}

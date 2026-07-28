@@ -265,3 +265,54 @@ one-finding-per-round loop claimed mkdocs' sidebar matched only `\.md`.
 It matches `\.md$|\.pdf$`; the grep had returned a different function 120
 lines above the sidebar builder in the same file.
 Caught by the very next review round.)
+
+**Adding an explanation supersedes whatever the file already said about the
+same thing, so re-read the older passage --- your own diff is the likeliest
+source of a contradiction nobody flags.**
+The sync rules in
+[`address-every-comment`](address-every-comment.md) all fire on an external
+trigger: a reviewer quotes a phrase, or behavior changes and a changelog goes
+stale.
+This one has no trigger at all.
+You add a paragraph explaining that something was misunderstood, and the note
+recording the original misunderstanding sits a few lines below, still stating
+it as fact.
+Nothing conflicts, no check fires, and both passages read plausibly on their
+own --- but a reader who reaches the older one first comes away with exactly
+the belief the new text was written to remove.
+
+The tell is a diff that adds an explanation, a correction, or a "what this
+actually means" paragraph near existing prose.
+Re-read the surrounding passage as a whole rather than diffing your addition
+in isolation, and treat a historical record ("we observed N of X") as a claim
+your explanation may have just falsified.
+When the older passage recorded a *different* session's observation, correct
+it with reasoning that stands on its own rather than restating it as though
+you had seen it --- an inference presented as an observation is the same
+defect one level up.
+(ai-config#770, 2026-07-28: an added explanation established that seven
+reported orphans were misclassifications, while the note two lines below went
+on calling them "already deleted from the repo."
+Caught by review, in the same hunk as the text that contradicted it.)
+
+**And when the explanation you add is a *mechanism* claim, test the class it
+distinguishes, not just the sample in front of you.**
+The bullet above is about contradicting old text; this is about the new text
+being unfalsifiable on the evidence you gathered.
+A classifier validated on a population containing no positive instance of the
+class it is supposed to catch will report a clean result either way, so
+"it returned zero" is not evidence it works --- it is the same
+missing-input-variety tell the regression-test bullet above describes, moved
+from a fixture to a diagnostic.
+Ask what a true positive would look like, confirm one exists in what you
+tested, and if none does, say so instead of claiming the mechanism separates
+the cases.
+(ai-config#770, same day: a `git log -- skills/<name>` probe was said to
+separate "deleted from the repo" from "never ours" *exactly*, on the evidence
+that it reported zero false orphans.
+The repo contained no deleted-but-still-installed skill at all, so there was
+nothing for it to get wrong; and `git rev-parse --is-shallow-repository`
+returned `true`, meaning anything deleted before the shallow boundary would
+have been silently misread as harness-provided.
+The claim went into a PR reply before either check was run, and ai-config#765
+had independently reached the correct conclusion.)

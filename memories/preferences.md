@@ -8,6 +8,13 @@
   A PR can merge between a "status?" call and a follow-up in the same session — running `gh pr checks` on a merged PR returns stale data and delays noticing the merge.
   If state is MERGED, trigger post-merge instead of reporting CI details. (Learned on ucdavis/bcs#266.)
   Same principle for tool availability: before telling a user a capability doesn't exist in the current session (e.g. "no `subscribe_pr_activity` tool here"), run a live check (`ToolSearch`, or the equivalent discovery mechanism) rather than reciting what a memory entry or a prior session documented — a local CLI session's tool roster isn't fixed, and reciting stale documentation as current fact is the exact failure this rule exists to prevent. (Sparta gii-ffdb93 session, 2026-07-14: initially told the user no GitHub MCP server was available in local sessions based on documented prior-session behavior, without running `ToolSearch` first. The user's pushback "can't you use the GitHub mcp server?" was the correct challenge, and a live check would have shown the tool was in fact reachable — that check should have been run before stating unavailability as fact, not after being questioned.)
+- Default to the most recent available package version.
+  Use an older or pinned version only when compatibility, reproducibility,
+  or another concrete project constraint gives a reason;
+  state that reason before choosing it.
+- When the user corrects my behavior or identifies a workflow gap, invoke UMS
+  immediately and persist the lesson before resuming the main task. Do not wait
+  for the user to say `ums` or to remind me again.
 - Apply critical thinking to every claim, including the user's own statements and anything found in an authoritative-looking source (official docs, a spec, a paper, a PR description) — don't take a claim as true just because it was asserted confidently or by someone/something with authority.
   This generalizes the "NEVER assume; ALWAYS verify" rule above (which targets operational state drift) and `shared/writing/fact-check-prose.md`'s "don't accept a plausible-sounding claim without checking it" (which targets prose review) to every claim, in every context, not just those two.
   Before treating a claim as settled, check it: cross-reference another source, re-derive it, run a small test, or reason through whether it's actually consistent with what else is known — rather than repeating it back as fact.

@@ -85,3 +85,22 @@ added in the PR's first commit had a raw em-dash that a same-session grep
 check caught on that commit but missed on a later, narrower re-check scoped
 only to the commit being amended -- the gap was closed by the repo's own
 automated `@claude` self-review, not by the author's manual check.)
+
+**Writing into a file that predates this rule is the likeliest way to break
+it, because the surrounding prose is the wrong model to imitate.**
+Ordinary practice is to match the file you are editing, and in a long-lived
+document full of em-dashes that instinct produces a new em-dash with no
+decision ever being made.
+The check only judges **added** lines, so the existing ones are not evidence
+of anything -- they are grandfathered, not permitted.
+Match the rule, not the file.
+
+The same asymmetry governs
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md), which is also
+diff-scoped: prose added to a fill-column-wrapped paragraph inherits that
+wrapping and lands two sentences on one line, flagged even though every
+neighbouring line does the same.
+So when adding prose to an older-conventions file, scan your own added lines
+for both before pushing.
+(ai-config#754, 2026-07-28: four multi-sentence lines and one em-dash, each
+a faithful imitation of the paragraph it was written next to.)

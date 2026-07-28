@@ -32,9 +32,10 @@ We build code and prose that is:
 - **Reliable** — behaves correctly on every run, not just the demo run:
   edge cases handled, failures surfaced early and clearly rather than
   silently swallowed, and no flaky tests or race-prone automation.
-  [`loop-hygiene`](../coding/loop-hygiene.md) covers three of the
-  commonest such edge cases in R, each of which misbehaves only on input
-  a fixture rarely contains (an empty vector, a classed vector).
+  [`loop-hygiene`](../coding/loop-hygiene.md) covers three common
+  `for`-loop defects in R, two of which surface only on input a fixture
+  rarely contains (an empty vector, a classed vector) while the third
+  degrades quadratically as the input grows.
 - **Secure and private** — no leaked secrets or PHI (the `check-phi`
   capability in
   [`d-morrison/gha`](https://github.com/d-morrison/gha) scans for it),

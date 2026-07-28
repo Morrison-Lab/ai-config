@@ -13,6 +13,9 @@ never — as silently wrong output.
   A bare `except:` in Python, an R
   `tryCatch(..., error = function(e) NULL)`, or a shell `|| true` hides
   the failure without fixing it.
+  R's `try()`, `suppressWarnings()`, and `suppressMessages()` belong in
+  the same category: each mutes a whole class of condition rather than
+  the one you know about.
 - When a fallback is genuinely wanted — graceful degradation at a
   system boundary, a retry for a known-transient failure — make it
   explicit and observable: message the degradation, bound the retries,

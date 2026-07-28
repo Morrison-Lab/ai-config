@@ -1193,5 +1193,19 @@ A regression test built on the *empty* form passes vacuously against
 unescaped code, since that path never errored --- pick a fixture whose text
 carries a populated brace (`https://x.org/{version}/` reaching a URL check
 works) so the test actually fails without the fix.
-And assert the brace survives into the **returned** value, not just that no
-error was raised, or the silent-deletion half goes uncovered.
+And assert the brace survives somewhere, not just that no error was raised,
+or the silent-deletion half goes uncovered.
+
+Where to look for it depends on the caller, and the obvious guess is wrong.
+The cli functions do not hand back the text they formatted: `cli_ul()`
+returns the element's **id** --- a character scalar like `"cli-10293-1"` ---
+so a test that inspects its return value gets something plausible-looking
+that never contained the message at all.
+Assert against whichever of these the code under test actually offers:
+
+- the **enclosing function's** return value, when it hands back the same
+  strings it printed (`check_altdoc()` returns its findings invisibly, which
+  is what altdoc#87's test uses);
+- `testthat::expect_output()` on the printed output, when nothing is
+  returned;
+- `conditionMessage()` on the caught condition, for `cli_abort()`.

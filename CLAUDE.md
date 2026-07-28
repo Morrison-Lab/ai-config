@@ -25,6 +25,23 @@ So a clean-but-unmerged PR can sit for hours, for days, or across a `/clear`, an
 Waiting buys nothing either, because by the time the verdict is clean every finding has already been Addressed, Rebutted, or Deferred -- the review has taught everything it is going to teach, and the merge adds only whatever the merge itself surfaces.
 So run UMS when the verdict comes back clean, and treat the merge-time pass as a top-up rather than the trigger.
 
+**A new instruction arriving at a checkpoint does not cancel the checkpoint.**
+The two bullets above establish *when* the pass is owed; this is the mechanism that actually skips it.
+A merge or clean verdict is usually the exact moment I report back, so it is also the moment the next request lands.
+That request then reads as the live task, and the checkpoint silently evaporates -- never refused, never deferred out loud, just never performed.
+Note the asymmetry with the deferral those bullets describe: there the failure is that no moment feels like the trigger, whereas here a moment *did* fire and was preempted.
+The remedies differ, and the preempted case cannot be fixed by naming more checkpoints.
+
+The fix is cheap, because the pass is short.
+When a request arrives at a checkpoint, either run UMS first and then start the request, or say in the same reply that the pass is owed and when it will run.
+Both are fine; dropping it silently is not.
+A reliable tell: if I am about to write "still open from this session" or "worth running `ums` before you `/clear`", the pass was owed at a checkpoint I already passed.
+
+The same skip has a second route worth checking, since several skills end in a UMS step ([`post-merge`](skills/post-merge/SKILL.md), [`ardi`](shared/workflow/ardi.md), [`wrap-up`](skills/wrap-up/SKILL.md)).
+Reporting one of those skills complete asserts that its final step ran, so before calling a merge wrapped up, confirm the UMS pass actually happened rather than only the steps before it.
+(2026-07-28, this session: three checkpoints passed -- two merges and a clean verdict -- each immediately followed by a new user request, plus a `post-merge` run reported done whose UMS step never executed.
+UMS ran only once the user said "you should have run ums already".)
+
 ## Flag good moments to `/clear` in long-running sessions
 
 Proactively tell me — don't wait to be asked — when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.

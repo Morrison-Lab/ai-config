@@ -724,11 +724,11 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `.Rd` by hand. (Corrected 2026-07-20: on serocalculator#562 I hand-edited two
   `.Rd` files instead of installing roxygen2 and running `document()`; the
   user's rule is to run the generator.)
-  - **Match the package's pinned roxygen2 version before trusting generated
-    output.** An older local roxygen may appear to pass while CI's newer pinned
-    version rewrites the same `.Rd` differently. Install and verify the version
-    recorded by the project's lockfile (or otherwise used by CI), regenerate,
-    and inspect the resulting diff before pushing. (ucdavis/bcs#448, 2026-07-28.)
+  - **Match the package's pinned roxygen2 version before trusting generated output.**
+    Different roxygen2 versions can rewrite the same `.Rd` differently,
+    so a local version that differs from the one CI uses can produce a misleading diff.
+    Install and verify the version recorded by the project's lockfile (or otherwise used by CI),
+    regenerate, and inspect the resulting diff before pushing. (ucdavis/bcs#448, 2026-07-28.)
 - **Hand-editing `.Rd` is a genuine last resort, only when installing the
   toolchain truly fails** (offline / locked-down sandbox). If forced to it, keep
   the edit safe: roxygen copies `@format`/`@param`/`@return` prose verbatim into

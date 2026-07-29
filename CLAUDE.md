@@ -52,6 +52,55 @@ The same skip has a second route worth checking, since several skills end in a U
 Reporting one of those skills complete asserts that its final step ran, so before calling a merge wrapped up, confirm the UMS pass actually happened rather than only the steps before it.
 (Same 2026-07-28 session as the correction above: three checkpoints passed -- two merges and a clean verdict -- each immediately followed by a new user request, plus a `post-merge` run reported done whose UMS step never executed.)
 
+**Recommending that the session end is itself a UMS trigger, and it is the one route where skipping the pass destroys the learnings rather than merely delaying them.**
+The three bullets above all describe a pass that is *postponed*: no moment felt like the trigger, or a moment fired and was announced, or a moment fired and was preempted.
+In each of those the material survives in the conversation, so a later pass can still recover it.
+This route closes that door.
+Proposing `/clear`, a fresh session, or a handoff while the pass is owed is proposing to discard exactly what the pass exists to save, and the recommendation reads as responsible precisely because it is framed as tidying up.
+
+Disclosing the owed pass in the same message as the `/clear` flag is not enough either.
+That is the *offer* failure one level up: it names the debt in the same breath as recommending the action that voids it, which leaves the user to notice the contradiction.
+So invert the order.
+Run the pass, then flag the stopping point.
+A flag that has to mention an owed UMS is a flag raised too early.
+
+**"I am low on context" does not exempt it, and that claim needs the same test any other asserted blocker does** (see [`ardi`](shared/workflow/ardi.md)'s "Verify a blocker you assert").
+It is the one blocker that is never tested, because it feels like introspection rather than a claim, and it is self-serving in a way the others are not: it excuses the work while sounding diligent.
+The asymmetry also runs the wrong way for caution.
+A pass that records the top three learnings in a few edits is worth far more than a thorough one that never runs, so shrink the pass rather than deferring it, and say what got left out.
+If context genuinely runs out mid-pass, the entries already written are durable and the session ends having banked most of the value.
+(Corrected 2026-07-28, this session: a `gia` run flagged the owed pass three times, then recommended starting a fresh session to run it, citing exhausted context.
+The correction was "you should have run ums before telling me to start a fresh session".
+The pass then ran to completion in the same session, which is the evidence that the blocker was never real.)
+
+- **Do:** run the pass, then flag the stopping point, then let the user decide how to end the session.
+- **Do:** shrink a pass you genuinely cannot finish, record the top items first, and say what was left out.
+- **Don't:** recommend `/clear`, a fresh session, or a handoff while a pass is owed, however clearly the debt is disclosed alongside it.
+- **Don't:** cite remaining context as a reason to defer, without having attempted the pass.
+
+## Record both the pattern and the anti-pattern
+
+When I tell you what to do, or what not to do, in a `cai` or `ums` statement, write down **both** sides: the behaviour to adopt and the behaviour to stop.
+Record them explicitly, as a labelled pair, not as a paragraph that leaves one side implied.
+
+Both halves carry information the other cannot.
+A rule stated only as the anti-pattern says what to stop without saying what replaces it, which invites a second wrong behaviour that merely avoids the named one.
+A rule stated only as the pattern is the more common failure and the harder one to notice: it reads as complete, but the specific move that prompted the correction usually *looks* like compliance from the inside, so the next reader has to re-derive which near-miss was actually being ruled out.
+The near-miss is the whole content of the correction.
+Naming it is what makes the entry falsifiable rather than merely agreeable.
+
+Keep the pair concrete enough to check against.
+"Do: run the pass before flagging a stopping point" and "Don't: recommend a fresh session while a pass is owed" both name an observable action, whereas "be diligent about UMS" names nothing and cannot be violated.
+Where a correction only ever surfaced as one side, derive the other rather than omitting it, and say which side came from the user and which you inferred.
+
+This applies to how the entry is *written*, so it composes with whatever the entry is about.
+It also applies to this entry: below is its own pair.
+
+- **Do:** state the adopted behaviour and the retired one, labelled, in every `cai`/`ums` entry that records a correction.
+- **Do:** make each side an action a later reader could observe you taking or not taking.
+- **Don't:** write only the corrected behaviour and leave the reader to infer which specific move it displaced.
+- **Don't:** state the pair so abstractly that no concrete action would violate it.
+
 ## Flag good moments to `/clear` in long-running sessions
 
 Proactively tell me — don't wait to be asked — when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
@@ -59,7 +108,7 @@ Use the `⚠️ FLAG` tag from this file's chat-output-tagging convention, one l
 
 Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, a PR I'm actively babysitting this session (waiting on CI, a review round, or a pending push), an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) — anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
-If UMS hasn't run recently, say so in the same flag rather than assuming it's safe.
+If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per "Recommending that the session end is itself a UMS trigger" above.
 
 **Run `wrap-up`'s state sweep *before* flagging a stopping point, not after the user asks for one.**
 The paragraph above says not to flag while live state remains; it doesn't say how to know.

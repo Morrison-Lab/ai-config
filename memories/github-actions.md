@@ -518,6 +518,47 @@ common patterns.
   `'auto'`) and resolve the real expression where the input is consumed (a `with:`/`env:`
   value or a step), treating `'auto'` as "apply the heuristic" while `'true'`/`'false'`
   are explicit overrides. (gha#148: `test-coverage.yml`'s `fail-ci-if-error` input.)
+- **Writing any explicit step-level `if:` REPLACES the default `success()`, so a
+  guard step's failure does not skip the steps that follow it.**
+  The default condition on a step is `success()`, which is why a failing step
+  normally ends a job's useful work.
+  Adding `if: steps.guard.outputs.blocked != 'true'` silently discards that,
+  so the step now runs *whatever* happened upstream, including a guard step
+  that exited non-zero because it could not establish whether the work was
+  safe to do.
+  This is the [`fail-fast`](../shared/principles/fail-fast.md) violation that
+  looks most like diligence: the guard is present, its logic is right, and its
+  verdict is simply not consulted on the one path it was written for.
+
+  What makes it hard to catch is that the bug is usually **masked by a second
+  mechanism** rather than being visible.
+  A guard written to fail closed writes its output before exiting
+  (`echo "blocked=true" >> "$GITHUB_OUTPUT"; exit 1`), and outputs are captured
+  from failed steps too, so the condition happens to evaluate correctly.
+  Every test passes, and the protection is entirely accidental --- it evaporates
+  the moment the guard fails *before* reaching that write, which is exactly what
+  a rate limit, a network error, or a `set -e` abort produces.
+
+  So spell out both halves: `if: success() && steps.guard.outputs.blocked != 'true'`.
+  And prefer `!= 'true'` over `== 'false'` for the output test, because a guard
+  gated on an event type is *skipped* on other events, and a skipped step's
+  output is the empty string rather than `'false'`.
+
+  - **Do:** include `success()` explicitly in any step condition that also reads
+    a guard's output.
+  - **Do:** treat a fail-closed output write as the second layer, and say so in
+    the comment, so nobody later "simplifies" the condition on the strength of it.
+  - **Don't:** rely on a non-zero exit alone to skip steps that carry their own
+    `if:`.
+  - **Don't:** infer from a passing test that the condition is right, when a
+    fail-closed write could be doing the work instead.
+
+  (gha#357 round 5, self-caught while writing the comment that claimed the
+  opposite: a ported fork/Dependabot guard in `gemini-code-review.yml` gated its
+  checkout and review steps on the output alone.
+  This is the same shape as gha#350, where a guard was gated on the step that
+  fails --- the difference is only that there the mechanism was
+  `continue-on-error`, and here it is the implicit `success()` being dropped.)
 
 ## Changelog section ordering in d-morrison/gha
 

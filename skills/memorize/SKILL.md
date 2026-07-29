@@ -91,7 +91,7 @@ those forms — this skill is what it hands off to once memory is the answer.
    Don't duplicate -- grep the target file for the subject
    (the tool name, the API call, the error string),
    not just the region you're appending to;
-   a long file like `memories/github-actions.md` can already cover it
+   a long file like `memories/r-quarto.md` can already cover it
    hundreds of lines away.
    Grep every topical file, not just the one you picked -- a fact about
    `gh workflow run` could plausibly have landed in `github.md` or

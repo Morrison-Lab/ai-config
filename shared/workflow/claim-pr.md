@@ -22,8 +22,9 @@ PR, checking status, explaining a diff) --- those don't risk a parallel session.
 This includes a PR **you opened yourself**: in repos with an active `@claude`
 agent (`claude.yml`), the agent can push commits to your branch on PR activity
 --- e.g. merging `main` in --- and collide with your in-flight push, so claim
-early to flag the branch as actively worked. (See `memories/github-actions.md`,
-"@claude CI action", for the collision-recovery steps.)
+early to flag the branch as actively worked. (See
+`memories/claude-bot-workflows.md`, "@claude CI action", for the
+collision-recovery steps.)
 
 When starting work from an issue, follow the claim comment with an immediate
 draft PR --- see [`pr-on-claim`](pr-on-claim.md) for the mechanics. An open

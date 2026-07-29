@@ -257,14 +257,20 @@ Two checks settle whether an orphan is safe to delete, and both are cheap:
   manuscript drafts the live sync had never received.
   Copy those in and verify by size plus `md5` before deleting anything.
 - **Check for FileProvider extended attributes on the two roots.**
-  `ls -ldO` shows `@` on a live sync root and nothing on a detached one.
-  That is the direct evidence deletion is local-only, and it is worth
-  having before removing a directory that sits under `CloudStorage/`.
+  `ls -ld@` names them, and the live root carries
+  `com.apple.file-provider-domain-id` while a detached one has no xattrs at
+  all.
+  Prefer that over reading the bare `@` marker in `ls -l` output, which only
+  says *some* xattr is present.
+  This is the direct evidence deletion is local-only, and it is worth having
+  before removing a directory that sits under `CloudStorage/`.
 
-Note that `du` reports logical size for dataless placeholder files, so a
+Note that `ls -l` reports logical size for dataless placeholder files, so a
 folder full of them can look enormous while occupying nothing.
 Compare `du -h` against `ls -l` on a large file to tell real bytes from
-placeholders.
+placeholders: on a fully-downloaded file the two roughly agree, while a
+placeholder reads `0B` under `du` and its full size under `ls -l`.
+`ls -ldO` names the condition outright, flagging such a file `dataless`.
 
 **`du` totals across `~/Library` double-count OneDrive and Google Drive.**
 `CloudStorage/OneDrive-<Org>` and
@@ -281,9 +287,15 @@ A 75 GB disk here showed 76,540 allocated against 76,437 used at 1 MB per
 block, so compaction was worth about 100 MB.
 There is no `info` subcommand despite the name, and no snapshots means no
 hidden `.hds` growth to find either.
-What is genuinely reclaimable is the suspend-state `.mem` file (a few GB,
-at the cost of discarding the suspended session) and the guest pagefile via
-`--exclude-pagefile`; both need `--force` to drop the suspended state.
+What is genuinely reclaimable is the suspend-state `.mem` file (a few GB, at
+the cost of discarding the suspended session) and the guest pagefile via
+`--exclude-pagefile`, whose help text reads `remove the page file from the
+disk` -- it reclaims that space rather than skipping it, despite a name that
+reads the other way.
+`--force` is about the suspended state rather than either of those: its help
+is `forcibly drop the suspended state before compacting the disk`, so it is
+what lets `compact` run at all against a suspended VM.
+A VM already shut down cleanly needs neither `--force` nor a `.mem` deletion.
 
 **Everything else, in rough order of yield.**
 `~/.ollama` holds multi-GB models that `ollama list` dates by last use, and

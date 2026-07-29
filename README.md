@@ -10,7 +10,7 @@ by `bootstrap.sh`.
 ## Setup on a new machine
 
 ```sh
-git clone --recurse-submodules https://github.com/d-morrison/ai-config.git ~/ai-config
+git clone --recurse-submodules https://github.com/Morrison-Lab/ai-config.git ~/ai-config
 bash ~/ai-config/bootstrap.sh
 ```
 
@@ -107,12 +107,12 @@ repo's** `.claude/settings.json`:
 ```json
 {
   "extraKnownMarketplaces": {
-    "d-morrison": {
-      "source": { "source": "github", "repo": "d-morrison/ai-config" }
+    "Morrison-Lab": {
+      "source": { "source": "github", "repo": "Morrison-Lab/ai-config" }
     }
   },
   "enabledPlugins": {
-    "ai-config@d-morrison": true
+    "ai-config@Morrison-Lab": true
   }
 }
 ```
@@ -125,8 +125,8 @@ Locally (or to try it), run these as slash commands inside a Claude Code
 session (or prefix with `claude ` to run them in a terminal):
 
 ```
-/plugin marketplace add d-morrison/ai-config
-/plugin install ai-config@d-morrison
+/plugin marketplace add Morrison-Lab/ai-config
+/plugin install ai-config@Morrison-Lab
 ```
 
 No `version` is pinned, so every commit to this repo counts as a new version —
@@ -262,7 +262,7 @@ Don't edit the vendored copies here — edit them in wai.
 `scripts/check-vendored-drift.py` (run by `validate.yml`) recomputes each copy's
 hash and fails CI if it stops matching the manifest. The `Sync from wai`
 workflow (`.github/workflows/sync-from-wai.yml`) refreshes them weekly —
-via `d-morrison/gha`'s `sync-shared-fragments` — and opens a PR when the upstream
+via `Morrison-Lab/gha`'s `sync-shared-fragments` — and opens a PR when the upstream
 files change.
 
 Add more by creating a top-level dir here (e.g., `agents/`,

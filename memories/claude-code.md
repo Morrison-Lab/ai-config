@@ -491,6 +491,64 @@ public repos need no authentication --- confirmed empirically by the PR's
 own `claude-review` check (which runs with submodule checkout on) completing
 successfully. (rme#982, epi204#359/#360, 2026-07-04.)
 
+## A plugin ref resolves by the marketplace's *declared* name, not by its URL
+
+The section above covers the submodule-plus-symlink path.
+The other way a repo consumes ai-config is the **plugin marketplace** ---
+`.claude/settings.json`'s `extraKnownMarketplaces` / `enabledPlugins` for a
+web/cloud session, and gha's `use-ai-config` input for the bots.
+That path has a failure mode the submodule path does not, and it is worth
+knowing because the obvious diagnosis is the wrong one.
+
+A plugin is installed as `<plugin>@<marketplace>`, and `<marketplace>` must
+match the `name` field the marketplace declares in its own
+`.claude-plugin/marketplace.json`.
+It is **not** derived from the URL you registered, and the two can disagree
+--- most easily when a repo moves orgs and renames the marketplace with it.
+
+The clone URL keeps working throughout, which is what makes this hard to
+read.
+Git and `gh` both follow GitHub's transfer redirect, so the old URL clones
+fine and the marketplace registers itself under its *new* declared name.
+The log then says both things on adjacent lines:
+
+```
+Adding marketplace: https://github.com/d-morrison/ai-config.git
+✔ Successfully added marketplace: Morrison-Lab (declared in user settings)
+Installing plugin: ai-config@d-morrison
+✘ Failed to install plugin "ai-config@d-morrison": Plugin "ai-config" not
+  found in marketplace "d-morrison".
+```
+
+Only the name lookup fails, and it fails hard: `claude-code-action` aborts
+the whole job, so every `@claude` run in the repo goes red at once.
+
+Read the marketplace's own manifest rather than inferring the name from the
+URL or the org: `git show origin/main:.claude-plugin/marketplace.json` gives
+the authoritative `name` and the plugin list in one call.
+
+Two consumers to fix, not one --- they are configured independently and a
+fix to either leaves the other broken.
+gha's reusable workflows carry the built-in ref (`gha#359` retargeted
+`claude.yml` and `claude-code-review.yml`), while each consuming repo's own
+`.claude/settings.json` carries its own copy for web/cloud sessions
+(`UCD-SERG/serodynamics#280`).
+Grep for the old `<plugin>@<marketplace>` string across both layers.
+
+- **Do:** read the declared `name` from `.claude-plugin/marketplace.json`
+  when writing or fixing a plugin ref.
+- **Do:** fix the reusable-workflow default and every consumer's
+  `.claude/settings.json` in the same sweep.
+- **Don't:** infer the marketplace name from the clone URL or the GitHub
+  org.
+- **Don't:** read a working clone, or a successful "added marketplace" line,
+  as evidence the plugin ref is right --- the redirect makes both succeed
+  while the install still fails.
+
+(2026-07-29: ai-config renamed its declared marketplace from `d-morrison` to
+`Morrison-Lab`.
+Both consumers broke; the gha fix shipped when `v2` was slid to `c50e847`.)
+
 ## Bash tool cwd persists across calls — an easy trap when juggling sibling repo checkouts
 
 The Bash tool's working directory carries over from one tool call to the

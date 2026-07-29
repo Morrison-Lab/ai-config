@@ -16,6 +16,12 @@ jobs:
     # PR would hard-fail rather than skip. Same-repo PRs only.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    # The action's own `timeout_minutes` defaults to 30, and it uses that
+    # budget to give up gracefully and still post a verdict. So bound the job
+    # above it rather than at it: 40 leaves the action 10 minutes to report
+    # before the runner hard-kills the job, which would leave `jules/review`
+    # stuck pending with no comment. Raise both together, never this alone.
+    timeout-minutes: 40
     permissions:
       contents: read        # src/index.ts: repos.getContent, compareCommitsWithBasehead
       pull-requests: write  # src/index.ts: issues.createComment / updateComment on the PR

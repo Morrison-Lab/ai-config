@@ -321,6 +321,31 @@ reported orphans were misclassifications, while the note two lines below went
 on calling them "already deleted from the repo."
 Caught by review, in the same hunk as the text that contradicted it.)
 
+**The same rule applies within a single diff, and there nothing prompts the
+check at all.**
+The version above compares your addition against the *existing* file, so
+re-reading the surrounding passage catches it.
+The harder case is a diff that both adds an explanation arguing against some
+older wording **and** rewrites that wording, in the same changeset.
+Then the argument survives while its target does not, and every file still
+reads plausibly on its own: the new prose is coherent, the rewritten passage
+is coherent, and only the cross-reference between them is stale.
+There is no older text to go back and re-read, which is the cue the other
+version relies on.
+
+So when a diff rewrites a passage, grep the rest of the diff for references to
+what that passage used to say, not just for references to the file.
+A rebuttal of the form "the section below already says X" is the shape to
+watch, since it pins the argument to wording the same commit may be deleting.
+Prefer stating the anti-pattern directly over citing another section as the
+thing being argued against; a self-contained sentence cannot go stale when its
+neighbour changes.
+(ai-config#801, 2026-07-28: a new UMS entry argued against the `/clear`
+section's "disclose the owed pass in the flag" line while the same PR rewrote
+that line to say the opposite.
+Review caught it before merge; the fix was to drop the cross-reference and
+state the point inline.)
+
 **And when the explanation you add is a *mechanism* claim, test the class it
 distinguishes, not just the sample in front of you.**
 The bullet above is about contradicting old text; this is about the new text

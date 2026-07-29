@@ -170,6 +170,12 @@ branches of new code can be structurally unreachable from them. A real
 consumer brings the input variety fixtures lack, and it is usually one clone
 plus one command to check.
 
+This bullet, and the two further down that also turn on fixtures, are all
+about **coverage** --- a fixture too thin to reach the code.
+[`fixtures-are-not-evidence`](fixtures-are-not-evidence.md) covers the
+opposite direction: a fixture that works perfectly, and an inference drawn
+from its behaviour back to the real system it stands in for.
+
 Three classes of gap this catches, none of them findable in a fixture:
 
 - **Input shapes no fixture happens to contain.** A real package carries

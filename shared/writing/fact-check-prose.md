@@ -5,6 +5,14 @@ style. This is broader than the terminology check in
 that guide catches phrasing whose meaning is unresolved; this one catches
 claims and reasoning that are resolved but wrong.
 
+One class of source needs naming before the checks below, because it defeats
+the premise they rest on.
+A **test fixture** looks like a source --- it lives in the repo, it is named
+after real output, and its comment often claims to be verbatim --- so a claim
+checked against one feels checked rather than guessed.
+It is not a source: see
+[`fixtures-are-not-evidence.md`](../workflow/fixtures-are-not-evidence.md).
+
 ## What to check
 
 - **Factual claims.** Check each claim against the AI's own domain knowledge

@@ -218,7 +218,11 @@ class rather than by matching its message text.
 Operationalized by:
 [`type-stable-outputs`](../coding/type-stable-outputs.md) --- the same
 principle applied to shape rather than to errors, since a type-unstable
-call returns a plausible object of the wrong kind instead of failing.
+call returns a plausible object of the wrong kind instead of failing ---
+and [`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), which
+covers the shell case where `set -e` silently stops applying, so a script
+either aborts on an expected non-zero exit or fails to, depending on the
+call site.
 
 ## Algorithmatize checks — instruments over judgment
 

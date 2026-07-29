@@ -553,12 +553,38 @@ common patterns.
   - **Don't:** infer from a passing test that the condition is right, when a
     fail-closed write could be doing the work instead.
 
+  **The sibling failure, and the reason to keep the two apart.**
+  gha#350 has the same *outcome* --- a guard's verdict never reaches the
+  decision it was written to gate --- by the opposite route, and conflating
+  them costs you the diagnosis:
+
+  - **gha#350: the guard never ran.**
+    `claude-code-review.yml`'s quota-exhaustion guard carried
+    `if: steps.claude-review.outcome == 'success'`, and quota exhaustion is
+    precisely what fails `claude-review`.
+    So the guard was *skipped*, `quota_exhausted` was never written, and the
+    resolve step read a literal `"skipped"` where the verdict belonged.
+    Note what this rules out: adding `continue-on-error: true` to the watched
+    step does **not** fix it, because `outcome` reports the status *before*
+    `continue-on-error` is applied --- only `conclusion` reflects it.
+    Nothing was swallowed; there was no output to swallow.
+  - **Here: the guard ran, failed, and was ignored.**
+    The output existed and the condition read it, but the dropped `success()`
+    meant the step's *failure* carried no weight.
+
+  So the diagnostic question differs.
+  For #350 you ask "can this guard's own gate be true in the scenario it
+  guards against?"; here you ask "does anything downstream still respect this
+  guard's failure?"
+  A fix aimed at the wrong one leaves the bug in place.
+
   (gha#357 round 5, self-caught while writing the comment that claimed the
-  opposite: a ported fork/Dependabot guard in `gemini-code-review.yml` gated its
-  checkout and review steps on the output alone.
-  This is the same shape as gha#350, where a guard was gated on the step that
-  fails --- the difference is only that there the mechanism was
-  `continue-on-error`, and here it is the implicit `success()` being dropped.)
+  opposite: a ported fork/Dependabot guard in `gemini-code-review.yml` gated
+  its checkout and review steps on the output alone.
+  The #350 contrast above was itself corrected in review on ai-config#829,
+  which is worth recording: the first draft attributed #350 to
+  `continue-on-error`, the exact fix #350's own body lists under "Two things
+  that look like fixes but are not".)
 
 ## Changelog section ordering in d-morrison/gha
 

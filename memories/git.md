@@ -827,4 +827,4 @@ It had happened two commits earlier on that same PR, at `082f369`, and had
 already been reworded away.
 Rebutted with the commit and the job log, then addressed by naming the SHA in
 the guidance itself --- which ucdavis/bcs#457 had to undo an hour later, once
-#456 squash-merged and that SHA stopped resolving.)
+PR #456 squash-merged and that SHA stopped resolving.)

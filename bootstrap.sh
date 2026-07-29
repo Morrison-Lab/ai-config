@@ -121,6 +121,14 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
     [ -d "$src" ] || continue
     link_one "$src" "$GEMINI_DIR/skills/$(basename "$src")"
   done
+  if [ -d "$SCRIPT_DIR/shared/sembr-skills/skills" ]; then
+    for src in "$SCRIPT_DIR"/shared/sembr-skills/skills/*; do
+      [ -d "$src" ] || continue
+      link_one "$src" "$GEMINI_DIR/skills/$(basename "$src")"
+    done
+  else
+    printf 'skip  sembr-skills (submodule not checked out -- run: git submodule update --init -- shared/sembr-skills)\n'
+  fi
 
   # Antigravity/Gemini CLI customization spec (https://github.com/google-gemini/gemini-cli):
   # skills.json in customization root accepts {"entries": [{"path": "..."}], "inherits": [...], "exclude": [...]}.

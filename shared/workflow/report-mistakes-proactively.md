@@ -87,9 +87,9 @@ sentence, because nothing in the repository contradicts it.
 A reader who follows the link lands on whatever #821 turns out to be, or on
 nothing; either way they have no reason to suspect the citation was invented
 rather than mistaken.
-This is [`ardi`](ardi.md)'s "a fix is not pushed until it is on the head
-commit" with a different artifact: the claim is about *state*, and the number
-is the one part of an issue you cannot verify by recollection.
+[`ardi`](ardi.md)'s head-commit rule covers the same defect for a different
+artifact: the claim is about *state*, and the number is the one part of an
+issue you cannot verify by recollection.
 
 The sharper reason to wait is that the announcement pre-empts step 2's
 answer.

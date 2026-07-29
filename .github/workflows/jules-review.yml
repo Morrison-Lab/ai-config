@@ -1,0 +1,31 @@
+name: Jules PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: jules-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Fork PRs get no access to `secrets.JULES_API_KEY`, and the action reads
+    # that input with `required: true` (src/index.ts:13) BEFORE its own
+    # `skip_forks` check (src/index.ts:60) -- so without this guard every fork
+    # PR would hard-fail rather than skip. Same-repo PRs only.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read        # src/index.ts: repos.getContent, compareCommitsWithBasehead
+      pull-requests: write  # src/index.ts: issues.createComment / updateComment on the PR
+      statuses: write       # src/index.ts: repos.createCommitStatus ("jules/review")
+    steps:
+      # Third-party, personal-account action: pinned to a full commit SHA so a
+      # force-pushed tag cannot change what runs. Re-verify the SHA against the
+      # upstream tag before bumping.
+      - name: Run Jules PR Reviewer
+        uses: sanjay3290/jules-pr-reviewer@fc66a7c78b499bfa2e16235b55574e458c6551d6 # v1.0.0
+        with:
+          jules_api_key: ${{ secrets.JULES_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

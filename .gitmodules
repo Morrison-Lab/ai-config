@@ -1,0 +1,3 @@
+[submodule "shared/sembr-skills"]
+	path = shared/sembr-skills
+	url = https://github.com/sembr/skills.git

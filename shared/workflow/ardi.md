@@ -5,6 +5,23 @@ review --- repeating until the latest review is **fully clean**. Don't stop at
 "review-clean, just needs approval" and hand triage back; keep the cycle going
 until it's genuinely clean.
 
+**Continuously monitor every PR/MR you are actively working until it reaches
+that terminal state.**
+At every periodic check-in, and again after any push or
+base-branch advance, query the current head for all three surfaces: mergeability
+(including conflicts), every CI workflow/check run, and both formal reviews and
+top-level/inline review comments. A conflict, CI failure, or newly posted
+finding is ARDI work immediately --- sync and resolve the conflict, investigate
+and fix or track the CI failure, or disposition the finding --- not merely a
+status item to hand back to the user.
+Keep polling while a review or check is
+in progress; do not call the PR clean from an earlier head or from green CI
+without a current-head review verdict.
+This applies transitively to PR-driving
+workflows such as `gi`, `gii`, and `ardia`; only monitor PRs the session owns or
+has explicitly claimed, so the rule does not authorize changing someone else's
+work.
+
 The loop's terminal action is to **report the PR ready, not to merge it**.
 Merging is human-gated --- it happens only on an explicit human "merge it" (the
 `merge-it` skill), never as a step ARDI takes on its own. So when you carry a PR

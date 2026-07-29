@@ -108,6 +108,35 @@ def main() -> int:
         errs, warns = run_check(root_source, [{"name": "self", "source": "./"}])
         check("repo-root source is clean", errs == [] and warns == [])
 
+        # An unreadable source directory reports the cause, not a traceback.
+        # Whether mode 000 actually denies a read depends on the environment
+        # (root ignores it, and Windows does not enforce it), so ask rather
+        # than assume -- a silent pass here would mean nothing was exercised.
+        unreadable = tmp / "unreadable"
+        locked = unreadable / "shared" / "sub"
+        locked.mkdir(parents=True)
+        locked.chmod(0o000)
+        try:
+            try:
+                any(locked.iterdir())
+                enforced = False
+            except PermissionError:
+                enforced = True
+            if enforced:
+                errs, warns = run_check(
+                    unreadable,
+                    [{"name": "sub", "source": "./shared/sub"}],
+                    GITMODULES,
+                )
+                check(
+                    "unreadable source errors, naming readability",
+                    len(errs) == 1 and "not readable" in errs[0],
+                )
+            else:
+                print("SKIP: unreadable source errors (mode 000 is not enforced here)")
+        finally:
+            locked.chmod(0o700)
+
         # Malformed entries fail loudly rather than being skipped.
         errs, warns = run_check(root_source, [{"name": "no-source"}])
         check("plugin without a source errors", len(errs) == 1)

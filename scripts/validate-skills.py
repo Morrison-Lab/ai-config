@@ -291,7 +291,16 @@ def check_plugin_sources(marketplace_rel: str) -> None:
             errors.append(f"{marketplace_rel}: plugin '{name}' has no `source` path")
             continue
         resolved = (root / source).resolve()
-        if resolved.is_dir() and any(resolved.iterdir()):
+        try:
+            populated = resolved.is_dir() and any(resolved.iterdir())
+        except PermissionError:
+            # Report the real cause rather than letting an unreadable directory
+            # surface as a traceback from a pre-commit hook.
+            errors.append(
+                f"{marketplace_rel}: plugin '{name}' source '{source}' is not readable"
+            )
+            continue
+        if populated:
             continue
         try:
             rel_source = resolved.relative_to(root).as_posix()

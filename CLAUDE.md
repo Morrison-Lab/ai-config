@@ -883,6 +883,22 @@ implementation of a right approach), and math/statistics errors (wrong
 formula or method, verified against a source), not just prose claims and
 derivations.
 
+## A test fixture is not evidence about the system it imitates
+
+The two fact-check rules above assume you can tell a source from a
+non-source.
+A test fixture defeats that assumption: it lives in the repo, it is named
+after real output, and its own comment often vouches for being verbatim ---
+so reasoning from its behaviour back to the real system feels like checking
+rather than guessing, and the resulting claim arrives dressed as a test
+result.
+
+@shared/workflow/fixtures-are-not-evidence.md
+
+Distinct from `ardi`'s fixture bullets, which are about coverage (a fixture
+too thin to reach a branch) rather than about the inference drawn from one
+that works fine.
+
 ## Challenge unnecessary complexity in review
 
 <!-- Shared with the lab manual; edit shared/workflow/challenge-unnecessary-complexity.md, not here. -->

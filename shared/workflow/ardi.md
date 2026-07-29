@@ -97,6 +97,53 @@ PR comment said they were "addressed in the latest push"; the head sat at the
 pre-fix commit for over an hour, with 14 green checks validating a branch
 carrying neither fix, until a scheduled check-in compared the SHAs.)
 
+**The same false claim arrives as *incoming* state when you pick a PR up
+mid-flight, and there the SHA comparison usually has nothing to compare.**
+The bullet above governs a claim you are about to make.
+Its mirror is the claim already sitting on the PR when you arrive: the latest
+comment says which findings are fixed, so starting from it means starting from
+a summary rather than from the branch.
+The rule is the same either way, and only the *instrument* differs, because a
+claim written for a human rarely carries a SHA to check.
+"Three fixes landed in two commits" names files, not commits.
+
+So compare the claim against the file list, which decides it in one call:
+
+```bash
+gh pr diff <N> --name-only   # DIFF_PR
+```
+
+A named file absent from that list was not touched, whatever the comment says.
+Nothing else in the PR contradicts a claim like this, and the trap is that
+green CI reads as corroboration when it is nothing of the sort.
+The checks that would have exercised the claimed fixes are frequently the very
+checks those fixes were supposed to add, so their absence is the reason CI is
+green.
+
+The right response is to do the work rather than to dwell on the discrepancy.
+Say once, in the round's summary, that the earlier claim was not true of the
+branch, since a reader who saw it will otherwise assume the round was
+redundant.
+
+- **Do:** run `gh pr diff <N> --name-only` against any inherited "already
+  fixed" claim before deciding a finding is closed.
+- **Do:** state plainly in your own summary that the prior claim did not hold,
+  and name the head it was false at.
+- **Don't:** treat green CI as evidence that a claimed fix landed.
+- **Don't:** infer that a finding is stale because a comment says it was
+  addressed.
+
+(Morrison-Lab/ai-config#804, 2026-07-29: the PR's own review workflow posted
+"Three fixes landed in two commits", naming `bootstrap.sh`, `validate.yml`,
+and `validate-skills.py`.
+The head was still the original commit plus a `main` merge, and
+`gh pr diff --name-only` returned four paths, none of them those three.
+All ten checks were green, because `validate` did not yet check out the
+submodule the fixes were about.
+This is the ownerless cousin of the parallel-session case in
+[`claim-pr`](claim-pr.md), which assumes a real commit exists to cross-check;
+here there was none.)
+
 **When the change affects downstream consumers, validate it against a real
 consumer repo before reporting the PR ready --- a package's own test
 fixtures are built to exercise its code, not to resemble the packages that

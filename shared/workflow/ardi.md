@@ -468,9 +468,9 @@ one a reader can act on.
 - **Don't:** carry such a claim into an issue or a decision doc, where it
   argues against the very fix that produced the silence.
 
-(ai-config#827, 2026-07-29: Jules approved a diff carrying both of its
-known false-positive triggers, and the first explanation drafted was that
-the false positives are nondeterministic.
+(ai-config#827, 2026-07-29: the Jules AI reviewer approved a diff carrying
+both of its known false-positive triggers, and the first explanation
+drafted was that the false positives are nondeterministic.
 ai-config#817 had in fact merged an `extra_instructions` fix at
 `21:30:51Z`, between #820's block at `19:43` and #827's approve at `22:51`.
 The nondeterminism claim was about to be posted to gha#366 as evidence,

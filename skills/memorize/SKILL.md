@@ -75,10 +75,9 @@ those forms — this skill is what it hands off to once memory is the answer.
      `~/.claude/CLAUDE.md` (it's loaded every session)
    - **General reference fact** — a cross-project fact that only matters when
      relevant ("gh opens a pager — pipe to cat") → a topical file in
-     `/memories/` -- `github.md`, `github-actions.md`, `git.md`,
-     `r-quarto.md`, `claude-code.md`, `debugging.md`,
-     or `tools.md` for what fits none of those.
-     Read `memories/MEMORY.md` for what each one covers.
+     `/memories/`, or `tools.md` for what fits none of them.
+     Read `memories/MEMORY.md` for the current set and what each one covers;
+     it is the registry, so naming the files here too would only go stale.
      When you add a *new* file here (not just a bullet to an existing one),
      register it in `memories/MEMORY.md` as an index entry.
    - **Conversation-only** → `/memories/session/`

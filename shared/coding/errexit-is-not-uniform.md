@@ -110,6 +110,14 @@ fixed version both survive and the test proves nothing.
 The same is true of `if buggy_fn; then`, of `buggy_fn && echo ok`, and of
 capturing the result with `x="$(buggy_fn)"` --- every convenient way to ask
 "did this abort?" is on the list of things that stop it aborting.
+
+`! buggy_fn` deserves its own mention, because it is the most natural thing
+to reach for when the expected result is a non-zero exit, and it fails
+twice over: the `!` operand is a suppression context, so the abort does not
+happen, *and* `!` inverts the status of whatever did happen.
+The test then passes against the buggy and the fixed version alike, for two
+independent reasons.
+
 Expect to get this wrong on the first attempt and to notice only because the
 buggy version passes.
 

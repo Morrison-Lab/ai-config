@@ -72,6 +72,49 @@ correct action was a comment with the new evidence rather than a new issue
 --- which is step 2 doing its job, and is exactly the decision the offer had
 deferred instead of making.)
 
+## Never name an issue number before the issue exists
+
+The rule above pushes filing earlier, and step 4 asks you to link the filed
+issue back into the PR you were working.
+Together they invite a specific error: writing the link-back **in the same
+breath** as the intent to file, before either step 2 or step 3 has run.
+An issue number is trivially predictable --- one more than the last one you
+saw --- so "tracked in #821" reads exactly like a fact and costs nothing to
+type.
+
+It is a false claim about an artifact, which is worse than an ordinary wrong
+sentence, because nothing in the repository contradicts it.
+A reader who follows the link lands on whatever #821 turns out to be, or on
+nothing; either way they have no reason to suspect the citation was invented
+rather than mistaken.
+This is [`ardi`](ardi.md)'s "a fix is not pushed until it is on the head
+commit" with a different artifact: the claim is about *state*, and the number
+is the one part of an issue you cannot verify by recollection.
+
+The sharper reason to wait is that the announcement pre-empts step 2's
+answer.
+Saying "filed as #N" commits you to a *new issue* before the dupe-check has
+decided whether a comment on an existing one was the right landing place ---
+so the premature citation does not merely risk a wrong number, it forecloses
+the correct action.
+Run the dupe-check, take whichever action it selects, then quote the number
+the API actually returned.
+
+- **Do:** file (or comment) first, and cite only the identifier the create
+  call returned.
+- **Do:** write the link-back as a separate step after step 2 has chosen new
+  issue versus comment, per step 4's ordering.
+- **Don't:** predict an issue number, however obvious the next one looks.
+- **Don't:** announce "filed as #N" while the dupe-check is still outstanding
+  --- that asserts the new-issue outcome before anything has decided it.
+
+(Corrected 2026-07-29, an ai-config session: a PR comment said a noticed
+mistake was "filed as #821" before any issue had been created.
+The dupe-check then found #815 already covering it, so the correct action was
+a comment carrying the new evidence --- not a new issue at any number.
+Both halves had to be repaired: a correction comment on the PR withdrawing
+the citation, and the evidence re-posted onto #815.)
+
 ## Where to file
 
 - **The repo where the mistake lives, when it's one we administrate** (our

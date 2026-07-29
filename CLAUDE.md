@@ -58,8 +58,8 @@ In each of those the material survives in the conversation, so a later pass can 
 This route closes that door.
 Proposing `/clear`, a fresh session, or a handoff while the pass is owed is proposing to discard exactly what the pass exists to save, and the recommendation reads as responsible precisely because it is framed as tidying up.
 
-The section below already says to disclose an outstanding pass when flagging a stopping point.
-That is not enough, and disclosing it is the *offer* failure one level up: it names the debt in the same breath as recommending the action that voids it, which leaves the user to notice the contradiction.
+Disclosing the owed pass in the same message as the `/clear` flag is not enough either.
+That is the *offer* failure one level up: it names the debt in the same breath as recommending the action that voids it, which leaves the user to notice the contradiction.
 So invert the order.
 Run the pass, then flag the stopping point.
 A flag that has to mention an owed UMS is a flag raised too early.

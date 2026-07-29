@@ -57,10 +57,15 @@
   Stale remotes accumulate from unrelated events --- an org transfer, a repo
   rename, a move between orgs --- so the set you know about is rarely the set
   that exists.
-  (2026-07-29: a sweep of 118 local checkouts found 5 stale.
-  Only 2 were the `d-morrison` -> `Morrison-Lab` transfer being fixed at the
-  time; the others were two repos moved out of `UCD-SERG` to `d-morrison`, one
-  moved to `ucdavis`, and one plain rename, `snapshot.data` -> `snapr`.)
+  (2026-07-29: a sweep of 118 local checkouts found 5 stale, and only **one**
+  was the `d-morrison` -> `Morrison-Lab` transfer being fixed at the time
+  (`gha`; the other repo in that transfer had already been corrected by hand
+  before the sweep ran, so it was no longer stale).
+  The rest came from three unrelated events: two repos moved out of
+  `UCD-SERG` to `d-morrison` (`qbt`, `qwt`), one moved from `UCD-IDDRC` to
+  `ucdavis` (`fxtas`), and one plain rename, `snapshot.data` -> `snapr`.
+  So 1 + 2 + 1 + 1, which is the point --- four of the five had nothing to do
+  with the move that prompted the sweep.)
 - **Preserve the URL scheme when rewriting a remote.**
   A remote on SSH (`git@github.com:<owner>/<repo>.git`) rewritten to the
   `https://` form still works for public reads, so nothing fails immediately ---

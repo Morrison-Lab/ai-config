@@ -437,3 +437,41 @@ returned `true`, meaning anything deleted before the shallow boundary would
 have been silently misread as harness-provided.
 The claim went into a PR reply before either check was run, and ai-config#765
 had independently reached the correct conclusion.)
+
+**A symptom that stops reproducing is a fix having landed, until you have
+checked otherwise --- reaching for nondeterminism is the attractive wrong
+answer.**
+The bullet above governs a mechanism claim you write into a file.
+The same defect arrives in a status report, and there it is easier to
+publish, because "the check is just flaky" sounds like a complete
+explanation while resting on nothing.
+It is also unfalsifiable from a single observation and predicts nothing,
+which is exactly why it feels safe to say.
+
+The shape to watch for: a known-failing check, a tracked false positive, or
+a reproducible bug goes quiet, and you explain the silence with a property
+of the *tool* rather than a change in the *world*.
+
+Check for the merge first, because the instrument is a timestamp comparison
+and it costs one API call.
+Compare when a candidate fix merged against when each observation was made.
+That turns "it seems flaky" into a before/after table with a negative
+control --- a far stronger claim than the one you were about to make, and
+one a reader can act on.
+
+- **Do:** look for a merged fix, and date it, before attributing a vanished
+  symptom to anything.
+- **Do:** report the before/after with its timestamps, so the negative
+  control is visible rather than asserted.
+- **Don't:** explain a symptom's disappearance as nondeterminism on the
+  strength of one clean run.
+- **Don't:** carry such a claim into an issue or a decision doc, where it
+  argues against the very fix that produced the silence.
+
+(ai-config#827, 2026-07-29: Jules approved a diff carrying both of its
+known false-positive triggers, and the first explanation drafted was that
+the false positives are nondeterministic.
+ai-config#817 had in fact merged an `extra_instructions` fix at
+`21:30:51Z`, between #820's block at `19:43` and #827's approve at `22:51`.
+The nondeterminism claim was about to be posted to gha#366 as evidence,
+where it would have argued against porting the fix that actually worked.)

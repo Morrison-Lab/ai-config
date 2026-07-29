@@ -449,6 +449,7 @@
   dispatch call, including in `.github/workflows/claude-review.yml`, but the
   push to `claude/issue-285-...` 403'd on exactly that file; re-implemented
   and pushed from the Claude Code web session instead.)
+
   **The run does not merely lose the work quietly -- a later post-step posts a
   comment claiming the fix shipped.**
   The push step exits 1, but the "Post Claude's response if no code was
@@ -508,10 +509,10 @@
   it in a fresh thread with a one-click `suggestion` block, and retracted it in
   the next round once shown a run that had already posted and edited the
   comment under `PullRequests: write` alone.
-  The first of its two suggestion blocks also silently dropped a
-  `statuses: write` it had retracted moments earlier -- another instance of the
-  standing rule that a suggestion block's literal is a claim to verify, not
-  text to accept.)
+  The first of its two suggestion blocks also silently dropped the
+  `statuses: write` that the reviewer had retracted moments earlier -- another
+  instance of the standing rule that a suggestion block's literal is a claim to
+  verify, not text to accept.)
 ## d-morrison/gha reusable workflows
 Check `d-morrison/gha` before writing bespoke CI — it has reusable workflows for
 common patterns.

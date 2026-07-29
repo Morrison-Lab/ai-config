@@ -693,6 +693,11 @@ Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding a
 <!-- Not yet shared with the lab manual; edit shared/coding/restore-global-state.md, not here. -->
 @shared/coding/restore-global-state.md
 
+## Coding: `set -e` is not uniform; tolerate expected non-zero exits explicitly
+
+<!-- Not yet shared with the lab manual; edit shared/coding/errexit-is-not-uniform.md, not here. -->
+@shared/coding/errexit-is-not-uniform.md
+
 ## Coding: avoid hard-coding data with an external source of truth
 
 <!-- Shared with the lab manual; edit shared/coding/avoid-hardcoding-external-data.md, not here. -->

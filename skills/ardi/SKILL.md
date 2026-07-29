@@ -234,7 +234,7 @@ finding → push → post summary → re-request review → repeat until clean.
      `.../actions/workflows/claude-code-review.yml/dispatches` endpoint, or your
      GitHub MCP workflow-dispatch tool). Closing+reopening the PR also works
      (fires `reopened`) but adds timeline noise. See
-     [`memories/github-actions.md`](../../memories/github-actions.md).
+     [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md).
    - **Marking a draft ready seconds after its final push is another
      cancel-in-progress race** — the ready-event and synchronize runs fire a
      second apart and the cancellation can land on the newer (current-head)

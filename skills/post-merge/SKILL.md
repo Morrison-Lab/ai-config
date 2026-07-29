@@ -225,8 +225,8 @@ Run the full `ums` procedure (invoke the `ums` skill by name), focused on what
 - **Corrections / guidance the user gave mid-PR** → preference + skill update
   (per "update BOTH skills AND preferences").
 - **Tool / CI quirks** hit during the loop → the matching topical memory file
-  (`github.md`, `github-actions.md`, `git.md`, `r-quarto.md`,
-  `claude-code.md`) or `debugging.md`; see `memories/MEMORY.md`.
+  under `memories/`, or `debugging.md`; see `memories/MEMORY.md` for the
+  current set.
 - **A multi-step pattern that emerged** → run `spot-skill-opportunities` to
   judge whether it's genuinely recurring, then hand off to `skill-builder`.
 

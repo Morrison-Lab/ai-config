@@ -126,6 +126,8 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
       [ -d "$src" ] || continue
       link_one "$src" "$GEMINI_DIR/skills/$(basename "$src")"
     done
+  else
+    printf 'skip  sembr-skills (submodule not checked out -- run: git submodule update --init -- shared/sembr-skills)\n'
   fi
 
   # Antigravity/Gemini CLI customization spec (https://github.com/google-gemini/gemini-cli):

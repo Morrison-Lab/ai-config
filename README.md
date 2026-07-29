@@ -10,11 +10,18 @@ by `bootstrap.sh`.
 ## Setup on a new machine
 
 ```sh
-git clone https://github.com/d-morrison/ai-config.git ~/ai-config
+git clone --recurse-submodules https://github.com/d-morrison/ai-config.git ~/ai-config
 bash ~/ai-config/bootstrap.sh
 ```
 
 Rerun `bootstrap.sh` any time a new top-level dir is added to the repo.
+
+`--recurse-submodules` populates `shared/sembr-skills`, the vendored
+[sembr/skills](https://github.com/sembr/skills) plugin.
+In a clone that predates it, run
+`git submodule update --init -- shared/sembr-skills` instead.
+Skipping it is not fatal: `bootstrap.sh` prints a `skip` line and
+`scripts/validate-skills.py` warns, so everything else still installs.
 
 ### Verify the install
 

@@ -14,6 +14,8 @@ Checks:
   * `allowed-tools` (if present) is a list of strings
   * .claude-plugin/marketplace.json and plugin.json are valid JSON with the
     required top-level keys
+  * every marketplace plugin `source` resolves to a non-empty directory
+    (an uninitialized submodule warns instead of erroring)
 
 Exits non-zero if any error is found.
 """
@@ -220,6 +222,94 @@ def check_json(rel: str, required: list[str]) -> None:
             errors.append(f"{rel}: missing required key `{key}`")
 
 
+def submodule_paths() -> set[str]:
+    """Repo-root-relative paths registered as submodules in .gitmodules."""
+    if not (ROOT / ".gitmodules").is_file():
+        return set()
+    try:
+        listed = subprocess.run(
+            ["git", "config", "-f", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$"],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        warnings.append(".gitmodules: git is not on PATH; cannot read submodule paths")
+        return set()
+    if listed.returncode == 1:
+        return set()  # .gitmodules exists but registers no paths
+    if listed.returncode != 0:
+        # Don't silently treat "couldn't ask git" as "no submodules": that
+        # would downgrade every uninitialized submodule below into an error.
+        warnings.append(
+            f".gitmodules: could not read submodule paths: "
+            f"{listed.stderr.strip() or f'git exited {listed.returncode}'}"
+        )
+        return set()
+    # Each line is "submodule.<name>.path <value>".
+    return {
+        line.split(" ", 1)[1].strip()
+        for line in listed.stdout.splitlines()
+        if " " in line
+    }
+
+
+def check_plugin_sources(marketplace_rel: str) -> None:
+    """Every marketplace plugin `source` must resolve to a non-empty directory.
+
+    A plugin whose source is an empty directory loads with no skills in it, and
+    nothing else in CI notices. The one case that isn't an error is a source
+    that is a registered submodule nobody has initialized yet (a fresh clone
+    without `--recurse-submodules`, or the pre-commit hook running there): that
+    warns with the exact command to fix it, since `validate-skills.py` also runs
+    as a pre-commit hook and shouldn't block a commit over it.
+    """
+    path = ROOT / marketplace_rel
+    if not path.is_file():
+        return  # check_json already reported the missing file
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return  # check_json already reported the parse error
+    plugins = data.get("plugins")
+    if not isinstance(plugins, list):
+        errors.append(f"{marketplace_rel}: `plugins` must be a list")
+        return
+    submodules = submodule_paths()
+    # Resolve the root too: on a checkout reached through a symlink, resolving
+    # only the source would leave the two sides incomparable and silently
+    # demote every submodule below to the error branch.
+    root = ROOT.resolve()
+    for plugin in plugins:
+        if not isinstance(plugin, dict):
+            errors.append(f"{marketplace_rel}: plugin entry is not an object: {plugin!r}")
+            continue
+        name = plugin.get("name", "<unnamed>")
+        source = plugin.get("source")
+        if not isinstance(source, str) or not source.strip():
+            errors.append(f"{marketplace_rel}: plugin '{name}' has no `source` path")
+            continue
+        resolved = (root / source).resolve()
+        if resolved.is_dir() and any(resolved.iterdir()):
+            continue
+        try:
+            rel_source = resolved.relative_to(root).as_posix()
+        except ValueError:
+            rel_source = source
+        if rel_source in submodules:
+            warnings.append(
+                f"{marketplace_rel}: plugin '{name}' source '{source}' is an "
+                f"uninitialized submodule -- run: "
+                f"git submodule update --init -- {rel_source}"
+            )
+        else:
+            errors.append(
+                f"{marketplace_rel}: plugin '{name}' source '{source}' "
+                f"does not exist or is empty"
+            )
+
+
 def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -231,6 +321,7 @@ def main() -> None:
     check_codex_wrappers()
     print("Validating manifests…")
     check_json(".claude-plugin/marketplace.json", ["name", "owner", "plugins"])
+    check_plugin_sources(".claude-plugin/marketplace.json")
     check_json(".claude-plugin/plugin.json", ["name"])
 
     for w in warnings:

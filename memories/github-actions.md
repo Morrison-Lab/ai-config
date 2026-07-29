@@ -449,6 +449,69 @@
   dispatch call, including in `.github/workflows/claude-review.yml`, but the
   push to `claude/issue-285-...` 403'd on exactly that file; re-implemented
   and pushed from the Claude Code web session instead.)
+  **The run does not merely lose the work quietly -- a later post-step posts a
+  comment claiming the fix shipped.**
+  The push step exits 1, but the "Post Claude's response if no code was
+  committed" step is not gated on it, so the PR thread gains an affirmative
+  "Applied both fixes from the prior review: 1. ... 2. ..." for a commit that
+  is not on the branch.
+  That is worse than silence: the next reader, human or reviewer bot, has no
+  reason to doubt a state claim and no cheap way to check it, which is the
+  failure [`ardi`](../shared/workflow/ardi.md) names from the author's side,
+  arriving here from someone else's run.
+  So when a PR comment says a fix was applied and the diff does not show it,
+  do not assume you are looking at a stale page.
+  Two commands decide it: compare the PR's `head.sha` against what the claim
+  implies, and read the linked run's own job list for a failed **Push** step.
+  Do not re-derive the fix from the comment's prose either -- read the failed
+  run's log, since the comment can describe a fix that was itself partly wrong
+  (here it claimed to swap `statuses: write` for `issues: write`, and both
+  halves of that were incorrect).
+  Filed as `Morrison-Lab/gha#360`.
+  (`Morrison-Lab/ai-config#805`, 2026-07-29, run 30435574496: the consumer-repo
+  instance -- `gha` set its own `WORKFLOW_TOKEN` after gha#292, but
+  `ai-config` never had one, so `secrets: inherit` had nothing to inherit,
+  tracked as `Morrison-Lab/ai-config#807`.
+  Note the secret is optional by design, so its absence is invisible in every
+  new consumer repo until the first workflow-touching push.)
+
+- **A dispute about which `permissions:` key an action needs is decided by the
+  run log, not by reasoning about which REST endpoint it calls.** Every job
+  prints the granted set near the top of "Set up job":
+
+  ```text
+  ##[group]GITHUB_TOKEN Permissions
+  Contents: read
+  Metadata: read
+  PullRequests: write
+  Statuses: write
+  ##[endgroup]
+  ```
+
+  Pair that with evidence the disputed call actually succeeded -- for a
+  comment-posting action, the comment's own `created_at`/`updated_at` from
+  `gh api repos/{o}/{r}/issues/{n}/comments`, matched against the run's step
+  timestamps -- and a green run under the disputed permission set is
+  conclusive.
+  This is the [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)
+  rule applied to a review argument: two log excerpts settle it exactly, so
+  never trade citations about endpoint semantics instead.
+
+  The specific claim worth knowing, since it is the one that keeps coming up:
+  `POST /repos/{o}/{r}/issues/{n}/comments` is shared by issues and pull
+  requests, and the required permission follows **which** it is called on --
+  `pull-requests: write` authorizes it against a PR number, while
+  `issues: write` is needed only against an issue number.
+  A `pull_request`-triggered workflow that only ever comments on PRs therefore
+  does not need `issues: write`, and adding it is an unused widening.
+  (`Morrison-Lab/ai-config#805`: a reviewer raised this, was rebutted, re-raised
+  it in a fresh thread with a one-click `suggestion` block, and retracted it in
+  the next round once shown a run that had already posted and edited the
+  comment under `PullRequests: write` alone.
+  The first of its two suggestion blocks also silently dropped a
+  `statuses: write` it had retracted moments earlier -- another instance of the
+  standing rule that a suggestion block's literal is a claim to verify, not
+  text to accept.)
 ## d-morrison/gha reusable workflows
 Check `d-morrison/gha` before writing bespoke CI — it has reusable workflows for
 common patterns.

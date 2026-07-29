@@ -791,14 +791,31 @@ A repo that creates real merge commits keeps the PR's individual commits as
 ancestors of `main`, so the short SHA stays reachable forever.
 A repo that **squash-merges** does not: the branch commits never become
 ancestors, and a cited SHA goes dead the moment the branch is deleted.
-Two repos in the same session differed on exactly this --- `ucdavis/bcs` merges
-(`git log` shows `Merge pull request #453 ...`, and the cited `082f369` remains
-reachable), while `Morrison-Lab/ai-config` squashes (after #795 merged,
-`git merge-base --is-ancestor <branch-commit> origin/main` returned false for
-both commits, though the *content* was present on `main`).
-So in a squash-merge repo, cite something durable instead: the PR or issue
-number, a permalink to the file at a merged commit, or the CI job URL, none of
-which the squash discards.
+**And you cannot read a repo's strategy off one merge, so never cite a branch
+SHA on the strength of what the last PR looked like.**
+GitHub lets a repository enable merge, squash, and rebase simultaneously, so
+the strategy is chosen per pull request by whoever clicks the button.
+`ucdavis/bcs` demonstrates it inside one afternoon:
+
+```
+$ for c in b8ee355 2daed4c eead1e0; do git show -s --format='%p %s' $c; done
+9787b57                  docs: record the Spellcheck house-style rule (#456)   <- 1 parent, squashed
+eead1e0 52d28e8          Merge pull request #453 from ucdavis/fix/repoint...   <- 2 parents, merged
+c10ed45                  fix: exclude artifact outputs from provenance (#449)  <- 1 parent, squashed
+```
+
+So the safe default is to cite what survives **every** strategy: the PR or
+issue number, a permalink to the file at a merged commit, or the CI job URL.
+Reach for a branch SHA only when the merge has already happened and you have
+checked that specific commit with `git merge-base --is-ancestor`.
+
+That is not a hypothetical.
+This entry originally cited `082f369` as a still-reachable example, on the
+strength of #453 having merged as a merge commit --- and #456 then
+squash-merged, so `git merge-base --is-ancestor 082f369 origin/main` returns
+false and the citation died within the hour.
+`Morrison-Lab/ai-config` squashed #795 the same way: ancestry false for both
+commits, though the *content* was present on `main`.
 
 That same asymmetry is why a post-merge check should verify **content** rather
 than ancestry in a squash repo --- `git show origin/main:<path> | grep` answers
@@ -808,5 +825,6 @@ the question ancestry cannot.
 failure "fabricated rather than drawn from a real incident".
 It had happened two commits earlier on that same PR, at `082f369`, and had
 already been reworded away.
-Rebutted with the commit and the job log, then fixed properly by naming the SHA
-in the guidance itself.)
+Rebutted with the commit and the job log, then addressed by naming the SHA in
+the guidance itself --- which ucdavis/bcs#457 had to undo an hour later, once
+PR #456 squash-merged and that SHA stopped resolving.)

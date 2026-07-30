@@ -97,8 +97,9 @@ A reviewer routinely asserts both at once: a `### Verdict` reading
 **Ready for merge**, and directly beneath it a findings section listing items
 nobody has addressed.
 Neither half is wrong, which is what separates this from the eight numbered
-cases below --- those are all a reviewer misreporting its own run, whereas here
-the comment is accurate throughout and the defect is in the reading.
+cases below --- those are all a reviewer producing an unreliable or absent
+signal, whereas here the comment is accurate throughout and the defect is in
+the reading.
 The verdict line answers a narrower question than the one criterion 2 asks, and
 it is the part that appears first and gets quoted into a status report.
 
@@ -120,6 +121,11 @@ gh api graphql -f query='{search(query:"repo:Morrison-Lab/ai-config is:pr is:mer
   --jq '[.data.search.nodes[].reviews.nodes[].state] | group_by(.) | map({state: .[0], n: length})'
 #=> [{"n":106,"state":"COMMENTED"}]
 ```
+
+The key order there is not a typo: `gh api --jq` marshals through Go and sorts
+keys alphabetically, so `n` precedes `state` even though the expression builds
+`state` first.
+Plain `jq` would preserve the insertion order and print `{"state":...,"n":...}`.
 
 A constant carries no information, so `.state` cannot confirm clean here, and
 waiting for a formal `APPROVED` would stall every PR indefinitely.

@@ -12,6 +12,37 @@ A PR/MR is **fully clean** when **both** of these hold:
    **A raw Actions workflow run and a check run are not the same thing, and the usual lookups (`gh pr checks`, `get_check_runs`) only cover check runs (plus legacy commit statuses) --- not every workflow run necessarily produces one.** A workflow run that's blocked on `action_required` (e.g. pending manual approval) before any job starts can complete with zero jobs and consequently zero check runs, making it invisible to a check-runs-only poll. This normally doesn't affect mergeability (GitHub's branch-protection required-checks gate operates on checks, not raw workflow runs, so a check-run-less run can't be wired as required), but if something about a PR's CI state looks off despite `gh pr checks` reporting all-clear, cross-check the raw workflow runs before trusting the checks-only view. **`gh run list --commit <head-sha>` is not a reliable substitute for this cross-check on its own**: it returns every attempt for that SHA (including superseded/cancelled re-runs, so an old failed attempt can look like an outstanding blocker), and a run triggered by `issue_comment` or a `workflow_dispatch` invoked without an explicit `ref` can be recorded against the default branch's SHA rather than the PR's head SHA and be missed by a `--commit` filter entirely. Neither `--commit` nor `--branch` is fully reliable for this, because GitHub itself does not record a reliable PR linkage for these trigger types: an `issue_comment`-triggered run on this very PR (#635, run 29967418653) recorded `head_branch: main` and an empty `pull_requests` array via the raw REST API (`GET /repos/{owner}/{repo}/actions/runs/{id}`) --- verified directly, not assumed --- so no single filter (commit, branch, or the API's own PR-linkage field) reliably narrows these runs to the ones for this PR. Treat this cross-check as best-effort: `gh run list -R <repo> --workflow <name>` (unfiltered, or windowed by approximate timestamp) and eyeball for anomalies near when the PR activity happened, rather than trusting any one filtered command to be exhaustive.
    This includes non-gating checks like the Coverage / codecov job: don't merge around a red Coverage run just because it isn't a required check, unless there's a specific, stated reason for that merge (the project wants to maintain decent coverage, so a red Coverage job is a real signal to fix, not to ignore).
    **`codecov/patch` is a separate check from the repo's own Coverage workflow job, and both must be green.** The Coverage job runs the coverage-instrumented test suite; `codecov/patch` is the Codecov service's own status check, gating the PR's DIFF against a minimum patch-coverage percentage --- a repo can have a fully green Coverage job while `codecov/patch` still fails (uncovered new lines in the diff). When delegating implement-a-PR work to a subagent, name this check explicitly in the brief ("ensure `codecov/patch` passes, not just the test suite") --- a subagent that only runs the local test suite and checks it's green has no way to know it also needs to check a service-side status check unless told.
+   **The set of checks is not fixed while the run proceeds, and a check run's
+   name is not unique --- so "the ones I was waiting on went green" is not the
+   same statement as "every check is green".**
+   A job can spawn further jobs when it completes, so the total grows *after*
+   you started watching.
+   Nothing announces that, and the natural mental model is a fixed list
+   draining toward zero, which makes the growth invisible precisely when you
+   are closest to declaring ready.
+   Re-fetch the whole list each time and re-count it, rather than checking off
+   the names you remember.
+
+   The name collision is the sharper half, because it turns a careless check
+   into a confidently wrong one.
+   Two check runs can carry the *same name* on the same head --- an earlier
+   one that already succeeded, and a later one still running --- so matching
+   on the name returns the stale green and reports the PR ready while the
+   other is still going.
+   They are usually not re-runs of each other: the common case is two
+   separate workflow runs that each happen to define a job by that name, so
+   neither replaces the other and both are legitimately present.
+   Key on the check run's **id**, and read `status` before `conclusion`, since
+   a run still `in_progress` has no `conclusion` to be misled by.
+
+   (`ucdavis/bcs#458`, 2026-07-29: a check-in found the three jobs it was
+   watching all green and would have called the PR clean, except the count had
+   gone from 17 to 20 --- `update-snapshots` had finished and spawned a
+   cross-platform R CMD check matrix.
+   Two of those three were still running, and one was a *second* check run
+   named `ubuntu-latest (release)`, alongside the original that had succeeded
+   14 minutes earlier.)
+
 2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
    A rebuttal the reviewer still disputes does **not** count as clean.
    That review must be a genuine posted verdict at the current head commit,

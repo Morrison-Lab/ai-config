@@ -176,10 +176,13 @@ yet says nothing about the bug, so name those and exclude them from the count.
 (ucdavis/bcs#479, 2026-07-30: `calc_ip_weights_ab507bs()` filtered adherence
 intervals with an upper bound only, `window_dur <= window_months`, missing the
 lower bound the SAS reference applies.
-The shared fixtures built annual interval durations of 4, 7, 10, 13 and 8
-months against an 11-18 month window, plus a 3-month multi-round interval, so
-applying the correct bound emptied the model frame outright and the durations
-had to move inside the real windows before the fix could pass.
+The shared fixtures built annual interval durations of 4, 7, 8, 10 and 13
+months against an 11-18 month window, and a multi-round fixture whose
+intervals were 3 months throughout.
+Only the 13-month intervals clear the lower bound, so applying it stripped the
+annual model frame to a fraction of its rows and emptied the multi-round one,
+and the durations had to move inside the real windows before the fix could
+pass.
 One existing test asserted the bug: "only the terminal round enters the
 adherence model, so perturbing the first exam's score leaves every weight
 unchanged" held only because a `slice_max` had collapsed the accumulation to

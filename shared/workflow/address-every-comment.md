@@ -480,6 +480,60 @@ comment itself had raised, which is the shape
 A three-arm `case $?` was used instead, reporting `0`, `1`, and `2+`
 distinctly.)
 
+**A quieter variant: the suggestion introduces no defect at all, it restates
+the line above it --- so applying it deletes coverage while reading as
+hardening.**
+Every bullet above is about a snippet that would break something, so the
+reviewer's authority is the trap and skepticism is the defence.
+Here nothing breaks.
+The tests still pass, the diff looks like a robustness improvement, and the
+comment is *correct about the problem*.
+What is lost is the only assertion covering a different property, replaced by
+a second copy of one already present a line earlier --- so a two-assertion
+test becomes a one-assertion test that still looks like two.
+
+The reason it survives review is that the surviving copy passes, which is
+indistinguishable from the fix working.
+So the usual after-the-fact check --- run the tests --- cannot detect it, and
+neither can CI.
+It is a [`challenge-redundant-content`](challenge-redundant-content.md)
+finding arriving from the reviewer, which is exactly the direction that makes
+deferring feel appropriate.
+
+Watch for the comment citing the neighbour as *support*: "the check on the
+line above is already load-bearing for this claim" is the argument against the
+replacement, and it reads as an argument for it.
+Same structure as the edge-case bullet above --- prose and snippet drafted
+separately, disagreeing --- one artifact over.
+
+Compare a suggested predicate against its **neighbours**, not only against
+the code it replaces, and evaluate both on real input rather than reasoning
+about them; one command decides it, per
+[`algorithmatize-checks`](algorithmatize-checks.md).
+Then prefer removing whatever made the original fragile over swapping one
+fragile sentinel for another.
+
+- **Do:** evaluate the suggested predicate and its neighbours on real input,
+  and keep the finding while rejecting the snippet when they coincide.
+- **Do:** fix the underlying coupling instead, and say in the reply why the
+  suggested form was set aside.
+- **Don't:** accept a `suggestion` block that restates an adjacent check ---
+  passing tests afterward prove nothing, since the survivor passes for both.
+- **Don't:** read a reviewer's own "the line above already covers this" as
+  support for their replacement.
+
+(Morrison-Lab/ai-config#896, 2026-07-30: a review correctly called a test's
+`"user-invocable" not in body` sentinel fragile, and suggested
+`"---" not in body.lstrip()[:3]`.
+Evaluated against the real body, that is the same predicate as the
+`not body.lstrip().startswith("---")` assertion directly above it --- both
+test the first three characters, both returned `True` --- so adopting it would
+have left one property checked twice and the other not at all.
+A synthetic fixture replaced the corpus coupling instead, plus a third
+assertion that body prose *survives* stripping, which neither the original nor
+the suggestion covered.
+Tracked as #905.)
+
 **A finding can be right, and its fix adequate, while the *reason* it supplies
 is too weak to ship --- and in a corpus of rules, the reason is the
 deliverable.**

@@ -48,6 +48,17 @@ push --- re-review --- merge actions serial or capped.
 - Flattening the work into a workflow would be more convoluted than just doing
   it.
 
+**"Inline" means not a `Workflow`, not necessarily serial.**
+Falling below this bar rules out the heavy fan-out and its opt-in gate; it says
+nothing about whether a single `Agent` call should handle one piece of the work
+alongside you.
+That lighter delegation is separately pre-authorized, and `CLAUDE.md`'s "Use
+subagents when helpful --- and delegate rather than queue" requires it for
+anything that would otherwise be announced as queued or next up.
+So read a below-the-bar verdict as "do it here, delegating whatever does not
+block the edit in front of you", rather than as a reason to work a parallel
+track serially.
+
 ## What "propose" looks like in practice
 
 Estimate the fan-out from the target count: roughly one agent per target for a

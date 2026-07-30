@@ -241,7 +241,7 @@ merged=$(gh pr view <N> --json mergedAt --jq .mergedAt)   # VIEW_PR
 A tip predating the merge cannot carry anything the merge did not see.
 A tip *after* it is the case worth stopping for, and it is the same orphaned
 commit that
-[`CLAUDE.md`](../../../CLAUDE.md)'s merge-race note describes --- work pushed
+[`CLAUDE.md`](../../CLAUDE.md)'s merge-race note describes --- work pushed
 onto a branch whose PR had already closed.
 
 - **Do:** treat a merged PR plus a tip predating its merge as Dead, whatever

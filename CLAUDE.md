@@ -104,15 +104,16 @@ Every bullet above rules out a deferral whose stated reason is about *me* --- no
 This one's stated reason is about the **repo**, so it reads as restraint rather than avoidance: holding a fourth concurrent PR looks like consideration for the reviewer and the merge queue.
 
 Three things dissolve it.
-A UMS PR is disjoint by construction --- it touches a memory file or a fragment nothing else in flight is editing --- so it costs no merge-order constraint and no conflict, which is exactly the case `CLAUDE.md`'s own merge-order section says to state plainly rather than manage.
+A UMS PR is *usually* disjoint --- it touches a memory file or a fragment nothing else in flight is editing --- so it usually costs no merge-order constraint and no conflict, which is exactly the case `CLAUDE.md`'s own merge-order section says to state plainly rather than manage.
+Verify that rather than assuming it, because two UMS passes in one session land in the same few files and collide readily; when they do, the answer is still to open the PR and resolve the collision, not to hold the pass.
 The queue is durable and the learning is not: an extra open PR waits patiently, while an unrecorded learning dies with the session, so the two costs are not comparable.
 And the deferral is usually announced in the same breath as reporting a PR ready, which is the moment the next instruction arrives --- so "once this lands" reliably becomes never.
 
 The permission to announce a pass rather than run it, granted above, is for a **real** blocker.
 Not wanting another PR is a preference, and a preference does not license the announcement.
 
-- **Do:** open the UMS PR immediately, however many of yours are already open, when its files are disjoint from them.
-- **Do:** say in the same message that it is disjoint and carries no merge-order constraint, so the count does not read as a problem.
+- **Do:** open the UMS PR immediately, however many of yours are already open, and resolve any collision it turns out to have.
+- **Do:** check whether its files overlap your other open PRs, and say either that it is disjoint or exactly where it collides, so the count does not read as a problem.
 - **Don't:** defer a pass to keep the open-PR count down, or until an unrelated PR merges.
 - **Don't:** treat "I will write it once #N lands" as a commitment --- it is the announced-and-never-run failure with a due date attached.
 

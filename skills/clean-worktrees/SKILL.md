@@ -252,8 +252,8 @@ onto a branch whose PR had already closed.
 - **Don't:** read a deleted remote branch as proof nothing local was added
   after the merge.
 
-(2026-07-29, an ai-config sweep: four worktrees, all clean, PRs #625/#643/
-#782/#810 all merged, and all four remotes gone.
+(2026-07-29, an ai-config sweep: four worktrees, all clean, all four remotes
+gone, and PRs #625/#643/#782/#810 all merged.
 Two were 1 and 2 days old, so the recency guard alone would have kept them.
 Every tip predated its own merge by 7 to 14 hours, and the maintainer's
 standing rule is that branches from merged PRs can go unless they have

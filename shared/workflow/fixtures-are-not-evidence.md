@@ -109,7 +109,8 @@ The nearest neighbour is [`ardi`](ardi.md)'s "a regression test written
 alongside a fix can lock the bug in", and it misses this by one step.
 That case concerns a test authored **in the same pass** as the code it
 validates, so you are at least present when the assertion is written.
-Here the fixture predates you, someone else wrote it, and it has been green
+Here the fixture predates the change.
+It was written for some earlier purpose, possibly by you, and has been green
 for as long as the file has existed -- which is exactly what makes it read as
 a specification rather than as a claim.
 
@@ -141,19 +142,21 @@ regime means the fixture was wrong, data inside it means the fix is.
 
 A fixture edited until the fix passes is otherwise only a fixture edited until
 the fix passes.
-Run the new tests against the old implementation and confirm they fail:
+[`ardi`](ardi.md) already asks for the general form of this check -- revert
+the fix, confirm the new test actually fails -- so what this shape changes is
+*what* to revert.
+The fixtures moved too, so reverting the whole change reverts them as well and
+compares two different suites, which proves nothing.
+Restore only the implementation:
 
 ```bash
-git checkout origin/main -- R/<file>.R   # old code, new fixtures and tests
-<run the test file>                      # must fail
-git checkout HEAD -- R/<file>.R          # restore
+git checkout origin/main -- <implementation-file>   # old code, new tests
+<run the affected tests>                            # must fail
+git checkout HEAD -- <implementation-file>          # restore
 ```
 
-Restoring only the implementation is what makes this work: the fixtures and
-the assertions are then identical across both runs, so every failure is
-attributable to the code rather than to the fixture edit.
-Checking out `main`'s tests as well would compare two different suites and
-prove nothing.
+The fixtures and the assertions are then identical across both runs, so every
+failure is attributable to the code rather than to the fixture edit.
 
 Report the count, per
 [`algorithmatize-checks`](algorithmatize-checks.md), since "9 failures across

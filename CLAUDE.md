@@ -149,12 +149,15 @@ And `git branch -D` refuses, with `cannot delete branch 'X' used by worktree at 
 That message names a worktree, which reads as a second checkout holding live parallel work --- the one condition that would genuinely make deleting the branch unsafe.
 It is almost always just that repo's ordinary checkout sitting on the branch.
 So the cautious reading is the wrong one here, and acting on it leaves a dead branch in place for the next session to re-discover and re-adjudicate.
-Switch that repo to `main` first, then delete.
 
-Settle liveness from the branch's own commits rather than from the error text: zero commits in `origin/main..<branch>`, an ancestor of `origin/main`, and absent from the remote together mean there is nothing to lose.
+Settle liveness from the branch's own commits rather than from the error text, and settle it before deleting anything.
+Zero commits in `origin/main..<branch>`, plus absence from the remote, together mean there is nothing to lose.
+Resist adding an ancestry check beside the first of those.
+An empty `origin/main..<branch>` range is the same fact as `git merge-base --is-ancestor <branch> origin/main` succeeding, so running both confirms one thing twice rather than two things once.
+Once liveness is settled, switch that repo to `main` --- which is what the refusal is really asking for --- and then delete.
 
 - **Do:** run the sweep across every scoped repo, not only the ones this session worked in.
-- **Do:** `git checkout main` in that repo before `git branch -D`, and decide liveness with the unique-commit and ancestry checks.
+- **Do:** settle liveness first, then `git checkout main` in that repo, then `git branch -D`.
 - **Don't:** read `used by worktree` as evidence that a separate live worktree exists.
 - **Don't:** assume a repo the session never opened is on `main`.
 

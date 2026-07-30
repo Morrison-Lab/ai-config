@@ -597,3 +597,63 @@ Redoing it in `tool-mappings.yml` regenerated 175 `codex-skills/` wrappers,
 and Jules returned `VERDICT: block` twice for "bulk pollution", its second
 verdict noting it had read only a truncated diff.
 `claude-review` called the same finding a false positive at the same head.)
+
+**Run the whole test suite before pushing, not the files you predict the
+change touches --- and check that the ones you ran were not silently
+skipped.**
+The pre-push self-review above assumes your local green means something.
+Two things quietly hollow it out, and they compound: you choose a subset,
+and the subset then reports success without having run.
+
+The subset is chosen by predicting blast radius, which is exactly the
+judgement the change calls into question.
+The tests that break are frequently *not* in the files you edited: a test
+elsewhere asserts the behaviour you are changing, often with a comment
+stating the rationale your diff invalidates.
+Nothing about editing `R/foo.R` suggests opening `test-bar.R`, so the
+prediction feels complete while omitting the one file that matters.
+
+The second is worse, because it looks like evidence.
+A conditional skip --- `skip_on_cran()` without `NOT_CRAN=true`,
+`skip_if(!.venv_exists())`, `skip_if_offline()` --- turns the test that
+would have caught the bug into a pass.
+`devtools::test()` sets `NOT_CRAN` for you --- it applies
+`withr::local_envvar(r_env_vars())`, and devtools documents that set as
+"the standard environment variables set by devtools", singling out
+`NOT_CRAN` as "of particular note for package tests"
+([`R/test.R`](https://github.com/r-lib/devtools/blob/main/R/test.R),
+[`R/check.R`](https://github.com/r-lib/devtools/blob/main/R/check.R)).
+`testthat::test_file()` and `testthat::test_dir()` do not, so the harness
+you reach for by hand for a quick targeted run is exactly the one that
+skips.
+Setting it explicitly anyway (`NOT_CRAN=true Rscript -e '...'`) costs
+nothing and is what the rest of this corpus does.
+So read the **skip count**, not just the failure count: a run reporting
+`0 failed, 20 skipped` has told you almost nothing, and is indistinguishable
+at a glance from one that verified everything.
+
+Match the environment the change will be judged in, too.
+Running with an env var set that CI does not set (or vice versa) reproduces
+a *different* configuration, and its failures and passes both mislead.
+
+- **Do:** run the full suite before pushing, and state the tests/failed/
+  skipped triple rather than "tests pass".
+- **Do:** set the flags that un-gate conditional skips, and re-run if the
+  skip count is non-trivial.
+- **Don't:** scope a local run to the files you edited --- the test asserting
+  the old behaviour is usually somewhere else.
+- **Don't:** read a green subset as a green suite, or a skip as a pass.
+
+(d-morrison/altdoc#95 and #96, 2026-07-29: twice in one session.
+On #95 a test asserting "aborts when no venv is configured" read that
+precondition from the ambient environment; the local run missed it because
+`NOT_CRAN` was unset and `skip_on_cran()` skipped that very test, and
+Windows R-CMD-check caught it.
+On #96 `test-llms_txt.R` asserted non-recursive discovery for `docsify` ---
+the exact behaviour the PR changed, with a comment stating the now-false
+rationale --- and was not among the files run locally, even though
+`.llms_txt_vignettes()` was one of the functions edited.
+Windows caught that one too.
+The subsequent full-suite run was itself misleading in the opposite
+direction: run *with* an env var CI does not set, it reported two failures
+belonging to the sibling PR.)

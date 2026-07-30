@@ -138,6 +138,34 @@ Run the sweep --- open PRs and issues per repo, `git status`, local branches, wo
 (gha#318/ai-config#733/#736, 2026-07-26: a clean stopping point was flagged twice on the strength of "my three PRs are merged."
 The `wrap-up` sweep the user then asked for found a stale draft PR (`gha#316`, a bot claim-commit for an issue closed hours earlier) and an unused harness-assigned branch still sitting in the `gha` checkout.)
 
+**Two mechanical details about that leftover-branch case, one of which reads as the opposite of what it is.**
+The harness assigns its branch name in *every* scoped repo and leaves each one checked out on it, including repos the session never opens.
+So the sweep finds the branch sitting in places nothing in the conversation points at, and two things follow from that.
+
+Point 3 of the "Keep ai-config and repo checkouts fresh" section quietly does nothing in those repos.
+It fast-forwards `main` only when `main` is the checked-out branch, and here it never is, so a repo you never opened stays as stale as the container left it.
+
+And `git branch -D` refuses, with `cannot delete branch 'X' used by worktree at '<path>'`.
+That message names a worktree, which reads as a second checkout holding live parallel work --- the one condition that would genuinely make deleting the branch unsafe.
+It is almost always just that repo's ordinary checkout sitting on the branch.
+So the cautious reading is the wrong one here, and acting on it leaves a dead branch in place for the next session to re-discover and re-adjudicate.
+
+Settle liveness from the branch's own commits rather than from the error text, and settle it before deleting anything.
+Zero commits in `origin/main..<branch>`, plus absence from the remote, together mean there is nothing to lose.
+Resist adding an ancestry check beside the first of those.
+An empty `origin/main..<branch>` range is the same fact as `git merge-base --is-ancestor <branch> origin/main` succeeding, so running both confirms one thing twice rather than two things once.
+Once liveness is settled, switch that repo to `main` --- which is what the refusal is really asking for --- and then delete.
+
+- **Do:** run the sweep across every scoped repo, not only the ones this session worked in.
+- **Do:** settle liveness first, then `git checkout main` in that repo, then `git branch -D`.
+- **Don't:** read `used by worktree` as evidence that a separate live worktree exists.
+- **Don't:** assume a repo the session never opened is on `main`.
+
+(2026-07-29/30, this session: after gha#376 and ai-config#849 merged, the sweep found the assigned branch `claude/gha-pr-374-cf7138` checked out in the `altdoc` and `rpt` clones, neither of which the session ever touched.
+Both carried 0 unique commits, were ancestors of `origin/main`, and were absent from the remote.
+`altdoc`'s pointed two merged PRs behind its own `origin/main`.
+The first `git branch -D` failed with the worktree message, and `git worktree list` showed one entry --- the main checkout itself.)
+
 **When flagging a good moment to `/clear`, offer archiving as the default alternative.** Whenever there's a meaningful chance I'd want to come back to this conversation later, recommend leaving the session alone and starting a fresh one for the next task, instead of `/clear`ing it -- the old session stays fully retrievable (nothing to lose), at the cost of a small navigation step to reopen it. Reserve a bare `/clear` recommendation for when nothing in the session is worth revisiting; when in doubt, default to the archive-and-start-new option since it's strictly safer.
 
 ## Flag good moments to run `compress-session`, too

@@ -34,6 +34,14 @@ jobs:
         run: python3 scripts/test_slb.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
+      - name: Run near-duplicate detector tests
+        # The detector itself is a find-overlap tool rather than a gate, so it
+        # is not run here -- a corpus growing a near-duplicate pair is a
+        # reading prompt, not a build failure. Its tests do run, because two
+        # of them pin measured corpus facts (alias stubs score low;
+        # conceptually adjacent pairs score low) that the script's documented
+        # scope rests on.
+        run: python3 scripts/test_find_near_duplicates.py
       - name: Run install-integrity check tests
         # Only the tests run here. check-install.py itself compares against a
         # consumer directory (~/.claude) that no CI runner has, so on a runner

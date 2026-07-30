@@ -41,7 +41,8 @@ command path.
 The official marketplace ships a concrete instance of this, worth knowing by
 name rather than only by shape.
 Its `github` plugin declares, in
-`external_plugins/github/.mcp.json`:
+`external_plugins/github/.mcp.json` under the marketplace checkout
+(`~/.claude/plugins/marketplaces/claude-plugins-official/`):
 
 ```json
 {"github": {"type": "http", "url": "https://api.githubcopilot.com/mcp/",

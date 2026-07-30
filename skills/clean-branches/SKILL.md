@@ -111,6 +111,46 @@ Look for branch naming patterns that reference issues:
 
 If a claim comment exists within the last 24 hours → **Active**, skip.
 
+#### f. If the PR closed unmerged, diff the branch against main before believing it
+
+Check c only asks whether an **open** PR exists, so a branch whose PR closed
+unmerged falls straight through to a delete classification. That is right for an
+abandoned branch and wrong for a superseded one, because a closure rationale
+describes the PR's **stated purpose**, not an inventory of its diff. "Superseded
+by #260, all review findings addressed" is a claim about the feature; it says
+nothing about an unrelated fix that happened to share the branch.
+
+The gap is easy to miss in exactly the case that matters, since the rationale is
+usually accurate about the thing it names, and the leftover work is by definition
+the part nobody was talking about. Nothing else flags it either: `git branch -d`
+consults the upstream rather than `main` (see the safety rules below), the
+superseding PR merged and closed the issue, and the tracker looks clean.
+
+So for any branch whose PR closed **unmerged**, compare the files rather than
+reading the closure comment:
+
+```bash
+gh pr list --head <branch> --state closed \
+  --json number,title,mergedAt,url | cat                     # LIST_PRS
+gh pr diff <N> --name-only                                   # DIFF_PR
+git diff --stat origin/main...origin/<branch>                # what is still unlanded
+```
+
+`mergedAt: null` on a closed PR is the trigger. Then diff each file the branch
+touched against `main`; anything still absent is unlanded work, and the branch is
+**Stale**, not Dead --- rebase it and open an MR (steps 6--7), or file an issue
+for the salvageable part and say so in the plan before deleting.
+
+Weight the check by how far the branch's contents stray from its title: a branch
+carrying commits unrelated to the PR that named it is the shape this catches.
+`rescue-closed` is the deliberate, whole-tracker version of the same sweep; this
+is the minimum owed before a deletion.
+
+(2026-07-29: a bcs branch closed as superseded still carried an orthogonal
+out-of-memory fix --- `geepack::geeglm` replaced by `glm` + `sandwich::vcovCL`
+--- that the superseding privacy redesign never touched. Deleting on the closure
+rationale would have discarded it silently; filed instead as `ucdavis/bcs#466`.)
+
 ### 4. Present the plan (dry run)
 
 Before taking any action, present a table to the user:
@@ -292,6 +332,15 @@ Print a summary covering **both** local and remote:
   the branch is merged, which catches "I thought this landed but it didn't."
   Only use `-D` after confirming the PR merged (squash/rebase merges can leave a
   local branch that `-d` won't recognize as merged).
+- **Don't read a successful `-d` as proof the work reached `main`.** Per
+  `git-branch(1)`, the branch must be fully merged "in its upstream branch, or in
+  HEAD if no upstream was set" — so a branch still tracking a live
+  `origin/<name>` passes on the *upstream* check alone, printing `warning:
+  deleting branch X that has been merged to refs/remotes/origin/X, but not yet
+  merged to HEAD`. Only a `[gone]` upstream falls back to the HEAD comparison.
+  Both outcomes are routine in one sweep (18 `-d` / 11 `-D` across 29 branches in
+  one 2026-07-29 run), so the flag that worked is not a classification signal —
+  step 3 is.
 - **Never delete a local-only unpushed branch without confirmation** — if it has
   unique commits and no remote, that work exists nowhere else.
 

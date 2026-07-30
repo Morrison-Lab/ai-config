@@ -161,6 +161,32 @@ Use `git branch -d` (not `-D`): `-d` refuses to delete a branch with commits
 that aren't merged. If it refuses, the branch has unmerged work — investigate
 before forcing anything.
 
+**Both outcomes are normal after a squash merge — a `-d` that succeeds is not
+evidence the commits reached `main`.** The natural reading of the paragraph
+above is that `-d` succeeding means `main` contains the work, so a squash-merged
+branch must always need `-D`. It does not. `git-branch(1)` defines the check
+against the **upstream**, not `main`: the branch must be "fully merged in its
+upstream branch, or in HEAD if no upstream was set with `--track` or
+`--set-upstream-to`." A branch still tracking a live `origin/<name>` is trivially
+fully merged into its own upstream, so `-d` succeeds and says so:
+
+```
+warning: deleting branch fix/thing that has been merged to
+         refs/remotes/origin/fix/thing, but not yet merged to HEAD
+```
+
+Which branch of that behavior you land on depends on whether the remote ref
+still exists, and that varies by repo setting and merge flag — a repo that
+auto-deletes head branches on merge (or `gh pr merge --delete-branch`) leaves
+`[gone]` upstreams that fall back to the HEAD check and refuse. In one sweep of
+29 branches, 18 deleted with `-d` and 11 needed `-D`; neither count meant
+anything about whether the work had landed.
+
+Two consequences. Don't treat a refusal as a surprise worth debugging — read
+step 1's merge confirmation and the `-D` guidance below instead. And don't treat
+a **success** as confirmation, either: when it prints that warning, `-d` checked
+the remote ref, not `main`.
+
 These guards avoid a common no-op/error sequence after
 `gh pr merge --delete-branch`: that command may already switch this checkout
 to `main`, fast-forward it, and delete the local merged branch.

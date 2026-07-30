@@ -173,8 +173,8 @@ A branch still tracking a live `origin/<name>` is trivially fully merged into
 its own upstream, so `-d` succeeds and says so:
 
 ```
-warning: deleting branch fix/thing that has been merged to
-         refs/remotes/origin/fix/thing, but not yet merged to HEAD
+warning: deleting branch 'fix/thing' that has been merged to
+         'refs/remotes/origin/fix/thing', but not yet merged to HEAD.
 ```
 
 Which branch of that behavior you land on depends on whether the remote ref

@@ -345,8 +345,8 @@ Print a summary covering **both** local and remote:
   refs/remotes/origin/X, but not yet merged to HEAD`.
   Only a `[gone]` upstream falls back to the HEAD comparison.
   Both outcomes are routine in one sweep (18 `-d` / 11 `-D` across 29 branches
-  in one 2026-07-29 run), so the flag that worked is not a classification
-  signal --- step 3 is.
+  in one 2026-07-29 run), so whether `-d` sufficed or `-D` was required is not
+  a classification signal --- step 3 is.
 - **Never delete a local-only unpushed branch without confirmation** — if it has
   unique commits and no remote, that work exists nowhere else.
 

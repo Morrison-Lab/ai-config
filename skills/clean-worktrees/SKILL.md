@@ -218,10 +218,10 @@ in one sweep.**
 `git-branch(1)` checks the branch against its **upstream** --- "fully merged in
 its upstream branch, or in HEAD if no upstream was set".
 So a branch still tracking a live `origin/<name>` passes `-d` regardless of what
-`main` contains, printing `warning: deleting branch X that has been merged to
-refs/remotes/origin/X, but not yet merged to HEAD`.
-Only once the remote ref is gone (auto-delete on merge, or `--delete-branch`)
-does the check fall back to HEAD and refuse.
+`main` contains, printing `warning: deleting branch 'X' that has been merged to
+'refs/remotes/origin/X', but not yet merged to HEAD.`
+Only once the remote ref is gone (auto-delete on merge, or
+`gh pr merge --delete-branch`) does the check fall back to HEAD and refuse.
 A sweep of 29 branches split 18 `-d` / 11 `-D` on that basis alone.
 So don't read a needed `-D` as a red flag, and don't read a successful `-d` as
 proof the work reached `main` --- step 3's classification is what establishes

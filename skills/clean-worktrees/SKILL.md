@@ -50,7 +50,7 @@ None of these self-clean once they have commits, so they accumulate.
 | **Prunable stub** | Worktree *record* whose directory no longer exists on disk (removed manually) | `git worktree prune` |
 | **Dead** | Linked worktree, **clean** tree, branch **merged into `origin/main`** OR upstream **`[gone]`** with no unique unpushed commits, **no live session**, not the current/main worktree | `git worktree remove` + delete its branch |
 | **Dirty** | Uncommitted changes, or unique commits not on `origin/main` and not pushed | **Skip** — flag; only `--force` after explicit confirmation |
-| **Active** | Live `session-lock` session registered, the **current** worktree, the **main** worktree, an open PR on its branch, or last commit < 7 days old | **Skip** — never touch |
+| **Active** | Live `session-lock` session registered, the **current** worktree, the **main** worktree, an open PR on its branch, or last commit < 7 days old **and its PR has not merged** | **Skip** — never touch |
 | **Locked** | `git worktree list` marks it `locked` | **Skip** unless the user confirms; then `git worktree unlock` before removing |
 
 "Clean tree" and "branch landed" must **both** hold for **Dead** — a clean tree
@@ -171,8 +171,56 @@ recency guards.)
 git -C <path> log -1 --format='%ci'    # last commit < 7 days → Active, skip
 ```
 
-A worktree is **Dead** only when 3a is clean, 3c says landed, 3d finds no live
+A worktree is **Dead** when 3a is clean, 3c says landed, 3d finds no live
 session, and 3e is older than 7 days.
+
+**A merged PR overrides the recency guard: a branch whose PR merged can go
+however recent it is, provided it carries no unpushed work.**
+The guard exists to protect work that is still in progress, and a merged PR
+is the definitive statement that it is not.
+Holding a worktree for six more days on the strength of a date, when its own
+PR closed hours ago, is the guard firing on the one case it was never
+written for --- and it is the *common* case in an active session, where the
+worktrees most worth sweeping are the ones created that week.
+
+So the age check only decides worktrees whose landed status is unknown.
+Once 3c has answered, age adds nothing.
+
+**Verify the no-unpushed-work half rather than assuming it from the merge.**
+The natural check --- does `origin/<branch>` still exist --- answers a
+different question in a repo that deletes head branches on merge, since
+every merged branch reports `remote=GONE` there.
+That is equally consistent with "merged and cleaned up" and with "merged,
+then you committed something else locally", and only the second is unsafe.
+
+Compare the branch tip's date against the PR's `mergedAt`:
+
+```bash
+tip=$(git log -1 --format='%cI' "<branch>")
+merged=$(gh pr view <N> --json mergedAt --jq .mergedAt)   # VIEW_PR
+[[ "$tip" < "$merged" ]] && echo "OK (tip predates merge)" || echo "tip AFTER merge -- inspect"
+```
+
+A tip predating the merge cannot carry anything the merge did not see.
+A tip *after* it is the case worth stopping for, and it is the same orphaned
+commit that
+[`CLAUDE.md`](../../../CLAUDE.md)'s merge-race note describes --- work pushed
+onto a branch whose PR had already closed.
+
+- **Do:** treat a merged PR plus a tip predating its merge as Dead, whatever
+  the age.
+- **Do:** compare timestamps, since `remote=GONE` is uninformative wherever
+  head branches are auto-deleted.
+- **Don't:** skip a worktree for recency alone once its PR has merged.
+- **Don't:** read a deleted remote branch as proof nothing local was added
+  after the merge.
+
+(2026-07-29, an ai-config sweep: four worktrees, all clean, PRs #625/#643/
+#782/#810 all merged, and all four remotes gone.
+Two were 1 and 2 days old, so the recency guard alone would have kept them.
+Every tip predated its own merge by 7 to 14 hours, and the maintainer's
+standing rule is that branches from merged PRs can go unless they have
+unpushed work.)
 
 ### 4. Present the plan (dry run) — wait for confirmation
 
@@ -247,6 +295,8 @@ git worktree prune -v               # clears any record left by the removals
   agent is working there.
 - **Always present the plan first** — no silent removals.
 - **Don't remove worktrees newer than 7 days** — likely in-progress work.
+  Unless the branch's PR has merged and its tip predates that merge, in which
+  case age is irrelevant (step 3e).
 - `git worktree prune` is safe (records only, never directories) — but still
   report what it pruned.
 

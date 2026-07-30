@@ -16,10 +16,20 @@
       "why": "CLAUDE.md 'Timestamp recaps in local time' -- supplies the real local time each turn, because a fabricated timestamp is indistinguishable from a remembered one."
     },
     {
+      "_note_no_if": [
+        "Deliberately carries no `if` prefilter. `Bash(gh *)` was tried and",
+        "verified working in the live harness -- it fires on `cd /tmp && gh ...`",
+        "and on `GH_TOKEN=x gh ...`, so it is not a strict prefix glob today.",
+        "It is still removed, because the asymmetry is bad: if that matching",
+        "ever tightens to a prefix check, the guard stops firing on exactly the",
+        "compound and env-prefixed shapes it exists to catch, and it stops",
+        "SILENTLY -- a disabled guard and a guard with nothing to block look",
+        "identical. The prefilter buys one Python startup (~30ms) per gh-less",
+        "Bash call; that is not worth a silent-failure mode."
+      ],
       "script": "require-gh-repo-flag.py",
       "event": "PreToolUse",
       "matcher": "Bash",
-      "if": "Bash(gh *)",
       "timeout": 10,
       "why": "Blocks mutating repo-scoped gh commands lacking -R, so a write never silently targets whatever repo the cwd happens to be."
     },

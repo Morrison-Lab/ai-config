@@ -122,6 +122,28 @@ Not wanting another PR is a preference, and a preference does not license the an
 The user's correction was "no; do it right away."
 This entry and its `memories/tools.md` sibling were then written immediately, in one short pass, against a `main` that #917 had not yet touched --- which is the evidence that nothing was blocking it.)
 
+**Correcting your own understanding of a technical issue is itself a trigger, and it fires immediately rather than at the next checkpoint.**
+Every trigger above is an event in the *work*: a verdict lands, a PR merges, a poll reports a merge, a stopping point gets proposed.
+This one is an event in what you *believe*, and it leaves no artifact behind.
+Nothing merges, no check turns green, and the only record is that you were wrong and then were not.
+
+That absence is why it needs naming rather than being left to "as learnings accumulate".
+A corrected misunderstanding feels resolved the moment it is corrected, so the correction reads as the completion when it is only the input.
+Nothing is left outstanding, so nothing prompts the pass, and the learning evaporates with the conversation that produced it.
+That puts it alongside the recommend-a-fresh-session route above, as a case where skipping the pass destroys the material rather than merely delaying it.
+It is also unusually valuable material, because a correction names both the model that was wrong and the thing that displaced it -- which is exactly the pair the section below asks every entry to carry.
+
+So run the pass at the correction, not at the end of whatever task the correction unblocked.
+The task will still be there; what you believed ten minutes ago will not.
+
+- **Do:** run the pass as soon as a technical belief is corrected, before resuming the work it was blocking.
+- **Do:** record the belief that was wrong alongside the fact that replaced it, not just the fact.
+- **Don't:** wait for the unblocked task to reach a checkpoint of its own -- that checkpoint carries the task's learnings, not the correction's.
+- **Don't:** treat "I know the right answer now" as the pass having happened.
+
+(Directive from the user, 2026-07-30: "when you correct your understanding of a technical issue like you just did, run ums immediately."
+The correction was a Quarto binary reported broken twice that turned out to be environment misuse both times, recorded in [`growth-mindset`](shared/workflow/growth-mindset.md)'s "First check the limitation is real" section.)
+
 ## Record both the pattern and the anti-pattern
 
 When I tell you what to do, or what not to do, in a `cai` or `ums` statement, write down **both** sides: the behaviour to adopt and the behaviour to stop.

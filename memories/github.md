@@ -179,6 +179,32 @@
   explicit go-ahead first if the workflow has a real side effect (e.g. a
   gh-pages deploy step not gated to `main`) — dispatching isn't just a status
   check in that case, it's a live action.
+- **`issue_write`'s `labels` REPLACES the issue's whole label set, and a name
+  that does not exist yet is silently CREATED rather than rejected.** Two
+  independent surprises in one parameter, pulling in opposite directions.
+  The replace semantics come from the underlying REST "update an issue"
+  endpoint, so passing `["needs-data"]` to an issue already carrying
+  `["bug","tech-debt"]` drops both, with no warning and nothing in the
+  response to notice --- always pass the **union** of existing plus new.
+  Read the current labels first; `list_issues` already returns them, so a
+  bulk pass needs no extra call per issue.
+  The auto-creation runs the other way: it means a typo becomes a real label
+  rather than an error, so a misspelling silently splits a set in two.
+  Confirmed on `ucdavis/bcs`, 2026-07-29: applying `needs-data` to an issue
+  in a repo that had no such label created it, and `get_label` then returned
+  it with the default grey `#ededed` and an empty description.
+  **Nothing in the MCP tool set can set a label's color or description** ---
+  there is only `get_label` (`GET_LABEL` in
+  [`tool-mappings.md`](../tool-mappings.md)), no create/update --- so a label
+  born this way stays grey and undescribed until a human with **write**
+  access fixes it, or a workflow with `issues: write` does it via `gh api`.
+  Write, not admin: the Labels REST API's create/update endpoints need push
+  access, while admin governs repository settings, branch protection, and
+  webhooks.
+  Note that the Triage role can *apply* an existing label but cannot create
+  or edit one, so it is not sufficient here.
+  Say so when handing off, rather than leaving someone to wonder why the new
+  labels look unstyled.
 - **Comments/replies you post via the GitHub MCP tools echo back into the
   session's `<github-webhook-activity>` events under the human account's
   identity, not a bot identity.** `add_reply_to_pull_request_comment` and

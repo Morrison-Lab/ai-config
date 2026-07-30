@@ -179,6 +179,32 @@
   explicit go-ahead first if the workflow has a real side effect (e.g. a
   gh-pages deploy step not gated to `main`) — dispatching isn't just a status
   check in that case, it's a live action.
+- **`issue_write`'s `labels` REPLACES the issue's whole label set, and a name
+  that does not exist yet is silently CREATED rather than rejected.** Two
+  independent surprises in one parameter, pulling in opposite directions.
+  The replace semantics come from the underlying REST "update an issue"
+  endpoint, so passing `["needs-data"]` to an issue already carrying
+  `["bug","tech-debt"]` drops both, with no warning and nothing in the
+  response to notice --- always pass the **union** of existing plus new.
+  Read the current labels first; `list_issues` already returns them, so a
+  bulk pass needs no extra call per issue.
+  The auto-creation runs the other way: it means a typo becomes a real label
+  rather than an error, so a misspelling silently splits a set in two.
+  Confirmed on `ucdavis/bcs`, 2026-07-29: applying `needs-data` to an issue
+  in a repo that had no such label created it, and `get_label` then returned
+  it with the default grey `#ededed` and an empty description.
+  **Nothing in the MCP tool set can set a label's color or description** ---
+  there is only `get_label` (`GET_LABEL` in
+  [`tool-mappings.md`](../tool-mappings.md)), no create/update --- so a label
+  born this way stays grey and undescribed until a human with **write**
+  access fixes it, or a workflow with `issues: write` does it via `gh api`.
+  Write, not admin: the Labels REST API's create/update endpoints need push
+  access, while admin governs repository settings, branch protection, and
+  webhooks.
+  Note that the Triage role can *apply* an existing label but cannot create
+  or edit one, so it is not sufficient here.
+  Say so when handing off, rather than leaving someone to wonder why the new
+  labels look unstyled.
 - **Comments/replies you post via the GitHub MCP tools echo back into the
   session's `<github-webhook-activity>` events under the human account's
   identity, not a bot identity.** `add_reply_to_pull_request_comment` and
@@ -894,3 +920,97 @@ transfer, failing affected runs with `startup_failure` and **zero jobs**.
 Note that a run started shortly before the cutover can still succeed, so two
 attempts of the *same run* can disagree --- which is the cheapest available
 proof that the cause is environmental rather than in the diff.
+
+## `gh search code` is not a reliable way to enumerate consumers
+
+When a shared repo moves or cuts a breaking release, the question is which
+repos call it.
+Code search is the obvious instrument and it is **incomplete**: it silently
+omits repos whose content it has not indexed, and nothing in the response
+says so.
+
+Measured 2026-07-28, hunting callers of a renamed `d-morrison/gha` across ten
+owners: an owner-scoped `gh search code '"d-morrison/gha" user:...'` returned
+176 hits across 23 repos, and missed `d-morrison/altdoc`, a live consumer with
+four workflow files calling it.
+An exhaustive scan of all 947 non-archived repos found it immediately.
+
+So treat code search as a fast first pass, never as the census.
+The census enumerates repos and reads their workflow files:
+
+```bash
+LIMIT=1000
+for o in <owners>; do
+  # gh repo list works for users AND orgs; `gh api /orgs/$o/repos` 404s on a
+  # user account, so don't substitute it just to get --paginate.
+  n=$(gh repo list "$o" --limit "$LIMIT" --no-archived --json nameWithOwner \
+        --jq '.[].nameWithOwner' | tee -a repos.txt | wc -l)
+  [ "$n" -ge "$LIMIT" ] && echo "TRUNCATED: $o hit --limit $LIMIT; raise it" >&2
+done
+
+while read -r r; do
+  echo "$r" >> scanned.txt          # before any early exit, per fail-fast
+  files=$(gh api "/repos/$r/contents/.github/workflows" --jq '.[].path' 2>err.txt) || {
+    # 404 = no workflows dir, expected. Anything else is an error, not a miss.
+    grep -q '"status": "404"' err.txt || echo "ERROR: $r $(tr -d '\n' < err.txt)" >&2
+    continue
+  }
+  for f in $files; do
+    gh api "/repos/$r/contents/$f" -H "Accept: application/vnd.github.raw" \
+      | grep -q "<old-owner>/<repo>" && echo "$r $f"
+  done
+done < repos.txt
+
+echo "scanned $(wc -l < scanned.txt) of $(wc -l < repos.txt)"
+```
+
+Note what the error branch is for: a blanket `2>/dev/null` on those calls
+swallows the 403 secondary-rate-limit failures the next section describes
+alongside the 404s it is meant to hide, so a rate-limited run reports fewer
+hits rather than an error.
+That is the same false-all-clear
+[`fail-fast`](../shared/principles/fail-fast.md) covers, arriving in the very
+command written to prevent it.
+
+Three things that scan still misses, so state them rather than claiming a
+clean census:
+
+- **Non-default branches.** It reads each repo's default branch only, so an
+  open PR branch carrying the old reference is invisible.
+  Those self-heal on the branch's next `main` sync when the branch does not
+  itself touch the file, but they break the branch's CI until then.
+- **Paths outside `.github/workflows/`.** A composite action under
+  `.github/actions/*/action.yml` can carry its own `uses:`, and is missed by
+  a workflows-only glob.
+  Widen the path filter, or use the git-trees API to list every blob under
+  `.github/` in one call per repo.
+- **A local checkout is not evidence about the remote.**
+  `d-morrison/methods.paper` had four gha-calling workflows on disk, all on an
+  unmerged branch; the remote default branch had no `.github/workflows`
+  directory at all.
+
+## A secondary rate limit fires while `rate_limit` still reports headroom
+
+`gh api /rate_limit` reporting `core: 4936/5000` does **not** mean the next
+call will succeed.
+GitHub enforces a separate concurrency/abuse limit, and at `xargs -P 12`
+across a few thousand `contents` reads, `/repos/{owner}/{repo}` began
+returning 403 `API rate limit exceeded for user ID <n>` while the
+`rate_limit` endpoint went on reporting nearly the full core budget unspent.
+The two counters are not the same counter, so the cheap check does not
+predict the expensive one.
+
+Two practical consequences:
+
+- **Back off rather than retry.** Re-running the same fan-out at the same
+  concurrency reproduced it immediately; the limit cleared on its own after
+  roughly fifteen minutes.
+  Lower the parallelism (`-P 3` completed the remainder without incident)
+  rather than looping.
+- **Log coverage, not just hits.** A per-repo scan that exits early on a 403
+  records nothing for that repo, so the run reports fewer findings rather
+  than an error.
+  Print `scanned N of M` and diff the two lists, or a truncated sweep reads
+  exactly like a clean one.
+  (2026-07-28: a 947-repo scan reported 910 scanned; the 37-repo shortfall
+  was the whole signal that anything had gone wrong.)

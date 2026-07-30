@@ -188,3 +188,50 @@ live-state list to match a new bright line re-added both an em-dash and a
 mid-line semicolon, flagged by `check-new-line-breaks` and the punctuation
 scan respectively.
 Neither glyph was authored in either session.)
+
+**Fixing one flagged glyph is a one-line edit; fixing it with a whole-file
+replace is a different, much larger change that happens to touch the same
+line.**
+The two look identical in intent --- both make the check pass --- but a
+blanket `str.replace()` or `sed -i` run against the whole file does not stop
+at the flagged occurrence.
+It rewrites every instance the file already carried, including the ones
+grandfathered under exactly the "writing into a file that predates this
+rule" reasoning two sections above.
+
+The failure is not that the result is wrong --- every rewritten line is
+individually correct, and a repo-wide sweep of this rule is a legitimate
+goal on its own.
+It is that the fix silently exceeds what the diff was for.
+A one-line finding can triple or worse the diff size, touching content no
+reviewer asked about, in a PR whose whole point was a small, targeted
+addition.
+That is scope creep by mechanism, not by intent, which is what makes it easy
+to do without noticing: nothing about running a global replace *feels* like
+expanding scope, and the tool reports success either way.
+
+Fix the flagged occurrence with a targeted edit --- `Edit`'s exact-match
+`old_string`, or a line-anchored substitution --- never a bare find-and-replace
+across the file.
+If a repo-wide sweep is worth doing, it is worth doing as its own change,
+not as a side effect of answering one review comment.
+
+- **Do:** fix a flagged glyph with an edit scoped to that occurrence.
+- **Do:** propose a corpus-wide punctuation sweep as a separate, explicit
+  change when the file's other grandfathered violations are worth clearing.
+- **Don't:** reach for a whole-file search-and-replace to answer a
+  single-line finding, even when the replacement itself is correct.
+- **Don't:** assume a diff is clean because the check now passes --- check
+  its size against what the finding actually asked for.
+
+(Morrison-Lab/ai-config#916, 2026-07-30: a review flagged one em-dash in a
+newly added heading.
+The first fix ran a file-wide replace of the banned em-dash (U+2014) with
+`---` against
+`skills/agent-builder/SKILL.md`, which also rewrote 52 pre-existing
+em-dashes elsewhere in that same file, turning a 33-line addition into a
+104-line diff.
+Caught before pushing by checking the diff's size against the single-line
+finding it was meant to answer; recovered via `git checkout -- <file>`
+against the still-staged pre-replace version, since the file had been
+`git add`-ed before the mistake.)

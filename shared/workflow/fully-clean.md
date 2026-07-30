@@ -381,12 +381,14 @@ rather than from `status`, per criterion 1 above.
 - **Don't:** keep spending retries on a failure whose every attempt dies at
   the same short duration.
 
-(d-morrison/altdoc#95 / altdoc#99, 2026-07-30: `claude-review` failed seven
-times across two PRs, each run finishing in the 26-to-35-second band, with
-`is_error: true`, `total_cost_usd: 0`, and no permission denials.
+(d-morrison/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
+times across those two PRs -- six on #96, one on #95 -- each run finishing in
+the 26-to-35-second band, with `is_error: true`, `total_cost_usd: 0`, and no
+permission denials.
 The nearest pair is 38 seconds apart: the run on altdoc#95 failed
 `04:07:37Z -> 04:08:12Z`, and the same reviewer returned a full
 `Ready for merge` verdict on Morrison-Lab/ai-config#858 over
 `04:08:50Z -> 04:11:41Z`.
 So the service was fine and the `d-morrison` credential was not, which no
-number of re-runs would have shown.)
+number of re-runs would have shown.
+Tracked in d-morrison/altdoc#99.)

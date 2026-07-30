@@ -11,6 +11,11 @@
 - `gh` opens a pager (alternate buffer) that hangs the agent terminal.
 - Always disable it: pipe `| cat` or set `GH_PAGER=cat` (e.g. `gh pr view 116 | cat`).
 - `gh --no-pager` is not a supported flag and will error; use `GH_PAGER=cat` or `| cat` instead.
+- **`gh repo list <owner>` works for a user or an org; `gh api /orgs/<owner>/repos` only works for an org.**
+  The REST endpoint returns 404 on a personal account, so it is not a drop-in replacement for `gh repo list` even though it offers `--paginate`.
+  `gh api /users/<owner>/repos` is the personal-account counterpart, and `gh api /users/<owner> --jq .type` returns `User` or `Organization` when you need to branch.
+  This matters when enumerating repos across a mixed owner list: substituting the `/orgs/` form to get pagination silently drops every user account in the list.
+  (Morrison-Lab/ai-config#833, 2026-07-29: a review suggested exactly that substitution to fix a `--limit 1000` truncation; `d-morrison` is a `User`, so it would have 404'd on the first owner in the list. The truncation was real, and the fix was to detect the ceiling instead --- see the census command later in this file.)
 - **Rate limit is shared (5000/hr) and split GraphQL vs REST.**
   All tools/sessions/agents share the one user's 5000/hr, and `core` (REST)
   and `graphql` are **separate pools**.

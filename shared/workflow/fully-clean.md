@@ -176,8 +176,8 @@ The maintainer's call was to hold; the PR merged with `jules/review` red.)
 API error, so there is no verdict of any kind --- and its error message may
 blame the wrong thing.**
 All seven cases above concern a reviewer that produced *something*: a stub, a
-misfiled conclusion, a fabricated premise, a refusal, a wrapped verdict, a
-false positive.
+misfiled conclusion, a pass that cannot fail, a fabricated premise, a
+refusal, a wrapped verdict, a false positive.
 This one produces nothing.
 The job goes red, no review comment appears, and the check is simply absent
 as evidence either way.

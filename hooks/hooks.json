@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "Binding metadata for the hooks in this directory. A hook script cannot",
+    "declare its own event, so scripts/install-hooks.py reads it from here.",
+    "",
+    "Each entry: the script's filename, the harness event it binds to, an",
+    "optional tool matcher, an optional `if` permission-rule prefilter (which",
+    "keeps the hook from spawning on every unrelated call), and a one-line",
+    "reason naming the rule it enforces."
+  ],
+  "hooks": [
+    {
+      "script": "inject-local-time.sh",
+      "event": "UserPromptSubmit",
+      "timeout": 10,
+      "why": "CLAUDE.md 'Timestamp recaps in local time' -- supplies the real local time each turn, because a fabricated timestamp is indistinguishable from a remembered one."
+    },
+    {
+      "_note_no_if": [
+        "Deliberately carries no `if` prefilter. `Bash(gh *)` was tried and",
+        "verified working in the live harness -- it fires on `cd /tmp && gh ...`",
+        "and on `GH_TOKEN=x gh ...`, so it is not a strict prefix glob today.",
+        "It is still removed, because the asymmetry is bad: if that matching",
+        "ever tightens to a prefix check, the guard stops firing on exactly the",
+        "compound and env-prefixed shapes it exists to catch, and it stops",
+        "SILENTLY -- a disabled guard and a guard with nothing to block look",
+        "identical. The prefilter buys one Python startup (~30ms) per gh-less",
+        "Bash call; that is not worth a silent-failure mode."
+      ],
+      "script": "require-gh-repo-flag.py",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 10,
+      "why": "Blocks mutating repo-scoped gh commands lacking -R, so a write never silently targets whatever repo the cwd happens to be."
+    },
+    {
+      "script": "no-offer-to-file.py",
+      "event": "Stop",
+      "timeout": 10,
+      "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+    }
+  ]
+}

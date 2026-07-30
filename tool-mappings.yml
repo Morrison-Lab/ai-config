@@ -146,9 +146,11 @@ operations:
     github_mcp: mcp__github__issue_write (method=update, state=open)
   - id: LABEL_ISSUE
     description: >-
-      Set an issue's labels. Note both tools REPLACE the label set rather than
-      appending, so pass the union of existing and new; the MCP path also
-      silently creates an unknown label name instead of rejecting it.
+      Set an issue's labels. The two behave differently and are not
+      interchangeable: `--add-label` ADDS to the existing set, while the MCP
+      path REPLACES the whole set, so pass the union of existing and new
+      labels there. The MCP path also silently creates an unknown label name
+      instead of rejecting it.
     cli: gh issue edit <N> --add-label "..."
     github_mcp: mcp__github__issue_write (method=update, labels=[...])
   - id: GET_LABEL

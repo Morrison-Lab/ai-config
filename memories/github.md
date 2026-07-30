@@ -913,15 +913,38 @@ So treat code search as a fast first pass, never as the census.
 The census enumerates repos and reads their workflow files:
 
 ```bash
+LIMIT=1000
 for o in <owners>; do
-  gh repo list "$o" --limit 1000 --no-archived --json nameWithOwner --jq '.[].nameWithOwner'
-done | while read -r r; do
-  gh api "/repos/$r/contents/.github/workflows" --jq '.[].path' 2>/dev/null | while read -r f; do
-    gh api "/repos/$r/contents/$f" -H "Accept: application/vnd.github.raw" 2>/dev/null \
+  # gh repo list works for users AND orgs; `gh api /orgs/$o/repos` 404s on a
+  # user account, so don't substitute it just to get --paginate.
+  n=$(gh repo list "$o" --limit "$LIMIT" --no-archived --json nameWithOwner \
+        --jq '.[].nameWithOwner' | tee -a repos.txt | wc -l)
+  [ "$n" -ge "$LIMIT" ] && echo "TRUNCATED: $o hit --limit $LIMIT; raise it" >&2
+done
+
+while read -r r; do
+  echo "$r" >> scanned.txt          # before any early exit, per fail-fast
+  files=$(gh api "/repos/$r/contents/.github/workflows" --jq '.[].path' 2>err.txt) || {
+    # 404 = no workflows dir, expected. Anything else is an error, not a miss.
+    grep -q '"status": "404"' err.txt || echo "ERROR: $r $(tr -d '\n' < err.txt)" >&2
+    continue
+  }
+  for f in $files; do
+    gh api "/repos/$r/contents/$f" -H "Accept: application/vnd.github.raw" \
       | grep -q "<old-owner>/<repo>" && echo "$r $f"
   done
-done
+done < repos.txt
+
+echo "scanned $(wc -l < scanned.txt) of $(wc -l < repos.txt)"
 ```
+
+Note what the error branch is for: a blanket `2>/dev/null` on those calls
+swallows the 403 secondary-rate-limit failures the next section describes
+alongside the 404s it is meant to hide, so a rate-limited run reports fewer
+hits rather than an error.
+That is the same false-all-clear
+[`fail-fast`](../shared/principles/fail-fast.md) covers, arriving in the very
+command written to prevent it.
 
 Three things that scan still misses, so state them rather than claiming a
 clean census:

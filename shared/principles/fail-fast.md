@@ -160,7 +160,7 @@ The shape is a scan whose per-item worker writes only on a hit, run under
 `xargs`/`parallel` with stderr discarded:
 
 ```bash
-xargs -P 12 -n 1 ./scan.sh < repos.txt >/dev/null 2>&1   # every failure discarded
+xargs -P 12 -n 1 ./scan.sh < "$OUT/repos.txt" >/dev/null 2>&1   # every failure discarded
 ```
 
 Any per-worker failure now produces an empty results file, which is exactly
@@ -178,7 +178,7 @@ early-exit path, turns the ambiguity into arithmetic:
 ```bash
 echo "$item" >> "$OUT/scanned.txt"     # first line of the worker, not the last
 ...
-echo "scanned $(wc -l < scanned.txt) of $(wc -l < items.txt)"
+echo "scanned $(wc -l < "$OUT/scanned.txt") of $(wc -l < "$OUT/repos.txt")"
 ```
 
 `scanned 0 of 947` is unmistakable; a bare "no hits" is not.

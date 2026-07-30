@@ -27,8 +27,11 @@ A PR/MR is **fully clean** when **both** of these hold:
    into a confidently wrong one.
    Two check runs can carry the *same name* on the same head --- an earlier
    one that already succeeded, and a later one still running --- so matching
-   on the name returns the stale green and reports the PR ready while its
-   replacement is mid-flight.
+   on the name returns the stale green and reports the PR ready while the
+   other is still going.
+   They are usually not re-runs of each other: the common case is two
+   separate workflow runs that each happen to define a job by that name, so
+   neither replaces the other and both are legitimately present.
    Key on the check run's **id**, and read `status` before `conclusion`, since
    a run still `in_progress` has no `conclusion` to be misled by.
 

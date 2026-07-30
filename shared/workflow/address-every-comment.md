@@ -222,6 +222,92 @@ which the commit body directly refutes, and which is wrong about
 Caught by `claude-review` as an inline finding, not by any check, and the
 correct framing turned out to be deferred versus immediate effect.)
 
+**One step further back: a figure inherited from the tracking issue is both
+the copy git keeps and the copy nobody verified.**
+The entry above explains a mismatch by *register* --- a commit message argues
+for the change while a changelog describes it, so they get drafted differently
+and never read together.
+Here both claims sit in the same register and describe the same fact.
+Only one of them was checked.
+What separates them is **provenance**: a number produced by running something,
+versus a number carried over from the issue you wrote before you had anything
+to run.
+
+Two properties make it worse than an ordinary wrong number.
+
+One of the two copies becomes permanent, and you cannot tell which from
+inside the PR.
+A PR body stays editable forever, while a commit message does not survive a
+merge in editable form --- but which text a squash merge actually keeps is a
+repository setting, and it can be either.
+Configured one way the commit messages land on `main` and the PR body is
+discarded; configured the other the PR body becomes the commit body and the
+commit messages are dropped.
+
+That is why the rule is *both must be right* rather than *check the important
+one*.
+The copy that survives is chosen by a setting most authors have never looked
+at, so treating either as the draft is a coin flip.
+And the odds are not even: the commit message is the one written earliest,
+from the least evidence, so the configuration that keeps it is the one that
+makes the weaker copy permanent.
+
+Read a recent squash commit on `main` if you want to know which way a given
+repo is set --- `git log -1 --format=%B <a squash merge>` shows it directly,
+and beats reasoning about settings pages.
+(Checked this way on this repo, 2026-07-30: `5670f9f`, the squash of
+[#855](https://github.com/Morrison-Lab/ai-config/pull/855), carries that PR's
+commit message rather than its body.
+So here the weaker copy is the one that persists.)
+
+And verifying once feels like verifying.
+Running the check for the PR body produces a real sense of having established
+the fact, which is what stops you checking the other place it appears.
+The verification is genuine; the coverage is not.
+
+Note the shape is the same as [`ardi`](ardi.md)'s "an instruction's own
+suggested code is not exempt", one artifact over: content inherited from a
+planning document does not feel authored, so the checks you apply to your own
+claims do not fire on it.
+
+- **Do:** re-run the check when a figure moves from an issue into a commit
+  message, even having verified it once for the PR body.
+- **Do:** read `git log -1 --format=%B` before pushing, against the same
+  source the body's claims came from --- a commit message is not greppable
+  from the working tree once written.
+- **Don't:** copy a count, version, or path out of the tracking issue on the
+  strength of having written that issue.
+- **Don't:** treat "permanent in history" as settled while the PR is
+  unmerged --- `git commit --amend` still works, and is usually worth a fresh
+  CI round against a wrong figure reaching `main`.
+
+(`ucdavis/bcs#465`, 2026-07-30: a submodule-pin bump whose PR body said
+`CLAUDE.md` resolves 33 `@.ai-config/...` imports and whose commit message,
+written minutes apart, said 25.
+33 came from a script; 25 came from the tracking issue, written from
+recollection.
+Review named the mechanism exactly --- inherited from the issue rather than
+re-checked against the file --- and graded it non-blocking on the grounds that
+it was already permanent, which was the one part that was not yet true.)
+
+**A corollary for checking any of this in a semantic-line-break corpus: a
+single-line `grep` returns false negatives on your own prose.**
+The instruments above and elsewhere in this file assume you can search for a
+phrase you wrote.
+In a corpus that mandates one clause per line, a phrase of any length
+routinely spans a newline, so `grep 'flat statement of intent'` reports zero
+against a file that plainly contains it.
+The failure direction is the dangerous one: a missing-content check that
+answers "absent" when the content is present reads as a merge having dropped
+your work, which invites re-doing something already done.
+Normalize whitespace before matching --- read the file, collapse `\s+` to a
+single space, then search --- rather than trusting a line-oriented tool
+against deliberately broken lines.
+(Same day, verifying that
+[#855](https://github.com/Morrison-Lab/ai-config/pull/855) had landed: two of
+three greps reported present and the third reported absent, purely because
+that phrase happened to straddle a line break.)
+
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
 
 **This generalizes to a skill's own inline restatement of a fragment it
@@ -309,9 +395,59 @@ Matching whole lines against the tag -- how bash itself ends a heredoc --
 removed the whole lazy-quantifier/anchor failure mode instead of narrowing
 it; the reply carried the failing output of the suggested form.)
 
+**The highest-yield version of that check: when a comment names an edge case
+in its own prose and also supplies a fix, run the fix against that edge
+case.**
+The bullets above test a suggestion against the code, or against a repro the
+reviewer provided.
+This tests it against the reviewer's *other paragraph*, and it is the cheapest
+of them, because the hazard has already been identified for you --- the
+work left is only to check whether the proposed code handles it.
+
+Nothing forces the two halves to agree.
+A comment's prose and its suggestion are drafted separately, and a reviewer
+who spots an edge case while reasoning about the problem does not necessarily
+carry it into the snippet.
+So a comment can read as unusually thorough --- it anticipated a failure mode
+you had not --- while shipping a fix that falls into exactly it.
+That thoroughness is what makes the suggestion persuasive, which is the trap.
+
+Applying it is worse than ignoring the whole finding.
+The prose half was right, so the reviewer's authority is real; the snippet
+then lands under that authority carrying a defect the same comment already
+described, and the thread reads as settled.
+Worse still when the defect is one your own corpus documents, since the
+review has now talked you out of a standing rule.
+
+Keep the finding and reject the snippet.
+Fix it your own way, quote the edge case back, and say plainly why the
+suggested form was set aside --- silently deviating from a `suggestion` block
+reads as having missed it.
+
+- **Do:** check a suggested fix against every failure mode the same comment
+  names, before checking anything else about it.
+- **Do:** name the reviewer's own caveat in the reply, so the rebuttal rests
+  on their evidence rather than on your say-so.
+- **Don't:** let a comment's demonstrated thoroughness transfer to its
+  snippet --- they are separate claims.
+- **Don't:** discard a finding because its fix is wrong; the half that named
+  the hazard usually still stands.
+
+(Morrison-Lab/ai-config#868, 2026-07-30: a review correctly found that
+`git merge-base --is-ancestor` prints nothing and answers by exit status, and
+its second paragraph noted the command exits 2 or higher when the ref has
+been pruned away.
+Its suggested `... && echo "ancestor" || echo "not ancestor"` maps that exit
+onto the `not ancestor` branch, since `&&` fails on any non-zero status --- so
+the fix printed a confident verdict for precisely the broken-check case the
+comment itself had raised, which is the shape
+[`fail-fast`](../principles/fail-fast.md) names.
+A three-arm `case $?` was used instead, reporting `0`, `1`, and `2+`
+distinctly.)
+
 **And the mirror case: a finding can be wrong on its stated grounds while
 still pointing at something real.**
-The two bullets above check the reviewer's *fix*; this one checks their
+The bullets above check the reviewer's *fix*; this one checks their
 *premise*.
 A confidently reasoned factual claim -- this pattern is valid, that value is
 in range, this call is safe -- invites one of two lazy responses: accept it

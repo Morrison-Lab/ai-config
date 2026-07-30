@@ -700,3 +700,124 @@ their next docs build.
 The regression test was verified to fail against the pre-fix code ---
 `find_versions_entry` returned `None`, so the caller raised `TypeError` ---
 rather than merely added.)
+
+## An action that hard-gates on the event name can still be driven from another event
+
+A third-party action can refuse every event but the one it was written for,
+before it reads any of its own inputs:
+
+```js
+// sanjay3290/jules-pr-reviewer, src/index.ts:37 (at the pinned SHA)
+if (ctx.eventName !== 'pull_request') {
+  core.setFailed(`Unsupported event: ${ctx.eventName}. Use on: pull_request.`);
+  return;
+}
+```
+
+That reads like a hard constraint on the trigger, and it usually gets treated
+as one: the obvious conclusions are "this capability cannot be made
+on-demand" or "fork the action".
+Neither is necessary.
+`@actions/github`'s `Context` hydrates itself entirely from environment
+variables, so both halves of the gate are caller-supplied:
+
+```js
+if (process.env.GITHUB_EVENT_PATH) {
+  if (existsSync(process.env.GITHUB_EVENT_PATH)) {
+    this.payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, ...));
+  }
+}
+this.eventName = process.env.GITHUB_EVENT_NAME;
+```
+
+Step-level `env:` overrides those, so a workflow triggered by anything can
+present the action with the event it demands.
+For a `pull_request` gate the payload is close to one API call, because
+`GET /repos/{owner}/{repo}/pulls/{n}` returns nearly the shape the event
+delivers --- near enough to work, not near enough to skip the field check
+below:
+
+```yaml
+      - name: Resolve the PR into a pull_request event payload
+        run: |
+          gh api "${{ github.event.issue.pull_request.url }}" \
+            | jq '{pull_request: .}' > "$RUNNER_TEMP/pr_event.json"
+
+      - uses: some/action@<sha>
+        env:
+          GITHUB_EVENT_NAME: pull_request
+          GITHUB_EVENT_PATH: ${{ runner.temp }}/pr_event.json
+```
+
+Two things make this safe rather than merely clever, and both need checking
+before relying on it:
+
+- **Read the action's own source for what it consumes past the gate**, and
+  confirm the synthesized payload covers it.
+  Everything after the gate in the case above read only the `pull_request`
+  object, so nothing else had to be faked.
+  A field the action reads and the API omits is the failure this check
+  catches; `labels` was the near-miss, and it survived only because the action
+  guards it as `(pr.labels || [])`.
+- **`ctx.repo` is unaffected**, since it prefers `GITHUB_REPOSITORY`, which
+  Actions always sets.
+
+Note what the override does **not** change: the token's permissions, and the
+security properties of the real trigger.
+An `issue_comment` run executes in the base repo with a write token even for a
+fork PR, so a gate the original event enforced implicitly (fork PRs get no
+secrets under `pull_request`) has to be re-established explicitly.
+
+- **Do:** read the pinned action's own code for how it reads `eventName` and
+  `payload` before concluding its trigger is fixed --- `src/` for a legible
+  version of the gate, and `dist/` to confirm what the pinned SHA actually
+  runs, since the bundle is what Actions executes and it can lag `src/`.
+- **Do:** re-derive any safety property the original event was providing for
+  free, once the event is synthesized.
+- **Don't:** fork an action, or abandon the feature, on the strength of an
+  `eventName` guard alone.
+- **Don't:** assume the API response is a drop-in payload without checking
+  every field the action reads.
+
+(Morrison-Lab/ai-config#857, 2026-07-30: making the Jules reviewer on-demand
+needed an `issue_comment` trigger, which its pinned action rejects outright.
+Both files were read at the pinned SHA rather than assumed --- `src/index.ts`
+for the gate quoted above, `dist/index.js` for the `Context` constructor that
+makes the override work --- and then this PR's own API object, for field
+coverage.
+The line number above was `:38` when first written, and a review round caught
+it: it is `:37`.
+Worth noting how, since it is the cheap lesson here.
+The reviewer inferred the citation was unverifiable because the case note named
+only `dist/`, which was the wrong reason --- but a `grep -n` settled the real
+question in one command, and the same off-by-one had already shipped into the
+workflow comment that makes the same claim.)
+
+## Which ref a workflow runs from decides whether a trigger change takes effect before merge
+
+Editing a workflow's `on:` block has different reach depending on which event
+you are adding or removing, and the asymmetry is easy to state backwards.
+
+- **`pull_request` runs from the PR's own head ref.**
+  So *removing* a `pull_request` trigger takes effect on that branch
+  immediately: the workflow simply stops running on the PR that removes it.
+- **`issue_comment`, `push` on the default branch, `schedule`, and
+  `workflow_dispatch` run from the default branch.**
+  So *adding* one of those is inert until merge, however correct the file is.
+
+A PR that swaps one for the other therefore half-works while it is open, and
+saying which half is a claim worth testing rather than reasoning about.
+`list_workflow_runs` filtered to the branch settles it: a run list that stops
+at the pre-change commit is the removal having taken effect, and the absence
+of a run for the new event is the addition being inert rather than broken.
+
+- **Do:** state which half of a trigger swap is demonstrable on the PR and
+  which cannot be, and name the check that will confirm the rest after merge.
+- **Don't:** write that "the old trigger still applies to this PR" when the
+  old trigger was `pull_request` --- the branch's own file is what runs.
+
+(Morrison-Lab/ai-config#857, 2026-07-30: the PR body first claimed the old
+`pull_request` trigger would still review the PR.
+`list_workflow_runs` for that workflow on the branch returned exactly one run,
+at the empty claim commit predating the change, and none for the
+`ready_for_review` event the old file would have fired on.)

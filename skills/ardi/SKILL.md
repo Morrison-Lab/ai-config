@@ -276,11 +276,18 @@ finding → push → post summary → re-request review → repeat until clean.
 
 ### Per-round checklist
 
-Per [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md),
-confirm each box before advancing to the next round:
+**Pause point: before advancing to the next round.**
+Do-Confirm; per
+[`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
-- [ ] The latest review analyzed is for the current head commit (not a stale
-      prior run).
+- [ ] **Killer item:** the latest review analyzed is for the current head
+      commit, not a stale prior run.
+      Marked because getting this wrong invalidates the whole round rather
+      than leaving a gap in it: a reviewer's snapshot predating your rebuttal
+      re-raises an item you already answered, and a verdict from an older head
+      says nothing about the code you just pushed.
+      Compare the review run's `started_at` against your last reply and the
+      head SHA.
 - [ ] Every finding from that review has an ARD disposition.
 - [ ] If code changed, main was synced in first when needed, then fixes were
       pushed.
@@ -358,11 +365,18 @@ thread) and your reply to it. (Thread mechanics live in the `ard` skill, step
 
 ### Fully-clean exit checklist
 
-Per [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md),
-confirm each box before declaring "clean":
+**Pause point: before declaring "clean" or reporting the PR ready.**
+Do-Confirm; per
+[`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
-- [ ] All workflows and check runs are green **and completed** for the current
-      head.
+- [ ] **Killer item:** all workflows and check runs are green **and
+      completed** for the current head --- re-fetched and re-counted now, not
+      checked off from the names you were watching.
+      Marked because a posted verdict does not mean the review job finished,
+      the check set can *grow* mid-run as jobs spawn others, and two check
+      runs can share a name (a stale green plus a live one), so matching on
+      name returns the wrong one.
+      Key on check-run id, and read `status` before `conclusion`.
 - [ ] Latest review has zero findings and no disputed rebuttals.
 - [ ] That review is a genuine posted verdict at the current head from an
       external reviewer, if one is reachable -- re-checked right before

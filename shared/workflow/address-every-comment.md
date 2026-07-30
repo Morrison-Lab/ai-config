@@ -496,7 +496,7 @@ workarounds, so adopting a weaker reason ships a rule the next reader can talk
 themselves around --- while the thread records the item as settled.
 
 The tell is a suggestion that explains *why* something is forbidden in a single
-clause, where the primary source has a stronger clause available.
+phrase, where the primary source carries a stronger provision.
 So ask what the strongest *available* reason is, rather than whether the offered
 one is defensible, and name the workaround the weaker reason would have
 licensed --- that is what makes the choice checkable rather than a matter of
@@ -522,8 +522,8 @@ no conflict arises.
 SPDX `license-list-data`'s `CC-BY-ND-4.0.txt` §2(a)(1) grants a
 **non-sublicensable** license, so the material cannot be re-offered under MIT at
 all, which is exactly what vendoring does.
-The conclusion was right and its stated reason was one clause short of
-load-bearing.)
+The conclusion was right, and its stated reason stopped short of the provision
+that actually forecloses the workaround.)
 
 **And the mirror case: a finding can be wrong on its stated grounds while
 still pointing at something real.**

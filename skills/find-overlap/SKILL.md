@@ -100,11 +100,36 @@ The line count separates thin stubs from real bodies at a glance.
 
 ### 3. Cluster candidates — then read the bodies
 
-Group units that share keywords, titles, or the same outcome. Do a cheap
-keyword/title pass first, **then read the full body of every member of each
-candidate cluster.** Never classify on titles or descriptions alone — that's the
-top source of false positives (two skills can share a verb and do different
-work).
+**Run the instrument first, then do the keyword pass --- you need both.**
+
+```bash
+python3 scripts/find-near-duplicates.py --calibrate            # skills corpus
+python3 scripts/find-near-duplicates.py --corpus 'memories/*.md'
+python3 scripts/find-near-duplicates.py --include-aliases      # to audit stubs
+```
+
+It ranks every pair by Jaccard similarity over word shingles and prints the
+candidates above a threshold with their shared phrasing, so which pairs get
+read is decided by arithmetic rather than by which ones you thought to
+compare --- per
+[`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md).
+It suppresses alias-stub pairs by default and reports how many it suppressed.
+
+**It covers one of the three buckets, so it does not replace the keyword
+pass.** It ranks *reused phrasing*, which is where genuine duplicates live.
+It cannot see conceptual adjacency: `tidy` and `simplify` --- this skill's own
+canonical adjacent-but-distinct example --- score 0.019, because they share an
+idea and almost no wording.
+Alias families are likewise invisible to the score (a stub's body is a
+pointer, so `find-duplicates` vs `find-overlap` scores 0.002) and are detected
+structurally instead, via the `alias?` flag.
+So: take the instrument's ranking, **then** add whatever the keyword/title
+pass turns up that it missed.
+
+Then **read the full body of every member of each candidate cluster.** Never
+classify on titles, descriptions, or a similarity score alone --- that's the top
+source of false positives (two skills can share a verb, or a paragraph of
+boilerplate, and do different work).
 
 ### 4. Classify each cluster into one of the three buckets
 

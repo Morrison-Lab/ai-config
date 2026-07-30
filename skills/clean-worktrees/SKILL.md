@@ -178,8 +178,18 @@ Scope it to those files.
 A bare `git diff origin/main <head>` reports every file `main` has gained
 since the worktree was cut, which in an active repo is hundreds --- all of it
 `main`'s drift rather than the worktree's work, and it buries the answer.
-Get the file list from `git log origin/main..HEAD` first, then diff only
-those.
+Get the file list from the worktree's own commits first, then diff only
+those:
+
+```bash
+git log --name-only --format='' "origin/main..$h" | sort -u
+```
+
+Note the `$h` rather than `HEAD`.
+A detached worktree's head is not the head of wherever you are running the
+command, so a bare `HEAD` silently reports on the current checkout instead ---
+and without `--name-only --format=''` the command prints commit messages
+rather than the file names the next step needs.
 An empty diff means the content is on `main` and the worktree is **Dead**.
 
 (2026-07-29, the same ai-config sweep: two detached worktrees showed
@@ -233,10 +243,23 @@ then you committed something else locally", and only the second is unsafe.
 Compare the branch tip's date against the PR's `mergedAt`:
 
 ```bash
-tip=$(git log -1 --format='%cI' "<branch>")
-merged=$(gh pr view <N> --json mergedAt --jq .mergedAt)   # VIEW_PR
-[[ "$tip" < "$merged" ]] && echo "OK (tip predates merge)" || echo "tip AFTER merge -- inspect"
+tip=$(git log -1 --format='%ct' "<branch>")                          # epoch seconds
+merged=$(gh pr view <N> --json mergedAt --jq '.mergedAt|fromdateiso8601')   # VIEW_PR
+[[ "$tip" -lt "$merged" ]] && echo "OK (tip predates merge)" || echo "tip AFTER merge -- inspect"
 ```
+
+Compare **epochs**, not the ISO strings.
+`%cI` renders the commit's date in the machine's local zone while `mergedAt`
+is UTC, so a lexicographic `<` between them compares clock faces from two
+different zones.
+It fails in the unsafe direction: west of UTC, a tip committed *after* the
+merge still sorts first, reports `OK`, and the worktree gets removed with
+that commit on it.
+Verified with `tip=2026-07-30T18:00:00-07:00` against
+`merged=2026-07-30T23:00:00Z` --- the tip is two hours later in real time and
+the string comparison says it predates.
+`%ct` and `fromdateiso8601` put both on the same absolute scale, and
+`fromdateiso8601` is available in the jq that `gh --jq` embeds.
 
 A tip predating the merge cannot carry anything the merge did not see.
 A tip *after* it is the case worth stopping for, and it is the same orphaned

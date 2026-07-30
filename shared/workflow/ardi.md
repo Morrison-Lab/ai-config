@@ -114,6 +114,51 @@ PR comment said they were "addressed in the latest push"; the head sat at the
 pre-fix commit for over an hour, with 14 green checks validating a branch
 carrying neither fix, until a scheduled check-in compared the SHAs.)
 
+**The read side of that comparison can lag a push by a few seconds, so test
+the two *local* refs against each other before concluding anything failed.**
+The rule above is an
+[`algorithmatize-checks`](algorithmatize-checks.md) case because two SHAs
+decide it exactly.
+That holds only as far as both numbers are current, and one of them is fetched
+over the network: `gh pr view <N> --json headRefOid` can still report the
+**previous** commit immediately after a successful push.
+
+The failure direction is a false alarm rather than a false all-clear, so it is
+the safe one --- but the reflexive response to it is wrong twice over.
+The rule's own remedy is "if they differ, push first", which is a no-op here,
+and treating a healthy branch as broken invites an amend or a force-push that
+manufactures the problem the check was watching for.
+A check that cries wolf on a clean branch also stops being run, which is the
+objection `algorithmatize-checks` raises against any instrument whose
+threshold cannot be trusted.
+
+Local refs cannot lag this way, so they settle it:
+
+```sh
+git rev-parse HEAD origin/<branch>   # both local reads
+```
+
+- Equal --- the push landed, and any disagreement with the PR API is a
+  read-side artifact.
+  Re-read it, preferably on a different surface, rather than re-pushing.
+- Different --- a genuinely unpushed commit, which is the case the rule exists
+  for.
+
+Note also that `git push` answering `Everything up-to-date` is itself evidence
+the remote branch already carries the commit.
+
+- **Do:** compare `HEAD` against `origin/<branch>` first when the PR API
+  disagrees, and re-read rather than re-push when those two agree.
+- **Don't:** amend, force-push, or re-commit on the strength of an API SHA
+  alone.
+
+(Morrison-Lab/ai-config#845, 2026-07-29: `git rev-parse HEAD` and
+`git rev-parse origin/<branch>` both read `9a3e722` and `git push` said
+`Everything up-to-date`, while `gh pr view --json headRefOid` still returned
+the prior commit `4bf5063`.
+`pull_request_read` `get` returned `9a3e722` moments later, so the two
+surfaces disagreed and the git-native one was right.)
+
 **The same false claim arrives as *incoming* state when you pick a PR up
 mid-flight, and there the SHA comparison usually has nothing to compare.**
 The bullet above governs a claim you are about to make.

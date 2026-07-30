@@ -9,6 +9,13 @@ gives reviewers context, lets the PR auto-close it via `Closes #N`, and keeps
 the work discoverable even if the PR stalls. Skip only when the task is already
 tracked by an open issue.
 
+This rule settles *whether* something is tracked, not *where* it goes.
+An item whose deliverable is a decision rather than a diff belongs on the
+discussion board instead, per
+[`choose-issue-or-discussion`](choose-issue-or-discussion.md) --- so read "file
+one" here as "file one in the right venue", which for actionable work is the
+tracker.
+
 When the issue is a **bug report**, include a minimal reproducible example
 (a reprex --- <https://reprex.tidyverse.org/>) whenever you can. A reprex is
 what a maintainer needs to confirm and fix the bug, and it's what they'll ask

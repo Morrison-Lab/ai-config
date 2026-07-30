@@ -545,6 +545,15 @@ Its last section generalizes past MCP: when a standing rule names a mechanism th
 
 The `st` (Start Task) skill operationalizes this; `gi` (Grab Issue) is the path when the issue already exists.
 
+## Issue or discussion? Pick the venue by best practice, not by precedent
+
+@shared/workflow/choose-issue-or-discussion.md
+
+The companion to issue-first above: that rule settles *whether* something is tracked before work starts, this one settles *where* it lands.
+Actionable work is an issue.
+An open-ended policy question whose deliverable is a decision, and which has a real do-nothing option, is a discussion --- in an answerable category (`Q&A`) so the resolution can be marked as the answer.
+Its second half is the general principle: best practice outranks repo precedent when choosing venue or method, and "the board is unused, so nobody would find it there" is circular reasoning that can never permit anyone to start using it.
+
 ## If you see something, say something — file an issue for every noticed mistake
 
 @shared/workflow/report-mistakes-proactively.md

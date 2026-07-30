@@ -238,8 +238,17 @@ For a contiguous run, name the range explicitly instead:
 `git cherry-pick <oldest>^..<newest>`.
 
 Get that list from the branch as it stood **before** the reset, not from
-memory --- `git log --oneline "origin/<base-branch>..<dependent-branch>"`
-while both refs still exist, or the PR's own commit list.
+memory --- `git log --oneline --no-merges
+"origin/<base-branch>..<dependent-branch>"` while both refs still exist, or
+the PR's own commit list.
+
+`--no-merges` is required rather than tidy.
+Every step-3 sync left a merge commit on the dependent branch, reachable from
+it and not from the base, so the range contains commits `cherry-pick` refuses
+outright: *commit is a merge but no `-m` option was given*.
+The same applies to the PR's commit list, which shows those merges too --- so
+filter by hand when reading it, rather than assuming GitHub has already
+dropped them.
 
 Confirm the diff dropped to the dependent PR's own changes, and re-run the
 repo's pre-push checks at the new head rather than carrying over the earlier

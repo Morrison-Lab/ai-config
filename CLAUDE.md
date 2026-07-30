@@ -669,9 +669,34 @@ The `sync-pr-branch` / `merge-main` skill runs this.)
 A tie-breaker for `ardia`'s PR-ordering step and `gi`'s (and `gii`/`gip`'s) issue-priority table when candidates are otherwise close in priority.
 The fragment also sets the default direction for the age factor: among several open PRs, take the **older** one first unless you have more specific instructions.
 
-## Use subagents when helpful
+## Use subagents when helpful --- and delegate rather than queue
 
-When available, use subagents for helpful sidecar work: independent investigation, verification, or disjoint implementation slices. Keep immediate blocking critical-path edits local so progress does not wait unnecessarily.
+When available, use subagents for helpful sidecar work: independent investigation, verification, or disjoint implementation slices.
+Keep immediate blocking critical-path edits local so progress does not wait unnecessarily.
+
+**Nothing parallelizable should ever sit "queued."**
+Work that does not block the edit in front of you is, by definition, work another agent could already be doing.
+Deferring it buys nothing: the serial version finishes no sooner, and the deferred item is the one most likely to be dropped outright when the session ends or the context turns over.
+
+The tell is a phrase, which makes it cheap to catch, because you have to type it before the mistake is complete.
+Writing "queued", "next up", "after this", or "I will do that next" into a status recap is the signal that a subagent should already have been running on that item.
+Treat the urge to write the word as the trigger to launch, not as an acceptable way to describe the plan.
+
+**Sidecar delegation is pre-authorized, so it is never worth asking about.**
+Independent investigation, verification, a disjoint implementation slice, an owed UMS pass, a routed `cai` --- all of these are standing grants.
+This section is the user instruction that settles it, so a harness default of the form "do not call the Agent tool unless the user requested it" is already satisfied: the request is here, standing, and does not need restating each session.
+Asking anyway costs a round trip and returns the answer already written down.
+
+- **Do:** launch the subagent at the moment you would otherwise have typed "queued", and say in the recap what it is working on.
+- **Do:** treat an owed UMS pass or a routed `cai` as delegable sidecar work rather than as a wrap-up step to reach later.
+- **Don't:** report an item as queued, next up, or deferred to later in the session when nothing actually blocks it.
+- **Don't:** wait for a per-session request before delegating, or ask whether to use a subagent.
+- **Don't:** hand off the blocking edit itself --- the critical-path change stays local, so progress never waits on a round trip.
+
+Distinct from [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md), which governs the heavier `Workflow` tool.
+That rule is a **gate**: a fan-out across four or more verification-bearing targets is a real spend, so it has to be opted into or proposed with a cost estimate.
+This one is a **grant**: a single `Agent` call covering one sidecar task is cheap, needs no opt-in, and the cost it prevents is an idle parallel track rather than an overspend.
+So when a task clears that fragment's three-part bar, follow it and propose the workflow; everything below that bar is a subagent to launch now.
 
 ## Non-destructive repo and memory actions
 

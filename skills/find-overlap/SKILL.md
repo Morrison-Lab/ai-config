@@ -17,6 +17,9 @@ allowed-tools:
   - Read
   - Grep
   - Glob
+context: fork
+agent: overlap-detector
+background: false
 ---
 
 # find-overlap — read-only overlap / redundancy detector
@@ -158,6 +161,31 @@ adjacent-but-distinct missing a link → `link-skills`; redundant code → `tidy
 cluster — a raw similarity list with no disposition just pushes the judgment back
 to the reader.
 
+## Runs forked, in the background by default
+
+This whole skill --- every step above, including the report --- runs
+isolated as the `overlap-detector` custom agent (`context: fork` +
+`agent: overlap-detector`), not inline in the calling conversation. Two
+reasons, and the second is the one that matters:
+
+- **Context cost.** The skill body (this file) never enters the calling
+  conversation at all, rather than staying resident once loaded.
+- **Isolation from anchoring.** A dedup pass that has already read the
+  conversation that produced the content under audit is a weaker audit ---
+  the same argument behind the `Workflow` adversarial-verify pattern this
+  skill's own Orchestration step already uses.
+
+Every step above needs only `Bash`/`Read`/`Grep`/`Glob`, so nothing is lost
+by running the whole procedure inside `overlap-detector` rather than only a
+sub-step of it --- unlike an audit skill that also files an issue or opens
+a PR, find-overlap has no write/PR follow-through to leave behind in the
+main session.
+
+`background: false` overrides the fork's own default so the report still
+returns in the turn that invoked the skill, matching how `consolidate-skills`
+and `consolidate-memory` already consume it (step 1 of each delegates here
+and acts on the result immediately, not asynchronously).
+
 ## Orchestration
 
 Overlap detection over a large corpus decomposes by comparison cluster --- each
@@ -169,6 +197,15 @@ against the three buckets, then a synthesis stage that assembles the
 dispositions, rather than reading the whole corpus in one context. This stays
 read-only; it only parallelizes the reading and classification. Launch directly
 when an opt-in signal is present; otherwise propose with a cost estimate first.
+
+**This decomposition needs the calling session, not the forked run.**
+`overlap-detector`'s own tool list has no `Workflow` --- deliberately, so
+granting the fork read-only detection doesn't also hand it a path to spin up
+a sub-agent with write access. So the fork itself always reads the corpus
+serially. For a corpus large enough to want the Workflow fan-out above, run
+that fan-out in the main session instead of invoking this skill, or treat it
+as a known limitation until a follow-up gives `overlap-detector` a
+read-only-scoped path to it.
 
 ## Relationship to other skills
 

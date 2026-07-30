@@ -695,6 +695,42 @@ extend an untested claim from `gh issue create --label` to `gh issue edit`.
 The reviewer's own enumeration of the real subcommands also missed `clone`,
 which is why the fix cited the registration list rather than the finding.)
 
+**Run that check over your own fix, too --- the remedy for an unverified
+literal is where the next unverified literal goes.**
+The rule above fires when you notice you are writing a literal.
+Answering a finding does not feel like that: it feels like careful work, and
+the care is real, so the fix inherits an assumption of rigor from the
+diligence of writing it.
+The specific rule you are in the middle of applying is therefore the one
+least likely to be applied to its own application.
+
+A correction also tends to *add* literals rather than merely repair one.
+Citing a source properly means naming the tool, the flag, the version, the
+file --- each an assertion, each as guessable as the one under review, and
+none of them the thing the finding was about.
+So the fix can carry more unverified surface than the original did.
+
+Nothing external catches this.
+The reviewer sees a fix that addresses the finding and confirms it, per the
+clean-verdict entry above, and the thread then records the item as settled
+twice over.
+
+- **Do:** re-run the rule you are applying against the text of your own fix,
+  before committing it.
+- **Do:** say in the thread when a fix's own draft tripped the same rule,
+  since that is the only place the near-miss is visible.
+- **Don't:** treat the effort of writing a correction as evidence the
+  correction is verified.
+
+(Morrison-Lab/ai-config#929, 2026-07-30: a review found `--failed`
+documented from recollection.
+The fix quoted `gh run rerun --help` correctly and anchored it to "`gh`
+2.83.0" --- a version invented in the same breath, where `gh --version`
+reported `2.96.0`.
+Caught before committing only by running this rule against the fix, which is
+the entire mechanism; the round-2 review confirmed the corrected text and
+would have confirmed the wrong version just as readily.)
+
 **When regenerating a generated tree makes it most of the diff, say so in the
 PR body --- otherwise a reviewer reads it as pollution and blocks.**
 Two failures share one root here, and both cost a round.

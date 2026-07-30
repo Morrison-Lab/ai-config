@@ -51,7 +51,7 @@ primary bug and a secondary note, and the PR fixing the first said
 `Closes #847`.
 The second item survived only because the maintainer asked about it before the
 merge, which is not a mechanism; it was split into #852 and shipped as #853,
-and all three PRs merged within the following half hour.
+and both PRs merged within the following half hour.
 The splitting rule directly above already existed and was simply not applied
 when #847 was filed, which is the argument for stating its consequence rather
 than only its instruction.)

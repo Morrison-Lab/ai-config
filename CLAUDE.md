@@ -128,6 +128,8 @@ Proactively tell me — don't wait to be asked — when a session has grown long
 Use the `⚠️ FLAG` tag from this file's chat-output-tagging convention, one line, at the natural end of that turn's recap — don't interrupt mid-task to say it.
 
 Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, **any PR this session opened or pushed to that has not yet merged or closed**, an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
+`/clear` wipes conversation state outright (unlike compaction, which summarizes) — anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
+If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per "Recommending that the session end is itself a UMS trigger" above.
 
 **That PR clause is a bright line, not a judgment call, and it was narrowed deliberately.**
 It used to read "a PR I'm actively babysitting", which invites the question of whether *this* PR still counts as active --- and the answer always sounds like no.
@@ -147,8 +149,6 @@ Open PRs belonging to *other* sessions do not trigger this --- `wrap-up`'s sweep
 
 (Corrected 2026-07-29: a session flagged a clean stopping point while its own `ums` PR sat open awaiting review, having reasoned that the PR was "just awaiting review" and therefore not live.
 The correction was "don't flag stopping points when you still have PRs open".)
-`/clear` wipes conversation state outright (unlike compaction, which summarizes) — anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
-If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per "Recommending that the session end is itself a UMS trigger" above.
 
 **Run `wrap-up`'s state sweep *before* flagging a stopping point, not after the user asks for one.**
 The paragraph above says not to flag while live state remains; it doesn't say how to know.
@@ -165,7 +165,8 @@ The mid-task counterpart to the section above: don't wait for the automatic comp
 Proactively flag (same `⚠️ FLAG` tag) when a session is still mid-task but has grown large — many tool calls, long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured, or a session that's already been through one automatic compaction and is heading for another.
 Then run `compress-session` yourself: write the focused distillation and, if compaction looks imminent, trigger `/compact focus on <what matters>` rather than leaving it to the automatic pass.
 
-Use this instead of the `/clear` flag above when there's still live state worth carrying forward (an unfinished task, a PR being babysat, an open question) — `/clear` is for a clean task boundary with nothing left to carry; this is for continuing the same work with a lighter context.
+Use this instead of the `/clear` flag above when there's still live state worth carrying forward (an unfinished task, an unmerged PR this session opened or pushed to, an open question) — `/clear` is for a clean task boundary with nothing left to carry; this is for continuing the same work with a lighter context.
+That middle item uses the same bright line as the section above, deliberately: the two are complements, so a PR that disqualifies the `/clear` flag is exactly what makes `compress-session` the right tool instead.
 
 ## Keep a running on-disk session lab notebook
 

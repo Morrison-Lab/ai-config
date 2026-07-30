@@ -324,6 +324,9 @@ generic Actions-authoring and reusable-workflow material.
     The guard step fails the check ❌. The prior clean review on the same diff is still
     valid.
     Fix: **re-run the failed job first** (`gh run rerun <id> --failed`).
+    `gh run rerun --help` documents that flag as "Rerun only failed jobs, including
+    dependencies", so it re-runs the review job and whatever it depends on rather
+    than the whole workflow (verified against `gh` 2.96.0, 2026-07-30).
     A trivial commit is not needed, and it costs a commit plus a full CI round for
     a defect that is not in the diff.
     The no-op re-run is also the better evidence, because nothing changed between

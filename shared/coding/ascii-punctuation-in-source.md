@@ -203,7 +203,7 @@ The failure is not that the result is wrong --- every rewritten line is
 individually correct, and a repo-wide sweep of this rule is a legitimate
 goal on its own.
 It is that the fix silently exceeds what the diff was for.
-A one-line finding becomes a five-times-larger diff touching content no
+A one-line finding can triple or worse the diff size, touching content no
 reviewer asked about, in a PR whose whole point was a small, targeted
 addition.
 That is scope creep by mechanism, not by intent, which is what makes it easy

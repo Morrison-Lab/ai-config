@@ -205,7 +205,8 @@ correct too --- but keep the explicit `--prune` above regardless, so the sweep
 does not depend on the user's config:
 
 ```bash
-git config --global fetch.prune true     # or per-remote: remote.origin.prune
+git config --global fetch.prune true          # or per-remote:
+git config --global remote.origin.prune true
 ```
 
 That setting only prunes `refs/remotes/origin/*`.

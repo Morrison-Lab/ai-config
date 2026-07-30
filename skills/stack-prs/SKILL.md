@@ -174,11 +174,30 @@ commits are already on `main`.
 ways it can go wrong have different causes and different fixes, and only one
 of them is the merge's fault:
 
+`git merge-base --is-ancestor` prints nothing and answers through its exit
+status alone, so report the three outcomes rather than running it bare:
+
 ```bash
-git fetch origin main                                    # FETCH
+git fetch origin main                                             # FETCH
 git merge-base --is-ancestor "origin/<base-branch>" origin/main   # ANCESTRY
-git diff --stat origin/main...HEAD                       # DIFF
+case $? in
+  0) echo "ancestor -- real merge commit" ;;
+  1) echo "not an ancestor -- squash or rebase merge" ;;
+  *) echo "cannot tell -- origin/<base-branch> is gone; treat as squash" ;;
+esac
+git diff --stat origin/main...HEAD                                # DIFF
 ```
+
+Keep the third arm rather than collapsing it into the second with
+`&& ... || ...`.
+The command exits 2 or higher when `origin/<base-branch>` does not resolve,
+which happens once the base branch is deleted on merge and something has run
+`git fetch --prune` since --- and a two-branch form maps that error onto
+"not an ancestor", so a broken check and a real squash print the same thing.
+That is the [`fail-fast`](../../shared/principles/fail-fast.md) shape: a
+check whose failure path is indistinguishable from one of its answers.
+The *action* is the same either way, since both lead to the rebuild below, but
+only the three-arm form tells you which one you are in.
 
 - **Ancestor, diff still bloated** --- the base PR merged as a real merge
   commit and the `git merge` above was a no-op or missed something.
@@ -190,6 +209,10 @@ git diff --stat origin/main...HEAD                       # DIFF
   work, and **merging `main` cannot fix it**: the merge commit keeps those
   original commits in the branch's history, which is exactly what the diff is
   reporting.
+- **Cannot tell** --- the remote-tracking ref is gone, so the test has nothing
+  to compare.
+  Treat it as the squash case and rebuild; that is correct under a real merge
+  too, just unnecessary.
 
 The squash case is the one to know, because nothing warns you.
 `CLAUDE.md` carries this ancestry check already, but under a trigger that
@@ -203,10 +226,20 @@ So a stack in a squash-merging repo needs this check on the base PR's
 Rebuild rather than merge, keeping only the dependent PR's own commits:
 
 ```bash
-git checkout -B <dependent-branch> origin/main            # RESET_BRANCH
-git cherry-pick <dependent-commit>...                     # CHERRY_PICK
-git push --force-with-lease origin <dependent-branch>     # PUSH
+git checkout -B <dependent-branch> origin/main                        # RESET_BRANCH
+git cherry-pick <commit-1> [<commit-2> ...]                           # CHERRY_PICK
+git push --force-with-lease origin <dependent-branch>                 # PUSH
 ```
+
+Spell the commits out as separate arguments rather than as `<commit>...`.
+A trailing `...` reads as git's own three-dot range syntax, which resolves
+against `HEAD` and selects something quite different from "these commits".
+For a contiguous run, name the range explicitly instead:
+`git cherry-pick <oldest>^..<newest>`.
+
+Get that list from the branch as it stood **before** the reset, not from
+memory --- `git log --oneline "origin/<base-branch>..<dependent-branch>"`
+while both refs still exist, or the PR's own commit list.
 
 Confirm the diff dropped to the dependent PR's own changes, and re-run the
 repo's pre-push checks at the new head rather than carrying over the earlier

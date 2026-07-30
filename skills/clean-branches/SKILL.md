@@ -191,6 +191,26 @@ git fetch --prune origin                       # marks deleted upstreams as [gon
 git branch --show-current                      # never delete the branch you're on
 ```
 
+**The `--prune` is a prerequisite, not a refresh --- without it step b finds
+nothing and reports success.** `[gone]` is produced *by* pruning, not by the
+branch being deleted upstream: until a prune runs, `%(upstream:track)` is
+empty for exactly the branches b exists to find, so its `grep` matches zero
+rows and the sweep says there is nothing to clean.
+The "nothing found" and "never ran" paths print the same thing,
+so never take a zero-row result as clean
+unless this fetch actually ran in this sweep.
+
+Recommend the standing setting once, since it makes every other tool's view
+correct too --- but keep the explicit `--prune` above regardless, so the sweep
+does not depend on the user's config:
+
+```bash
+git config --global fetch.prune true     # or per-remote: remote.origin.prune
+```
+
+That setting only prunes `refs/remotes/origin/*`.
+It never deletes a local branch, so it replaces none of the steps below.
+
 Classify each **local** branch (excluding `main`/`master`/protected and the
 current branch):
 
@@ -233,6 +253,28 @@ glab mr list --source-branch=<branch> --state merged 2>&1 | cat
   first.
 - No merged PR and unique commits exist → **stale local work**: don't delete;
   offer to push it and open an MR (step 7 mechanics).
+
+**Read the PR, not local ancestry, to decide whether the work landed.** In a
+repo that squash-merges --- `ucdavis/bcs` and `Morrison-Lab/ai-config` both do
+--- a branch whose work is already on `main` still reports a non-zero
+ahead-count, is not an ancestor of `main`, is absent from
+`git branch --merged`, and is refused by `git branch -d`.
+All four say "unmerged" about a branch that merged,
+because the squash commit is a different commit.
+So treat a `-d` refusal as *unproven*,
+never as evidence the branch holds unique local work ---
+that is what the merged-PR lookup above is for,
+and why `-D` is the right tool once it comes back positive.
+
+The converse still holds and is what keeps this safe: no merged PR **and**
+unique commits means the work may exist nowhere else,
+so it is never deleted without confirmation.
+When the PR lookup is inconclusive,
+check content rather than ancestry, since content survives a squash:
+
+```bash
+git show origin/main:<path> | grep <something-the-branch-added>   # did it land?
+```
 
 #### c. Never pushed, has unique commits → keep, but flag
 

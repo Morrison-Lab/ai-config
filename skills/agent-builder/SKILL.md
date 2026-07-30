@@ -161,15 +161,44 @@ existing three model.
 ## Register the new agent with its calling skill
 
 There's no central agent list to update (see above) — "registering" a new
-agent means updating the **one skill** that spawns it:
+agent means updating the **one skill** that spawns it, via one of two
+mechanisms:
 
-1. Add the fan-out call in that skill's procedure — `Agent(subagent_type:
-   "<name>", ...)`, or inside a `Workflow` script, `agent(prompt, {agentType:
-   "<name>"})`.
-2. Name the `.claude/agents/<name>.md` path explicitly in the skill body (grep
+1. **Inline fan-out call**, when the skill only needs the agent for one
+   step and continues afterward in the calling session --- add
+   `Agent(subagent_type: "<name>", ...)` in that step, or inside a
+   `Workflow` script, `agent(prompt, {agentType: "<name>"})`.
+2. **Declarative `context: fork`**, when the agent's own procedure covers
+   the skill's *entire* body end to end --- add `context: fork`,
+   `agent: <name>`, and (usually) `background: false` to the skill's own
+   frontmatter, per `code.claude.com/docs/en/skills`' "Run skills in a
+   subagent" section.
+   See `skill-audit`/`find-overlap` for the pattern.
+
+**The two are not interchangeable, and picking the wrong one silently
+breaks a write step.** With `context: fork`, tool access comes from the
+`agent:` type, not the skill's own `allowed-tools` --- the whole skill body
+becomes the forked subagent's task, so there is no way to fork only a
+sub-step.
+A skill whose procedure mixes a read-only detect phase with a
+**main-session-only** write/PR/interactive-confirmation follow-through
+(`reproducibility-audit`, `purge-hallucinations`, `fact-check-prose`,
+`check-info-quality` all do this --- see #914) cannot use mechanism 2
+without restructuring into two skills first: forking the whole thing to a
+read-only custom agent would strip the write access the follow-through
+needs, not replace it declaratively.
+Reach for mechanism 2 only when every step in the skill needs no more
+than the agent's own `tools:` list --- confirm this by reading the
+skill's full procedure, not by assuming a skill that already pairs with a
+read-only agent is automatically eligible.
+
+Either way:
+
+1. Name the `.claude/agents/<name>.md` path explicitly in the skill body (grep
    `check-dependency-updates`, `purge-hallucinations`, or `opposition-research`
-   for the pattern to match).
-3. If the skill's procedure names a GitHub MCP tool the agent will call,
+   for the inline pattern; `skill-audit` or `find-overlap` for the
+   declarative one).
+2. If the skill's procedure names a GitHub MCP tool the agent will call,
    register it in `tool-mappings.yml` per `skill-builder`'s rule — the same
    possible-hallucination risk applies to agent-spawning skills.
 

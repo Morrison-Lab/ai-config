@@ -20,6 +20,10 @@ BLOCK = [
     ("cd /tmp && " + G + "secret set FOO", "compound: cd && gh secret set"),
     (G + "pr merge 25 --squash", "pr merge"),
     ("GH_TOKEN=x " + G + "run rerun --job 1", "leading env assignment"),
+    ('GITHUB_TOKEN="my token" ' + G + "secret set FOO",
+     "double-quoted env value containing a space"),
+    ("GITHUB_TOKEN='my token' " + G + "secret set FOO",
+     "single-quoted env value containing a space"),
     (G + "api repos/{owner}/{repo}/x -X POST", "api with cwd-resolved placeholders"),
     (G + "repo delete something", "repo delete"),
 ]

@@ -232,3 +232,37 @@ earlier, so the 404 was a propagation race on the sub-resource, not auth ---
 an invalid key fails at creation with 401/403.
 Jules had already approved twice on the same key that session, and
 `rerun_failed_jobs` with no code change returned `approve`.)
+
+**A second shape of that failure is cheaper to diagnose, because the
+reviewer names its own session in the failure comment.**
+`jules/review` can fail with
+`Jules did not return a review within 15 minutes. Session: <id>`,
+which is not an API error at all --- the request authenticated, created that
+session, and then never delivered a verdict.
+The session id is itself the auth-succeeded proof, so this shape needs no log
+fetch: a credential that cannot authenticate never gets a session to name.
+Prefer that field to the log whenever it is present, per
+[`algorithmatize-checks`](algorithmatize-checks.md) --- one value in the
+comment decides the question the log was going to answer.
+
+And when a fix is already queued for the same round, **the push is the
+retry**, so a separate `rerun_failed_jobs` call is wasted: the push
+re-triggers every reviewer on the new head anyway.
+Say which of the two you did, because they are not equally good evidence ---
+a push changes the code, so it demonstrates only that the reviewer works now,
+rather than being the no-op negative control the bullets above prize.
+
+- **Do:** read the failure comment for a session id or similar
+  work-happened marker before fetching a log.
+- **Do:** let a pending push serve as the retry, and label that evidence as
+  weaker than a no-op re-run.
+- **Don't:** spend a `rerun_failed_jobs` call on a head you are about to
+  replace.
+- **Don't:** report a push-triggered pass as proof the failure was transient
+  by construction.
+
+(Morrison-Lab/gha#374, 2026-07-30: `jules/review` reported "Jules did not
+return a review", with the 15-minute timeout and session
+`4236561570323034536` in its own comment.
+A review fix was already staged, so the push carried the re-trigger, and
+Jules returned `VERDICT: approve` on the new head about four minutes later.)

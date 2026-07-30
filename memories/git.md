@@ -533,6 +533,46 @@ Lacaedemon/sparta #883→#884, 2026-07-15):
   head (`gh pr view N --json headRefOid`) and comparing to the local SHA —
   then `git fetch` + retry the push if it didn't. Don't diagnose PR state
   until the head matches.
+- **`stale info` after `checkout -B` usually means the remote branch was
+  DELETED, not moved -- and then a plain push is the correct fix, not a bigger
+  hammer.**
+  The bullet above says the remote-tracking ref can be stale; this is the
+  specific cause that recurs on this repo's normal flow, since a squash-merge
+  with auto-delete-on-merge removes the branch while your ref still names its
+  old tip.
+  `--force-with-lease` then fails for a reason that reads alarmingly like a
+  race with another session:
+
+  ```
+  ! [rejected]  HEAD -> claude/... (stale info)
+  ```
+
+  The lease is unsatisfiable rather than violated, because the ref it names no
+  longer exists.
+  So the reflex it invites -- reach for `--force`, or assume someone else
+  pushed -- is wrong in both directions: `--force` is unnecessary, and there is
+  nothing to race.
+  Settle which case it is before pushing anything:
+
+  ```sh
+  git ls-remote --heads origin <branch>   # empty output = deleted
+  ```
+
+  Empty means the next push *creates* the branch, so it can destroy nothing and
+  needs no lease at all.
+  `git fetch --prune` followed by a retry works for the same reason, and is
+  worth preferring when you want the remote-tracking ref corrected too.
+
+  - **Do:** run `git ls-remote --heads origin <branch>` when a lease push
+    reports `stale info`, and plain-push when it comes back empty.
+  - **Don't:** escalate to `--force`, or suspect a parallel session, before
+    checking whether the branch still exists.
+
+  (Morrison-Lab/ai-config#857 -> #872, 2026-07-30: #857 squash-merged and its
+  head branch was auto-deleted.
+  Restarting the same harness-assigned branch name from the new `main` and
+  pushing the follow-up work produced `stale info`; `ls-remote` returned
+  nothing, and the plain push reported `* [new branch]`.)
 
 ## `git push origin <name>` pushes the LOCAL BRANCH of that name, not HEAD
 

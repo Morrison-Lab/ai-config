@@ -79,6 +79,37 @@ category, an uncited claim, and missing test coverage for new logic --- all
 catchable this way, since each was a direct match against gha's own
 `CLAUDE.md` conventions, not new information the review surfaced.)
 
+### Pre-push checklist
+
+**Pause point: after committing, before `git push`.**
+Do-Confirm --- the items are independent, so work in whatever order suits the
+round and confirm all six here.
+Per [`skill-checklists`](skill-checklists.md); every item below exists because
+the bullets in this fragment record it failing at this exact boundary.
+
+- [ ] **The whole test suite ran**, not the files you predicted the change
+      touches, and the tests/failed/**skipped** triple was read --- a
+      non-trivial skip count means re-running with the gating flags set
+      (`NOT_CRAN=true`, and whatever else un-gates a conditional skip).
+- [ ] **Generated trees were regenerated** if the diff (or a `main` merge)
+      touched a generator's inputs, and the PR body states how many changed
+      files are generated.
+- [ ] **Added lines were scanned** for banned punctuation and multi-sentence
+      lines, run *after* committing and with the three-dot range
+      (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree,
+      and a two-dot range re-attributes whatever `main` deleted to you.
+- [ ] **The changelog entry and the PR description were re-read** against the
+      new behavior, not just the code --- neither is in the diff, so no
+      reviewer and no grep will catch a stale one.
+- [ ] **`main` was merged in** if it moved, with version parity re-checked
+      afterward, so the round costs one review run rather than two.
+- [ ] **Killer item: the push landed.** `git rev-parse HEAD origin/<branch>`
+      agree before any reply asserting a fix.
+      This one is marked because its failure is not an omission but a **false
+      claim about state**, which a reviewer has no reason to doubt: CI reports
+      green because it correctly validated the older head, and the session's
+      own recollection agrees with the reply.
+
 **Proactively self-correct a technical claim you already told a reviewer,
 the moment further testing shows it was wrong --- don't wait for the
 reviewer to catch it.** If you stated a rationale (an approach is safe, a

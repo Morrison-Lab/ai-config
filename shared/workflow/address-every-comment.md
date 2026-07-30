@@ -429,9 +429,59 @@ Matching whole lines against the tag -- how bash itself ends a heredoc --
 removed the whole lazy-quantifier/anchor failure mode instead of narrowing
 it; the reply carried the failing output of the suggested form.)
 
+**The highest-yield version of that check: when a comment names an edge case
+in its own prose and also supplies a fix, run the fix against that edge
+case.**
+The bullets above test a suggestion against the code, or against a repro the
+reviewer provided.
+This tests it against the reviewer's *other paragraph*, and it is the cheapest
+of them, because the hazard has already been identified for you --- the
+work left is only to check whether the proposed code handles it.
+
+Nothing forces the two halves to agree.
+A comment's prose and its suggestion are drafted separately, and a reviewer
+who spots an edge case while reasoning about the problem does not necessarily
+carry it into the snippet.
+So a comment can read as unusually thorough --- it anticipated a failure mode
+you had not --- while shipping a fix that falls into exactly it.
+That thoroughness is what makes the suggestion persuasive, which is the trap.
+
+Applying it is worse than ignoring the whole finding.
+The prose half was right, so the reviewer's authority is real; the snippet
+then lands under that authority carrying a defect the same comment already
+described, and the thread reads as settled.
+Worse still when the defect is one your own corpus documents, since the
+review has now talked you out of a standing rule.
+
+Keep the finding and reject the snippet.
+Fix it your own way, quote the edge case back, and say plainly why the
+suggested form was set aside --- silently deviating from a `suggestion` block
+reads as having missed it.
+
+- **Do:** check a suggested fix against every failure mode the same comment
+  names, before checking anything else about it.
+- **Do:** name the reviewer's own caveat in the reply, so the rebuttal rests
+  on their evidence rather than on your say-so.
+- **Don't:** let a comment's demonstrated thoroughness transfer to its
+  snippet --- they are separate claims.
+- **Don't:** discard a finding because its fix is wrong; the half that named
+  the hazard usually still stands.
+
+(Morrison-Lab/ai-config#868, 2026-07-30: a review correctly found that
+`git merge-base --is-ancestor` prints nothing and answers by exit status, and
+its second paragraph noted the command exits 2 or higher when the ref has
+been pruned away.
+Its suggested `... && echo "ancestor" || echo "not ancestor"` maps that exit
+onto the `not ancestor` branch, since `&&` fails on any non-zero status --- so
+the fix printed a confident verdict for precisely the broken-check case the
+comment itself had raised, which is the shape
+[`fail-fast`](../principles/fail-fast.md) names.
+A three-arm `case $?` was used instead, reporting `0`, `1`, and `2+`
+distinctly.)
+
 **And the mirror case: a finding can be wrong on its stated grounds while
 still pointing at something real.**
-The two bullets above check the reviewer's *fix*; this one checks their
+The bullets above check the reviewer's *fix*; this one checks their
 *premise*.
 A confidently reasoned factual claim -- this pattern is valid, that value is
 in range, this call is safe -- invites one of two lazy responses: accept it

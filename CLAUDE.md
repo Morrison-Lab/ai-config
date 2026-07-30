@@ -52,6 +52,27 @@ The same skip has a second route worth checking, since several skills end in a U
 Reporting one of those skills complete asserts that its final step ran, so before calling a merge wrapped up, confirm the UMS pass actually happened rather than only the steps before it.
 (Same 2026-07-28 session as the correction above: three checkpoints passed -- two merges and a clean verdict -- each immediately followed by a new user request, plus a `post-merge` run reported done whose UMS step never executed.)
 
+**A merge you discover rather than perform is still a checkpoint, and it is the one that never feels like a moment.**
+Every bullet above describes a checkpoint that *happens* while you are watching: you push, the verdict lands, the PR merges, you report back.
+The merge someone else performs while you are away arrives differently --- as a row in a status table, hours later, alongside a dozen other rows.
+Nothing about reading `MERGED` in a poll resembles the event the rule was written for, so the checkpoint passes without ever presenting itself as one.
+
+The asymmetry is worth naming because it inverts the usual risk.
+A checkpoint you witness is at least *available* to be skipped.
+This one is never noticed to begin with, and the more of them arrive at once, the less any single one reads as an occasion to stop.
+A status poll that flips several PRs from open to merged is therefore a strong UMS trigger, not a weak one.
+
+So treat any transition **to** merged as the trigger, whoever performed it and whenever you learn of it.
+The cheap check is the poll you are already running: if a PR you were driving reads merged now and did not last time you looked, the pass is owed.
+
+- **Do:** run the pass when a status query first shows a PR merged, exactly as if you had merged it yourself.
+- **Do:** treat a batch of merges discovered together as one checkpoint carrying all of their learnings, rather than as background news.
+- **Don't:** require that you witnessed the merge for it to count.
+- **Don't:** let a poll that reports several merges roll straight into the next task because no single row felt like an event.
+
+(Corrected 2026-07-29: eight PRs from a multi-repo migration merged overnight and were discovered in a morning status check.
+The session read the table, reported 14 of 22 done, and continued driving the remaining PRs for several more turns before the user said "you should have done the ums pass already.")
+
 **Recommending that the session end is itself a UMS trigger, and it is the one route where skipping the pass destroys the learnings rather than merely delaying them.**
 The three bullets above all describe a pass that is *postponed*: no moment felt like the trigger, or a moment fired and was announced, or a moment fired and was preempted.
 In each of those the material survives in the conversation, so a later pass can still recover it.

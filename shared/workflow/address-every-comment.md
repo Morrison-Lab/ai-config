@@ -338,8 +338,9 @@ unformatted fragment rather than the whole title.
   concluding a quoted phrase is absent.
 - **Do:** read the single hit when a search for a citation's target returns
   only the citation itself.
-- **Don't:** file a dangling-citation issue on a zero-hit literal grep ---
-  that is the search failing, until a normalized one agrees.
+- **Don't:** file a dangling-citation issue while the only evidence is a
+  literal grep that found nothing but the citation --- that is the search
+  failing, until a normalized one agrees.
 
 (Morrison-Lab/ai-config, 2026-07-30: `skills/ums/SKILL.md:109` cites
 `memories/preferences.md`'s worktree-by-default rule, and a literal grep for

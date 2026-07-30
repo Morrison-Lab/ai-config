@@ -96,7 +96,8 @@ PATH=/usr/bin:/bin ./wrapper     # meant to starve a binary lookup
 If `wrapper` prepends its own directory to `PATH` before looking anything up
 --- a reasonable thing to do, since a GUI-launched process may not inherit a
 login shell's `PATH` --- then the restriction is overwritten before the guard
-runs. The guard never fires and the script exits 0.
+runs.
+The guard never fires and the script exits 0.
 
 That is worse than an ordinary vacuous assertion, because it launders an
 untested guard into a verified one during the very step added to prevent that.
@@ -104,11 +105,13 @@ It also carries the [`fail-fast`](../principles/fail-fast.md) signature: the
 failure path and the pass path produce the same observable.
 
 - **The tell.** A "should fail" run and a "should pass" run print the same
-  thing and exit the same way. A negative control that is indistinguishable
-  from the positive case proved nothing.
+  thing and exit the same way.
+  A negative control that is indistinguishable from the positive case proved
+  nothing.
 - **The check.** Before trusting the control, grep the code under test for
   assignments to whatever you are controlling --- `PATH`, an env var, a config
-  path, the clock. One grep usually settles it.
+  path, the clock.
+  One grep usually settles it.
 - **The fix.** Assert the guard's *own* message and exit status rather than a
   bare exit code, and impose the condition somewhere the code cannot undo:
   strip the overriding line into a copy under test, or set the override

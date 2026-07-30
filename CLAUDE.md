@@ -165,7 +165,9 @@ The mid-task counterpart to the section above: don't wait for the automatic comp
 Proactively flag (same `⚠️ FLAG` tag) when a session is still mid-task but has grown large — many tool calls, long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured, or a session that's already been through one automatic compaction and is heading for another.
 Then run `compress-session` yourself: write the focused distillation and, if compaction looks imminent, trigger `/compact focus on <what matters>` rather than leaving it to the automatic pass.
 
-Use this instead of the `/clear` flag above when there's still live state worth carrying forward (an unfinished task, an unmerged PR this session opened or pushed to, an open question) — `/clear` is for a clean task boundary with nothing left to carry; this is for continuing the same work with a lighter context.
+Use this instead of the `/clear` flag above when there's still live state worth carrying forward: an unfinished task, an unmerged PR this session opened or pushed to, or an open question.
+`/clear` is for a clean task boundary with nothing left to carry.
+This is for continuing the same work with a lighter context.
 That middle item uses the same bright line as the section above, deliberately: the two are complements, so a PR that disqualifies the `/clear` flag is exactly what makes `compress-session` the right tool instead.
 
 ## Keep a running on-disk session lab notebook

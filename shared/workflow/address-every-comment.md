@@ -122,8 +122,11 @@ reversal was.
 
 Distinguish this from an ordinary stale snapshot before answering.
 A reviewer that started before your edit never saw the correction and needs
-only a pointer to it; that case is covered further down, under the
-timestamp check.
+only a pointer to it.
+The timestamp check further down is written about a missed *rebuttal*, but
+the same `started_at` comparison decides a missed *body edit*: a body
+corrected after the run began is invisible to it for exactly the same
+reason, since the whole PR is snapshotted once at run start.
 This one re-raises *at the corrected text*, so the timestamps clear and the
 finding still stands.
 Compare the run's start time against the edit, then read which passage the

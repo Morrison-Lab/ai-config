@@ -173,7 +173,7 @@ Eight of the eighteen existing fragments carry an identically-worded section.
 The maintainer's call was to hold; the PR merged with `jules/review` red.)
 
 **An eighth case: the reviewer's workflow can fail outright on an upstream
-API error, so there is no verdict of any kind --- and its error message may
+failure, so there is no verdict of any kind --- and its error message may
 blame the wrong thing.**
 All seven cases above concern a reviewer that produced *something*: a stub, a
 misfiled conclusion, a pass that cannot fail, a fabricated premise, a

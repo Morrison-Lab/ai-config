@@ -487,7 +487,7 @@ If everything is boxed, the box stops meaning "look here," so keep it reserved.
   - 🛑 **BLOCKER** — stopped; need their call.
   - ✅ **ANSWER** — the headline answer to a question they asked; put nuance below the box.
   - 🧭 **RECOMMENDATION** --- the course of action I think they should take, when the decision is theirs.
-    The boundary against its two neighbours is what makes it a separate category rather than a flavour of either:
+    The boundary against the two categories it most resembles is what makes it a separate category rather than a flavour of either:
     an ✅ **ANSWER** reports what is true, a 💡 **OFFER** proposes work I would do,
     and a recommendation is a judgment about what *they* should do --- including about things I will not be doing,
     such as which PR to merge first, which option to decline, or whether to stop.

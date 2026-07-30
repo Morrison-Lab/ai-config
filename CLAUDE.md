@@ -244,7 +244,7 @@ Boxed (a `===` line above and below the labeled block):
 - 🛑 **BLOCKER** — stopped; need their call.
 - ✅ **ANSWER** — the headline answer to a question they asked (put nuance below the box).
 - 🧭 **RECOMMENDATION** --- the course of action I think they should take, when the decision is theirs.
-  Distinct from its two neighbours in this list: an ✅ **ANSWER** reports what is true, and a 💡 **OFFER** proposes work I would do.
+  Distinct from the two categories it is most easily confused with: an ✅ **ANSWER** reports what is true, and a 💡 **OFFER** proposes work I would do.
   A recommendation is a judgment about what *they* should do, including about things I will not be doing --- which PR to merge first, which option to decline, whether to stop.
   Lead the box with the action and put the reasoning below it, so the box holds the call rather than the argument for it.
   It boxes because it feeds a decision they are waiting to make;

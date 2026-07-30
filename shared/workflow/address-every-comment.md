@@ -334,6 +334,14 @@ reading the hit distinguishes them.
 Normalize backticks along with whitespace, or search a distinctive
 unformatted fragment rather than the whole title.
 
+- **Do:** account for inline markup as well as whitespace before concluding a
+  quoted phrase is absent --- see the next block for which side to normalize.
+- **Do:** read the single hit when a search for a citation's target returns
+  only the citation itself.
+- **Don't:** file a dangling-citation issue while the only evidence is a
+  literal grep that found nothing but the citation --- that is the search
+  failing, until a normalized one agrees.
+
 (Morrison-Lab/ai-config, 2026-07-30: `skills/ums/SKILL.md:109` cites
 `memories/preferences.md`'s worktree-by-default rule, and a literal grep for
 the quoted title returned only the citation, which was reported as a

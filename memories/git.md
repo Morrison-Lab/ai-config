@@ -1032,7 +1032,7 @@ rc=128 out=[]
 - **Do:** read `rc` from `git rev-parse <ref>:<path>`, or switch to `git cat-file -e` when only existence is in question.
 - **Do:** treat an output that is not SHA-shaped as "the path was absent" rather than as a difference.
 - **Don't:** pipe `git rev-parse <ref>:<path>` through `2>&1` into a comparison.
-- **Don't:** infer that two refs disagree about a file from two unequal `rev-parse` outputs alone.
+- **Don't:** compare two `git rev-parse <ref>:<path>` outputs for equality without first establishing that both resolved -- two absent paths echo two different strings, which reads as a difference.
 
 (2026-07-30, a `ucdavis/bcs` branch sweep: a per-path comparison built this way reported that a branch was about to destroy another session's work, and that went out as a blocker.
 The paths were absent on one side rather than different, and a real set-difference over the two file lists showed the branch was safe.)

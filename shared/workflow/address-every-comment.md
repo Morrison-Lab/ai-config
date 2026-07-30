@@ -308,6 +308,47 @@ against deliberately broken lines.
 three greps reported present and the third reported absent, purely because
 that phrase happened to straddle a line break.)
 
+**Inline markup breaks the same search, and that variant aims the false
+negative at someone else's work rather than your own.**
+Whitespace is the obvious thing a line-oriented tool gets wrong, so the fix
+above normalizes it.
+Markup is the one nobody normalizes, because the two strings *look*
+identical: a rule titled ``Run a local session in an isolated `git worktree`
+by DEFAULT`` is quoted in a citation as "Run a local session in an isolated
+git worktree by DEFAULT", since prose quoting a title drops its code spans.
+Grep the quoted form and the definition does not match; only the citation
+does.
+
+The consequence is worse than the line-break case, and in a specific way.
+There a false negative says your own merged work is missing, so you re-do
+something already done.
+Here it says the **cited** thing is missing, which reads as a dangling
+citation --- and the prescribed response to a dangling citation is to file
+an issue.
+So the wrong search does not merely waste effort, it puts a false claim
+about the corpus into the tracker, against a citation that resolves.
+A result of exactly one hit, in the citing file, is the tell: a genuinely
+dangling citation and a formatting mismatch produce the same count, and only
+reading the hit distinguishes them.
+
+Normalize backticks along with whitespace, or search a distinctive
+unformatted fragment rather than the whole title.
+
+- **Do:** strip inline markup as well as collapsing whitespace before
+  concluding a quoted phrase is absent.
+- **Do:** read the single hit when a search for a citation's target returns
+  only the citation itself.
+- **Don't:** file a dangling-citation issue while the only evidence is a
+  literal grep that found nothing but the citation --- that is the search
+  failing, until a normalized one agrees.
+
+(Morrison-Lab/ai-config, 2026-07-30: `skills/ums/SKILL.md:109` cites
+`memories/preferences.md`'s worktree-by-default rule, and a literal grep for
+the quoted title returned only the citation, which was reported as a
+dangling reference.
+The rule is at `memories/preferences.md:264`, differing from the quotation by
+two backticks; a backtick-normalized search found both files.)
+
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
 
 **This generalizes to a skill's own inline restatement of a fragment it

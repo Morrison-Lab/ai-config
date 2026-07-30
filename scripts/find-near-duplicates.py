@@ -166,11 +166,19 @@ def main() -> int:
     args = p.parse_args()
 
     paths = tracked_files(args.corpus)
-    if not paths:
-        # Fail loudly rather than reporting a clean corpus we never read --
-        # `shared/principles/fail-fast.md`: an instrument whose failure path
-        # and pass path look alike is not yet an instrument.
-        print(f"error: no tracked files matched {args.corpus!r}", file=sys.stderr)
+    # Fail loudly rather than reporting a clean corpus we never read --
+    # `shared/principles/fail-fast.md`: an instrument whose failure path and
+    # pass path look alike is not yet an instrument. Fewer than two units is
+    # the same defect as zero: no pair exists, so "0 candidates" would be a
+    # true statement about a comparison that never happened. A pathspec
+    # matching one file is one typo away, which is why this is an error
+    # rather than a note.
+    if len(paths) < 2:
+        print(
+            f"error: {args.corpus!r} matched {len(paths)} tracked file(s); "
+            "need at least 2 to compare a pair",
+            file=sys.stderr,
+        )
         return 2
 
     units = {}
@@ -202,23 +210,36 @@ def main() -> int:
     # "thousands of duplicates" and is pure boilerplate self-similarity.
     suppressed = sum(1 for score, _, _, is_alias in scored if score >= args.threshold and is_alias)
 
+    # Distribution over the REPORTABLE set, for the reason above -- the
+    # whole-set distribution measures the boilerplate, not the corpus.
+    reportable = [row for row in scored if args.include_aliases or not row[3]]
+
     if args.calibrate:
-        # Distribution over the REPORTABLE set, for the reason above -- the
-        # whole-set distribution measures the boilerplate, not the corpus.
-        vals = [score for score, _, _, is_alias in scored if args.include_aliases or not is_alias]
-        for q in (0.5, 0.9, 0.99, 0.999):
-            idx = min(len(vals) - 1, int((1 - q) * len(vals)))
-            print(f"  p{q * 100:<5g} {vals[idx]:.4f}")
-        print(f"  max   {vals[0]:.4f}")
+        vals = [row[0] for row in reportable]
+        if not vals:
+            # Reachable with >= 2 units when every one of them is an alias
+            # stub: the corpus is non-empty, pairs exist, and all of them are
+            # suppressed. An IndexError traceback here would be a worse
+            # failure than the one the guard above prevents, since it reports
+            # a crash where the honest answer is "nothing to calibrate over".
+            print("  (no reportable pairs; every pair was an alias stub -- try --include-aliases)")
+        else:
+            for q in (0.5, 0.9, 0.99, 0.999):
+                idx = min(len(vals) - 1, int((1 - q) * len(vals)))
+                print(f"  p{q * 100:<5g} {vals[idx]:.4f}")
+            print(f"  max   {vals[0]:.4f}")
 
     reported = 0
     print()
     print(f"{'score':>7}  {'':5}  pair")
-    for score, a, b, is_alias in scored:
+    # Iterate the prefiltered list rather than `continue`-ing over suppressed
+    # pairs inside a `break`-bounded loop: at the default threshold the
+    # alias-stub pairs above it outnumber the reportable ones several hundred
+    # to one, so the old form walked all of them before reaching the first
+    # result. Same output, and it no longer scales with the stub count.
+    for score, a, b, is_alias in reportable:
         if score < args.threshold or reported >= args.top:
             break
-        if is_alias and not args.include_aliases:
-            continue
         reported += 1
         flag = "alias?" if is_alias else ""
         ra, rb = a.relative_to(REPO_ROOT), b.relative_to(REPO_ROOT)

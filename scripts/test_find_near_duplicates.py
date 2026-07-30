@@ -14,6 +14,7 @@ wrong reason, the docstring's stated scope has silently become false.
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 from pathlib import Path
 
@@ -75,13 +76,37 @@ def test_short_body_falls_back_to_tokens() -> None:
 
 
 def test_frontmatter_is_stripped() -> None:
-    body, _ = fnd.body_of(REPO_ROOT / "skills" / "find-overlap" / "SKILL.md")
+    """Asserted against a synthetic file, not against a corpus one.
+
+    An earlier version keyed the "frontmatter did not leak" half on
+    `"user-invocable" not in body` for a real `SKILL.md`, which review
+    correctly called fragile: body prose could legitimately mention the field
+    name and the test would fail for a reason unrelated to stripping. The
+    suggested replacement was `"---" not in body.lstrip()[:3]`, which was
+    measured and is the same predicate as the delimiter check below -- both
+    inspect the first three characters -- so adopting it would have deleted
+    the second assertion's coverage rather than hardening it.
+
+    A synthetic fixture removes the coupling instead: the sentinel is a value
+    that exists only in the frontmatter of a file this test writes, so no
+    corpus edit can affect it either way.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        f = Path(tmp) / "SKILL.md"
+        f.write_text(
+            "---\nname: fixture\ndescription: SENTINEL_IN_FRONTMATTER_ONLY\n---\n\n# Body\n\nreal prose here.\n"
+        )
+        body, _ = fnd.body_of(f)
+
     check("frontmatter delimiter is gone from the body", not body.lstrip().startswith("---"))
     check(
-        "a description-only phrase does not reach the body",
-        "user-invocable" not in body,
+        "no frontmatter value reaches the body",
+        "SENTINEL_IN_FRONTMATTER_ONLY" not in body,
         "frontmatter leaked, which double-counts trigger phrases",
     )
+    check("body prose survives stripping", "real prose here." in body)
 
 
 # --- the corpus facts the docstring's stated scope rests on -----------------
@@ -132,6 +157,41 @@ def test_a_real_high_scoring_pair_exists() -> None:
         score > 0.3,
         f"score={score:.4f} -- metric may be returning near-zero for everything",
     )
+
+
+def _run(*argv: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "find-near-duplicates.py"), *argv],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+
+
+def test_too_few_units_fails_loudly() -> None:
+    """A corpus of 0 or 1 units cannot form a pair, so reporting 0 candidates
+    would be true about a comparison that never ran. Both must exit 2.
+    """
+    one = _run("--corpus", "skills/find-overlap/SKILL.md", "--calibrate")
+    check("a 1-file corpus exits 2", one.returncode == 2, f"rc={one.returncode}")
+    check("...and says how many it matched", "matched 1 tracked file" in one.stderr, one.stderr[:120])
+    check("...and does not traceback", "Traceback" not in one.stderr, one.stderr[-200:])
+
+    none = _run("--corpus", "nope/*.md")
+    check("a 0-file corpus exits 2", none.returncode == 2, f"rc={none.returncode}")
+
+
+def test_all_alias_corpus_calibrates_without_crashing() -> None:
+    """>= 2 units, every pair suppressed: the empty-`vals` case review found.
+
+    `skills/ad*/SKILL.md` is adr/adri/adria, all alias stubs, so with the
+    default `--include-aliases` off there is nothing to calibrate over.
+    """
+    r = _run("--corpus", "skills/ad*/SKILL.md", "--calibrate")
+    check("does not traceback on an all-alias corpus", "Traceback" not in r.stderr, r.stderr[-200:])
+    check("exits 0", r.returncode == 0, f"rc={r.returncode}")
+    check("says why there is nothing to calibrate", "no reportable pairs" in r.stdout, r.stdout[-200:])
+    check("still reports the suppressed count", "suppressed" in r.stdout, r.stdout[-200:])
 
 
 def test_corpus_resolution_is_git_tracked() -> None:

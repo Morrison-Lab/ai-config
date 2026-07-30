@@ -145,9 +145,71 @@ A test that passes against both is not a test.
 - **Don't:** wrap the call in `( ... ) ||`, `if`, or `!` when testing whether
   it aborts --- all three are the very contexts that suppress the abort.
 
+## A pipe discards the status of everything left of it
+
+Everything above is about `errexit` not firing.
+The sibling defect is that the status `errexit` would have read is gone before
+it gets there: a pipeline's exit status is its **last** command's, so piping a
+command into anything at all throws away whether that command succeeded.
+
+The shape is a command piped only to trim or format its output, with a
+fallback attached:
+
+```bash
+git branch -d "$b" | tail -1 || echo "  (unmerged, keeping $b)"
+```
+
+`tail` succeeds on empty input, so the pipeline succeeds whatever `git` did.
+The fallback is unreachable, `set -e` sees a zero status and does not abort,
+and the branch that failed to delete is silently reported as handled.
+Both the check and its own error path are lost in one character.
+
+`set -o pipefail` fixes exactly this, by making the pipeline take the
+rightmost non-zero status.
+That is worth knowing precisely because it means the bug is **conditional on
+the script's options** rather than intrinsic --- the same line is correct in a
+`set -euo pipefail` script and broken in a `set -eu` one, so a snippet copied
+between two scripts changes meaning with nothing at the call site to show it.
+Measured on bash 5.1.16:
+
+```bash
+$ bash -c 'set -eu;            false | tail -1 || echo FALLBACK; echo "rc=$?"'
+rc=0                      # no fallback, no abort --- the failure vanished
+$ bash -c 'set -euo pipefail; false | tail -1 || echo FALLBACK'
+FALLBACK
+```
+
+Two remedies, and prefer the first.
+Set `pipefail` alongside `errexit` in any script that pipes commands whose
+success matters --- it is one word and it fixes every such line at once.
+Where a single call needs the status and `pipefail` is not in force, take the
+status before the pipe rather than after it: capture the output first
+(`out="$(cmd)" || fallback`), test the command on its own, or read
+`${PIPESTATUS[0]}` immediately after the pipeline.
+
+This is the same [`fail-fast`](../principles/fail-fast.md) shape the
+`|| echo "none"` case above has, arriving by a different route: there the
+failure and the clean result printed the same thing, here the failure is
+never given a chance to print anything.
+
+- **Do:** set `pipefail` with `errexit`, so a pipeline reports the failure of
+  any stage rather than only its last.
+- **Do:** read `${PIPESTATUS[0]}`, or split the pipeline, when one specific
+  stage's status is the thing you need.
+- **Don't:** attach `|| fallback` to a pipeline and expect it to fire for a
+  failure on the left-hand side.
+- **Don't:** pipe a command through `head`, `tail`, `tr`, or `grep` purely to
+  tidy its output when its exit status is the point.
+
+(2026-07-29, a bcs branch sweep: `git branch -d "$b" | tail -1 || echo ...`
+under `set -eu` reported every branch deleted, including the ones `git` had
+refused.)
+
 ## In review
 
 Flag a pipeline or command under `set -e` whose left-hand side routinely
 exits non-zero on a legitimate input, where the tolerance is not stated.
+Flag `|| fallback` attached to a pipeline in a script without `pipefail`, and
+a piped command whose status the script goes on to rely on.
 Flag it even when every current call site masks it: the finding is that the
 behaviour is call-site dependent, not that it misbehaves today.

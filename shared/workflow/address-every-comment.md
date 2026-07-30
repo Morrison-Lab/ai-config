@@ -308,6 +308,47 @@ against deliberately broken lines.
 three greps reported present and the third reported absent, purely because
 that phrase happened to straddle a line break.)
 
+**Inline markup breaks the same search, and that variant aims the false
+negative at someone else's work rather than your own.**
+Whitespace is the obvious thing a line-oriented tool gets wrong, so the fix
+above normalizes it.
+Markup is the one nobody normalizes, because the two strings *look*
+identical: a rule titled ``Run a local session in an isolated `git worktree`
+by DEFAULT`` is quoted in a citation as "Run a local session in an isolated
+git worktree by DEFAULT", since prose quoting a title drops its code spans.
+Grep the quoted form and the definition does not match; only the citation
+does.
+
+The consequence is worse than the line-break case, and in a specific way.
+There a false negative says your own merged work is missing, so you re-do
+something already done.
+Here it says the **cited** thing is missing, which reads as a dangling
+citation --- and the prescribed response to a dangling citation is to file
+an issue.
+So the wrong search does not merely waste effort, it puts a false claim
+about the corpus into the tracker, against a citation that resolves.
+A result of exactly one hit, in the citing file, is the tell: a genuinely
+dangling citation and a formatting mismatch produce the same count, and only
+reading the hit distinguishes them.
+
+Normalize backticks along with whitespace, or search a distinctive
+unformatted fragment rather than the whole title.
+
+- **Do:** strip inline markup as well as collapsing whitespace before
+  concluding a quoted phrase is absent.
+- **Do:** read the single hit when a search for a citation's target returns
+  only the citation itself.
+- **Don't:** file a dangling-citation issue while the only evidence is a
+  literal grep that found nothing but the citation --- that is the search
+  failing, until a normalized one agrees.
+
+(Morrison-Lab/ai-config, 2026-07-30: `skills/ums/SKILL.md:109` cites
+`memories/preferences.md`'s worktree-by-default rule, and a literal grep for
+the quoted title returned only the citation, which was reported as a
+dangling reference.
+The rule is at `memories/preferences.md:264`, differing from the quotation by
+two backticks; a backtick-normalized search found both files.)
+
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
 
 **This generalizes to a skill's own inline restatement of a fragment it
@@ -533,6 +574,51 @@ A synthetic fixture replaced the corpus coupling instead, plus a third
 assertion that body prose *survives* stripping, which neither the original nor
 the suggestion covered.
 Tracked as #905.)
+
+**A finding can be right, and its fix adequate, while the *reason* it supplies
+is too weak to ship --- and in a corpus of rules, the reason is the
+deliverable.**
+The bullets above all test whether the suggested fix *works*: against the code,
+against the reviewer's repro, against an edge case their own prose named.
+This one assumes it works, and asks whether the justification handed to you
+still holds when someone leans on it.
+
+That distinction is invisible in code and decisive in a rule.
+A patch is judged by its behaviour, so a correct patch with a shaky rationale is
+merely under-commented.
+A `shared/` fragment is judged entirely by whether its reason forecloses the
+workarounds, so adopting a weaker reason ships a rule the next reader can talk
+themselves around --- while the thread records the item as settled.
+
+The tell is a suggestion that explains *why* something is forbidden in a single
+phrase, where the primary source carries a stronger provision.
+So ask what the strongest *available* reason is, rather than whether the offered
+one is defensible, and name the workaround the weaker reason would have
+licensed --- that is what makes the choice checkable rather than a matter of
+taste.
+
+- **Do:** read the primary source for the strongest reason before adopting a
+  suggested rationale, even when the suggestion's conclusion is right.
+- **Do:** say in the reply which reason you took and why the offered one was set
+  aside, since deviating from a `suggestion` block silently reads as having
+  missed it.
+- **Don't:** accept a defensible-sounding mechanism because the conclusion it
+  supports is correct.
+- **Don't:** treat this as grounds to reject the finding --- the conclusion
+  usually stands, and only its reason needs strengthening.
+
+(Morrison-Lab/ai-config#873, 2026-07-30: a review correctly found a `CC-BY-ND`
+table row that called verbatim copying allowed and then concluded idea-only with
+no bridge.
+Its suggested reason, "MIT grants modification rights; ND does not", frames the
+conflict as two grants differing in scope --- which licenses the workaround of
+keeping the file under its own notice inside the MIT repo, since on that framing
+no conflict arises.
+SPDX `license-list-data`'s `CC-BY-ND-4.0.txt` §2(a)(1) grants a
+**non-sublicensable** license, so the material cannot be re-offered under MIT at
+all, which is exactly what vendoring does.
+The conclusion was right, and its stated reason stopped short of the provision
+that actually forecloses the workaround.)
 
 **And the mirror case: a finding can be wrong on its stated grounds while
 still pointing at something real.**

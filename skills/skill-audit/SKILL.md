@@ -7,6 +7,9 @@ allowed-tools:
   - Read
   - Grep
   - Glob
+context: fork
+agent: skill-usage-auditor
+background: false
 ---
 
 # skill-audit — usage-frequency audit and pruning recommender
@@ -152,15 +155,29 @@ to defer for consolidation or deletion, and which "dead" results are actually
 "automated, not measured" or "machine-local blind spot" and should NOT be
 pruned on this evidence alone.
 
-## Custom agent for the detection phase
+## Runs forked; `background: false` for synchronous return
 
-Steps 1–5 need no Edit/Write access and can run against a large transcript
-corpus. Delegate them to the `skill-usage-auditor` custom agent
-(`.claude/agents/skill-usage-auditor.md`) for a harness-enforced guarantee
-that the audit pass can't accidentally touch a skill file while gathering
-counts — the same pattern `check-dependency-updates` uses for its
-`dependency-auditor`. Run the report/recommendation synthesis in the main
-session afterward.
+This whole skill --- steps 1-6, report and pruning recommendation included ---
+runs isolated as the `skill-usage-auditor` custom agent
+(`.claude/agents/skill-usage-auditor.md`, `context: fork` +
+`agent: skill-usage-auditor`), not inline in the calling conversation.
+No step here needs Edit/Write, so nothing is lost by forking the whole
+procedure rather than only steps 1-5 --- unlike an audit skill that also
+files an issue or opens a PR, this skill has no write/PR follow-through to
+leave behind in the main session, and forking the whole run makes the
+harness-enforced no-Edit/Write guarantee cover step 6 too, not just the
+counting steps.
+
+Two further reasons this is worth doing, and the second is the one that
+matters: **context cost** (the skill body never enters the calling
+conversation at all, rather than staying resident once loaded), and
+**isolation from anchoring** (a usage audit that has already read the
+conversation that invoked it is a weaker audit).
+
+`background: false` overrides the fork's own default so the report still
+returns in the turn that invoked the skill, matching how this skill is
+normally used --- an interactive query, not a fire-and-forget background
+task.
 
 ## Relationship to other skills
 

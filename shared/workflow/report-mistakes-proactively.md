@@ -72,6 +72,65 @@ correct action was a comment with the new evidence rather than a new issue
 --- which is step 2 doing its job, and is exactly the decision the offer had
 deferred instead of making.)
 
+## A gated action bundled into a discretionary one is still an offer
+
+The section above rules out the *standalone* offer --- a message whose only
+ask is permission to do the thing this rule already requires.
+That one is recognizable, because the sentence has no other business.
+
+The version that survives it is a compound question, where filing rides along
+with something genuinely discretionary:
+
+> Want me to file the issue and open that PR?
+
+Opening the PR is a real decision, and asking about it is correct.
+Filing is not, and putting them in one sentence hands the whole question to
+the user under cover of the half that was legitimately theirs.
+It also reads as *more* diligent than the standalone offer rather than less,
+since the reply is now consulting them about scope instead of merely stalling.
+
+Note where the two failures live, because it explains why re-reading the rule
+does not prevent this one.
+The rule is consulted at **read time**, when the mistake is noticed and the
+disposition is chosen; the violation happens at **composition time**, in a
+long message's closing paragraph, where two actions concerning the same
+subject get folded into one question for the sake of brevity.
+Nothing at that moment feels like a decision about whether to file --- that
+decision was already made, correctly, several paragraphs earlier.
+
+So make the split at composition time.
+Take the ungated action first, report it in the past tense, and let the
+question carry only the remainder:
+
+> Filed as #466.
+> Want me to open the PR as well?
+
+- **Do:** scan any question you are about to ask for a second verb, and
+  perform whichever half this rule already requires.
+- **Do:** report the filing as done in the same message that asks about the
+  rest, so the user sees one decision rather than two.
+- **Don't:** conjoin filing with a discretionary action --- "file X and do Y?"
+  is an offer to file, whatever the second clause is.
+- **Don't:** treat a question that is *mostly* legitimate as therefore
+  legitimate; the gated clause is the one that decides it.
+
+A `Stop` hook can enforce this mechanically, which is the right shape for a
+check with a lexical definition (see
+[`algorithmatize-checks`](algorithmatize-checks.md)): scan the outgoing
+message for an offer-to-file pattern and block it.
+Note the limit before relying on one --- hooks are configured per user in
+`~/.claude/settings.json` and are **not** distributed by this repo, so a hook
+protects the machine it was written on and no other.
+Treat it as a backstop for your own setup rather than as a reason to relax the
+rule, since every other session still runs on the prose alone.
+
+(Corrected 2026-07-29, a bcs branch-sweep session: an unlanded engineering fix
+found on a closed branch was correctly identified as needing a tracking issue,
+and the closing line asked "want me to file the issue and open that PR?".
+The user's correction was that filing is not a thing to ask about.
+The issue --- `ucdavis/bcs#466` --- was filed immediately afterward, which is
+the evidence that nothing was blocking it in the first place.)
+
 ## Never name an issue number before the issue exists
 
 The rule above pushes filing earlier, and step 4 asks you to link the filed

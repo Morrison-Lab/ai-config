@@ -915,3 +915,81 @@ already been reworded away.
 Rebutted with the commit and the job log, then addressed by naming the SHA in
 the guidance itself --- which ucdavis/bcs#457 had to undo an hour later, once
 PR #456 squash-merged and that SHA stopped resolving.)
+
+## Cleaning up a branch deleted on `origin` is two mechanisms, and only one is a config
+
+"Prune branches once they are deleted on `origin`" sounds like one setting.
+It is two, they live in different places, and only the first is a git config.
+
+**Half 1 --- the remote-tracking ref.**
+`fetch.prune=true` (or the per-remote `remote.origin.prune=true`) drops
+`refs/remotes/origin/<name>` once that branch is gone upstream.
+It never touches a local branch.
+Verified on git 2.34.1 (2026-07-29), deleting `feat` from a second clone:
+
+```
+=== after fetch.prune=true ===
+remote-tracking refs:   origin/master       <- origin/feat pruned
+LOCAL branches:         feat  * master      <- feat untouched
+```
+
+**Half 2 --- the local branch whose upstream is now `[gone]`.**
+Git has no config for this at all, so no setting will ever do it.
+It is a procedure, owned by
+[`clean-branches`](../skills/clean-branches/SKILL.md) step 8b: find the
+`[gone]` branches, confirm the PR actually merged, then delete.
+Keep it confirmation-gated --- it is the half that can destroy work.
+
+### Without half 1, half 2 reports a false clean rather than an error
+
+The `[gone]` marker is produced **by pruning**, not by the branch being deleted
+upstream.
+Until a prune runs, `%(upstream:track)` is empty for exactly the branches the
+sweep exists to find, so a `grep '\[gone\]'` matches nothing and the sweep
+reports there is nothing to clean:
+
+```
+=== plain fetch, no prune ===
+feat | origin/feat | track=
+=== after fetch.prune=true ===
+feat | origin/feat | track=[gone]
+```
+
+That is the shape [`fail-fast`](../shared/principles/fail-fast.md) warns about:
+the "nothing found" path and the "never ran" path print the same thing.
+So a sweep has to *establish* that a prune happened rather than assume it.
+Running `git fetch --prune` inside the step is what keeps the config a
+convenience rather than a silent prerequisite.
+
+### In a squash-merge repo, local ancestry cannot be the safety signal
+
+The safety rule is "never delete a branch carrying unique local commits", and
+the obvious instruments for it all give the wrong answer where the repo
+squash-merges.
+Verified against a branch whose work had demonstrably landed on `main`:
+
+```
+ahead: 1   behind: 1
+is feat an ancestor of master?      NO
+git branch --merged origin/master   ->  * master        (feat absent)
+git branch -d feat                  ->  error: The branch 'feat' is not fully merged.
+```
+
+Every one of those says "unmerged" about a branch that merged.
+Once the upstream ref itself has been pruned there is no upstream left to
+compare against, so `-d` falls back to `HEAD` and refuses.
+Read that refusal as *unproven*, not as *unique local work* --- which is why
+step 8b confirms the merge through the PR and only then reaches for `-D`.
+
+So the authoritative landed-signal is the PR's own merge state, and the
+content check that survives a squash (`git show origin/main:<path>`), not
+local ancestry.
+`ucdavis/bcs` and `Morrison-Lab/ai-config` both squash-merge.
+
+- **Do:** set `fetch.prune` for the remote-tracking half, and treat the
+  local-branch half as a reviewed sweep rather than something a config does.
+- **Do:** decide "did this land?" from the PR, in any repo that squash-merges.
+- **Don't:** read a `[gone]` sweep that found nothing as a clean result until
+  you know a prune actually ran.
+- **Don't:** treat `git branch -d` refusing, a non-zero ahead-count, or absence
+  from `git branch --merged` as evidence a branch still holds unpushed work.

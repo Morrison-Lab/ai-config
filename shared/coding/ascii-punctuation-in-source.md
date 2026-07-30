@@ -145,3 +145,46 @@ So when adding prose to an older-conventions file, scan your own added lines
 for both before pushing.
 (ai-config#754, 2026-07-28: four multi-sentence lines and one em-dash, each
 a faithful imitation of the paragraph it was written next to.)
+
+**Editing an existing line for an unrelated reason makes its pre-existing
+violations yours, because the diff cannot tell the two apart.**
+The section above is about prose you *write*, where the risk is imitating a
+grandfathered neighbour.
+This is the case where you write nothing objectionable at all: you change
+three words in a long-standing line for some other purpose, and the em-dash
+that line has carried for a year arrives in the diff as an added line with
+your name on it.
+
+Note how it inverts the grandfathering the section above relies on.
+Untouched, that line is exempt indefinitely.
+Touched, it is judged in full --- not just the part you changed --- because
+the check reads added lines, and a modified line is an added line.
+So the exemption is not a property of the *content* but of whether anyone has
+edited it lately, which is why this fires on changes that feel purely
+incidental.
+
+The fix is cheap and worth taking rather than resenting: you are already
+editing the line, so bring it into compliance while you are there.
+The same applies to
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md), since it is
+diff-scoped in the same way --- editing half of a two-sentence line makes the
+whole line yours to split.
+
+- **Do:** scan any line you modify for banned glyphs and multi-sentence
+  structure, not only the lines you add outright.
+- **Do:** fix what you find in the same edit, since the line is open in front
+  of you and the alternative is a review round about punctuation you did not
+  write.
+- **Don't:** expect a line's grandfathered status to survive your touching it.
+- **Don't:** read such a flag as the check misfiring --- it is reporting the
+  diff correctly, and the diff genuinely contains that character.
+
+(Twice on 2026-07-29/30.
+`Morrison-Lab/gha#374`: retargeting an owner name inside
+`sync-upstream.yml`'s generated PR-body string re-added that line's
+long-standing em-dash, flagged on the next scan.
+`Morrison-Lab/ai-config#863`: rewording `CLAUDE.md`'s `compress-session`
+live-state list to match a new bright line re-added both an em-dash and a
+mid-line semicolon, flagged by `check-new-line-breaks` and the punctuation
+scan respectively.
+Neither glyph was authored in either session.)

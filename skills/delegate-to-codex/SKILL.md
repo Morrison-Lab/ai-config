@@ -35,8 +35,12 @@ until the window resets. This skill is the mechanism; the preference lives in
   progress doesn't block on a codex round-trip.
 - codex is unavailable or the 5-hour window is already exhausted (see step 4).
 
-Every exception above is stated in terms of **work shape**, so none of them
-applies when the trigger is what the work *reads* --- see the next section.
+The first two exceptions are stated in terms of **work shape**, so neither
+applies when the trigger is what the work *reads*.
+The third is not a shape exception at all --- it is about codex being
+*available* --- and under a data trigger it inverts rather than applies: the
+work waits for the window instead of falling back.
+Both cases are covered in the next section.
 
 ## Data sensitivity is a second trigger, and it overrides the shape exceptions
 

@@ -158,7 +158,7 @@ operations:
       Read a single label's name, color, and description. There is no MCP tool
       to create or update a label; use gh label create/edit, or gh api from a
       workflow.
-    cli: gh label view <name>
+    cli: gh api repos/<owner>/<repo>/labels/<name>
     github_mcp: mcp__github__get_label
   - id: LIST_DISCUSSIONS
     description: List a repository's discussions. Discussions are GraphQL-only.

@@ -341,7 +341,8 @@ loop when the file list is small enough not to need rsync.
 
 - **Table rows must stay on one line (MD055/MD056).**
   Wrapping a cell across lines breaks the `|` alignment and trips both rules.
-  Rewrite the cell concisely on a single line rather than word-wrapping it; prefer a short, complete description over hitting a length target.
+  Rewrite the cell concisely on a single line rather than word-wrapping it.
+  Prefer a short, complete description over hitting a length target.
 - **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
   MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
   Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.

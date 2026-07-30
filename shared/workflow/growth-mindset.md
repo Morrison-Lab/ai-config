@@ -38,6 +38,60 @@ problem, or not the user's to authorize (see the contribution-policy gate in
 settle for the current limitation after that's been considered --- not to treat
 the current limitation as the ceiling from the outset.
 
+## First check the limitation is real
+
+Everything above starts from a limitation that exists.
+That premise is the one most often wrong, and it fails in the direction that
+looks like diligence: a tool errors on its first invocation, and reporting it
+broken feels like the finding rather than like the thing that stopped you
+checking.
+
+Environment misuse presents identically to breakage.
+An environment not activated, a working directory outside the project, an
+unset library path, a missing credential -- each produces an error from the
+tool itself, which reads as the tool's own verdict on its own health.
+Nothing in the message says the caller is holding it wrong, because the tool
+cannot tell.
+
+So spend one round diagnosing the error before reporting it.
+Read what the message actually names, then check the environment it names
+things in: which env is active, which directory the command ran from, which
+library path it resolved, which credential it read.
+Re-invoking with one of those corrected is cheap, and it is the whole check.
+
+The stakes are not the tool.
+"The tool is broken" is the most comfortable explanation available, because
+it is externally caused, requires nothing of me, and licenses skipping the
+verification the tool was being used for -- so the unverified claim ships
+anyway.
+That is an excuse wearing a finding's clothes.
+The general principle is the "stop making excuses for avoiding demos"
+directive in [`preferences.md`](../../memories/preferences.md); this is the
+same move one level up, where the excuse skips checking a claim rather than
+skips producing an artifact.
+
+- **Do:** diagnose the first failure -- env, working directory, library path,
+  credential -- before concluding the tool itself is at fault.
+- **Do:** name which environment correction you tried, so "still broken"
+  becomes a claim someone else can check rather than a verdict.
+- **Don't:** report a tool as broken on the strength of one invocation.
+- **Don't:** let "broken tool" become the reason a verification gets skipped
+  and its unverified claim ships regardless.
+
+(2026-07-30: checking whether Quarto's `execute: echo` can be set per output
+format, `quarto` was reported broken twice, and was working both times.
+The first invocation ran the conda environment's binary without activating
+that environment, failing with
+`bin/tools/x86_64/deno: No such file or directory`; `conda activate bcs`
+fixed it.
+The second ran from a scratchpad directory outside the project, so `renv`
+never activated and the conda base R library genuinely lacked `rmarkdown`;
+`export R_LIBS=<project renv library>` fixed it.
+The user's correction was "if a tool you could use is broken, fix it, don't
+accept it as broken".
+The render then worked on the first try and settled the question, which the
+manuscript would otherwise have asserted unchecked.)
+
 ## Applies to our own metacognitive tooling, too
 
 The same bias governs the skills, memories, and self-improvement loops in these

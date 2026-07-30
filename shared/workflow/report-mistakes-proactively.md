@@ -102,7 +102,8 @@ So make the split at composition time.
 Take the ungated action first, report it in the past tense, and let the
 question carry only the remainder:
 
-> Filed as #466. Want me to open the PR as well?
+> Filed as #466.
+> Want me to open the PR as well?
 
 - **Do:** scan any question you are about to ask for a second verb, and
   perform whichever half this rule already requires.

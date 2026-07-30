@@ -64,9 +64,9 @@ easy because the first felt like the work.
 
 ## Install the binary the platform's own way
 
-The wrapper below hardcodes a path in its `exec` line, which quietly assumes
-a binary is already sitting there.
-Getting one is usually a single command, and the package manager's copy beats
+The wrapper below ends by `exec`-ing a server binary, which quietly assumes one
+is already on the machine.
+Getting it is usually a single command, and the package manager's copy beats
 a manual download because it updates with everything else:
 
 ```sh
@@ -81,17 +81,35 @@ Skipping the check defers the failure to *server start* rather than to
 `claude mcp add`, where it presents as a broken MCP config instead of a
 stopped daemon.
 
-Take the binary path as an overridable variable rather than hardcoding it,
-since the location differs per platform and package manager:
+Don't hardcode where the binary landed, in the wrapper or anywhere else.
+The location differs per platform and package manager --- Homebrew on Apple
+silicon uses `/opt/homebrew/bin`, Intel Homebrew `/usr/local/bin`, a manual
+download typically `~/.local/bin` --- so any single default is wrong somewhere.
+Resolve it from `PATH` instead, and keep an override for the case where it
+isn't on one:
 
 ```sh
-SERVER="${GITHUB_MCP_SERVER_BIN:-/opt/homebrew/bin/github-mcp-server}"
+SERVER="${GITHUB_MCP_SERVER_BIN:-$(command -v github-mcp-server || true)}"
+if [ -z "$SERVER" ]; then
+  echo "github-mcp-server not on PATH; brew install github-mcp-server" >&2
+  exit 1
+fi
 ```
+
+The `|| true` is required rather than sloppy: `command -v` exits non-zero when
+it finds nothing, and under `set -e` that would abort the wrapper with no
+message at all --- see
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md) for why a
+command substitution's behaviour there depends on `inherit_errexit`.
+The explicit emptiness check is what turns the tolerated exit back into a loud
+failure naming the fix, which is the same shape as the empty-token check below.
 
 - **Do:** install via the platform's package manager, and confirm the daemon
   is up before committing to a container-based server.
-- **Don't:** copy a wrapper's hardcoded binary path onto a machine whose
-  package manager puts it somewhere else.
+- **Do:** resolve the binary from `PATH`, and fail loudly with the install
+  command when it isn't there.
+- **Don't:** hardcode a package manager's install path as a wrapper's default
+  --- it silently sends every other platform to a file that doesn't exist.
 
 ## 400 and 401 mean different things
 
@@ -121,7 +139,11 @@ A launch wrapper reads it at start time from a tool that already holds one:
 ```sh
 #!/bin/sh
 set -eu
-SERVER="${GITHUB_MCP_SERVER_BIN:-/opt/homebrew/bin/github-mcp-server}"
+SERVER="${GITHUB_MCP_SERVER_BIN:-$(command -v github-mcp-server || true)}"
+if [ -z "$SERVER" ]; then
+  echo "github-mcp-server not on PATH" >&2       # fail loudly
+  exit 1
+fi
 TOKEN="$(gh auth token)"
 if [ -z "$TOKEN" ]; then
   echo "empty token; run 'gh auth login'" >&2   # fail loudly

@@ -83,7 +83,7 @@ catchable this way, since each was a direct match against gha's own
 
 **Pause point: after committing, before `git push`.**
 Do-Confirm --- the items are independent, so work in whatever order suits the
-round and confirm all six here.
+round and confirm all seven here.
 Per [`skill-checklists`](skill-checklists.md); every item below exists because
 the bullets in this fragment record it failing at this exact boundary.
 
@@ -101,6 +101,10 @@ the bullets in this fragment record it failing at this exact boundary.
 - [ ] **The changelog entry and the PR description were re-read** against the
       new behavior, not just the code --- neither is in the diff, so no
       reviewer and no grep will catch a stale one.
+- [ ] **The diff's deleted lines were read**
+      (`git diff origin/main...HEAD | grep '^-'`), and each one was a decision
+      rather than collateral from an edit's blast radius --- a reviewer reads
+      every deletion as deliberate and will rationalize an accidental one.
 - [ ] **`main` was merged in** if it moved, with version parity re-checked
       afterward, so the round costs one review run rather than two.
 - [ ] **Killer item: the push landed.** `git rev-parse HEAD origin/<branch>`
@@ -109,6 +113,56 @@ the bullets in this fragment record it failing at this exact boundary.
       claim about state**, which a reviewer has no reason to doubt: CI reports
       green because it correctly validated the older head, and the session's
       own recollection agrees with the reply.
+
+**A clean verdict does not certify that your diff contains only what you
+meant, because a reviewer cannot tell an accident from a decision.**
+Every check above tests whether the diff is *correct*.
+None of them tests whether it is what you *intended*, and those come apart
+whenever an edit does something extra --- a replacement string that drops
+neighbouring lines, a global substitution that rewrites more than the
+flagged occurrence, a stray hunk carried in from another branch.
+
+A reviewer reads the diff as a set of deliberate choices, since that is the
+only thing a diff can present.
+So it does not report the extra change; it *explains* it, and often well ---
+constructing a plausible rationale, grading the result appropriate, and
+moving on.
+That is worse than silence.
+Silence leaves the change unexamined, while a reasoned endorsement converts
+it into a decision the thread now records as settled, and any later reader
+finds an accident with an argument attached.
+
+The tell is reading a review that justifies something you have no memory of
+choosing.
+Treat that as a prompt to check the diff rather than as confirmation, and
+note that the review's argument may be perfectly sound --- the question is
+not whether the change is defensible but whether anyone decided it.
+
+Deletions are where this concentrates, because an addition is something you
+wrote and a deletion is usually something that got displaced.
+`git diff origin/main...HEAD | grep '^-'` lists them in one command, and on
+a prose diff the list is normally short enough to read in full.
+
+- **Do:** read your diff's deleted lines before pushing, and confirm each one
+  was a decision rather than a casualty of an edit's blast radius.
+- **Do:** say plainly, in the thread, when a review has blessed something
+  unintended --- the reviewer cannot know, and its verdict will otherwise
+  stand as the record.
+- **Don't:** treat a clean verdict as evidence about intent; it is evidence
+  about correctness only.
+- **Don't:** keep an unintended change because the reasoning offered for it
+  turned out to be good.
+
+(Morrison-Lab/ai-config#922, 2026-07-30: a replacement string written to add
+one block silently dropped the three `Do`/`Don't` bullets belonging to the
+entry above it, leaving that entry with prose and a case record but no
+labelled pair --- which `CLAUDE.md`'s "Record both the pattern and the
+anti-pattern" specifically asks for.
+`claude-review` returned Ready for merge, analysed all three deletions, and
+concluded they were "appropriate", reasoning that two restated surviving
+prose and the third was superseded.
+The third point was right and the other two were not; the bullets were
+restored, one reworded, and the deletion count fell from seven lines to two.)
 
 **Proactively self-correct a technical claim you already told a reviewer,
 the moment further testing shows it was wrong --- don't wait for the

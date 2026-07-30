@@ -102,6 +102,63 @@ wrong claim verbatim --- "`continue-on-error` there, the dropped implicit
 was not part of the diff either reviewer read.
 Caught only while assembling the ready-for-merge summary.)
 
+**Following that "state it as history" advice is what produces the next
+block, because an automated reviewer reads the body as a flat statement of
+intent.**
+The paragraph above is right that a correction with history worth keeping
+should be recorded rather than silently overwritten, since earlier comments
+respond to the old version.
+It has a failure mode it does not warn about, and the failure lands precisely
+on the authors who follow it.
+
+A past-tense paragraph saying a thing *was* excluded is, to a bot, not
+distinguishable from a claim that it *is* excluded.
+Tense is doing all the work, and nothing in the reviewer's reading of the
+document preserves it.
+So the more faithfully the reversal is recorded, the more confidently the
+reviewer reports the diff as contradicting its own description --- and the
+remedy it proposes is to revert the change, which means undoing whatever the
+reversal was.
+
+Distinguish this from an ordinary stale snapshot before answering.
+A reviewer that started before your edit never saw the correction and needs
+only a pointer to it; that case is covered further down, under the
+timestamp check.
+This one re-raises *at the corrected text*, so the timestamps clear and the
+finding still stands.
+Compare the run's start time against the edit, then read which passage the
+new verdict quotes --- if it is quoting your history section, this is the
+case, not that one.
+
+- **Do:** state the current content first, marked as current, before any
+  history.
+- **Do:** put the reversal in its own section that opens by saying it is
+  history.
+- **Do:** make sure the "what is excluded" section does not name the reversed
+  item at all, in any tense.
+- **Don't:** rely on past tense alone to carry the distinction.
+- **Don't:** revert a maintainer-requested change because a reviewer read the
+  history as current --- rebut, and escalate rather than comply.
+
+Be honest about the residual: all of that can be applied and a further run
+can still block, at which point the only remaining move is deleting the
+history outright, which costs the earlier comments their referent.
+That trade belongs to the human, not to the agent driving the PR.
+
+(Morrison-Lab/ai-config#843, 2026-07-30: the maintainer asked for a fourth
+tool on an allowlist that had shipped with three.
+Jules blocked twice.
+The first was an ordinary stale snapshot --- its run started at `02:56:28Z`,
+two seconds before the body was corrected.
+The second re-ran at `03:00:31Z` against the corrected body, with a new
+session id and a different cited line number, read the reversal-history
+section, and praised the description for "explicitly documenting which
+permissions should be intentionally excluded" while demanding the requested
+tool be removed.
+`claude-review` saw the same inconsistency at the same stale head and graded
+it a minor, explicitly non-blocking prose note.
+Escalated; the human merged past it.)
+
 **The same sync is needed when the review fix is to CODE BEHAVIOR rather than
 to wording --- and that case is easier to miss, because nothing about fixing a
 bug points at the changelog.**
@@ -127,6 +184,40 @@ corrected that round, while `NEWS.md` kept saying links point at `.html` under
 "`mkdocs` and `quarto_website`" through two further clean review rounds.
 Caught by a `main`-sync merge conflict that happened to land in that entry ---
 not by any review, and not by any check.)
+
+**Tighter still: a changelog entry can contradict its own commit message, in
+the same commit, with no review in the loop at all.**
+Both cases above need a review round to set them up --- a reviewer quotes a
+phrase, or a finding changes behaviour --- so the trigger to go looking is
+external.
+Here there is none.
+The commit message and the changelog entry are written minutes apart, by you,
+in the same commit, and disagree.
+
+The reason it survives is that the two are drafted in different registers.
+A commit message argues for the change and reaches for the sharpest true
+statement of the mechanism; a changelog entry describes the change for a
+release note and reaches for the tidiest one.
+Nobody reads them side by side afterwards.
+A diff review sees one, a `git log` sees the other, and no check compares
+them --- so the contradiction ships, and the release notes are the half a
+user actually reads.
+
+The check is mechanical and belongs in the pre-push self-review pass
+[`ardi`](ardi.md) already requires: after writing a rationale into a commit
+message, grep that same commit's prose changes for a claim about the same
+mechanism, and read the two together before pushing.
+Where they differ, the commit message is usually the correct one, because it
+was written while the mechanism was in front of you.
+
+(`ucdavis/bcs#463`, 2026-07-30: `a0f4113d`'s commit body said `update_trigger`
+"can set `enabled: false` and rewrite a routine's prompt and cron outright".
+The `NEWS.md` entry edited by that same commit justified excluding a different
+tool on the grounds that the allowed set only changes *when* routines run ---
+which the commit body directly refutes, and which is wrong about
+`create_trigger` too, since it authors a whole new routine.
+Caught by `claude-review` as an inline finding, not by any check, and the
+correct framing turned out to be deferred versus immediate effect.)
 
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
 

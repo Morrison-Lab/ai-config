@@ -264,6 +264,24 @@ Boxed (a `===` line above and below the labeled block):
 - 💡 **OFFER** — optional work I can do if they want it.
 - 🛑 **BLOCKER** — stopped; need their call.
 - ✅ **ANSWER** — the headline answer to a question they asked (put nuance below the box).
+- 🧭 **RECOMMENDATION** --- the course of action I think they should take,
+  when the decision is theirs.
+  Distinct from the two categories it is most easily confused with:
+  an ✅ **ANSWER** reports what is true,
+  and a 💡 **OFFER** proposes work I would do.
+  A recommendation is a judgment about what *they* should do,
+  including about things I will not be doing ---
+  which PR to merge first, which option to decline, whether to stop.
+  Lead the box with the action and put the reasoning below it,
+  so the box holds the call rather than the argument for it.
+  It boxes because it feeds a decision they are waiting to make;
+  an opinion nobody was waiting on is a 📊 **UPDATE** with a view in it,
+  and stays unboxed.
+  - **Do:** box the recommendation, lead with the action,
+    keep the reasoning under the box.
+  - **Don't:** bury it in a closing paragraph,
+    or fold it into an ✅ **ANSWER** box
+    so a factual claim and a judgment read as one thing.
 - 🔀 **MERGE ORDER** --- several PRs are ready,
   and merging them in the wrong order would produce a wrong result.
   The one category labeled with a markdown **heading** (`### 🔀 MERGE ORDER`) rather than bold text,
@@ -460,6 +478,15 @@ If you've already pushed a bloated diff, the same fix applies retroactively: reb
 Many skills under `skills/` name concrete `gh`/`glab` CLI commands (e.g. `gh pr comment`, `gh issue create`).
 In a remote/web session where `gh`/`glab` isn't on `PATH`, substitute the equivalent GitHub MCP tool from [`tool-mappings.md`](tool-mappings.md) instead of failing or improvising.
 That registry is the single source of truth for the gh/glab-to-MCP mapping in this repo --- don't inline a separate translation table into individual skills; point to `tool-mappings.md` and let it stay the one place to update. (GitLab operations have no MCP equivalent listed there; `glab` stays CLI-only.)
+
+## Install and use MCP servers proactively
+
+@shared/workflow/use-mcp-servers.md
+
+The section above is about substituting an MCP tool for a CLI command when the CLI is missing.
+This one is the other direction: when a server would help, install and register it rather than waiting to be asked --- including locally, where `tool-mappings.md`'s per-model table describes the default rather than a limit.
+Covers reading `claude mcp list` for transport rather than name (a plugin's remote server can shadow the local one you meant), 400-versus-401 on an uninterpolated credential, supplying tokens by launch wrapper instead of storing them, opt-in toolsets whose selection *replaces* the default, and verifying by a real call rather than by the tool listing.
+Its last section generalizes past MCP: when a standing rule names a mechanism this session doesn't have, look for the local equivalent instead of silently degrading to a worse fallback.
 
 ## File an issue before starting a new task
 

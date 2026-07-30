@@ -334,3 +334,61 @@ return a review", with the 15-minute timeout and session
 `4236561570323034536` in its own comment.
 A review fix was already staged, so the push carried the re-trigger, and
 Jules returned `VERDICT: approve` on the new head about four minutes later.)
+
+**A third shape is the one the retry rule hands off to and then stops
+short of: the failure that reproduces identically on every attempt.**
+The eighth case tells you to retry once and call the reviewer unreachable if
+it fails again, which is right, and it is where that case ends.
+But "unreachable" covers two situations with different owners and opposite
+next actions.
+A service-wide outage clears on its own, so waiting is correct.
+A credential scoped to this repository or organization never clears by
+itself, so every further retry is wasted and the real deliverable is an
+issue naming a human with admin access.
+Retrying cannot separate them, because both keep failing.
+
+The discriminator is a repository you are not asking about: run the same
+reviewer on a **different** repo in the same session.
+A success there proves the service is up, which leaves the failing repo's own
+credential as the only remaining explanation.
+This is an [`algorithmatize-checks`](algorithmatize-checks.md) case rather
+than a judgment call -- two check runs decide it -- and a multi-repo session
+usually has the second one for free.
+
+**The inversion is what makes this worth writing down, because it reuses the
+eighth case's own evidence and points the opposite way.**
+That case offers "prior successes on the same credential in the same session"
+as grounds for calling a failure transient.
+Read it carefully: it holds only when the successes are on the **same repo**.
+A cross-repo success is a different credential, so treating it as evidence of
+transience argues for waiting out precisely the failure that will never
+clear.
+Same evidence type, opposite conclusion, and only the scope tells them apart.
+
+The duration signature is the corroborating half.
+A reviewer that authenticates and then works takes minutes; one whose
+credential is rejected dies in seconds, with `is_error: true`, zero cost, and
+zero permission denials, because no work ever started.
+Take those seconds from the completed run's own `started_at`/`completed_at`
+rather than from `status`, per criterion 1 above.
+
+- **Do:** run the same reviewer against another repo in the session before
+  concluding a service is down.
+- **Do:** stop retrying and file an issue naming the credential once a
+  cross-repo success has localized the failure.
+- **Don't:** read a success on a different repo as evidence that this repo's
+  failure is transient.
+- **Don't:** keep spending retries on a failure whose every attempt dies at
+  the same short duration.
+
+(d-morrison/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
+times across those two PRs -- six on #96, one on #95 -- each run finishing in
+the 26-to-35-second band, with `is_error: true`, `total_cost_usd: 0`, and no
+permission denials.
+The nearest pair is 38 seconds apart: the run on altdoc#95 failed
+`04:07:37Z -> 04:08:12Z`, and the same reviewer returned a full
+`Ready for merge` verdict on Morrison-Lab/ai-config#858 over
+`04:08:50Z -> 04:11:41Z`.
+So the service was fine and the `d-morrison` credential was not, which no
+number of re-runs would have shown.
+Tracked in d-morrison/altdoc#99.)

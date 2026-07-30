@@ -204,6 +204,47 @@ Ideas borrowed from comparable projects (and their licenses) are recorded in
 [`CREDITS.md`](CREDITS.md); see the `scout-peers` skill for the survey behind
 them.
 
+## Enforcement hooks (`hooks/`)
+
+A few rules in this corpus cannot be enforced by writing them down, because
+the rule is consulted when it is *read* and broken when a message is
+*composed*.
+`hooks/` ships the harness hooks that close those gaps:
+
+| hook | event | enforces |
+|---|---|---|
+| `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
+| `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
+| `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
+
+`bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
+directory, so the scripts arrive with no extra step.
+Registering them is separate and deliberately opt-in --- bootstrap is a pure
+symlinker and never edits `settings.json`, since silently rewriting harness
+config while installing skills is the wrong default:
+
+```sh
+python3 scripts/install-hooks.py         # report what is registered
+python3 scripts/install-hooks.py --fix   # register the missing ones
+```
+
+`--fix` backs `settings.json` up first, preserves any hooks already there, and
+is idempotent.
+Hooks connect at session start, so restart before expecting a newly registered
+one to fire.
+
+Bindings live in [`hooks/hooks.json`](hooks/hooks.json) --- a script cannot
+declare its own event, so the manifest names the event, matcher, and the rule
+each one enforces.
+
+**A hook that misfires is worse than a missing one**, since it trains everyone
+to work around the guard.
+Keep the matchers narrow, and test both directions before adding one: the
+cases it must block *and* the near-misses it must let through.
+`require-gh-repo-flag.py` is the cautionary example --- its first version
+fired on any command whose text merely contained a gated `gh` invocation,
+including a heredoc documenting one.
+
 ## What's tracked
 
 - `skills/` — reusable workflow skills (`~/.claude/skills/`)

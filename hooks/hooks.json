@@ -1,0 +1,33 @@
+{
+  "_comment": [
+    "Binding metadata for the hooks in this directory. A hook script cannot",
+    "declare its own event, so scripts/install-hooks.py reads it from here.",
+    "",
+    "Each entry: the script's filename, the harness event it binds to, an",
+    "optional tool matcher, an optional `if` permission-rule prefilter (which",
+    "keeps the hook from spawning on every unrelated call), and a one-line",
+    "reason naming the rule it enforces."
+  ],
+  "hooks": [
+    {
+      "script": "inject-local-time.sh",
+      "event": "UserPromptSubmit",
+      "timeout": 10,
+      "why": "CLAUDE.md 'Timestamp recaps in local time' -- supplies the real local time each turn, because a fabricated timestamp is indistinguishable from a remembered one."
+    },
+    {
+      "script": "require-gh-repo-flag.py",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "if": "Bash(gh *)",
+      "timeout": 10,
+      "why": "Blocks mutating repo-scoped gh commands lacking -R, so a write never silently targets whatever repo the cwd happens to be."
+    },
+    {
+      "script": "no-offer-to-file.py",
+      "event": "Stop",
+      "timeout": 10,
+      "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+    }
+  ]
+}

@@ -153,6 +153,43 @@ checks above say. (Hit on `Lacaedemon/sparta`, 2026-07-02: ~40 of 48 worktrees
 slated for cleanup showed `ahead=2` to `ahead=15` on the naive check — every
 one had actually merged via squash minutes to hours earlier.)
 
+**A detached worktree has no branch, so the squash-merge escape hatch above
+does not apply to it --- and the naive check it falls back to is the one that
+is wrong in a squash-merge repo.**
+Every landed-detection route in 3b and 3c keys on a branch name: `gh pr list
+--head <branch>`, `git branch --merged`, `<branch>@{upstream}`.
+A detached HEAD answers none of them, so classification silently drops to the
+ahead-of-main count --- which the warning above already establishes is
+meaningless here, since a squash merge guarantees it is nonzero.
+
+The result reads as the *safe* answer while being the wrong one.
+`ahead=5` with no branch and no upstream looks exactly like commits that exist
+nowhere else, so the worktree is labelled **Dirty** and kept indefinitely,
+when in fact its work merged hours earlier.
+
+Diff the content instead, which needs no branch:
+
+```bash
+h=$(git -C <path> rev-parse HEAD)
+git diff --name-only origin/main "$h" -- <files the unique commits touched>
+```
+
+Scope it to those files.
+A bare `git diff origin/main <head>` reports every file `main` has gained
+since the worktree was cut, which in an active repo is hundreds --- all of it
+`main`'s drift rather than the worktree's work, and it buries the answer.
+Get the file list from `git log origin/main..HEAD` first, then diff only
+those.
+An empty diff means the content is on `main` and the worktree is **Dead**.
+
+(2026-07-29, the same ai-config sweep: two detached worktrees showed
+`ahead=5` and `ahead=2` and were classified Dirty on that basis.
+Narrowed to the files their own commits touched, both diffed **empty**
+against `main` --- one was PR #804's review fixes, already squash-merged, and
+the other's two commits were both present in `jules-review.yml` on `main`.
+The whole-tree diff for the same pair reported 222 and 221 changed files,
+which is why the narrowing matters.)
+
 #### d. Live-session check — is another session using it?
 
 ```bash

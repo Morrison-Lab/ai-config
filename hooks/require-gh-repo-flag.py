@@ -29,7 +29,13 @@ import sys
 # positive with real cost, since a blocked turn is more disruptive than a
 # missed one here (the miss is caught by the -R habit; the false positive
 # teaches you to distrust the guard).
-LEAD = r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*gh\s+"
+# The value slot accepts a quoted string as well as a bare token: `\S*` alone
+# stops at the first space, so `VAR="two words" gh secret set` would fail to
+# match the prefix and the whole segment would be treated as not-a-gh-command.
+# That direction is a false NEGATIVE -- the guard would wave the command
+# through -- which is worse here than the false positive the anchor was added
+# to fix.
+LEAD = r"""^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*gh\s+"""
 
 GATED = [
     (LEAD + r"secret\s+(set|delete|remove)\b", "gh secret set/delete"),

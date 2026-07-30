@@ -82,10 +82,15 @@ def load_settings(path: Path) -> dict:
 def command_for(entry: dict) -> str:
     """The command string as it appears in settings.json.
 
-    Uses $HOME rather than an absolute path so the same settings.json works on
-    every machine this repo is installed on.
+    Uses `$HOME/.claude` when that is where the hooks actually live, so the
+    same settings.json works on every machine this repo is installed on. When
+    CLAUDE_HOME points somewhere else, emit that literal path instead --
+    writing `$HOME/.claude` there would register a command that does not exist.
     """
-    rel = f'"$HOME/.claude/hooks/{entry["script"]}"'
+    default = Path.home() / ".claude"
+    cdir = claude_dir()
+    base = "$HOME/.claude" if cdir.resolve() == default.resolve() else str(cdir)
+    rel = f'"{base}/hooks/{entry["script"]}"'
     return rel if entry["script"].endswith(".sh") else f"python3 {rel}"
 
 
@@ -183,7 +188,11 @@ def main() -> int:
     settings_path.write_text(json.dumps(settings, indent=2) + "\n")
     print(f"\nadded {added} hook(s) to {settings_path}")
     print("Hooks connect at session start -- restart before expecting them to run.")
-    return 0 if added == counts["missing"] else 1
+    # a stale entry is still broken after --fix, and --fix deliberately does not
+    # touch it, so it must keep the exit code non-zero. Without the stale term
+    # a stale-only run returns 0 == 0 and reports success over broken hooks --
+    # the pass-path-equals-failure-path shape this file's own docstring cites.
+    return 0 if added == counts["missing"] and counts["stale"] == 0 else 1
 
 
 if __name__ == "__main__":

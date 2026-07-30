@@ -336,3 +336,52 @@ status concludes the copy succeeded -- the
 expects it from.
 Prefix the source with `./` so a slash precedes the colon, or use a `cp`
 loop when the file list is small enough not to need rsync.
+
+## The Bash tool runs zsh here, and zsh does not word-split unquoted expansions
+
+Kin to the two path gotchas above --- it produces a confident wrong answer
+rather than an error --- but it is not about paths, so it gets its own entry.
+
+`SHELL=/bin/zsh` on this machine, and zsh leaves `SH_WORD_SPLIT` **off** by
+default.
+So an unquoted parameter expansion stays one word, where bash would split it:
+
+```zsh
+r="804 MERGED 2026-07-29"
+set -- $r      # zsh: $1="804 MERGED 2026-07-29", $2=""   <- bash: $1="804", $2="MERGED"
+set -- ${=r}   # zsh: $1="804", $2="MERGED"               <- the = flag forces splitting
+```
+
+`for x in $list` has the same shape: one iteration over the whole string
+rather than one per word.
+
+**Nothing errors.** `$2` is simply empty, so a downstream `[ "$2" = "MERGED" ]`
+is false and every row of a report comes back the same wrong way.
+That uniformity is what sells it: a loop over 19 branches printing `no-PR` for
+all 19 reads as a finding about the branches, not as a broken parser.
+
+Prefer a form that needs no word splitting at all, since it is also portable
+back to bash:
+
+```zsh
+num=${r%% *}; rest=${r#* }; state=${rest%% *}   # parameter expansion
+read -r num state date <<< "$r"                 # or read into named vars
+```
+
+Reach for `${=r}` only when you specifically want zsh's splitting and know the
+script will never run under bash.
+
+- **Do:** parse with parameter expansion, `read`, or `awk`, rather than
+  relying on the shell to split an unquoted expansion.
+- **Do:** suspect the parser first when every row of a generated table reports
+  the same value.
+- **Don't:** carry a `set -- $var` idiom over from bash notes and assume it
+  splits here.
+- **Don't:** put `2>/dev/null` on the command whose output the table is built
+  from --- that hides the other half of this failure class (see
+  [`fail-fast`](../shared/principles/fail-fast.md)).
+
+(2026-07-29/30, one ai-config session, twice.
+The second time, a branch sweep reported all 19 local branches as having no
+PR; the immediately preceding run of the same data had correctly shown 16 as
+`MERGED`, which is the only reason the contradiction was noticed at all.)

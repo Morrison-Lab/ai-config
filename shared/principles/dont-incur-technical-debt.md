@@ -3,16 +3,17 @@ When the right way to do the work in front of you needs a change you have not
 made yet, make that change as part of the work, rather than shipping the
 version that routes around it.
 
-The rule bounds **new** work only.
-That bound is not a softening -- it is what makes the rule followable, and it
-is stated in "What this does not oblige" below.
-Read it before applying anything else here, or this reads as "refactor
+The rule bounds **new** work only: what you add is yours to get right, and the
+un-migrated code you happened to land next to is not.
+That bound is not a softening.
+It is what makes the rule followable, since without it this reads as "refactor
 everything adjacent", which nobody can comply with and everybody therefore
 ignores.
+"What this does not oblige" draws the line case by case.
 
 ## The case this comes from
 
-Every section below refers to one incident, so it is worth stating once.
+Every section here refers to one incident, so it is worth stating once.
 
 While adding a check to [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha),
 I needed a function mapping a unified diff to the new-file line numbers it
@@ -33,7 +34,7 @@ It failed only because the expected values had been written out by hand.
 Three copies of one function in one afternoon, two of them wrong, and the test
 concealed the bug rather than catching it.
 
-The remedy was then diagnosed correctly -- organize that repo's R code as a
+I then diagnosed the remedy correctly -- organize that repo's R code as a
 package, filed as
 [Morrison-Lab/gha#383](https://github.com/Morrison-Lab/gha/issues/383) -- and
 recommended for deferral: land the new check as scripts now, package later.
@@ -81,7 +82,7 @@ Filing the issue is necessary, and it is not sufficient.
 [`report-mistakes-proactively`](../workflow/report-mistakes-proactively.md)'s
 "Filing is not gated on approval" section makes the neighbouring move for a
 different artifact, and its reasoning holds here unchanged -- read it there
-rather than re-derived here.
+rather than re-deriving it here.
 
 What differs is the direction of the error.
 There, filing *is* the whole deliverable, and the failure is not filing.

@@ -350,6 +350,41 @@ posted about a minute before the follow-up review job started; that review
 reported the item "wasn't addressed in `9398d5d`" and re-posted the
 identical suggestion.)
 
+**Reply-first collides with citing the fix's SHA, and the way out is to commit
+between them rather than to pick one.**
+The rule above is easy to agree with and still lose, because on a mixed round
+the reply you want to write says "Addressed in `<sha>`" --- and that SHA does
+not exist until you have committed.
+So the two instructions read as mutually exclusive: reply first and you have no
+SHA to cite, push first and the reply misses the next review's snapshot.
+Pushing first wins that standoff by default, since it is the half that
+*unblocks* the sentence you were trying to write.
+
+The conflict is only apparent, because committing and pushing are separate
+steps and only the push triggers review:
+
+1. **Commit** the round's fixes.
+   The SHA now exists and is stable.
+2. **Reply** on each thread, citing that SHA.
+3. **Push.** The next review's snapshot already contains the replies.
+
+A commit that is never pushed is invisible to CI and to the reviewer, so step 2
+is citing something real but not yet reachable --- which is fine for a few
+seconds, and is exactly the window step 3 closes.
+Note the one thing this does *not* license: the SHA you cite must come from
+`git rev-parse HEAD` or `git log`, never from recollection, per the PR-body
+bullet in [`ardi`](ardi.md).
+
+- **Do:** commit, reply citing the committed SHA, then push --- in that order.
+- **Don't:** treat "I need the SHA for the reply" as a reason to push before
+  replying; that is the ordering the bullet above exists to prevent.
+
+(ai-config#871, 2026-07-30: a four-finding round with three Addresses and one
+Rebut was pushed first and replied to about a minute later, so the round-2
+review run started before the rebuttal was visible to it.
+It happened to engage the rebuttal anyway --- the evidence was in the diff as
+well as the thread --- but that was luck, not the ordering working.)
+
 **A finding can be right while its `suggestion` block is wrong --- verify
 the suggested literal before applying it.**
 A GitHub ```` ```suggestion ```` block is one-click-appliable, which is

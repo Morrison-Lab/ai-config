@@ -145,6 +145,55 @@ PR comment said they were "addressed in the latest push"; the head sat at the
 pre-fix commit for over an hour, with 14 green checks validating a branch
 carrying neither fix, until a scheduled check-in compared the SHAs.)
 
+**A SHA you put in a PR body or a reply must be read, never recalled --- and
+the PR body is where an invented one survives longest.**
+The bullet above asks whether the right commit reached the branch.
+This asks the prior question: whether the commit you named exists at all.
+A short SHA is seven plausible hex characters, so writing one from memory feels
+like recalling a fact rather than asserting one, and the result is
+indistinguishable from a correct citation --- nothing renders differently, and
+GitHub neither linkifies nor validates a SHA with no commit behind it.
+
+The PR body is the worst host for it, for the reason
+[`address-every-comment`](address-every-comment.md) gives about stale
+paraphrases there: the body is in no diff, so no reviewer reads it as part of
+the change and no `grep` over the diff finds it.
+It is also what a maintainer reads while deciding whether to merge, so an
+invented SHA misdirects the one reader most likely to act on it.
+
+One command against the value you are about to paste settles it:
+
+```sh
+git rev-parse --verify <sha>^{commit}   # or: git cat-file -e <sha>
+```
+
+When a wrong SHA has already been published, correct it **visibly** rather than
+overwriting it silently --- a reader who saw the original cannot otherwise tell
+a revised body from one that always said this, which is the same reasoning the
+withdraw-a-stale-blocker bullet below applies to a retracted caveat.
+
+This is the commit-SHA case of the rule
+[`report-mistakes-proactively`](report-mistakes-proactively.md) states for
+issue numbers ("never name an issue number before the issue exists").
+Same defect, different artifact: an identifier guessable enough to assert
+casually, with nothing in the repository to contradict it.
+
+- **Do:** read every SHA you cite out of `git rev-parse` or `git log`, and
+  confirm it resolves before pasting it.
+- **Do:** correct a published wrong SHA with a visible note naming the real one.
+- **Don't:** write a short SHA from recollection because it looks like the
+  commit you just made.
+- **Don't:** expect review to catch it --- a reviewer has no reason to suspect
+  a citation, and the body is not in the diff they are reading.
+
+(ai-config#871, 2026-07-30: the PR body credited a sentence-boundary fix to
+`1f79a4a`, which existed nowhere in the branch or the repository ---
+`git cat-file -e` returned `Not a valid object name`.
+The real commit was `fcb605f`.
+Two review rounds read that body without flagging it; it surfaced only when the
+body was re-read against the diff before declaring the PR ready, which is the
+`address-every-comment` check above doing work its own rule did not anticipate.)
+
 **The read side of that comparison can lag a push by a few seconds, so test
 the two *local* refs against each other before concluding anything failed.**
 The rule above is an

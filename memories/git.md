@@ -993,3 +993,46 @@ local ancestry.
   you know a prune actually ran.
 - **Don't:** treat `git branch -d` refusing, a non-zero ahead-count, or absence
   from `git branch --merged` as evidence a branch still holds unpushed work.
+
+## `git rev-parse <ref>:<path>` writes its own input to stdout when the path is absent
+
+`git rev-parse` resolves `<ref>:<path>` to a blob SHA.
+When that path does not exist in that ref it fails **and still writes to stdout** -- the literal input string, unchanged.
+Verified on git 2.34.1, 2026-07-30:
+
+```console
+$ git rev-parse origin/main:not/a/real/path; echo "rc=$?"
+fatal: path 'not/a/real/path' does not exist in 'origin/main'
+origin/main:not/a/real/path
+rc=128
+$ git rev-parse origin/main:README.md; echo "rc=$?"
+939ce89cb74324b1c783fe726a20a1d2b4d9b06b
+rc=0
+```
+
+The two lines go to different streams, so a capture keeps the echoed input whichever way stderr is handled:
+
+```console
+$ out=$(git rev-parse origin/main:not/a/real/path 2>/dev/null); echo "[$out]"
+[origin/main:not/a/real/path]
+```
+
+A capture that merges stderr with `2>&1`, or that ignores the exit status, therefore comes back non-empty with a value that reads as an ordinary answer.
+It is also unequal to every real SHA, which is what makes it worse than an empty result.
+A "does this path differ between two refs" check compares two such strings, finds them unequal, and reports **differs** when the true answer was **absent from one side**.
+That is the by-hand-check shape [`fail-fast`](../shared/principles/fail-fast.md) describes, where the failure path and the pass path print the same kind of thing.
+
+Test the exit status, or use `git cat-file -e "$ref:$path"`, which writes nothing to stdout at all:
+
+```console
+$ out=$(git cat-file -e origin/main:not/a/real/path 2>/dev/null); echo "rc=$? out=[$out]"
+rc=128 out=[]
+```
+
+- **Do:** read `rc` from `git rev-parse <ref>:<path>`, or switch to `git cat-file -e` when only existence is in question.
+- **Do:** treat an output that is not SHA-shaped as "the path was absent" rather than as a difference.
+- **Don't:** pipe `git rev-parse <ref>:<path>` through `2>&1` into a comparison.
+- **Don't:** compare two `git rev-parse <ref>:<path>` outputs for equality without first establishing that both resolved -- two absent paths echo two different strings, which reads as a difference.
+
+(2026-07-30, a `ucdavis/bcs` branch sweep: a per-path comparison built this way reported that a branch was about to destroy another session's work, and that went out as a blocker.
+The paths were absent on one side rather than different, and a real set-difference over the two file lists showed the branch was safe.)

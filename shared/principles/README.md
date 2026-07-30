@@ -147,11 +147,13 @@ the case where duplicated logic corrupts its own tests, and why this
 does not conflict with YAGNI.
 Operationalized by:
 [`dont-reinvent-wheel`](dont-reinvent-wheel.md) (the search that comes
-one step earlier),
+one step earlier) and
 [`report-mistakes-proactively`](../workflow/report-mistakes-proactively.md)
-(file the issue -- necessary, not sufficient), and
+(file the issue -- necessary, not sufficient).
+Contrast with, rather than apply,
 [`address-every-comment`](../workflow/address-every-comment.md)'s Defer
-disposition (which bounds when deferral is legitimate at all).
+disposition: it governs a finding on code that already exists, and
+licenses nothing about a defect inside the diff you are about to push.
 
 ## Modularity — small, single-purpose, composable units
 

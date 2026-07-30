@@ -264,14 +264,24 @@ Boxed (a `===` line above and below the labeled block):
 - 💡 **OFFER** — optional work I can do if they want it.
 - 🛑 **BLOCKER** — stopped; need their call.
 - ✅ **ANSWER** — the headline answer to a question they asked (put nuance below the box).
-- 🧭 **RECOMMENDATION** --- the course of action I think they should take, when the decision is theirs.
-  Distinct from the two categories it is most easily confused with: an ✅ **ANSWER** reports what is true, and a 💡 **OFFER** proposes work I would do.
-  A recommendation is a judgment about what *they* should do, including about things I will not be doing --- which PR to merge first, which option to decline, whether to stop.
-  Lead the box with the action and put the reasoning below it, so the box holds the call rather than the argument for it.
+- 🧭 **RECOMMENDATION** --- the course of action I think they should take,
+  when the decision is theirs.
+  Distinct from the two categories it is most easily confused with:
+  an ✅ **ANSWER** reports what is true,
+  and a 💡 **OFFER** proposes work I would do.
+  A recommendation is a judgment about what *they* should do,
+  including about things I will not be doing ---
+  which PR to merge first, which option to decline, whether to stop.
+  Lead the box with the action and put the reasoning below it,
+  so the box holds the call rather than the argument for it.
   It boxes because it feeds a decision they are waiting to make;
-  an opinion nobody was waiting on is a 📊 **UPDATE** with a view in it, and stays unboxed.
-  - **Do:** box the recommendation, lead with the action, keep the reasoning under the box.
-  - **Don't:** bury it in a closing paragraph, or fold it into an ✅ **ANSWER** box so a factual claim and a judgment read as one thing.
+  an opinion nobody was waiting on is a 📊 **UPDATE** with a view in it,
+  and stays unboxed.
+  - **Do:** box the recommendation, lead with the action,
+    keep the reasoning under the box.
+  - **Don't:** bury it in a closing paragraph,
+    or fold it into an ✅ **ANSWER** box
+    so a factual claim and a judgment read as one thing.
 - 🔀 **MERGE ORDER** --- several PRs are ready,
   and merging them in the wrong order would produce a wrong result.
   The one category labeled with a markdown **heading** (`### 🔀 MERGE ORDER`) rather than bold text,

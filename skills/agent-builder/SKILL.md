@@ -171,8 +171,9 @@ mechanisms:
 2. **Declarative `context: fork`**, when the agent's own procedure covers
    the skill's *entire* body end to end --- add `context: fork`,
    `agent: <name>`, and (usually) `background: false` to the skill's own
-   frontmatter, per `code.claude.com/docs/en/skills`' "Run skills in a
-   subagent" section.
+   frontmatter, per the
+   [Run skills in a subagent](https://code.claude.com/docs/en/skills#run-skills-in-a-subagent)
+   docs section.
    See `skill-audit`/`find-overlap` for the pattern.
 
 **The two are not interchangeable, and picking the wrong one silently

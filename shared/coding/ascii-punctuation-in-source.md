@@ -86,6 +86,47 @@ check caught on that commit but missed on a later, narrower re-check scoped
 only to the commit being amended -- the gap was closed by the repo's own
 automated `@claude` self-review, not by the author's manual check.)
 
+**Use the three-dot range for that scan, not the two-dot one, or a `main`
+that has advanced turns the check into a flood of false positives.**
+`git diff origin/main` compares the two *tips*, so a `+` line means "present
+in your HEAD, absent from main's tip" --- which is true of your own additions
+**and** of anything `main` has since deleted or moved that your branch still
+carries.
+Those deletions are the ones that flood the scan, and note the inversion:
+content `main` *added* shows up as `-` and is invisible to a `+`-only scan,
+so the direction that bites is the opposite of the intuitive one.
+A file whose content moved elsewhere on `main` is the worst case, since every
+line of it reappears as yours.
+
+The failure is loud rather than silent, which is its one mercy, but it is
+still worse than useless: a scan reporting dozens of violations in files you
+never touched trains you to dismiss the check, and the real hits are buried
+among them.
+
+`git diff origin/main...HEAD` compares against the **merge base** instead ---
+the state your branch actually diverged from --- so it reports only your own
+additions no matter how far `main` has moved:
+
+```bash
+git diff -U0 origin/main...HEAD        # your additions only
+git diff -U0 origin/main               # plus anything main deleted or moved
+```
+
+Two follow-ons.
+The gha `check-new-line-breaks` workflow already uses the three-dot form
+internally, which is why it can report clean on the same head where a
+hand-rolled two-dot scan reports scores of hits --- so a disagreement
+between the two is a signal about your range, not about the file.
+And merging `main` first collapses the difference, since the merge base
+becomes `main`'s tip; that is the better habit anyway, per
+[`sync-with-main`](../workflow/sync-with-main.md).
+(Morrison-Lab/ai-config#816, 2026-07-29: a pre-push scan reported 88 banned
+glyphs, mostly in `memories/github-actions.md`, none of them in the diff.
+`main` had since moved 609 of that file's lines into a new
+`memories/claude-bot-workflows.md`, so the two-dot diff re-attributed every
+one of them to the branch --- `+609/-5` on a file the branch never opened.
+The same scan with `...` reported 0 over 66 added lines.)
+
 **Writing into a file that predates this rule is the likeliest way to break
 it, because the surrounding prose is the wrong model to imitate.**
 Ordinary practice is to match the file you are editing, and in a long-lived

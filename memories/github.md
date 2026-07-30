@@ -49,6 +49,35 @@
 - `gh pr create` fails with `Head sha can't be blank, Base sha can't be blank, No commits between <owner>:main and <other-owner>:<branch>` when `origin` points to an **old repo URL** (e.g. after a GitHub repo transfer/rename).
 - Fix: `git remote set-url origin https://github.com/<new-owner>/<repo>.git` and re-push the branch before creating the PR.
 - Diagnosis: `git remote -v` shows the stale URL; `gh repo view --json nameWithOwner` shows where `gh` thinks the canonical repo is.
+- **`gh repo view <old-slug> --json nameWithOwner` is the whole detector, and it
+  resolves the redirect for you** --- ask for the old name and read which name
+  comes back.
+  That makes the check a one-liner per repo, so run it over *every* local
+  checkout rather than over the ones you happened to notice.
+  Stale remotes accumulate from unrelated events --- an org transfer, a repo
+  rename, a move between orgs --- so the set you know about is rarely the set
+  that exists.
+  (2026-07-29: a sweep of 118 local checkouts found 5 stale, and only **one**
+  was the `d-morrison` -> `Morrison-Lab` transfer being fixed at the time
+  (`gha`; the other repo in that transfer had already been corrected by hand
+  before the sweep ran, so it was no longer stale).
+  The rest came from three unrelated events: two repos moved out of
+  `UCD-SERG` to `d-morrison` (`qbt`, `qwt`), one moved from `UCD-IDDRC` to
+  `ucdavis` (`fxtas`), and one plain rename, `snapshot.data` -> `snapr`.
+  So 1 + 2 + 1 + 1, which is the point --- four of the five had nothing to do
+  with the move that prompted the sweep.)
+- **Preserve the URL scheme when rewriting a remote.**
+  A remote on SSH (`git@github.com:<owner>/<repo>.git`) rewritten to the
+  `https://` form still works for public reads, so nothing fails immediately ---
+  but it silently moves that repo's auth from your SSH key to whatever
+  credential helper HTTPS uses, which surfaces later as an unexpected
+  credential prompt or a push denial.
+  Read the existing URL first and rebuild it in the same form.
+  A scripted sweep is where this bites, since a single hard-coded
+  `https://github.com/...` template rewrites every remote it touches into HTTPS
+  regardless of what each one was.
+  (Same sweep: 4 of the 5 were HTTPS and one, `snapr`, was SSH; the template
+  converted it before the mismatch was spotted and reverted.)
 
 ## GitHub MCP tools (Claude Code remote/web sessions)
 - In remote/web sessions the authenticated GitHub identity is the repo owner

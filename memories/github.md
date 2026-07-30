@@ -128,6 +128,19 @@
   Neither surface therefore answers "was Copilot asked to review this", in either direction.
   (Probed on `ucdavis/bcs#479`, 2026-07-30.)
 
+  **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
+  One session ran the POST once and got `422`; another ran it three times, across all three login spellings, and got `201` every time.
+  Neither session was lying, and the first one's real mistake was not the observation but the generalisation -- it turned a single failed attempt into a stated property of the repository, wrote that into a PR body as settled fact, and steered two later rounds with it.
+  The second session's report then invited the mirror-image error, of treating `201` as the settled answer.
+
+  The likeliest reconciliation, **untested**: GitHub answers `422` when the requested reviewer is already pending.
+  The `review_on_push: true` rule above re-requests Copilot on **every push**, so there is a window after each push in which Copilot is already a pending reviewer and a manual request is a duplicate.
+  That would make the response depend on *when* you ask rather than on how, and it fits both observations without either being wrong.
+  It stays untested on purpose: probing consumes the per-user quota that is usually the actual reason Copilot is absent, so the experiment damages the thing it would explain.
+
+  The operational advice does not depend on resolving it.
+  Don't spend a call on this endpoint either way -- the ruleset already requests the review, and neither response tells you whether one is pending.
+
 ## gh — stale remote URL causes cryptic `gh pr create` failure
 - `gh pr create` fails with `Head sha can't be blank, Base sha can't be blank, No commits between <owner>:main and <other-owner>:<branch>` when `origin` points to an **old repo URL** (e.g. after a GitHub repo transfer/rename).
 - Fix: `git remote set-url origin https://github.com/<new-owner>/<repo>.git` and re-push the branch before creating the PR.

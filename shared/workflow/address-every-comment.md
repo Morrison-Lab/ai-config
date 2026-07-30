@@ -312,10 +312,10 @@ it; the reply carried the failing output of the suggested form.)
 **The highest-yield version of that check: when a comment names an edge case
 in its own prose and also supplies a fix, run the fix against that edge
 case.**
-The two bullets above test a suggestion against the code or against a repro
-the reviewer provided.
+The bullets above test a suggestion against the code, or against a repro the
+reviewer provided.
 This tests it against the reviewer's *other paragraph*, and it is the cheapest
-of the three, because the hazard has already been identified for you --- the
+of them, because the hazard has already been identified for you --- the
 work left is only to check whether the proposed code handles it.
 
 Nothing forces the two halves to agree.
@@ -361,7 +361,7 @@ distinctly.)
 
 **And the mirror case: a finding can be wrong on its stated grounds while
 still pointing at something real.**
-The two bullets above check the reviewer's *fix*; this one checks their
+The bullets above check the reviewer's *fix*; this one checks their
 *premise*.
 A confidently reasoned factual claim -- this pattern is valid, that value is
 in range, this call is safe -- invites one of two lazy responses: accept it

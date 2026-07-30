@@ -818,7 +818,7 @@ The `prefer-upstream` skill runs the search; the `prefer-packaged-functions` fra
 
 When the right way to do the work in front of you needs a change you have not made yet, make that change as part of the work, rather than shipping the version that routes around it.
 The moment debt is incurred is the moment you defer a fix you have **already diagnosed** -- the most defensible-sounding moment there is, because the diagnosis is fresh, the scope argument is genuine, and deferring reads as discipline rather than as a decision.
-A filed tracking issue records the debt; it does not pay it, and it makes the deferral feel settled in a way an undocumented shortcut never does.
+A filed tracking issue records the debt rather than paying it, and it makes the deferral feel settled in a way an undocumented shortcut never does.
 The rule bounds **new** work only: adding a copy to un-migrated code is yours to fix now, the un-migrated code itself is not -- the line is authorship, not adjacency.
 Apply this in review too: a diff that adds a second copy of logic the repo already has is a review finding, and a PR that links a follow-up issue for a defect inside its own diff is a stronger one.
 

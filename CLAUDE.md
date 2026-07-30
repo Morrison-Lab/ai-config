@@ -479,6 +479,15 @@ Many skills under `skills/` name concrete `gh`/`glab` CLI commands (e.g. `gh pr 
 In a remote/web session where `gh`/`glab` isn't on `PATH`, substitute the equivalent GitHub MCP tool from [`tool-mappings.md`](tool-mappings.md) instead of failing or improvising.
 That registry is the single source of truth for the gh/glab-to-MCP mapping in this repo --- don't inline a separate translation table into individual skills; point to `tool-mappings.md` and let it stay the one place to update. (GitLab operations have no MCP equivalent listed there; `glab` stays CLI-only.)
 
+## Install and use MCP servers proactively
+
+@shared/workflow/use-mcp-servers.md
+
+The section above is about substituting an MCP tool for a CLI command when the CLI is missing.
+This one is the other direction: when a server would help, install and register it rather than waiting to be asked --- including locally, where `tool-mappings.md`'s per-model table describes the default rather than a limit.
+Covers reading `claude mcp list` for transport rather than name (a plugin's remote server can shadow the local one you meant), 400-versus-401 on an uninterpolated credential, supplying tokens by launch wrapper instead of storing them, opt-in toolsets whose selection *replaces* the default, and verifying by a real call rather than by the tool listing.
+Its last section generalizes past MCP: when a standing rule names a mechanism this session doesn't have, look for the local equivalent instead of silently degrading to a worse fallback.
+
 ## File an issue before starting a new task
 
 <!-- Shared with the lab manual; edit shared/workflow/issue-first.md, not here. -->

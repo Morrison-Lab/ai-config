@@ -534,6 +534,51 @@ assertion that body prose *survives* stripping, which neither the original nor
 the suggestion covered.
 Tracked as #905.)
 
+**A finding can be right, and its fix adequate, while the *reason* it supplies
+is too weak to ship --- and in a corpus of rules, the reason is the
+deliverable.**
+The bullets above all test whether the suggested fix *works*: against the code,
+against the reviewer's repro, against an edge case their own prose named.
+This one assumes it works, and asks whether the justification handed to you
+still holds when someone leans on it.
+
+That distinction is invisible in code and decisive in a rule.
+A patch is judged by its behaviour, so a correct patch with a shaky rationale is
+merely under-commented.
+A `shared/` fragment is judged entirely by whether its reason forecloses the
+workarounds, so adopting a weaker reason ships a rule the next reader can talk
+themselves around --- while the thread records the item as settled.
+
+The tell is a suggestion that explains *why* something is forbidden in a single
+phrase, where the primary source carries a stronger provision.
+So ask what the strongest *available* reason is, rather than whether the offered
+one is defensible, and name the workaround the weaker reason would have
+licensed --- that is what makes the choice checkable rather than a matter of
+taste.
+
+- **Do:** read the primary source for the strongest reason before adopting a
+  suggested rationale, even when the suggestion's conclusion is right.
+- **Do:** say in the reply which reason you took and why the offered one was set
+  aside, since deviating from a `suggestion` block silently reads as having
+  missed it.
+- **Don't:** accept a defensible-sounding mechanism because the conclusion it
+  supports is correct.
+- **Don't:** treat this as grounds to reject the finding --- the conclusion
+  usually stands, and only its reason needs strengthening.
+
+(Morrison-Lab/ai-config#873, 2026-07-30: a review correctly found a `CC-BY-ND`
+table row that called verbatim copying allowed and then concluded idea-only with
+no bridge.
+Its suggested reason, "MIT grants modification rights; ND does not", frames the
+conflict as two grants differing in scope --- which licenses the workaround of
+keeping the file under its own notice inside the MIT repo, since on that framing
+no conflict arises.
+SPDX `license-list-data`'s `CC-BY-ND-4.0.txt` §2(a)(1) grants a
+**non-sublicensable** license, so the material cannot be re-offered under MIT at
+all, which is exactly what vendoring does.
+The conclusion was right, and its stated reason stopped short of the provision
+that actually forecloses the workaround.)
+
 **And the mirror case: a finding can be wrong on its stated grounds while
 still pointing at something real.**
 The bullets above check the reviewer's *fix*; this one checks their

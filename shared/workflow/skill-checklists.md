@@ -51,8 +51,13 @@ test suite before or after the non-ASCII scan changes neither result.
 
 - **Do:** state which kind a checklist is, in the heading or its first line,
   so a reader knows whether they may work ahead of it.
-- **Do:** write Read-Do items as imperatives in execution order, and
-  Do-Confirm items as past-tense confirmations of an observable fact.
+- **Do:** write Read-Do items as imperatives in execution order.
+- **Do:** in a Do-Confirm list, match the tense to what the item confirms ---
+  past tense for an **action** that had to happen ("the whole test suite ran",
+  "the changelog was re-read"), present tense for a **state** that has to hold
+  right now ("every inline thread is resolved", "all check runs are green").
+  An action written in the present tense reads as an aspiration rather than as
+  something to look up, which is the slip this distinction prevents.
 - **Don't:** write a Read-Do list for independent items -- it forces a
   serial order that buys nothing and invites working around the list.
 - **Don't:** write a Do-Confirm list for an irreversible sequence, where
@@ -78,8 +83,11 @@ cancel the checkpoint" describes.
 
 ## Mark the killer items
 
-Gawande's term for the steps that are both most often skipped and most
-costly to skip.
+The term *The Checklist Manifesto* uses for the steps that are both most often
+skipped and most costly to skip.
+Gawande relays it from Boeing's own checklist practice, via the veteran pilot
+Daniel Boorman, rather than coining it --- so cite it as the book's usage, not
+as his invention.
 Mark them, because a flat list of equals gets triaged under time pressure and
 the item that gets dropped is whichever looks most like bookkeeping -- which
 is frequently the killer item, since the dangerous steps are often the
@@ -98,8 +106,18 @@ Two we already know empirically:
 
 ## Keep it short
 
-Five to nine items, ordered by execution.
-Write each as an action plus its evidence, not a slogan.
+Nine items is the bound that matters, and it is not arbitrary: five to nine is
+the range Boorman gives as ideal for a pause-point list, on the reasoning that
+attention drifts after roughly a minute of reading and people start skipping
+steps.
+
+Treat nine as a ceiling, and **not** five as a floor.
+A boundary with three genuine failure points wants a three-item list; padding
+it to five adds items that have never caught anything, which is exactly the
+harm the deletion rule below describes.
+
+Order by execution, and write each item as an action plus its evidence, not a
+slogan.
 When a list outgrows nine items, the usual cause is that it has started
 teaching -- move the explanation into the prose above it and leave the
 reminder behind.

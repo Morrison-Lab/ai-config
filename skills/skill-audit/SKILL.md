@@ -155,7 +155,7 @@ to defer for consolidation or deletion, and which "dead" results are actually
 "automated, not measured" or "machine-local blind spot" and should NOT be
 pruned on this evidence alone.
 
-## Runs forked, in the background by default
+## Runs forked; `background: false` for synchronous return
 
 This whole skill --- steps 1-6, report and pruning recommendation included ---
 runs isolated as the `skill-usage-auditor` custom agent

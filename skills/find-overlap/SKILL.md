@@ -161,7 +161,7 @@ adjacent-but-distinct missing a link → `link-skills`; redundant code → `tidy
 cluster — a raw similarity list with no disposition just pushes the judgment back
 to the reader.
 
-## Runs forked, in the background by default
+## Runs forked; `background: false` for synchronous return
 
 This whole skill --- every step above, including the report --- runs
 isolated as the `overlap-detector` custom agent (`context: fork` +

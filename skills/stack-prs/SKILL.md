@@ -161,13 +161,64 @@ gh pr edit <dependent-N> --base main   # EDIT_PR
 ```
 
 In a remote/web session, use `mcp__github__update_pull_request` with `base:
-"main"`. After retargeting, GitHub recomputes the diff against `main` — it
-should now show only the dependent PR's own changes, since the base PR's
-commits are already on `main`. If it doesn't (the merge above was a no-op or
-missed something), re-check before proceeding. Update the PR body to drop the
-`Stacked on #<base-N>` note --- and the `> [!IMPORTANT]` merge-order alert
-from step 2 --- once this step is done; both describe a constraint that no
-longer exists, and a stale alert trains readers to ignore the next real one.
+"main"`.
+GitHub also retargets the PR **on its own** when the base branch is deleted
+on merge, so this step is often already done by the time you look.
+That changes nothing below, because retargeting only moves a pointer and
+never rewrites the branch.
+
+After retargeting, GitHub recomputes the diff against `main`.
+It should now show only the dependent PR's own changes, since the base PR's
+commits are already on `main`.
+**Check that it does, with an ancestry test rather than by eye** --- the two
+ways it can go wrong have different causes and different fixes, and only one
+of them is the merge's fault:
+
+```bash
+git fetch origin main                                    # FETCH
+git merge-base --is-ancestor "origin/<base-branch>" origin/main   # ANCESTRY
+git diff --stat origin/main...HEAD                       # DIFF
+```
+
+- **Ancestor, diff still bloated** --- the base PR merged as a real merge
+  commit and the `git merge` above was a no-op or missed something.
+  Re-run it.
+- **Not an ancestor** --- the base PR was **squash-merged**, so its commits
+  are not on `main` at all; `main` carries one new commit with the same
+  content under a different hash.
+  The dependent PR's diff therefore re-shows the base PR's already-merged
+  work, and **merging `main` cannot fix it**: the merge commit keeps those
+  original commits in the branch's history, which is exactly what the diff is
+  reporting.
+
+The squash case is the one to know, because nothing warns you.
+`CLAUDE.md` carries this ancestry check already, but under a trigger that
+does not fire here --- it fires *before adding commits to a branch you did
+not just create*, whereas a stacked PR is created and pushed while the base
+is still open, and self-bloats later when the base lands.
+No action of yours sits between the two.
+So a stack in a squash-merging repo needs this check on the base PR's
+**merge**, not on your next push.
+
+Rebuild rather than merge, keeping only the dependent PR's own commits:
+
+```bash
+git checkout -B <dependent-branch> origin/main            # RESET_BRANCH
+git cherry-pick <dependent-commit>...                     # CHERRY_PICK
+git push --force-with-lease origin <dependent-branch>     # PUSH
+```
+
+Confirm the diff dropped to the dependent PR's own changes, and re-run the
+repo's pre-push checks at the new head rather than carrying over the earlier
+run's results --- the branch is a different commit now, so the old output
+describes something else.
+Say on the PR that you rebuilt and why, since a force-push with no
+explanation reads as history being rewritten for no reason.
+
+Update the PR body to drop the `Stacked on #<base-N>` note --- and the
+`> [!IMPORTANT]` merge-order alert from step 2 --- once this step is done;
+both describe a constraint that no longer exists, and a stale alert trains
+readers to ignore the next real one.
 
 ### 5. If the base PR is abandoned or closed unmerged
 
@@ -227,5 +278,11 @@ discards the abandoned base PR's commits from a published branch.
   — sync it before every push, not just once at creation.
 - ❌ Leaving the dependent PR targeting the base branch after the base PR
   merges — retarget to `main` (step 4) so the diff and merge behave normally.
+- ❌ Treating the retarget as the whole of step 4 --- run the ancestry test
+  after it, since under a squash-merge the diff stays bloated while
+  retargeting moves a pointer without touching the branch.
+- ❌ Merging `main` again to shrink a diff that is bloated because the base
+  PR was squash-merged, when the merge preserves the very commits the diff
+  is reporting --- rebuild from `main` and cherry-pick instead.
 - ❌ Force-pushing or rebasing a published dependent branch without telling
   the user, even when the base PR was abandoned (step 5).

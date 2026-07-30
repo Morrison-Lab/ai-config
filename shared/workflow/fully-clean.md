@@ -43,6 +43,43 @@ A PR/MR is **fully clean** when **both** of these hold:
    named `ubuntu-latest (release)`, alongside the original that had succeeded
    14 minutes earlier.)
 
+   **`status` itself can be stale, so never infer a job's *duration* from it.**
+   Reading `status` before `conclusion` is right, and it invites a second
+   inference that is not: that a run still showing `in_progress` is still
+   running, and therefore that the time since `started_at` is how long it has
+   been going.
+   The field lags.
+   A job can read `in_progress` for minutes after it has actually finished,
+   so "started at T, still in_progress now" measures the API's freshness
+   rather than the job's runtime.
+
+   That is harmless while you are only waiting for a job to end, which is the
+   usual reason to read the field --- the lag costs a poll.
+   It inverts the answer whenever **duration is itself the diagnostic**.
+   A reviewer job that dies on a bad credential and one that genuinely
+   reviews a diff differ mainly in how long they take, so a stale
+   `in_progress` is indistinguishable from exactly the recovery you are
+   watching for, and it arrives as good news.
+
+   Take duration from the log's own timestamps --- first line to
+   `Cleaning up orphan processes` --- or from `completed_at` minus
+   `started_at` once the run really is complete.
+   Both are facts about the job; `status` at any given moment is a fact about
+   the API.
+
+   - **Do:** read elapsed time from log timestamps whenever the length of a
+     run is the thing being judged.
+   - **Don't:** conclude a job is still running, or has passed some duration
+     threshold, from `in_progress` plus the wall clock.
+
+   (`d-morrison/altdoc#96`, 2026-07-30: `claude-review` had failed six times
+   in ~26 seconds each, the signature of the model call failing at auth.
+   A re-run was polled twice, three minutes apart, and read `in_progress`
+   both times --- reported as "the reviewer has recovered", and acted on by
+   firing a second re-run on the sibling PR.
+   The log showed that job starting at `04:05:25` and cleaning up at
+   `04:05:51`: 26 seconds, identical to the other six.)
+
 2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
    A rebuttal the reviewer still disputes does **not** count as clean.
    That review must be a genuine posted verdict at the current head commit,

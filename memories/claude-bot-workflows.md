@@ -322,17 +322,22 @@ generic Actions-authoring and reusable-workflow material.
   - **Intermittent upstream bug** (`total_cost_usd > 0`, `duration_ms` ~192 s): the
     `claude-code-action` completes a real review but exits with `is_error=true` anyway.
     The guard step fails the check ❌. The prior clean review on the same diff is still
-    valid. Fix: **re-run the failed job first** (`gh run rerun <id> --failed`) --- a
-    trivial commit is not needed, and costs a commit plus a full CI round for a defect
-    that is not in the diff. The no-op re-run is also the better evidence: nothing
-    changed between the two attempts, so a pass proves the failure was transient by
-    construction, which is the negative control `shared/workflow/fully-clean.md`'s
-    eighth case prizes. A push cannot show that, since it changes the code. Fall back
-    to a trivial commit only if the re-run fails too. Observed on gha#92 run
-    #28034977099; the re-run path verified on Morrison-Lab/ai-config#922, 2026-07-30
-    (`is_error=true`, `subtype=success`, `num_turns=7`, `duration_ms=118719`,
-    `total_cost_usd=1.10`, no permission denials, with a full `Ready for merge` verdict
-    posted --- the re-run on the same commit passed).
+    valid.
+    Fix: **re-run the failed job first** (`gh run rerun <id> --failed`).
+    A trivial commit is not needed, and it costs a commit plus a full CI round for
+    a defect that is not in the diff.
+    The no-op re-run is also the better evidence, because nothing changed between
+    the two attempts.
+    A pass therefore proves the failure was transient by construction, which is the
+    negative control `shared/workflow/fully-clean.md`'s eighth case prizes.
+    A push cannot show that, since it changes the code.
+    Fall back to a trivial commit only if the re-run fails too.
+    Observed on gha#92 run #28034977099.
+    The re-run path was verified on Morrison-Lab/ai-config#922, 2026-07-30, where
+    the run reported `is_error=true` with `subtype=success`, `num_turns=7`,
+    `duration_ms=118719`, `total_cost_usd=1.10`, and no permission denials, having
+    posted a full `Ready for merge` verdict.
+    The re-run on the same commit passed.
 - **A review job with `conclusion: success` but NO posted comment is NOT
   automatically "unreviewed."** It is either (a) a quota/auth skip (see above:
   `total_cost_usd=0`, `num_turns=1`) or (b) a genuinely **clean review that found

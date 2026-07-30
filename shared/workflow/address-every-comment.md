@@ -363,7 +363,8 @@ Pushing first wins that standoff by default, since it is the half that
 The conflict is only apparent, because committing and pushing are separate
 steps and only the push triggers review:
 
-1. **Commit** the round's fixes. The SHA now exists and is stable.
+1. **Commit** the round's fixes.
+   The SHA now exists and is stable.
 2. **Reply** on each thread, citing that SHA.
 3. **Push.** The next review's snapshot already contains the replies.
 

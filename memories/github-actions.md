@@ -707,7 +707,7 @@ A third-party action can refuse every event but the one it was written for,
 before it reads any of its own inputs:
 
 ```js
-// sanjay3290/jules-pr-reviewer, src/index.ts:38
+// sanjay3290/jules-pr-reviewer, src/index.ts:37 (at the pinned SHA)
 if (ctx.eventName !== 'pull_request') {
   core.setFailed(`Unsupported event: ${ctx.eventName}. Use on: pull_request.`);
   return;
@@ -732,9 +732,10 @@ this.eventName = process.env.GITHUB_EVENT_NAME;
 
 Step-level `env:` overrides those, so a workflow triggered by anything can
 present the action with the event it demands.
-For a `pull_request` gate the payload is one API call, because
-`GET /repos/{owner}/{repo}/pulls/{n}` returns exactly the shape the event
-delivers:
+For a `pull_request` gate the payload is close to one API call, because
+`GET /repos/{owner}/{repo}/pulls/{n}` returns nearly the shape the event
+delivers --- near enough to work, not near enough to skip the field check
+below:
 
 ```yaml
       - name: Resolve the PR into a pull_request event payload
@@ -767,8 +768,10 @@ An `issue_comment` run executes in the base repo with a write token even for a
 fork PR, so a gate the original event enforced implicitly (fork PRs get no
 secrets under `pull_request`) has to be re-established explicitly.
 
-- **Do:** read the pinned action's `dist/` for how it reads `eventName` and
-  `payload` before concluding its trigger is fixed.
+- **Do:** read the pinned action's own code for how it reads `eventName` and
+  `payload` before concluding its trigger is fixed --- `src/` for a legible
+  version of the gate, and `dist/` to confirm what the pinned SHA actually
+  runs, since the bundle is what Actions executes and it can lag `src/`.
 - **Do:** re-derive any safety property the original event was providing for
   free, once the event is synthesized.
 - **Don't:** fork an action, or abandon the feature, on the strength of an
@@ -778,8 +781,17 @@ secrets under `pull_request`) has to be re-established explicitly.
 
 (Morrison-Lab/ai-config#857, 2026-07-30: making the Jules reviewer on-demand
 needed an `issue_comment` trigger, which its pinned action rejects outright.
-Verified against `dist/index.js` at the pinned SHA rather than assumed, then
-against this PR's own API object for field coverage.)
+Both files were read at the pinned SHA rather than assumed --- `src/index.ts`
+for the gate quoted above, `dist/index.js` for the `Context` constructor that
+makes the override work --- and then this PR's own API object, for field
+coverage.
+The line number above was `:38` when first written, and a review round caught
+it: it is `:37`.
+Worth noting how, since it is the cheap lesson here.
+The reviewer inferred the citation was unverifiable because the case note named
+only `dist/`, which was the wrong reason --- but a `grep -n` settled the real
+question in one command, and the same off-by-one had already shipped into the
+workflow comment that makes the same claim.)
 
 ## Which ref a workflow runs from decides whether a trigger change takes effect before merge
 

@@ -215,9 +215,14 @@ The result is a PR with every check green, zero inline comments, zero
 unresolved threads, and a blocking correctness finding sitting in plain text
 that no count reaches.
 
-This is [`configurable-parameters`](../coding/configurable-parameters.md)'s
-never-fails-by-design check, arriving on the one job whose whole purpose is
-to gate on review outcome.
+This is the third numbered case below -- a check that cannot fail on its own
+content, so its green carries no signal -- arriving on the one job whose whole
+purpose is to gate on review outcome.
+The difference is what makes it worse than the benchmark check recorded there.
+That one is *designed* never to block, and a reader who knows the design knows
+to read its comment.
+`require-review` is designed to block, is frequently a required check, and
+still reports green on a verdict that says the opposite.
 Read the verdict line itself, every round; a green `require-review` is
 evidence a reviewer spoke, and nothing more.
 

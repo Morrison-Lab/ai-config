@@ -127,6 +127,35 @@ verbatim.
 Re-running after the commit reported 0 multi-sentence lines and 1 over-80
 line out of 38 added.)
 
+**A rebase or cherry-pick expires the result, so re-run it after moving the
+commit to a new base.**
+The rule above covers a check that ran too early, against an empty diff.
+This is its mirror: a check that ran correctly, and whose answer has since
+stopped applying.
+A diff-scoped check answers a question about `<base>...HEAD`, so changing the
+base asks a different question, and the previous answer is about a diff that
+no longer exists.
+
+Cherry-picking onto a fresh `main` is the usual way this happens, and it is
+the worst moment for it, because attention is on whether the *content*
+survived the move.
+The checks feel like settled history rather than like something the move
+invalidated, so nothing re-runs them, and the PR opens carrying an all-clear
+that was true of a different diff.
+
+Treat any change of base as invalidating every diff-scoped result at once:
+this check, the banned-punctuation scan in
+[`ascii-punctuation-in-source`](../coding/ascii-punctuation-in-source.md),
+and a repo's own `lint-changed-lines`.
+The re-run is seconds; the alternative is a reviewer finding what your own
+instrument already knew how to find.
+(Morrison-Lab/ai-config#833 -> #836, 2026-07-29: #833 merged while a
+follow-up commit was mid-push, so that commit was cherry-picked onto a fresh
+branch off the new `main`.
+The check had passed on the old branch and was not re-run against the new
+head; review then flagged a two-sentence line, which the re-run reproduced on
+the first try.)
+
 **When hand-reformatting a line the check flagged, copy the raw line rather
 than the check's own report of it.**
 The script strips a bullet marker or blockquote prefix before handing the

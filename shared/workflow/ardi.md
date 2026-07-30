@@ -572,8 +572,17 @@ The second is worse, because it looks like evidence.
 A conditional skip --- `skip_on_cran()` without `NOT_CRAN=true`,
 `skip_if(!.venv_exists())`, `skip_if_offline()` --- turns the test that
 would have caught the bug into a pass.
-`devtools::test()` sets `NOT_CRAN`; a bare `testthat::test_file()` does not,
-so the harness you reach for by hand is the one that skips.
+`devtools::test()` sets `NOT_CRAN` for you --- it applies
+`withr::local_envvar(r_env_vars())`, and devtools documents that set as
+"the standard environment variables set by devtools", singling out
+`NOT_CRAN` as "of particular note for package tests"
+([`R/test.R`](https://github.com/r-lib/devtools/blob/main/R/test.R),
+[`R/check.R`](https://github.com/r-lib/devtools/blob/main/R/check.R)).
+`testthat::test_file()` and `testthat::test_dir()` do not, so the harness
+you reach for by hand for a quick targeted run is exactly the one that
+skips.
+Setting it explicitly anyway (`NOT_CRAN=true Rscript -e '...'`) costs
+nothing and is what the rest of this corpus does.
 So read the **skip count**, not just the failure count: a run reporting
 `0 failed, 20 skipped` has told you almost nothing, and is indistinguishable
 at a glance from one that verified everything.

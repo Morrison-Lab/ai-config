@@ -152,9 +152,9 @@ guidance".
 All three threads were unresolved at that point, so the PR failed both halves of
 criterion 2 while carrying a verdict line that read like a pass.)
 
-**Findings hide on three different surfaces, and no single check sees all
-three --- so read the verdict body, the inline comments, and the thread list
-every round.**
+**Findings hide on four different surfaces, and no single check sees all
+four --- so read the verdict body, the inline comments, the thread list, and
+the verdict's own conclusion every round.**
 The entry above is about a reviewer contradicting itself inside one comment.
 This is about the *detection method* returning an answer that is technically
 true and substantively wrong, which is harder to notice because nothing looks
@@ -188,13 +188,43 @@ Per [`algorithmatize-checks`](algorithmatize-checks.md), prefer the instrument
 that decides the question exactly --- and where none does, as here, say so
 rather than substituting the nearest available count.
 
-- **Do:** read all three surfaces before calling a PR clean, every round.
+- **Do:** read all four surfaces before calling a PR clean, every round.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
 - **Don't:** report clean on a zero thread count, however many checks are
   green.
 - **Don't:** treat an empty review body as an all-clear without checking the
   inline comments.
+- **Don't:** read a reviewer's silence as a verdict --- a job that posted
+  nothing leaves the same zero counts as a job that found nothing.
+
+**A fourth surface, and the one that defeats the gate itself: the review
+check can pass on a blocking verdict.**
+The three above are cases where a *reader* looks at the wrong place.
+This is the case where the repo's own gate looks at the right place and still
+reports green, because `require-review` tests whether a review **ran**, not
+what it **concluded**.
+So a "Needs more work" verdict and a "Ready for merge" verdict produce an
+identical check row.
+
+It compounds with case 1 rather than sitting beside it.
+A review invoked without a `--comment` argument reports its findings in the
+run's own comment and posts nothing as a thread --- and the better reviewers
+say so in their last line, which is the tell worth grepping for.
+The result is a PR with every check green, zero inline comments, zero
+unresolved threads, and a blocking correctness finding sitting in plain text
+that no count reaches.
+
+This is [`configurable-parameters`](../coding/configurable-parameters.md)'s
+never-fails-by-design check, arriving on the one job whose whole purpose is
+to gate on review outcome.
+Read the verdict line itself, every round; a green `require-review` is
+evidence a reviewer spoke, and nothing more.
+
+- **Do:** grep the verdict body for its own conclusion, and treat a
+  `require-review` pass as orthogonal to whether the PR is clean.
+- **Don't:** let a green review-gate check stand in for reading what the
+  review said.
 
 (Morrison-Lab/ai-config#921, ucdavis/bcs#477, ucdavis/bcs#473, all 2026-07-30,
 within hours of each other.
@@ -205,6 +235,15 @@ On #477 the review body was empty and the finding was inline-only.
 On #473 `claude-review` failed after its built-in retry, posting nothing at
 all, so there was no body to read past and zero threads because zero
 comments.)
+
+(The fourth surface, ucdavis/bcs#468, same night.
+`require-review` passed, `claude-review` passed, all 18 checks were green,
+and there were zero inline comments and zero threads --- while the verdict
+read "Needs more work" over a blocking finding that the new section's own
+safety rule was false on one code path.
+The review's own closing line said as much, noting that because no
+`--comment` argument was passed, it had not posted the findings to the PR.
+Every count-based check called that PR ready.)
 
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---

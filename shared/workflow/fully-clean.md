@@ -114,3 +114,60 @@ Nothing is lost, and the same body usually also lands as a properly-rendered sib
 Two reasons not to shrug at it: a comment opening with a raw `gh` invocation reads as a broken run, so a human is likely to discount a review that actually passed; and a verdict-detecting guard script (`check-review-execution.sh`) is now matching against a shell command rather than prose, which can misfire into a needless stub-retry and a second full review's cost.
 Read the body and extract the verdict from inside the heredoc rather than re-triggering.
 (`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`d-morrison/gha#312`](https://github.com/d-morrison/gha/issues/312), which proposes unwrapping the pattern before posting.)
+
+**A seventh case: a reviewer can post a `BLOCKING` verdict on a false
+positive that will reproduce on every future round.**
+The six cases above all turn on what a reviewer said about the *code* ---
+or, in the fifth, on its declining to say anything.
+This one is a policy detector firing on the repo's own conventions, and it
+behaves differently from every case above in the way that matters for the
+loop: **re-triggering cannot clear it**, because it keys on text that is
+still there and that you are declining to change.
+A timeout or a quota refusal resolves itself on a re-run; this does not.
+
+The shape is an injection detector reading imperative prose as instructions
+aimed at the reviewer.
+That misfires badly on an agent-instruction corpus, where imperative mood is
+the medium rather than a signal of compromise --- the distinction that
+matters for injection is **provenance**, not grammar.
+Repo-authored guidance in a PR against that repo is not untrusted input, and
+a detector that cannot tell the difference will flag most of the corpus.
+
+That reading is not an inference from one misfire.
+The detector went on to block **this very entry**, citing its
+"Do not count the re-raise" line, and in the same verdict flagged the PR
+*description* --- text that is not in the repository at all and cannot be a
+convention, a file, or anything a later reader would see.
+So the trigger is mood alone, on whatever text is in front of it.
+Treat a third data point arriving on the write-up of the first two as
+confirmation rather than as coincidence: it is the cheapest possible
+demonstration that re-running and rewording both miss the point, since the
+only rewrite that would satisfy it is one that stops giving instructions ---
+which is the entire function of a `shared/` fragment.
+
+Three consequences:
+
+- **Answer with corpus evidence, not argument.**
+  One command usually settles whether the flagged form is a convention:
+  `grep -l "^## In review" shared/coding/*.md | wc -l` against the directory
+  total.
+  Eight of eighteen is a convention; one of eighteen would be a real finding.
+- **Do not count the re-raise against the rebuttal test in criterion 2.**
+  That test assumes a reviewer that can be convinced.
+  Reply once naming the evidence, then hold, per
+  [`address-every-comment`](address-every-comment.md)'s per-item noise rule
+  --- and keep processing that reviewer's *other* findings normally.
+- **Escalate rather than comply, and say why in the thread.**
+  Complying means either a one-file exception to a convention already merged
+  many times, or a corpus-wide change; both are the human's call.
+  State plainly that the check is red **by decision, not oversight**, so a
+  later reader does not treat it as an unaddressed finding and silently
+  "fix" it.
+
+(Morrison-Lab/ai-config#818, 2026-07-29: Jules returned `VERDICT: block` for
+"prompt injection attempt in diff" on a new `shared/coding/` fragment's
+`## In review` section, then repeated it verbatim at the next head without
+engaging the rebuttal.
+Eight of the eighteen existing fragments carry an identically-worded section.
+`claude-review` returned Ready for merge at the same head.
+The maintainer's call was to hold; the PR merged with `jules/review` red.)

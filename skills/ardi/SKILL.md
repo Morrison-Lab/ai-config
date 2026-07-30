@@ -375,8 +375,8 @@ Do-Confirm; per
       Marked because a posted verdict does not mean the review job finished,
       the check set can *grow* mid-run as jobs spawn others, and two check
       runs can share a name (a stale green plus a live one), so matching on
-      name returns the wrong one. Key on check-run id, and read `status`
-      before `conclusion`.
+      name returns the wrong one.
+      Key on check-run id, and read `status` before `conclusion`.
 - [ ] Latest review has zero findings and no disputed rebuttals.
 - [ ] That review is a genuine posted verdict at the current head from an
       external reviewer, if one is reachable -- re-checked right before

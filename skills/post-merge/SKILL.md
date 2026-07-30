@@ -329,8 +329,9 @@ Do-Confirm; per
       Marked because reporting this skill complete asserts that its final step
       ran, and the recorded failure is a `post-merge` run reported done whose
       UMS step never happened --- which discards the learnings rather than
-      delaying them. Naming what UMS changed (or that nothing durable emerged)
-      is the evidence; "ran UMS" on its own is not.
+      delaying them.
+      Naming what UMS changed (or that nothing durable emerged) is the
+      evidence; "ran UMS" on its own is not.
 
 Then a linked summary: the merged PR, the auto-closed issue, any deferred
 follow-up issues, what UMS updated, and a Pacific-time timestamp

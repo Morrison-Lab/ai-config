@@ -252,8 +252,9 @@ Do-Confirm; per
       the second clears
       [`fully-clean`](../../shared/workflow/fully-clean.md)'s criterion --- an
       addressed-but-unresolved thread reads as outstanding work to every later
-      reviewer. Sweep by thread id, not by finding: a re-raise usually opens a
-      *second* thread on the same line, often already marked outdated.
+      reviewer.
+      Sweep by thread id, not by finding: a re-raise usually opens a *second*
+      thread on the same line, often already marked outdated.
 - [ ] The summary comment is posted from a body file (not inline), and no
       accidental review-trigger mention is present unless this round must
       explicitly re-request review.

@@ -127,7 +127,26 @@ It also applies to this entry: below is its own pair.
 Proactively tell me — don't wait to be asked — when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
 Use the `⚠️ FLAG` tag from this file's chat-output-tagging convention, one line, at the natural end of that turn's recap — don't interrupt mid-task to say it.
 
-Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, a PR I'm actively babysitting this session (waiting on CI, a review round, or a pending push), an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
+Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, **any PR this session opened or pushed to that has not yet merged or closed**, an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
+
+**That PR clause is a bright line, not a judgment call, and it was narrowed deliberately.**
+It used to read "a PR I'm actively babysitting", which invites the question of whether *this* PR still counts as active --- and the answer always sounds like no.
+A PR whose checks are green and whose review has not come back yet feels finished: there is nothing to do, so there is nothing live.
+That reading is what the rule has to rule out, because "waiting on a review round" is the single most common state for a PR to be in when a session reaches a natural pause, and it is exactly when the flag is most tempting.
+
+Two things make an unmerged PR live regardless of how quiet it looks.
+[`ardi`](shared/workflow/ardi.md) obliges the session to keep monitoring it until it merges or closes, so proposing a stop proposes abandoning that loop mid-flight.
+And a review can still come back with findings, which is work only this conversation has the context to address cheaply.
+
+Open PRs belonging to *other* sessions do not trigger this --- `wrap-up`'s sweep surfaces them, and they are worth reporting, but they are not this conversation's live state.
+
+- **Do:** hold the flag until every PR this session opened or pushed to has merged or closed.
+- **Do:** report an unmerged PR's status plainly instead, with no stopping-point suggestion attached.
+- **Don't:** treat "green checks, just awaiting review" as not-live --- it is the archetypal live PR.
+- **Don't:** flag a stopping point and disclose the open PR in the same breath, which is the same too-early flag the UMS rule above rejects.
+
+(Corrected 2026-07-29: a session flagged a clean stopping point while its own `ums` PR sat open awaiting review, having reasoned that the PR was "just awaiting review" and therefore not live.
+The correction was "don't flag stopping points when you still have PRs open".)
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) — anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
 If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per "Recommending that the session end is itself a UMS trigger" above.
 

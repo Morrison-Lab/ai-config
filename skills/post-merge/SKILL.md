@@ -246,8 +246,18 @@ case:
 
 ```bash
 git fetch origin --tags
-git rev-parse v2 origin/main       # equal, or is main ahead?
+git rev-parse 'v2^{}' origin/main   # equal means current; different means a slide is owed
 ```
+
+Keep the `^{}`.
+It peels a tag to the commit it names, and without it an **annotated** tag
+resolves to its own tag-object SHA instead --- which never equals a commit
+SHA, so the check would report a slide owed on every run and become noise
+rather than an instrument.
+A lightweight tag resolves the same either way, so the peeled form is correct
+for both and there is no case where dropping it helps.
+(`slide-tag` reads a tag with `git log --oneline -1 <tag>`, which peels for
+the same reason.)
 
 Then raise it as a `⚠️ FLAG` in step 5's report, naming the tag and what is
 unreachable until it moves.
@@ -258,8 +268,9 @@ rules out offering to file an issue instead of filing it.
 
 - **Do:** compare the release ref against `main` after the merge, and flag the
   gap with the specific tag and the affected consumer-facing paths.
-- **Do:** treat a repo with `examples/`, caller stubs, or pinned docs as
-  presumptively release-gated until the comparison says otherwise.
+- **Do:** run the comparison on every merge rather than first judging whether
+  the repo looks release-gated --- it costs two commands and prints nothing to
+  act on when the SHAs match, so the comparison *is* the classifier.
 - **Don't:** run the release step yourself when it force-moves a ref or
   publishes --- that is the human-gated action `ardi` reserves for explicit
   authorization.

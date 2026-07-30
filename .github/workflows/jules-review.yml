@@ -78,7 +78,7 @@ jobs:
           comment-body: ${{ github.event.comment.body }}
 
       # The action refuses every event but `pull_request`, before it reads
-      # anything else (`src/index.ts:38` at the pinned SHA):
+      # anything else (`src/index.ts:37` at the pinned SHA):
       #
       #     if (ctx.eventName !== 'pull_request') { core.setFailed(...); return; }
       #

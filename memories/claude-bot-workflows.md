@@ -676,3 +676,46 @@ merge and yields an actual external verdict.
 (ucdavis/bcs#450, 2026-07-28: its workflow-rename commit was superseded by
 \#453; the `main`-merge shrank #450's diff back to its own five files and
 re-enabled a genuine bot review that had been unobtainable for hours.)
+
+## A comment a workflow *posts* is a mention-trigger surface, not just output
+
+`claude-bot.yml` gates on `contains(github.event.comment.body, '@claude')`, a
+plain substring test with no notion of Markdown.
+The known consequence is that a human quoting the mention while writing *about*
+the bot dispatches a run (#682 -> #683, and gha#342's stripper is the fix
+upstream).
+The consequence that is easy to miss: **your own workflows post comments too**,
+and that gate does not care who wrote the body.
+
+So a step that helpfully points a reader at the other reviewer ---
+`Review it with @claude review instead` --- makes every one of its own comments
+dispatch an agent run.
+Nothing about writing it feels like triggering anything, because the mention is
+being *documented* rather than issued, and it is being written into a workflow
+file rather than into a comment box.
+It becomes a comment only at runtime.
+
+This is worse than the human-quoting case in two ways.
+It fires on a code path taken automatically, so it repeats for every occurrence
+rather than once per careless comment.
+And it usually sits in an error or fallback path, which is exactly where nobody
+watches closely and where the spurious run is least wanted.
+
+The check is cheap: grep any workflow that posts a comment for every bot
+mention it can emit, and confirm each one is either wanted or defanged.
+Prefer rewording over cleverness --- naming the reviewer without the `@` is
+both safe and usually more accurate, since an automatic reviewer needs no
+request at all.
+
+- **Do:** treat a `-f body=` / `gh pr comment` payload in a workflow as
+  trigger-carrying text, and grep it for mentions before shipping.
+- **Do:** name a bot without its `@` when the point is to tell a human which
+  reviewer covers them.
+- **Don't:** rely on backticks or a code span to defang a mention in a body
+  your workflow posts --- the gate reads the raw string.
+
+(Morrison-Lab/ai-config#857, 2026-07-30: an on-demand Jules trigger grew a
+fork-skip comment ending "Review it with `@claude review` instead."
+Caught in self-review before the first push; every fork skip would have
+dispatched an agent run, on the exact substring gate this file already
+documents for the human case.)

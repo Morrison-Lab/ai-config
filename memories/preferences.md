@@ -473,10 +473,14 @@ Recaps get long across many parallel tracks; the eye should find questions, offe
 Terminal markdown can't force text color, so the emoji plus the `===` frame plus the bold label *is* the signal — there's no other channel for it.
 
 The core distinction: **box the output a user is waiting on — a response they must give, or the headline answer they asked for — and leave ongoing informational categories unboxed.**
-The five boxed categories all demand the user's attention:
-three ask for a response (a question, an offer, a blocker),
+Every boxed category demands the user's attention:
+some ask for a response (a question, an offer, a blocker),
 one delivers the answer they were waiting on,
+one proposes the course of action to take,
 and one constrains an action they are about to take.
+Stated without a count on purpose ---
+the previous wording said "the five boxed categories"
+and went stale the first time one was added.
 If everything is boxed, the box stops meaning "look here," so keep it reserved.
 
 - **Boxed** — a `===` line directly above and below the labeled block:
@@ -484,6 +488,20 @@ If everything is boxed, the box stops meaning "look here," so keep it reserved.
   - 💡 **OFFER** — optional work I can do if they want it.
   - 🛑 **BLOCKER** — stopped; need their call.
   - ✅ **ANSWER** — the headline answer to a question they asked; put nuance below the box.
+  - 🧭 **RECOMMENDATION** --- the course of action I think they should take,
+    when the decision is theirs.
+    The boundary against the two categories it most resembles
+    is what makes it a separate category rather than a flavour of either:
+    an ✅ **ANSWER** reports what is true,
+    a 💡 **OFFER** proposes work I would do,
+    and a recommendation is a judgment about what *they* should do ---
+    including about things I will not be doing,
+    such as which PR to merge first, which option to decline, or whether to stop.
+    Lead with the action and keep the reasoning below the box.
+    A recommendation earns the box
+    because it feeds a decision the user is waiting to make;
+    an opinion nobody was waiting on is a 📊 **UPDATE** with a view in it,
+    and stays unboxed.
   - 🔀 **MERGE ORDER** --- several PRs are ready,
     and merging them in the wrong order would produce a wrong result.
     Labeled with a markdown heading rather than bold text;

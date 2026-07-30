@@ -334,8 +334,8 @@ reading the hit distinguishes them.
 Normalize backticks along with whitespace, or search a distinctive
 unformatted fragment rather than the whole title.
 
-- **Do:** strip inline markup as well as collapsing whitespace before
-  concluding a quoted phrase is absent.
+- **Do:** account for inline markup as well as whitespace before concluding a
+  quoted phrase is absent --- see the next block for which side to normalize.
 - **Do:** read the single hit when a search for a citation's target returns
   only the citation itself.
 - **Don't:** file a dangling-citation issue while the only evidence is a
@@ -348,6 +348,48 @@ the quoted title returned only the citation, which was reported as a
 dangling reference.
 The rule is at `memories/preferences.md:264`, differing from the quotation by
 two backticks; a backtick-normalized search found both files.)
+
+**Apply whatever normalization you choose to the search term as well as to
+the text, or the fix produces a third false negative of its own.**
+Both cases above are answered by transforming the haystack --- collapse
+whitespace, strip backticks --- and that framing invites transforming only
+the haystack, since the needle is the string you already know.
+But a normalizer is a function, and testing `f(text)` against a raw needle
+compares two different alphabets.
+Strip `_` to catch `*emphasis*` and a snake_case identifier stops matching
+itself: `SH_WORD_SPLIT` becomes `SH WORD SPLIT` in the file while your
+pattern still carries the underscores, so a term that is present reports
+absent.
+
+This failure gets *more* likely as the normalizer gets better, which is the
+part worth naming.
+Every character class added to catch another markup form is another class
+that occurs inside real identifiers, so the enumerate-what-to-strip approach
+converges on breaking the searches it was extended to fix.
+Enumerating is the wrong shape, not merely an incomplete list.
+
+Running the same function over both sides dissolves the question, whatever
+the function is:
+
+```python
+norm = lambda s: re.sub(r"[`*_\s]+", " ", s)
+norm(needle) in norm(haystack)
+```
+
+- **Do:** normalize the needle with the identical function applied to the
+  text, so the comparison is between two transformed strings.
+- **Do:** re-test any earlier absent verdict after extending a normalizer,
+  since the extension can break a term the previous version matched.
+- **Don't:** enumerate which markup to strip and treat that list as the fix.
+- **Don't:** test a raw search term against normalized text, however plain
+  the term looks.
+
+(Morrison-Lab/ai-config, 2026-07-30, verifying #919 on `main`: a probe
+collapsing backticks, asterisks, underscores, and whitespace in the file
+alone reported `SH_WORD_SPLIT` ABSENT, while `git grep -c` found it.
+The same needle normalized reported present.
+That was the third normalization-caused false negative of the session, and
+the first produced by the remedy rather than by the raw search.)
 
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
 

@@ -534,6 +534,53 @@ Lacaedemon/sparta #883→#884, 2026-07-15):
   then `git fetch` + retry the push if it didn't. Don't diagnose PR state
   until the head matches.
 
+## `git push origin <name>` pushes the LOCAL BRANCH of that name, not HEAD
+
+`git push origin <refspec>` takes a *ref*, not a label for "what I am working
+on".
+So in a checkout that has both the PR's branch checked out and a leftover
+local branch named after something else --- the harness-assigned
+`claude/...` name, say --- running `git push -u origin claude/...` pushes
+**that other branch**, wherever it happens to point, and leaves the current
+work unpushed.
+
+The failure is quiet in the direction that matters.
+The push succeeds, `git log` still shows the commits, and the only complaint
+is from whatever check later notices the PR did not move.
+The `-u` compounds it by repointing the *other* branch's upstream, so a
+subsequent bare `git push` is now aimed somewhere new.
+
+The tell is `* [new branch]` in the push output, and this is a **second
+cause** for that line, distinct from the one in `CLAUDE.md`'s "Use the
+existing PR branch" section.
+There it means the remote branch was deleted underneath you, which on a PR
+branch means the PR merged.
+Here it means the ref you named had no remote counterpart because it was
+never the branch you were working on.
+Both warrant stopping, and they are told apart by which name is on the line:
+if it is not the branch you have been pushing all along, you pushed the
+wrong ref.
+
+Recovery is cheap when caught immediately --- push the real branch, then
+clean up the stray remote ref (`git merge-base --is-ancestor <stray-tip>
+origin/main` first, to confirm it carries nothing unmerged; note that
+deletion no-ops under the remote push proxy, per the section below).
+
+- **Do:** push with no refspec (`git push`) once upstream is set, or name the
+  branch you confirmed with `git branch --show-current`.
+- **Do:** read the push output for `* [new branch]` versus a `SHA..SHA`
+  range, and stop on the former.
+- **Don't:** paste a branch name from the harness's instructions into
+  `git push` without checking it is the branch you are on.
+- **Don't:** read a zero exit status as evidence the right commits went out.
+
+(Morrison-Lab/gha#357, 2026-07-29: `git push -u origin
+claude/gha-pr-357-review-of6k4h` while on `add-gemini-and-ai-review-workflows`
+created a stray remote branch at an already-merged commit and pushed none of
+the round's four commits.
+Caught by the `* [new branch]` line, since the PR branch had been pushed
+several times already.)
+
 ## Remote-session push proxy: branch DELETION silently no-ops
 
 The Claude Code web/remote push proxy accepts branch pushes but silently

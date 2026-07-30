@@ -93,9 +93,14 @@ Two consequences, both observed on GitHub's:
   It carries no CI access at all --- no workflow runs, no job logs, no re-run
   trigger --- and no notification/subscription tools.
 - **A selection replaces the default rather than extending it.**
-  Asking for `actions` alone trades 44 tools for 4: a net loss that presents
-  as a successful configuration change.
+  Asking for `actions` alone trades the whole default set for a handful of
+  tools: a net loss that presents as a successful configuration change.
   Name the default explicitly (`default,actions,notifications`).
+  (Measured on `github-mcp-server` 1.7.0: 44 tools in `default`, 4 in
+  `actions` alone.
+  Read those as a dated snapshot rather than as current fact --- the ratio
+  is the point, and it is why the paragraph below says to measure rather
+  than to trust a number written here.)
 
 Measure the tool list before and after rather than assuming, and confirm the
 count went up rather than sideways.
@@ -148,5 +153,11 @@ The GitHub MCP server's `notifications` toolset --- carrying
 `manage_notification_subscription` and a `list_notifications` call that covers
 every subscribed thread across every repo in one request --- was present the
 whole time, switched off.
+Those are the **server's own** tool names, as returned by a `tools/list` call
+against `github-mcp-server` 1.7.0.
+A harness that namespaces MCP tools surfaces them prefixed, which is why this
+repo's other references spell them `mcp__github__list_notifications`; ask the
+server rather than grepping our docs when you need to know what a toolset
+actually contains.
 The same session had already hit the shadowed-plugin and 400-vs-401 traps
 above, which is why they are written down here.)

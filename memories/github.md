@@ -11,7 +11,40 @@
 - `gh` opens a pager (alternate buffer) that hangs the agent terminal.
 - Always disable it: pipe `| cat` or set `GH_PAGER=cat` (e.g. `gh pr view 116 | cat`).
 - `gh --no-pager` is not a supported flag and will error; use `GH_PAGER=cat` or `| cat` instead.
-- **Rate limit is shared (5000/hr) and split GraphQL vs REST.** All tools/sessions/agents share the one user's 5000/hr; **GraphQL has its own, smaller pool that exhausts first** — `gh pr checks`, `gh pr view --json comments`, `gh pr list --json` use GraphQL. When GraphQL is spent, get the same data via REST (still has budget): `gh api repos/<o>/<r>/pulls/<n>`, `.../commits/<sha>/check-runs`, `.../issues/<n>/comments`. `gh api rate_limit --jq .resources` is **free** (doesn't count) — check `core` vs `graphql` remaining/reset before retrying. Don't tight-poll; use a background watcher with `sleep` (parallel sessions drain the shared pool fast).
+- **Rate limit is shared (5000/hr) and split GraphQL vs REST.**
+  All tools/sessions/agents share the one user's 5000/hr, and `core` (REST)
+  and `graphql` are **separate pools**.
+  `gh pr checks`, `gh pr view --json comments`, and `gh pr list --json` use
+  GraphQL.
+  When one pool is spent, get the same data through the other: REST as
+  `gh api repos/<o>/<r>/pulls/<n>`, `.../commits/<sha>/check-runs`,
+  `.../issues/<n>/comments`; GraphQL as `gh api graphql -f query=...`.
+  `gh api rate_limit --jq .resources` is **free** and doesn't count against
+  either pool, so check `core` vs `graphql` remaining/reset before retrying.
+  Don't tight-poll; use a background watcher with `sleep`, since parallel
+  sessions drain the shared pool fast.
+  **Don't assume which pool empties first --- read `rate_limit` rather than
+  predicting.**
+  An earlier version of this entry said GraphQL exhausts first, generalized
+  from one session.
+  The reverse happens just as readily: a session doing mostly REST work
+  (per-PR `gh api` reads, check-run polls) exhausts `core` while `graphql`
+  sits nearly untouched.
+  So the fallback direction is whichever the free call says it is, in either
+  direction.
+  **GraphQL can carry a whole ARDI round on its own**, which is what makes
+  the REST-exhausted case survivable rather than merely diagnosable:
+  `addPullRequestReviewThreadReply` for a threaded reply,
+  `resolveReviewThread` to resolve it, `addComment` for a top-level summary,
+  and `pullRequest{ headRefOid mergeable reviewThreads statusCheckRollup }`
+  for the fully-clean sweep.
+  Note `statusCheckRollup.contexts` needs inline fragments, since a
+  `CheckRun` and a legacy `StatusContext` carry different fields
+  (`name`/`status`/`conclusion` versus `context`/`state`).
+  (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round
+  with `graphql` at 4922/5000; the round's reply, thread-resolve, ARD
+  summary, and clean-state verification all went through GraphQL, and
+  `core` reset 11 minutes later.)
 - **The @claude review bot's author name differs by API:** its comment author is `claude[bot]` in REST (`.user.login`) but `claude` in GraphQL (`.author.login`). A watcher filtering REST comments for `.user.login == "claude"` silently finds nothing — use `"claude[bot]"`.
 - **A third variant: on `d-morrison/gha` itself, the review comment posts as `github-actions[bot]`, not `claude`/`claude[bot]`.** Filtering `.user.login == "claude"` (or `"claude[bot]"`) there returns nothing even though a real, complete review was posted — the workflow's own `gather-context` job comment even says "REST author login is `claude[bot]`", which doesn't match what the bot actually posts under in that repo. Don't conclude "no review yet" from an empty filter on one login string: if it comes back empty, list all comment authors (`gh api repos/<o>/<r>/issues/<N>/comments --jq '.[] | .user.login'`) and check the body for the `**Claude finished` marker regardless of which login posted it. (gha#278, 2026-07-21: `select(.author.login == "claude")` and `select(.user.login | test("claude"))` both came up empty; the actual review comments were under `github-actions[bot]`.)
 - **Polling for the bot's verdict: match `Claude finished`, don't exclude a placeholder.** While a run is underway, the bot's comment holds an in-progress placeholder whose wording *varies between runs* ("### Review in progress …", "Claude Code is working…"), so a watcher that exits when comments exist, or when one known placeholder phrase disappears, fires early on the next differently-worded placeholder. Completed runs (review and agent alike) start the body with `**Claude finished`. **Filter on that body marker, not on an author login** --- the login itself varies by repo (see the `github-actions[bot]` variant in the bullet above), so a login-only filter can come up empty even once a review has posted.

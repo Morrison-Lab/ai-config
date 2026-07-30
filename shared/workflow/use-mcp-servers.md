@@ -38,9 +38,59 @@ not your setup, and the local binary you installed sits unregistered.
 An `(HTTP)` row pointing at a vendor URL is remote; a local server shows a
 command path.
 
+The official marketplace ships a concrete instance of this, worth knowing by
+name rather than only by shape.
+Its `github` plugin declares, in
+`external_plugins/github/.mcp.json`:
+
+```json
+{"github": {"type": "http", "url": "https://api.githubcopilot.com/mcp/",
+            "headers": {"Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"}}}
+```
+
+That single file is both halves of this warning at once: it claims the name
+`github`, and it carries the uninterpolated placeholder that produces the
+400 the next section is about.
+So don't install `github@claude-plugins-official` alongside a local server of
+the same name, and check `enabledPlugins` in `~/.claude/settings.json` when a
+`github` entry looks unfamiliar.
+(Verified 2026-07-29; a plugin's config can change, so re-read the file rather
+than trusting this snapshot.)
+
 An installed binary is not a registered server.
 Installing and registering are two separate acts, and skipping the second is
 easy because the first felt like the work.
+
+## Install the binary the platform's own way
+
+The wrapper below hardcodes a path in its `exec` line, which quietly assumes
+a binary is already sitting there.
+Getting one is usually a single command, and the package manager's copy beats
+a manual download because it updates with everything else:
+
+```sh
+brew install github-mcp-server        # macOS; /opt/homebrew/bin on Apple silicon
+```
+
+Two notes on the alternative.
+GitHub's own `install-claude.md` leads with Docker recipes, and **`docker` on
+`PATH` does not mean the daemon is running** --- so check `docker info` before
+choosing that path.
+Skipping the check defers the failure to *server start* rather than to
+`claude mcp add`, where it presents as a broken MCP config instead of a
+stopped daemon.
+
+Take the binary path as an overridable variable rather than hardcoding it,
+since the location differs per platform and package manager:
+
+```sh
+SERVER="${GITHUB_MCP_SERVER_BIN:-/opt/homebrew/bin/github-mcp-server}"
+```
+
+- **Do:** install via the platform's package manager, and confirm the daemon
+  is up before committing to a container-based server.
+- **Don't:** copy a wrapper's hardcoded binary path onto a machine whose
+  package manager puts it somewhere else.
 
 ## 400 and 401 mean different things
 
@@ -70,13 +120,14 @@ A launch wrapper reads it at start time from a tool that already holds one:
 ```sh
 #!/bin/sh
 set -eu
+SERVER="${GITHUB_MCP_SERVER_BIN:-/opt/homebrew/bin/github-mcp-server}"
 TOKEN="$(gh auth token)"
 if [ -z "$TOKEN" ]; then
   echo "empty token; run 'gh auth login'" >&2   # fail loudly
   exit 1
 fi
 export GITHUB_PERSONAL_ACCESS_TOKEN="$TOKEN"
-exec "$HOME/.local/bin/github-mcp-server" stdio "$@"
+exec "$SERVER" stdio "$@"
 ```
 
 Note the explicit failure on an empty token.

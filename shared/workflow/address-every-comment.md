@@ -227,20 +227,38 @@ the copy git keeps and the copy nobody verified.**
 The entry above explains a mismatch by *register* --- a commit message argues
 for the change while a changelog describes it, so they get drafted differently
 and never read together.
-This one has both claims in the same register, about the same fact, and one of
-them checked.
+Here both claims sit in the same register and describe the same fact.
+Only one of them was checked.
 What separates them is **provenance**: a number produced by running something,
 versus a number carried over from the issue you wrote before you had anything
 to run.
 
 Two properties make it worse than an ordinary wrong number.
 
-The unverified copy is the one that becomes permanent.
-A PR body stays editable forever; a commit message does not survive a merge in
-editable form, and in a squash-merge repo it is the commit body that lands on
-`main`.
-So permanence attaches to whichever copy was written earliest, from the least
-evidence --- exactly backwards.
+One of the two copies becomes permanent, and you cannot tell which from
+inside the PR.
+A PR body stays editable forever, while a commit message does not survive a
+merge in editable form --- but which text a squash merge actually keeps is a
+repository setting, and it can be either.
+Configured one way the commit messages land on `main` and the PR body is
+discarded; configured the other the PR body becomes the commit body and the
+commit messages are dropped.
+
+That is why the rule is *both must be right* rather than *check the important
+one*.
+The copy that survives is chosen by a setting most authors have never looked
+at, so treating either as the draft is a coin flip.
+And the odds are not even: the commit message is the one written earliest,
+from the least evidence, so the configuration that keeps it is the one that
+makes the weaker copy permanent.
+
+Read a recent squash commit on `main` if you want to know which way a given
+repo is set --- `git log -1 --format=%B <a squash merge>` shows it directly,
+and beats reasoning about settings pages.
+(Checked this way on this repo, 2026-07-30: `5670f9f`, the squash of
+[#855](https://github.com/Morrison-Lab/ai-config/pull/855), carries that PR's
+commit message rather than its body.
+So here the weaker copy is the one that persists.)
 
 And verifying once feels like verifying.
 Running the check for the PR body produces a real sense of having established

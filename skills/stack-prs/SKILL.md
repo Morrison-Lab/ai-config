@@ -156,7 +156,7 @@ merges normally and the stacking note stops being misleading:
 
 ```bash
 git fetch origin main            # FETCH
-git merge origin/main            # MERGE_BRANCH — picks up the now-merged base commits via main
+git merge origin/main            # MERGE_BRANCH -- see the ancestry test below before trusting this
 gh pr edit <dependent-N> --base main   # EDIT_PR
 ```
 

@@ -92,6 +92,41 @@ output.
 went into the PR body; the same content flagged 7 lines the moment it was
 run again after committing.)
 
+**On a branch that already has commits, the same mistake reports the opposite
+symptom: the violations you just fixed, quoted in their pre-edit form.**
+The case above assumes nothing is committed yet, so `HEAD` equals the base
+and the diff is empty.
+Fixing a *review* finding is the other situation, and the more common one:
+the branch already carries commits, so the diff is not empty --- it is simply
+the committed state, which still holds the long lines whose replacements sit
+uncommitted in the tree.
+The check duly reports them.
+
+That inverts the misreading, and the inverted one is worse.
+A vacuous all-clear at least invites suspicion, whereas this output looks
+like a fix that did not work --- which invites re-editing prose that is
+already correct, or doubting where the reviewer's finding actually pointed.
+The tell from the case above, passing instantly on a large diff, does not
+fire here, because the check runs normally and reports real lines.
+The tell for this one is that the flagged text is the *old* wording of lines
+you know you changed: if the report quotes a string no longer in the file, it
+is describing `HEAD` rather than your tree.
+One `grep` for a quoted fragment settles it.
+
+So the rule is unchanged and only the failure looks different: commit first,
+then measure.
+
+- **Do:** re-run the check after committing whenever it flags lines you
+  believe you already fixed, before touching the prose again.
+- **Don't:** conclude a reflow failed because a pre-commit run still reports
+  the old lines.
+
+(Morrison-Lab/ai-config#835, 2026-07-30: a round-2 reflow was checked before
+committing, and the scan returned the original 154- and 175-character lines
+verbatim.
+Re-running after the commit reported 0 multi-sentence lines and 1 over-80
+line out of 38 added.)
+
 **When hand-reformatting a line the check flagged, copy the raw line rather
 than the check's own report of it.**
 The script strips a bullet marker or blockquote prefix before handing the

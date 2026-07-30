@@ -171,3 +171,64 @@ engaging the rebuttal.
 Eight of the eighteen existing fragments carry an identically-worded section.
 `claude-review` returned Ready for merge at the same head.
 The maintainer's call was to hold; the PR merged with `jules/review` red.)
+
+**An eighth case: the reviewer's workflow can fail outright on an upstream
+API error, so there is no verdict of any kind --- and its error message may
+blame the wrong thing.**
+All seven cases above concern a reviewer that produced *something*: a stub, a
+misfiled conclusion, a pass that cannot fail, a fabricated premise, a
+refusal, a wrapped verdict, a false positive.
+This one produces nothing.
+The job goes red, no review comment appears, and the check is simply absent
+as evidence either way.
+
+It matters for the loop because the right response is neither of the two
+obvious ones.
+It is not a finding to address, so do not self-review as though the reviewer
+had spoken.
+And it is not the fifth case's unreachable reviewer either, so do not write
+the reviewer off yet: an infra failure is frequently transient, where a quota
+refusal is not.
+Retry the failed job once, per this repo's standing flaky-infra rule, and
+only treat the reviewer as unreachable if it fails again.
+
+**Read the log rather than the error message, because the message can name a
+cause the log rules out.** A failure of this shape often surfaces as a
+credential hint ("check `<SERVICE>_API_KEY` is valid"), which is the most
+expensive possible wrong diagnosis --- it sends you to repo secrets for
+something that will clear on its own.
+The log usually settles it: a request that *authenticated*, did work, and
+then failed on a follow-up call was never an auth failure, whatever the
+summary says.
+
+Two pieces of evidence beat arguing about it, and both are cheap:
+
+- **Prior successes on the same credential in the same session.** A reviewer
+  that posted verdicts minutes earlier is not using an invalid key.
+- **A retry with no code change.** If it passes, the failure was transient by
+  construction.
+  This is the mirror of [`ardi`](ardi.md)'s "a symptom that stops reproducing
+  is a fix having landed" --- there, silence after a merge needs the merge
+  ruled out before you may call it flaky; here the retry is a genuine
+  negative control, because nothing changed between the two runs.
+
+Say which of the two you have when reporting it, so a later reader can tell a
+diagnosed transient from a hopeful one.
+And state plainly that the posted error text was wrong, since the next person
+to hit it will read that text first.
+
+- **Do:** retry the failed job once, then read the log for where the request
+  actually broke.
+- **Do:** cite prior successes or a no-op retry as the evidence for calling it
+  transient.
+- **Don't:** treat a crashed reviewer as either a finding or a refusal.
+- **Don't:** act on a credential hint that the same log contradicts.
+
+(Morrison-Lab/ai-config#835, 2026-07-30: `jules/review` failed with a 404 on
+`GET /v1alpha/sessions/<id>/activities`, reported as
+"Check `JULES_API_KEY` is valid".
+The log showed the key creating that session and confirming it *ready* 0.2s
+earlier, so the 404 was a propagation race on the sub-resource, not auth ---
+an invalid key fails at creation with 401/403.
+Jules had already approved twice on the same key that session, and
+`rerun_failed_jobs` with no code change returned `approve`.)

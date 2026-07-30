@@ -91,6 +91,67 @@ A PR/MR is **fully clean** when **both** of these hold:
    round self-review first started; an inferred "probably clean" from green
    CI and resolved threads does not satisfy this.
 
+**Criterion 2's test is the absence of findings, not the presence of a verdict
+line saying so.**
+A reviewer routinely asserts both at once: a `### Verdict` reading
+**Ready for merge**, and directly beneath it a findings section listing items
+nobody has addressed.
+Neither half is wrong, which is what separates this from the eight numbered
+cases below --- those are all a reviewer producing an unreliable or absent
+signal, whereas here the comment is accurate throughout and the defect is in
+the reading.
+The verdict line answers a narrower question than the one criterion 2 asks, and
+it is the part that appears first and gets quoted into a status report.
+
+So when the two disagree inside one comment, **the findings win**.
+Read to the end of the comment before calling anything clean, and count the
+items under every heading, whatever that heading is called ---
+[`address-every-comment`](address-every-comment.md) already establishes that
+"non-blocking", "nit", "minor", and "optional" are prioritization labels rather
+than a pass, and a reviewer files findings under exactly those words in the
+section that contradicts its own verdict line.
+
+**What "an approving review" means here is not a review state.**
+Across the 25 most recent merged PRs, all 106 posted reviews are `COMMENTED` and
+none is `APPROVED` --- `d-morrison`'s own included, so this is not a bot
+limitation:
+
+```sh
+gh api graphql -f query='{search(query:"repo:Morrison-Lab/ai-config is:pr is:merged", type:ISSUE, last:25){nodes{... on PullRequest{reviews(first:20){nodes{state}}}}}}' \
+  --jq '[.data.search.nodes[].reviews.nodes[].state] | group_by(.) | map({state: .[0], n: length})'
+#=> [{"n":106,"state":"COMMENTED"}]
+```
+
+The key order there is not a typo: `gh api --jq` marshals through Go and sorts
+keys alphabetically, so `n` precedes `state` even though the expression builds
+`state` first.
+Plain `jq` would preserve the insertion order and print `{"state":...,"n":...}`.
+
+A constant carries no information, so `.state` cannot confirm clean here, and
+waiting for a formal `APPROVED` would stall every PR indefinitely.
+Approval is established instead by the two reads criterion 2 and the
+**Threads** paragraph already name: zero findings in the latest review body,
+and zero unresolved inline threads.
+The one state that does still carry information is `CHANGES_REQUESTED`, which
+stays blocking however a later verdict line reads.
+
+- **Do:** read the whole review comment and count findings under every heading
+  before calling a PR clean.
+- **Do:** establish approval from the findings and thread lists, since `.state`
+  is `COMMENTED` on every review this repo receives.
+- **Don't:** quote a **Ready for merge** line as the clean signal while the same
+  comment lists findings.
+- **Don't:** wait for a formal `APPROVED` review, or read `COMMENTED` as a
+  defect in the reviewer.
+
+(Morrison-Lab/ai-config#900, 2026-07-30: the verdict read "**Ready for merge.**
+No hallucinations, fabricated references, or factual errors found", immediately
+above a "Findings (all nits, non-blocking)" section naming three inline
+comments and closing "None of these affect correctness or usability of the
+guidance".
+All three threads were unresolved at that point, so the PR failed both halves of
+criterion 2 while carrying a verdict line that read like a pass.)
+
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---
 including gaining its own independent addition that collides with yours

@@ -160,8 +160,8 @@ pruned on this evidence alone.
 This whole skill --- steps 1-6, report and pruning recommendation included ---
 runs isolated as the `skill-usage-auditor` custom agent
 (`.claude/agents/skill-usage-auditor.md`, `context: fork` +
-`agent: skill-usage-auditor`), not inline in the calling conversation. No
-step here needs Edit/Write, so nothing is lost by forking the whole
+`agent: skill-usage-auditor`), not inline in the calling conversation.
+No step here needs Edit/Write, so nothing is lost by forking the whole
 procedure rather than only steps 1-5 --- unlike an audit skill that also
 files an issue or opens a PR, this skill has no write/PR follow-through to
 leave behind in the main session, and forking the whole run makes the

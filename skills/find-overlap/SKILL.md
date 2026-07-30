@@ -165,8 +165,8 @@ to the reader.
 
 This whole skill --- every step above, including the report --- runs
 isolated as the `overlap-detector` custom agent (`context: fork` +
-`agent: overlap-detector`), not inline in the calling conversation. Two
-reasons, and the second is the one that matters:
+`agent: overlap-detector`), not inline in the calling conversation.
+Two reasons, and the second is the one that matters:
 
 - **Context cost.** The skill body (this file) never enters the calling
   conversation at all, rather than staying resident once loaded.
@@ -201,10 +201,11 @@ when an opt-in signal is present; otherwise propose with a cost estimate first.
 **This decomposition needs the calling session, not the forked run.**
 `overlap-detector`'s own tool list has no `Workflow` --- deliberately, so
 granting the fork read-only detection doesn't also hand it a path to spin up
-a sub-agent with write access. So the fork itself always reads the corpus
-serially. For a corpus large enough to want the Workflow fan-out above, run
-that fan-out in the main session instead of invoking this skill, or treat it
-as a known limitation until a follow-up gives `overlap-detector` a
+a sub-agent with write access.
+So the fork itself always reads the corpus serially.
+For a corpus large enough to want the Workflow fan-out above, run that
+fan-out in the main session instead of invoking this skill, or treat it as
+a known limitation until a follow-up gives `overlap-detector` a
 read-only-scoped path to it.
 
 ## Relationship to other skills

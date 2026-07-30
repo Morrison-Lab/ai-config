@@ -152,6 +152,60 @@ guidance".
 All three threads were unresolved at that point, so the PR failed both halves of
 criterion 2 while carrying a verdict line that read like a pass.)
 
+**Findings hide on three different surfaces, and no single check sees all
+three --- so read the verdict body, the inline comments, and the thread list
+every round.**
+The entry above is about a reviewer contradicting itself inside one comment.
+This is about the *detection method* returning an answer that is technically
+true and substantively wrong, which is harder to notice because nothing looks
+inconsistent.
+
+- **An out-of-diff finding never becomes a thread.**
+  A finding about a line the diff did not touch cannot be attached as an
+  inline comment, so it appears only in the body --- reviewers say so
+  explicitly ("inline comments were unavailable for out-of-diff lines").
+  A thread count therefore cannot see it.
+  Zero unresolved threads is not evidence of zero findings.
+- **An empty body hides the mirror case.**
+  A review can post a completely empty top-level body and carry its entire
+  finding in one inline comment, so a body-only read finds nothing to act on
+  and concludes there is nothing.
+- **"No verdict" is its own state, distinct from "a verdict with no
+  findings".**
+  A review job can fail having posted *nothing* --- not a stub, not an empty
+  comment.
+  Zero findings and zero review are indistinguishable by any count, and they
+  call for opposite responses: one is done, the other needs a self-review and
+  a re-run.
+  Read the job's step outcomes when a review is missing rather than inferring
+  from the absence of comments.
+
+The reason this defeats otherwise-good instruments is that each check answers
+a narrower question than the one being asked.
+"Are all threads resolved" is not "are there no findings", and neither is
+"does the verdict say ready".
+Per [`algorithmatize-checks`](algorithmatize-checks.md), prefer the instrument
+that decides the question exactly --- and where none does, as here, say so
+rather than substituting the nearest available count.
+
+- **Do:** read all three surfaces before calling a PR clean, every round.
+- **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
+  the latter as unreviewed.
+- **Don't:** report clean on a zero thread count, however many checks are
+  green.
+- **Don't:** treat an empty review body as an all-clear without checking the
+  inline comments.
+
+(Morrison-Lab/ai-config#921, ucdavis/bcs#477, ucdavis/bcs#473, all 2026-07-30,
+within hours of each other.
+On #921 every mechanical check passed --- all CI green, zero unresolved
+threads, verdict line reading "Ready for merge" --- and the PR was reported
+clean twice while carrying an open out-of-diff finding.
+On #477 the review body was empty and the finding was inline-only.
+On #473 `claude-review` failed after its built-in retry, posting nothing at
+all, so there was no body to read past and zero threads because zero
+comments.)
+
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---
 including gaining its own independent addition that collides with yours

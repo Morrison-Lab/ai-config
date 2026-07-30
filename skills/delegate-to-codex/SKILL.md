@@ -35,6 +35,47 @@ until the window resets. This skill is the mechanism; the preference lives in
   progress doesn't block on a codex round-trip.
 - codex is unavailable or the 5-hour window is already exhausted (see step 4).
 
+Every exception above is stated in terms of **work shape**, so none of them
+applies when the trigger is what the work *reads* --- see the next section.
+
+## Data sensitivity is a second trigger, and it overrides the shape exceptions
+
+Everything above weighs delegation against **quota**: heavy fan-out earns a
+codex round-trip, a focused edit does not.
+A repo can also route work to codex because of **what the work reads**, and
+that trigger behaves differently in the one way that matters here.
+
+The quota trigger is a heuristic that yields to workload shape.
+A data-sensitivity trigger does not yield at all.
+So read the exceptions above as scoped to the quota rationale: a focused,
+single-file, critical-path analysis of restricted data matches both of the
+first two exactly, and still goes to codex.
+
+Two further consequences:
+
+- **The exhausted-window fallback inverts.**
+  Step 4 says to fall back to Claude until the window resets.
+  Under a data trigger, the work waits for the reset instead.
+  Falling back is what the rule exists to prevent, so it cannot be the
+  remedy for codex being busy.
+- **The path list belongs to the consuming repo, not here.**
+  Which paths count as restricted is project-specific, so the repo's own
+  `CLAUDE.md` defines them and this skill stays the mechanism.
+  A good definition is mechanical rather than a judgment call --- `ucdavis/bcs`
+  uses "under `inst/extdata/`, anything `git ls-files` does not list", checkable
+  with `git check-ignore -q`, and names the boundary in its own API
+  (schema-only inspection stays local, `collect()` goes to codex).
+
+Do not infer a data trigger from a repo merely having sensitive data.
+It applies where the consuming repo has written the rule down.
+
+- **Do:** delegate to codex when a repo's own rules route that repo's data
+  work there, even for a one-file, critical-path task.
+- **Do:** wait for the window to reset when a data-triggered task cannot run.
+- **Don't:** apply the shape-based exceptions above to a data-triggered task
+  because it is small or blocking.
+- **Don't:** invent a restricted-path list here; read the consuming repo's.
+
 ## Procedure
 
 ### 1. Confirm codex is available and in-window

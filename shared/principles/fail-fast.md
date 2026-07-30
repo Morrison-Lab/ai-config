@@ -149,6 +149,45 @@ nothing in a container, with no output difference to notice.
 So set the locale explicitly in any check that matches non-ASCII, and
 still make the error path distinguishable from the clean one.
 
+**Setting it explicitly is not the same as setting it on the right command,
+and a pipeline is where those two come apart.**
+An environment-variable prefix binds to the single command it precedes, so in
+a pipeline it never reaches the later stages:
+
+```bash
+LC_ALL=C.UTF-8 git diff | grep -P '[\x{2014}]'   # prefix reaches git diff only
+```
+
+`grep` still runs in the ambient locale, so this fails exactly as the bare
+form does while *looking* like the fixed version above.
+The correct string is present, one process to the left of where it was needed.
+
+Put the assignment on the command that reads it, or export it around the whole
+pipeline:
+
+```bash
+git diff | LC_ALL=C.UTF-8 grep -P '[\x{2014}]'                # on the consumer
+( export LC_ALL=C.UTF-8; git diff | grep -P '[\x{2014}]' )    # whole subshell
+```
+
+This variant is more survivable than the `|| true` above, and worth recording
+for the opposite reason: `grep` exits 2 with "code point value ... too large",
+so it fails **loudly** and the fix is a one-token move.
+The hazard is that a reader who has already internalized "set the locale" sees
+the variable on the line and stops looking.
+
+- **Do:** put the locale assignment on the process that interprets the
+  pattern, or export it around the whole pipeline.
+- **Don't:** treat the presence of `LC_ALL=` somewhere in a command line as
+  evidence that the matching stage received it.
+
+(ai-config#871, 2026-07-30: a pre-push punctuation scan written as
+`LC_ALL=C.UTF-8 git diff -U0 origin/main...HEAD | grep -P '[...]'` aborted with
+rc=2.
+The fix adopted was rewriting the scan in Python, which also reports how many
+added lines it examined --- so a zero-hit result is distinguishable from a run
+that examined nothing, per the fan-out section below.)
+
 ### A fan-out makes this worse, because every worker fails identically
 
 The one-liner above swallows one command's failure.

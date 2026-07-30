@@ -75,10 +75,12 @@ There is also **no issue-to-discussion conversion mutation** in the public
 schema.
 `createDiscussion`, `updateDiscussion`, and `closeDiscussion` all exist;
 conversion is UI-only.
-So moving a misfiled issue means creating the discussion and closing the issue
-with a pointer, which loses the native "converted from issue" provenance link.
-Offer the maintainer the UI route when that provenance matters, rather than
-silently re-filing.
+That matters here because it makes a misfiled item expensive to move rather than
+free, so the venue judgment is worth making up front rather than deferring.
+When something is already in the wrong place, run
+[`migrate-discussion`](../../skills/migrate-discussion/SKILL.md) rather than
+improvising: it prefers GitHub's native convert path, which preserves the
+author, the thread, and an automatic cross-reference that a re-file cannot.
 
 ## Relationship to other rules
 
@@ -94,6 +96,12 @@ silently re-filing.
   requests to a board.
   This fragment says the same reasoning applies to repos we administrate, rather
   than being a courtesy owed only to strangers.
+- [`migrate-discussion`](../../skills/migrate-discussion/SKILL.md) --- the
+  after-the-fact correction.
+  This fragment picks the venue before filing; that skill moves an item already
+  in the wrong one, and owns the mechanics for both directions.
+  Reach for it instead of hand-rolling a create-and-close, which loses
+  provenance the native convert path keeps.
 
 (Corrected 2026-07-29: a verdict-gating policy question was filed as
 [`Morrison-Lab/gha#377`](https://github.com/Morrison-Lab/gha/issues/377),

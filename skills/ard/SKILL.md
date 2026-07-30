@@ -235,8 +235,9 @@ yet.
 
 ### ARD round-close checklist
 
-Per [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md),
-confirm each box before reporting the round done:
+**Pause point: before reporting the round done.**
+Do-Confirm; per
+[`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
 - [ ] Every finding is captured exactly once in the ARD table (after
       deduping summary + inline duplicates).
@@ -244,8 +245,15 @@ confirm each box before reporting the round done:
       request is labeled K.
 - [ ] Every Address row points to a pushed commit SHA.
 - [ ] Every Defer row links a filed tracking issue.
-- [ ] Every inline thread has a reply; settled Address/Defer/Acknowledge threads
-      are resolved; unresolved rebuttals stay open.
+- [ ] **Killer item:** every inline thread has a reply; settled
+      Address/Defer/Acknowledge threads are **resolved**; unresolved rebuttals
+      stay open.
+      Marked because addressing and resolving are separate actions and only
+      the second clears
+      [`fully-clean`](../../shared/workflow/fully-clean.md)'s criterion --- an
+      addressed-but-unresolved thread reads as outstanding work to every later
+      reviewer. Sweep by thread id, not by finding: a re-raise usually opens a
+      *second* thread on the same line, often already marked outdated.
 - [ ] The summary comment is posted from a body file (not inline), and no
       accidental review-trigger mention is present unless this round must
       explicitly re-request review.

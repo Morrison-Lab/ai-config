@@ -653,6 +653,39 @@ wants to be an instrument --- see the fragment for the procedure and tells.
 
 @shared/workflow/algorithmatize-checks.md
 
+## Checklists: Do-Confirm, Read-Do, pause points, killer items
+
+Where a check is mechanical but no instrument can decide it -- because it
+spans several unrelated observations at one moment, like a pre-push sweep --
+the instrument is a **checklist**, and the same discipline applies.
+
+Add one only where a failure is repeatable, expensive, and mechanically
+observable, then get four things right:
+
+- **Type.** *Do-Confirm* (work freely, then stop and confirm) is the default.
+  Use *Read-Do* (read each item and perform it in order) only when
+  reordering the steps changes the answer, or when a step cannot be undone --
+  a merge, a release, session-start freshness.
+- **Pause point.** State the moment it fires as an observable event ("before
+  `git push`", "before reporting the PR ready"), not a topic.
+  A checklist with no trigger is read only by whoever was already careful.
+- **Killer items.** Mark the one or two steps most often skipped and most
+  costly to skip, since a flat list gets triaged under pressure and the
+  dropped item is usually the one that looks like bookkeeping.
+  The known ones: the UMS pass ending `post-merge`/`ardi`, and `wrap-up`'s
+  state sweep.
+- **Length.** Five to nine items, action plus evidence.
+  Past that it has started teaching; move the explanation into the prose
+  above it.
+
+Treat every checklist as a draft until it has been run on real work, and
+treat UMS as its revision loop: when a checklist was followed and the failure
+happened anyway, the finding is about the checklist, not only the incident.
+Don't checklist-ize skills that are mostly design judgment, exploratory
+research, or one-off improvisation.
+
+@shared/workflow/skill-checklists.md
+
 ## Check for merge conflicts on every merge in an ultracode session
 
 @shared/workflow/ultracode-merge-conflicts.md

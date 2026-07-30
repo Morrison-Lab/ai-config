@@ -80,6 +80,26 @@ List, don't bury:
 
 ### 3. Report a linked final summary
 
+**Pause point: before reporting the session wrapped up, or flagging a good
+moment to `/clear`.**
+Do-Confirm; per
+[`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
+
+- [ ] **Killer item: step 1's state sweep actually ran** --- the open-PR and
+      open-issue queries per repo, `git status`, local branches, worktrees ---
+      and the report is built from *its output*, not from recollection.
+      Marked because recollection covers only the PRs and branches this
+      conversation created, which is precisely the blind spot: a bot-opened
+      PR, a leftover harness branch, or another session's PR in the same repo
+      never entered the conversation, so nothing about them feels outstanding.
+      The recorded failure is a clean stopping point flagged twice on the
+      strength of "my three PRs are merged", with the sweep then finding a
+      stale draft PR and an unused branch.
+- [ ] Everything the sweep surfaced is named in the report, including anything
+      unexpected, with whose call it is.
+- [ ] Step 4's UMS review ran before any `/clear` flag is raised --- a flag
+      that has to mention an owed UMS pass is a flag raised too early.
+
 - A table of the session's PRs/issues with outcomes, where **every** PR/MR/issue
   number is a markdown link (repo policy — never a bare `#N`).
 - A Pacific-time timestamp (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`;

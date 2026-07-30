@@ -317,8 +317,23 @@ the UMS diff is a new lesson worth a follow-up.)
 
 ### 5. Report
 
-A linked summary: the merged PR, the auto-closed issue, any deferred follow-up
-issues, what UMS updated, and a Pacific-time timestamp
+**Pause point: before reporting the merge wrapped up.**
+Do-Confirm; per
+[`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
+
+- [ ] The merge actually landed (step 1's verification, not the notification).
+- [ ] The local branch is tidied and `main` is fast-forwarded.
+- [ ] Every deferred item has a filed follow-up issue.
+- [ ] **Killer item: step 4's UMS pass actually executed**, or was
+      deliberately skipped under the recursion guard and that is stated.
+      Marked because reporting this skill complete asserts that its final step
+      ran, and the recorded failure is a `post-merge` run reported done whose
+      UMS step never happened --- which discards the learnings rather than
+      delaying them. Naming what UMS changed (or that nothing durable emerged)
+      is the evidence; "ran UMS" on its own is not.
+
+Then a linked summary: the merged PR, the auto-closed issue, any deferred
+follow-up issues, what UMS updated, and a Pacific-time timestamp
 (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces
 PT on a machine set to any other zone).
 

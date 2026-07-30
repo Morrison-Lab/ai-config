@@ -50,7 +50,7 @@ None of these self-clean once they have commits, so they accumulate.
 | **Prunable stub** | Worktree *record* whose directory no longer exists on disk (removed manually) | `git worktree prune` |
 | **Dead** | Linked worktree, **clean** tree, branch **merged into `origin/main`** OR upstream **`[gone]`** with no unique unpushed commits, **no live session**, not the current/main worktree | `git worktree remove` + delete its branch |
 | **Dirty** | Uncommitted changes, or unique commits not on `origin/main` and not pushed | **Skip** — flag; only `--force` after explicit confirmation |
-| **Active** | Live `session-lock` session registered, the **current** worktree, the **main** worktree, an open PR on its branch, or last commit < 7 days old **and its PR has not merged** | **Skip** — never touch |
+| **Active** | Live `session-lock` session registered, the **current** worktree, the **main** worktree, an open PR on its branch, or last commit < 7 days old **and its PR has not merged** | **Skip** --- never touch |
 | **Locked** | `git worktree list` marks it `locked` | **Skip** unless the user confirms; then `git worktree unlock` before removing |
 
 "Clean tree" and "branch landed" must **both** hold for **Dead** — a clean tree

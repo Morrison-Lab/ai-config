@@ -144,6 +144,20 @@ operations:
     description: Reopen a closed issue.
     cli: gh issue reopen <N> --comment "..."
     github_mcp: mcp__github__issue_write (method=update, state=open)
+  - id: LABEL_ISSUE
+    description: >-
+      Set an issue's labels. Note both tools REPLACE the label set rather than
+      appending, so pass the union of existing and new; the MCP path also
+      silently creates an unknown label name instead of rejecting it.
+    cli: gh issue edit <N> --add-label "..."
+    github_mcp: mcp__github__issue_write (method=update, labels=[...])
+  - id: GET_LABEL
+    description: >-
+      Read a single label's name, color, and description. There is no MCP tool
+      to create or update a label; use gh label create/edit, or gh api from a
+      workflow.
+    cli: gh label view <name>
+    github_mcp: mcp__github__get_label
   - id: LIST_DISCUSSIONS
     description: List a repository's discussions. Discussions are GraphQL-only.
     cli: gh api graphql (list discussions)

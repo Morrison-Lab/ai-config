@@ -50,7 +50,7 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `CLOSE_ISSUE` | Close an issue with a reason. | `gh issue close <N> --reason "..."` | `mcp__github__issue_write (method=update, state=closed, state_reason=...)` |
 | `REOPEN_ISSUE` | Reopen a closed issue. | `gh issue reopen <N> --comment "..."` | `mcp__github__issue_write (method=update, state=open)` |
 | `LABEL_ISSUE` | Set an issue's labels. Note both tools REPLACE the label set rather than appending, so pass the union of existing and new; the MCP path also silently creates an unknown label name instead of rejecting it. | `gh issue edit <N> --add-label "..."` | `mcp__github__issue_write (method=update, labels=[...])` |
-| `GET_LABEL` | Read a single label's name, color, and description. There is no MCP tool to create or update a label; use `gh label create/edit`, or `gh api` from a workflow. | `gh label view <name>` | `mcp__github__get_label` |
+| `GET_LABEL` | Read a single label's name, color, and description. There is no MCP tool to create or update a label; use gh label create/edit, or gh api from a workflow. | `gh label view <name>` | `mcp__github__get_label` |
 | `LIST_DISCUSSIONS` | List a repository's discussions. Discussions are GraphQL-only. | `gh api graphql (list discussions)` | (no GitHub MCP tool; use gh api graphql) |
 | `VIEW_DISCUSSION` | Read a discussion topic and its comment thread. | `gh api graphql (read discussion + comments)` | (no GitHub MCP tool; use gh api graphql) |
 | `COMMENT_DISCUSSION` | Post a reply on a discussion (top-level or threaded). | `gh api graphql (addDiscussionComment)` | (no GitHub MCP tool; use gh api graphql) |

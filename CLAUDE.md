@@ -821,7 +821,7 @@ research, or one-off improvisation.
 
 ## Big-picture principles: KISS, DRY, DRW, modularity, and friends
 
-Our big-picture principles are cataloged centrally in `shared/principles/` — the overall dev goals they serve (code and prose that is valid and easy to externally validate, reproducible, highly functional, reliable, secure, efficient, maintainable, extensible, human- and AI-readable, and reusable), each principle's statement (KISS, YAGNI, DRY, DRW, modularity, least astonishment, purity, self-documenting code, fail fast, algorithmatize checks — plus the reduce/reuse/recycle lens over them), the specific rules and skills that operationalize each, and how the principles relate and trade off.
+Our big-picture principles are cataloged centrally in `shared/principles/` -- the overall dev goals they serve (code and prose that is valid and easy to externally validate, reproducible, highly functional, reliable, secure, efficient, maintainable, extensible, human- and AI-readable, and reusable), each principle's statement (KISS, YAGNI, DRY, DRW, don't incur technical debt, modularity, least astonishment, purity, self-documenting code, fail fast, algorithmatize checks -- plus the reduce/reuse/recycle lens over them), the specific rules and skills that operationalize each, and how the principles relate and trade off.
 When encoding a new coding/review rule, file it under the principle it serves (and add a new principle to the catalog when one emerges) rather than leaving either the rule or the principle floating free.
 
 @shared/principles/README.md
@@ -835,6 +835,18 @@ Apply this in review too: a hand-rolled equivalent of functionality that already
 @shared/principles/dont-reinvent-wheel.md
 
 The `prefer-upstream` skill runs the search; the `prefer-packaged-functions` fragment below is the R-function special case; the `scout-peers` skill gates borrowed code by license.
+
+## Don't incur technical debt
+
+When the right way to do the work in front of you needs a change you have not made yet, make that change as part of the work, rather than shipping the version that routes around it.
+The moment debt is incurred is the moment you defer a fix you have **already diagnosed** -- the most defensible-sounding moment there is, because the diagnosis is fresh, the scope argument is genuine, and deferring reads as discipline rather than as a decision.
+A filed tracking issue records the debt rather than paying it, and it makes the deferral feel settled in a way an undocumented shortcut never does.
+The rule bounds **new** work only: adding a copy to un-migrated code is yours to fix now, the un-migrated code itself is not -- the line is authorship, not adjacency.
+Apply this in review too: a diff that adds a second copy of logic the repo already has is a review finding, and a PR that links a follow-up issue for a defect inside its own diff is a stronger one.
+
+@shared/principles/dont-incur-technical-debt.md
+
+The fragment also covers the case where duplicated logic corrupts its own tests -- a test that reimplements the unit under test validates the copy, not the code -- and why this does not conflict with YAGNI.
 
 ## Fail fast — no silent failures
 

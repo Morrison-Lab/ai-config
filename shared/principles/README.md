@@ -131,6 +131,30 @@ search procedure), and the
 [`scout-peers`](../../skills/scout-peers/SKILL.md) skill (license-gated
 borrowing from peer repos).
 
+## Don't incur technical debt
+
+When the right way to do the work in front of you needs a change you
+have not made yet, make that change as part of the work.
+The moment debt is incurred is the moment you defer a fix you have
+already diagnosed, and a filed tracking issue records that debt rather
+than paying it.
+The rule bounds new work only: adding a copy to un-migrated code is
+yours, the un-migrated code itself is not.
+
+Full statement:
+[`dont-incur-technical-debt`](dont-incur-technical-debt.md), including
+the case where duplicated logic corrupts its own tests, and why this
+does not conflict with YAGNI.
+Operationalized by:
+[`dont-reinvent-wheel`](dont-reinvent-wheel.md) (the search that comes
+one step earlier) and
+[`report-mistakes-proactively`](../workflow/report-mistakes-proactively.md)
+(file the issue -- necessary, not sufficient).
+Contrast with, rather than apply,
+[`address-every-comment`](../workflow/address-every-comment.md)'s Defer
+disposition: it governs a finding on code that already exists, and
+licenses nothing about a defect inside the diff you are about to push.
+
 ## Modularity — small, single-purpose, composable units
 
 Favor small, single-purpose functions and reusable units over long
@@ -278,6 +302,18 @@ the same fact or logic has two hand-maintained copies, DRY wins.
 DRW is the outward-facing sibling: KISS, DRY, and modularity govern the
 code we write; DRW asks first whether we should be writing it at all,
 or reusing, forking, or contributing to something that already exists.
+
+Don't-incur-technical-debt is the *timing* member of that family.
+KISS, DRY, and DRW each say what the right shape is;
+this one says when you have to adopt it, which is now.
+
+It looks like it contradicts YAGNI and does not, because the two
+never fire on the same object.
+YAGNI governs a speculated future requirement, whose defining
+property is that you cannot yet tell whether it is real.
+This governs a present, diagnosed defect in code you are writing now.
+Feeling both at once usually means you are holding a suspicion rather
+than a diagnosis, and the way out is to settle which it is.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

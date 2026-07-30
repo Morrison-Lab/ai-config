@@ -149,6 +149,51 @@ nothing in a container, with no output difference to notice.
 So set the locale explicitly in any check that matches non-ASCII, and
 still make the error path distinguishable from the clean one.
 
+### A fan-out makes this worse, because every worker fails identically
+
+The one-liner above swallows one command's failure.
+A parallel sweep swallows every worker's, and the aggregate then reads as a
+finding rather than as an error: not "the check broke" but "nothing was
+found", across the whole corpus at once.
+
+The shape is a scan whose per-item worker writes only on a hit, run under
+`xargs`/`parallel` with stderr discarded:
+
+```bash
+xargs -P 12 -n 1 ./scan.sh < repos.txt >/dev/null 2>&1   # every failure discarded
+```
+
+Any per-worker failure now produces an empty results file, which is exactly
+what a clean corpus produces.
+The specific trap worth naming: a `chmod +x` that lived in an earlier command
+which never ran --- denied by a permission prompt, edited out, lost to a
+failed compound --- leaves the script non-executable, so all N invocations
+die with "permission denied" into `/dev/null`.
+Nothing in the output distinguishes that from success.
+
+Count what you examined, not only what you found.
+A worker that appends its own identifier unconditionally, before any
+early-exit path, turns the ambiguity into arithmetic:
+
+```bash
+echo "$item" >> "$OUT/scanned.txt"     # first line of the worker, not the last
+...
+echo "scanned $(wc -l < scanned.txt) of $(wc -l < items.txt)"
+```
+
+`scanned 0 of 947` is unmistakable; a bare "no hits" is not.
+Place that line **before** the worker's early exits, or the items that failed
+their first lookup go unrecorded and the shortfall silently shrinks --- which
+converts this instrument back into the thing it was built to replace.
+
+Distrust a sweep that reports zero, and distrust one whose scanned count you
+never printed.
+(2026-07-28: a 947-repo scan reported `scanned: 0`, caught only because the
+count was printed; the `chmod +x` had been in a command the permission
+classifier denied minutes earlier.
+A later run of the fixed script reported 910 of 947, which is how the
+rate-limit truncation above was found.)
+
 ## In review
 
 Flag error handling that hides failure — swallowed exceptions, silent

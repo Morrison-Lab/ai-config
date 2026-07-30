@@ -72,6 +72,36 @@ one file over. Grep the diff for the flagged phrase before considering the
 finding closed. (ai-config#373: fixed "routing/dispatch site" in the skill
 per review, but the CHANGELOG entry still said it until a follow-up commit.)
 
+**The PR description is on that list and is the one copy grepping the diff
+cannot find, so check it separately.**
+A PR body is not a file, so it appears in no diff and no reviewer reads it as
+part of the change under review.
+That makes it the copy most likely to survive a fix, and the copy most
+likely to be *read* by someone deciding whether to merge --- so a stale one
+teaches the reader exactly the thing the diff was corrected to remove.
+
+The tell is a fix to something the PR body summarizes: a behaviour change, a
+mechanism, a rationale.
+Re-read the description against the corrected diff before declaring the round
+done, and say in the update that it was corrected, so a reader who saw the
+original knows it was revised rather than always having said this.
+Where the correction has history worth keeping --- a claim that was wrong and
+is now right --- state it as history in the body rather than silently
+overwriting, since the wrong version is what earlier comments respond to.
+
+- **Do:** re-read the PR description after any Address that changes what the
+  PR does or why, alongside the changelog check above.
+- **Don't:** treat a clean `grep` over the diff as evidence every paraphrase
+  is synced --- the description was never in it.
+
+(ai-config#829, 2026-07-29: a review nit led to correcting a gha#350
+attribution in `memories/github-actions.md`.
+Both reviewers then approved, and the PR body still carried the original
+wrong claim verbatim --- "`continue-on-error` there, the dropped implicit
+`success()` here" --- because it had been written before the correction and
+was not part of the diff either reviewer read.
+Caught only while assembling the ready-for-merge summary.)
+
 **The same sync is needed when the review fix is to CODE BEHAVIOR rather than
 to wording --- and that case is easier to miss, because nothing about fixing a
 bug points at the changelog.**

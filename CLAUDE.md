@@ -105,7 +105,8 @@ This one's stated reason is about the **repo**, so it reads as restraint rather 
 
 Three things dissolve it.
 A UMS PR is *usually* disjoint --- it touches a memory file or a fragment nothing else in flight is editing --- so it usually costs no merge-order constraint and no conflict, which is exactly the case `CLAUDE.md`'s own merge-order section says to state plainly rather than manage.
-Verify that rather than assuming it, because two UMS passes in one session land in the same few files and collide readily; when they do, the answer is still to open the PR and resolve the collision, not to hold the pass.
+Verify that rather than assuming it, because two UMS passes in one session land in the same few files and collide readily.
+When they do, the answer is still to open the PR and resolve the collision, not to hold the pass.
 The queue is durable and the learning is not: an extra open PR waits patiently, while an unrecorded learning dies with the session, so the two costs are not comparable.
 And the deferral is usually announced in the same breath as reporting a PR ready, which is the moment the next instruction arrives --- so "once this lands" reliably becomes never.
 

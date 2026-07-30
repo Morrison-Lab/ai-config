@@ -204,4 +204,5 @@ this synthesis step — codex produced the parts, Claude assembles the whole.
 - ❌ Spending Claude/Workflow tokens on heavy fan-out read/verify while the codex
   5-hour window still has budget.
 - ❌ Delegating a focused authoring/judgment task that needs Claude's own context
-  (write those inline).
+  (write those inline --- unless a data-sensitivity trigger applies, which
+  overrides this shape exception; see "Data sensitivity is a second trigger").

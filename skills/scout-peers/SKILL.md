@@ -53,6 +53,14 @@ hand the same profile to every research agent so verdicts are comparable.
 
 ### 2. Find the peer set
 
+**Skip this step when the task already names one repo.** A "study
+`<owner>/<repo>`" issue supplies the peer set, so there is nothing to search
+for; go straight to §3 and run §4 through §7 unchanged.
+Searching anyway produces a survey nobody asked for and buries the named repo
+among peers.
+The rest of the loop does not depend on the set having more than one member ---
+§5's uniformly-superior question and §6's ranked borrow list both work on one.
+
 Use `WebSearch` (2–4 queries from different angles — by category, by
 "awesome-X list", by the repo's distinctive feature) to assemble a candidate
 list. Pull in curated "awesome" lists too: they surface peers a direct search
@@ -103,12 +111,30 @@ Then apply:
 |---|---|
 | **MIT / BSD / Apache-2.0 / ISC** | Copy or adapt code/text **with attribution** — retain the copyright + permission notice. Apache-2.0: also preserve `NOTICE` if present. |
 | **GPL / AGPL / LGPL / MPL (copyleft)** | Do **not** copy into a permissive/unlicensed repo without flagging the license-compatibility consequence to the user first. Prefer reimplementing the *idea* independently. |
-| **CC-BY / CC-BY-SA** | Fine for prose/docs with attribution; SA imposes share-alike — flag it. Not meant for code. |
+| **CC-BY / CC-BY-SA** (no `NC`, no `ND`) | Fine for prose/docs with attribution; SA imposes share-alike --- flag it. Not meant for code. |
+| **CC-BY-NC / CC-BY-NC-SA / CC-BY-NC-ND** | **Read-only for a permissively licensed repo.** The NonCommercial term does not survive relicensing, so it cannot go into an MIT/BSD/Apache repo at all --- not even prose, not even with attribution. Clean-room the *idea* and credit it as inspiration. *Using* the work is still fine where the use is noncommercial; this row is about copying. |
+| **CC-BY-ND** | **Read-only.** ND does permit reproducing and Sharing the material *verbatim*; what it forbids is Sharing anything adapted --- you may "produce and reproduce, but not Share, Adapted Material" (§2(a)(1)). That still lands on idea-only here, for two reasons. The grant is **non-sublicensable** (same section), so this repo cannot re-offer the material under MIT, which is what vendoring it would do. And a fragment nobody may revise is dead weight in a corpus whose files exist to be revised --- the *next* edit to it is the one that becomes an unshareable derivative. |
 | **No license / "all rights reserved"** | **Read-only.** You may learn from it and reimplement the *idea* from scratch in your own words/code, but you may **not** copy its files, text, or structure verbatim. |
+
+**Match the full SPDX id, not the `CC BY` prefix.** A Creative Commons
+license's base letters look permissive while the suffix carries the
+restriction, so `CC-BY-4.0` and `CC-BY-NC-4.0` differ by exactly the clause
+that decides the answer.
+Read the whole identifier, and check `.claude-plugin/*.json`, `package.json`,
+or an equivalent manifest as a second source --- a repo that declares its
+license in metadata as well as in `LICENSE` gives you a free cross-check.
 
 When in doubt, treat it as "no license" and reimplement independently.
 A clean-room reimplementation of an *idea* is always allowed — copyright
 protects expression, not concepts.
+
+**Copying and using are separate questions, and only the first is what this
+gate decides.** A license that forbids vendoring a peer's files into this repo
+may still permit installing and running that peer alongside it --- which is
+often the better outcome anyway, since it needs no maintenance here.
+When the gate comes back read-only, check whether the peer ships as an
+installable plugin before concluding there is nothing to gain, and report both
+answers.
 
 ### 5. Decide "uniformly superior"
 

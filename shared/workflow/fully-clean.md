@@ -800,10 +800,10 @@ and #986: two run results were read directly and shared a genuine signature,
 `is_error: true` alongside `subtype: "success"` after real work
 ($4.10 over 13 turns, $0.97 over 2 turns).
 Both of those reads were #986's own two runs, though.
-#984 and #985 were admitted on nothing but a `claude-review` failure the same
-day, with no result object read for either -- so that grouping was already
-the pattern this section condemns, one step before the one it was written
-about.
+PRs #984 and #985 were admitted on nothing but a `claude-review` failure the
+same day, with no result object read for either -- so that grouping was
+already the pattern this section condemns, one step before the one it was
+written about.
 Reading them later made it worse rather than merely unverified: both had
 posted complete **Ready for merge** verdicts, minutes before their guards
 failed the check.

@@ -343,13 +343,13 @@ the prior commit `4bf5063`.
 `pull_request_read` `get` returned `9a3e722` moments later, so the two
 surfaces disagreed and the git-native one was right.)
 
-**The write side can fail in the same direction, so the local two-ref
-comparison above is not sufficient on a brand-new branch.**
+**A brand-new branch can read back at the wrong commit, so the local two-ref
+comparison above is not sufficient there.**
 That bullet offers `git rev-parse HEAD origin/<branch>` as the pair that
 settles the question, on the grounds that local refs cannot lag.
 They cannot.
-What they can do is agree with a remote ref the push itself created at the
-wrong commit, and then the pair reports the push as landed.
+What they can do is agree with a remote ref that reads back at the wrong
+commit, and then the pair reports the push as landed.
 
 The failure direction inverts, which is what makes this worth separating.
 A read-side lag is a false alarm, correctly called the safe one there.
@@ -363,9 +363,24 @@ upstream, and exited 0, because that is the least suspicious moment in the
 round.
 
 `git ls-remote origin <branch>` reads the remote directly rather than through
-a tracking ref, so it is the instrument that decides it.
+a tracking ref, so it is the instrument that catches it.
 The corrective push is an explicit refspec:
 `git push origin HEAD:refs/heads/<branch>`.
+
+**Which side actually failed is not established, and the one control that
+would settle it was not run.**
+Reading the remote directly rules out a stale *local* tracking ref.
+It does not rule out `git ls-remote` racing GitHub's own ref propagation, so
+"the push landed at the wrong commit" and "the read arrived too early" both
+fit the observation equally well.
+Re-running plain `git ls-remote`, without the corrective push, is what
+separates them: a ref that self-corrects means the write was fine and this is
+the read-side bullet above arriving on a different read path.
+Because that was never run, the re-push cannot be credited with having fixed
+anything -- it may only have bought the propagation enough time to catch up.
+Run it before concluding anything about which side failed.
+The practical advice is unaffected either way, since checking and re-pushing
+are both cheap whichever it turns out to be.
 
 Two things about diagnosing one of these.
 The downstream error misdirects, because opening the PR fails with
@@ -377,15 +392,17 @@ exist before, **not** the deleted-underneath-you signal `CLAUDE.md`'s
 There the line is diagnostic precisely because the branch had already been
 pushed to; here it is expected, so the two cases must not be conflated.
 
-What was not established is **why** `push -u` created the ref at `main`'s tip
-rather than at `HEAD`.
+What was not established is **why** the ref read back at `main`'s tip rather
+than at `HEAD`.
 Read this as an observed effect with a detection instrument and a fix, not as
 a mechanism.
 
 - **Do:** run `git ls-remote origin <branch>` after the first push to a new
   branch, and compare its SHA against `git rev-parse HEAD`.
-- **Do:** re-push with `git push origin HEAD:refs/heads/<branch>` when those
-  two disagree, and read the SHA range it prints as the confirmation.
+- **Do:** re-run plain `git ls-remote` first when the two disagree, so a ref
+  that self-corrects stays distinguishable from one a re-push repaired.
+- **Do:** re-push with `git push origin HEAD:refs/heads/<branch>` when the
+  mismatch persists, and read the SHA range it prints as the confirmation.
 - **Don't:** treat a `git push` that exited 0 and printed `* [new branch]` as
   evidence the commit reached the remote.
 - **Don't:** answer a `No commits between main and <branch>` error by
@@ -401,7 +418,9 @@ value, so the two-ref comparison reported the push as landed.
 `create_pull_request` then returned a 422 reading
 `No commits between main and ums/prose-count-adjacent-to-block`.
 `git push origin HEAD:refs/heads/ums/prose-count-adjacent-to-block` reported
-`98102a2..1611ccc`.)
+`98102a2..1611ccc`.
+Plain `git ls-remote` was never re-run on its own, so whether the ref would
+have corrected itself is unknown.)
 
 **The same false claim arrives as *incoming* state when you pick a PR up
 mid-flight, and there the SHA comparison usually has nothing to compare.**

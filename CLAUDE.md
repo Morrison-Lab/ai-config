@@ -666,6 +666,15 @@ The proactive counterpart to issue-first above: when a mistake shows up in any m
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.
 The `defer-issue` skill covers the user-initiated version of this; this rule is self-initiated.
 
+## Say when a practice is slipping, not only when an artifact is wrong
+
+@shared/workflow/flag-practice-slippage.md
+
+The counterpart to the rule above, for *practice* rather than for artifacts: that one governs a mistake in a thing and its deliverable is a filed issue, this one governs how the work is being done and its deliverable is one sentence at the moment it is actionable.
+The outward direction is already covered by the review fragments and needs no restatement.
+The two that need stating are inward, unprompted and outside any review loop, and **upward** --- telling me when *my* practice is slipping, which will not happen by default because deference costs nothing at the moment it is chosen and reads as politeness.
+Name the specific practice and gap, cite the rule or label the opinion as an opinion, say it before the action rather than in the retrospective, and say it once --- the decision stays mine, and this is not a licence to relitigate it.
+
 ## Tracking issues in upstream repos
 
 <!-- Shared with the lab manual; edit shared/workflow/upstream-issues.md, not here. -->

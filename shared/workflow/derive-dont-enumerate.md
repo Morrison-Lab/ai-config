@@ -53,7 +53,8 @@ It is **read-only reporting, not authorization**.
 [`ardi`](ardi.md) limits its monitoring mandate to PRs a session owns or has explicitly claimed, and a PR appearing in this sweep does not transfer ownership.
 Surface an unowned stalled PR to the human, or claim it per [`claim-pr`](claim-pr.md) before driving it.
 
-[`pr-status-all`](../../skills/pr-status-all/SKILL.md) remains the richer per-PR dashboard; this is the cheap standing sweep that says where to point it.
+[`pr-status-all`](../../skills/pr-status-all/SKILL.md) remains the richer per-PR dashboard.
+This is the cheap standing sweep that says where to point it.
 
 ## In review
 

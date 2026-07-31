@@ -42,6 +42,63 @@ to look.
 - A defect was caught by eye that a threshold over dumped state would have
   caught earlier and every time thereafter.
 
+## Test the instrument against the incident that prompted it, verbatim
+
+Building an instrument in response to a specific failure is the usual path
+into this rule.
+When that is why it exists, the incident's **exact input** is test case
+number one -- pasted in unaltered from wherever it was reported, not retyped
+and not tidied.
+
+Expect the first draft to fail it.
+That is the whole reason to write the test, and it is worth saying plainly
+because the failure feels impossible from the inside: you have just finished
+designing against that very case.
+
+You do not design against the incident, though.
+You design against your **summary** of it, and the summary is what made the
+rule statable in the first place -- so the abstraction that let you write the
+guard is the same one that lets the guard miss.
+The real input carries an env-var prefix, an assignment, a `;`, a wrapping
+quote.
+The summary carries none of those, and neither does the matcher.
+
+Write the negative cases in the same pass, since a guard that blocks too much
+gets switched off and then protects nothing.
+Mentioning a thing is not doing it: a `grep` for the gated command, an `echo`
+of it, and a doc quoting it all have to pass.
+
+**Treat a comment claiming the matcher's scope as an untested assertion.**
+A comment beside a regex saying it "only matches at the start of a command"
+sits exactly where a reviewer stops asking, and it was written by the same
+mental model that wrote the regex -- so the two agree with each other and
+neither is evidence.
+Only a test separates them.
+
+This is the guard-shaped case of [`ardi`](ardi.md)'s rule that a regression
+test must be seen to fail before it is believed.
+The gap runs the other way here: there the test encodes the bug as intended
+behaviour, while here the test is the only thing that can catch the mismatch
+between the incident and your memory of it.
+
+- **Do:** make the reported input test case number one, copied literally.
+- **Do:** test that mentions, greps, and quotes of the gated command pass.
+- **Don't:** validate a matcher by reading it -- a wrong one reads as correct.
+- **Don't:** trust a comment describing what the pattern cannot match.
+
+(2026-07-31, a guard against running heavy R jobs on a cluster's head node:
+the reported command was
+`R -e 'Sys.setenv(NOT_CRAN="true"); res <- devtools::test()'`.
+Splitting on `;` left a fragment leading with `res` rather than an
+interpreter, so the one command the hook existed to stop was the one it let
+through.
+A second bug in the same file had a comment asserting that a leading anchor
+kept bare mentions from matching, which it did not -- `grep -rn
+'devtools::test'` was blocked.
+Neither surfaced from re-reading the code.
+Both surfaced from tests, and the first only from the test that pasted the
+reported line in unaltered.)
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

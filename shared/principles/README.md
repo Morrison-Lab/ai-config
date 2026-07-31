@@ -259,6 +259,31 @@ Full statement:
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
 (predates this catalog, so it lives in `shared/workflow/`).
 
+## Deterministic tools over model judgment -- and build the missing ones
+
+Prefer deterministic, inspectable algorithms over model reasoning, and
+where none exists, build one.
+One principle with two faces: a **constraint** binding now (use the
+instrument that exists) and a **goal** over time (build the one that
+does not, so the constraint gets cheap to obey).
+The observable trigger is recurrence -- after doing the same judgment
+task twice, the third time is a tool.
+
+Extends the entry above on two axes: **scope**, from verification to
+agentic work generally, and **inspectability** -- an algorithm can be
+read before it runs, diffed, and reproduced, which model reasoning
+cannot.
+Applies to every repo we work in, research code included, not only to
+tooling.
+
+Full statement: [`deterministic-tools`](deterministic-tools.md).
+Operationalized by:
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md) (the
+checks-shaped special case), the `hooks/` directory (rules made
+mechanical), and
+[`skill-checklists`](../workflow/skill-checklists.md) (the pause-point
+instrument where no script can decide).
+
 ## The 3Rs lens — reduce, reuse, recycle
 
 The environmental mnemonic maps cleanly onto the catalog, and makes a
@@ -314,6 +339,23 @@ property is that you cannot yet tell whether it is real.
 This governs a present, diagnosed defect in code you are writing now.
 Feeling both at once usually means you are holding a suspicion rather
 than a diagnosis, and the way out is to settle which it is.
+
+Deterministic-tools and algorithmatize-checks are the same instinct at
+two scopes, and the pair is worth keeping distinct rather than merging.
+Algorithmatize-checks governs *verification* and is the older, narrower
+statement; deterministic-tools governs the work itself and adds the
+argument from inspectability.
+Read the narrow one when deciding how to verify something, and the broad
+one when deciding whether a task should still be done by hand at all.
+
+Deterministic-tools also sits in the same relation to YAGNI that
+don't-incur-technical-debt does, and resolves it the same way.
+YAGNI governs a tool for a task that has happened once, whose recurrence
+is still speculation.
+The goal half fires only on the third occurrence, by which point
+recurrence is observed rather than predicted.
+Feeling both at once usually means the count is one or two, and the way
+out is to wait rather than to argue.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

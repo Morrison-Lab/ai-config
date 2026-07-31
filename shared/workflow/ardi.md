@@ -392,7 +392,7 @@ a mechanism.
   re-checking the base branch argument before checking where the head ref
   actually points.
 
-(Morrison-Lab/ai-config, 2026-07-31:
+(Morrison-Lab/ai-config#985, 2026-07-31:
 `git push -u origin ums/prose-count-adjacent-to-block`, carrying commit
 `1611ccc`, printed `* [new branch]`, set the upstream, and exited 0.
 `git ls-remote` showed that ref at `98102a2`, which was `main`'s tip.

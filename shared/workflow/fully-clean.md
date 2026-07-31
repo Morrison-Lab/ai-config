@@ -111,6 +111,46 @@ items under every heading, whatever that heading is called ---
 than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 
+**The disagreement is measurable, and it is not a wording problem.**
+Across 38 verdict-bearing `claude-review` comments sampled from 16 PRs,
+8 (21%) carried a verdict line that disagreed with the findings in the
+same comment.
+Six read a pass over unaddressed nits, and two ran the other way,
+blocking over findings the reviewer itself called non-blocking, so the
+error is not a consistent bias that an offset could correct.
+The vocabulary is nearly closed by contrast: five outcome lexemes across
+five markup carriers, with 37 of the 38 naming "Verdict" somewhere.
+So neither detection nor parsing is the weak link.
+
+That is the argument against gating on a machine-readable verdict
+field.
+Adding one would encode the reviewer's own looser threshold, making
+roughly one review in five confidently wrong in exactly the form that
+invites automation.
+Structured review output should carry **finding counts**, which are
+checkable against the inline-comment and thread lists, rather than a
+pass/fail mood, which is checkable against nothing.
+
+(Sampled 2026-07-31 across 12 `Morrison-Lab/ai-config` PRs and 4 in
+`Morrison-Lab/gha`.
+All eight are named, so the rate is reconstructable.
+The six pass-over-nits cases were ai-config #955, #941, #939, #935, #934,
+and #925 --- #934's verdict line *is* the hedge, reading
+`**One finding (nit), otherwise ready for merge.**`.
+Both opposite-direction cases were on
+[gha#371](https://github.com/Morrison-Lab/gha/pull/371), which returned
+`**Needs minor changes**` over "two non-blocking, fact/scope findings".
+Four other comments within the same 38 are counted out as unclear for a
+different reason: three of them passes --- two with the verdict restated
+or hyperlinked from an earlier review, one whose findings never reached
+the PR --- plus one where `Needs work` did double duty as both the
+verdict and an inline finding's heading.
+Those are legibility problems rather than disagreements, and they sit
+inside the pass and non-pass groups rather than beside them.
+Of the 24 passes, 23 used `Ready for merge` and one used the hedged
+variant above; the four non-pass lexemes were `Needs more work`,
+`Needs minor changes`, `Needs work`, and `Needs one fix`.)
+
 **What "an approving review" means here is not a review state.**
 Across the 25 most recent merged PRs, all 106 posted reviews are `COMMENTED` and
 none is `APPROVED` --- `d-morrison`'s own included, so this is not a bot

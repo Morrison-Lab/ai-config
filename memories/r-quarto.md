@@ -238,9 +238,9 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `NEWS.md` entry under `# <pkg> (development version)` **and** a `DESCRIPTION`
   `Version:` dev-bump (e.g. `0.0.0.9053` → `.9054`), or CI fails. Add them up
   front rather than waiting for the red check. (Observed on ucdavis/bcs#223.)
-  For a **non-user-visible** PR (CI/workflow-only), skip both with the
-  `no changelog` + `no version increment` labels instead — see the label-bypass
-  note below.
+  For a **non-user-visible** PR (CI/workflow-only), the `no changelog` +
+  `no version increment` labels may skip both, but that bypass is per-repo and
+  serodynamics has none: see the label-bypass note in `memories/github-actions.md`.
 - The **Spellcheck** job (`spelling::spell_check_package()`) fails on any word
   not in `inst/WORDLIST`. For one-off non-dictionary words in NEWS/prose, prefer
   rewording (e.g. "uncaptioned" → "without captions") over polluting WORDLIST;

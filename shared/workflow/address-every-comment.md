@@ -808,3 +808,52 @@ workflow resolving fine --- logs from 45 and 30 minutes before the PR was
 opened, spanning the cutover.
 Re-running one of those very workflows reproduced `startup_failure`
 immediately, and the retraction had to be published in the same thread.)
+
+**A finding built on a *negative* result -- "I searched and it isn't there"
+-- is only as strong as the paths that were searched, and the search scope
+is the part reviewers state loosest.**
+The bullets above all check a reviewer's positive evidence: the suggested
+literal, the proposed fix, the cited source.
+A negative result invites none of that scrutiny, because there is nothing
+to look up: the claim is that looking up would fail.
+It also arrives sounding the most settled of any finding -- "no file or
+heading with that title anywhere" reads as exhaustive, and the reader's
+natural move is to accept it and edit.
+
+So read the search itself rather than the conclusion.
+Ask which paths were actually covered, and whether the obvious location is
+among them.
+One command usually settles it, which makes this an
+[`algorithmatize-checks`](algorithmatize-checks.md) case rather than a
+judgment call -- and note the reviewer's own tooling may have failed the way
+[`fail-fast`](../principles/fail-fast.md)'s hand-check section describes,
+matching too narrowly against text that was wrapped or reformatted.
+
+When it turns out the thing does exist, name the gap rather than only the
+correction: which paths were searched, where it actually lives, and why the
+two did not overlap.
+That is what stops the same search being re-run the same way.
+And check whether the finding still points at something real, per the mirror
+case above -- an unresolvable-looking citation is often a genuinely
+under-specified one.
+
+- **Do:** ask which paths a negative finding actually searched, and check the
+  obvious location yourself before editing anything.
+- **Do:** name the gap when the thing does exist -- paths searched versus
+  where it lives -- so the same search is not re-run the same way.
+- **Don't:** accept "it isn't there anywhere" as settled because it is stated
+  more confidently than a positive finding would be.
+- **Don't:** discard the finding once its negative result is disproved -- the
+  thing it tripped over is often a real ambiguity.
+
+(`Morrison-Lab/gha#338`, 2026-07-28: a review reported a cited section as
+nonexistent, having "checked ai-config's full tree (`shared/workflow/*.md`,
+`skills/`, `codex-skills/`)".
+The heading was an H2 in that repo's **root** `CLAUDE.md`, the one directory
+those three paths skip.
+The reviewer had even found the phrase in `shared/workflow/fully-clean.md`
+and read it as pointing at a *consuming* repo's `CLAUDE.md`.
+The rebuttal carried the one-line grep; the underlying point was real
+anyway, since citing a section title without naming its file is what sent
+the search to the wrong directories, so the citation was fixed to name and
+link the file.)

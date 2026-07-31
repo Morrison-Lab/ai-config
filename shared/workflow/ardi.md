@@ -164,6 +164,56 @@ prose and the third was superseded.
 The third point was right and the other two were not; the bullets were
 restored, one reworded, and the deletion count fell from seven lines to two.)
 
+**A clean verdict does not discharge the self-review against project
+conventions either, and the reviewer's own "not a finding" is where that
+shows up.**
+The section above covers an **accident** a reviewer explains rather than
+reports, and its check is reading the diff's deleted lines.
+Here that check finds nothing.
+The choice is deliberate, nothing was displaced, and the diff contains
+exactly what you meant --- it simply violates a rule stated verbatim in the
+repo's own `CLAUDE.md`.
+
+A reviewer can notice such a choice, analyse it correctly, and still grade it
+acceptable, because it is judging whether the code is defensible rather than
+checking it against the project's written rules.
+That verdict arrives under a heading like "Observations (non-blocking)" and
+closes "Not a finding", which is stronger than the severity labels
+[`address-every-comment`](address-every-comment.md) already warns about:
+"nit" downgrades an item, while "not a finding" retires it.
+So the part of a review most likely to be skimmed is the part a genuine
+convention violation is most likely to sit in.
+
+The pre-push self-review this fragment already requires is the only thing
+that catches it, and a clean external verdict is exactly what makes that step
+feel finished.
+
+- **Do:** re-run the project-conventions check against your own diff after a
+  clean verdict, not only before the push.
+- **Do:** read a reviewer's "observations" and "not a finding" items as
+  candidate violations, and grep `CLAUDE.md` for whatever they discuss.
+- **Don't:** let a reasoned "belt-and-suspenders is fine" settle a question
+  the repo already answered in writing.
+- **Don't:** treat a non-blocking label as deciding whether an item gets
+  checked at all.
+
+(Morrison-Lab/ai-config#965 at `b85941c`, 2026-07-31: a diagnostic block ran
+both `git merge-base --is-ancestor HEAD origin/main` and
+`git rev-list --count origin/main..HEAD`, where `CLAUDE.md`'s `wrap-up`-sweep
+section says verbatim to "resist adding an ancestry check beside the first of
+those", since the two confirm one thing twice rather than two things once.
+`claude-review` returned Ready for merge, called the pair "logically
+equivalent (both express `HEAD <= origin/main` in ancestry)", judged that
+"presenting both is reasonable as belt-and-suspenders for a diagnostic
+block", and closed the item "Not a finding"; a second reviewer comment
+returned Ready for merge at the same head.
+The same block's `--is-ancestor ... && echo "pure upstream history"` was
+graded the same way, although `address-every-comment`'s own ai-config#868
+case record already establishes that `--is-ancestor` exits 2 or higher on a
+pruned ref and `&&` fails on any non-zero status --- measured here, a bogus
+ref gives rc=128 and the two-arm form still reports "not ancestor".
+Both verdicts were wrong; fixed in `0c19d3c`.)
+
 **Proactively self-correct a technical claim you already told a reviewer,
 the moment further testing shows it was wrong --- don't wait for the
 reviewer to catch it.** If you stated a rationale (an approach is safe, a

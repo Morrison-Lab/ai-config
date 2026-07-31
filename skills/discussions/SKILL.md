@@ -69,21 +69,38 @@ what this skill does is available even where GraphQL is blocked.
 
 ### 1. Confirm the repo has Discussions enabled
 
+The REST repo object carries this, so the check itself does not need GraphQL:
+
 ```bash
-gh api graphql -f owner='<owner>' -f repo='<repo>' -f query='
-  query($owner: String!, $repo: String!) {
-    repository(owner: $owner, name: $repo) { hasDiscussionsEnabled }
-  }'
+gh api repos/<owner>/<repo> --jq .has_discussions
 ```
 
-If `hasDiscussionsEnabled` is `false`, stop and tell the user — there's nothing
-to read or post to.
+If it is `false`, stop and tell the user -- there's nothing to read or post to.
+
+The GraphQL equivalent is `repository { hasDiscussionsEnabled }`, if you are
+already making a GraphQL call for another reason.
+Don't substitute "the list endpoint returned 200" for either: a repo with
+Discussions enabled and no topics yet returns an empty `200`, so a 200 does
+not distinguish enabled-but-empty from anything else.
 
 ### 2. List topics
 
 `LIST_DISCUSSIONS` (abstract operation token; resolve to your model's tool via
-[`tool-mappings.md`](../../tool-mappings.md) — no GitHub MCP tool exists for
-Discussions, so every model runs this same `gh api graphql`):
+[`tool-mappings.md`](../../tool-mappings.md) -- there is no GitHub MCP tool for
+Discussions, so every model runs one of the two `gh api` forms below).
+Prefer REST, since it works in sessions where GraphQL is blocked:
+
+```bash
+gh api repos/<owner>/<repo>/discussions --jq \
+  '.[] | {number, title, html_url, updated_at, comments,
+          category: .category.name, answer: .answer_html_url}'
+```
+
+A non-null `answer_html_url` means a Q&A topic already has an accepted answer.
+The category object carries `is_answerable`, which marks a Q&A category.
+
+The GraphQL form returns the same fields under different names, and is what to
+use when you also want node IDs in the same call:
 
 ```bash
 gh api graphql -f owner='<owner>' -f repo='<repo>' -f query='
@@ -101,14 +118,30 @@ gh api graphql -f owner='<owner>' -f repo='<repo>' -f query='
   }'
 ```
 
-`answerChosenAt` is non-null when a Q&A topic already has an accepted answer;
-`category.isAnswerable` marks a Q&A category. Report the list to the user with
-clickable URLs.
+`answerChosenAt` is the GraphQL spelling of the same accepted-answer signal.
+Report the list to the user with clickable URLs.
 
 ### 3. Read one topic and its thread
 
-The reply and answer mutations need node **IDs** (not numbers), so capture them
-here (`VIEW_DISCUSSION`):
+To **read** the topic and its thread, REST is enough, and works where GraphQL
+is blocked (`VIEW_DISCUSSION`):
+
+```bash
+gh api repos/<owner>/<repo>/discussions/<N>            # the topic
+gh api repos/<owner>/<repo>/discussions/<N>/comments   # its thread
+```
+
+The topic object carries `node_id` (e.g. `D_kwDOS6B1yM4AoI39`), which is the
+`discussionId` step 5's top-level-reply mutation wants -- so a REST read is
+sufficient to post a top-level comment.
+
+Use the GraphQL form when you need a **comment's** node id, for a threaded
+reply (`replyToId`) or to mark an answer.
+Whether REST's comment objects also expose `node_id` is unverified: every
+discussion in this org currently has zero comments, so there was nothing to
+check it against.
+Verify it on a thread that has comments before relying on REST for those two
+mutations.
 
 ```bash
 gh api graphql -f owner='<owner>' -f repo='<repo>' -F number=<N> -f query='

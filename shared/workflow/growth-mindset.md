@@ -92,6 +92,53 @@ accept it as broken".
 The render then worked on the first try and settled the question, which the
 manuscript would otherwise have asserted unchecked.)
 
+## A refusal can name its own remedy, and that sentence is the one skipped
+
+The section above assumes the error needs diagnosing.
+Sometimes it does not, because the error already contains the answer -- and
+that case is missed more reliably than the ambiguous one, for a reason worth
+naming: a status code is read as a verdict, so attention resolves at `403`
+and never reaches the body.
+
+The shape is a refusal whose text distinguishes *this route is closed* from
+*you are not allowed to do this*:
+
+```console
+$ curl -X POST https://api.github.com/graphql ...
+{"message": "This GraphQL query is not enabled for this session -- only the
+ pinned set of PR-review operations is served. Use REST via
+ `gh api repos/{owner}/{repo}/...` instead."}
+```
+
+That is a routing instruction wearing a denial's status code.
+Read as a denial it says the capability is absent; read to the end it names
+the working path.
+
+What makes this worse than an ordinary missed hint is where the mistaken
+reading sends you.
+"The capability is absent" invites acquiring it -- installing a server,
+adding a plugin, asking for a credential -- which is expensive, plausible,
+and in a sandbox usually futile, since anything installed runs behind the
+same boundary that issued the refusal.
+So the wrong reading produces a confident, effortful search for something
+that could not have worked, while the remedy sat in the sentence that
+prompted the search.
+
+- **Do:** read a refusal's whole body before concluding a capability is
+  missing, and try any alternative it names.
+- **Do:** treat "acquire the capability" as the fallback *after* the named
+  route fails, not the first response to a non-2xx.
+- **Don't:** stop at the status code -- 401, 403, and 404 are all routinely
+  attached to messages that say what to do instead.
+- **Don't:** reach for installing something to get past a sandbox boundary;
+  what you install inherits the boundary.
+
+(2026-07-30: a GraphQL call was refused with exactly the message above, read
+as a flat denial, and answered by searching the MCP registry and plugin
+catalog for a GitHub Discussions server to install.
+Neither could have helped -- a local server sits behind the same proxy.
+The REST route the refusal named worked on the first attempt.)
+
 ## Applies to our own metacognitive tooling, too
 
 The same bias governs the skills, memories, and self-improvement loops in these

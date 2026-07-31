@@ -185,6 +185,17 @@ same underlying failure, while the polished output continued.)
   instrument rather than reason.
   This says when to reach for one, since a claim you never doubted is a claim
   you never instrumented.
+- [`fact-check-code-logic`](../coding/fact-check-code-logic.md) reaches the
+  same verdict on confidence from the code-review side: "a claim you are
+  confident about is exactly the one you will publish without support."
+  Read this fragment as the general case of that observation, differing in
+  two ways that are the reason both exist.
+  It supplies the *empirical basis* --- confidence is not merely unreliable
+  but inversely related to accuracy --- and it supplies a filter that works
+  where that one cannot.
+  That rule's filter is "is this checkable here, right now?", which presumes
+  a runtime and a diff; this one keys on claim type, so it still fires on an
+  assertion in a chat recap, where there is nothing to execute.
 - [`research-before-asking`](research-before-asking.md) governs a **question**
   aimed at the user.
   This governs an **assertion** aimed at them, which is the commoner act and

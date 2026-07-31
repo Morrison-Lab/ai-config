@@ -5,7 +5,9 @@ A diff has a reviewer, a check, and a later reader who will hit the bug.
 The *way the work is being done* has none of those, so a drift in practice is
 observed by whoever happens to notice it and by nobody else.
 
-Three directions, and only one of them is uncovered here.
+Three directions.
+One is fully covered elsewhere and is cited rather than restated; the other
+two are what this fragment is for.
 
 **Outward, in review**, is settled, and this fragment deliberately adds nothing
 to it.

@@ -1,6 +1,6 @@
 ---
 name: discussions
-description: "Read and respond to GitHub Discussions forum topics — list a repo's discussions, read a topic and its comments, draft and post a reply, and mark an answer on Q&A discussions. Discussions are GraphQL-only (no `gh discussion` subcommand, no GitHub MCP tool), so this skill runs `gh api graphql`. Use when asked to 'read the discussions', 'respond to this discussion', 'answer the discussion topic', 'reply to the forum', 'triage the discussion board', or 'check GitHub Discussions'."
+description: "Read and respond to GitHub Discussions forum topics -- list a repo's discussions, read a topic and its comments, draft and post a reply, and mark an answer on Q&A discussions. Reads are available over REST (`gh api repos/{owner}/{repo}/discussions/...`), so a topic is readable even where GraphQL is blocked; writes are GraphQL-only (no `gh discussion` subcommand, no GitHub MCP tool), so posting runs `gh api graphql`. Use when asked to 'read the discussions', 'respond to this discussion', 'answer the discussion topic', 'reply to the forum', 'triage the discussion board', or 'check GitHub Discussions'."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -27,18 +27,40 @@ If the topic really belongs in the issue tracker (a concrete, actionable bug or
 task), hand off to **[migrate-discussion](../migrate-discussion/SKILL.md)**
 instead of just replying.
 
-## How Discussions are reached — GraphQL only
+## How Discussions are reached -- writes via GraphQL, reads also via REST
 
-Discussions are **not** in the REST API. There is **no `gh discussion`
-subcommand** and **no `mcp__github__*` Discussions tool**. Every operation goes
-through GraphQL:
+**Writing** goes through GraphQL.
+There is **no `gh discussion` subcommand** and **no `mcp__github__*`
+Discussions tool**, so posting a comment, creating a topic, or marking an
+answer all require `gh api graphql`.
 
-- **Local session with `gh`:** run `gh api graphql` (shown below). This is the
-  primary path.
-- **Remote / web session (MCP only, no `gh`):** the GitHub MCP server exposes no
-  Discussions tools and `gh` isn't installed, so Discussions may be unreachable.
-  If the session has an authenticated GraphQL passthrough, use it; otherwise say
-  so and surface it to the user — don't fake a reply that never posted.
+**Reading** does not.
+GitHub serves repository discussions over REST, so these work from any
+session that can reach `api.github.com` with a token:
+
+```bash
+gh api repos/<owner>/<repo>/discussions                 # list topics
+gh api repos/<owner>/<repo>/discussions/<N>             # one topic
+gh api repos/<owner>/<repo>/discussions/<N>/comments    # its comments
+```
+
+Without `gh`, the same three are a plain `curl` against
+`https://api.github.com/...` with an `Authorization: bearer` header.
+
+Which path a session has:
+
+- **Local session with `gh`:** everything works.
+  Use `gh api graphql` for writes (shown below) and either form for reads.
+- **Remote / web session (MCP only, no `gh`):** the GitHub MCP server exposes
+  no Discussions tools, but the REST reads above still work, so the topic and
+  its comments are readable.
+  Writes need an authenticated GraphQL passthrough -- and some sandboxes
+  refuse GraphQL outright while serving REST normally.
+  When the write path is missing, say so and hand the drafted text to the user
+  rather than faking a reply that never posted.
+
+Don't report a discussion as unreachable without trying the REST read: half of
+what this skill does is available even where GraphQL is blocked.
 
 `<owner>`/`<repo>` below are the repository; `<N>` is a discussion number. Use
 `-F` for typed (Int) variables and `-f` for strings.

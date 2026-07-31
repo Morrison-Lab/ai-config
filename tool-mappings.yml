@@ -161,13 +161,13 @@ operations:
     cli: gh api repos/<owner>/<repo>/labels/<name>
     github_mcp: mcp__github__get_label
   - id: LIST_DISCUSSIONS
-    description: List a repository's discussions. Discussions are GraphQL-only.
-    cli: gh api graphql (list discussions)
-    github_mcp: (no GitHub MCP tool; use gh api graphql)
+    description: List a repository's discussions. Readable over REST; writes are GraphQL-only.
+    cli: gh api repos/{owner}/{repo}/discussions
+    github_mcp: (no GitHub MCP tool; use gh api REST or graphql)
   - id: VIEW_DISCUSSION
-    description: Read a discussion topic and its comment thread.
-    cli: gh api graphql (read discussion + comments)
-    github_mcp: (no GitHub MCP tool; use gh api graphql)
+    description: Read a discussion topic and its comment thread. Readable over REST.
+    cli: gh api repos/{owner}/{repo}/discussions/{number}[/comments]
+    github_mcp: (no GitHub MCP tool; use gh api REST or graphql)
   - id: COMMENT_DISCUSSION
     description: Post a reply on a discussion (top-level or threaded).
     cli: gh api graphql (addDiscussionComment)

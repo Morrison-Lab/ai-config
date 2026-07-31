@@ -343,6 +343,66 @@ the prior commit `4bf5063`.
 `pull_request_read` `get` returned `9a3e722` moments later, so the two
 surfaces disagreed and the git-native one was right.)
 
+**The write side can fail in the same direction, so the local two-ref
+comparison above is not sufficient on a brand-new branch.**
+That bullet offers `git rev-parse HEAD origin/<branch>` as the pair that
+settles the question, on the grounds that local refs cannot lag.
+They cannot.
+What they can do is agree with a remote ref the push itself created at the
+wrong commit, and then the pair reports the push as landed.
+
+The failure direction inverts, which is what makes this worth separating.
+A read-side lag is a false alarm, correctly called the safe one there.
+This is a false all-clear, arriving on the one instrument that rule offers
+for deciding the question.
+
+**The gap is in the trigger rather than in the remedy.**
+The original SHA comparison does catch this whenever it is run.
+Nobody runs it after a `git push -u` that printed `* [new branch]`, set the
+upstream, and exited 0, because that is the least suspicious moment in the
+round.
+
+`git ls-remote origin <branch>` reads the remote directly rather than through
+a tracking ref, so it is the instrument that decides it.
+The corrective push is an explicit refspec:
+`git push origin HEAD:refs/heads/<branch>`.
+
+Two things about diagnosing one of these.
+The downstream error misdirects, because opening the PR fails with
+`No commits between main and <branch>`, which names a base-versus-head
+relationship and sends you to check the wrong argument.
+And `* [new branch]` here is the ordinary output for a branch that did not
+exist before, **not** the deleted-underneath-you signal `CLAUDE.md`'s
+"Use the existing PR branch" section describes.
+There the line is diagnostic precisely because the branch had already been
+pushed to; here it is expected, so the two cases must not be conflated.
+
+What was not established is **why** `push -u` created the ref at `main`'s tip
+rather than at `HEAD`.
+Read this as an observed effect with a detection instrument and a fix, not as
+a mechanism.
+
+- **Do:** run `git ls-remote origin <branch>` after the first push to a new
+  branch, and compare its SHA against `git rev-parse HEAD`.
+- **Do:** re-push with `git push origin HEAD:refs/heads/<branch>` when those
+  two disagree, and read the SHA range it prints as the confirmation.
+- **Don't:** treat a `git push` that exited 0 and printed `* [new branch]` as
+  evidence the commit reached the remote.
+- **Don't:** answer a `No commits between main and <branch>` error by
+  re-checking the base branch argument before checking where the head ref
+  actually points.
+
+(Morrison-Lab/ai-config, 2026-07-31:
+`git push -u origin ums/prose-count-adjacent-to-block`, carrying commit
+`1611ccc`, printed `* [new branch]`, set the upstream, and exited 0.
+`git ls-remote` showed that ref at `98102a2`, which was `main`'s tip.
+The local `origin/ums/prose-count-adjacent-to-block` agreed with the wrong
+value, so the two-ref comparison reported the push as landed.
+`create_pull_request` then returned a 422 reading
+`No commits between main and ums/prose-count-adjacent-to-block`.
+`git push origin HEAD:refs/heads/ums/prose-count-adjacent-to-block` reported
+`98102a2..1611ccc`.)
+
 **The same false claim arrives as *incoming* state when you pick a PR up
 mid-flight, and there the SHA comparison usually has nothing to compare.**
 The bullet above governs a claim you are about to make.

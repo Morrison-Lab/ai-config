@@ -206,27 +206,39 @@ again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content
 in the file.)
 
-## `scripts/semantic-line-breaks.py` rewrites the whole file, not the part you added
+## `scripts/semantic-line-breaks.py` previews by default and scopes its writes
 
-It is an in-place reformatter over every prose paragraph in each file it is
-given --- no `--check`, no `--dry-run`, no diff scoping (`main()` takes bare
-paths and calls `path.write_text()`).
-Running it on a mature file to tidy a few lines you just appended therefore
-reflows everything else too: on `memories/r-quarto.md` a 65-line addition
+**Fixed in ai-config#951. This entry is kept because the old behaviour is
+what most of this corpus was written against, and because the failure it
+describes is worth recognizing in any formatter.**
+
+It used to be an unconditional in-place reformatter over every prose
+paragraph in each file it was given --- no `--check`, no `--dry-run`, no diff
+scoping, with `main()` taking bare paths and calling `path.write_text()`.
+Running it on a mature file to tidy a few lines you had just appended
+reflowed everything else too: on `memories/r-quarto.md` a 65-line addition
 came back as `273 insertions(+), 923 deletions(-)`, burying the actual change
 and rewriting `git blame` for content nobody touched.
+Measured against a copy of `CLAUDE.md`, the unguarded version changed 342 of
+1163 lines.
 
-Two consequences.
-Format new prose by hand and reserve the script for a file you intend to
-convert wholesale.
-And if you do run it by reflex, `git checkout -- <file>` and re-apply just
-your own text --- the reformat is not worth keeping as a side effect of an
-unrelated change.
+It now behaves the way the entry above used to tell you to behave by hand:
 
-Note the contrast with its CI counterpart, `check-new-line-breaks` in
-[`d-morrison/gha`](https://github.com/d-morrison/gha), which is diff-scoped
-by design so a corpus's pre-existing drift is never reflagged.
-The checker got that treatment and the formatter did not.
+- naming a path **previews** a unified diff and writes nothing
+- `--write` applies it, scoped to the lines changed against `--base`
+  (default `origin/main`)
+- `--all` widens to the whole file
+- a scope it cannot determine is a **loud error**, never a silent widening
+
+So the old advice --- format new prose by hand, and `git checkout -- <file>`
+if you ran it by reflex --- is no longer needed for its own sake, though a
+preview is still worth reading before passing `--write`.
+
+The contrast that motivated the fix: its CI counterpart,
+`check-new-line-breaks` in
+[`d-morrison/gha`](https://github.com/d-morrison/gha), was diff-scoped by
+design from the start, so a corpus's pre-existing drift is never reflagged.
+The checker got that treatment years before the formatter did.
 
 ## macOS disk cleanup: where the space actually goes
 

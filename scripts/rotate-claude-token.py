@@ -86,7 +86,7 @@ def gh(args: list[str], stdin: str | None = None) -> str:
 def discover_owners() -> list[str]:
     """The authenticated login plus every org it belongs to."""
     login = gh(["api", "/user", "--jq", ".login"]).strip()
-    orgs = gh(["api", "/user/orgs", "--jq", ".[].login"]).split()
+    orgs = gh(["api", "/user/orgs", "--paginate", "--jq", ".[].login"]).split()
     return [login, *orgs]
 
 
@@ -111,9 +111,27 @@ def admin_repos(owner: str) -> list[str]:
 
 
 def secret_updated_at(repo: str, secret: str) -> str | None:
-    """`updated_at` for `secret` on `repo`, or None if the repo lacks it."""
-    out = gh(["api", f"/repos/{repo}/actions/secrets", "--paginate"])
-    for entry in json.loads(out).get("secrets", []):
+    """`updated_at` for `secret` on `repo`, or None if the repo lacks it.
+
+    `--jq` is what makes `--paginate` safe here. This endpoint returns an
+    object (`{"total_count":N,"secrets":[...]}`), not an array, so a bare
+    `--paginate` concatenates one object per page and the result is not
+    valid JSON. Projecting `.secrets[]` flattens every page into NDJSON
+    instead, one entry per line, which parses regardless of page count.
+    """
+    out = gh(
+        [
+            "api",
+            f"/repos/{repo}/actions/secrets",
+            "--paginate",
+            "--jq",
+            ".secrets[]",
+        ]
+    )
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
         if entry["name"] == secret:
             return entry["updated_at"]
     return None
@@ -128,6 +146,11 @@ def find_targets(
     `errors` is `(repo, message)`. A repo that simply lacks the secret appears
     in neither -- it is a normal result, not a failure.
 
+    Unparseable output is caught alongside a failed `gh` call, so one bad
+    response is reported against its own repo rather than aborting the whole
+    sweep. It still lands in `errors` and is printed, so this reports the
+    failure rather than swallowing it.
+
     Reads are concurrent because a full sweep is several hundred API calls;
     they are read-only, so ordering does not matter.
     """
@@ -141,7 +164,7 @@ def find_targets(
             repo = futures[future]
             try:
                 updated_at = future.result()
-            except GhError as exc:
+            except (GhError, json.JSONDecodeError) as exc:
                 errors.append((repo, str(exc)))
                 continue
             if updated_at is not None:

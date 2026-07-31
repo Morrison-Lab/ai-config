@@ -35,9 +35,16 @@ def check(name, condition):
 
 
 def secrets_payload(*names_and_times):
+    """What `gh api --paginate --jq '.secrets[]'` writes: one entry per line.
+
+    NDJSON rather than a single object, because that is the shape the script
+    actually reads. A fixture returning one object per call would pass just as
+    happily against a bare `--paginate`, which this endpoint breaks on -- so
+    it would pin the bug rather than catch it. See the pagination test below.
+    """
     pairs = zip(names_and_times[::2], names_and_times[1::2])
-    return json.dumps(
-        {"secrets": [{"name": n, "updated_at": t} for n, t in pairs]}
+    return "".join(
+        json.dumps({"name": n, "updated_at": t}) + "\n" for n, t in pairs
     )
 
 
@@ -84,6 +91,46 @@ check(
     rct.secret_updated_at("owner/other", "CLAUDE_CODE_OAUTH_TOKEN") is None,
 )
 
+# --- secret_updated_at over paginated output ---------------------------
+
+# Why the `.secrets[]` projection is required rather than stylistic: this
+# endpoint returns an object, so a bare `--paginate` emits one object per page
+# and the concatenation is not valid JSON. Measured against the real API on
+# Morrison-Lab/ai-config with `?per_page=1`, which forces two pages.
+two_pages = (
+    '{"total_count":2,"secrets":[{"name":"A","updated_at":"t1"}]}'
+    '{"total_count":2,"secrets":[{"name":"B","updated_at":"t2"}]}'
+)
+try:
+    json.loads(two_pages)
+    concatenated_parses = True
+except json.JSONDecodeError:
+    concatenated_parses = False
+check(
+    "a bare --paginate on this endpoint yields output json.loads cannot read",
+    not concatenated_parses,
+)
+
+fake = with_gh(
+    FakeGh(
+        {
+            "owner/many": secrets_payload(
+                "FIRST_PAGE_SECRET", "2026-01-01T00:00:00Z",
+                "CLAUDE_CODE_OAUTH_TOKEN", "2026-07-30T00:00:00Z",
+            )
+        }
+    )
+)
+check(
+    "secret_updated_at finds a secret that falls beyond the first page",
+    rct.secret_updated_at("owner/many", "CLAUDE_CODE_OAUTH_TOKEN")
+    == "2026-07-30T00:00:00Z",
+)
+check(
+    "secret_updated_at asks gh for the flattened .secrets[] projection",
+    fake.calls[-1]["args"][-2:] == ["--jq", ".secrets[]"],
+)
+
 # --- find_targets ------------------------------------------------------
 
 fake = with_gh(
@@ -109,6 +156,28 @@ check(
 check(
     "a repo merely lacking the secret is neither a target nor an error",
     all("owner/lacks" not in repo for repo, _ in targets + errors),
+)
+
+# Unparseable output must be attributed to its own repo. Before this was
+# caught, a single bad response raised through the executor and killed the
+# whole sweep, taking every other repo's result with it.
+with_gh(
+    FakeGh(
+        answers={
+            "owner/good": secrets_payload(
+                "CLAUDE_CODE_OAUTH_TOKEN", "2026-07-28T00:00:00Z"
+            ),
+            "owner/garbled": "{not json at all\n",
+        }
+    )
+)
+targets, errors = rct.find_targets(
+    ["owner/good", "owner/garbled"], "CLAUDE_CODE_OAUTH_TOKEN", 2
+)
+check(
+    "unparseable output is reported against its repo, not raised through the sweep",
+    [repo for repo, _ in errors] == ["owner/garbled"]
+    and [repo for repo, _ in targets] == ["owner/good"],
 )
 
 # --- rotate ------------------------------------------------------------
@@ -215,6 +284,46 @@ check(
     repos == ["a/one", "b/two"],
 )
 check("an explicit --repos list reports no swept owners", owners == [])
+
+
+# --- discover_owners, and the default path through collect_repos -------
+
+fake = with_gh(FakeGh({"/user/orgs": "acme\nwidgets\n", "/user": "octocat\n"}))
+check(
+    "discover_owners returns the authenticated login followed by its orgs",
+    rct.discover_owners() == ["octocat", "acme", "widgets"],
+)
+check(
+    "discover_owners paginates /user/orgs, so a 31st org is not dropped",
+    any(
+        "--paginate" in call["args"]
+        for call in fake.calls
+        if any("/user/orgs" in arg for arg in call["args"])
+    ),
+)
+
+with_gh(
+    FakeGh(
+        {
+            "/user/orgs": "acme\n",
+            "/user": "octocat\n",
+            "acme": json.dumps(
+                [{"nameWithOwner": "acme/one", "viewerPermission": "ADMIN"}]
+            ),
+            "octocat": json.dumps(
+                [
+                    {"nameWithOwner": "octocat/two", "viewerPermission": "ADMIN"},
+                    {"nameWithOwner": "octocat/ro", "viewerPermission": "READ"},
+                ]
+            ),
+        }
+    )
+)
+repos, owners = rct.collect_repos(Args())
+check(
+    "collect_repos falls back to discover_owners when neither flag is given",
+    repos == ["acme/one", "octocat/two"] and owners == ["octocat", "acme"],
+)
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

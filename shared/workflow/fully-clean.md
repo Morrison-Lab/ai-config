@@ -431,6 +431,76 @@ The inverse, easy to miss: a review job reporting FAILURE can still have posted 
 Read the posted comment body, not just the check conclusion, before concluding a PR is or isn't clean.
 If the check is a **required** check and you've independently confirmed the posted content is genuinely clean, that is still not authorization to merge past it yourself --- a required check failing is exactly the "stop and ask" case even under a merge-when-confident grant (see `mwc`'s scope note); report the evidence and let the human decide whether to override, fix the guard script, or relax branch protection. (Learned on sparta#590/#594/#598, 2026-07-02: two independent PRs hit the inverse misfire in the same session, and an attempt to merge past the required check on verified-clean content was correctly blocked by the harness's own permission system.)
 
+**That inverse has a second mechanism, and under this one the guard is not
+misfiring at all.**
+The sparta case above is a guard that reads the transcript for a verdict and
+gets the answer wrong, so the red is a defect, and finding the defect explains
+everything.
+A guard can also fail a run **before** it ever asks about a verdict, and then
+nothing is malfunctioning.
+
+`Morrison-Lab/gha`'s review guard is built that way, in both shipped versions.
+It reads the run's result object and, on `is_error == "true"`, prints
+`Claude review ended in an error state` and exits 1, with a single carve-out
+for the quota case (`total_cost` 0 at `num_turns` 1).
+At `@v1` the step is inline in `claude-code-review.yml` and contains no verdict
+test whatsoever.
+At `@v2` the logic moved into `check-review-execution.sh`, which does scan for
+a verdict, but every line of that scan sits below the `is_error` branch, on the
+`is_error: false` path.
+So an errored run is failed without either version asking whether a review was
+posted, and the version that ran is not the variable.
+
+The claim the guard makes is therefore true, and narrower than it looks: the
+run ended in an error state.
+The false step is the reader's.
+A review reaches the PR through tool calls **as it works**, so its comment can
+be complete minutes before the run's own result object reports a failure.
+Read `is_error` as a fact about how a run **ended**, never about what it
+**accomplished**.
+
+That is what lets this survive a long investigation rather than a careless one.
+Every reading of the run data is correct, and the natural check against the
+case above, whether the guard misfired, comes back **no**, which reads as
+confirmation that the red can be trusted.
+Nothing in the run's conclusion, result object, step list, or logs differs
+between "the reviewer produced nothing" and "the reviewer produced a full
+verdict and then errored", because the distinguishing fact was never in the
+run.
+
+So read the guard's own failure branch once, and let it tell you what its red
+is worth.
+A branch that exits before evaluating the artifact yields a red carrying no
+information about that artifact, which is the mirror of the benchmark-check
+case this file records, whose green carries none about its content.
+Two timestamps then localize it exactly, per
+[`algorithmatize-checks`](algorithmatize-checks.md): the verdict comment's
+`updated_at` against the guard step's `started_at`.
+A comment finished before the guard began is not a comment the guard was
+reacting to.
+
+- **Do:** read the PR's own comments before accepting that a failed review run
+  produced no verdict.
+- **Do:** read a guard's failure branch to learn whether its red is evidence
+  about the artifact at all, rather than keeping "go look" as a habit to
+  remember.
+- **Don't:** infer that a run produced nothing from a true report that it ended
+  in an error.
+- **Don't:** treat "the guard did not misfire" as establishing that its red is
+  informative.
+
+(`Morrison-Lab/ai-config#984`, 2026-07-31, job `91208954246`:
+`Run Claude Code Review` concluded **success** over `16:17:16Z` to `16:28:13Z`;
+the review's comment carries a `### Verdict` heading reading
+**Ready for merge** above a substantive findings review, last updated
+`16:28:12Z`; `Fail the check if the review did not complete` then failed at
+`16:28:13Z`, and the job went red.
+A session spent several hours on that failure and its siblings, asserting
+throughout that the runs had produced no verdict, without reading either PR.
+The unsuffixed step name is the `@v1` tell, and `@v1` is the version with no
+verdict test at all, which is why the mechanism had to be read at both tags
+rather than at the one the extracted script lives in.)
+
 **A third case, distinct from either misfire above: some checks are designed to NEVER fail regardless of their own posted content, so their green color carries zero signal at all.** A CI-runner-relative benchmark check that gates a soft threshold (e.g. "regressed beyond 20% vs. baseline") may deliberately report success/pass at the GitHub-check level even when it posts a `:warning:` regression comment, precisely because the project has decided that threshold is "a human call, not an auto-block" rather than a hard gate. `gh pr checks` (or the equivalent status API) showing this check as PASS is consequently not evidence there is nothing to look at --- it only means the check ran, not that its content was clean. Read the check's own posted comment body every time, the same discipline the review-job case above already demands, but don't expect the check's pass/fail conclusion to ever flip for this class of check even on a real, large regression. (Sparta#995/#998/#999, 2026-07-19: `gh pr checks` reported `benchmark` as PASS across three separate PRs while the actual posted comment showed regressions of 45%, 38.8%, and 36.9% respectively against the CI-runner baseline --- two were real, fixable redundant-computation bugs; the third traced to a stale baseline that predated an earlier PR's own accepted cost increase and hadn't been refreshed yet, since the refresh workflow only runs on a weekly schedule, not on every main push.)
 
 **A fourth case: a review job can post a syntactically valid, confidently stated verdict that is nonetheless invalid because it rests on a hallucinated premise about the PR's own state --- not a stub (no verdict) and not a misfire (guard-script/check-conclusion mismatch), but a fabricated fact baked into an otherwise well-formed review.** A reviewer that infers PR state from a commit message rather than querying the PR's actual `state`/`merged` API fields can mistake a routine `Merge remote-tracking branch 'origin/main' into <PR-branch>` commit --- pushed to resolve a sync conflict on the still-open PR branch itself --- for evidence the *PR* was merged into `main`, and confidently report "PR is closed, no action taken" while never actually reviewing the diff. This reads exactly like a legitimate all-clear (a `### Verdict` section is present, the job reports success), so the stub-detection guards described in CLAUDE.md's "Do the review yourself when the @claude workflow doesn't produce a verdict" section don't catch it. Sanity-check any surprising verdict --- especially "nothing to review" or "already merged/closed" --- against the PR's real API state before trusting it, and re-trigger for a genuine review rather than accepting a verdict-shaped comment built on a false premise. (gha#293/gha#295, 2026-07-24: after a merge-conflict-resolution push, the re-triggered `claude-code-review` run reported "The PR is closed --- it was merged as commit `db11634`" even though the PR was still open and `db11634` was only the PR branch's own merge-with-main commit; re-triggering once more produced a genuine review of the actual diff.)

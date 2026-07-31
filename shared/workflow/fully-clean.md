@@ -790,7 +790,7 @@ Morrison-Lab/gha#390 was then added to the group because its own
 finding to two repositories was posted to the tracking issue,
 Morrison-Lab/gha#391.
 It was a different bug.
-#390's log reads `Attempt 1 produced a stub review (gha#185) and the retry
+That PR's log reads `Attempt 1 produced a stub review (gha#185) and the retry
 ALSO ended without a verdict with a low denial count`, a path reachable only
 when `is_error` is false, so the grouped signature is rejected by the guard
 before any retry can happen.

@@ -113,7 +113,7 @@ section that contradicts its own verdict line.
 
 **The disagreement is measurable, and it is not a wording problem.**
 Across 38 verdict-bearing `claude-review` comments sampled from 16 PRs,
-11 (29%) carried a verdict line that disagreed with the findings in the
+8 (21%) carried a verdict line that disagreed with the findings in the
 same comment.
 Six read a pass over unaddressed nits, and two ran the other way,
 blocking over findings the reviewer itself called non-blocking, so the
@@ -122,10 +122,10 @@ The vocabulary is nearly closed by contrast: five outcome lexemes across
 five markup carriers, with 37 of the 38 naming "Verdict" somewhere.
 So neither detection nor parsing is the weak link.
 
-That is the argument against ever gating on a machine-readable verdict
+That is the argument against gating on a machine-readable verdict
 field.
 Adding one would encode the reviewer's own looser threshold, making
-roughly three reviews in ten confidently wrong in exactly the form that
+roughly one review in five confidently wrong in exactly the form that
 invites automation.
 Structured review output should carry **finding counts**, which are
 checkable against the inline-comment and thread lists, rather than a
@@ -133,15 +133,21 @@ pass/fail mood, which is checkable against nothing.
 
 (Sampled 2026-07-31 across 12 `Morrison-Lab/ai-config` PRs and 4 in
 `Morrison-Lab/gha`.
+All eight are named, so the rate is reconstructable.
 The six pass-over-nits cases were ai-config #955, #941, #939, #935, #934,
 and #925 --- #934's verdict line *is* the hedge, reading
 `**One finding (nit), otherwise ready for merge.**`.
 Both opposite-direction cases were on
 [gha#371](https://github.com/Morrison-Lab/gha/pull/371), which returned
 `**Needs minor changes**` over "two non-blocking, fact/scope findings".
-The five lexemes were `Ready for merge` for all 24 passes, plus
-`Needs more work`, `Needs minor changes`, `Needs work`, and
-`Needs one fix`.)
+Four further comments were unclear for a different reason --- a verdict
+restated or hyperlinked from an earlier review, or `Needs work` doing
+double duty as both the verdict and an inline finding's heading --- and
+are counted out, since those are legibility problems rather than
+disagreements.
+Of the 24 passes, 23 used `Ready for merge` and one used the hedged
+variant above; the remaining four lexemes were `Needs more work`,
+`Needs minor changes`, `Needs work`, and `Needs one fix`.)
 
 **What "an approving review" means here is not a review state.**
 Across the 25 most recent merged PRs, all 106 posted reviews are `COMMENTED` and

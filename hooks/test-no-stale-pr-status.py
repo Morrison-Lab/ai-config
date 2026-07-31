@@ -1,0 +1,91 @@
+"""Test the no-stale-pr-status guard.
+
+The guard's whole value is the third case below: a message that honestly
+reports work in flight ("checks are running") must NOT be blocked. A guard
+that fires on honest status reporting gets disabled, and then the case it
+exists for goes unprotected too.
+
+Run: python3 hooks/test-no-stale-pr-status.py hooks/no-stale-pr-status.py
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+
+HOOK = sys.argv[1]
+
+PUSH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "git push -q"}}]}}
+QUERY = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"command": "gh pr checks 493 -R o/r"}}]}}
+MCP_QUERY = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {"method": "get_check_runs", "pullNumber": 493}}]}}
+
+
+def say(text):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "text", "text": text}]}}
+
+
+# (events, should_block, label)
+CASES = [
+    ([QUERY, PUSH, say("493 is green, conflict-free.")], True,
+     "the real incident: queried, pushed, then claimed green"),
+    ([QUERY, PUSH, say("11 pass, 0 fail -- ready to merge.")], True,
+     "counts quoted from a pre-push reading"),
+    ([QUERY, PUSH, say("All checks green at this head.")], True,
+     "'all green' after a push"),
+
+    ([PUSH, QUERY, say("493 is green: 11 pass.")], False,
+     "queried AFTER the push -- the claim is current"),
+    ([PUSH, MCP_QUERY, say("All green, 0 fail.")], False,
+     "MCP get_check_runs counts as a query too"),
+    ([QUERY, PUSH, say("Pushed the fix; checks are running now.")], False,
+     "honest in-flight reporting must not be blocked"),
+    ([QUERY, PUSH, say("Waiting on test-coverage and docs; will report when settled.")], False,
+     "naming pending checks is not an assertion of green"),
+    ([QUERY, say("All checks green.")], False,
+     "nothing pushed, so no reading can have gone stale"),
+    ([PUSH, QUERY, say("Merged and tidied up.")], False,
+     "no status assertion at all"),
+]
+
+
+def run(events):
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+    # The guard fires once per distinct message; clear sentinels so repeated
+    # runs of this suite stay deterministic.
+    for f in os.listdir(tempfile.gettempdir()):
+        if f.startswith(".claude-stale-status-"):
+            try:
+                os.remove(os.path.join(tempfile.gettempdir(), f))
+            except OSError:
+                pass
+    out = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": path}),
+        capture_output=True, text=True,
+    ).stdout.strip()
+    os.remove(path)
+    return bool(out)
+
+
+def main():
+    failures = 0
+    for events, want_block, label in CASES:
+        got = run(events)
+        ok = got == want_block
+        if not ok:
+            failures += 1
+        print(f"{'ok  ' if ok else 'FAIL'}  "
+              f"{'block' if want_block else 'allow'}: {label}")
+    print(f"\n{len(CASES) - failures}/{len(CASES)} passed")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

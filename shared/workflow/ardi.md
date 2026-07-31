@@ -5,6 +5,23 @@ review --- repeating until the latest review is **fully clean**. Don't stop at
 "review-clean, just needs approval" and hand triage back; keep the cycle going
 until it's genuinely clean.
 
+**Continuously monitor every PR/MR you are actively working until it reaches
+that terminal state.**
+At every periodic check-in, and again after any push or
+base-branch advance, query the current head for all three surfaces: mergeability
+(including conflicts), every CI workflow/check run, and both formal reviews and
+top-level/inline review comments. A conflict, CI failure, or newly posted
+finding is ARDI work immediately --- sync and resolve the conflict, investigate
+and fix or track the CI failure, or disposition the finding --- not merely a
+status item to hand back to the user.
+Keep polling while a review or check is
+in progress; do not call the PR clean from an earlier head or from green CI
+without a current-head review verdict.
+This applies transitively to PR-driving
+workflows such as `gi`, `gii`, and `ardia`; only monitor PRs the session owns or
+has explicitly claimed, so the rule does not authorize changing someone else's
+work.
+
 The loop's terminal action is to **report the PR ready, not to merge it**.
 Merging is human-gated --- it happens only on an explicit human "merge it" (the
 `merge-it` skill), never as a step ARDI takes on its own. So when you carry a PR
@@ -62,6 +79,91 @@ category, an uncited claim, and missing test coverage for new logic --- all
 catchable this way, since each was a direct match against gha's own
 `CLAUDE.md` conventions, not new information the review surfaced.)
 
+### Pre-push checklist
+
+**Pause point: after committing, before `git push`.**
+Do-Confirm --- the items are independent, so work in whatever order suits the
+round and confirm all seven here.
+Per [`skill-checklists`](skill-checklists.md); every item below exists because
+the bullets in this fragment record it failing at this exact boundary.
+
+- [ ] **The whole test suite ran**, not the files you predicted the change
+      touches, and the tests/failed/**skipped** triple was read --- a
+      non-trivial skip count means re-running with the gating flags set
+      (`NOT_CRAN=true`, and whatever else un-gates a conditional skip).
+- [ ] **Generated trees were regenerated** if the diff (or a `main` merge)
+      touched a generator's inputs, and the PR body states how many changed
+      files are generated.
+- [ ] **Added lines were scanned** for banned punctuation and multi-sentence
+      lines, run *after* committing and with the three-dot range
+      (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree,
+      and a two-dot range re-attributes whatever `main` deleted to you.
+- [ ] **The changelog entry and the PR description were re-read** against the
+      new behavior, not just the code --- neither is in the diff, so no
+      reviewer and no grep will catch a stale one.
+- [ ] **The diff's deleted lines were read**
+      (`git diff origin/main...HEAD | grep '^-'`), and each one was a decision
+      rather than collateral from an edit's blast radius --- a reviewer reads
+      every deletion as deliberate and will rationalize an accidental one.
+- [ ] **`main` was merged in** if it moved, with version parity re-checked
+      afterward, so the round costs one review run rather than two.
+- [ ] **Killer item: the push landed.** `git rev-parse HEAD origin/<branch>`
+      agree before any reply asserting a fix.
+      This one is marked because its failure is not an omission but a **false
+      claim about state**, which a reviewer has no reason to doubt: CI reports
+      green because it correctly validated the older head, and the session's
+      own recollection agrees with the reply.
+
+**A clean verdict does not certify that your diff contains only what you
+meant, because a reviewer cannot tell an accident from a decision.**
+Every check above tests whether the diff is *correct*.
+None of them tests whether it is what you *intended*, and those come apart
+whenever an edit does something extra --- a replacement string that drops
+neighbouring lines, a global substitution that rewrites more than the
+flagged occurrence, a stray hunk carried in from another branch.
+
+A reviewer reads the diff as a set of deliberate choices, since that is the
+only thing a diff can present.
+So it does not report the extra change; it *explains* it, and often well ---
+constructing a plausible rationale, grading the result appropriate, and
+moving on.
+That is worse than silence.
+Silence leaves the change unexamined, while a reasoned endorsement converts
+it into a decision the thread now records as settled, and any later reader
+finds an accident with an argument attached.
+
+The tell is reading a review that justifies something you have no memory of
+choosing.
+Treat that as a prompt to check the diff rather than as confirmation, and
+note that the review's argument may be perfectly sound --- the question is
+not whether the change is defensible but whether anyone decided it.
+
+Deletions are where this concentrates, because an addition is something you
+wrote and a deletion is usually something that got displaced.
+`git diff origin/main...HEAD | grep '^-'` lists them in one command, and on
+a prose diff the list is normally short enough to read in full.
+
+- **Do:** read your diff's deleted lines before pushing, and confirm each one
+  was a decision rather than a casualty of an edit's blast radius.
+- **Do:** say plainly, in the thread, when a review has blessed something
+  unintended --- the reviewer cannot know, and its verdict will otherwise
+  stand as the record.
+- **Don't:** treat a clean verdict as evidence about intent; it is evidence
+  about correctness only.
+- **Don't:** keep an unintended change because the reasoning offered for it
+  turned out to be good.
+
+(Morrison-Lab/ai-config#922, 2026-07-30: a replacement string written to add
+one block silently dropped the three `Do`/`Don't` bullets belonging to the
+entry above it, leaving that entry with prose and a case record but no
+labelled pair --- which `CLAUDE.md`'s "Record both the pattern and the
+anti-pattern" specifically asks for.
+`claude-review` returned Ready for merge, analysed all three deletions, and
+concluded they were "appropriate", reasoning that two restated surviving
+prose and the third was superseded.
+The third point was right and the other two were not; the bullets were
+restored, one reworded, and the deletion count fell from seven lines to two.)
+
 **Proactively self-correct a technical claim you already told a reviewer,
 the moment further testing shows it was wrong --- don't wait for the
 reviewer to catch it.** If you stated a rationale (an approach is safe, a
@@ -97,6 +199,147 @@ PR comment said they were "addressed in the latest push"; the head sat at the
 pre-fix commit for over an hour, with 14 green checks validating a branch
 carrying neither fix, until a scheduled check-in compared the SHAs.)
 
+**A SHA you put in a PR body or a reply must be read, never recalled --- and
+the PR body is where an invented one survives longest.**
+The bullet above asks whether the right commit reached the branch.
+This asks the prior question: whether the commit you named exists at all.
+A short SHA is seven plausible hex characters, so writing one from memory feels
+like recalling a fact rather than asserting one, and the result is
+indistinguishable from a correct citation --- nothing renders differently, and
+GitHub neither linkifies nor validates a SHA with no commit behind it.
+
+The PR body is the worst host for it, for the reason
+[`address-every-comment`](address-every-comment.md) gives about stale
+paraphrases there: the body is in no diff, so no reviewer reads it as part of
+the change and no `grep` over the diff finds it.
+It is also what a maintainer reads while deciding whether to merge, so an
+invented SHA misdirects the one reader most likely to act on it.
+
+One command against the value you are about to paste settles it:
+
+```sh
+git rev-parse --verify <sha>^{commit}   # or: git cat-file -e <sha>
+```
+
+When a wrong SHA has already been published, correct it **visibly** rather than
+overwriting it silently --- a reader who saw the original cannot otherwise tell
+a revised body from one that always said this, which is the same reasoning the
+withdraw-a-stale-blocker bullet below applies to a retracted caveat.
+
+This is the commit-SHA case of the rule
+[`report-mistakes-proactively`](report-mistakes-proactively.md) states for
+issue numbers ("never name an issue number before the issue exists").
+Same defect, different artifact: an identifier guessable enough to assert
+casually, with nothing in the repository to contradict it.
+
+- **Do:** read every SHA you cite out of `git rev-parse` or `git log`, and
+  confirm it resolves before pasting it.
+- **Do:** correct a published wrong SHA with a visible note naming the real one.
+- **Don't:** write a short SHA from recollection because it looks like the
+  commit you just made.
+- **Don't:** expect review to catch it --- a reviewer has no reason to suspect
+  a citation, and the body is not in the diff they are reading.
+
+(ai-config#871, 2026-07-30: the PR body credited a sentence-boundary fix to
+`1f79a4a`, which existed nowhere in the branch or the repository ---
+`git cat-file -e` returned `Not a valid object name`.
+The real commit was `fcb605f`.
+Two review rounds read that body without flagging it; it surfaced only when the
+body was re-read against the diff before declaring the PR ready, which is the
+`address-every-comment` check above doing work its own rule did not anticipate.)
+
+**The read side of that comparison can lag a push by a few seconds, so test
+the two *local* refs against each other before concluding anything failed.**
+The rule above is an
+[`algorithmatize-checks`](algorithmatize-checks.md) case because two SHAs
+decide it exactly.
+That holds only as far as both numbers are current, and one of them is fetched
+over the network: `gh pr view <N> --json headRefOid` can still report the
+**previous** commit immediately after a successful push.
+
+The failure direction is a false alarm rather than a false all-clear, so it is
+the safe one --- but the reflexive response to it is wrong twice over.
+The rule's own remedy is "if they differ, push first", which is a no-op here,
+and treating a healthy branch as broken invites an amend or a force-push that
+manufactures the problem the check was watching for.
+A check that cries wolf on a clean branch also stops being run, which is the
+objection `algorithmatize-checks` raises against any instrument whose
+threshold cannot be trusted.
+
+Local refs cannot lag this way, so they settle it:
+
+```sh
+git rev-parse HEAD origin/<branch>   # both local reads
+```
+
+- Equal --- the push landed, and any disagreement with the PR API is a
+  read-side artifact.
+  Re-read it, preferably on a different surface, rather than re-pushing.
+- Different --- a genuinely unpushed commit, which is the case the rule exists
+  for.
+
+Note also that `git push` answering `Everything up-to-date` is itself evidence
+the remote branch already carries the commit.
+
+- **Do:** compare `HEAD` against `origin/<branch>` first when the PR API
+  disagrees, and re-read rather than re-push when those two agree.
+- **Don't:** amend, force-push, or re-commit on the strength of an API SHA
+  alone.
+
+(Morrison-Lab/ai-config#845, 2026-07-29: `git rev-parse HEAD` and
+`git rev-parse origin/<branch>` both read `9a3e722` and `git push` said
+`Everything up-to-date`, while `gh pr view --json headRefOid` still returned
+the prior commit `4bf5063`.
+`pull_request_read` `get` returned `9a3e722` moments later, so the two
+surfaces disagreed and the git-native one was right.)
+
+**The same false claim arrives as *incoming* state when you pick a PR up
+mid-flight, and there the SHA comparison usually has nothing to compare.**
+The bullet above governs a claim you are about to make.
+Its mirror is the claim already sitting on the PR when you arrive: the latest
+comment says which findings are fixed, so starting from it means starting from
+a summary rather than from the branch.
+The rule is the same either way, and only the *instrument* differs, because a
+claim written for a human rarely carries a SHA to check.
+"Three fixes landed in two commits" names files, not commits.
+
+So compare the claim against the file list, which decides it in one call:
+
+```bash
+gh pr diff <N> --name-only   # DIFF_PR
+```
+
+A named file absent from that list was not touched, whatever the comment says.
+Nothing else in the PR contradicts a claim like this, and the trap is that
+green CI reads as corroboration when it is nothing of the sort.
+The checks that would have exercised the claimed fixes are frequently the very
+checks those fixes were supposed to add, so their absence is the reason CI is
+green.
+
+The right response is to do the work rather than to dwell on the discrepancy.
+Say once, in the round's summary, that the earlier claim was not true of the
+branch, since a reader who saw it will otherwise assume the round was
+redundant.
+
+- **Do:** run `gh pr diff <N> --name-only` against any inherited "already
+  fixed" claim before deciding a finding is closed.
+- **Do:** state plainly in your own summary that the prior claim did not hold,
+  and name the head it was false at.
+- **Don't:** treat green CI as evidence that a claimed fix landed.
+- **Don't:** infer that a finding is stale because a comment says it was
+  addressed.
+
+(Morrison-Lab/ai-config#804, 2026-07-29: the PR's own review workflow posted
+"Three fixes landed in two commits", naming `bootstrap.sh`, `validate.yml`,
+and `validate-skills.py`.
+The head was still the original commit plus a `main` merge, and
+`gh pr diff --name-only` returned four paths, none of them those three.
+All ten checks were green, because `validate` did not yet check out the
+submodule the fixes were about.
+This is the ownerless cousin of the parallel-session case in
+[`claim-pr`](claim-pr.md), which assumes a real commit exists to cross-check;
+here there was none.)
+
 **When the change affects downstream consumers, validate it against a real
 consumer repo before reporting the PR ready --- a package's own test
 fixtures are built to exercise its code, not to resemble the packages that
@@ -105,6 +348,12 @@ Fixtures are minimal by construction and tend to share one shape, so whole
 branches of new code can be structurally unreachable from them. A real
 consumer brings the input variety fixtures lack, and it is usually one clone
 plus one command to check.
+
+This bullet, and the two further down that also turn on fixtures, are all
+about **coverage** --- a fixture too thin to reach the code.
+[`fixtures-are-not-evidence`](fixtures-are-not-evidence.md) covers the
+opposite direction: a fixture that works perfectly, and an inference drawn
+from its behaviour back to the real system it stands in for.
 
 Three classes of gap this catches, none of them findable in a fixture:
 
@@ -321,6 +570,31 @@ reported orphans were misclassifications, while the note two lines below went
 on calling them "already deleted from the repo."
 Caught by review, in the same hunk as the text that contradicted it.)
 
+**The same rule applies within a single diff, and there nothing prompts the
+check at all.**
+The version above compares your addition against the *existing* file, so
+re-reading the surrounding passage catches it.
+The harder case is a diff that both adds an explanation arguing against some
+older wording **and** rewrites that wording, in the same changeset.
+Then the argument survives while its target does not, and every file still
+reads plausibly on its own: the new prose is coherent, the rewritten passage
+is coherent, and only the cross-reference between them is stale.
+There is no older text to go back and re-read, which is the cue the other
+version relies on.
+
+So when a diff rewrites a passage, grep the rest of the diff for references to
+what that passage used to say, not just for references to the file.
+A rebuttal of the form "the section below already says X" is the shape to
+watch, since it pins the argument to wording the same commit may be deleting.
+Prefer stating the anti-pattern directly over citing another section as the
+thing being argued against; a self-contained sentence cannot go stale when its
+neighbour changes.
+(ai-config#801, 2026-07-28: a new UMS entry argued against the `/clear`
+section's "disclose the owed pass in the flag" line while the same PR rewrote
+that line to say the opposite.
+Review caught it before merge; the fix was to drop the cross-reference and
+state the point inline.)
+
 **And when the explanation you add is a *mechanism* claim, test the class it
 distinguishes, not just the sample in front of you.**
 The bullet above is about contradicting old text; this is about the new text
@@ -342,3 +616,214 @@ returned `true`, meaning anything deleted before the shallow boundary would
 have been silently misread as harness-provided.
 The claim went into a PR reply before either check was run, and ai-config#765
 had independently reached the correct conclusion.)
+
+**A symptom that stops reproducing is a fix having landed, until you have
+checked otherwise --- reaching for nondeterminism is the attractive wrong
+answer.**
+The bullet above governs a mechanism claim you write into a file.
+The same defect arrives in a status report, and there it is easier to
+publish, because "the check is just flaky" sounds like a complete
+explanation while resting on nothing.
+It is also unfalsifiable from a single observation and predicts nothing,
+which is exactly why it feels safe to say.
+
+The shape to watch for: a known-failing check, a tracked false positive, or
+a reproducible bug goes quiet, and you explain the silence with a property
+of the *tool* rather than a change in the *world*.
+
+Check for the merge first, because the instrument is a timestamp comparison
+and it costs one API call.
+Compare when a candidate fix merged against when each observation was made.
+That turns "it seems flaky" into a before/after table with a negative
+control --- a far stronger claim than the one you were about to make, and
+one a reader can act on.
+
+- **Do:** look for a merged fix, and date it, before attributing a vanished
+  symptom to anything.
+- **Do:** report the before/after with its timestamps, so the negative
+  control is visible rather than asserted.
+- **Don't:** explain a symptom's disappearance as nondeterminism on the
+  strength of one clean run.
+- **Don't:** carry such a claim into an issue or a decision doc, where it
+  argues against the very fix that produced the silence.
+
+(ai-config#827, 2026-07-29: the Jules AI reviewer approved a diff carrying
+both of its known false-positive triggers, and the first explanation
+drafted was that the false positives are nondeterministic.
+ai-config#817 had in fact merged an `extra_instructions` fix at
+`21:30:51Z`, between #820's block at `19:43` and #827's approve at `22:51`.
+The nondeterminism claim was about to be posted to gha#366 as evidence,
+where it would have argued against porting the fix that actually worked.)
+
+**Verify a command, path, or flag *you* write into a doc, with the same rigor
+[`address-every-comment`](address-every-comment.md) demands for one a reviewer
+suggests.**
+That rule and the blocker rule above both point outward, at a claim someone
+else made or at a limit you hit.
+This is the one you author from scratch, and it is easier to miss than either,
+because inventing a plausible command does not feel like making a claim at
+all --- it feels like remembering one.
+
+The shape is a CLI invocation, a file path, or a flag written into
+documentation, a comment, or a registry, where the surrounding prose is
+carefully sourced and the literal is not.
+A reader reaching for it gets `unknown command`, and they get it while
+following a document whose every other sentence checked out, so they are
+likelier to doubt their own setup than the doc.
+
+Settle it against the tool's own source or `--help` rather than recollection.
+For a CLI, the subcommand registration list is definitive and usually one
+fetch away, and it beats a docs page because it cannot lag the release you
+are describing.
+Quote what you checked in the commit message, so the next reader inherits the
+evidence instead of the assertion.
+
+- **Do:** confirm every literal you invent against the tool's own source or
+  help output before it lands in a doc.
+- **Do:** cite the file or command you checked, so the claim stays falsifiable.
+- **Don't:** infer a subcommand from a family that has its siblings
+  (`gh label list`/`create`/`edit` does not imply `gh label view`).
+- **Don't:** treat a literal as exempt because the prose around it is
+  well-sourced --- the literal is the part a reader executes.
+
+(Morrison-Lab/ai-config#834, 2026-07-29: a `GET_LABEL` registry row shipped
+`gh label view <name>`, which does not exist --- cli/cli's
+`pkg/cmd/label/label.go` registers `list`, `create`, `clone`, `edit`,
+`delete`.
+Caught by review, in the same file where the previous round had declined to
+extend an untested claim from `gh issue create --label` to `gh issue edit`.
+The reviewer's own enumeration of the real subcommands also missed `clone`,
+which is why the fix cited the registration list rather than the finding.)
+
+**Run that check over your own fix, too --- the remedy for an unverified
+literal is where the next unverified literal goes.**
+The rule above fires when you notice you are writing a literal.
+Answering a finding does not feel like that: it feels like careful work, and
+the care is real, so the fix inherits an assumption of rigor from the
+diligence of writing it.
+The specific rule you are in the middle of applying is therefore the one
+least likely to be applied to its own application.
+
+A correction also tends to *add* literals rather than merely repair one.
+Citing a source properly means naming the tool, the flag, the version, the
+file --- each an assertion, each as guessable as the one under review, and
+none of them the thing the finding was about.
+So the fix can carry more unverified surface than the original did.
+
+Nothing external catches this.
+The reviewer sees a fix that addresses the finding and confirms it, per the
+clean-verdict entry above, and the thread then records the item as settled
+twice over.
+
+- **Do:** re-run the rule you are applying against the text of your own fix,
+  before committing it.
+- **Do:** say in the thread when a fix's own draft tripped the same rule,
+  since that is the only place the near-miss is visible.
+- **Don't:** treat the effort of writing a correction as evidence the
+  correction is verified.
+
+(Morrison-Lab/ai-config#929, 2026-07-30: a review found `--failed`
+documented from recollection.
+The fix quoted `gh run rerun --help` correctly and anchored it to "`gh`
+2.83.0" --- a version invented in the same breath, where `gh --version`
+reported `2.96.0`.
+Caught before committing only by running this rule against the fix, which is
+the entire mechanism; the round-2 review confirmed the corrected text and
+would have confirmed the wrong version just as readily.)
+
+**When regenerating a generated tree makes it most of the diff, say so in the
+PR body --- otherwise a reviewer reads it as pollution and blocks.**
+Two failures share one root here, and both cost a round.
+
+The first is editing the generated file rather than its source.
+A generated file usually declares itself in a header, and that header is the
+last thing you read when you have already found the line you wanted to
+change; the generator then reverts the edit and the sync check fails.
+Grep for `generated by` before editing any file you did not create.
+
+The second is what happens once you regenerate correctly.
+A one-line source change can rewrite hundreds of files, and a reviewer
+working from a truncated diff sees only the generated bulk --- so the finding
+comes back as "revert the unintended changes", where complying would break
+the very check that demanded them.
+The PR body is the only place that can pre-empt this, since it is what a
+reviewer reads before the diff.
+Lead with the ratio and a per-path table marking each path generated or
+hand-written.
+
+- **Do:** grep a file for a generated-by header before editing it, and change
+  the source instead.
+- **Do:** state in the PR body how many of the changed files are generated,
+  and name the hand-written ones.
+- **Don't:** revert generated output because a reviewer calls it noise ---
+  check first whether the sync check requires it.
+- **Don't:** assume a reviewer sees the source files; on a large diff they
+  frequently do not.
+
+(Morrison-Lab/ai-config#834, same day: a fix was applied to the generated
+`tool-mappings.md`, which `sync-codex-skill-wrappers.py` then overwrote,
+failing `validate` with `stale tool-mappings.md`.
+Redoing it in `tool-mappings.yml` regenerated 175 `codex-skills/` wrappers,
+and Jules returned `VERDICT: block` twice for "bulk pollution", its second
+verdict noting it had read only a truncated diff.
+`claude-review` called the same finding a false positive at the same head.)
+
+**Run the whole test suite before pushing, not the files you predict the
+change touches --- and check that the ones you ran were not silently
+skipped.**
+The pre-push self-review above assumes your local green means something.
+Two things quietly hollow it out, and they compound: you choose a subset,
+and the subset then reports success without having run.
+
+The subset is chosen by predicting blast radius, which is exactly the
+judgement the change calls into question.
+The tests that break are frequently *not* in the files you edited: a test
+elsewhere asserts the behaviour you are changing, often with a comment
+stating the rationale your diff invalidates.
+Nothing about editing `R/foo.R` suggests opening `test-bar.R`, so the
+prediction feels complete while omitting the one file that matters.
+
+The second is worse, because it looks like evidence.
+A conditional skip --- `skip_on_cran()` without `NOT_CRAN=true`,
+`skip_if(!.venv_exists())`, `skip_if_offline()` --- turns the test that
+would have caught the bug into a pass.
+`devtools::test()` sets `NOT_CRAN` for you --- it applies
+`withr::local_envvar(r_env_vars())`, and devtools documents that set as
+"the standard environment variables set by devtools", singling out
+`NOT_CRAN` as "of particular note for package tests"
+([`R/test.R`](https://github.com/r-lib/devtools/blob/main/R/test.R),
+[`R/check.R`](https://github.com/r-lib/devtools/blob/main/R/check.R)).
+`testthat::test_file()` and `testthat::test_dir()` do not, so the harness
+you reach for by hand for a quick targeted run is exactly the one that
+skips.
+Setting it explicitly anyway (`NOT_CRAN=true Rscript -e '...'`) costs
+nothing and is what the rest of this corpus does.
+So read the **skip count**, not just the failure count: a run reporting
+`0 failed, 20 skipped` has told you almost nothing, and is indistinguishable
+at a glance from one that verified everything.
+
+Match the environment the change will be judged in, too.
+Running with an env var set that CI does not set (or vice versa) reproduces
+a *different* configuration, and its failures and passes both mislead.
+
+- **Do:** run the full suite before pushing, and state the tests/failed/
+  skipped triple rather than "tests pass".
+- **Do:** set the flags that un-gate conditional skips, and re-run if the
+  skip count is non-trivial.
+- **Don't:** scope a local run to the files you edited --- the test asserting
+  the old behaviour is usually somewhere else.
+- **Don't:** read a green subset as a green suite, or a skip as a pass.
+
+(d-morrison/altdoc#95 and #96, 2026-07-29: twice in one session.
+On #95 a test asserting "aborts when no venv is configured" read that
+precondition from the ambient environment; the local run missed it because
+`NOT_CRAN` was unset and `skip_on_cran()` skipped that very test, and
+Windows R-CMD-check caught it.
+On #96 `test-llms_txt.R` asserted non-recursive discovery for `docsify` ---
+the exact behaviour the PR changed, with a comment stating the now-false
+rationale --- and was not among the files run locally, even though
+`.llms_txt_vignettes()` was one of the functions edited.
+Windows caught that one too.
+The subsequent full-suite run was itself misleading in the opposite
+direction: run *with* an env var CI does not set, it reported two failures
+belonging to the sibling PR.)

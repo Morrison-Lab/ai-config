@@ -268,9 +268,9 @@ committed pass.
 
 - [ ] Did I follow a skill but miss a step? → Update the skill
 - [ ] Did the user correct my behavior? → Encode as preference + skill update
-- [ ] Did I discover a tool quirk? → the matching topical file
-  (`/memories/github.md`, `github-actions.md`, `git.md`, `r-quarto.md`,
-  `claude-code.md`, or `tools.md` when it fits none of them)
+- [ ] Did I discover a tool quirk? → the matching topical file under
+  `/memories/` (`memories/MEMORY.md` lists the current set; `tools.md` when
+  it fits none of them)
 - [ ] Did I learn a debugging pattern? → `/memories/debugging.md`
 - [ ] Did I create a *new* file under `/memories/`? → register it in
   `memories/MEMORY.md` as an index entry

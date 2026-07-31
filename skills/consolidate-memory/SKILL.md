@@ -22,10 +22,8 @@ allowed-tools:
 
 # consolidate-memory — merge redundant memory entries into one canonical
 
-The memory corpus (the topical files indexed in `memories/MEMORY.md` --
-`github.md`, `github-actions.md`, `git.md`, `r-quarto.md`, `claude-code.md`,
-`debugging.md`, `preferences.md`, `tools.md` -- plus per-repo entries in
-`~/.claude/projects/<path>/memory/`)
+The memory corpus (the topical files indexed in `memories/MEMORY.md`, plus
+per-repo entries in `~/.claude/projects/<path>/memory/`)
 accretes near-duplicates: two sessions each record the same lesson in different
 words, or a fact lands in both a general file and a repo-specific one. This skill collapses a
 genuine-duplicate cluster into **one canonical entry** — unioning the facts and

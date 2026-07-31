@@ -72,6 +72,156 @@ correct action was a comment with the new evidence rather than a new issue
 --- which is step 2 doing its job, and is exactly the decision the offer had
 deferred instead of making.)
 
+## A gated action bundled into a discretionary one is still an offer
+
+The section above rules out the *standalone* offer --- a message whose only
+ask is permission to do the thing this rule already requires.
+That one is recognizable, because the sentence has no other business.
+
+The version that survives it is a compound question, where filing rides along
+with something genuinely discretionary:
+
+> Want me to file the issue and open that PR?
+
+Opening the PR is a real decision, and asking about it is correct.
+Filing is not, and putting them in one sentence hands the whole question to
+the user under cover of the half that was legitimately theirs.
+It also reads as *more* diligent than the standalone offer rather than less,
+since the reply is now consulting them about scope instead of merely stalling.
+
+Note where the two failures live, because it explains why re-reading the rule
+does not prevent this one.
+The rule is consulted at **read time**, when the mistake is noticed and the
+disposition is chosen; the violation happens at **composition time**, in a
+long message's closing paragraph, where two actions concerning the same
+subject get folded into one question for the sake of brevity.
+Nothing at that moment feels like a decision about whether to file --- that
+decision was already made, correctly, several paragraphs earlier.
+
+So make the split at composition time.
+Take the ungated action first, report it in the past tense, and let the
+question carry only the remainder:
+
+> Filed as #466.
+> Want me to open the PR as well?
+
+- **Do:** scan any question you are about to ask for a second verb, and
+  perform whichever half this rule already requires.
+- **Do:** report the filing as done in the same message that asks about the
+  rest, so the user sees one decision rather than two.
+- **Don't:** conjoin filing with a discretionary action --- "file X and do Y?"
+  is an offer to file, whatever the second clause is.
+- **Don't:** treat a question that is *mostly* legitimate as therefore
+  legitimate; the gated clause is the one that decides it.
+
+A `Stop` hook can enforce this mechanically, which is the right shape for a
+check with a lexical definition (see
+[`algorithmatize-checks`](algorithmatize-checks.md)): scan the outgoing
+message for an offer-to-file pattern and block it.
+Note the limit before relying on one --- hooks are configured per user in
+`~/.claude/settings.json` and are **not** distributed by this repo, so a hook
+protects the machine it was written on and no other.
+Treat it as a backstop for your own setup rather than as a reason to relax the
+rule, since every other session still runs on the prose alone.
+
+(Corrected 2026-07-29, a bcs branch-sweep session: an unlanded engineering fix
+found on a closed branch was correctly identified as needing a tracking issue,
+and the closing line asked "want me to file the issue and open that PR?".
+The user's correction was that filing is not a thing to ask about.
+The issue --- `ucdavis/bcs#466` --- was filed immediately afterward, which is
+the evidence that nothing was blocking it in the first place.)
+
+## Offering to hand over work you have already finished
+
+Both sections above concern work not yet done, where the offer at least
+proposes spending something.
+The version that survives them offers an artifact that **already exists**:
+the comment is drafted, the file is written, the diff is staged --- and the
+reply says "say the word and I'll post it" rather than posting it.
+
+It is the most defensible-feeling offer of the three and the emptiest.
+The two asymmetries in "Filing is not gated on approval" both collapse here,
+because the cost side is zero: there is no duplicate work to risk and no
+spend to authorize.
+The only thing the offer purchases is a round trip.
+
+Two things make it feel like courtesy rather than avoidance.
+The work being done drains the urgency --- nothing is outstanding from the
+inside, so holding it reads as consideration for the user's attention rather
+than as withholding.
+And the artifact is usually sitting in a scratch file, which feels like
+*somewhere*, so it does not feel at risk.
+It is: a scratch file dies with the container, and the user cannot read it.
+An artifact nobody has been shown has the same value as one never written.
+
+The fix is positional rather than procedural.
+The moment you find yourself writing that a deliverable exists, that sentence
+is the place to deliver it --- inline, in the same message.
+Where genuine discretion remains, it attaches to what happens *next* (open
+the PR, post it publicly under their name), never to whether they may see
+what you already made.
+
+- **Do:** put the finished artifact in the message where you first mention
+  it exists.
+- **Do:** keep the question for the irreversible or outward-facing step that
+  follows, and ask it in the past tense about the delivery ("here it is ---
+  want me to post it?").
+- **Don't:** offer to show, print, paste, or summarize something already
+  written; that is not a decision the user has.
+- **Don't:** treat a scratch-file path as delivery --- naming where it lives
+  is not the same as handing it over.
+
+(Corrected 2026-07-30: a drafted answer for a GitHub discussion sat complete
+in a scratchpad file across two replies, each offering to print it on
+request, while the surrounding messages explained at length why posting it
+directly was blocked.
+The user's correction was "why haven't you done it already then?".
+It was printed in full in the next message, which is the evidence that
+nothing was blocking it.)
+
+## Never name an issue number before the issue exists
+
+The rule above pushes filing earlier, and step 4 asks you to link the filed
+issue back into the PR you were working.
+Together they invite a specific error: writing the link-back **in the same
+breath** as the intent to file, before either step 2 or step 3 has run.
+An issue number is trivially predictable --- one more than the last one you
+saw --- so "tracked in #821" reads exactly like a fact and costs nothing to
+type.
+
+It is a false claim about an artifact, which is worse than an ordinary wrong
+sentence, because nothing in the repository contradicts it.
+A reader who follows the link lands on whatever #821 turns out to be, or on
+nothing; either way they have no reason to suspect the citation was invented
+rather than mistaken.
+[`ardi`](ardi.md)'s head-commit rule covers the same defect for a different
+artifact: the claim is about *state*, and the number is the one part of an
+issue you cannot verify by recollection.
+
+The sharper reason to wait is that the announcement pre-empts step 2's
+answer.
+Saying "filed as #N" commits you to a *new issue* before the dupe-check has
+decided whether a comment on an existing one was the right landing place ---
+so the premature citation does not merely risk a wrong number, it forecloses
+the correct action.
+Run the dupe-check, take whichever action it selects, then quote the number
+the API actually returned.
+
+- **Do:** file (or comment) first, and cite only the identifier the create
+  call returned.
+- **Do:** write the link-back as a separate step after step 2 has chosen new
+  issue versus comment, per step 4's ordering.
+- **Don't:** predict an issue number, however obvious the next one looks.
+- **Don't:** announce "filed as #N" while the dupe-check is still outstanding
+  --- that asserts the new-issue outcome before anything has decided it.
+
+(Corrected 2026-07-29, an ai-config session: a PR comment said a noticed
+mistake was "filed as #821" before any issue had been created.
+The dupe-check then found #815 already covering it, so the correct action was
+a comment carrying the new evidence --- not a new issue at any number.
+Both halves had to be repaired: a correction comment on the PR withdrawing
+the citation, and the evidence re-posted onto #815.)
+
 ## Where to file
 
 - **The repo where the mistake lives, when it's one we administrate** (our

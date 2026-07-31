@@ -1,140 +1,9 @@
-# GitHub Actions & the @claude bot workflows
+# GitHub Actions authoring & the `Morrison-Lab/gha` reusable workflows
 
-## Re-triggering the @claude PR *review* (d-morrison Quarto / R-pkg repos, e.g. `psw`)
-- Filenames below are those in the **content/package repos** (verified in
-  `d-morrison/psw`): the review workflow is `.github/workflows/claude-code-review.yml`
-  and the comment-triggered agent workflow is `.github/workflows/claude.yml`.
-  (ai-config's *own* bot uses different names — `claude-review.yml` /
-  `claude-bot.yml` — so don't infer these from *this* repo's `.github/workflows/`.)
-- **`d-morrison/gha` itself (the shared workflow repo) is different:** the
-  reusable workflow is `claude-code-review.yml` (no `workflow_dispatch`), and the
-  dogfooding caller stub with `workflow_dispatch` is `claude-review.yml`. So to
-  dispatch a review in `gha`:
-  `gh workflow run claude-review.yml -f pr_number=<N>` (not `claude-code-review.yml`).
-- The review workflow (which calls `d-morrison/gha`'s reusable review workflow)
-  is **not** comment-triggered. It runs on `pull_request` (`types: [opened,
-  synchronize, ready_for_review, reopened]`) and on `workflow_dispatch` (input
-  `pr_number`). Posting an `@claude review` *comment* drives the separate agent
-  workflow `claude.yml` (which then re-dispatches a review after it pushes) — it
-  does not directly fire the review workflow.
-- A new push (`synchronize`) auto-fires a fresh review — the normal path during
-  an iterate loop.
-- To force a fresh review on an existing PR **without a new commit**:
-  - **workflow_dispatch** (preferred — no extra PR timeline noise). Same
-    dispatch, three ways to send it:
-    - **`gh`:** `gh workflow run claude-code-review.yml -f pr_number=<N>`
-      (dispatches the workflow as defined on the **default branch** — `gh`
-      defaults `--ref` to it).
-    - **REST** (remote/web sessions, no `gh`):
-      `POST /repos/<owner>/<repo>/actions/workflows/claude-code-review.yml/dispatches`
-      with body `{"ref":"main","inputs":{"pr_number":"<N>"}}` (`"main"` = the
-      repo's **default branch**; the `ref` must be a branch/tag that *contains*
-      the workflow file, not the PR branch, unless you mean to dispatch a
-      modified version).
-    - **GitHub MCP:** your workflow-dispatch tool if available (e.g.
-      `mcp__github__actions_run_trigger`).
-  - **Close + reopen the PR** → fires the `reopened` event, which re-runs the
-    review. Works reliably, but clutters the timeline with close/reopen events;
-    prefer workflow_dispatch unless dispatch isn't available.
-- **A successful `workflow_dispatch` review does not clear the PR's required
-  `pull_request`-triggered check.** The dispatched run's check-runs attach to
-  the **dispatch ref's SHA** (typically `main`, the default branch used to
-  invoke it), not the PR's actual head SHA — even though the run reviews and
-  comments on the right PR (it takes `pr_number` as an input and reads that
-  PR's diff). So after a stub/failed `pull_request`-triggered review (see
-  `mcp__github__actions_run_trigger` 403 below), posting `@claude review` or
-  `/review` gets you a fresh, real verdict in the PR thread, but
-  `review / claude-review` and any gate job on the PR's head SHA (checked via
-  `get_check_runs`, not `get_status` — see below) stay red. Since reruns 403 in
-  these sessions, the only way to get a fresh **gating** run is to push a new
-  commit (an empty `git commit --allow-empty` is fine) so a real `pull_request`
-  `synchronize` event fires against the actual head SHA. (Hit twice in one
-  session on gha#176: two consecutive genuine — not raced — stub reviews on the
-  pinned dogfooding checker, each requiring an empty retrigger commit after the
-  dispatched `/review` came back clean.)
-  - **The empty retrigger commit must be pushed by a HUMAN actor — a
-    bot-pushed one is silently skipped.** `claude-code-review.yml` (and the
-    review-triggering workflows generally) gate on a bot-actor `if:` filter
-    (e.g. `github.actor != 'github-actions[bot]'` / not a `[bot]` login), so a
-    `synchronize` event fired by a bot-authored push — e.g. the `@claude`
-    agent itself doing `git commit --allow-empty` on the PR — is *filtered
-    out* and never starts the gating `claude-review` run. The check stays red
-    with no new run at all (not even a stub), which reads like nothing
-    happened. Push the empty commit from a human actor (your own session's
-    push) to get the gating run to fire. So when you ask the `@claude` agent
-    to "retrigger the review," it can't self-serve this: its own empty commit
-    is skipped, and it separately 403s on `rerun_failed_jobs` (below) — a
-    human-actor push is the only lever left. (serocalculator#564, 2026-07-20:
-    the agent's bot-pushed empty commit didn't fire the review; a
-    human-actor empty commit did.)
-  - **Root-caused and fixed at the source in gha#286 (issue gha#285):** the
-    misattribution isn't inherent to `workflow_dispatch` -- it's that `gh
-    workflow run <file> -f pr_number=<N>` with no `--ref` implicitly
-    dispatches against the repo's default branch. `claude.yml`'s and
-    `claude-review.yml`'s own dispatch calls now pass `--ref <PR-branch>`
-    explicitly, so a re-dispatched review's check-runs attach to the PR's
-    actual head commit and DO supersede a stale/cancelled `pull_request`-
-    triggered run. Once a repo's `@v2` pin picks this fix up (check
-    `slide-major-tag` has run since gha#286 merged), the empty-retrigger-
-    commit workaround above should no longer be necessary for a plain
-    `@claude review`/`/review` dispatch -- verify the fix landed before
-    reaching for the workaround on a repo that might already have it.
-- **A distinct stub-review signature: `is_error: false`, real `num_turns`/cost,
-  but `permission_denials_count: 1` and no `Verdict` line.** (`permission_denials_count`
-  is a field in the Claude Code SDK's runtime execution-output JSON, not
-  anything in this repo's own files — if a future SDK version renames it,
-  look for an equivalent counter in that JSON rather than assuming the
-  signature vanished.) Not the
-  quota-exhaustion case (`total_cost_usd==0 && num_turns==1`) and not a raced
-  cancellation (`conclusion: cancelled`) — the SDK call itself ran several
-  turns and cost real money, but a denied tool call mid-run derailed it before
-  it wrote a verdict. Reproduced 3× identically on the same PR/diff (gha#180)
-  across both push-triggered and dispatched reruns — not random flakiness once
-  it starts recurring on a given diff. **Root-caused and fixed in gha#185/#187:**
-  agent mode's default `allowedTools` has no `WebFetch`/`WebSearch`, but the
-  review prompt's own fact-checking instructions can still lead the agent to
-  attempt one, and on denial it sometimes stopped instead of finishing. The
-  fix is prompt-only — tell the reviewer up front that network-fetch tools
-  aren't available (so it doesn't try) and that a denied tool call is never a
-  reason to stop early — rather than widening `allowedTools`, since granting
-  broad `WebFetch` to a review-only job with secrets access raises its own
-  prompt-injection/exfiltration question for a workflow shared across
-  potentially-private consumer repos. That tradeoff (a domain-scoped
-  `WebFetch(domain:...)` allowlist to let the reviewer live-fact-check
-  external sources, matching `gha`'s own `CLAUDE.md` "Fact-check prose
-  against domain knowledge and external sources" review guideline) is left
-  as an open decision in gha#189, not decided unilaterally.
-  - **The stub can recur across *unrelated* PRs in the same session/window,
-    not just repeatedly on one diff — treat a cluster as a
-    session/service-level condition, not N independent diff bugs.** When two
-    different PRs in different repos both stub within the same span
-    (serocalculator#564 and gha#276, 2026-07-20, both stubbed in the same
-    session), don't burn a re-trigger round on each hoping the *diff* is at
-    fault: post the self-review (per `CLAUDE.md`'s "Do the review yourself
-    when the @claude workflow doesn't produce a verdict"), hand the required
-    `require-review` check to the human, and stop re-triggering after one
-    round. Both the app token and the `@claude` agent 403 on
-    `rerun_failed_jobs` (below), so neither you nor the agent can force a
-    fresh gating run without a human-actor push — which the human is doing
-    anyway when they decide to merge past the stubbed check.
-- **Diagnosing which tool call was denied requires the reusable workflow's
-  `show-full-output` input turned on for a re-run — the job log alone won't
-  show it.** Same underlying hidden-output behavior as the
-  `show-full-output`/`show_full_output` note below (see there for the
-  input-vs-passthrough-parameter naming); worth restating here because it's
-  the reason `permission_denials_count` in the final result confirms *that*
-  something was denied but never *what* — the turn-by-turn tool-call detail
-  is exactly what stays hidden without it.
-- **Claude Code's tool-permission syntax scopes `WebFetch` by domain:**
-  `WebFetch(domain:host)` (e.g. `WebFetch(domain:docs.anthropic.com)`), with
-  wildcards like `WebFetch(domain:*.github.com)` (matches a subdomain at any
-  depth, not the bare domain) or `WebFetch(domain:example.*)` (matches
-  `example.org`, i.e. a wildcard segment can't cross a `.` — `example.*`
-  does not match `example.evil.com`). Confirmed against the official docs:
-  <https://code.claude.com/docs/en/permissions> (WebFetch section). Same
-  bracketed-scope pattern as `Bash(git commit:*)`. Useful for granting
-  narrow, exfiltration-bounded fetch access instead of unrestricted
-  `WebFetch` or none at all.
+Generic Actions material: YAML authoring, the reusable workflows, and the
+gotchas that bite any workflow.
+The `@claude` bot's own behaviour lives in
+[`claude-bot-workflows.md`](claude-bot-workflows.md).
 
 ## YAML authoring (GitHub Actions / workflow files)
 - **Regex values with backslashes: prefer single-quoted YAML, but document both forms
@@ -145,310 +14,6 @@
   This applies to `branches-or-tags-to-list` / regex inputs in reusable-workflow YAML.
   (d-morrison/altdoc#30.)
 
-## @claude CI action (d-morrison/gha `claude.yml`)
-- The reusable `claude.yml@v1` agent workflow restores config files (`CLAUDE.md`,
-  `.claude/**`) to `origin/main` during its run (`restoreConfigFromBase`), so a
-  PR can't rewrite the reviewer's own instructions. With `eager-pr: true` +
-  `contents: write`, the **residual auto-commit step** historically then committed
-  that reset onto the PR branch as `claude[bot]` "chore: auto-commit residual
-  @claude session changes" — **deleting the PR's own `CLAUDE.md` edits**.
-  `memories/**` and `skills/**` were untouched; only the restored-config paths
-  were affected.
-- **FIXED in gha `v1` (≈2026-06-20):** the residual sweep now force-reverts the
-  protected config paths (incl. `CLAUDE.md`, `.claude`, `.mcp.json`, `.gitmodules`,
-  `.husky`) back to **PR-tip (HEAD)** before `git add -A`, so it no longer commits
-  the reset. A follow-up commit (`78fe7bc`, "honor PR deletions of config files in
-  the residual sweep") prevents the sweep from reverting legitimate config-file
-  deletions in the PR.
-  Verified on ai-config#41: once the fix landed, the gut stopped recurring (the
-  config-edit payload stayed on the branch across later bot runs). Was tracked as
-  d-morrison/gha#39.
-- If a repo pins an **older** gha tag (pre-fix), the workaround still applies. The
-  symptom was `claude[bot]` "auto-commit residual @claude session changes" commits
-  that reverted only config paths. Restore the section
-  (`git checkout <my-commit> -- CLAUDE.md`, commit), then before merging verify with
-  `git diff origin/main -- CLAUDE.md` being **non-empty** (an empty diff means the
-  payload was silently reverted to main), and merge promptly.
-- **The `@claude` agent can push a `main`-merge commit to your PR branch — not just
-  comment.** Triggered by PR activity, the `claude.yml` agent may merge `origin/main`
-  into the branch and push it (e.g. `claude[bot]` "Merge branch 'main' into <branch>").
-  **The same collision happens with a human's push, too** — e.g. the repo owner
-  clicking GitHub's "Update branch" button while you're mid-session on the same PR
-  produces an identical merge-main commit (authored by the human, committed by
-  `GitHub`) and the identical rejection; the recovery is the same regardless of who
-  pushed it. Two consequences: (1) your in-flight local push is rejected ("fetch
-  first" / RPC `HTTP 403` from the git backend — a non-fast-forward, **not** a
-  policy denial); (2) **bot-push only** — the `@claude` agent may resolve a
-  `DESCRIPTION` version conflict to `== main` when it merges, which then fails
-  `version-check`; a human's "Update branch" click doesn't do this — GitHub blocks
-  the merge on conflict instead of silently resolving it, so re-check versions only
-  applies after a bot merge. Recovery (either case): stash any uncommitted work
-  first (`git stash` — `reset --hard` discards it), then `git fetch origin <branch>`,
-  `git reset --hard origin/<branch>` onto the remote's merge commit (build on it —
-  don't force-push a competing parallel merge of your own), then re-bump the version
-  above main if needed and push.
-  (Hit on bcs#255: the bot pushed `4807f0c` and resolved the version to `.9062` == main,
-  failing version-check until I bumped to `.9063` on top.)
-- **Cherry-pick recovery when the bot and your session both merge main.** If the `@claude` agent pushes a merge-main commit to the PR branch while you have unpushed commits, your push will be rejected ("fetch first"). Don't open a competing parallel merge — cherry-pick instead: (1) note the SHA of your local fix commit(s), (2) `git reset --hard origin/<branch>` to build on the bot's merge, (3) `git cherry-pick <sha>`, (4) push. This lands your fix cleanly on top without creating a divergent history.
-- **The `@claude` agent can run a parallel session that posts a phantom commit SHA.**
-  While you ARDI a PR (pushing fixes + posting reply comments), the activity can trigger
-  the `claude.yml` agent to spin up its own run that attempts the *same* fixes, fails to
-  push (it collides with your pushes), then posts review comments crediting a commit SHA
-  that **never reached the remote** (e.g. it posts "Addressed in `a841fc7`", but that SHA
-  was never pushed and isn't on the remote). The fixes are really there via *your* pushed commit; the cited SHA
-  is a phantom. Don't chase it: verify the real branch head with `git ls-remote origin
-  <branch>` (or `git rev-parse HEAD` vs `origin/<branch>`), and if the cited SHA fails
-  `git cat-file -t <sha>` it never existed. Post a one-line clarification on the PR so the
-  phantom doesn't confuse later readers, and keep going. (Hit on ai-config#254.)
-- **A self-review's own prose can false-positive-trigger the `@claude` agent via
-  substring match.** `claude.yml`'s comment dispatcher matches any occurrence of the
-  literal substring `@claude` in a new PR comment, not just a genuine mention. A manual
-  self-review that refers to the failed job by name (e.g. "the `@claude` review job
-  failed with a hard SDK error") satisfies that match and spins up an unrelated agent
-  run. That run isn't wasted, though: it re-reads the whole thread, finds no new
-  directed request, but still runs a general review pass — and in one observed case
-  that was enough to independently catch and fix a real stale-doc bug (a `CLAUDE.md`
-  line no longer matching the PR's own diff), committing the fix under the same GitHub
-  identity a human session posts under.
-  From outside, this looks exactly like a second human/session claiming the same PR (a
-  duplicate "Working on this" comment, an unexplained new commit) even though only one
-  person was ever working it. Before treating that as a collision worth investigating,
-  check the commit author: `Claude <noreply@anthropic.com>` committing without a
-  matching claim from an actual second session is this false-positive-trigger pattern,
-  not a real parallel-session conflict. (Hit on d-morrison/gha#225: the self-review
-  comment's own reference to the failed `@claude` review job triggered a real agent
-  run, which found and fixed a stale `CLAUDE.md` trigger-type claim before the PR
-  merged.)
-  Prevention: in PR status/report comments, don't write the literal string
-  `@claude` unless you want a run — say "the Claude review" / "the Claude
-  bot" instead. Each accidental mention dispatches a full agent workflow run
-  (API spend) even when the comment asks for nothing. (Second instance on
-  ucdavis/rampp#111, 2026-07-18: a ready-for-merge report quoting "latest
-  @claude verdict" dispatched a run, which correctly no-op'd with a status
-  recap.)
-  (Third instance on UCD-SERG/lab-manual#441, 2026-07-24: a status comment
-  reporting "the `@claude` review verdict is clean" dispatched a run against
-  `main`'s HEAD rather than the PR branch (the `gha#285`/`gha#286`
-  `workflow_dispatch`-without-`--ref` pattern documented under "@claude CI
-  action" below), even though the PR's own review had already gone clean.
-  It self-resolved with an "Acknowledge @claude mention" no-op rather than
-  making any change, but still cost a wasted agent run.)
-  **The vector is not limited to comments: an issue's own body or title
-  matches too, via the `issues` trigger.** `claude.yml`'s job gate for the
-  `issues` event checks `contains(github.event.issue.body, ...)` /
-  `contains(..., .title, ...)` with the same formatting-blind substring match,
-  so **filing** an issue that merely discusses the bot dispatches a full agent
-  run -- the worst case of the four, because an issue is the artifact most
-  likely to *describe* the bot rather than address it, and because
-  `eager-pr: true` makes that run open a branch and a draft PR before doing
-  any work. Prevention on the caller side: don't list `opened` in the
-  `issues:` trigger types. `ai-config`'s `claude-bot.yml` now uses
-  `types: [assigned]` for exactly this reason (#686/#687) -- the agent runs
-  only when deliberately summoned. Note the gate treats `assigned` the same
-  way, so bare assignment is not itself sufficient; the issue text must still
-  contain the mention. (Fourth instance, ai-config#682 -> #683, 2026-07-24: an
-  issue proposing a markdown line-length check said "like the `@claude`
-  reviewer already can" inside a code span; the run opened #683, worked ~8
-  minutes, then died at the push step on the `WORKFLOW_TOKEN` gap, losing the
-  work.)
-  **Once fired, a remote/web session cannot call it back -- so prevention is
-  the only control.** `cancel_workflow_run` 403s exactly like
-  `rerun_failed_jobs` does (see `memories/github.md`), and no MCP tool edits
-  an existing comment, so the mention can't be defused after the fact either.
-  Editing would not help regardless: the caller stubs trigger on
-  `issue_comment: [created]`, so an already-fired comment cannot re-fire, and
-  a later edit changes nothing. Don't spend retries discovering this. (Fifth
-  instance, `UCD-SERG/serocalculator#605`, 2026-07-25: a comment reporting a
-  CI blocker said "another `@claude` review (about $1.24)" -- backticked and
-  purely descriptive -- and spawned a $0.43 run that correctly no-op'd.
-  Both a cancel attempt and a search for a comment-edit tool came up empty.)
-- **Dispatched reviews now post a PR comment (gha#89, now in `v1`).** Before this fix,
-  `workflow_dispatch` runs wrote output to the step summary only —
-  `github.event.pull_request.number` is null for dispatch events, so the action's
-  internal post-step failed silently, and the old-comment collapse step then minimized
-  all prior review comments, leaving the PR thread silent. Fixed by a "Post review
-  comment for dispatched run" step that reads the last assistant text from the execution
-  file and posts it via `gh issue comment`. When the review finds no new issues, Claude
-  is prompted to link the most recent prior `claude[bot]` review comment and state it
-  still stands. Execution file extraction (for debugging):
-  ```
-  jq -r '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text] | last // ""' \
-    "${RUNNER_TEMP}/claude-execution-output.json"
-  ```
-- **Dispatched review quoting bug (gha#90, not yet fixed).** When the review body
-  contains backtick-quoted text (e.g. `` `@v1` ``), the "Post review comment for
-  dispatched run" step fails with `unexpected EOF while looking for matching '"'` — the
-  backticks are interpreted as shell command substitution. The review itself still
-  completes: look for `Claude review completed cleanly (subtype=success)` in the step
-  logs to confirm. The PR comment simply isn't posted. Workaround: push a trivial
-  commit to trigger the push-based review instead of dispatching again.
-- **Self-mod skip in `claude-code-review.yml` (added in gha#70, now in `v1`).** The
-  workflow skips when the PR modifies `.claude/**` paths or the
-  review workflow file itself (derived from `github.workflow_ref`). CI completes in
-  ~48 s without posting a verdict comment. This prevents 401 errors from the
-  App-token exchange during workflow validation of a not-yet-merged workflow file
-  (source: gha#70 PR body). Not a CI failure — check the job logs for the skip message.
-  **The self-mod skip is NOT the same signal as the quota-skip (gha#104) — the
-  `require-review` gate job does not catch it.** `require-review`'s `if:` only
-  goes gray when `claude-review`'s result is literally `skipped` or
-  `quota_exhausted=true`; a self-mod skip leaves individual *steps* conditioned
-  off (`steps.selfmod.outputs.self_mod != 'true'`) but the `claude-review` JOB
-  itself still reports `success`, so `require-review` passes trivially and the
-  PR shows all-green with no review having actually run. Don't read "CI green,
-  no `@claude` comment" as "review ran clean" on a PR that touches
-  `claude-code-review.yml` — check the `claude-review` job log for the
-  `self_mod=true` notice, and do a manual review in its place (same playbook as
-  the quota-skip case below). (d-morrison/altdoc#14.)
-- **`grep -qxF` for literal fixed-string line matching in workflow files.** Flags: `-q`
-  = quiet, `-x` = full-line match, `-F` = treat pattern as a fixed string (not a
-  regex). Omitting `-F` makes `.` in file paths (e.g.
-  `.github/workflows/claude-code-review.yml`) act as a regex wildcard, so the selfmod
-  check would match any file with a similar path structure. Use `-qxF` whenever
-  comparing file paths literally. The `selfmod` step in `claude-code-review.yml` uses
-  `grep -qxF` for this reason.
-- **`is_error=true, subtype=success` in review execution output — two distinct causes:**
-  - **Quota/auth exhaustion** (`total_cost_usd=0`, `num_turns=1`, `duration_ms` < 2000):
-    the API rejected the request before Claude did any work. Fixed in gha#102 (`@v1`):
-    the guard step exits 0 and posts a `[!WARNING]` PR comment naming `CLAUDE_CODE_OAUTH_TOKEN`
-    as the account whose quota is exhausted. Further fixed in gha#104: a second `require-review`
-    gate job (whose `if:` is false when `quota_exhausted=true`) shows as the gray **skipped**
-    icon rather than a misleading green checkmark. Consumers should add `require-review` (e.g.
-    `review / require-review`) to their branch protection required-checks.
-    Fix: wait for quota reset (or auth fix), then re-trigger. No need to push a commit.
-    ⚠️ **Verify the consumed guard actually warns — don't assume the fix is live.**
-    Observed 2026-06 on sparta#207 (consuming `d-morrison/gha@v1`) AND in `dem-extra1/gha`'s
-    own `claude-code-review.yml`: the guard still `exit 1`d on `is_error=true` (RED check, no
-    `[!WARNING]` comment) — gha#102's exit-0 behavior was not yet on the consumed `@v1` pin
-    there. Read the actual guard code on the pin you consume rather than trusting this note.
-    Note OAuth/subscription auth (`CLAUDE_CODE_OAUTH_TOKEN`) shows `total_cost_usd=0`
-    regardless, because it isn't metered per-call — so cost=0 + 1 turn + immediate `is_error`
-    points to a **subscription usage-limit**, not only API credits; confirm via the Anthropic
-    Console usage for that account.
-  - **Intermittent upstream bug** (`total_cost_usd > 0`, `duration_ms` ~192 s): the
-    `claude-code-action` completes a real review but exits with `is_error=true` anyway.
-    The guard step fails the check ❌. The prior clean review on the same diff is still
-    valid. Fix: push a trivial commit to trigger a fresh review. Observed on gha#92 run
-    #28034977099.
-- **A review job with `conclusion: success` but NO posted comment is NOT
-  automatically "unreviewed."** It is either (a) a quota/auth skip (see above:
-  `total_cost_usd=0`, `num_turns=1`) or (b) a genuinely **clean review that found
-  nothing to flag**. Tell them apart from the job log: a clean review shows a
-  full agent run (`"subtype":"success"`, `"is_error":false`, high `num_turns`,
-  `total_cost_usd` > 0) followed by `No buffered inline comments` in the
-  post-comments step — the bot reviewed and posted nothing because it had nothing
-  to say. Don't treat that as a missing review or re-trigger it. (macros#71:
-  `claude-review` ran 21 turns at $0.88 and buffered 0 comments = clean.)
-- **Reading the hidden error behind a failed `claude-code-review`.** The action prints
-  `Running Claude Code via SDK (full output hidden for security)…` and suppresses the real
-  API error. The reusable `claude-code-review.yml` now accepts a **`show-full-output`** input
-  (default false; added in dem-extra1/gha#1) that passes through to the action's
-  `show_full_output` — flip it to print the raw error in the job log. The live consumer pin
-  `d-morrison/gha@v1` may not carry it yet, so check the tag. You CANNOT side-channel the
-  error from a throwaway workflow on a feature branch: `claude-code-action` rejects `push`
-  events (`Unsupported event type: push`) and refuses to run unless the workflow file is
-  byte-identical to the default-branch copy (`Workflow validation failed … must … match the
-  default branch`) — both are deliberate guards, so a diagnostic workflow only works once
-  it's on `main`.
-- **`review / claude-review` fails with "no '### Verdict' heading" (gha#173,
-  closed/fixed) — a DIFFERENT failure than the `is_error=true` cases above.**
-  Symptom: the job's SDK run reports `is_error: false` / `subtype: success` (it
-  genuinely completed, no crash), but a guard step (`run-review-guard`) still
-  fails the job because the review's final message never emitted the mandated
-  `### Verdict` heading or `Verdict:` line — the review agent silently
-  stubbed. `review / require-review` then fails too, since it gates on this
-  job. **This is the fix, not a bug**: gha#173 replaced an earlier
-  silent-green-stub failure mode with a loud one, so don't read the red check
-  as a content problem in your diff — check the job log
-  (`mcp__github__get_job_logs`) for this exact error string before assuming
-  otherwise. gha#173's primary contribution is that `run-review-guard` step
-  itself, not a proven root cause for *why* the agent stubs — its issue body
-  only *observed* (hedged, not traced) that `workflow_dispatch` re-triggers
-  succeeded more reliably than another push in the incidents it cites, and
-  don't read that as push-trigger-*specific*: the separate gha#185/#187
-  root-cause investigation later found the underlying stall reproduces across
-  **both** push-triggered and dispatched reruns on the same PR/diff (gha#180)
-  — so `workflow_dispatch` is a practically-useful re-trigger, not a guaranteed
-  fix tied to the push/dispatch distinction. If the API returns
-  `403 Resource not accessible by integration` on
-  `rerun_failed_jobs`/`run_workflow` (no Actions-write permission in the
-  session), you can't self-trigger the dispatch — surface it to the user with
-  the fix path rather than guessing at a comment-based re-trigger. In practice,
-  the very next push-triggered review after the failure has also gone through
-  cleanly both times it recurred (rme#706, #976) — so a subsequent normal
-  push can clear it too; try `workflow_dispatch` if you have the permission
-  and a normal push isn't an option (e.g. no new commit to make).
-- **Write accurate `workflow_dispatch` comments when adapting the upstream
-  `claude-code-review.yml` template.** The upstream template says "workflow_dispatch is
-  fired by claude.yml" — but that's only true when the repo's `claude.yml` actually
-  dispatches the review workflow. In repos where `claude.yml` runs `claude-code-action`
-  directly (e.g. qbt), that comment is wrong. When adapting the template, check whether
-  the local `claude.yml` dispatches `claude-code-review.yml`; if not, rewrite the
-  comment to say "workflow_dispatch is a manual re-review from the Actions UI" rather
-  than citing `claude.yml`. The `PR_NUMBER` env comment (was "when claude.yml triggered
-  us") should become "when a manual re-review is triggered." Fixed in rpt#153 and qbt#43.
-- **`@claude review` produced no review? Trace the whole dispatch chain — the
-  failure is usually in the *dispatched* review run, not the agent run.** An
-  `@claude review` *comment* fires the agent workflow `claude.yml` (issue_comment),
-  which **succeeds** and then, in a later step (a regular step after the Claude run —
-  not an Actions post-step), re-dispatches `claude-code-review.yml` via
-  `gh workflow run` (workflow_dispatch). So a green `claude.yml` run with no review
-  comment means the review died in the separately-dispatched run. Find it:
-  `actions_list` the runs of `claude-code-review.yml` filtered to
-  `event=workflow_dispatch` around the comment time, then read that run's failed
-  job logs. Don't stop at the agent run's green checkmark. (Diagnosed on rme#706:
-  agent run 28256515868 was green; the dispatched review run 28257175025 had failed.)
-- **`allowed_bots` actor gate: dispatched reviews fail in ~6 s with "Workflow
-  initiated by non-human actor: github-actions (type: Bot)".** `anthropics/claude-code-action`
-  has its **own** actor gate, separate from the workflow's job-level `if:`. Because
-  `claude.yml` re-dispatches as `github-actions[bot]`, the action aborts
-  ("Add bot to allowed_bots list or use '*'") unless the action step sets
-  `allowed_bots: "github-actions[bot]"` in its `with:` (underscore — the action's
-  own input name; the gha reusable exposes this as `allowed-bots` with a hyphen
-  and maps it through). A job `if:` that permits
-  `workflow_dispatch` is **not** enough — the run passes the `if:` then dies one layer
-  deeper in the action. The canonical gha reusable `claude-code-review.yml` already
-  sets this (via its `allowed-bots` input, default `github-actions[bot]`); a
-  standalone copy must add it. Fixed for rme in #945.
-- **Consumer repos may carry a standalone `claude-code-review.yml` that has drifted
-  from the gha reusable one — check gha first when debugging CI/infra bugs.** Not
-  every consumer calls `uses: d-morrison/gha/.github/workflows/claude-code-review.yml@v1`;
-  some (rme, pre-#948) kept a hand-maintained fork that missed fixes gha already
-  had — that drift is how the `allowed_bots` bug reached rme. When debugging a
-  CI/infra bug in a consumer repo, compare against the canonical gha `@v1` version;
-  the fix often already exists there. Preferred remedy: migrate the standalone file
-  to a thin reusable-workflow caller (gha ships example caller stubs in `examples/`)
-  so it can't drift again. Keep the workflow filename and the `pr_number`
-  workflow_dispatch input so `claude.yml`'s
-  `gh workflow run claude-code-review.yml -f pr_number=<N>` still works, mapping it
-  to the reusable's `pr-number` input; set `checkout-submodules: true` if the repo
-  has submodules the reviewer must read (e.g. rme's `latex-macros`). Done for rme
-  in #948.
-- **The `@claude` reviewer may re-raise a finding that was previously rebutted and
-  its thread resolved, if a new commit triggers a fresh review cycle.** Each review
-  run re-reads the diff from scratch; a rebuttal reply in the thread does not persist
-  into the next run's context. Keep the rebuttal text ready to post again. (Hit
-  repeatedly on ai-config#267 with the MD060/table-column-style finding.)
-- **The agent can commit the right fix and still fail to push it, when the diff
-  touches `.github/workflows/*.yml` -- "refusing to allow a GitHub App to create
-  or update workflow ... without `workflows` permission".** `claude.yml`'s
-  `PUSH_TOKEN` (`secrets.WORKFLOW_TOKEN || secrets.GITHUB_TOKEN`) needs an
-  explicit `workflows` OAuth scope to push a commit that edits a workflow file;
-  a plain `GITHUB_TOKEN`/GitHub App token doesn't have it, and even a
-  configured `WORKFLOW_TOKEN` secret can be unset/not wired for a given
-  trigger path. The job reports `conclusion: failure` on its "Push branch and
-  finalize PR" step (`get_job_logs` with `failed_only: true` shows the exact
-  rejection), and the draft PR is left with only its empty seed commit -- the
-  correct fix exists only in that ephemeral run's checkout, never landed.
-  A session with a broader-scoped push (e.g. Claude Code on the web) doesn't
-  hit this, so the recovery is: read the failed job's logs for the actual
-  diagnosis, fetch the PR's real head branch (`pull_request_read`'s
-  `head.ref`, not the harness-assigned fallback branch -- see "Use the
-  existing PR branch" in `CLAUDE.md`), re-implement the same fix from that
-  session's own checkout, and push directly. (gha#286, fixing gha#285: the
-  agent's own commit correctly added `--ref` to every `gh workflow run`
-  dispatch call, including in `.github/workflows/claude-review.yml`, but the
-  push to `claude/issue-285-...` 403'd on exactly that file; re-implemented
-  and pushed from the Claude Code web session instead.)
 ## d-morrison/gha reusable workflows
 Check `d-morrison/gha` before writing bespoke CI — it has reusable workflows for
 common patterns.
@@ -662,50 +227,6 @@ common patterns.
   auto-update before R-CMD-check (`ref: github.head_ref`). Pass system deps via
   `apt-packages`. Added in gha#103; bcs#226 is the reference caller.
 
-## GitHub Actions — gathering prior review context in reusable workflows
-
-When a reusable workflow needs to fetch prior `claude[bot]` review comments for
-deduplication, two API endpoints carry different content:
-
-- **`/repos/{owner}/{repo}/issues/{n}/comments`** — top-level PR comments
-  (summary/tracking verdicts). Filter to review comments with
-  `select(.user.login == "claude[bot]" and (.body | test("### Code Review")))`.
-  This pattern discriminates review summaries from `@claude` task-handler responses
-  (which also post as `claude[bot]` but use "Claude finished…" / "Claude Code is
-  working…" headers, not the "### Code Review" heading the review workflow uses).
-  The ai-config `claude-review.yml` (#275) omits this content filter — it was
-  accepted, but task-handler responses can appear in the `prior-reviews` context.
-- **`/repos/{owner}/{repo}/pulls/{n}/comments`** — inline review findings posted
-  via the review API. These are already `claude[bot]`-only (the `@claude` task
-  handler posts to `/issues/`, not `/pulls/`), so no content filter is needed.
-  Fetch the most recent ~30, map to `"=== Inline finding on {path}:{line} ===\n{body}"`.
-
-Combine both (inline first, summary last) and cap at ~12000 chars with `head -c`.
-Require `pull-requests: read` permission in the job that fetches inline comments.
-
-**`GITHUB_OUTPUT` multiline heredoc — always use a random delimiter.**
-A static delimiter like `__EOF__` collides with content in prior review comments
-(e.g. a review suggestion showing a shell heredoc). Use:
-```bash
-DELIMITER="eof_$(openssl rand -hex 8)"
-{
-  echo "my-output<<${DELIMITER}"
-  printf '%s\n' "$VALUE"
-  echo "${DELIMITER}"
-} >> "$GITHUB_OUTPUT"
-```
-The ai-config `claude-review.yml` (merged in #275) uses a static
-`__REVIEWS_EOF__` delimiter instead — accepted by design but is a known
-divergence from this best practice.
-
-**`needs.X.result != 'cancelled'` vs `== 'success'`** — when the dependency job
-is non-critical (acceptable to proceed without its output), use
-`!= 'cancelled'` in the dependent job's `if:` so genuine failures fall through
-rather than blocking. When the dependency is truly required, use `== 'success'`
-(not `!= 'failure'` — that still runs when the dep was cancelled, which usually
-means its output was never produced). (gha#133: `gather-context` failure should
-not block `claude-review`.)
-
 ## GitHub Actions workflow authoring gotchas
 
 - **A bare `devtools::test()` in a gating CI step never fails the job.**
@@ -896,27 +417,49 @@ not block `claude-review`.)
   it without evaluating), matching the existing convention (e.g.
   `R/calc_ip_weights.R`). Runnable examples with self-contained synthetic data
   are fine and do execute. (Hit on ucdavis/bcs#238.)
-- **altdoc's `$ALTDOC_MAN_BLOCK` sidebar placeholder has no pkgdown-style
-  `reference:` grouping and no internal-topic exclusion --- it flat-lists
-  every `man/*.Rd` file under one ungrouped "Reference" section, internal
-  topics (`@keywords internal`) included.** Confirmed by reading
-  `d-morrison/altdoc`'s `R/settings_quarto_website.R`,
-  `.sidebar_vignettes_quarto_website()` (despite the vignettes-only-sounding
-  name, this one function handles both the `$ALTDOC_VIGNETTE_BLOCK` and
-  `$ALTDOC_MAN_BLOCK` placeholders): it globs `man/*.qmd` under the
-  render output and turns the whole list into `section: Reference` with no
-  filtering or title-based grouping, unlike pkgdown's `reference:` block in
-  `_pkgdown.yml`. To reproduce a pkgdown-style grouped index/sidebar (with
-  internal topics hidden) on an altdoc site today, hand-author the grouping
-  directly in the consuming repo's `altdoc/quarto_website.yml` --- replace
-  the `$ALTDOC_MAN_BLOCK` placeholder with explicit `section:`/`contents:`
-  entries pointing at `man/<topic>.qmd` (the same file-path convention the
-  navbar's "Documentation" entry already uses for
-  `man/serocalculator-package.qmd`), and simply omit any `.Rd` topic marked
-  `\keyword{internal}`. When migrating from an old pkgdown site, its retired
-  `_pkgdown.yml` (recoverable from git history even after deletion) is
-  usually still an accurate source for the grouping and titles to reproduce.
-  (`UCD-SERG/serocalculator#575`.)
+- **altdoc's `$ALTDOC_MAN_BLOCK` sidebar placeholder is grouped and
+  internal-aware as of 2026-07; the hand-authored workaround it used to need
+  is retired.** It formerly flat-listed every `man/*.Rd` under one ungrouped
+  "Reference" section with `@keywords internal` topics included, which is why
+  consuming repos hand-wrote `section:`/`contents:` entries pointing at
+  `man/<topic>.qmd` in `altdoc/quarto_website.yml` (`UCD-SERG/serocalculator#575`).
+  altdoc now reads an `altdoc/reference.yml` and builds BOTH surfaces from it
+  --- the reference index page and the sidebar --- so the grouping is declared
+  once and there is nothing left to keep in step. `.select_topics()` aborts the
+  render on a topic name with no backing `.Rd`, and warns by name for any
+  exported topic no section claims while dropping it into a trailing `Other`
+  section; an internal topic is excluded unless explicitly named, and naming it
+  opts it back in. `sidebar_labels: name-and-title` prefixes each entry with the
+  function name --- titles alone are genuinely ambiguous in practice, e.g.
+  serocalculator's `as_pop_data`/`load_pop_data` rendered as two adjacent
+  identical lines. Migrating off the hand-written pair is a net deletion: drop
+  `altdoc/reference.qmd`, replace the `Reference` block in
+  `quarto_website.yml` with `$ALTDOC_MAN_BLOCK`, and move the grouping into
+  `reference.yml`. Verify by generating the index from the new config and
+  diffing section names, topic order, and count against the deleted
+  `reference.qmd` --- eyeballing the built site will not catch a reordering.
+  (`UCD-SERG/serocalculator#625`.)
+- **A vendored copy of a docs feature drifts within days --- prefer altdoc's
+  own `$ALTDOC_*` variable, and remember `sidebar_fold` sets the fold control's
+  starting state without creating the control.** The sidebar-fold button began
+  as a hand-written `altdoc/sidebar-fold.html` plus a matching `styles.css`
+  block copied into two repos; within a week one repo had changed its copy to
+  start folded and the other never heard about it. altdoc now ships it:
+  `include-in-header: $ALTDOC_SIDEBAR_FOLD` under `format: html:` stages the
+  snippet into `_quarto/` at render time with script and style in one file.
+  The starting state is separate --- `sidebar_fold` in `altdoc/reference.yml`,
+  valid values `expanded` (the default) and `collapsed`. **Omitting it on a
+  repo that previously started folded silently reverts to open**: the site
+  renders fine and nothing warns, so a repo carrying non-default behavior must
+  set it explicitly during the migration. `check_altdoc()` reports a
+  `sidebar_fold` set with no settings file referencing `$ALTDOC_SIDEBAR_FOLD`
+  (and one set for a non-`quarto_website` generator), which is the check that
+  catches the half-wired case --- but it is opt-in, so it will not fire during
+  an ordinary `render_docs()`. An unrecognized `$ALTDOC_*` variable is left in
+  the settings file verbatim rather than dropped, so pointing
+  `include-in-header` at one before the altdoc pin supports it fails the Quarto
+  build outright rather than degrading. (`d-morrison/altdoc#103`/`#104`,
+  `ucdavis/bcs#528`, `UCD-SERG/serocalculator#626`.)
 - **`NEWS.md` section headers need a blank line before them.** A bullet that ends
   immediately before a `## Next-section` heading (no blank line) can cause
   `utils::news()` to misparse adjacent sections. Always leave one blank line
@@ -997,62 +540,73 @@ not block `claude-review`.)
   `'auto'`) and resolve the real expression where the input is consumed (a `with:`/`env:`
   value or a step), treating `'auto'` as "apply the heuristic" while `'true'`/`'false'`
   are explicit overrides. (gha#148: `test-coverage.yml`'s `fail-ci-if-error` input.)
+- **Writing any explicit step-level `if:` REPLACES the default `success()`, so a
+  guard step's failure does not skip the steps that follow it.**
+  The default condition on a step is `success()`, which is why a failing step
+  normally ends a job's useful work.
+  Adding `if: steps.guard.outputs.blocked != 'true'` silently discards that,
+  so the step now runs *whatever* happened upstream, including a guard step
+  that exited non-zero because it could not establish whether the work was
+  safe to do.
+  This is the [`fail-fast`](../shared/principles/fail-fast.md) violation that
+  looks most like diligence: the guard is present, its logic is right, and its
+  verdict is simply not consulted on the one path it was written for.
 
-## claude-code-action: tag mode vs agent mode and git write tools
+  What makes it hard to catch is that the bug is usually **masked by a second
+  mechanism** rather than being visible.
+  A guard written to fail closed writes its output before exiting
+  (`echo "blocked=true" >> "$GITHUB_OUTPUT"; exit 1`), and outputs are captured
+  from failed steps too, so the condition happens to evaluate correctly.
+  Every test passes, and the protection is entirely accidental --- it evaporates
+  the moment the guard fails *before* reaching that write, which is exactly what
+  a rate limit, a network error, or a `set -e` abort produces.
 
-- **Tag mode (`track_progress: true`) hardcodes git write tools into `ALLOWED_TOOLS`
-  regardless of `--disallowedTools`.** The action's TypeScript sets the `ALLOWED_TOOLS`
-  env var at runtime, injecting `Bash(git add:*)`, `Bash(git commit:*)`,
-  `Bash(git rm:*)`, and `git-push.sh`. The `--disallowedTools` CLI flag cannot
-  override an env var set by the same process. Evidence: `d-morrison/gha` PR #134,
-  where a supposedly read-only `claude-code-review` run pushed commit `02af72b` to
-  UCD-SERG/serodynamics PR #175. Upstream fix tracked in
-  `anthropics/claude-code-action#1415` (draft PR #1433).
-- **Agent mode (`track_progress: false`) builds `ALLOWED_TOOLS` solely from
-  `claude_args` — no git write tools are injected.** This is the safe default for
-  a read-only reviewer. Trade-off: no live tracking comment, no inline-comment tool
-  (the inline-comment tool is only initialized in tag mode per `claude-code-action#635`);
-  reviews post as top-level PR comments instead.
-- **`inputs.dot-notation` vs `inputs['bracket-notation']` in GitHub Actions `if:`.**
-  Both work, but use dot notation (`inputs.track-progress`) for consistency — bracket
-  notation looks non-idiomatic next to the dot notation used everywhere else in the
-  same workflow. Caught in gha#134 review.
-- **A `claude-code-review`-style job that fails with "no verdict written" but `is_error: false` and real cost/turns can be root-caused by downloading the uploaded execution-transcript artifact, not just reading the summary `result` object.**
-  The `Run Claude Code Review` step's own JSON output only shows the final SDK
-  summary (`is_error`, `num_turns`, `total_cost_usd`, `permission_denials_count`)
-  — enough to confirm a stub occurred, not why. The workflow separately uploads
-  the full turn-by-turn transcript as a `claude-review-execution-<run>-<attempt>.zip`
-  artifact (the name is defined by `d-morrison/gha`'s reusable workflow, not a
-  Claude Code convention — a future rename there invalidates this; confirm via
-  `gh api repos/<owner>/<repo>/actions/runs/<run_id>/artifacts` rather than
-  assuming the name, then `curl -H "Authorization: token $(gh auth token)"
-  .../artifacts/<id>/zip` to fetch). It's a single pretty-printed JSON array of
-  Claude Code SDK message objects, not NDJSON — each element has a top-level
-  `type` (`"system"`/`"assistant"`/`"user"`/`"result"`) and, for `"assistant"`
-  elements, a `message.content` array of blocks (`{"type":"tool_use", "name":
-  ..., ...}`, `{"type":"text", "text": ...}`, etc.) — parse with
-  `jq '.[] | select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | .name'`
-  for a tool-use histogram, or pull `is_error==true` tool_results for the actual
-  denial messages. This is how a "stub review" traced back to the model
-  fanning its own review out across background `Agent` calls and ending its turn
-  on "waiting for background agents" — a mechanism the summary object alone
-  can't show (`d-morrison/gha#185`, `Lacaedemon/sparta` PR #615, 2026-07-03).
-- **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.** `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments. If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading. This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review. Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text. Filed with full evidence as `d-morrison/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
-- **`gh pr checks <N>` can return a momentarily-stale check entry right after a
-  state-changing trigger (close/reopen, a push, `gh run rerun`).** Querying
-  immediately after triggering can show the check that was current a few
-  seconds ago — including a red/failed one from a run that already finished
-  hours earlier — rather than the freshly-queued run. Don't trust a `gh pr
-  checks` read taken within seconds of triggering; instead look up the actual
-  newest run for the branch and watch that specific run id:
-  `gh run list --workflow "<name>" --json databaseId,createdAt,headBranch --jq
-  'map(select(.headBranch=="<branch>")) | sort_by(.createdAt) | last | .databaseId'`,
-  then poll `gh run view <id> --json status,conclusion` directly. A poll loop
-  built on `gh pr checks`'s live state must also treat every non-`"completed"`
-  status (`queued`, `in_progress`, and any value not explicitly enumerated) as
-  still-running rather than allow-listing only `PENDING`/`IN_PROGRESS` —
-  `QUEUED` slipping through an allow-list caused a premature "settled" false
-  positive in one session (`Lacaedemon/sparta`, 2026-07-03).
+  So spell out both halves: `if: success() && steps.guard.outputs.blocked != 'true'`.
+  And prefer `!= 'true'` over `== 'false'` for the output test, because a guard
+  gated on an event type is *skipped* on other events, and a skipped step's
+  output is the empty string rather than `'false'`.
+
+  - **Do:** include `success()` explicitly in any step condition that also reads
+    a guard's output.
+  - **Do:** treat a fail-closed output write as the second layer, and say so in
+    the comment, so nobody later "simplifies" the condition on the strength of it.
+  - **Don't:** rely on a non-zero exit alone to skip steps that carry their own
+    `if:`.
+  - **Don't:** infer from a passing test that the condition is right, when a
+    fail-closed write could be doing the work instead.
+
+  **The sibling failure, and the reason to keep the two apart.**
+  gha#350 has the same *outcome* --- a guard's verdict never reaches the
+  decision it was written to gate --- by the opposite route, and conflating
+  them costs you the diagnosis:
+
+  - **gha#350: the guard never ran.**
+    `claude-code-review.yml`'s quota-exhaustion guard carried
+    `if: steps.claude-review.outcome == 'success'`, and quota exhaustion is
+    precisely what fails `claude-review`.
+    So the guard was *skipped*, `quota_exhausted` was never written, and the
+    resolve step read a literal `"skipped"` where the verdict belonged.
+    Note what this rules out: adding `continue-on-error: true` to the watched
+    step does **not** fix it, because `outcome` reports the status *before*
+    `continue-on-error` is applied --- only `conclusion` reflects it.
+    Nothing was swallowed; there was no output to swallow.
+  - **Here: the guard ran, failed, and was ignored.**
+    The output existed and the condition read it, but the dropped `success()`
+    meant the step's *failure* carried no weight.
+
+  So the diagnostic question differs.
+  For #350 you ask "can this guard's own gate be true in the scenario it
+  guards against?"; here you ask "does anything downstream still respect this
+  guard's failure?"
+  A fix aimed at the wrong one leaves the bug in place.
+
+  (gha#357 round 5, self-caught while writing the comment that claimed the
+  opposite: a ported fork/Dependabot guard in `gemini-code-review.yml` gated
+  its checkout and review steps on the output alone.
+  The #350 contrast above was itself corrected in review on ai-config#829,
+  which is worth recording: the first draft attributed #350 to
+  `continue-on-error`, the exact fix #350's own body lists under "Two things
+  that look like fixes but are not".)
 
 ## Changelog section ordering in d-morrison/gha
 
@@ -1060,46 +614,232 @@ not block `claude-review`.)
   Match this when adding new `## [Unreleased]` entries or when resolving merge
   conflicts in the changelog. Caught in gha#134 review (Fixed appeared before Changed).
 
-## gha claude-code-review — self-modification skip guard (not a stub)
+## A repo/org rename breaks Actions `uses:` refs -- and repointing the owner is not the fix
 
-A PR that **edits `.github/workflows/claude-code-review.yml` itself** gets a
-fast (~9s) green `review / claude-review` job that posts **no review**: the
-reusable workflow detects the self-edit and deliberately skips
-("PR #N edits .github/workflows/claude-code-review.yml — skipping self-review
-(the action 401s on workflow validation until merged; it runs after merge)"),
-and `require-review` tolerates the skip. Don't treat this as a stub review or
-re-trigger it — read the job log for the `::notice::` line to confirm, post a
-manual self-review with a verdict instead (per the do-the-review-yourself
-rule), and note the first genuine end-to-end run happens on the next PR after
-merge. (ucdavis/win#75, 2026-07-16 — the migration PR itself could never be
-bot-reviewed; win#69's post-merge sync then ran the migrated workflow live and
-it worked, including `check-latex-macros` and the cost report.)
+`d-morrison/gha` moved to `Morrison-Lab/gha` (2026-07-28), and the same shape
+recurs for any renamed owner.
+GitHub Actions does **not** follow repository-rename redirects when resolving a
+`uses:` ref, so every caller naming the old owner fails at run preparation,
+before any job starts.
+Git and plain HTTP *do* follow the redirect, so clones, submodules, and raw
+fetches keep working -- which is why the breakage looks selective and arrives
+with no warning from the repo that moved.
 
-**A manual self-review is not the only remedy: the AGENT workflow
-(`claude.yml`) carries no self-modification guard, so mentioning the bot in a
-comment does produce a genuine external review of a PR that trips the
-reviewer's guard.**
-The guard lives in `claude-code-review.yml`, which gates on the caller's own
-review-workflow path.
-`claude.yml` is a separate reusable workflow with no equivalent check.
-So on a guard-tripping PR, post the mention deliberately and let the agent
-review it, which yields an actual external verdict at the current head.
-[`fully-clean`](../shared/workflow/fully-clean.md)'s criterion 2 prefers an
-external verdict whenever one is reachable, and a self-review cannot satisfy
-it.
+Three things to know, in the order they bite.
 
-Two things to know before relying on it.
-The mention is matched with `contains(github.event.comment.body, '@claude')`,
-which has **no notion of code spans**, so writing the literal string inside
-backticks or ordinary prose fires the workflow just the same.
-That makes it easy to trigger a full agent run by accident while merely
-*describing* the reviewer.
-The agent's reply also arrives as a plain PR comment rather than a check run,
-so it satisfies the review criterion without turning any check green, and
-`claude-review` stays a skip either way.
-(d-morrison/altdoc#71, 2026-07-27: a self-review comment that named the
-reviewer woke the agent unintentionally, and it posted a substantive review of
-the diff, checking `"${REF_ARGS[@]}"` expansion under `set -u`, the per-event
-`author_association` fields, and `required: false` secret semantics, on a PR
-whose `claude-review` job had skipped in 8 seconds.
-Worth doing on purpose next time rather than by accident.)
+- **A tag can RESOLVE while its own contents still name the old owner.**
+  Repointing the caller's owner is not sufficient on its own.
+  `Morrison-Lab/gha@v1` resolved fine as a tag, but that tag's
+  `claude-code-review.yml:155` and `claude.yml:288` still called
+  `d-morrison/gha/.github/actions/checkout-submodules@v1`, so both workflows
+  failed identically after the "fix".
+  Read what the pinned tag *contains* --
+  `curl -sS https://raw.githubusercontent.com/<new-owner>/<repo>/<tag>/<path> | grep -n 'uses:'`
+  -- rather than confirming only that the pin resolves.
+  Where a `@v2` exists with updated internals the fix is owner **and** tag, and
+  a major bump means checking each caller's inputs against the new
+  `workflow_call` signature instead of swapping the string blind.
+- **A workflow run that completes as `failure` with ZERO jobs is the signature
+  of an unresolvable reusable-workflow ref**, not a real test failure.
+  `get_job_logs` with `failed_only: true` answers "no failed jobs found"
+  because no job was ever created.
+  This is the same zero-job shape as the `startup_failure` permission error
+  documented earlier in this file, so the two are told apart by cause rather
+  than by appearance: check the ref's owner and tag before the permission
+  ceilings when a repo has just been renamed.
+  The *action*-level case looks different and names itself -- a job that does
+  start, then dies in ~3s with
+  `##[error]Unable to resolve action. Repository not found: <old-owner>/<repo>`.
+- **Sweep by grep, and re-grep after every fix.**
+  A partial rename leaves the repo worse off than before, because the workflows
+  that do run make it look repaired.
+  `git grep "<old-owner>/<repo>" -- .github/` returning nothing is the check; a
+  memory of which files you edited is not.
+
+Before any blanket find-and-replace, establish **which** repos actually moved --
+see `github.md`'s note on `raw.githubusercontent.com` following rename
+redirects, which is the probe that answers it.
+In the ucdavis/bcs sweep exactly two of nine `d-morrison/*` references had
+moved, so a blanket replace would have broken the other seven.
+Historical references in a changelog are a separate case: they record what was
+true when written, so leave them alone.
+
+(ucdavis/bcs#451/#453, 2026-07-28.
+The first fix repointed all 15 `uses:` refs but kept `@v1`, and `claude-review`
+went on failing in 3 seconds with the action-level error above.)
+
+## A marker an action writes into consumer repos is a wire format, not a label
+
+An action that edits a consumer's file often leaves a marker behind so a later
+run can find its own block again.
+That string looks like a comment, so renaming it looks like a docs change.
+It is closer to a serialization format: the copies already sitting in consumer
+repos were written by an older release, and the new release has to keep
+reading them.
+
+The failure is silent and lands downstream.
+The consumer's next docs build does not error --- the read simply fails to
+match, the action concludes it has never run on that file, and it appends a
+second copy of whatever it generates beside the first.
+Nothing in the action's own repo is wrong at that point, and its tests pass,
+because every fixture was written by the current release.
+
+Two properties turn the rename from awkward into breaking, and both are worth
+checking before touching such a string:
+
+- **The match is exact.** `if line.strip() == GENERATED_MARKER` admits no
+  drift, so one character is as fatal as a full rename.
+- **The marker is often the *only* anchor left.** Where the generator's first
+  run consumes the human-written anchor it keyed on --- replacing a
+  `- text: Versions` line with a rendered version label --- the fallback path
+  cannot fire on a file the action has already rewritten.
+  A rename therefore strands exactly the population it was safe to ignore in
+  testing: the already-migrated ones.
+
+So treat the old spelling as input the code must keep accepting.
+Read every historical spelling, write only the current one, and cover the old
+one with a regression test built from a pre-change fixture:
+
+```python
+GENERATED_MARKER = "# Generated by <action> (<new-owner>/<repo>); ..."
+_LEGACY_GENERATED_MARKERS = ("# Generated by <action> (<old-owner>/<repo>); ...",)
+
+def _is_generated_marker(line):
+    stripped = line.strip()
+    return stripped == GENERATED_MARKER or stripped in _LEGACY_GENERATED_MARKERS
+```
+
+The same reasoning covers any identifier an action leaves in someone else's
+tree: a branch name it looks up, a PR-body sentinel it greps for, a label it
+filters on, a cache key.
+An org rename is the likeliest trigger, since a bulk find-and-replace reaches
+all of them at once and none of them announce that they are read back.
+(Morrison-Lab/gha#374, 2026-07-29: `generate-altdoc-version-dropdown`'s
+`GENERATED_MARKER` carried the pre-move owner into every consumer's navbar
+config.
+Renaming it alone would have stacked a second version dropdown on each one at
+their next docs build.
+The regression test was verified to fail against the pre-fix code ---
+`find_versions_entry` returned `None`, so the caller raised `TypeError` ---
+rather than merely added.)
+
+## An action that hard-gates on the event name can still be driven from another event
+
+A third-party action can refuse every event but the one it was written for,
+before it reads any of its own inputs:
+
+```js
+// sanjay3290/jules-pr-reviewer, src/index.ts:37 (at the pinned SHA)
+if (ctx.eventName !== 'pull_request') {
+  core.setFailed(`Unsupported event: ${ctx.eventName}. Use on: pull_request.`);
+  return;
+}
+```
+
+That reads like a hard constraint on the trigger, and it usually gets treated
+as one: the obvious conclusions are "this capability cannot be made
+on-demand" or "fork the action".
+Neither is necessary.
+`@actions/github`'s `Context` hydrates itself entirely from environment
+variables, so both halves of the gate are caller-supplied:
+
+```js
+if (process.env.GITHUB_EVENT_PATH) {
+  if (existsSync(process.env.GITHUB_EVENT_PATH)) {
+    this.payload = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, ...));
+  }
+}
+this.eventName = process.env.GITHUB_EVENT_NAME;
+```
+
+Step-level `env:` overrides those, so a workflow triggered by anything can
+present the action with the event it demands.
+For a `pull_request` gate the payload is close to one API call, because
+`GET /repos/{owner}/{repo}/pulls/{n}` returns nearly the shape the event
+delivers --- near enough to work, not near enough to skip the field check
+below:
+
+```yaml
+      - name: Resolve the PR into a pull_request event payload
+        run: |
+          gh api "${{ github.event.issue.pull_request.url }}" \
+            | jq '{pull_request: .}' > "$RUNNER_TEMP/pr_event.json"
+
+      - uses: some/action@<sha>
+        env:
+          GITHUB_EVENT_NAME: pull_request
+          GITHUB_EVENT_PATH: ${{ runner.temp }}/pr_event.json
+```
+
+Two things make this safe rather than merely clever, and both need checking
+before relying on it:
+
+- **Read the action's own source for what it consumes past the gate**, and
+  confirm the synthesized payload covers it.
+  Everything after the gate in the case above read only the `pull_request`
+  object, so nothing else had to be faked.
+  A field the action reads and the API omits is the failure this check
+  catches; `labels` was the near-miss, and it survived only because the action
+  guards it as `(pr.labels || [])`.
+- **`ctx.repo` is unaffected**, since it prefers `GITHUB_REPOSITORY`, which
+  Actions always sets.
+
+Note what the override does **not** change: the token's permissions, and the
+security properties of the real trigger.
+An `issue_comment` run executes in the base repo with a write token even for a
+fork PR, so a gate the original event enforced implicitly (fork PRs get no
+secrets under `pull_request`) has to be re-established explicitly.
+
+- **Do:** read the pinned action's own code for how it reads `eventName` and
+  `payload` before concluding its trigger is fixed --- `src/` for a legible
+  version of the gate, and `dist/` to confirm what the pinned SHA actually
+  runs, since the bundle is what Actions executes and it can lag `src/`.
+- **Do:** re-derive any safety property the original event was providing for
+  free, once the event is synthesized.
+- **Don't:** fork an action, or abandon the feature, on the strength of an
+  `eventName` guard alone.
+- **Don't:** assume the API response is a drop-in payload without checking
+  every field the action reads.
+
+(Morrison-Lab/ai-config#857, 2026-07-30: making the Jules reviewer on-demand
+needed an `issue_comment` trigger, which its pinned action rejects outright.
+Both files were read at the pinned SHA rather than assumed --- `src/index.ts`
+for the gate quoted above, `dist/index.js` for the `Context` constructor that
+makes the override work --- and then this PR's own API object, for field
+coverage.
+The line number above was `:38` when first written, and a review round caught
+it: it is `:37`.
+Worth noting how, since it is the cheap lesson here.
+The reviewer inferred the citation was unverifiable because the case note named
+only `dist/`, which was the wrong reason --- but a `grep -n` settled the real
+question in one command, and the same off-by-one had already shipped into the
+workflow comment that makes the same claim.)
+
+## Which ref a workflow runs from decides whether a trigger change takes effect before merge
+
+Editing a workflow's `on:` block has different reach depending on which event
+you are adding or removing, and the asymmetry is easy to state backwards.
+
+- **`pull_request` runs from the PR's own head ref.**
+  So *removing* a `pull_request` trigger takes effect on that branch
+  immediately: the workflow simply stops running on the PR that removes it.
+- **`issue_comment`, `push` on the default branch, `schedule`, and
+  `workflow_dispatch` run from the default branch.**
+  So *adding* one of those is inert until merge, however correct the file is.
+
+A PR that swaps one for the other therefore half-works while it is open, and
+saying which half is a claim worth testing rather than reasoning about.
+`list_workflow_runs` filtered to the branch settles it: a run list that stops
+at the pre-change commit is the removal having taken effect, and the absence
+of a run for the new event is the addition being inert rather than broken.
+
+- **Do:** state which half of a trigger swap is demonstrable on the PR and
+  which cannot be, and name the check that will confirm the rest after merge.
+- **Don't:** write that "the old trigger still applies to this PR" when the
+  old trigger was `pull_request` --- the branch's own file is what runs.
+
+(Morrison-Lab/ai-config#857, 2026-07-30: the PR body first claimed the old
+`pull_request` trigger would still review the PR.
+`list_workflow_runs` for that workflow on the branch returned exactly one run,
+at the empty claim commit predating the change, and none for the
+`ready_for_review` event the old file would have fired on.)

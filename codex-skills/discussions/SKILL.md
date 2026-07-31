@@ -1,6 +1,6 @@
 ---
 name: "discussions"
-description: "Codex wrapper for the ai-config Claude skill `discussions`. Read and respond to GitHub Discussions forum topics \u2014 list a repo's discussions, read a topic and its comments, draft and post a reply, and mark an answer on Q&A discussions. Discussions are GraphQL-only (no `gh discussion` subcommand, no GitHub MCP tool), so this skill runs `gh api graphql`. Use when asked to 'read the discussions', 'respond to this discussion', 'answer the discussion topic', 'reply to the forum', 'triage the discussion board', or 'check GitHub Discussions'. Use when Codex is asked to use `discussions`, `/discussions`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `discussions`. Read and respond to GitHub Discussions forum topics -- list a repo's discussions, read a topic and its comments, draft and post a reply, and mark an answer on Q&A discussions. Reads are available over REST (`gh api repos/{owner}/{repo}/discussions/...`), so a topic is readable even where GraphQL is blocked; writes are GraphQL-only (no `gh discussion` subcommand, no GitHub MCP tool), so posting runs `gh api graphql`. Use when asked to 'read the discussions', 'respond to this discussion', 'answer the discussion topic', 'reply to the forum', 'triage the discussion board', or 'check GitHub Discussions'. Use when Codex is asked to use `discussions`, `/discussions`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # discussions (Codex wrapper)
@@ -53,8 +53,10 @@ run the CLI command. Full per-model reference: [tool-mappings.md](../../tool-map
 | `COMMENT_ISSUE` | Post a comment on an issue. | `gh issue comment <N> --body "..."` | `mcp__github__add_issue_comment` |
 | `CLOSE_ISSUE` | Close an issue with a reason. | `gh issue close <N> --reason "..."` | `mcp__github__issue_write (method=update, state=closed, state_reason=...)` |
 | `REOPEN_ISSUE` | Reopen a closed issue. | `gh issue reopen <N> --comment "..."` | `mcp__github__issue_write (method=update, state=open)` |
-| `LIST_DISCUSSIONS` | List a repository's discussions. Discussions are GraphQL-only. | `gh api graphql (list discussions)` | (no GitHub MCP tool; use gh api graphql) |
-| `VIEW_DISCUSSION` | Read a discussion topic and its comment thread. | `gh api graphql (read discussion + comments)` | (no GitHub MCP tool; use gh api graphql) |
+| `LABEL_ISSUE` | Set an issue's labels. The two behave differently and are not interchangeable: `--add-label` ADDS to the existing set, while the MCP path REPLACES the whole set, so pass the union of existing and new labels there. The MCP path also silently creates an unknown label name instead of rejecting it. | `gh issue edit <N> --add-label "..."` | `mcp__github__issue_write (method=update, labels=[...])` |
+| `GET_LABEL` | Read a single label's name, color, and description. There is no MCP tool to create or update a label; use gh label create/edit, or gh api from a workflow. | `gh api repos/<owner>/<repo>/labels/<name>` | `mcp__github__get_label` |
+| `LIST_DISCUSSIONS` | List a repository's discussions. Readable over REST; writes are GraphQL-only. | `gh api repos/{owner}/{repo}/discussions` | (no GitHub MCP tool; use gh api REST or graphql) |
+| `VIEW_DISCUSSION` | Read a discussion topic and its comment thread. Readable over REST. | `gh api repos/{owner}/{repo}/discussions/{number}[/comments]` | (no GitHub MCP tool; use gh api REST or graphql) |
 | `COMMENT_DISCUSSION` | Post a reply on a discussion (top-level or threaded). | `gh api graphql (addDiscussionComment)` | (no GitHub MCP tool; use gh api graphql) |
 | `ANSWER_DISCUSSION` | Mark a comment as the accepted answer on a Q&A discussion. | `gh api graphql (markDiscussionCommentAsAnswer)` | (no GitHub MCP tool; use gh api graphql) |
 | `CREATE_DISCUSSION` | Open a new discussion in a category. | `gh api graphql (createDiscussion)` | (no GitHub MCP tool; use gh api graphql) |

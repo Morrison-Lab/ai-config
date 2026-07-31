@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # Populate shared/sembr-skills so the marketplace plugin source is a
+          # real directory rather than an empty placeholder; without this, the
+          # plugin-source check below can only ever report the warning branch.
+          submodules: true
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
@@ -23,10 +28,20 @@ jobs:
         run: python3 scripts/check-vendored-drift.py
       - name: Check markdown (.md) style
         run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
+      - name: Run skills-validator tests
+        run: python3 scripts/test_validate_skills.py
       - name: Run semantic-line-break tool tests
         run: python3 scripts/test_slb.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
+      - name: Run near-duplicate detector tests
+        # The detector itself is a find-overlap tool rather than a gate, so it
+        # is not run here -- a corpus growing a near-duplicate pair is a
+        # reading prompt, not a build failure. Its tests do run, because two
+        # of them pin measured corpus facts (alias stubs score low;
+        # conceptually adjacent pairs score low) that the script's documented
+        # scope rests on.
+        run: python3 scripts/test_find_near_duplicates.py
       - name: Run install-integrity check tests
         # Only the tests run here. check-install.py itself compares against a
         # consumer directory (~/.claude) that no CI runner has, so on a runner
@@ -40,7 +55,7 @@ jobs:
         # rationale.
         run: python3 scripts/check-memory-file-size.py
       - name: Check Quarto (.qmd) prose style
-        uses: d-morrison/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
+        uses: Morrison-Lab/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
 
   new-line-breaks:
     # Diff-scoped, non-blocking (ai-config#682, ported to gha#300): MD013 is
@@ -52,7 +67,7 @@ jobs:
     # (github.event.pull_request.base.sha on PRs, '' otherwise) already
     # makes a non-PR run (e.g. push to main) skip cleanly rather than
     # scanning the whole tree -- see check-new-line-breaks.yml gha#300.
-    uses: d-morrison/gha/.github/workflows/check-new-line-breaks.yml@209bfb76bd412aa10d4d56a809d791a6dc8f10df # v2, gha#300
+    uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76bd412aa10d4d56a809d791a6dc8f10df # v2, gha#300
     with:
       globs: '**/*.md'
       paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'

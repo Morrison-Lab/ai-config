@@ -1018,3 +1018,48 @@ damage.
 The affected directories' mtimes read *earlier* than the bootstrap run because
 they were copied from a bundle, which is why the log, not the mtimes, was the
 deciding evidence.)
+
+## An except-branch that substitutes a fallback value hides a misclassification
+
+A `try/except` whose handler assigns a default instead of re-raising turns a
+failed computation into a *quiet answer*, and the answer is usually wrong in a
+way nothing downstream can see.
+It is the swallowed-error shape from
+[`fail-fast`](../shared/principles/fail-fast.md), one level in: the exception
+is caught deliberately and for a real reason, so it does not read as swallowing
+at all.
+
+Path comparison is where this bites most often, because the two sides can
+disagree without either being wrong:
+
+```python
+try:
+    rel = candidate.resolve().relative_to(ROOT).as_posix()
+except ValueError:
+    rel = raw_source          # <- silently a different string
+```
+
+`resolve()` follows symlinks and `ROOT` may not have been resolved, so
+`relative_to` raises `ValueError` and the fallback returns something that
+never matches the registry it is about to be looked up in.
+Every branch keyed on that lookup then takes the wrong arm, with no error
+anywhere.
+macOS makes this reproducible for free: `tempfile` hands out `/var/folders/...`
+while `resolve()` returns `/private/var/folders/...`, so a test exercises the
+fallback that production never reaches, or the reverse.
+
+Two habits:
+
+- **Resolve both sides of any path comparison**, not just the one you compute.
+- **Prefer a test over an inspection for this class of bug.**
+  A fallback branch is invisible in review precisely because the code that
+  produces it looks defensive and correct.
+
+(Morrison-Lab/ai-config#804, 2026-07-29: a new `check_plugin_sources()` in
+`scripts/validate-skills.py` classified an uninitialized git submodule as a
+warning and anything else missing as an error.
+Its own regression test failed on the warning case only, because the temp-dir
+root was unresolved -- so every registered submodule would have been demoted to
+the error branch on any checkout reached through a symlink.
+The function passed against the real repo throughout, since `ROOT` there is
+already `resolve()`d.)

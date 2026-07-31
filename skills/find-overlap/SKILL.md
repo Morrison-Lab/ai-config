@@ -17,6 +17,9 @@ allowed-tools:
   - Read
   - Grep
   - Glob
+context: fork
+agent: overlap-detector
+background: false
 ---
 
 # find-overlap — read-only overlap / redundancy detector
@@ -100,11 +103,36 @@ The line count separates thin stubs from real bodies at a glance.
 
 ### 3. Cluster candidates — then read the bodies
 
-Group units that share keywords, titles, or the same outcome. Do a cheap
-keyword/title pass first, **then read the full body of every member of each
-candidate cluster.** Never classify on titles or descriptions alone — that's the
-top source of false positives (two skills can share a verb and do different
-work).
+**Run the instrument first, then do the keyword pass --- you need both.**
+
+```bash
+python3 scripts/find-near-duplicates.py --calibrate            # skills corpus
+python3 scripts/find-near-duplicates.py --corpus 'memories/*.md'
+python3 scripts/find-near-duplicates.py --include-aliases      # to audit stubs
+```
+
+It ranks every pair by Jaccard similarity over word shingles and prints the
+candidates above a threshold with their shared phrasing, so which pairs get
+read is decided by arithmetic rather than by which ones you thought to
+compare --- per
+[`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md).
+It suppresses alias-stub pairs by default and reports how many it suppressed.
+
+**It covers one of the three buckets, so it does not replace the keyword
+pass.** It ranks *reused phrasing*, which is where genuine duplicates live.
+It cannot see conceptual adjacency: `tidy` and `simplify` --- this skill's own
+canonical adjacent-but-distinct example --- score 0.019, because they share an
+idea and almost no wording.
+Alias families are likewise invisible to the score (a stub's body is a
+pointer, so `find-duplicates` vs `find-overlap` scores 0.002) and are detected
+structurally instead, via the `alias?` flag.
+So: take the instrument's ranking, **then** add whatever the keyword/title
+pass turns up that it missed.
+
+Then **read the full body of every member of each candidate cluster.** Never
+classify on titles, descriptions, or a similarity score alone --- that's the top
+source of false positives (two skills can share a verb, or a paragraph of
+boilerplate, and do different work).
 
 ### 4. Classify each cluster into one of the three buckets
 
@@ -133,6 +161,31 @@ adjacent-but-distinct missing a link → `link-skills`; redundant code → `tidy
 cluster — a raw similarity list with no disposition just pushes the judgment back
 to the reader.
 
+## Runs forked; `background: false` for synchronous return
+
+This whole skill --- every step above, including the report --- runs
+isolated as the `overlap-detector` custom agent (`context: fork` +
+`agent: overlap-detector`), not inline in the calling conversation.
+Two reasons, and the second is the one that matters:
+
+- **Context cost.** The skill body (this file) never enters the calling
+  conversation at all, rather than staying resident once loaded.
+- **Isolation from anchoring.** A dedup pass that has already read the
+  conversation that produced the content under audit is a weaker audit ---
+  the same argument behind the `Workflow` adversarial-verify pattern this
+  skill's own Orchestration step already uses.
+
+Every step above needs only `Bash`/`Read`/`Grep`/`Glob`, so nothing is lost
+by running the whole procedure inside `overlap-detector` rather than only a
+sub-step of it --- unlike an audit skill that also files an issue or opens
+a PR, find-overlap has no write/PR follow-through to leave behind in the
+main session.
+
+`background: false` overrides the fork's own default so the report still
+returns in the turn that invoked the skill, matching how `consolidate-skills`
+and `consolidate-memory` already consume it (step 1 of each delegates here
+and acts on the result immediately, not asynchronously).
+
 ## Orchestration
 
 Overlap detection over a large corpus decomposes by comparison cluster --- each
@@ -144,6 +197,16 @@ against the three buckets, then a synthesis stage that assembles the
 dispositions, rather than reading the whole corpus in one context. This stays
 read-only; it only parallelizes the reading and classification. Launch directly
 when an opt-in signal is present; otherwise propose with a cost estimate first.
+
+**This decomposition needs the calling session, not the forked run.**
+`overlap-detector`'s own tool list has no `Workflow` --- deliberately, so
+granting the fork read-only detection doesn't also hand it a path to spin up
+a sub-agent with write access.
+So the fork itself always reads the corpus serially.
+For a corpus large enough to want the Workflow fan-out above, run that
+fan-out in the main session instead of invoking this skill, or treat it as
+a known limitation until a follow-up gives `overlap-detector` a
+read-only-scoped path to it.
 
 ## Relationship to other skills
 

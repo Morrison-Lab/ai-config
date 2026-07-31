@@ -111,6 +111,51 @@ Look for branch naming patterns that reference issues:
 
 If a claim comment exists within the last 24 hours → **Active**, skip.
 
+#### f. If the PR closed unmerged, diff the branch against main before believing it
+
+Check c only asks whether an **open** PR exists, so a branch whose PR closed
+unmerged falls straight through to a delete classification.
+That is right for an abandoned branch and wrong for a superseded one, because a
+closure rationale describes the PR's **stated purpose**, not an inventory of its
+diff.
+"Superseded by #260, all review findings addressed" is a claim about the
+feature; it says nothing about an unrelated fix that happened to share the
+branch.
+
+The gap is easy to miss in exactly the case that matters, since the rationale is
+usually accurate about the thing it names, and the leftover work is by
+definition the part nobody was talking about.
+Nothing else flags it either: `git branch -d` consults the upstream rather than
+`main` (see the safety rules below), the superseding PR merged and closed the
+issue, and the tracker looks clean.
+
+So for any branch whose PR closed **unmerged**, compare the files rather than
+reading the closure comment:
+
+```bash
+gh pr list --head <branch> --state closed \
+  --json number,title,mergedAt,url | cat                     # LIST_PRS
+gh pr diff <N> --name-only                                   # DIFF_PR
+git diff --stat origin/main...origin/<branch>                # what is still unlanded
+```
+
+`mergedAt: null` on a closed PR is the trigger.
+Then diff each file the branch touched against `main`;
+anything still absent is unlanded work, and the branch is **Stale**, not Dead
+--- rebase it and open an MR (steps 6--7), or file an issue for the salvageable
+part and say so in the plan before deleting.
+
+Weight the check by how far the branch's contents stray from its title: a branch
+carrying commits unrelated to the PR that named it is the shape this catches.
+`rescue-closed` is the deliberate, whole-tracker version of the same sweep; this
+is the minimum owed before a deletion.
+
+(2026-07-29: a bcs branch closed as superseded still carried an orthogonal
+out-of-memory fix --- `geepack::geeglm` replaced by `glm` + `sandwich::vcovCL`
+--- that the superseding privacy redesign never touched.
+Deleting on the closure rationale would have discarded it silently;
+filed instead as `ucdavis/bcs#466`.)
+
 ### 4. Present the plan (dry run)
 
 Before taking any action, present a table to the user:
@@ -191,6 +236,27 @@ git fetch --prune origin                       # marks deleted upstreams as [gon
 git branch --show-current                      # never delete the branch you're on
 ```
 
+**The `--prune` is a prerequisite, not a refresh --- without it step b finds
+nothing and reports success.** `[gone]` is produced *by* pruning, not by the
+branch being deleted upstream: until a prune runs, `%(upstream:track)` is
+empty for exactly the branches b exists to find, so its `grep` matches zero
+rows and the sweep says there is nothing to clean.
+The "nothing found" and "never ran" paths print the same thing,
+so never take a zero-row result as clean
+unless this fetch actually ran in this sweep.
+
+Recommend the standing setting once, since it makes every other tool's view
+correct too --- but keep the explicit `--prune` above regardless, so the sweep
+does not depend on the user's config:
+
+```bash
+git config --global fetch.prune true          # or per-remote:
+git config --global remote.origin.prune true
+```
+
+That setting only prunes `refs/remotes/origin/*`.
+It never deletes a local branch, so it replaces none of the steps below.
+
 Classify each **local** branch (excluding `main`/`master`/protected and the
 current branch):
 
@@ -233,6 +299,28 @@ glab mr list --source-branch=<branch> --state merged 2>&1 | cat
   first.
 - No merged PR and unique commits exist → **stale local work**: don't delete;
   offer to push it and open an MR (step 7 mechanics).
+
+**Read the PR, not local ancestry, to decide whether the work landed.** In a
+repo that squash-merges --- `ucdavis/bcs` and `Morrison-Lab/ai-config` both do
+--- a branch whose work is already on `main` still reports a non-zero
+ahead-count, is not an ancestor of `main`, is absent from
+`git branch --merged`, and is refused by `git branch -d`.
+All four say "unmerged" about a branch that merged,
+because the squash commit is a different commit.
+So treat a `-d` refusal as *unproven*,
+never as evidence the branch holds unique local work ---
+that is what the merged-PR lookup above is for,
+and why `-D` is the right tool once it comes back positive.
+
+The converse still holds and is what keeps this safe: no merged PR **and**
+unique commits means the work may exist nowhere else,
+so it is never deleted without confirmation.
+When the PR lookup is inconclusive,
+check content rather than ancestry, since content survives a squash:
+
+```bash
+git show origin/main:<path> | grep <something-the-branch-added>   # did it land?
+```
 
 #### c. Never pushed, has unique commits → keep, but flag
 
@@ -292,6 +380,16 @@ Print a summary covering **both** local and remote:
   the branch is merged, which catches "I thought this landed but it didn't."
   Only use `-D` after confirming the PR merged (squash/rebase merges can leave a
   local branch that `-d` won't recognize as merged).
+- **Don't read a successful `-d` as proof the work reached `main`.**
+  Per `git-branch(1)`, the branch must be fully merged "in its upstream branch,
+  or in HEAD if no upstream was set".
+  So a branch still tracking a live `origin/<name>` passes on the *upstream*
+  check alone, printing `warning: deleting branch X that has been merged to
+  refs/remotes/origin/X, but not yet merged to HEAD`.
+  Only a `[gone]` upstream falls back to the HEAD comparison.
+  Both outcomes are routine in one sweep (18 `-d` / 11 `-D` across 29 branches
+  in one 2026-07-29 run), so whether `-d` sufficed or `-D` was required is not
+  a classification signal --- step 3 is.
 - **Never delete a local-only unpushed branch without confirmation** — if it has
   unique commits and no remote, that work exists nowhere else.
 

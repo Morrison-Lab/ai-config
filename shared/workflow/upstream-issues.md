@@ -17,6 +17,9 @@ them wrong can get the user's account banned. Check, in the upstream repo:
 - **Where the item belongs.** Many projects route **feature requests and
   questions to a Discussions board**, not the issue tracker. File bugs as
   issues only if that's what the guidelines say; otherwise use Discussions.
+  The same judgment applies to repos we administrate, rather than being a
+  courtesy owed only to strangers --- see
+  [`choose-issue-or-discussion`](choose-issue-or-discussion.md).
 
 Beyond what you read in those files: **never open an upstream issue/PR
 autonomously.** Draft it, show the user the full text, and **get explicit

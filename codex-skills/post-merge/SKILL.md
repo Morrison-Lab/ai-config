@@ -1,6 +1,6 @@
 ---
 name: "post-merge"
-description: "Codex wrapper for the ai-config Claude skill `post-merge`. Wrap up a just-merged PR/MR: verify the merge actually landed (never assume), tidy the local branch (switch to main, pull, delete the merged branch), confirm any deferred follow-up issues are tracked, then run UMS to capture what the PR's review lifecycle taught \u2014 mistakes corrected and guidance given along the way. Use right after a PR merges, or when asked to 'post-merge', 'wrap up the merged PR', or 'clean up after the merge'. For the directive to actually perform the merge ('merge it' / 'merge this'), use the merge-it skill, which merges then chains into this one. Use when Codex is asked to use `post-merge`, `/post-merge`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `post-merge`. Wrap up a just-merged PR/MR: verify the merge actually landed (never assume), tidy the local branch (switch to main, pull, delete the merged branch), confirm any deferred follow-up issues are tracked, flag a release step the merge left owed (a floating tag a human must still slide), then run UMS to capture what the PR's review lifecycle taught -- mistakes corrected and guidance given along the way. Use right after a PR merges, or when asked to 'post-merge', 'wrap up the merged PR', or 'clean up after the merge'. For the directive to actually perform the merge ('merge it' / 'merge this'), use the merge-it skill, which merges then chains into this one. Use when Codex is asked to use `post-merge`, `/post-merge`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # post-merge (Codex wrapper)
@@ -53,8 +53,10 @@ run the CLI command. Full per-model reference: [tool-mappings.md](../../tool-map
 | `COMMENT_ISSUE` | Post a comment on an issue. | `gh issue comment <N> --body "..."` | `mcp__github__add_issue_comment` |
 | `CLOSE_ISSUE` | Close an issue with a reason. | `gh issue close <N> --reason "..."` | `mcp__github__issue_write (method=update, state=closed, state_reason=...)` |
 | `REOPEN_ISSUE` | Reopen a closed issue. | `gh issue reopen <N> --comment "..."` | `mcp__github__issue_write (method=update, state=open)` |
-| `LIST_DISCUSSIONS` | List a repository's discussions. Discussions are GraphQL-only. | `gh api graphql (list discussions)` | (no GitHub MCP tool; use gh api graphql) |
-| `VIEW_DISCUSSION` | Read a discussion topic and its comment thread. | `gh api graphql (read discussion + comments)` | (no GitHub MCP tool; use gh api graphql) |
+| `LABEL_ISSUE` | Set an issue's labels. The two behave differently and are not interchangeable: `--add-label` ADDS to the existing set, while the MCP path REPLACES the whole set, so pass the union of existing and new labels there. The MCP path also silently creates an unknown label name instead of rejecting it. | `gh issue edit <N> --add-label "..."` | `mcp__github__issue_write (method=update, labels=[...])` |
+| `GET_LABEL` | Read a single label's name, color, and description. There is no MCP tool to create or update a label; use gh label create/edit, or gh api from a workflow. | `gh api repos/<owner>/<repo>/labels/<name>` | `mcp__github__get_label` |
+| `LIST_DISCUSSIONS` | List a repository's discussions. Readable over REST; writes are GraphQL-only. | `gh api repos/{owner}/{repo}/discussions` | (no GitHub MCP tool; use gh api REST or graphql) |
+| `VIEW_DISCUSSION` | Read a discussion topic and its comment thread. Readable over REST. | `gh api repos/{owner}/{repo}/discussions/{number}[/comments]` | (no GitHub MCP tool; use gh api REST or graphql) |
 | `COMMENT_DISCUSSION` | Post a reply on a discussion (top-level or threaded). | `gh api graphql (addDiscussionComment)` | (no GitHub MCP tool; use gh api graphql) |
 | `ANSWER_DISCUSSION` | Mark a comment as the accepted answer on a Q&A discussion. | `gh api graphql (markDiscussionCommentAsAnswer)` | (no GitHub MCP tool; use gh api graphql) |
 | `CREATE_DISCUSSION` | Open a new discussion in a category. | `gh api graphql (createDiscussion)` | (no GitHub MCP tool; use gh api graphql) |

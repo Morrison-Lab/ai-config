@@ -149,14 +149,89 @@ nothing in a container, with no output difference to notice.
 So set the locale explicitly in any check that matches non-ASCII, and
 still make the error path distinguishable from the clean one.
 
-Better still, do not reach for that form at all.
-Remembering to set the locale is a discipline that fails silently the one
-time it is forgotten, and the bash one-liner is what hands reach for
-reflexively -- including minutes after reading this section, which is how
-it recurred while this very paragraph was being written (2026-07-31).
-A few lines of Python that raise on a bad pattern and print
-`examined N lines` cost about as much to type and cannot produce a false
-all-clear.
+**Setting it explicitly is not the same as setting it on the right command,
+and a pipeline is where those two come apart.**
+An environment-variable prefix binds to the single command it precedes, so in
+a pipeline it never reaches the later stages:
+
+```bash
+LC_ALL=C.UTF-8 git diff | grep -P '[\x{2014}]'   # prefix reaches git diff only
+```
+
+`grep` still runs in the ambient locale, so this fails exactly as the bare
+form does while *looking* like the fixed version above.
+The correct string is present, one process to the left of where it was needed.
+
+Put the assignment on the command that reads it, or export it around the whole
+pipeline:
+
+```bash
+git diff | LC_ALL=C.UTF-8 grep -P '[\x{2014}]'                # on the consumer
+( export LC_ALL=C.UTF-8; git diff | grep -P '[\x{2014}]' )    # whole subshell
+```
+
+This variant is more survivable than the `|| true` above, and worth recording
+for the opposite reason: `grep` exits 2 with "code point value ... too large",
+so it fails **loudly** and the fix is a one-token move.
+The hazard is that a reader who has already internalized "set the locale" sees
+the variable on the line and stops looking.
+
+- **Do:** put the locale assignment on the process that interprets the
+  pattern, or export it around the whole pipeline.
+- **Don't:** treat the presence of `LC_ALL=` somewhere in a command line as
+  evidence that the matching stage received it.
+
+(ai-config#871, 2026-07-30: a pre-push punctuation scan written as
+`LC_ALL=C.UTF-8 git diff -U0 origin/main...HEAD | grep -P '[...]'` aborted with
+rc=2.
+The fix adopted was rewriting the scan in Python, which also reports how many
+added lines it examined --- so a zero-hit result is distinguishable from a run
+that examined nothing, per the fan-out section below.)
+
+### A fan-out makes this worse, because every worker fails identically
+
+The one-liner above swallows one command's failure.
+A parallel sweep swallows every worker's, and the aggregate then reads as a
+finding rather than as an error: not "the check broke" but "nothing was
+found", across the whole corpus at once.
+
+The shape is a scan whose per-item worker writes only on a hit, run under
+`xargs`/`parallel` with stderr discarded:
+
+```bash
+xargs -P 12 -n 1 ./scan.sh < "$OUT/repos.txt" >/dev/null 2>&1   # every failure discarded
+```
+
+Any per-worker failure now produces an empty results file, which is exactly
+what a clean corpus produces.
+The specific trap worth naming: a `chmod +x` that lived in an earlier command
+which never ran --- denied by a permission prompt, edited out, lost to a
+failed compound --- leaves the script non-executable, so all N invocations
+die with "permission denied" into `/dev/null`.
+Nothing in the output distinguishes that from success.
+
+Count what you examined, not only what you found.
+A worker that appends its own identifier unconditionally, before any
+early-exit path, turns the ambiguity into arithmetic:
+
+```bash
+echo "$item" >> "$OUT/scanned.txt"     # first line of the worker, not the last
+...
+echo "scanned $(wc -l < "$OUT/scanned.txt") of $(wc -l < "$OUT/repos.txt")"
+```
+
+`scanned 0 of 947` is unmistakable; a bare "no hits" is not.
+Place that line **before** the worker's early exits, or the items that failed
+their first lookup go unrecorded and the shortfall silently shrinks --- which
+converts this instrument back into the thing it was built to replace.
+
+Distrust a sweep that reports zero, and distrust one whose scanned count you
+never printed.
+(2026-07-28: a 947-repo scan reported `scanned: 0`, caught only because the
+count was printed; the `chmod +x` had been in a command the permission
+classifier denied minutes earlier.
+A later run of the fixed script reported 910 of 947, which is how the
+rate-limit truncation above was found.)
 
 ### The pattern itself is the other half, and it fails without erroring
 
@@ -196,6 +271,16 @@ move or wrap the very string being looked for.
 State the scope with the result, too.
 "No matches" and "no matches **under these three paths**" are different
 claims, and the second is the honest one when the search was scoped.
+
+Distinct from
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md), and the pair is
+worth keeping apart.
+That fragment governs a **sound** command whose conclusion overreaches --- the
+null result is a real fact about the pattern, and only the step to "the corpus
+lacks this" is wrong.
+Here the command itself is unsound, so the result is not a fact about anything.
+Read that one before concluding a concept is absent; read this one before
+trusting any grep as an instrument.
 
 (Morrison-Lab/gha#328/#329, 2026-07-31: the unanchored `uses: [a-z]` was
 published in an issue and a merged PR body as *the* verification command

@@ -533,6 +533,93 @@ Lacaedemon/sparta #883→#884, 2026-07-15):
   head (`gh pr view N --json headRefOid`) and comparing to the local SHA —
   then `git fetch` + retry the push if it didn't. Don't diagnose PR state
   until the head matches.
+- **`stale info` after `checkout -B` usually means the remote branch was
+  DELETED, not moved -- and then a plain push is the correct fix, not a bigger
+  hammer.**
+  The bullet above says the remote-tracking ref can be stale; this is the
+  specific cause that recurs on this repo's normal flow, since a squash-merge
+  with auto-delete-on-merge removes the branch while your ref still names its
+  old tip.
+  `--force-with-lease` then fails for a reason that reads alarmingly like a
+  race with another session:
+
+  ```
+  ! [rejected]  HEAD -> claude/... (stale info)
+  ```
+
+  The lease is unsatisfiable rather than violated, because the ref it names no
+  longer exists.
+  So the reflex it invites -- reach for `--force`, or assume someone else
+  pushed -- is wrong in both directions: `--force` is unnecessary, and there is
+  nothing to race.
+  Settle which case it is before pushing anything:
+
+  ```sh
+  git ls-remote --heads origin <branch>   # empty output = deleted
+  ```
+
+  Empty means the next push *creates* the branch, so it can destroy nothing and
+  needs no lease at all.
+  `git fetch --prune` followed by a retry works for the same reason, and is
+  worth preferring when you want the remote-tracking ref corrected too.
+
+  - **Do:** run `git ls-remote --heads origin <branch>` when a lease push
+    reports `stale info`, and plain-push when it comes back empty.
+  - **Don't:** escalate to `--force`, or suspect a parallel session, before
+    checking whether the branch still exists.
+
+  (Morrison-Lab/ai-config#857 -> #872, 2026-07-30: #857 squash-merged and its
+  head branch was auto-deleted.
+  Restarting the same harness-assigned branch name from the new `main` and
+  pushing the follow-up work produced `stale info`; `ls-remote` returned
+  nothing, and the plain push reported `* [new branch]`.)
+
+## `git push origin <name>` pushes the LOCAL BRANCH of that name, not HEAD
+
+`git push origin <refspec>` takes a *ref*, not a label for "what I am working
+on".
+So in a checkout that has both the PR's branch checked out and a leftover
+local branch named after something else --- the harness-assigned
+`claude/...` name, say --- running `git push -u origin claude/...` pushes
+**that other branch**, wherever it happens to point, and leaves the current
+work unpushed.
+
+The failure is quiet in the direction that matters.
+The push succeeds, `git log` still shows the commits, and the only complaint
+is from whatever check later notices the PR did not move.
+The `-u` compounds it by repointing the *other* branch's upstream, so a
+subsequent bare `git push` is now aimed somewhere new.
+
+The tell is `* [new branch]` in the push output, and this is a **second
+cause** for that line, distinct from the one in `CLAUDE.md`'s "Use the
+existing PR branch" section.
+There it means the remote branch was deleted underneath you, which on a PR
+branch means the PR merged.
+Here it means the ref you named had no remote counterpart because it was
+never the branch you were working on.
+Both warrant stopping, and they are told apart by which name is on the line:
+if it is not the branch you have been pushing all along, you pushed the
+wrong ref.
+
+Recovery is cheap when caught immediately --- push the real branch, then
+clean up the stray remote ref (`git merge-base --is-ancestor <stray-tip>
+origin/main` first, to confirm it carries nothing unmerged; note that
+deletion no-ops under the remote push proxy, per the section below).
+
+- **Do:** push with no refspec (`git push`) once upstream is set, or name the
+  branch you confirmed with `git branch --show-current`.
+- **Do:** read the push output for `* [new branch]` versus a `SHA..SHA`
+  range, and stop on the former.
+- **Don't:** paste a branch name from the harness's instructions into
+  `git push` without checking it is the branch you are on.
+- **Don't:** read a zero exit status as evidence the right commits went out.
+
+(Morrison-Lab/gha#357, 2026-07-29: `git push -u origin
+claude/gha-pr-357-review-of6k4h` while on `add-gemini-and-ai-review-workflows`
+created a stray remote branch at an already-merged commit and pushed none of
+the round's four commits.
+Caught by the `* [new branch]` line, since the PR branch had been pushed
+several times already.)
 
 ## Remote-session push proxy: branch DELETION silently no-ops
 
@@ -765,6 +852,190 @@ applied here.
 Running both forms before replying is what caught it; applying the suggestion
 would have silently un-gated all five root-level files, including the
 `NEWS.md` whose merge-splice defect motivated the PR.)
+
+## Citing evidence that lives in a PR's own superseded commits
+
+When durable guidance (a `CLAUDE.md` rule, a memory entry, a doc) cites a real
+incident as its worked example, ask where a later reader would go to check it.
+An incident that happened on an **earlier commit of the very PR adding the
+guidance** is the hard case: it is real, and it is invisible to every obvious
+probe.
+
+A reviewer checking `git show HEAD:<file>` finds nothing, because the later
+commit fixed the thing away.
+A reviewer checking the *linked prior PR* -- the one the guidance is about --
+finds nothing either, because the incident was never there.
+Both probes are reasonable, and both come back empty, so a true claim reads as
+fabricated.
+
+Cite the SHA, so the claim is reachable rather than merely true.
+Naming the commit (and, where it exists, the CI job id) converts an
+unverifiable anecdote into something a reader can run `git show` against.
+
+**Whether that citation survives the merge depends on the repo's merge
+strategy, so check it before relying on a branch SHA.**
+A repo that creates real merge commits keeps the PR's individual commits as
+ancestors of `main`, so the short SHA stays reachable forever.
+A repo that **squash-merges** does not: the branch commits never become
+ancestors, and a cited SHA goes dead the moment the branch is deleted.
+**And you cannot read a repo's strategy off one merge, so never cite a branch
+SHA on the strength of what the last PR looked like.**
+GitHub lets a repository enable merge, squash, and rebase simultaneously, so
+the strategy is chosen per pull request by whoever clicks the button.
+`ucdavis/bcs` demonstrates it inside one afternoon:
+
+```
+$ for c in b8ee355 2daed4c eead1e0; do git show -s --format='%p %s' $c; done
+9787b57                  docs: record the Spellcheck house-style rule (#456)   <- 1 parent, squashed
+eead1e0 52d28e8          Merge pull request #453 from ucdavis/fix/repoint...   <- 2 parents, merged
+c10ed45                  fix: exclude artifact outputs from provenance (#449)  <- 1 parent, squashed
+```
+
+So the safe default is to cite what survives **every** strategy: the PR or
+issue number, a permalink to the file at a merged commit, or the CI job URL.
+Reach for a branch SHA only when the merge has already happened and you have
+checked that specific commit with `git merge-base --is-ancestor`.
+
+That is not a hypothetical.
+This entry originally cited `082f369` as a still-reachable example, on the
+strength of #453 having merged as a merge commit --- and #456 then
+squash-merged, so `git merge-base --is-ancestor 082f369 origin/main` returns
+false and the citation died within the hour.
+`Morrison-Lab/ai-config` squashed #795 the same way: ancestry false for both
+commits, though the *content* was present on `main`.
+
+That same asymmetry is why a post-merge check should verify **content** rather
+than ancestry in a squash repo --- `git show origin/main:<path> | grep` answers
+the question ancestry cannot.
+
+(ucdavis/bcs#456, 2026-07-28: a review called a `wordlist NEWS.md:3` spellcheck
+failure "fabricated rather than drawn from a real incident".
+It had happened two commits earlier on that same PR, at `082f369`, and had
+already been reworded away.
+Rebutted with the commit and the job log, then addressed by naming the SHA in
+the guidance itself --- which ucdavis/bcs#457 had to undo an hour later, once
+PR #456 squash-merged and that SHA stopped resolving.)
+
+## Cleaning up a branch deleted on `origin` is two mechanisms, and only one is a config
+
+"Prune branches once they are deleted on `origin`" sounds like one setting.
+It is two, they live in different places, and only the first is a git config.
+
+**Half 1 --- the remote-tracking ref.**
+`fetch.prune=true` (or the per-remote `remote.origin.prune=true`) drops
+`refs/remotes/origin/<name>` once that branch is gone upstream.
+It never touches a local branch.
+Verified on git 2.34.1 (2026-07-29), deleting `feat` from a second clone:
+
+```
+=== after fetch.prune=true ===
+remote-tracking refs:   origin/master       <- origin/feat pruned
+LOCAL branches:         feat  * master      <- feat untouched
+```
+
+**Half 2 --- the local branch whose upstream is now `[gone]`.**
+Git has no config for this at all, so no setting will ever do it.
+It is a procedure, owned by
+[`clean-branches`](../skills/clean-branches/SKILL.md) step 8b: find the
+`[gone]` branches, confirm the PR actually merged, then delete.
+Keep it confirmation-gated --- it is the half that can destroy work.
+
+### Without half 1, half 2 reports a false clean rather than an error
+
+The `[gone]` marker is produced **by pruning**, not by the branch being deleted
+upstream.
+Until a prune runs, `%(upstream:track)` is empty for exactly the branches the
+sweep exists to find, so a `grep '\[gone\]'` matches nothing and the sweep
+reports there is nothing to clean:
+
+```
+=== plain fetch, no prune ===
+feat | origin/feat | track=
+=== after fetch.prune=true ===
+feat | origin/feat | track=[gone]
+```
+
+That is the shape [`fail-fast`](../shared/principles/fail-fast.md) warns about:
+the "nothing found" path and the "never ran" path print the same thing.
+So a sweep has to *establish* that a prune happened rather than assume it.
+Running `git fetch --prune` inside the step is what keeps the config a
+convenience rather than a silent prerequisite.
+
+### In a squash-merge repo, local ancestry cannot be the safety signal
+
+The safety rule is "never delete a branch carrying unique local commits", and
+the obvious instruments for it all give the wrong answer where the repo
+squash-merges.
+Verified against a branch whose work had demonstrably landed on `main`:
+
+```
+ahead: 1   behind: 1
+is feat an ancestor of master?      NO
+git branch --merged origin/master   ->  * master        (feat absent)
+git branch -d feat                  ->  error: The branch 'feat' is not fully merged.
+```
+
+Every one of those says "unmerged" about a branch that merged.
+Once the upstream ref itself has been pruned there is no upstream left to
+compare against, so `-d` falls back to `HEAD` and refuses.
+Read that refusal as *unproven*, not as *unique local work* --- which is why
+step 8b confirms the merge through the PR and only then reaches for `-D`.
+
+So the authoritative landed-signal is the PR's own merge state, and the
+content check that survives a squash (`git show origin/main:<path>`), not
+local ancestry.
+`ucdavis/bcs` and `Morrison-Lab/ai-config` both squash-merge.
+
+- **Do:** set `fetch.prune` for the remote-tracking half, and treat the
+  local-branch half as a reviewed sweep rather than something a config does.
+- **Do:** decide "did this land?" from the PR, in any repo that squash-merges.
+- **Don't:** read a `[gone]` sweep that found nothing as a clean result until
+  you know a prune actually ran.
+- **Don't:** treat `git branch -d` refusing, a non-zero ahead-count, or absence
+  from `git branch --merged` as evidence a branch still holds unpushed work.
+
+## `git rev-parse <ref>:<path>` writes its own input to stdout when the path is absent
+
+`git rev-parse` resolves `<ref>:<path>` to a blob SHA.
+When that path does not exist in that ref it fails **and still writes to stdout** -- the literal input string, unchanged.
+Verified on git 2.34.1, 2026-07-30:
+
+```console
+$ git rev-parse origin/main:not/a/real/path; echo "rc=$?"
+fatal: path 'not/a/real/path' does not exist in 'origin/main'
+origin/main:not/a/real/path
+rc=128
+$ git rev-parse origin/main:README.md; echo "rc=$?"
+939ce89cb74324b1c783fe726a20a1d2b4d9b06b
+rc=0
+```
+
+The two lines go to different streams, so a capture keeps the echoed input whichever way stderr is handled:
+
+```console
+$ out=$(git rev-parse origin/main:not/a/real/path 2>/dev/null); echo "[$out]"
+[origin/main:not/a/real/path]
+```
+
+A capture that merges stderr with `2>&1`, or that ignores the exit status, therefore comes back non-empty with a value that reads as an ordinary answer.
+It is also unequal to every real SHA, which is what makes it worse than an empty result.
+A "does this path differ between two refs" check compares two such strings, finds them unequal, and reports **differs** when the true answer was **absent from one side**.
+That is the by-hand-check shape [`fail-fast`](../shared/principles/fail-fast.md) describes, where the failure path and the pass path print the same kind of thing.
+
+Test the exit status, or use `git cat-file -e "$ref:$path"`, which writes nothing to stdout at all:
+
+```console
+$ out=$(git cat-file -e origin/main:not/a/real/path 2>/dev/null); echo "rc=$? out=[$out]"
+rc=128 out=[]
+```
+
+- **Do:** read `rc` from `git rev-parse <ref>:<path>`, or switch to `git cat-file -e` when only existence is in question.
+- **Do:** treat an output that is not SHA-shaped as "the path was absent" rather than as a difference.
+- **Don't:** pipe `git rev-parse <ref>:<path>` through `2>&1` into a comparison.
+- **Don't:** compare two `git rev-parse <ref>:<path>` outputs for equality without first establishing that both resolved -- two absent paths echo two different strings, which reads as a difference.
+
+(2026-07-30, a `ucdavis/bcs` branch sweep: a per-path comparison built this way reported that a branch was about to destroy another session's work, and that went out as a blocker.
+The paths were absent on one side rather than different, and a real set-difference over the two file lists showed the branch was safe.)
 
 ## A hook that names a branch but not a repo may be pointing at a different checkout
 

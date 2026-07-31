@@ -1,5 +1,5 @@
 # Refresh the vendored wai fragments under shared/vendored/ and open a PR
-# when they change. Calls d-morrison/gha's reusable sync-shared-fragments workflow.
+# when they change. Calls Morrison-Lab/gha's reusable sync-shared-fragments workflow.
 #
 # wai is public, so no SOURCE_TOKEN is needed, and the PR is opened in this
 # repo with the integrated GITHUB_TOKEN -- which requires Settings -> Actions ->
@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: d-morrison/gha/.github/workflows/sync-shared-fragments.yml@v1
+    uses: Morrison-Lab/gha/.github/workflows/sync-shared-fragments.yml@v1
     with:
       source-repo: d-morrison/wai
       source-paths: |

@@ -12,6 +12,74 @@ A PR/MR is **fully clean** when **both** of these hold:
    **A raw Actions workflow run and a check run are not the same thing, and the usual lookups (`gh pr checks`, `get_check_runs`) only cover check runs (plus legacy commit statuses) --- not every workflow run necessarily produces one.** A workflow run that's blocked on `action_required` (e.g. pending manual approval) before any job starts can complete with zero jobs and consequently zero check runs, making it invisible to a check-runs-only poll. This normally doesn't affect mergeability (GitHub's branch-protection required-checks gate operates on checks, not raw workflow runs, so a check-run-less run can't be wired as required), but if something about a PR's CI state looks off despite `gh pr checks` reporting all-clear, cross-check the raw workflow runs before trusting the checks-only view. **`gh run list --commit <head-sha>` is not a reliable substitute for this cross-check on its own**: it returns every attempt for that SHA (including superseded/cancelled re-runs, so an old failed attempt can look like an outstanding blocker), and a run triggered by `issue_comment` or a `workflow_dispatch` invoked without an explicit `ref` can be recorded against the default branch's SHA rather than the PR's head SHA and be missed by a `--commit` filter entirely. Neither `--commit` nor `--branch` is fully reliable for this, because GitHub itself does not record a reliable PR linkage for these trigger types: an `issue_comment`-triggered run on this very PR (#635, run 29967418653) recorded `head_branch: main` and an empty `pull_requests` array via the raw REST API (`GET /repos/{owner}/{repo}/actions/runs/{id}`) --- verified directly, not assumed --- so no single filter (commit, branch, or the API's own PR-linkage field) reliably narrows these runs to the ones for this PR. Treat this cross-check as best-effort: `gh run list -R <repo> --workflow <name>` (unfiltered, or windowed by approximate timestamp) and eyeball for anomalies near when the PR activity happened, rather than trusting any one filtered command to be exhaustive.
    This includes non-gating checks like the Coverage / codecov job: don't merge around a red Coverage run just because it isn't a required check, unless there's a specific, stated reason for that merge (the project wants to maintain decent coverage, so a red Coverage job is a real signal to fix, not to ignore).
    **`codecov/patch` is a separate check from the repo's own Coverage workflow job, and both must be green.** The Coverage job runs the coverage-instrumented test suite; `codecov/patch` is the Codecov service's own status check, gating the PR's DIFF against a minimum patch-coverage percentage --- a repo can have a fully green Coverage job while `codecov/patch` still fails (uncovered new lines in the diff). When delegating implement-a-PR work to a subagent, name this check explicitly in the brief ("ensure `codecov/patch` passes, not just the test suite") --- a subagent that only runs the local test suite and checks it's green has no way to know it also needs to check a service-side status check unless told.
+   **The set of checks is not fixed while the run proceeds, and a check run's
+   name is not unique --- so "the ones I was waiting on went green" is not the
+   same statement as "every check is green".**
+   A job can spawn further jobs when it completes, so the total grows *after*
+   you started watching.
+   Nothing announces that, and the natural mental model is a fixed list
+   draining toward zero, which makes the growth invisible precisely when you
+   are closest to declaring ready.
+   Re-fetch the whole list each time and re-count it, rather than checking off
+   the names you remember.
+
+   The name collision is the sharper half, because it turns a careless check
+   into a confidently wrong one.
+   Two check runs can carry the *same name* on the same head --- an earlier
+   one that already succeeded, and a later one still running --- so matching
+   on the name returns the stale green and reports the PR ready while the
+   other is still going.
+   They are usually not re-runs of each other: the common case is two
+   separate workflow runs that each happen to define a job by that name, so
+   neither replaces the other and both are legitimately present.
+   Key on the check run's **id**, and read `status` before `conclusion`, since
+   a run still `in_progress` has no `conclusion` to be misled by.
+
+   (`ucdavis/bcs#458`, 2026-07-29: a check-in found the three jobs it was
+   watching all green and would have called the PR clean, except the count had
+   gone from 17 to 20 --- `update-snapshots` had finished and spawned a
+   cross-platform R CMD check matrix.
+   Two of those three were still running, and one was a *second* check run
+   named `ubuntu-latest (release)`, alongside the original that had succeeded
+   14 minutes earlier.)
+
+   **`status` itself can be stale, so never infer a job's *duration* from it.**
+   Reading `status` before `conclusion` is right, and it invites a second
+   inference that is not: that a run still showing `in_progress` is still
+   running, and therefore that the time since `started_at` is how long it has
+   been going.
+   The field lags.
+   A job can read `in_progress` for minutes after it has actually finished,
+   so "started at T, still in_progress now" measures the API's freshness
+   rather than the job's runtime.
+
+   That is harmless while you are only waiting for a job to end, which is the
+   usual reason to read the field --- the lag costs a poll.
+   It inverts the answer whenever **duration is itself the diagnostic**.
+   A reviewer job that dies on a bad credential and one that genuinely
+   reviews a diff differ mainly in how long they take, so a stale
+   `in_progress` is indistinguishable from exactly the recovery you are
+   watching for, and it arrives as good news.
+
+   Take duration from the log's own timestamps --- first line to
+   `Cleaning up orphan processes` --- or from `completed_at` minus
+   `started_at` once the run really is complete.
+   Both are facts about the job; `status` at any given moment is a fact about
+   the API.
+
+   - **Do:** read elapsed time from log timestamps whenever the length of a
+     run is the thing being judged.
+   - **Don't:** conclude a job is still running, or has passed some duration
+     threshold, from `in_progress` plus the wall clock.
+
+   (`d-morrison/altdoc#96`, 2026-07-30: `claude-review` had failed six times
+   in ~26 seconds each, the signature of the model call failing at auth.
+   A re-run was polled twice, three minutes apart, and read `in_progress`
+   both times --- reported as "the reviewer has recovered", and acted on by
+   firing a second re-run on the sibling PR.
+   The log showed that job starting at `04:05:25` and cleaning up at
+   `04:05:51`: 26 seconds, identical to the other six.)
+
 2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
    A rebuttal the reviewer still disputes does **not** count as clean.
    That review must be a genuine posted verdict at the current head commit,
@@ -22,6 +90,165 @@ A PR/MR is **fully clean** when **both** of these hold:
    Re-check availability right before declaring clean, not just at whichever
    round self-review first started; an inferred "probably clean" from green
    CI and resolved threads does not satisfy this.
+
+**Criterion 2's test is the absence of findings, not the presence of a verdict
+line saying so.**
+A reviewer routinely asserts both at once: a `### Verdict` reading
+**Ready for merge**, and directly beneath it a findings section listing items
+nobody has addressed.
+Neither half is wrong, which is what separates this from the eight numbered
+cases below --- those are all a reviewer producing an unreliable or absent
+signal, whereas here the comment is accurate throughout and the defect is in
+the reading.
+The verdict line answers a narrower question than the one criterion 2 asks, and
+it is the part that appears first and gets quoted into a status report.
+
+So when the two disagree inside one comment, **the findings win**.
+Read to the end of the comment before calling anything clean, and count the
+items under every heading, whatever that heading is called ---
+[`address-every-comment`](address-every-comment.md) already establishes that
+"non-blocking", "nit", "minor", and "optional" are prioritization labels rather
+than a pass, and a reviewer files findings under exactly those words in the
+section that contradicts its own verdict line.
+
+**What "an approving review" means here is not a review state.**
+Across the 25 most recent merged PRs, all 106 posted reviews are `COMMENTED` and
+none is `APPROVED` --- `d-morrison`'s own included, so this is not a bot
+limitation:
+
+```sh
+gh api graphql -f query='{search(query:"repo:Morrison-Lab/ai-config is:pr is:merged", type:ISSUE, last:25){nodes{... on PullRequest{reviews(first:20){nodes{state}}}}}}' \
+  --jq '[.data.search.nodes[].reviews.nodes[].state] | group_by(.) | map({state: .[0], n: length})'
+#=> [{"n":106,"state":"COMMENTED"}]
+```
+
+The key order there is not a typo: `gh api --jq` marshals through Go and sorts
+keys alphabetically, so `n` precedes `state` even though the expression builds
+`state` first.
+Plain `jq` would preserve the insertion order and print `{"state":...,"n":...}`.
+
+A constant carries no information, so `.state` cannot confirm clean here, and
+waiting for a formal `APPROVED` would stall every PR indefinitely.
+Approval is established instead by the two reads criterion 2 and the
+**Threads** paragraph already name: zero findings in the latest review body,
+and zero unresolved inline threads.
+The one state that does still carry information is `CHANGES_REQUESTED`, which
+stays blocking however a later verdict line reads.
+
+- **Do:** read the whole review comment and count findings under every heading
+  before calling a PR clean.
+- **Do:** establish approval from the findings and thread lists, since `.state`
+  is `COMMENTED` on every review this repo receives.
+- **Don't:** quote a **Ready for merge** line as the clean signal while the same
+  comment lists findings.
+- **Don't:** wait for a formal `APPROVED` review, or read `COMMENTED` as a
+  defect in the reviewer.
+
+(Morrison-Lab/ai-config#900, 2026-07-30: the verdict read "**Ready for merge.**
+No hallucinations, fabricated references, or factual errors found", immediately
+above a "Findings (all nits, non-blocking)" section naming three inline
+comments and closing "None of these affect correctness or usability of the
+guidance".
+All three threads were unresolved at that point, so the PR failed both halves of
+criterion 2 while carrying a verdict line that read like a pass.)
+
+**Findings hide on four different surfaces, and no single check sees all
+four --- so read the verdict body, the inline comments, the thread list, and
+the verdict's own conclusion every round.**
+The entry above is about a reviewer contradicting itself inside one comment.
+This is about the *detection method* returning an answer that is technically
+true and substantively wrong, which is harder to notice because nothing looks
+inconsistent.
+
+- **An out-of-diff finding never becomes a thread.**
+  A finding about a line the diff did not touch cannot be attached as an
+  inline comment, so it appears only in the body --- reviewers say so
+  explicitly ("inline comments were unavailable for out-of-diff lines").
+  A thread count therefore cannot see it.
+  Zero unresolved threads is not evidence of zero findings.
+- **An empty body hides the mirror case.**
+  A review can post a completely empty top-level body and carry its entire
+  finding in one inline comment, so a body-only read finds nothing to act on
+  and concludes there is nothing.
+- **"No verdict" is its own state, distinct from "a verdict with no
+  findings".**
+  A review job can fail having posted *nothing* --- not a stub, not an empty
+  comment.
+  Zero findings and zero review are indistinguishable by any count, and they
+  call for opposite responses: one is done, the other needs a self-review and
+  a re-run.
+  Read the job's step outcomes when a review is missing rather than inferring
+  from the absence of comments.
+
+The reason this defeats otherwise-good instruments is that each check answers
+a narrower question than the one being asked.
+"Are all threads resolved" is not "are there no findings", and neither is
+"does the verdict say ready".
+Per [`algorithmatize-checks`](algorithmatize-checks.md), prefer the instrument
+that decides the question exactly --- and where none does, as here, say so
+rather than substituting the nearest available count.
+
+- **Do:** read all four surfaces before calling a PR clean, every round.
+- **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
+  the latter as unreviewed.
+- **Don't:** report clean on a zero thread count, however many checks are
+  green.
+- **Don't:** treat an empty review body as an all-clear without checking the
+  inline comments.
+- **Don't:** read a reviewer's silence as a verdict --- a job that posted
+  nothing leaves the same zero counts as a job that found nothing.
+
+**A fourth surface, and the one that defeats the gate itself: the review
+check can pass on a blocking verdict.**
+The three above are cases where a *reader* looks at the wrong place.
+This is the case where the repo's own gate looks at the right place and still
+reports green, because `require-review` tests whether a review **ran**, not
+what it **concluded**.
+So a "Needs more work" verdict and a "Ready for merge" verdict produce an
+identical check row.
+
+It compounds with case 1 rather than sitting beside it.
+A review invoked without a `--comment` argument reports its findings in the
+run's own comment and posts nothing as a thread --- and the better reviewers
+say so in their last line, which is the tell worth grepping for.
+The result is a PR with every check green, zero inline comments, zero
+unresolved threads, and a blocking correctness finding sitting in plain text
+that no count reaches.
+
+This is the third numbered case below -- a check that cannot fail on its own
+content, so its green carries no signal -- arriving on the one job whose whole
+purpose is to gate on review outcome.
+The difference is what makes it worse than the benchmark check recorded there.
+That one is *designed* never to block, and a reader who knows the design knows
+to read its comment.
+`require-review` is designed to block, is frequently a required check, and
+still reports green on a verdict that says the opposite.
+Read the verdict line itself, every round; a green `require-review` is
+evidence a reviewer spoke, and nothing more.
+
+- **Do:** grep the verdict body for its own conclusion, and treat a
+  `require-review` pass as orthogonal to whether the PR is clean.
+- **Don't:** let a green review-gate check stand in for reading what the
+  review said.
+
+(Morrison-Lab/ai-config#921, ucdavis/bcs#477, ucdavis/bcs#473, all 2026-07-30,
+within hours of each other.
+On #921 every mechanical check passed --- all CI green, zero unresolved
+threads, verdict line reading "Ready for merge" --- and the PR was reported
+clean twice while carrying an open out-of-diff finding.
+On #477 the review body was empty and the finding was inline-only.
+On #473 `claude-review` failed after its built-in retry, posting nothing at
+all, so there was no body to read past and zero threads because zero
+comments.)
+
+(The fourth surface, ucdavis/bcs#468, same night.
+`require-review` passed, `claude-review` passed, all 18 checks were green,
+and there were zero inline comments and zero threads --- while the verdict
+read "Needs more work" over a blocking finding that the new section's own
+safety rule was false on one code path.
+The review's own closing line said as much, noting that because no
+`--comment` argument was passed, it had not posted the findings to the PR.
+Every count-based check called that PR ready.)
 
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---
@@ -114,3 +341,262 @@ Nothing is lost, and the same body usually also lands as a properly-rendered sib
 Two reasons not to shrug at it: a comment opening with a raw `gh` invocation reads as a broken run, so a human is likely to discount a review that actually passed; and a verdict-detecting guard script (`check-review-execution.sh`) is now matching against a shell command rather than prose, which can misfire into a needless stub-retry and a second full review's cost.
 Read the body and extract the verdict from inside the heredoc rather than re-triggering.
 (`UCD-SERG/serocalculator#392`, 2026-07-25; filed as [`d-morrison/gha#312`](https://github.com/d-morrison/gha/issues/312), which proposes unwrapping the pattern before posting.)
+
+**A seventh case: a reviewer can post a `BLOCKING` verdict on a false
+positive that will reproduce on every future round.**
+The six cases above all turn on what a reviewer said about the *code* ---
+or, in the fifth, on its declining to say anything.
+This one is a policy detector firing on the repo's own conventions, and it
+behaves differently from every case above in the way that matters for the
+loop: **re-triggering cannot clear it**, because it keys on text that is
+still there and that you are declining to change.
+A timeout or a quota refusal resolves itself on a re-run; this does not.
+
+The shape is an injection detector reading imperative prose as instructions
+aimed at the reviewer.
+That misfires badly on an agent-instruction corpus, where imperative mood is
+the medium rather than a signal of compromise --- the distinction that
+matters for injection is **provenance**, not grammar.
+Repo-authored guidance in a PR against that repo is not untrusted input, and
+a detector that cannot tell the difference will flag most of the corpus.
+
+That reading is not an inference from one misfire.
+The detector went on to block **this very entry**, citing its
+"Do not count the re-raise" line, and in the same verdict flagged the PR
+*description* --- text that is not in the repository at all and cannot be a
+convention, a file, or anything a later reader would see.
+So the trigger is mood alone, on whatever text is in front of it.
+Treat a third data point arriving on the write-up of the first two as
+confirmation rather than as coincidence: it is the cheapest possible
+demonstration that re-running and rewording both miss the point, since the
+only rewrite that would satisfy it is one that stops giving instructions ---
+which is the entire function of a `shared/` fragment.
+
+Three consequences:
+
+- **Answer with corpus evidence, not argument.**
+  One command usually settles whether the flagged form is a convention:
+  `grep -l "^## In review" shared/coding/*.md | wc -l` against the directory
+  total.
+  Eight of eighteen is a convention; one of eighteen would be a real finding.
+- **Do not count the re-raise against the rebuttal test in criterion 2.**
+  That test assumes a reviewer that can be convinced.
+  Reply once naming the evidence, then hold, per
+  [`address-every-comment`](address-every-comment.md)'s per-item noise rule
+  --- and keep processing that reviewer's *other* findings normally.
+- **Escalate rather than comply, and say why in the thread.**
+  Complying means either a one-file exception to a convention already merged
+  many times, or a corpus-wide change; both are the human's call.
+  State plainly that the check is red **by decision, not oversight**, so a
+  later reader does not treat it as an unaddressed finding and silently
+  "fix" it.
+
+(Morrison-Lab/ai-config#818, 2026-07-29: Jules returned `VERDICT: block` for
+"prompt injection attempt in diff" on a new `shared/coding/` fragment's
+`## In review` section, then repeated it verbatim at the next head without
+engaging the rebuttal.
+Eight of the eighteen existing fragments carry an identically-worded section.
+`claude-review` returned Ready for merge at the same head.
+The maintainer's call was to hold; the PR merged with `jules/review` red.)
+
+**An eighth case: the reviewer's workflow can fail outright on an upstream
+failure, so there is no verdict of any kind --- and its error message may
+blame the wrong thing.**
+All seven cases above concern a reviewer that produced *something*: a stub, a
+misfiled conclusion, a pass that cannot fail, a fabricated premise, a
+refusal, a wrapped verdict, a false positive.
+This one produces nothing.
+The job goes red, no review comment appears, and the check is simply absent
+as evidence either way.
+
+It matters for the loop because the right response is neither of the two
+obvious ones.
+It is not a finding to address, so do not self-review as though the reviewer
+had spoken.
+And it is not the fifth case's unreachable reviewer either, so do not write
+the reviewer off yet: an infra failure is frequently transient, where a quota
+refusal is not.
+Retry the failed job once, per this repo's standing flaky-infra rule, and
+only treat the reviewer as unreachable if it fails again.
+
+**Read the log rather than the error message, because the message can name a
+cause the log rules out.** A failure of this shape often surfaces as a
+credential hint ("check `<SERVICE>_API_KEY` is valid"), which is the most
+expensive possible wrong diagnosis --- it sends you to repo secrets for
+something that will clear on its own.
+The log usually settles it: a request that *authenticated*, did work, and
+then failed on a follow-up call was never an auth failure, whatever the
+summary says.
+
+Two pieces of evidence beat arguing about it, and both are cheap:
+
+- **Prior successes on the same credential in the same session.** A reviewer
+  that posted verdicts minutes earlier is not using an invalid key.
+- **A retry with no code change.** If it passes, the failure was transient by
+  construction.
+  This is the mirror of [`ardi`](ardi.md)'s "a symptom that stops reproducing
+  is a fix having landed" --- there, silence after a merge needs the merge
+  ruled out before you may call it flaky; here the retry is a genuine
+  negative control, because nothing changed between the two runs.
+
+Say which of the two you have when reporting it, so a later reader can tell a
+diagnosed transient from a hopeful one.
+And state plainly that the posted error text was wrong, since the next person
+to hit it will read that text first.
+
+- **Do:** retry the failed job once, then read the log for where the request
+  actually broke.
+- **Do:** cite prior successes or a no-op retry as the evidence for calling it
+  transient.
+- **Don't:** treat a crashed reviewer as either a finding or a refusal.
+- **Don't:** act on a credential hint that the same log contradicts.
+
+(Morrison-Lab/ai-config#835, 2026-07-30: `jules/review` failed with a 404 on
+`GET /v1alpha/sessions/<id>/activities`, reported as
+"Check `JULES_API_KEY` is valid".
+The log showed the key creating that session and confirming it *ready* 0.2s
+earlier, so the 404 was a propagation race on the sub-resource, not auth ---
+an invalid key fails at creation with 401/403.
+Jules had already approved twice on the same key that session, and
+`rerun_failed_jobs` with no code change returned `approve`.)
+
+**A second shape of that failure is cheaper to diagnose, because the
+reviewer names its own session in the failure comment.**
+`jules/review` can fail with
+`Jules did not return a review within 15 minutes. Session: <id>`,
+which is not an API error at all --- the request authenticated, created that
+session, and then never delivered a verdict.
+The session id is itself the auth-succeeded proof, so this shape needs no log
+fetch: a credential that cannot authenticate never gets a session to name.
+Prefer that field to the log whenever it is present, per
+[`algorithmatize-checks`](algorithmatize-checks.md) --- one value in the
+comment decides the question the log was going to answer.
+
+And when a fix is already queued for the same round, **the push is the
+retry**, so a separate `rerun_failed_jobs` call is wasted: the push
+re-triggers every reviewer on the new head anyway.
+Say which of the two you did, because they are not equally good evidence ---
+a push changes the code, so it demonstrates only that the reviewer works now,
+rather than being the no-op negative control the bullets above prize.
+
+- **Do:** read the failure comment for a session id or similar
+  work-happened marker before fetching a log.
+- **Do:** let a pending push serve as the retry, and label that evidence as
+  weaker than a no-op re-run.
+- **Don't:** spend a `rerun_failed_jobs` call on a head you are about to
+  replace.
+- **Don't:** report a push-triggered pass as proof the failure was transient
+  by construction.
+
+(Morrison-Lab/gha#374, 2026-07-30: `jules/review` reported "Jules did not
+return a review", with the 15-minute timeout and session
+`4236561570323034536` in its own comment.
+A review fix was already staged, so the push carried the re-trigger, and
+Jules returned `VERDICT: approve` on the new head about four minutes later.)
+
+**A third shape is the one the retry rule hands off to and then stops
+short of: the failure that reproduces identically on every attempt.**
+The eighth case tells you to retry once and call the reviewer unreachable if
+it fails again, which is right, and it is where that case ends.
+But "unreachable" covers two situations with different owners and opposite
+next actions.
+A service-wide outage clears on its own, so waiting is correct.
+A credential scoped to this repository or organization never clears by
+itself, so every further retry is wasted and the real deliverable is an
+issue naming a human with admin access.
+Retrying cannot separate them, because both keep failing.
+
+The discriminator is a repository you are not asking about: run the same
+reviewer on a **different** repo in the same session.
+A success there proves the service is up, which leaves the failing repo's own
+credential as the only remaining explanation.
+This is an [`algorithmatize-checks`](algorithmatize-checks.md) case rather
+than a judgment call -- two check runs decide it -- and a multi-repo session
+usually has the second one for free.
+
+**The inversion is what makes this worth writing down, because it reuses the
+eighth case's own evidence and points the opposite way.**
+That case offers "prior successes on the same credential in the same session"
+as grounds for calling a failure transient.
+Read it carefully: it holds only when the successes are on the **same repo**.
+A cross-repo success is a different credential, so treating it as evidence of
+transience argues for waiting out precisely the failure that will never
+clear.
+Same evidence type, opposite conclusion, and only the scope tells them apart.
+
+The duration signature is the corroborating half.
+A reviewer that authenticates and then works takes minutes; one whose
+credential is rejected dies in seconds, with `is_error: true`, zero cost, and
+zero permission denials, because no work ever started.
+Take those seconds from the completed run's own `started_at`/`completed_at`
+rather than from `status`, per criterion 1 above.
+
+- **Do:** run the same reviewer against another repo in the session before
+  concluding a service is down.
+- **Do:** stop retrying and file an issue naming the credential once a
+  cross-repo success has localized the failure.
+- **Don't:** read a success on a different repo as evidence that this repo's
+  failure is transient.
+- **Don't:** keep spending retries on a failure whose every attempt dies at
+  the same short duration.
+
+(d-morrison/altdoc#95 / altdoc#96, 2026-07-30: `claude-review` failed seven
+times across those two PRs -- six on #96, one on #95 -- each run finishing in
+the 26-to-35-second band, with `is_error: true`, `total_cost_usd: 0`, and no
+permission denials.
+The nearest pair is 38 seconds apart: the run on altdoc#95 failed
+`04:07:37Z -> 04:08:12Z`, and the same reviewer returned a full
+`Ready for merge` verdict on Morrison-Lab/ai-config#858 over
+`04:08:50Z -> 04:11:41Z`.
+So the service was fine and the `d-morrison` credential was not, which no
+number of re-runs would have shown.
+Tracked in d-morrison/altdoc#99.)
+
+**That duration signature does not run backwards, and reading it in reverse
+is how several unrelated bugs get filed as one.**
+The paragraph above offers a short run as **corroboration**, once a credential
+is already the hypothesis on other grounds.
+It is not a test that *produces* the hypothesis, and the difference is easy to
+lose because the sentence reads the same in both directions.
+
+The reason it cannot run backwards is that every failure occurring before the
+model call takes about the same time.
+A job that dies at checkout, at the App token exchange, or at authentication
+has spent its whole life on setup, so 13 seconds and 28 seconds are the same
+observation.
+The duration tells you the run stopped early.
+It says nothing about **which** early step stopped it, and a credential
+problem is only one of several candidates.
+
+The failure this produces is worse than an ordinary wrong guess, because it
+**merges** distinct bugs.
+Reading a cluster of short failures as one credential fault yields a single
+tidy story covering all of them, and every separate root cause underneath it
+goes unfiled.
+Grouping by symptom feels like pattern recognition, which is why nothing about
+it prompts a second look.
+
+So read each job's own terminal error before naming any cause, and expect
+short failures sharing a repo and an afternoon to have nothing to do with each
+other.
+
+- **Do:** open the log and quote the line the job actually died on.
+- **Do:** treat a cluster of short failures as several candidate bugs until
+  each one's error says otherwise.
+- **Don't:** infer a credential or quota problem from a short duration alone.
+- **Don't:** let one explanation absorb every failure that resembles it.
+
+(2026-07-30, auditing which repos held a `CLAUDE_CODE_OAUTH_TOKEN`: three
+failures in the 13-to-28-second band were reported as one App-permissions
+problem.
+They had three unrelated causes.
+`UCD-SERG/ucd-serg.github.io` run 30529959398 (25s) failed
+`App token exchange failed: 401 Unauthorized - User does not have write access
+on this repository`, because the triggering actor was the `Copilot` coding
+agent, which is not a collaborator -- filed as ucd-serg.github.io#84.
+Run 30509709695 (13s) on the same repo logged `Actor has write access: write`
+and then failed
+`Command failed: git fetch origin --depth=20 pull/77/head:main`.
+`d-morrison/qwt` run 30391041128 (28s) reached the model and returned
+`is_error:true` after a workflow-modification denial.
+Only the first was about permissions at all.)

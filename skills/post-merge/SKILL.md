@@ -1,6 +1,6 @@
 ---
 name: post-merge
-description: "Wrap up a just-merged PR/MR: verify the merge actually landed (never assume), tidy the local branch (switch to main, pull, delete the merged branch), confirm any deferred follow-up issues are tracked, then run UMS to capture what the PR's review lifecycle taught — mistakes corrected and guidance given along the way. Use right after a PR merges, or when asked to 'post-merge', 'wrap up the merged PR', or 'clean up after the merge'. For the directive to actually perform the merge ('merge it' / 'merge this'), use the merge-it skill, which merges then chains into this one."
+description: "Wrap up a just-merged PR/MR: verify the merge actually landed (never assume), tidy the local branch (switch to main, pull, delete the merged branch), confirm any deferred follow-up issues are tracked, flag a release step the merge left owed (a floating tag a human must still slide), then run UMS to capture what the PR's review lifecycle taught -- mistakes corrected and guidance given along the way. Use right after a PR merges, or when asked to 'post-merge', 'wrap up the merged PR', or 'clean up after the merge'. For the directive to actually perform the merge ('merge it' / 'merge this'), use the merge-it skill, which merges then chains into this one."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -161,6 +161,36 @@ Use `git branch -d` (not `-D`): `-d` refuses to delete a branch with commits
 that aren't merged. If it refuses, the branch has unmerged work — investigate
 before forcing anything.
 
+**Both outcomes are normal after a squash merge --- a `-d` that succeeds is not
+evidence the commits reached `main`.**
+The natural reading of the paragraph above is that `-d` succeeding means `main`
+contains the work, so a squash-merged branch must always need `-D`.
+It does not.
+`git-branch(1)` defines the check against the **upstream**, not `main`:
+the branch must be "fully merged in its upstream branch, or in HEAD if no
+upstream was set with `--track` or `--set-upstream-to`."
+A branch still tracking a live `origin/<name>` is trivially fully merged into
+its own upstream, so `-d` succeeds and says so:
+
+```
+warning: deleting branch 'fix/thing' that has been merged to
+         'refs/remotes/origin/fix/thing', but not yet merged to HEAD.
+```
+
+Which branch of that behavior you land on depends on whether the remote ref
+still exists, and that varies by repo setting and merge flag.
+A repo that auto-deletes head branches on merge (or `gh pr merge
+--delete-branch`) leaves `[gone]` upstreams that fall back to the HEAD check
+and refuse.
+In one sweep of 29 branches, 18 deleted with `-d` and 11 needed `-D`;
+neither count meant anything about whether the work had landed.
+
+Two consequences.
+Don't treat a refusal as a surprise worth debugging --- read step 1's merge
+confirmation and the `-D` guidance below instead.
+And don't treat a **success** as confirmation, either:
+when it prints that warning, `-d` checked the remote ref, not `main`.
+
 These guards avoid a common no-op/error sequence after
 `gh pr merge --delete-branch`: that command may already switch this checkout
 to `main`, fast-forward it, and delete the local merged branch.
@@ -215,6 +245,74 @@ If the PR's review loop deferred or acknowledged anything, make sure each has a
 follow-up issue (preferences: *never leave deferred items untracked*). List
 them, linked. File any that slipped through.
 
+### 3.5. Check whether delivery is gated on a further human action
+
+In most repos the merge *is* the delivery, and this step is a no-op.
+In a repo whose artifact reaches consumers only through a separate,
+human-gated release step, the merge is the midpoint, and the gap between the
+two is a window in which the repo's own documentation is wrong.
+
+`Morrison-Lab/gha` is the case to recognize.
+A capability ships with `examples/<name>.yml` and
+`website/reference/<name>.qmd` stubs pinning `@v2`, but `@v2` moves only when
+someone dispatches `slide-major-tag.yml` --- so a consumer who copies a stub
+literally between merge and slide gets `workflow-not-found`, per that repo's
+own README.
+The same holds for any tag-, registry-, or release-gated artifact: a version
+bump merged but unpublished, a submodule pin not yet bumped in its consumer.
+
+Two things make this the step that gets skipped rather than deferred.
+Nothing turns red --- CI passed, the PR is green and merged, and the failure
+lands on a consumer who is not in the room.
+And the slide is destructive (it force-moves a tag), so it needs explicit
+human authorization and cannot simply be folded into the tidy, which is
+exactly why it evaporates instead: a step you are not allowed to perform is
+easy to stop tracking.
+
+Decide it mechanically rather than from memory of what the PR touched --- two
+lookups settle it, so this is an
+[`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md)
+case:
+
+```bash
+git fetch origin --tags
+git rev-parse 'v2^{}' origin/main   # equal means current; different means a slide is owed
+```
+
+Keep the `^{}`.
+It peels a tag to the commit it names, and without it an **annotated** tag
+resolves to its own tag-object SHA instead --- which never equals a commit
+SHA, so the check would report a slide owed on every run and become noise
+rather than an instrument.
+A lightweight tag resolves the same either way, so the peeled form is correct
+for both and there is no case where dropping it helps.
+(`slide-tag` reads a tag with `git log --oneline -1 <tag>`, which peels for
+the same reason.)
+
+Then raise it as a `⚠️ FLAG` in step 5's report, naming the tag and what is
+unreachable until it moves.
+An offer is not a flag: say plainly that the slide is owed and that it needs
+the human, the same way
+[`report-mistakes-proactively`](../../shared/workflow/report-mistakes-proactively.md)
+rules out offering to file an issue instead of filing it.
+
+- **Do:** compare the release ref against `main` after the merge, and flag the
+  gap with the specific tag and the affected consumer-facing paths.
+- **Do:** run the comparison on every merge rather than first judging whether
+  the repo looks release-gated --- it costs two commands and prints nothing to
+  act on when the SHAs match, so the comparison *is* the classifier.
+- **Don't:** run the release step yourself when it force-moves a ref or
+  publishes --- that is the human-gated action `ardi` reserves for explicit
+  authorization.
+- **Don't:** report a merged PR wrapped up while the artifact it documents is
+  still unreachable at the version its own docs name.
+
+(gha#357, 2026-07-30: three new reusable workflows merged as `159dbf4` while
+`v2` still pointed at `c50e847`, so every `@v2` line in the new capabilities'
+own stubs named a workflow that did not exist yet.
+Found only by an ad-hoc `rev-parse` at the end of the tidy, after steps 1
+through 3 had already reported clean.)
+
 ### 4. Run UMS — learn from the PR's lifecycle
 
 Run the full `ums` procedure (invoke the `ums` skill by name), focused on what
@@ -225,8 +323,8 @@ Run the full `ums` procedure (invoke the `ums` skill by name), focused on what
 - **Corrections / guidance the user gave mid-PR** → preference + skill update
   (per "update BOTH skills AND preferences").
 - **Tool / CI quirks** hit during the loop → the matching topical memory file
-  (`github.md`, `github-actions.md`, `git.md`, `r-quarto.md`,
-  `claude-code.md`) or `debugging.md`; see `memories/MEMORY.md`.
+  under `memories/`, or `debugging.md`; see `memories/MEMORY.md` for the
+  current set.
 - **A multi-step pattern that emerged** → run `spot-skill-opportunities` to
   judge whether it's genuinely recurring, then hand off to `skill-builder`.
 
@@ -249,8 +347,24 @@ the UMS diff is a new lesson worth a follow-up.)
 
 ### 5. Report
 
-A linked summary: the merged PR, the auto-closed issue, any deferred follow-up
-issues, what UMS updated, and a Pacific-time timestamp
+**Pause point: before reporting the merge wrapped up.**
+Do-Confirm; per
+[`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
+
+- [ ] The merge actually landed (step 1's verification, not the notification).
+- [ ] The local branch is tidied and `main` is fast-forwarded.
+- [ ] Every deferred item has a filed follow-up issue.
+- [ ] **Killer item: step 4's UMS pass actually executed**, or was
+      deliberately skipped under the recursion guard and that is stated.
+      Marked because reporting this skill complete asserts that its final step
+      ran, and the recorded failure is a `post-merge` run reported done whose
+      UMS step never happened --- which discards the learnings rather than
+      delaying them.
+      Naming what UMS changed (or that nothing durable emerged) is the
+      evidence; "ran UMS" on its own is not.
+
+Then a linked summary: the merged PR, the auto-closed issue, any deferred
+follow-up issues, what UMS updated, and a Pacific-time timestamp
 (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces
 PT on a machine set to any other zone).
 
@@ -262,6 +376,8 @@ PT on a machine set to any other zone).
 - **`ums`** — step 4 invokes it.
 - **`spot-skill-opportunities`** — step 4's "multi-step pattern that emerged"
   bullet routes here to judge recurrence before handing off to `skill-builder`.
+- **`slide-tag`** -- what step 3.5's flag asks the human to authorize; it does
+  the force-move, this skill only detects that one is owed.
 - **`cb` / `clean-branches`** — for stacked or stale sibling branches.
 - **`clean-worktrees` / `cw`** — if the PR was built in a git worktree, remove
   it during the tidy (step 2); a leftover worktree pins its branch and blocks
@@ -279,4 +395,7 @@ PT on a machine set to any other zone).
   itself the learnings PR, restating lessons it already banked (see step 4's
   guard). The chain has to terminate somewhere.
 - ❌ Leaving deferred/acknowledged items without follow-up issues.
+- ❌ Calling a merge wrapped up in a release-gated repo without comparing the
+  release ref against `main` (step 3.5) -- the merged docs pin a version
+  consumers cannot resolve until a human slides the tag.
 - ❌ Reporting "all cleaned up" while a stacked sibling branch dangles unmentioned.

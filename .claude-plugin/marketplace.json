@@ -1,14 +1,19 @@
 {
-  "name": "d-morrison",
+  "name": "Morrison-Lab",
   "owner": {
-    "name": "d-morrison"
+    "name": "Morrison-Lab"
   },
-  "description": "d-morrison's personal Claude Code plugins.",
+  "description": "Morrison-Lab plugins marketplace.",
   "plugins": [
     {
       "name": "ai-config",
       "source": "./",
       "description": "Personal skills (PR/review workflow, grading, reprexes, R-package helpers) and slash commands."
+    },
+    {
+      "name": "sembr-skills",
+      "source": "./shared/sembr-skills",
+      "description": "AI agent skills for Semantic Line Breaks (SemBr)."
     }
   ]
 }

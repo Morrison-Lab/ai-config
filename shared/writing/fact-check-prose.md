@@ -5,6 +5,14 @@ style. This is broader than the terminology check in
 that guide catches phrasing whose meaning is unresolved; this one catches
 claims and reasoning that are resolved but wrong.
 
+One class of source needs naming before the checks below, because it defeats
+the premise they rest on.
+A **test fixture** looks like a source --- it lives in the repo, it is named
+after real output, and its comment often claims to be verbatim --- so a claim
+checked against one feels checked rather than guessed.
+It is not a source: see
+[`fixtures-are-not-evidence.md`](../workflow/fixtures-are-not-evidence.md).
+
 ## What to check
 
 - **Factual claims.** Check each claim against the AI's own domain knowledge
@@ -109,3 +117,40 @@ the excluded pattern from the retried one. A `claude[bot]` review caught the
 gap: the code didn't implement what the prose claimed. Re-reading the claim
 against the actual `if` conditions before posting would have caught it
 without needing a review round.)
+
+## Check a general claim against the concrete numbers in the same document
+
+The checks above compare prose against an external referent --- the code,
+the source, the tool.
+The cheapest referent is usually closer than that: a document that reports
+a measurement and then generalizes from it carries its own test case, and
+the two can contradict each other with nothing external consulted at all.
+
+The shape is a sentence of the form "X behaves like this" sitting near a
+figure that only makes sense if X behaves the other way.
+Both read fine alone.
+The generalization sounds authoritative because it is stated as background
+rather than as a finding, and the number reads as a detail of the example
+rather than as evidence about the claim.
+
+So when a passage states a rule *and* reports a number the rule governs,
+run the rule against the number before publishing.
+A mismatch means one of them is wrong, and the number is usually the
+trustworthy one, since it was observed while the rule was recalled.
+This is the same missing-input-variety tell as elsewhere, inverted: here
+the disconfirming case is already present in the text, unexamined.
+
+- **Do:** re-read each general claim against every figure in the same
+  passage, and reconcile the two before pushing.
+- **Do:** prefer the measured number over the remembered rule when they
+  disagree, then re-verify the rule directly.
+- **Don't:** treat a number as illustration rather than as evidence about
+  the claim it sits next to.
+
+(Morrison-Lab/ai-config#813, 2026-07-29: a memory entry stated that `du`
+reports logical size for dataless placeholder files, three paragraphs after
+reporting that a placeholder-only OneDrive folder occupied 2.1 MB.
+That figure is only possible if `du` reports physical blocks, which is what
+it does.
+The review caught it by citing the entry's own number back at it; a direct
+test then showed `du` = `0B` against `ls -l` = 276 MB on one placeholder.)

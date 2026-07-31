@@ -52,6 +52,8 @@
   A plausible-sounding mechanism (e.g. "Rd `\arguments{\item{name}{...}}` labels get spell-checked", or "git pathspec globs don't cross `/` by default") can be wrong for the specific tool/version in use; a real, controlled test against a case that actually distinguishes the claim from its negation is the authoritative signal, not a theory about what the tool probably does — and this cuts both ways: accepting a false-but-confident finding wastes a fix cycle on a non-bug exactly as much as wrongly rebutting a true one does.
   (Learned on UCD-SERG/serodynamics#193: rebutted a claude[bot] WORDLIST finding by reading the Spellcheck job's actual log rather than debating the claim in the abstract. Learned again on sparta#852: a review claimed a git pathspec (`scripts/*.gd`) silently missed subdirectories; an initial "confirmation" test was flawed — it diffed against a case with no subdirectory files present, so it couldn't have shown the bug either way — and a rigorous test against a real commit touching `scripts/campaign/*.gd` showed the claim was false. The reviewer re-raised the same claim (inverted) on the next round, this time with a specific but wrong mechanism ("git uses `wildmatch()` with `WM_PATHNAME` by default"); `gitglossary(7)`'s own "pathspec" definition settles it authoritatively — the DEFAULT (non-magic) pathspec is explicitly documented as "matched against that pattern using fnmatch(3); in particular, `*` and `?` CAN match directory separators" (example given: `Documentation/*.jpg` matches `Documentation/chapter_1/figure_1.jpg`), which is a DIFFERENT code path from the explicit `:(glob)` magic word (documented separately as using `FNM_PATHNAME`, which does NOT cross `/`) — the two are easy to conflate but behave oppositely. The fix landed anyway since the more explicit `:(glob)**` form was harmless, but the PR/code comments had to be corrected from "this was a real bug" to "verified this was never actually broken," and the citation is what finally closed the loop after two rounds of empirical-only rebuttal weren't enough to convince the reviewer on their own. Learned again on ai-config#635 (2026-07-22): a Copilot review flagged a documented CI-check-state caveat across three review rounds (5, 7, and 8, with an unrelated finding at round 6 in between), each time with a specific, checkable claim — first that `gh pr checks`/`get_check_runs` miss raw workflow runs, then that a `gh run list --commit <sha>` fix still misses some trigger types, then that a `--branch <pr-branch>` fix has the same class of gap. Verifying each claim directly against the PR's own actual runs (not reasoning abstractly) confirmed all three were correct in sequence, while a separate claim in the same PR — that markdown skill docs are bound by the repo's source-code-only em-dash rule — checked out FALSE against the rule's own explicit scope and was rebutted. The review loop only reached zero new comments once every claim got the same live-query treatment, rather than being pattern-matched as "probably right" or "probably just noise" this many rounds in.)
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
+- NEVER auto-merge a Pull Request unless the user has explicitly granted session permission (e.g. via `/mwc` or `/maw`) or explicitly instructed to merge that specific PR (e.g. `/merge-it` or "merge this").
+  Creating or pushing a PR does NOT imply permission to merge it.
 - If the user says the work belongs on a specific existing branch or on top of a
   specific PR branch, honor that branch/base instruction over auto branch-naming
   hygiene.
@@ -471,10 +473,14 @@ Recaps get long across many parallel tracks; the eye should find questions, offe
 Terminal markdown can't force text color, so the emoji plus the `===` frame plus the bold label *is* the signal — there's no other channel for it.
 
 The core distinction: **box the output a user is waiting on — a response they must give, or the headline answer they asked for — and leave ongoing informational categories unboxed.**
-The five boxed categories all demand the user's attention:
-three ask for a response (a question, an offer, a blocker),
+Every boxed category demands the user's attention:
+some ask for a response (a question, an offer, a blocker),
 one delivers the answer they were waiting on,
+one proposes the course of action to take,
 and one constrains an action they are about to take.
+Stated without a count on purpose ---
+the previous wording said "the five boxed categories"
+and went stale the first time one was added.
 If everything is boxed, the box stops meaning "look here," so keep it reserved.
 
 - **Boxed** — a `===` line directly above and below the labeled block:
@@ -482,6 +488,20 @@ If everything is boxed, the box stops meaning "look here," so keep it reserved.
   - 💡 **OFFER** — optional work I can do if they want it.
   - 🛑 **BLOCKER** — stopped; need their call.
   - ✅ **ANSWER** — the headline answer to a question they asked; put nuance below the box.
+  - 🧭 **RECOMMENDATION** --- the course of action I think they should take,
+    when the decision is theirs.
+    The boundary against the two categories it most resembles
+    is what makes it a separate category rather than a flavour of either:
+    an ✅ **ANSWER** reports what is true,
+    a 💡 **OFFER** proposes work I would do,
+    and a recommendation is a judgment about what *they* should do ---
+    including about things I will not be doing,
+    such as which PR to merge first, which option to decline, or whether to stop.
+    Lead with the action and keep the reasoning below the box.
+    A recommendation earns the box
+    because it feeds a decision the user is waiting to make;
+    an opinion nobody was waiting on is a 📊 **UPDATE** with a view in it,
+    and stays unboxed.
   - 🔀 **MERGE ORDER** --- several PRs are ready,
     and merging them in the wrong order would produce a wrong result.
     Labeled with a markdown heading rather than bold text;

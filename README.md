@@ -10,11 +10,18 @@ by `bootstrap.sh`.
 ## Setup on a new machine
 
 ```sh
-git clone https://github.com/d-morrison/ai-config.git ~/ai-config
+git clone --recurse-submodules https://github.com/Morrison-Lab/ai-config.git ~/ai-config
 bash ~/ai-config/bootstrap.sh
 ```
 
 Rerun `bootstrap.sh` any time a new top-level dir is added to the repo.
+
+`--recurse-submodules` populates `shared/sembr-skills`, the vendored
+[sembr/skills](https://github.com/sembr/skills) plugin.
+In a clone that predates it, run
+`git submodule update --init -- shared/sembr-skills` instead.
+Skipping it is not fatal: `bootstrap.sh` prints a `skip` line and
+`scripts/validate-skills.py` warns, so everything else still installs.
 
 ### Verify the install
 
@@ -100,12 +107,12 @@ repo's** `.claude/settings.json`:
 ```json
 {
   "extraKnownMarketplaces": {
-    "d-morrison": {
-      "source": { "source": "github", "repo": "d-morrison/ai-config" }
+    "Morrison-Lab": {
+      "source": { "source": "github", "repo": "Morrison-Lab/ai-config" }
     }
   },
   "enabledPlugins": {
-    "ai-config@d-morrison": true
+    "ai-config@Morrison-Lab": true
   }
 }
 ```
@@ -118,8 +125,8 @@ Locally (or to try it), run these as slash commands inside a Claude Code
 session (or prefix with `claude ` to run them in a terminal):
 
 ```
-/plugin marketplace add d-morrison/ai-config
-/plugin install ai-config@d-morrison
+/plugin marketplace add Morrison-Lab/ai-config
+/plugin install ai-config@Morrison-Lab
 ```
 
 No `version` is pinned, so every commit to this repo counts as a new version —
@@ -197,6 +204,95 @@ Ideas borrowed from comparable projects (and their licenses) are recorded in
 [`CREDITS.md`](CREDITS.md); see the `scout-peers` skill for the survey behind
 them.
 
+## Enforcement hooks (`hooks/`)
+
+A few rules in this corpus cannot be enforced by writing them down, because
+the rule is consulted when it is *read* and broken when a message is
+*composed*.
+`hooks/` ships the harness hooks that close those gaps:
+
+| hook | event | enforces |
+|---|---|---|
+| `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
+| `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
+| `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
+| `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
+
+`bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
+directory, so the scripts arrive with no extra step.
+Registering them is separate and deliberately opt-in --- bootstrap is a pure
+symlinker and never edits `settings.json`, since silently rewriting harness
+config while installing skills is the wrong default:
+
+```sh
+python3 scripts/install-hooks.py         # report what is registered
+python3 scripts/install-hooks.py --fix   # register the missing ones
+```
+
+`--fix` backs `settings.json` up first, preserves any hooks already there, and
+is idempotent.
+Hooks connect at session start, so restart before expecting a newly registered
+one to fire.
+
+Bindings live in [`hooks/hooks.json`](hooks/hooks.json) --- a script cannot
+declare its own event, so the manifest names the event, matcher, and the rule
+each one enforces.
+
+**A hook that misfires is worse than a missing one**, since it trains everyone
+to work around the guard.
+Keep the matchers narrow, and test both directions before adding one: the
+cases it must block *and* the near-misses it must let through.
+`require-gh-repo-flag.py` is the cautionary example --- its first version
+fired on any command whose text merely contained a gated `gh` invocation,
+including a heredoc documenting one.
+
+**Never activate a new hook before its PR merges.**
+Writing the script into `hooks/` and testing it is *authoring*, and needs no
+permission.
+Adding the entry to `~/.claude/settings.json` --- by hand or via
+`install-hooks.py --fix` --- is *activation*, and it waits for review.
+That line is what makes this checkable rather than a general instruction to be
+careful: the file existing is harmless, the registration is not.
+
+This makes hooks the deliberate exception to the ordering
+[`record-learnings`](skills/record-learnings/SKILL.md) states for a new skill,
+where "the skill becomes available locally immediately (via symlink)" is
+listed as a feature.
+The mechanism is what separates them, and it is what makes the exception cheap
+to honour: a skill goes live by symlink whether you like it or not, whereas a
+hook goes live only when someone deliberately runs `install-hooks.py --fix`.
+Declining to run it is the entire cost of compliance.
+
+CI already takes this position.
+`claude-code-action`'s `restoreConfigFromBase` restores `.claude/` from `main`
+on every PR precisely so a branch cannot inject hooks or settings, so a hook
+that has not merged is one the bot already refuses to honour.
+This gate is the local-session counterpart of a rule the CI side enforces
+mechanically.
+
+A hook is unlike anything else this repo ships, in two ways that make
+self-activation worse than merging an unreviewed skill.
+It runs **automatically and invisibly**, on every matching event, with no
+invocation anyone chose --- a bad skill is inert until called, while a bad hook
+is already running.
+And a `Stop` hook sits **between the model and the user**, so a wrong one
+changes what the user is told: the mechanism that would normally surface the
+mistake is the mechanism that is broken.
+
+- **Do:** author the script, write its test, run both directions, open the PR,
+  and register it only after that PR merges.
+- **Do:** say in the PR which event it binds to and what it does when it fires,
+  since a reviewer cannot tell blocking from advisory by reading the manifest.
+- **Don't:** run `install-hooks.py --fix` for a hook whose PR is still open.
+- **Don't:** treat a passing test suite as authorization --- the tests
+  establish that the mechanism works, never that it should exist.
+
+(Corrected 2026-07-30: a `Stop` hook was written into `~/.claude/hooks/` and
+registered in `settings.json` before its PR was opened, so a guard able to
+block outgoing messages ran on the user's machine unreviewed.
+The user's correction was "all new hooks must go through pr review before being
+activated.")
+
 ## What's tracked
 
 - `skills/` — reusable workflow skills (`~/.claude/skills/`)
@@ -255,7 +351,7 @@ Don't edit the vendored copies here — edit them in wai.
 `scripts/check-vendored-drift.py` (run by `validate.yml`) recomputes each copy's
 hash and fails CI if it stops matching the manifest. The `Sync from wai`
 workflow (`.github/workflows/sync-from-wai.yml`) refreshes them weekly —
-via `d-morrison/gha`'s `sync-shared-fragments` — and opens a PR when the upstream
+via `Morrison-Lab/gha`'s `sync-shared-fragments` — and opens a PR when the upstream
 files change.
 
 Add more by creating a top-level dir here (e.g., `agents/`,

@@ -11,7 +11,47 @@
 - `gh` opens a pager (alternate buffer) that hangs the agent terminal.
 - Always disable it: pipe `| cat` or set `GH_PAGER=cat` (e.g. `gh pr view 116 | cat`).
 - `gh --no-pager` is not a supported flag and will error; use `GH_PAGER=cat` or `| cat` instead.
-- **Rate limit is shared (5000/hr) and split GraphQL vs REST.** All tools/sessions/agents share the one user's 5000/hr; **GraphQL has its own, smaller pool that exhausts first** — `gh pr checks`, `gh pr view --json comments`, `gh pr list --json` use GraphQL. When GraphQL is spent, get the same data via REST (still has budget): `gh api repos/<o>/<r>/pulls/<n>`, `.../commits/<sha>/check-runs`, `.../issues/<n>/comments`. `gh api rate_limit --jq .resources` is **free** (doesn't count) — check `core` vs `graphql` remaining/reset before retrying. Don't tight-poll; use a background watcher with `sleep` (parallel sessions drain the shared pool fast).
+- **`gh repo list <owner>` works for a user or an org; `gh api /orgs/<owner>/repos` only works for an org.**
+  The REST endpoint returns 404 on a personal account, so it is not a drop-in replacement for `gh repo list` even though it offers `--paginate`.
+  `gh api /users/<owner>/repos` is the personal-account counterpart, and `gh api /users/<owner> --jq .type` returns `User` or `Organization` when you need to branch.
+  This matters when enumerating repos across a mixed owner list: substituting the `/orgs/` form to get pagination silently drops every user account in the list.
+  (Morrison-Lab/ai-config#833, 2026-07-29: a review suggested exactly that substitution to fix a `--limit 1000` truncation.
+  `d-morrison` is a `User`, so it would have 404'd on the first owner in the list.
+  The truncation was real, and the fix was to detect the ceiling instead, in the census command under "`gh search code` is not a reliable way to enumerate consumers".)
+- **Rate limit is shared (5000/hr) and split GraphQL vs REST.**
+  All tools/sessions/agents share the one user's 5000/hr, and `core` (REST)
+  and `graphql` are **separate pools**.
+  `gh pr checks`, `gh pr view --json comments`, and `gh pr list --json` use
+  GraphQL.
+  When one pool is spent, get the same data through the other: REST as
+  `gh api repos/<o>/<r>/pulls/<n>`, `.../commits/<sha>/check-runs`,
+  `.../issues/<n>/comments`; GraphQL as `gh api graphql -f query=...`.
+  `gh api rate_limit --jq .resources` is **free** and doesn't count against
+  either pool, so check `core` vs `graphql` remaining/reset before retrying.
+  Don't tight-poll; use a background watcher with `sleep`, since parallel
+  sessions drain the shared pool fast.
+  **Don't assume which pool empties first --- read `rate_limit` rather than
+  predicting.**
+  An earlier version of this entry said GraphQL exhausts first, generalized
+  from one session.
+  The reverse happens just as readily: a session doing mostly REST work
+  (per-PR `gh api` reads, check-run polls) exhausts `core` while `graphql`
+  sits nearly untouched.
+  So the fallback direction is whichever the free call says it is, in either
+  direction.
+  **GraphQL can carry a whole ARDI round on its own**, which is what makes
+  the REST-exhausted case survivable rather than merely diagnosable:
+  `addPullRequestReviewThreadReply` for a threaded reply,
+  `resolveReviewThread` to resolve it, `addComment` for a top-level summary,
+  and `pullRequest{ headRefOid mergeable reviewThreads statusCheckRollup }`
+  for the fully-clean sweep.
+  Note `statusCheckRollup.contexts` needs inline fragments, since a
+  `CheckRun` and a legacy `StatusContext` carry different fields
+  (`name`/`status`/`conclusion` versus `context`/`state`).
+  (Morrison-Lab/ai-config#816, 2026-07-29: `core` returned `403` mid-round
+  with `graphql` at 4922/5000; the round's reply, thread-resolve, ARD
+  summary, and clean-state verification all went through GraphQL, and
+  `core` reset 11 minutes later.)
 - **The @claude review bot's author name differs by API:** its comment author is `claude[bot]` in REST (`.user.login`) but `claude` in GraphQL (`.author.login`). A watcher filtering REST comments for `.user.login == "claude"` silently finds nothing — use `"claude[bot]"`.
 - **A third variant: on `d-morrison/gha` itself, the review comment posts as `github-actions[bot]`, not `claude`/`claude[bot]`.** Filtering `.user.login == "claude"` (or `"claude[bot]"`) there returns nothing even though a real, complete review was posted — the workflow's own `gather-context` job comment even says "REST author login is `claude[bot]`", which doesn't match what the bot actually posts under in that repo. Don't conclude "no review yet" from an empty filter on one login string: if it comes back empty, list all comment authors (`gh api repos/<o>/<r>/issues/<N>/comments --jq '.[] | .user.login'`) and check the body for the `**Claude finished` marker regardless of which login posted it. (gha#278, 2026-07-21: `select(.author.login == "claude")` and `select(.user.login | test("claude"))` both came up empty; the actual review comments were under `github-actions[bot]`.)
 - **Polling for the bot's verdict: match `Claude finished`, don't exclude a placeholder.** While a run is underway, the bot's comment holds an in-progress placeholder whose wording *varies between runs* ("### Review in progress …", "Claude Code is working…"), so a watcher that exits when comments exist, or when one known placeholder phrase disappears, fires early on the next differently-worded placeholder. Completed runs (review and agent alike) start the body with `**Claude finished`. **Filter on that body marker, not on an author login** --- the login itself varies by repo (see the `github-actions[bot]` variant in the bullet above), so a login-only filter can come up empty even once a review has posted.
@@ -27,12 +67,39 @@
     When polling for the *first* run on a fresh thread (no prior completed comment to collide with), the simpler unscoped form still needs `--paginate` for the same >30-comment reason (a REST issue-comments page is oldest-first, so page 1 alone can miss the newest comment entirely once a thread grows past one page): `gh api repos/<o>/<r>/issues/<N>/comments --paginate | jq -s '[.[][] | select(.body | startswith("**Claude finished"))] | last | .body'`. (Cost two wasted watch rounds on ai-config#357 before keying on the marker; the login-filtered version of this command was flagged as stale by review on ai-config#636; the unscoped-across-reruns version was flagged by a follow-up review on ai-config#637 and confirmed concretely on gha#278, whose thread holds two separate `**Claude finished` comments, one per run; and the `gh api --jq --argjson`/pagination gaps in *that* fix were themselves flagged by a still-later review on the same PR, caught only after #637 had already merged.)
 - **A reply posted via `gh pr comment`/`gh api` from within a session shows up under the *human user's own* GitHub account, not a bot identity — don't mistake it for an independent human review when auditing a PR's review state.** `gh` authenticates as whatever account is logged in locally (often the user's own, e.g. seen as `dem-extra1` on `Lacaedemon/sparta`), so when an agent (or a dispatched subagent) replies to an inline review comment on the user's behalf, `gh api repos/<o>/<r>/pulls/<N>/reviews` lists it as a `COMMENTED` review authored by the user — indistinguishable at a glance from the user genuinely opening the PR in a browser and typing a reply themselves. Before treating an unexpected review entry as a signal that the human intervened, check whether its body/inline-comment content reads like the agent's own scripted reply (referencing a specific commit SHA, restating verification numbers) rather than free-form human commentary — if so, it's the session's own tooling, not new human input.
 - **`gh pr view --json` does not accept `merged` as a field.** Use `state` (returns `"MERGED"`) and `mergedAt` (ISO timestamp, null if not merged) to check merge status. Example: `gh pr view <N> --json state,mergedAt`.
+  **Never compare that `mergedAt` against a git timestamp as strings --- convert both to epochs first.**
+  Every GitHub API timestamp is UTC (`...Z`), while git's `%cI`/`%cd` render in the *machine's local zone*, so a lexicographic `<` between them compares clock faces from two different zones and silently answers wrong.
+  It fails in the unsafe direction west of UTC: a commit made *after* the merge still sorts first.
+  Verified directly --- `tip="2026-07-30T18:00:00-07:00"` is `2026-07-31T01:00:00Z`, two hours *later* than `merged="2026-07-30T23:00:00Z"`, and `[[ "$tip" < "$merged" ]]` returns true.
+  Use `%ct` (epoch seconds) plus jq's `fromdateiso8601`, and an integer test:
+  ```bash
+  tip=$(git log -1 --format='%ct' "<branch>")
+  merged=$(gh pr view <N> --json mergedAt --jq '.mergedAt|fromdateiso8601')
+  [[ "$tip" -lt "$merged" ]] && echo "tip predates merge" || echo "tip AFTER merge"
+  ```
+  `fromdateiso8601` is available in the jq that `gh --jq` embeds, confirmed by `gh pr view <N> --json createdAt --jq '.createdAt|fromdateiso8601'` returning an integer.
+  So this needs no external `jq` and no `date -d`, which is GNU-only and absent on macOS.
+  (Morrison-Lab/ai-config#908, 2026-07-30: the `clean-worktrees` merged-PR guard shipped the string comparison.
+  Review caught it, and the repro above confirmed the failure direction before the fix went in.)
 - **`gh pr edit` exits 1 on repos with Projects Classic — use `gh api` to update PR body.** `gh pr edit <N> --body "..."` / `--body-file <f>` returns exit code 1 with a GraphQL deprecation warning (`Projects (classic) is being deprecated…`). Sometimes the edit lands anyway; **sometimes it does not apply at all** (seen on sparta 2026-06-30: three `gh pr edit --body-file` attempts left the body unchanged with the `SHA_PLACEHOLDER` still in place). Either way, don't trust it — verify with `gh api repos/<o>/<r>/pulls/<N> --jq .body`, and just use the REST PATCH directly, which always exits 0 and applies: `gh api -X PATCH repos/<o>/<r>/pulls/<N> -f body="..."`. For a multi-line body, read it from a file with `-F body=@<path>` (capital `-F` to pull the field value from the file) rather than cramming it into `-f body="..."`.
 - **PR description image embeds: use `raw.githubusercontent.com`, not `github.com/.../raw/...`.** Embedding a committed file in a PR body with `![](https://github.com/<owner>/<repo>/raw/<sha>/<path>)` may not render — the reviewer will flag it. The correct raw-content domain is `https://raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`. Reference the full commit SHA so the image keeps rendering after the branch is deleted on merge.
+- **`raw.githubusercontent.com` FOLLOWS repository-rename redirects, so a `200` under the OLD owner proves nothing — only a `200` under the NEW owner is decisive.** To test whether a repo has moved, probe the *new* name and treat `404` there as "did not move". Run a known-moved repo as a control first, or the probe silently answers backwards: `d-morrison/gha` still returned `200` on `raw.githubusercontent.com` well after it became `Morrison-Lab/gha`, so an old-name probe reports every repo as "not moved". The REST API is not a substitute — behind an agent proxy `api.github.com/repos/<o>/<r>` can return `403` for every repo regardless of existence, which answers nothing in either direction. This matters before any blanket owner rewrite: probing all nine `d-morrison/*` references in ucdavis/bcs under the new owner showed only `gha` and `ai-config` had moved, so a find-and-replace would have broken `macros`, `altdoc`, `snapr`, `stats-allowlist`, `diffviewer`, `equation-anchors`, and `rme`. Note the bare `d-morrison` *username* (a `reviewer:` input, author metadata) is unaffected by a repo/org rename and must not be swept along. The Actions-side consequences of the same rename are in `github-actions.md` ("A repo/org rename breaks Actions `uses:` refs"). (2026-07-28.)
 - **Download a user-pasted PR screenshot with `curl -L`.** When a user pastes an image into a GitHub PR comment, the file lives at `https://github.com/user-attachments/assets/<uuid>` and is publicly downloadable: `curl -L -o <dest>.png "https://github.com/user-attachments/assets/<uuid>"`. Retrieve the URL from the comment body via `gh api repos/<o>/<r>/issues/comments/<comment_id> --jq .body`.
 - **Linking a GitHub sub-issue needs an integer DB id, not the number.** `POST /repos/<o>/<r>/issues/<parent>/sub_issues` takes `sub_issue_id` = the child's **database id** (`gh api repos/<o>/<r>/issues/<child> --jq .id`), *not* its issue number. Pass it with `-F` (typed, integer), never `-f` (string) — `-f sub_issue_id=…` fails with `422 Invalid property /sub_issue_id: "…" is not of type integer`. Full call: `gh api repos/<o>/<r>/issues/<parent>/sub_issues -F sub_issue_id=<child_db_id>`. Verify with `gh api .../issues/<parent>/sub_issues --jq '.[] | "#\(.number) \(.title)"'`.
 - **Backticks in a double-quoted `-m` / `--body` string get command-substituted by the shell.** In the Bash tool, `` git commit -m "... `origin` ..." `` or `` gh pr comment --body "use `foo`" `` makes the shell run `` `origin` ``/`` `foo` `` as a command and splice the (usually empty/erroring) output into the message — silently mangling it (seen on sparta 2026-06-30: a commit body's `` `origin` `` and `` `killer` `` vanished, with `origin: command not found` in stderr). For any message/body containing backticks, use a single-quoted **heredoc** (`` -m "$(cat <<'EOF' … EOF)" `` — the quoted `'EOF'` disables all expansion) or a `--body-file`, never a bare double-quoted string. (Same root cause as ARD inline reply bodies too; use `-F body=@<file>` for `gh api .../pulls/<N>/comments`/`glab api .../notes` so backticks in Markdown never get shell-expanded.)
 - **GitHub review inline comments are on a different API endpoint than top-level PR comments.** The top-level comment-view endpoint (`` `gh pr view <N> --json comments` `` or `gh api repos/<o>/<r>/issues/<N>/comments`) captures PR-level comments and bot-posted review overview summaries, but **not inline comments from formal reviews** (line-by-line inline findings). When a user links a specific review ID (e.g. `#pullrequestreview-4761444085`), fetch both the review overview and its inline comments separately: `gh api repos/<o>/<r>/pulls/<N>/reviews/<review-id> --jq '{state, body}'` for the overview, then `gh api repos/<o>/<r>/pulls/<N>/comments --jq '.[] | select(.pull_request_review_id == <review-id>) | {line: .line, body: .body}'` to get the inline findings. A review's overview body can be generic ("I reviewed the code") with all the actual findings in inline comments on specific lines — reading only the overview misses the findings. (Encountered on ai-config#647 review 4761444085: the overview body was generic, but the specific finding was in an inline comment on CLAUDE.md line 324.)
+
+- **`repos/{owner}/{repo}/issues/comments` -- without a number -- is repo-wide, not PR-scoped, and it fails by returning another PR's review.**
+  The bullet above gives the correct form, `issues/<N>/comments`.
+  Dropping the `<N>` produces a path that still looks PR-shaped and still returns well-formed review JSON, so `--paginate | last` hands back whichever comment is newest **anywhere in the repository**.
+  On a repo with several PRs in flight that is routinely a review of a different PR.
+  Nothing in the payload announces the mismatch: it is a genuine review with genuine findings, and a reader who asked for "the latest review on this PR" has every reason to accept it.
+  The damage runs both ways -- the PR you are on gets reported as blocked by findings that are not its own, and you go looking for defects in files it never touches.
+  Worse, the wrong query is **intermittently correct**: whenever the PR you care about happens to hold the newest comment in the repo, it returns the right answer, so the method can survive several rounds before it bites.
+  Treat "this worked last time" as no evidence at all here.
+  Prefer `gh pr view <N> --json comments`, which cannot be mis-scoped.
+  (`ucdavis/bcs`, 2026-07-30: an agent driving #473 was handed #468's "Needs more work" verdict, with two HIGH findings about restricted-data handling, and was three sentences into treating them as #473's before the body's own `## Code Review: ucdavis/bcs#468` header caught it.
+  The same query had been used for two earlier rounds and was right both times, by luck.)
 - **Finding the PR(s) linked to an issue from the CLI: use the REST timeline endpoint, not `gh issue view --json`.** `gh issue view --json` has no `timelineItems` field (that exists only on `gh pr view --json`), so `gh issue view <N> --json timelineItems` errors — and a `2>/dev/null` swallows the error so the check silently returns nothing and *looks* like it passed. Query the timeline instead, with three gotchas: (1) in a `cross-referenced` event, `source.type` is always `"issue"`, so a PR is one whose `source.issue.pull_request` is non-null (`source.type == "pull_request"` never matches); (2) `--paginate` is required, or `gh api` returns only the first 30 events and silently misses a later cross-reference; (3) filter `source.issue.state` if you only want open PRs. Full call: `gh api --paginate repos/<o>/<r>/issues/<N>/timeline --jq '.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"'`. (Learned over three review rounds on #287.)
 - **`gh pr checks` does NOT say which checks are REQUIRED, and the legacy protection endpoint 404s on ruleset-gated repos — so the lazy check confirms the wrong answer.** `gh pr checks` reports check *state* only; required-ness is nowhere in its output. And `gh api repos/<o>/<r>/branches/<branch>/protection` returns `404 Branch not protected` on a repo that gates the branch with a **ruleset** rather than legacy branch protection, which reads as "nothing is required" and *confirms* the mistaken assumption. Query rulesets too, before any "ready to merge" or "that check doesn't gate us" claim:
   ```bash
@@ -44,10 +111,69 @@
   (ucdavis/bcs, 2026-07-26: a red `docs` check was twice reported non-required and a PR reported "ready" on that basis; `docs` is required under ruleset 11050897, so the merge was blocked the whole time and a queue-wide blocker was mislabeled a cosmetic flake. The legacy endpoint's 404 would have reinforced the error if consulted alone.)
   Note: the two commands above cover only **repo-level** rulesets. Org-level rulesets (`gh api "orgs/<org>/rulesets"`) can also gate branches in member repos and would still return "nothing required" with the repo queries alone; add that sweep when the repo belongs to an org.
 
+  **Required checks are not the only thing a ruleset carries -- Copilot code review is turned on there too.**
+  A `copilot_code_review` rule schedules Copilot itself, so nothing in the PR requests the review and no per-PR reviewer entry explains where it came from.
+  Read it off the same endpoint:
+  ```bash
+  gh api "repos/<o>/<r>/rulesets/<id>" \
+    --jq '.rules[] | select(.type=="copilot_code_review") | .parameters'
+  ```
+  On `ucdavis/bcs` (2026-07-30) ruleset `19248641`, scoped to `~DEFAULT_BRANCH`, returns `{"review_on_push":true,"review_draft_pull_requests":true}` -- which is why draft PRs there get Copilot reviews at all.
+  Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
+
+  **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
+  `POST /repos/<o>/<r>/pulls/<N>/requested_reviewers` with `reviewers[]=copilot-pull-request-reviewer[bot]` returned **201**, and the plain `Copilot` and `copilot` logins were accepted the same way.
+  So the login spelling is not what decides the outcome, and a `422` seen elsewhere is likelier to be about whether Copilot review is enabled for that repo at all -- untested here, since bcs has it enabled.
+  The 201 body lists Copilot under `requested_reviewers`, but an immediate `GET .../requested_reviewers` returns `{"users":[],"teams":[]}` and `gh pr view --json reviewRequests` returns `[]`.
+  Neither surface therefore answers "was Copilot asked to review this", in either direction.
+  (Probed on `ucdavis/bcs#479`, 2026-07-30.)
+
+  **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
+  One session ran the POST once and got `422`; another ran it three times, across all three login spellings, and got `201` every time.
+  Neither session was lying, and the first one's real mistake was not the observation but the generalisation -- it turned a single failed attempt into a stated property of the repository, wrote that into a PR body as settled fact, and steered two later rounds with it.
+  The second session's report then invited the mirror-image error, of treating `201` as the settled answer.
+
+  The likeliest reconciliation, **untested**: GitHub answers `422` when the requested reviewer is already pending.
+  The `review_on_push: true` rule above re-requests Copilot on **every push**, so there is a window after each push in which Copilot is already a pending reviewer and a manual request is a duplicate.
+  That would make the response depend on *when* you ask rather than on how, and it fits both observations without either being wrong.
+  It stays untested on purpose: probing consumes the per-user quota that is usually the actual reason Copilot is absent, so the experiment damages the thing it would explain.
+
+  The operational advice does not depend on resolving it.
+  Don't spend a call on this endpoint either way -- the ruleset already requests the review, and neither response tells you whether one is pending.
+
 ## gh — stale remote URL causes cryptic `gh pr create` failure
 - `gh pr create` fails with `Head sha can't be blank, Base sha can't be blank, No commits between <owner>:main and <other-owner>:<branch>` when `origin` points to an **old repo URL** (e.g. after a GitHub repo transfer/rename).
 - Fix: `git remote set-url origin https://github.com/<new-owner>/<repo>.git` and re-push the branch before creating the PR.
 - Diagnosis: `git remote -v` shows the stale URL; `gh repo view --json nameWithOwner` shows where `gh` thinks the canonical repo is.
+- **`gh repo view <old-slug> --json nameWithOwner` is the whole detector, and it
+  resolves the redirect for you** --- ask for the old name and read which name
+  comes back.
+  That makes the check a one-liner per repo, so run it over *every* local
+  checkout rather than over the ones you happened to notice.
+  Stale remotes accumulate from unrelated events --- an org transfer, a repo
+  rename, a move between orgs --- so the set you know about is rarely the set
+  that exists.
+  (2026-07-29: a sweep of 118 local checkouts found 5 stale, and only **one**
+  was the `d-morrison` -> `Morrison-Lab` transfer being fixed at the time
+  (`gha`; the other repo in that transfer had already been corrected by hand
+  before the sweep ran, so it was no longer stale).
+  The rest came from three unrelated events: two repos moved out of
+  `UCD-SERG` to `d-morrison` (`qbt`, `qwt`), one moved from `UCD-IDDRC` to
+  `ucdavis` (`fxtas`), and one plain rename, `snapshot.data` -> `snapr`.
+  So 1 + 2 + 1 + 1, which is the point --- four of the five had nothing to do
+  with the move that prompted the sweep.)
+- **Preserve the URL scheme when rewriting a remote.**
+  A remote on SSH (`git@github.com:<owner>/<repo>.git`) rewritten to the
+  `https://` form still works for public reads, so nothing fails immediately ---
+  but it silently moves that repo's auth from your SSH key to whatever
+  credential helper HTTPS uses, which surfaces later as an unexpected
+  credential prompt or a push denial.
+  Read the existing URL first and rebuild it in the same form.
+  A scripted sweep is where this bites, since a single hard-coded
+  `https://github.com/...` template rewrites every remote it touches into HTTPS
+  regardless of what each one was.
+  (Same sweep: 4 of the 5 were HTTPS and one, `snapr`, was SSH; the template
+  converted it before the mismatch was spotted and reverted.)
 
 ## GitHub MCP tools (Claude Code remote/web sessions)
 - In remote/web sessions the authenticated GitHub identity is the repo owner
@@ -116,6 +242,32 @@
   explicit go-ahead first if the workflow has a real side effect (e.g. a
   gh-pages deploy step not gated to `main`) — dispatching isn't just a status
   check in that case, it's a live action.
+- **`issue_write`'s `labels` REPLACES the issue's whole label set, and a name
+  that does not exist yet is silently CREATED rather than rejected.** Two
+  independent surprises in one parameter, pulling in opposite directions.
+  The replace semantics come from the underlying REST "update an issue"
+  endpoint, so passing `["needs-data"]` to an issue already carrying
+  `["bug","tech-debt"]` drops both, with no warning and nothing in the
+  response to notice --- always pass the **union** of existing plus new.
+  Read the current labels first; `list_issues` already returns them, so a
+  bulk pass needs no extra call per issue.
+  The auto-creation runs the other way: it means a typo becomes a real label
+  rather than an error, so a misspelling silently splits a set in two.
+  Confirmed on `ucdavis/bcs`, 2026-07-29: applying `needs-data` to an issue
+  in a repo that had no such label created it, and `get_label` then returned
+  it with the default grey `#ededed` and an empty description.
+  **Nothing in the MCP tool set can set a label's color or description** ---
+  there is only `get_label` (`GET_LABEL` in
+  [`tool-mappings.md`](../tool-mappings.md)), no create/update --- so a label
+  born this way stays grey and undescribed until a human with **write**
+  access fixes it, or a workflow with `issues: write` does it via `gh api`.
+  Write, not admin: the Labels REST API's create/update endpoints need push
+  access, while admin governs repository settings, branch protection, and
+  webhooks.
+  Note that the Triage role can *apply* an existing label but cannot create
+  or edit one, so it is not sufficient here.
+  Say so when handing off, rather than leaving someone to wonder why the new
+  labels look unstyled.
 - **Comments/replies you post via the GitHub MCP tools echo back into the
   session's `<github-webhook-activity>` events under the human account's
   identity, not a bot identity.** `add_reply_to_pull_request_comment` and
@@ -526,7 +678,7 @@
   string with no regard for Markdown context, so an angle-bracket span inside
   a code span is stripped exactly like a bare one, leaving an empty pair of
   backticks. This is the same formatting-blind-substring failure mode as the
-  bot-mention gate in `memories/github-actions.md` -- a pass that inspects
+  bot-mention gate in `memories/claude-bot-workflows.md` -- a pass that inspects
   raw text while the author reasons in rendered Markdown.
   **Write the URL with no angle brackets at all**: a `[text](url)` link, or
   the bare `https://...` (GitHub auto-links it in a PR body anyway). Then
@@ -783,3 +935,145 @@ label-name fix round-tripped through a wrong "redocument the label" patch
 before the actual `@v1`→`@v2` pin bump was found; `gha#304`'s own review then
 caught two more stale `@v1` references in sibling docs pages and the
 contradicting pending changelog fragment, all in the same repo-wide sweep.)
+
+## A repository transfer redirects `pull` paths but NOT `issues` paths
+
+When a repo moves between owners (`d-morrison/gha` -> `Morrison-Lab/gha`),
+GitHub's redirect does not cover every path shape, and the split is not
+documented anywhere obvious.
+Measured directly after one such move:
+
+| Old-owner URL | Result |
+| --- | --- |
+| `.../gha` (repo root) | 301 -> new owner |
+| `.../gha/tree/main/examples` | 301 -> new owner |
+| `.../gha/blob/main/README.md` | 301 -> new owner |
+| `.../gha/pull/34` | 301 -> new owner |
+| `.../gha/issues/325` | **404** |
+
+The issues themselves are fine --- the same numbers return 200 under the new
+owner.
+Only the redirect is missing, so every prose link of the form
+`https://github.com/<old-owner>/<repo>/issues/N` becomes a hard 404 the
+moment the transfer completes.
+
+Two consequences worth knowing before diagnosing this:
+
+- **A link checker goes red repo-wide, on `main`, with no diff to blame.**
+  lychee's usual config accepts 301, so the redirecting links pass and only
+  the issue links fail.
+  Every open PR inherits the failure, which invites blaming whichever PR you
+  happen to be looking at.
+  Confirm by checking whether the failing files appear in the PR's own
+  changed-file list at all: a file the diff never touched cannot be the
+  cause.
+  An identical count of old-owner links on `main` and on the branch
+  corroborates it.
+- **Do not infer that the issues were lost.**
+  A 404 on the old owner says nothing about the new one.
+  Request the new-owner URL before concluding anything; the fix is usually a
+  plain rewrite rather than recreating or remapping anything.
+  (This exact inference was made, published in a review, and had to be
+  retracted --- gha#351, 2026-07-28.)
+
+`uses:` resolution is a separate question from link resolution and behaves
+differently again: Actions stopped resolving
+`uses: <old-owner>/<repo>/.github/workflows/x.yml@v2` after the same
+transfer, failing affected runs with `startup_failure` and **zero jobs**.
+Note that a run started shortly before the cutover can still succeed, so two
+attempts of the *same run* can disagree --- which is the cheapest available
+proof that the cause is environmental rather than in the diff.
+
+## `gh search code` is not a reliable way to enumerate consumers
+
+When a shared repo moves or cuts a breaking release, the question is which
+repos call it.
+Code search is the obvious instrument and it is **incomplete**: it silently
+omits repos whose content it has not indexed, and nothing in the response
+says so.
+
+Measured 2026-07-28, hunting callers of a renamed `d-morrison/gha` across ten
+owners: an owner-scoped `gh search code '"d-morrison/gha" user:...'` returned
+176 hits across 23 repos, and missed `d-morrison/altdoc`, a live consumer with
+four workflow files calling it.
+An exhaustive scan of all 947 non-archived repos found it immediately.
+
+So treat code search as a fast first pass, never as the census.
+The census enumerates repos and reads their workflow files:
+
+```bash
+LIMIT=1000
+for o in <owners>; do
+  # gh repo list works for users AND orgs; `gh api /orgs/$o/repos` 404s on a
+  # user account, so don't substitute it just to get --paginate.
+  n=$(gh repo list "$o" --limit "$LIMIT" --no-archived --json nameWithOwner \
+        --jq '.[].nameWithOwner' | tee -a repos.txt | wc -l)
+  [ "$n" -ge "$LIMIT" ] && echo "TRUNCATED: $o hit --limit $LIMIT; raise it" >&2
+done
+
+while read -r r; do
+  echo "$r" >> scanned.txt          # before any early exit, per fail-fast
+  files=$(gh api "/repos/$r/contents/.github/workflows" --jq '.[].path' 2>err.txt) || {
+    # 404 = no workflows dir, expected. Anything else is an error, not a miss.
+    grep -q '"status": "404"' err.txt || echo "ERROR: $r $(tr -d '\n' < err.txt)" >&2
+    continue
+  }
+  for f in $files; do
+    gh api "/repos/$r/contents/$f" -H "Accept: application/vnd.github.raw" \
+      | grep -q "<old-owner>/<repo>" && echo "$r $f"
+  done
+done < repos.txt
+
+echo "scanned $(wc -l < scanned.txt) of $(wc -l < repos.txt)"
+```
+
+Note what the error branch is for: a blanket `2>/dev/null` on those calls
+swallows the 403 secondary-rate-limit failures the next section describes
+alongside the 404s it is meant to hide, so a rate-limited run reports fewer
+hits rather than an error.
+That is the same false-all-clear
+[`fail-fast`](../shared/principles/fail-fast.md) covers, arriving in the very
+command written to prevent it.
+
+Three things that scan still misses, so state them rather than claiming a
+clean census:
+
+- **Non-default branches.** It reads each repo's default branch only, so an
+  open PR branch carrying the old reference is invisible.
+  Those self-heal on the branch's next `main` sync when the branch does not
+  itself touch the file, but they break the branch's CI until then.
+- **Paths outside `.github/workflows/`.** A composite action under
+  `.github/actions/*/action.yml` can carry its own `uses:`, and is missed by
+  a workflows-only glob.
+  Widen the path filter, or use the git-trees API to list every blob under
+  `.github/` in one call per repo.
+- **A local checkout is not evidence about the remote.**
+  `d-morrison/methods.paper` had four gha-calling workflows on disk, all on an
+  unmerged branch; the remote default branch had no `.github/workflows`
+  directory at all.
+
+## A secondary rate limit fires while `rate_limit` still reports headroom
+
+`gh api /rate_limit` reporting `core: 4936/5000` does **not** mean the next
+call will succeed.
+GitHub enforces a separate concurrency/abuse limit, and at `xargs -P 12`
+across a few thousand `contents` reads, `/repos/{owner}/{repo}` began
+returning 403 `API rate limit exceeded for user ID <n>` while the
+`rate_limit` endpoint went on reporting nearly the full core budget unspent.
+The two counters are not the same counter, so the cheap check does not
+predict the expensive one.
+
+Two practical consequences:
+
+- **Back off rather than retry.** Re-running the same fan-out at the same
+  concurrency reproduced it immediately; the limit cleared on its own after
+  roughly fifteen minutes.
+  Lower the parallelism (`-P 3` completed the remainder without incident)
+  rather than looping.
+- **Log coverage, not just hits.** A per-repo scan that exits early on a 403
+  records nothing for that repo, so the run reports fewer findings rather
+  than an error.
+  Print `scanned N of M` and diff the two lists, or a truncated sweep reads
+  exactly like a clean one.
+  (2026-07-28: a 947-repo scan reported 910 scanned; the 37-repo shortfall
+  was the whole signal that anything had gone wrong.)

@@ -131,6 +131,30 @@ search procedure), and the
 [`scout-peers`](../../skills/scout-peers/SKILL.md) skill (license-gated
 borrowing from peer repos).
 
+## Don't incur technical debt
+
+When the right way to do the work in front of you needs a change you
+have not made yet, make that change as part of the work.
+The moment debt is incurred is the moment you defer a fix you have
+already diagnosed, and a filed tracking issue records that debt rather
+than paying it.
+The rule bounds new work only: adding a copy to un-migrated code is
+yours, the un-migrated code itself is not.
+
+Full statement:
+[`dont-incur-technical-debt`](dont-incur-technical-debt.md), including
+the case where duplicated logic corrupts its own tests, and why this
+does not conflict with YAGNI.
+Operationalized by:
+[`dont-reinvent-wheel`](dont-reinvent-wheel.md) (the search that comes
+one step earlier) and
+[`report-mistakes-proactively`](../workflow/report-mistakes-proactively.md)
+(file the issue -- necessary, not sufficient).
+Contrast with, rather than apply,
+[`address-every-comment`](../workflow/address-every-comment.md)'s Defer
+disposition: it governs a finding on code that already exists, and
+licenses nothing about a defect inside the diff you are about to push.
+
 ## Modularity — small, single-purpose, composable units
 
 Favor small, single-purpose functions and reusable units over long
@@ -218,7 +242,11 @@ class rather than by matching its message text.
 Operationalized by:
 [`type-stable-outputs`](../coding/type-stable-outputs.md) --- the same
 principle applied to shape rather than to errors, since a type-unstable
-call returns a plausible object of the wrong kind instead of failing.
+call returns a plausible object of the wrong kind instead of failing ---
+and [`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), which
+covers the shell case where `set -e` silently stops applying, so a script
+either aborts on an expected non-zero exit or fails to, depending on the
+call site.
 
 ## Algorithmatize checks — instruments over judgment
 
@@ -230,6 +258,31 @@ Serves the "easy to externally validate" goal directly.
 Full statement:
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
 (predates this catalog, so it lives in `shared/workflow/`).
+
+## Deterministic tools over model judgment -- and build the missing ones
+
+Prefer deterministic, inspectable algorithms over model reasoning, and
+where none exists, build one.
+One principle with two faces: a **constraint** binding now (use the
+instrument that exists) and a **goal** over time (build the one that
+does not, so the constraint gets cheap to obey).
+The observable trigger is recurrence -- after doing the same judgment
+task twice, the third time is a tool.
+
+Extends the entry above on two axes: **scope**, from verification to
+agentic work generally, and **inspectability** -- an algorithm can be
+read before it runs, diffed, and reproduced, which model reasoning
+cannot.
+Applies to every repo we work in, research code included, not only to
+tooling.
+
+Full statement: [`deterministic-tools`](deterministic-tools.md).
+Operationalized by:
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md) (the
+checks-shaped special case), the `hooks/` directory (rules made
+mechanical), and
+[`skill-checklists`](../workflow/skill-checklists.md) (the pause-point
+instrument where no script can decide).
 
 ## The 3Rs lens — reduce, reuse, recycle
 
@@ -274,6 +327,35 @@ the same fact or logic has two hand-maintained copies, DRY wins.
 DRW is the outward-facing sibling: KISS, DRY, and modularity govern the
 code we write; DRW asks first whether we should be writing it at all,
 or reusing, forking, or contributing to something that already exists.
+
+Don't-incur-technical-debt is the *timing* member of that family.
+KISS, DRY, and DRW each say what the right shape is;
+this one says when you have to adopt it, which is now.
+
+It looks like it contradicts YAGNI and does not, because the two
+never fire on the same object.
+YAGNI governs a speculated future requirement, whose defining
+property is that you cannot yet tell whether it is real.
+This governs a present, diagnosed defect in code you are writing now.
+Feeling both at once usually means you are holding a suspicion rather
+than a diagnosis, and the way out is to settle which it is.
+
+Deterministic-tools and algorithmatize-checks are the same instinct at
+two scopes, and the pair is worth keeping distinct rather than merging.
+Algorithmatize-checks governs *verification* and is the older, narrower
+statement; deterministic-tools governs the work itself and adds the
+argument from inspectability.
+Read the narrow one when deciding how to verify something, and the broad
+one when deciding whether a task should still be done by hand at all.
+
+Deterministic-tools also sits in the same relation to YAGNI that
+don't-incur-technical-debt does, and resolves it the same way.
+YAGNI governs a tool for a task that has happened once, whose recurrence
+is still speculation.
+The goal half fires only on the third occurrence, by which point
+recurrence is observed rather than predicted.
+Feeling both at once usually means the count is one or two, and the way
+out is to wait rather than to argue.
 
 The remaining principles serve the goals directly: least astonishment
 and self-documenting code serve readability the way modularity serves

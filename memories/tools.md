@@ -206,24 +206,209 @@ again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content
 in the file.)
 
-## `scripts/semantic-line-breaks.py` rewrites the whole file, not the part you added
+## `scripts/semantic-line-breaks.py` previews by default and scopes its writes
 
-It is an in-place reformatter over every prose paragraph in each file it is
-given --- no `--check`, no `--dry-run`, no diff scoping (`main()` takes bare
-paths and calls `path.write_text()`).
-Running it on a mature file to tidy a few lines you just appended therefore
-reflows everything else too: on `memories/r-quarto.md` a 65-line addition
+**Fixed in ai-config#951.**
+This entry is kept because the old behaviour is what most of this corpus was
+written against, and because the failure it describes is worth recognizing in
+any formatter.
+
+It used to be an unconditional in-place reformatter over every prose
+paragraph in each file it was given --- no `--check`, no `--dry-run`, no diff
+scoping, with `main()` taking bare paths and calling `path.write_text()`.
+Running it on a mature file to tidy a few lines you had just appended
+reflowed everything else too: on `memories/r-quarto.md` a 65-line addition
 came back as `273 insertions(+), 923 deletions(-)`, burying the actual change
 and rewriting `git blame` for content nobody touched.
+Measured against a copy of `CLAUDE.md`, the unguarded version changed 342 of
+1163 lines.
 
-Two consequences.
-Format new prose by hand and reserve the script for a file you intend to
-convert wholesale.
-And if you do run it by reflex, `git checkout -- <file>` and re-apply just
-your own text --- the reformat is not worth keeping as a side effect of an
-unrelated change.
+It now behaves the way the entry above used to tell you to behave by hand:
 
-Note the contrast with its CI counterpart, `check-new-line-breaks` in
-[`d-morrison/gha`](https://github.com/d-morrison/gha), which is diff-scoped
-by design so a corpus's pre-existing drift is never reflagged.
-The checker got that treatment and the formatter did not.
+- naming a path **previews** a unified diff and writes nothing
+- `--write` applies it, scoped to the lines changed against `--base`
+  (default `origin/main`)
+- `--all` widens to the whole file
+- a scope it cannot determine is a **loud error**, never a silent widening
+
+So the old advice --- format new prose by hand, and `git checkout -- <file>`
+if you ran it by reflex --- is no longer needed for its own sake, though a
+preview is still worth reading before passing `--write`.
+
+The contrast that motivated the fix: its CI counterpart,
+`check-new-line-breaks` in
+[`d-morrison/gha`](https://github.com/d-morrison/gha), was diff-scoped by
+design from the start, so a corpus's pre-existing drift is never reflagged.
+The checker got that treatment years before the formatter did.
+
+## macOS disk cleanup: where the space actually goes
+
+Findings from a full sweep of the user's Mac, 2026-07-28, when the data
+volume hit 97% full.
+The order below is the order worth checking, since the biggest directories
+are rarely the most reclaimable.
+
+**A OneDrive account re-link orphans the entire old sync folder, and it
+keeps every byte.**
+Re-linking renames the previous folder with a timestamp suffix
+(`OneDrive-<Org> (5-1-25 9:55 PM)`) and starts a fresh one alongside it.
+The new folder syncs with files-on-demand, so it reports a few MB on disk
+while holding the same content; the orphan holds real local bytes for all
+of it and no longer syncs to anything.
+The result is a directory that looks like live cloud storage and is neither
+live nor reclaimable by any OneDrive setting.
+33 GB in this case, against 2.1 MB for the live folder holding the same
+tree.
+
+Two checks settle whether an orphan is safe to delete, and both are cheap:
+
+- **Name-diff it against the live folder** rather than trusting the
+  timestamps.
+  `find . -type f | sort` in each, then `comm -23`, lists exactly what
+  exists only in the orphan.
+  Here that was 103 files out of 11,428, all of them collaborator-marked
+  manuscript drafts the live sync had never received.
+  Copy those in and verify by size plus `md5` before deleting anything.
+- **Check for FileProvider extended attributes on the two roots.**
+  `ls -ld@` names them, and the live root carries
+  `com.apple.file-provider-domain-id` while a detached one has no xattrs at
+  all.
+  Prefer that over reading the bare `@` marker in `ls -l` output, which only
+  says *some* xattr is present.
+  This is the direct evidence deletion is local-only, and it is worth having
+  before removing a directory that sits under `CloudStorage/`.
+
+Note that `ls -l` reports logical size for dataless placeholder files, so a
+folder full of them can look enormous while occupying nothing.
+Compare `du -h` against `ls -l` on a large file to tell real bytes from
+placeholders: on a fully-downloaded file the two roughly agree, while a
+placeholder reads `0B` under `du` and its full size under `ls -l`.
+`ls -ldO` names the condition outright, flagging such a file `dataless`.
+
+**`du` totals across `~/Library` double-count OneDrive and Google Drive.**
+`CloudStorage/OneDrive-<Org>` and
+`Group Containers/UBF8T346G9.OneDriveStandaloneSuite/OneDrive - <Org>.noindex`
+are the same data seen twice.
+Don't sum them when estimating what a cleanup will free.
+
+**A Parallels VM is usually not the win its size suggests.**
+Check before doing anything:
+`prl_disk_tool compact --info --hdd "<vm>.pvm/harddisk.hdd"`.
+It prints allocated versus used blocks, and the gap between them is the
+entire reclaimable amount.
+A 75 GB disk here showed 76,540 allocated against 76,437 used at 1 MB per
+block, so compaction was worth about 100 MB.
+There is no `info` subcommand despite the name, and no snapshots means no
+hidden `.hds` growth to find either.
+What is genuinely reclaimable is the suspend-state `.mem` file (a few GB, at
+the cost of discarding the suspended session) and the guest pagefile via
+`--exclude-pagefile`, whose help text reads `remove the page file from the
+disk` -- it reclaims that space rather than skipping it, despite a name that
+reads the other way.
+`--force` is about the suspended state rather than either of those: its help
+is `forcibly drop the suspended state before compacting the disk`, so it is
+what lets `compact` run at all against a suspended VM.
+A VM already shut down cleanly needs neither `--force` nor a `.mem` deletion.
+
+**Everything else, in rough order of yield.**
+`~/.ollama` holds multi-GB models that `ollama list` dates by last use, and
+`ollama rm` reclaims immediately with a `pull` to undo it.
+Chrome keeps a 4 GB on-device model under
+`Application Support/Google/Chrome/OptGuideOnDeviceModel`, separate from
+its profile and cache directories.
+Outlook's local mail store under `Group Containers/UBF8T346G9.Office/Outlook`
+shrinks only by narrowing the sync window in Outlook's own settings.
+Regenerable dev caches worth sweeping together: `~/.cache/codex-runtimes`,
+`~/.cache/puppeteer`, `~/.cache/uv`, `~/Library/Caches/{copilot,github-copilot-sdk,ollama}`,
+plus `npm cache clean --force` and `brew cleanup --prune=all`.
+
+## Two shell gotchas that make a path silently unreachable
+
+Both surfaced in the disk sweep above, and both produce a confident wrong
+answer rather than an obvious error.
+
+**macOS writes U+202F (narrow no-break space) before AM/PM in generated
+names.**
+A path copied from `ls` output then quoted normally fails with
+`No such file or directory`, because the quoted string carries a regular
+space where the name has U+202F.
+Nothing about the error hints at an encoding mismatch, and the two glyphs
+are visually identical in terminal output.
+Confirm it by piping the name through `xxd -p` and looking for `e280af`,
+then avoid retyping the path at all: capture it with a glob into a
+variable (`D=$(ls -d 'prefix'*)`) and use `"$D"` from there.
+
+**`rsync` treats a path with a colon before the first slash as a remote
+host.**
+A directory named with a time in it (`... 9:55 PM`) is therefore parsed as
+`host:path`, and the run dies with `hostname contains invalid characters`
+followed by `unexpected end of file`.
+Worse, the wrapper can still exit 0, so a script that checks only the exit
+status concludes the copy succeeded -- the
+[`fail-fast`](../shared/principles/fail-fast.md) trap, in a tool nobody
+expects it from.
+Prefix the source with `./` so a slash precedes the colon, or use a `cp`
+loop when the file list is small enough not to need rsync.
+
+## Markdown linting (markdownlint, lint-qmd)
+
+- **Table rows must stay on one line (MD055/MD056).**
+  Wrapping a cell across lines breaks the `|` alignment and trips both rules.
+  Rewrite the cell concisely on a single line rather than word-wrapping it.
+  Prefer a short, complete description over hitting a length target.
+- **Don't tag a non-shell CLI block `bash`/`sh` (MD040).**
+  MD040 wants a language on every fence, which invites tagging anything command-shaped as `bash`.
+  Claude slash commands (`/ums`, `/plugin`, `/also`) and other application-level directives are not shell-executable, so `bash` implies a reader can run them and they fail when someone tries.
+  Tag those `text` instead.
+
+(Recovered 2026-07-30 from `a739c69`, an orphaned commit on `ums/ardi-review-link-handling`: it landed about 30 minutes after its own PR [#650](https://github.com/Morrison-Lab/ai-config/pull/650) merged, so it never reached `main` and sat unnoticed for a week.
+Both rules were first learned on [#645](https://github.com/Morrison-Lab/ai-config/pull/645).)
+
+## The Bash tool runs zsh here, and zsh does not word-split unquoted expansions
+
+Kin to the two path gotchas above --- it produces a confident wrong answer
+rather than an error --- but it is not about paths, so it gets its own entry.
+
+`SHELL=/bin/zsh` on this machine, and zsh leaves `SH_WORD_SPLIT` **off** by
+default.
+So an unquoted parameter expansion stays one word, where bash would split it:
+
+```zsh
+r="804 MERGED 2026-07-29"
+set -- $r      # zsh: $1="804 MERGED 2026-07-29", $2=""   <- bash: $1="804", $2="MERGED"
+set -- ${=r}   # zsh: $1="804", $2="MERGED"               <- the = flag forces splitting
+```
+
+`for x in $list` has the same shape: one iteration over the whole string
+rather than one per word.
+
+**Nothing errors.** `$2` is simply empty, so a downstream `[ "$2" = "MERGED" ]`
+is false and every row of a report comes back the same wrong way.
+That uniformity is what sells it: a loop over 19 branches printing `no-PR` for
+all 19 reads as a finding about the branches, not as a broken parser.
+
+Prefer a form that needs no word splitting at all, since it is also portable
+back to bash:
+
+```zsh
+num=${r%% *}; rest=${r#* }; state=${rest%% *}   # parameter expansion
+read -r num state date <<< "$r"                 # or read into named vars
+```
+
+Reach for `${=r}` only when you specifically want zsh's splitting and know the
+script will never run under bash.
+
+- **Do:** parse with parameter expansion, `read`, or `awk`, rather than
+  relying on the shell to split an unquoted expansion.
+- **Do:** suspect the parser first when every row of a generated table reports
+  the same value.
+- **Don't:** carry a `set -- $var` idiom over from bash notes and assume it
+  splits here.
+- **Don't:** put `2>/dev/null` on the command whose output the table is built
+  from --- that hides the other half of this failure class (see
+  [`fail-fast`](../shared/principles/fail-fast.md)).
+
+(2026-07-29/30, one ai-config session, twice.
+The second time, a branch sweep reported all 19 local branches as having no
+PR; the immediately preceding run of the same data had correctly shown 16 as
+`MERGED`, which is the only reason the contradiction was noticed at all.)

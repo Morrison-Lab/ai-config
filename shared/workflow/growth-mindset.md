@@ -38,6 +38,116 @@ problem, or not the user's to authorize (see the contribution-policy gate in
 settle for the current limitation after that's been considered --- not to treat
 the current limitation as the ceiling from the outset.
 
+## First check the limitation is real
+
+Everything above starts from a limitation that exists.
+That premise is the one most often wrong, and it fails in the direction that
+looks like diligence: a tool errors on its first invocation, and reporting it
+broken feels like the finding rather than like the thing that stopped you
+checking.
+
+Environment misuse presents identically to breakage.
+An environment not activated, a working directory outside the project, an
+unset library path, a missing credential -- each produces an error from the
+tool itself, which reads as the tool's own verdict on its own health.
+Nothing in the message says the caller is holding it wrong, because the tool
+cannot tell.
+
+So spend one round diagnosing the error before reporting it.
+Read what the message actually names, then check the environment it names
+things in: which env is active, which directory the command ran from, which
+library path it resolved, which credential it read.
+Re-invoking with one of those corrected is cheap, and it is the whole check.
+
+The stakes are not the tool.
+"The tool is broken" is the most comfortable explanation available, because
+it is externally caused, requires nothing of me, and licenses skipping the
+verification the tool was being used for -- so the unverified claim ships
+anyway.
+That is an excuse wearing a finding's clothes.
+The general principle is the "stop making excuses for avoiding demos"
+directive in [`preferences.md`](../../memories/preferences.md); this is the
+same move one level up, where the excuse skips checking a claim rather than
+skips producing an artifact.
+
+- **Do:** diagnose the first failure -- env, working directory, library path,
+  credential -- before concluding the tool itself is at fault.
+- **Do:** name which environment correction you tried, so "still broken"
+  becomes a claim someone else can check rather than a verdict.
+- **Don't:** report a tool as broken on the strength of one invocation.
+- **Don't:** let "broken tool" become the reason a verification gets skipped
+  and its unverified claim ships regardless.
+
+(2026-07-30: checking whether Quarto's `execute: echo` can be set per output
+format, `quarto` was reported broken twice, and was working both times.
+The first invocation ran the conda environment's binary without activating
+that environment, failing with
+`bin/tools/x86_64/deno: No such file or directory`; `conda activate bcs`
+fixed it.
+The second ran from a scratchpad directory outside the project, so `renv`
+never activated and the conda base R library genuinely lacked `rmarkdown`;
+`export R_LIBS=<project renv library>` fixed it.
+The user's correction was "if a tool you could use is broken, fix it, don't
+accept it as broken".
+The render then worked on the first try and settled the question, which the
+manuscript would otherwise have asserted unchecked.)
+
+## A refusal can name its own remedy, and that sentence is the one skipped
+
+The section above assumes the error needs diagnosing.
+Sometimes it does not, because the error already contains the answer -- and
+that case is missed more reliably than the ambiguous one, for a reason worth
+naming: a status code is read as a verdict, so attention resolves at `403`
+and never reaches the body.
+
+The shape is a refusal whose text distinguishes *this route is closed* from
+*you are not allowed to do this*:
+
+```console
+$ curl -X POST https://api.github.com/graphql ... | jq -r .message
+This GraphQL query is not enabled for this session - only the pinned set of
+PR-review operations is served. Use REST via `gh api repos/{owner}/{repo}/...`
+instead.
+```
+
+That is a routing instruction wearing a denial's status code.
+Read as a denial it says the capability is absent; read to the end it names
+the working path.
+
+What makes this worse than an ordinary missed hint is where the mistaken
+reading sends you.
+"The capability is absent" invites acquiring it -- installing a server,
+adding a plugin, asking for a credential -- which is expensive, plausible,
+and in a sandbox usually futile, since anything installed runs behind the
+same boundary that issued the refusal.
+So the wrong reading produces a confident, effortful search for something
+that could not have worked, while the remedy sat in the sentence that
+prompted the search.
+
+- **Do:** read a refusal's whole body before concluding a capability is
+  missing, and try any alternative it names.
+- **Do:** treat "acquire the capability" as the fallback *after* the named
+  route fails, not the first response to a non-2xx.
+- **Don't:** stop at the status code -- a 401 or 403 is the usual carrier of
+  an actionable alternative, since something deliberately refused you and had
+  a reason to state.
+
+A 404 rarely carries one, and is worth naming as the exception rather than
+lumping in: it usually means the route does not exist, so there is nothing to
+route you to.
+The same session that produced the 403 above also got a bare
+`{"message": "Not Found"}` from `POST .../discussions/{n}/comments`, which
+said nothing and settled nothing -- reading the body cost one glance and was
+still the right move, but it is the case where reading it does not help.
+- **Don't:** reach for installing something to get past a sandbox boundary;
+  what you install inherits the boundary.
+
+(2026-07-30: a GraphQL call was refused with exactly the message above, read
+as a flat denial, and answered by searching the MCP registry and plugin
+catalog for a GitHub Discussions server to install.
+Neither could have helped -- a local server sits behind the same proxy.
+The REST route the refusal named worked on the first attempt.)
+
 ## Applies to our own metacognitive tooling, too
 
 The same bias governs the skills, memories, and self-improvement loops in these

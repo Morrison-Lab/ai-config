@@ -567,8 +567,9 @@ generic Actions-authoring and reusable-workflow material.
   and still need it backported -- it matters most once `/review` is the *only*
   path that ever produces a review check-run.
 - (2026-07-31, `UCD-SERG/serodynamics#282` + `UCD-SERG/serocalculator#627`:
-  agent disabled in both. serodynamics needed the `/review` path built, having
-  relied entirely on the mention; serocalculator already had it and needed the
+  agent disabled in both.
+  serodynamics needed the `/review` path built, having relied entirely on the
+  mention; serocalculator already had it and needed the
   `pull_request` trigger removed plus the `--ref` backport.)
 
 ## GitHub Actions — gathering prior review context in reusable workflows

@@ -233,6 +233,53 @@ classifier denied minutes earlier.
 A later run of the fixed script reported 910 of 947, which is how the
 rate-limit truncation above was found.)
 
+#### A zero-shaped summary can be sound, and the scope line is what decides it
+
+The rule above has a false-positive direction, and it lands on exactly the
+tools that already comply with it.
+
+A well-behaved instrument prints its scope --- which is the remedy this
+section asks for --- but it prints it on a **different line** from its
+summary, and the summary can be phrased so that it reads as the vacuous-scan
+signature:
+
+```
+Linting: 439 files
+Summary: 0 issues in 0 files
+```
+
+That is `markdownlint-cli2`.
+`0 files` counts **files with issues**, not files scanned.
+So the line that looks like "this examined nothing" is the line reporting
+that nothing was wrong, and the evidence against that reading is sitting two
+lines up.
+
+The failure this produces is not a swallowed error but a needless
+retraction: you report your own check as having verified nothing, withdraw a
+true claim, and spend a round re-running an instrument that was fine.
+That is the same cost the fragment warns about elsewhere --- a check nobody
+trusts stops being run --- arriving from over-application rather than from
+under-application.
+
+So read for the scope line before concluding a zero is vacuous, and quote it
+alongside the result rather than quoting the summary alone.
+Where a tool prints no scope at all, the original rule stands unchanged: that
+zero is not yet evidence.
+
+- **Do:** look for a scanned/examined count on its own line before calling a
+  zero-hit result vacuous.
+- **Do:** report the scope and the finding together --- "439 files linted, 0
+  issues" cannot be misread in either direction.
+- **Don't:** read a summary's "0 files" as the number examined without
+  checking what that tool counts.
+- **Don't:** retract a check as vacuous on the strength of one line of its
+  output.
+
+(Morrison-Lab/ai-config#974, 2026-07-31: a `markdownlint-cli2` result already
+published in a PR body as `0 issues in 0 files` was about to be re-reported as
+a check that examined nothing.
+Re-running it printed `Linting: 439 files` above the same summary.)
+
 ### The pattern itself is the other half, and it fails without erroring
 
 Everything above is about a check that *cannot report* its own failure.

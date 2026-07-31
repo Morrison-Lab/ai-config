@@ -412,20 +412,23 @@ common patterns.
 - **That bypass is per-repo, not a property of the shared workflow.**
   `UCD-SERG/serocalculator`'s `version-check.yaml` gates every later step on a
   `check_label` step reading `no version increment`, and bcs has the bypass per the
-  note above (its mechanism not checked here). `UCD-SERG/serodynamics`'s copy of the
-  same RMI-PACTA-derived workflow has no such step at all, so its
-  `stopifnot(working_version > compare_version)` is unconditional and a CI-only PR
-  there **must** bump `DESCRIPTION`. The files look alike enough that the difference
-  is easy to miss, so run
+  note above (its mechanism not checked here).
+  `UCD-SERG/serodynamics`'s copy of the same RMI-PACTA-derived workflow has no
+  such step at all, so its `stopifnot(working_version > compare_version)` is
+  unconditional and a CI-only PR there **must** bump `DESCRIPTION`.
+  The files look alike enough that the difference is easy to miss, so run
   `grep -c check_label .github/workflows/version-check.yaml` in the repo you are
   actually in before reaching for the label.
-- **A workflow-only PR is the one that forgets the bump**, because nothing in the diff
-  is about the package. The familiar failure is main advancing past you into parity;
-  this one never bumps at all, so the branch sits at parity from its first commit and
-  `version-check` goes red on a diff containing no R code. Compare
-  `grep ^Version DESCRIPTION` against `git show origin/main:DESCRIPTION | grep ^Version`
-  before pushing, whatever the diff contains. (2026-07-31: `serodynamics#282` and
-  `serocalculator#627`, both `.github/workflows/`-only, both red for this reason.)
+- **A workflow-only PR is the one that forgets the bump**, because nothing in the
+  diff is about the package.
+  The familiar failure is main advancing past you into parity; this one never
+  bumps at all, so the branch sits at parity from its first commit and
+  `version-check` goes red on a diff containing no R code.
+  Compare `grep ^Version DESCRIPTION` against
+  `git show origin/main:DESCRIPTION | grep ^Version` before pushing, whatever the
+  diff contains.
+  (2026-07-31: `serodynamics#282` and `serocalculator#627`, both
+  `.github/workflows/`-only, both red for this reason.)
 - **bcs `docs` build (altdoc) EXECUTES the rendered man-page examples.** altdoc
   renders each `man/*.Rd` to a `man/*.qmd` and runs the example chunk, so
   `@examplesIf FALSE` does NOT protect an example — the code still runs and a

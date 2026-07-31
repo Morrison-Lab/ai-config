@@ -768,7 +768,8 @@ The miss here is subtler than a deferred to-do, because "I need to read somethin
 It feels like a prerequisite to thinking, so the dispatch question is never asked --- and a category of work that does not present as work cannot be caught by a rule about how to handle work.
 
 This composes with [`research-before-asking`](shared/workflow/research-before-asking.md) rather than competing with it.
-That fragment makes reading an obligation before asking a human; this makes it delegable when you do it.
+That fragment makes reading an obligation before asking a human.
+This one makes it delegable once you are doing it.
 Neither is licence to skip it.
 
 Note what makes a routing failure hard to catch at all: **it leaves no trace in the artifact**.

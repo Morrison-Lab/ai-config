@@ -87,9 +87,9 @@ observation is:
 
 That split is the existing rule applied, not an exception carved into it.
 The tag's definition says it "boxes because it feeds a decision they are
-waiting to make", and adds that "an opinion nobody was waiting on is a
-**UPDATE** with a view in it, and stays unboxed" --- which reads at first like
-a bar this rule cannot clear, since nobody asked.
+waiting to make", and adds that "an opinion nobody was waiting on" is an
+UPDATE "with a view in it, and stays unboxed" --- which reads at first like a
+bar this rule cannot clear, since nobody asked.
 The deciding question is whether a **decision** is pending, not whether the
 *observation* was solicited.
 Someone about to merge is making a decision, so an input to it is boxed even

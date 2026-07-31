@@ -62,14 +62,50 @@ argument.
 One objection to Discussions survives the correction above, and it is worth
 stating precisely so it does not get waved away along with the bad one.
 
-Discussions are **GraphQL-only**.
+Discussion **writes** are GraphQL-only.
 There is no `gh discussion` subcommand and no `mcp__github__*` Discussions tool,
-so a remote or web session without `gh` may be unable to read or post at all
+so a remote or web session without `gh` may be unable to post at all
 (see [`tool-mappings.md`](../../tool-mappings.md), and the
 [`discussions`](../../skills/discussions/SKILL.md) skill for the local
 `gh api graphql` path).
 That is a real property of the tool.
 "Nobody uses the board" is not.
+
+**Reads are a different story, and this fragment's older blanket
+"GraphQL-only" claim was wrong about them.**
+GitHub serves repository discussions over REST:
+`GET /repos/{owner}/{repo}/discussions`,
+`.../discussions/{n}`,
+and `.../discussions/{n}/comments` all return normally.
+So a session with no `gh` and no GraphQL passthrough can still read a topic
+and its comments,
+which is enough to answer a question *about* a discussion,
+to check whether an answer has been marked,
+and to dupe-check before filing.
+It is not enough to reply in the thread.
+
+The distinction matters because the blanket claim licensed the wrong
+conclusion twice over.
+It invited reporting a discussion as entirely unreachable when only half of it
+was,
+and it is the shape
+[`growth-mindset`](growth-mindset.md) warns about:
+a limitation asserted from a category ("Discussions are GraphQL-only") rather
+than from an attempt.
+Try the REST read before reporting either half unavailable.
+
+Measured 2026-07-30 against
+[`Morrison-Lab/gha` discussion 378](https://github.com/Morrison-Lab/gha/discussions/378),
+from a session whose egress proxy refuses GraphQL outright:
+all three GETs returned 200 from `Server: github.com`, with
+`X-Github-Api-Version-Selected: 2022-11-28` and a real `X-Github-Request-Id`,
+so they are genuine GitHub responses rather than a proxy shim.
+`POST .../discussions/378/comments` returned 404 from that same host.
+The write half was not pinned down further --
+a 404 there is consistent both with the route not existing and with the token
+lacking discussion write --
+so treat writes as GraphQL-only until something demonstrates otherwise,
+and re-test rather than trusting this paragraph if it matters.
 
 There is also **no issue-to-discussion conversion mutation** in the public
 schema.

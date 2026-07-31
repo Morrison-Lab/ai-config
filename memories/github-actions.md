@@ -311,9 +311,10 @@ common patterns.
   `Rscript working/.github/workflows/scripts/check-dev-version.R` straight
   after `actions/checkout` steps with no `repository:` input, so the script
   path would never exist on any real consumer's checkout, since those
-  checkouts are the CALLER's repo, never gha's own. Caught by self-review
-  before merge rather than by a live consumer failure, and fixed the same
-  way: route through the already-built `check-dev-version` composite
+  checkouts are the CALLER's repo, never gha's own.
+  Caught by self-review before merge rather than by a live consumer
+  failure, and fixed the same way: route through the already-built
+  `check-dev-version` composite
   instead of hand-rolling the `Rscript` call, so the script resolves via
   `github.action_path` regardless of what `workflow_call` checked out.
   (Morrison-Lab/gha#390, 2026-07-31.)

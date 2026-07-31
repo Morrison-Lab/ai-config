@@ -765,3 +765,52 @@ applied here.
 Running both forms before replying is what caught it; applying the suggestion
 would have silently un-gated all five root-level files, including the
 `NEWS.md` whose merge-splice defect motivated the PR.)
+
+## A hook that names a branch but not a repo may be pointing at a different checkout
+
+A multi-repo session assigns the **same** harness branch name in every
+repo it has cloned, so a pre-commit/stop hook reporting
+"commit(s) on branch `claude/<slug>`" does not tell you which working tree
+it looked at.
+It can easily be a repo you only ever *read* from -- and whose branch is
+just tracking `main`.
+
+The failure mode is that the remediation the hook suggests is destructive
+in that case.
+A hook flagging commits as Unverified (committer not
+`noreply@anthropic.com`) will suggest
+`git rebase --exec "git commit --amend --no-edit --reset-author"`.
+Run against a checkout carrying only upstream history, that rewrites
+commits nobody in the session authored and **reattributes the repo owner's
+own commits to Claude**, for a branch with nothing to push.
+
+Decide it mechanically before touching anything:
+
+```bash
+git remote get-url origin              # which repo is this actually?
+git merge-base --is-ancestor HEAD origin/main && echo "pure upstream history"
+git rev-list --count origin/main..HEAD  # 0 => no local work here
+git show -s --format='%an <%ae> | %cn <%ce>' <flagged-sha>
+```
+
+A branch that is an **ancestor** of `origin/main` has no local work on it
+by definition, so anything flagged there is upstream history and the hook
+is a false positive.
+Check the author too: an upstream squash-merge commit is typically authored
+by the repo owner and committed by `noreply@github.com`, which is exactly
+the shape a committer-email check flags.
+
+The root cause is worth fixing rather than re-diagnosing: a non-working
+checkout should sit on `main`, not a leftover harness-named branch.
+`CLAUDE.md`'s "Keep ai-config and repo checkouts fresh" rule already asks
+for this for the ai-config clone specifically; the hook noise is a second
+reason it matters.
+
+(2026-07-28: a stop hook flagged 17 "Unverified" commits on
+`claude/gha-workflows-review-84aqlu`.
+The session's actual work was in `gha`, whose two commits were correctly
+`Claude <noreply@anthropic.com>` as both author and committer.
+The flagged commits were in the **ai-config** checkout, pulled in minutes
+earlier by a routine `git pull --ff-only`, authored by the repo owner.
+`git merge-base --is-ancestor HEAD origin/main` returned true, settling it
+in one command.)

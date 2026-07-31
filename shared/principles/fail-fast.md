@@ -149,6 +149,59 @@ nothing in a container, with no output difference to notice.
 So set the locale explicitly in any check that matches non-ASCII, and
 still make the error path distinguishable from the clean one.
 
+Better still, do not reach for that form at all.
+Remembering to set the locale is a discipline that fails silently the one
+time it is forgotten, and the bash one-liner is what hands reach for
+reflexively -- including minutes after reading this section, which is how
+it recurred while this very paragraph was being written (2026-07-31).
+A few lines of Python that raise on a bad pattern and print
+`examined N lines` cost about as much to type and cannot produce a false
+all-clear.
+
+### The pattern itself is the other half, and it fails without erroring
+
+Everything above is about a check that *cannot report* its own failure.
+The sibling case is a check that runs perfectly, exits 0, and answers the
+wrong question, because the pattern was looser or narrower than intended.
+There is no error to swallow here and no exit status to inspect -- the
+instrument works, and its verdict is simply false.
+
+Two directions, both seen in one session:
+
+- **Too loose -> phantom finding.**
+  `grep "uses: [a-z]"`, written to find unpinned GitHub Actions, also
+  matches the tail of `statuses: write`.
+  It reported a pinning regression in a repo that had none.
+- **Too narrow -> false all-clear, which is the dangerous direction.**
+  A detector that serialized each CI job to YAML and searched the dump for
+  `git push` cleared a job that runs `git push --force`, because the dump
+  had line-wrapped the string.
+  Acting on that would have stripped the push credential from a job that
+  pushes.
+  Separately, grepping a Markdown file for a section title returned nothing
+  although the title was there, because the phrase spanned two source lines
+  and was interrupted by backticks.
+
+The fix is not "be careful with regexes".
+It is to **test the instrument against a known positive before trusting a
+negative**.
+A grep that should find something, run against a case you know contains it,
+either matches or exposes the assumption that was wrong.
+Where the thing being matched has structure -- a YAML key, a Markdown
+heading -- anchor to that structure (`^[[:space:]]*(- )?uses:`) rather than
+to a substring that happens to appear inside it, and search the source text
+rather than a re-serialization of it, since dumping and reformatting can
+move or wrap the very string being looked for.
+
+State the scope with the result, too.
+"No matches" and "no matches **under these three paths**" are different
+claims, and the second is the honest one when the search was scoped.
+
+(Morrison-Lab/gha#328/#329, 2026-07-31: the unanchored `uses: [a-z]` was
+published in an issue and a merged PR body as *the* verification command
+for a security invariant, so the phantom it produced was reported as a
+regression before the pattern was re-read.)
+
 ## In review
 
 Flag error handling that hides failure — swallowed exceptions, silent

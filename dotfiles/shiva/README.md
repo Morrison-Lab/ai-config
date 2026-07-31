@@ -18,6 +18,7 @@ of truth for what they *are*.
 | `config/tui-alloc/.zshrc` | `~/.config/tui-alloc/.zshrc` | the session rc `tui-alloc` points `ZDOTDIR` at; sources `~/.zshrc`, activates the env, launches the agent |
 | `config/tui-alloc/README.md` | `~/.config/tui-alloc/README.md` | the user-facing usage and exit doc |
 | `zshrc-fragment.zsh` | sourced from `~/.zshrc` | puts `~/bin` on PATH, installs the `ALLOC_CONDA_ENV` chpwd hook |
+| `lib/slurm-guard.sh` | not installed | `refuse_if_nested`, shared by `tui-alloc` and `cnode`; sourced through the install symlink |
 
 ## Install
 
@@ -60,6 +61,14 @@ A session launched by `claude-alloc` or `cnode` runs on a compute node, so
 `uname -n` reports `c2`, `c3`, or `c4` rather than the login node, while
 `scontrol show config` reads the same from either.
 Set `AI_CONFIG_DOTFILES_FORCE=1` to install on a machine that fails the gate.
+
+## Both launchers refuse to nest
+
+`refuse_if_nested` exits rather than grabbing a second allocation from inside
+an existing one, because a nested `srun`/`salloc` contends with its parent
+allocation's own step instead of getting new resources.
+It keys on `$SLURM_JOB_ID`, falling back to `sinfo`'s node list for a shell
+that reached a compute node without one.
 
 ## Slices hold resources until you release them
 

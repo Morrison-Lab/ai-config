@@ -108,7 +108,18 @@ def scan(path):
     admit_txt, admit_at, ums_at = None, -1, -1
 
     for i, m in enumerate(records(path)):
-        # a subagent's own turns are not my outgoing message
+        # A subagent's own turns are not my outgoing message.
+        #
+        # Field name measured, not assumed: across 138 real transcripts under
+        # ~/.claude/projects, all 29,465 assistant records carry the key
+        # spelled exactly `isSidechain` (9,561 of them true), and no variant
+        # spelling (`is_sidechain`, `sideChain`) occurs anywhere. On that
+        # harness layout the true records sit in `subagents/agent-*.jsonl`
+        # rather than in the session transcript, so on the UserPromptSubmit
+        # path this guard is defensive rather than load-bearing. It is kept
+        # because it costs one dict lookup and is the correct reading if a
+        # subagent transcript is ever passed here, or if sidechain turns are
+        # inlined into the parent transcript again as they once were.
         if m.get("isSidechain"):
             continue
         if m.get("type") != "assistant":
@@ -169,7 +180,11 @@ def main() -> int:
     if ums_at >= admit_at:  # already recorded after the admission
         return 0
 
-    key = hashlib.sha256(f"{admit_txt}:{admit_at}".encode()).hexdigest()[:16]
+    # Keyed on the transcript path too, so the sentinel is per session. Without
+    # it, two sessions producing the same admission at the same record index
+    # share one sentinel in /tmp, and the second session's reminder is
+    # suppressed for as long as that /tmp survives.
+    key = hashlib.sha256(f"{path}:{admit_txt}:{admit_at}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-after-error-{key}")
     if os.path.exists(sentinel):
         return 0

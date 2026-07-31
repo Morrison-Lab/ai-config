@@ -17,10 +17,13 @@ Run:  python3 hooks/test-remind-ums-after-error.py hooks/remind-ums-after-error.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 
+if len(sys.argv) < 2:
+    sys.exit(f"Usage: python3 {sys.argv[0]} <path-to-hook>")
 HOOK = sys.argv[1]
 
 if not os.path.isfile(HOOK):
@@ -94,20 +97,30 @@ SILENT = [
 ]
 
 
-def run(recs):
+def run(recs, sentinel_dir=None):
+    """Run the hook against a synthetic transcript.
+
+    `sentinel_dir` shares one sentinel directory across calls, so a caller can
+    exercise the dedup key itself; the default gives each case a fresh one.
+    """
     fd, tpath = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         for r in recs:
             fh.write(json.dumps(r) + "\n")
+    own_dir = sentinel_dir is None
+    if own_dir:
+        sentinel_dir = tempfile.mkdtemp()
     try:
-        env = dict(os.environ, TMPDIR=tempfile.mkdtemp())  # fresh sentinel dir
         p = subprocess.run(
             ["python3", HOOK],
             input=json.dumps({"transcript_path": tpath}),
-            capture_output=True, text=True, env=env,
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=sentinel_dir),
         )
     finally:
         os.unlink(tpath)
+        if own_dir:
+            shutil.rmtree(sentinel_dir, ignore_errors=True)
 
     if p.returncode != 0:
         sys.exit(f"FATAL: hook exited {p.returncode}\n{p.stderr.strip()}")
@@ -132,6 +145,43 @@ for recs, desc in SILENT:
     wrong += v != "silent"
     print(f"  {v:<7} {desc}")
 
-total = len(REMIND) + len(SILENT)
+# The sentinel suppresses a repeat of the SAME admission, and must not reach
+# across sessions. Two distinct transcripts carrying identical text at an
+# identical record index are different sessions, so both must remind; only the
+# second run against the SAME transcript is a repeat. Sharing one sentinel dir
+# is what makes the distinction observable -- with the transcript path dropped
+# from the key, case 2 below goes silent.
+print("\nsentinel scope (one shared sentinel dir):")
+shared = tempfile.mkdtemp()
+try:
+    seq = [
+        (run([ADMIT], shared), "REMIND", "session A, first prompt"),
+        (run([ADMIT], shared), "REMIND", "session B, same text and index"),
+    ]
+    fd, same_path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        fh.write(json.dumps(ADMIT) + "\n")
+    try:
+        env = dict(os.environ, TMPDIR=shared)
+        payload = json.dumps({"transcript_path": same_path})
+        out = [
+            subprocess.run(["python3", HOOK], input=payload, capture_output=True,
+                           text=True, env=env).stdout.strip()
+            for _ in range(2)
+        ]
+        seq.append(("REMIND" if out[0] else "silent", "REMIND",
+                    "same transcript, first prompt"))
+        seq.append(("REMIND" if out[1] else "silent", "silent",
+                    "same transcript again -- fires once per admission"))
+    finally:
+        os.unlink(same_path)
+finally:
+    shutil.rmtree(shared, ignore_errors=True)
+
+for got, want, desc in seq:
+    wrong += got != want
+    print(f"  {got:<7} {desc}")
+
+total = len(REMIND) + len(SILENT) + len(seq)
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

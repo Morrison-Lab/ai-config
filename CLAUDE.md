@@ -38,6 +38,28 @@ What stays genuinely worth asking is **where** a learning belongs when the desti
 Write it down first, then ask.
 (Corrected 2026-07-28: a flag reading "worth running `ums` before this session ends" named a real, specific learning and still produced no pass, until the user said "you should have run ums already.")
 
+**The offer also survives being phrased as a decision, and that form is harder to see.**
+The bullet above rules out the question.
+It does not rule out the sentence that states an intention and then hands the timing back: "I'll run it now unless you'd rather I do something else first."
+
+That reads as a commitment rather than a request, which is exactly why it passes self-review.
+It is not one.
+The pass still does not start, the user still has to spend a turn, and the trailing clause is doing the same work the question did --- it just moved the gate from *whether* to *when*.
+It usually appears at the end of a long status recap, where it reads as courtesy about sequencing rather than as a request for permission.
+
+The test is mechanical, so apply it rather than judging the tone: **if the sentence about UMS contains a conditional referring to the user, it is an offer.**
+"Unless you'd rather", "if that works", "let me know if" --- all of them.
+Run the pass, then report it in the past tense, and put any genuine sequencing question in its own sentence about the *other* work.
+
+- **Do:** run the pass and say "ran UMS; here is what it recorded".
+- **Do:** ask about ordering the remaining work, once the pass is already done.
+- **Don't:** attach a user-conditional to a stated intention to run it.
+- **Don't:** read "I will" as sufficient --- the trailing clause is what decides it.
+
+(Corrected 2026-07-30, a bcs session.
+After a day of findings, a recap closed "I owe a UMS pass ... I'll run it now unless you'd rather I do something else first."
+The correction was "cai: stop asking for approval for ums passes; just run them.")
+
 **A new instruction arriving at a checkpoint does not cancel the checkpoint.**
 The bullet above covers the pass you *announce* and never run; this is the one you never announce at all, because something else arrived first.
 A merge or clean verdict is usually the exact moment I report back, so it is also the moment the next request lands.

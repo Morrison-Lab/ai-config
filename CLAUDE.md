@@ -666,6 +666,15 @@ The proactive counterpart to issue-first above: when a mistake shows up in any m
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.
 The `defer-issue` skill covers the user-initiated version of this; this rule is self-initiated.
 
+## Say when a practice is slipping, not only when an artifact is wrong
+
+@shared/workflow/flag-practice-slippage.md
+
+The counterpart to the rule above, for *practice* rather than for artifacts: that one governs a mistake in a thing and its deliverable is a filed issue, this one governs how the work is being done and its deliverable is one sentence at the moment it is actionable.
+The outward direction is already covered by the review fragments and needs no restatement.
+The two that need stating are inward, unprompted and outside any review loop, and **upward** --- telling me when *my* practice is slipping, which will not happen by default because deference costs nothing at the moment it is chosen and reads as politeness.
+Name the specific practice and gap, cite the rule or label the opinion as an opinion, say it before the action rather than in the retrospective, and say it once --- the decision stays mine, and this is not a licence to relitigate it.
+
 ## Tracking issues in upstream repos
 
 <!-- Shared with the lab manual; edit shared/workflow/upstream-issues.md, not here. -->
@@ -937,6 +946,44 @@ Don't checklist-ize skills that are mostly design judgment, exploratory
 research, or one-off improvisation.
 
 @shared/workflow/skill-checklists.md
+
+## Never pattern-match blindly: check the purpose transfers
+
+Before reusing a structure --- a template, a working script, a neighbouring
+file's shape, a pattern from another tool --- state what the original was
+**for** and what the new one is **for**, and confirm those are the same kind
+of thing.
+Structural fit is necessary and never sufficient.
+
+The tell is that every check you naturally run after adapting a template asks
+whether the *mechanism* works, and none asks whether the *purpose* survived
+the substitution: same interface, passing tests, and the thing now does the
+opposite of what it should.
+A template you wrote yourself recently gets the least scrutiny, because
+reusing something you just verified feels like consistency rather than like
+assuming --- which inverts the scrutiny the situation warrants.
+This is not an argument against reuse; it is the check that makes reuse safe.
+
+@shared/workflow/check-purpose-before-reusing.md
+
+## Avoid false dichotomies
+
+When laying out alternatives, test whether they are actually exclusive before
+presenting them as such.
+The tell is a question posed as either/or and answered with "both" --- which
+means the exclusivity was constructed rather than found.
+
+The observable action: before presenting alternatives, state what would be
+lost by taking more than one.
+If the answer is nothing, they are not alternatives --- enable multi-select,
+or present them as composable steps with an order.
+Genuinely exclusive options exist (two incompatible designs, a merge strategy,
+a name), and presenting those as combinable is its own error; the target is
+the unexamined default, not the act of choosing.
+Composes with "Present decisions one at a time" above, which governs how many
+questions to ask rather than how one question's options relate.
+
+@shared/workflow/avoid-false-dichotomies.md
 
 ## Metacognition: monitor claims by type, and distrust the fluent ones
 

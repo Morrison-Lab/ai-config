@@ -1,6 +1,6 @@
 ---
 name: discussions
-description: "Read and respond to GitHub Discussions forum topics — list a repo's discussions, read a topic and its comments, draft and post a reply, and mark an answer on Q&A discussions. Discussions are GraphQL-only (no `gh discussion` subcommand, no GitHub MCP tool), so this skill runs `gh api graphql`. Use when asked to 'read the discussions', 'respond to this discussion', 'answer the discussion topic', 'reply to the forum', 'triage the discussion board', or 'check GitHub Discussions'."
+description: "Read and respond to GitHub Discussions forum topics -- list a repo's discussions, read a topic and its comments, draft and post a reply, and mark an answer on Q&A discussions. Reads are available over REST (`gh api repos/{owner}/{repo}/discussions/...`), so a topic is readable even where GraphQL is blocked; writes are GraphQL-only (no `gh discussion` subcommand, no GitHub MCP tool), so posting runs `gh api graphql`. Use when asked to 'read the discussions', 'respond to this discussion', 'answer the discussion topic', 'reply to the forum', 'triage the discussion board', or 'check GitHub Discussions'."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -27,18 +27,40 @@ If the topic really belongs in the issue tracker (a concrete, actionable bug or
 task), hand off to **[migrate-discussion](../migrate-discussion/SKILL.md)**
 instead of just replying.
 
-## How Discussions are reached — GraphQL only
+## How Discussions are reached -- writes via GraphQL, reads also via REST
 
-Discussions are **not** in the REST API. There is **no `gh discussion`
-subcommand** and **no `mcp__github__*` Discussions tool**. Every operation goes
-through GraphQL:
+**Writing** goes through GraphQL.
+There is **no `gh discussion` subcommand** and **no `mcp__github__*`
+Discussions tool**, so posting a comment, creating a topic, or marking an
+answer all require `gh api graphql`.
 
-- **Local session with `gh`:** run `gh api graphql` (shown below). This is the
-  primary path.
-- **Remote / web session (MCP only, no `gh`):** the GitHub MCP server exposes no
-  Discussions tools and `gh` isn't installed, so Discussions may be unreachable.
-  If the session has an authenticated GraphQL passthrough, use it; otherwise say
-  so and surface it to the user — don't fake a reply that never posted.
+**Reading** does not.
+GitHub serves repository discussions over REST, so these work from any
+session that can reach `api.github.com` with a token:
+
+```bash
+gh api repos/<owner>/<repo>/discussions                 # list topics
+gh api repos/<owner>/<repo>/discussions/<N>             # one topic
+gh api repos/<owner>/<repo>/discussions/<N>/comments    # its comments
+```
+
+Without `gh`, the same three are a plain `curl` against
+`https://api.github.com/...` with an `Authorization: bearer` header.
+
+Which path a session has:
+
+- **Local session with `gh`:** everything works.
+  Use `gh api graphql` for writes (shown below) and either form for reads.
+- **Remote / web session (MCP only, no `gh`):** the GitHub MCP server exposes
+  no Discussions tools, but the REST reads above still work, so the topic and
+  its comments are readable.
+  Writes need an authenticated GraphQL passthrough -- and some sandboxes
+  refuse GraphQL outright while serving REST normally.
+  When the write path is missing, say so and hand the drafted text to the user
+  rather than faking a reply that never posted.
+
+Don't report a discussion as unreachable without trying the REST read: half of
+what this skill does is available even where GraphQL is blocked.
 
 `<owner>`/`<repo>` below are the repository; `<N>` is a discussion number. Use
 `-F` for typed (Int) variables and `-f` for strings.
@@ -47,21 +69,38 @@ through GraphQL:
 
 ### 1. Confirm the repo has Discussions enabled
 
+The REST repo object carries this, so the check itself does not need GraphQL:
+
 ```bash
-gh api graphql -f owner='<owner>' -f repo='<repo>' -f query='
-  query($owner: String!, $repo: String!) {
-    repository(owner: $owner, name: $repo) { hasDiscussionsEnabled }
-  }'
+gh api repos/<owner>/<repo> --jq .has_discussions
 ```
 
-If `hasDiscussionsEnabled` is `false`, stop and tell the user — there's nothing
-to read or post to.
+If it is `false`, stop and tell the user -- there's nothing to read or post to.
+
+The GraphQL equivalent is `repository { hasDiscussionsEnabled }`, if you are
+already making a GraphQL call for another reason.
+Don't substitute "the list endpoint returned 200" for either: a repo with
+Discussions enabled and no topics yet returns an empty `200`, so a 200 does
+not distinguish enabled-but-empty from anything else.
 
 ### 2. List topics
 
 `LIST_DISCUSSIONS` (abstract operation token; resolve to your model's tool via
-[`tool-mappings.md`](../../tool-mappings.md) — no GitHub MCP tool exists for
-Discussions, so every model runs this same `gh api graphql`):
+[`tool-mappings.md`](../../tool-mappings.md) -- there is no GitHub MCP tool for
+Discussions, so every model runs one of the two `gh api` forms below).
+Prefer REST, since it works in sessions where GraphQL is blocked:
+
+```bash
+gh api repos/<owner>/<repo>/discussions --jq \
+  '.[] | {number, title, html_url, updated_at, comments,
+          category: .category.name, answer: .answer_html_url}'
+```
+
+A non-null `answer_html_url` means a Q&A topic already has an accepted answer.
+The category object carries `is_answerable`, which marks a Q&A category.
+
+The GraphQL form returns the same fields under different names, and is what to
+use when you also want node IDs in the same call:
 
 ```bash
 gh api graphql -f owner='<owner>' -f repo='<repo>' -f query='
@@ -79,14 +118,30 @@ gh api graphql -f owner='<owner>' -f repo='<repo>' -f query='
   }'
 ```
 
-`answerChosenAt` is non-null when a Q&A topic already has an accepted answer;
-`category.isAnswerable` marks a Q&A category. Report the list to the user with
-clickable URLs.
+`answerChosenAt` is the GraphQL spelling of the same accepted-answer signal.
+Report the list to the user with clickable URLs.
 
 ### 3. Read one topic and its thread
 
-The reply and answer mutations need node **IDs** (not numbers), so capture them
-here (`VIEW_DISCUSSION`):
+To **read** the topic and its thread, REST is enough, and works where GraphQL
+is blocked (`VIEW_DISCUSSION`):
+
+```bash
+gh api repos/<owner>/<repo>/discussions/<N>            # the topic
+gh api repos/<owner>/<repo>/discussions/<N>/comments   # its thread
+```
+
+The topic object carries `node_id` (e.g. `D_kwDOS6B1yM4AoI39`), which is the
+`discussionId` step 5's top-level-reply mutation wants -- so a REST read is
+sufficient to post a top-level comment.
+
+Use the GraphQL form when you need a **comment's** node id, for a threaded
+reply (`replyToId`) or to mark an answer.
+Whether REST's comment objects also expose `node_id` is unverified: every
+discussion in this org currently has zero comments, so there was nothing to
+check it against.
+Verify it on a thread that has comments before relying on REST for those two
+mutations.
 
 ```bash
 gh api graphql -f owner='<owner>' -f repo='<repo>' -F number=<N> -f query='

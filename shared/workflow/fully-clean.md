@@ -342,9 +342,9 @@ A verdict captioned with a superseded commit can be a current-head review
 whose caption simply names a different commit than the run checked out.
 
 The failure direction is the expensive one.
-It reads as a stale review, which invites a needless re-trigger, and a
-re-trigger can cancel a run already in flight (see
-[`pr-on-claim`](pr-on-claim.md) for that race).
+It reads as a stale review, which invites a needless re-trigger, and under
+`concurrency: cancel-in-progress` that re-trigger cancels the run already
+in flight at the real head.
 So the caption costs you the verdict it was making you doubt.
 
 The run's `head_sha` settles it, and the comment links the run it came from,

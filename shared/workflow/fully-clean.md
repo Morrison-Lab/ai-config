@@ -768,7 +768,9 @@ The cost is not only a mislabelled case.
 Dropping the second repository also removed the support for a real inference
 that had been drawn from it, that two repositories sharing one action implies
 the bug lives in the action.
-So the retraction cost more than the false claim did.
+That support was never real, so the false claim cost an inference on top of a
+case record.
+The retraction only revealed the loss rather than causing it.
 
 - **Do:** re-read the new case's own terminal error before adding it to an
   existing group, however well established that group is.
@@ -782,7 +784,12 @@ So the retraction cost more than the false claim did.
 (2026-07-31, `claude-review` failures on Morrison-Lab/ai-config #984, #985,
 and #986: two run results were read directly and shared a genuine signature,
 `is_error: true` alongside `subtype: "success"` after real work
-($4.10 over 13 turns, $0.97 over 2 turns), so that grouping was sound.
+($4.10 over 13 turns, $0.97 over 2 turns).
+Both of those reads were #986's own two runs, though.
+#984 and #985 were admitted on nothing but a `claude-review` failure the same
+day, with no result object read for either -- so that grouping was already
+the pattern this section condemns, one step before the one it was written
+about.
 The duration rule above was invoked explicitly to confirm that #986's
 9-minute and 53-second runs were the same bug.
 Morrison-Lab/gha#390 was then added to the group because its own

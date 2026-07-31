@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# yield-array — temporarily throttle your own SLURM array job(s) so an
+# yield-array -- temporarily throttle your own SLURM array job(s) so an
 # interactive session can grab a slice, then restore the original throttle.
 #
 # The deliberate, explicit counterpart to the launchers: throttling *other*
@@ -19,7 +19,7 @@
 # On return (normal exit or Ctrl-C) the original throttle is restored.
 #
 # CAVEAT: a hard kill (SIGKILL), node/walltime death, or a dropped SSH session
-# will NOT run the restore — the array stays throttled. Undo manually with:
+# will NOT run the restore -- the array stays throttled. Undo manually with:
 #   scontrol update jobid=<id> ArrayTaskThrottle=<orig>   (0 = unlimited)
 
 set -eu
@@ -81,7 +81,7 @@ for jid in "${JOBIDS[@]}"; do
 done
 
 if (( DRYRUN )); then
-  echo "yield-array: DRY RUN — no changes made" >&2
+  echo "yield-array: DRY RUN -- no changes made" >&2
   for jid in "${JOBIDS[@]}"; do
     echo "  $jid: ArrayTaskThrottle ${ORIG[$jid]} -> ${TARGET[$jid]}" >&2
   done
@@ -95,7 +95,7 @@ restore() {
     if scontrol update "jobid=$jid" "ArrayTaskThrottle=${ORIG[$jid]}"; then
       echo "  $jid -> ArrayTaskThrottle=${ORIG[$jid]}" >&2
     else
-      echo "  $jid: restore FAILED — run: scontrol update jobid=$jid ArrayTaskThrottle=${ORIG[$jid]}" >&2
+      echo "  $jid: restore FAILED -- run: scontrol update jobid=$jid ArrayTaskThrottle=${ORIG[$jid]}" >&2
     fi
   done
 }

@@ -7,7 +7,7 @@ HOSTS=~/.config/gh/hosts.yml
 OUT=~/.gh-token.gpg
 
 if [[ ! -f "$HOSTS" ]]; then
-  echo "no $HOSTS — nothing to encrypt" >&2
+  echo "no $HOSTS -- nothing to encrypt" >&2
   exit 1
 fi
 

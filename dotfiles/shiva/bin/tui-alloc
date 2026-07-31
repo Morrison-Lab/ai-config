@@ -7,7 +7,7 @@
 #
 # Resource overrides (env):
 #   ALLOC_CPUS       cores      (default 8 hwthreads = 4 physical)
-#   ALLOC_MEM        memory     (default 32G — MUST be set on shiva, see below)
+#   ALLOC_MEM        memory     (default 32G -- MUST be set on shiva, see below)
 #   ALLOC_TIME       walltime   (default 24:00:00; see the walltime note below)
 #   ALLOC_CONDA_ENV  conda env to activate inside the slice (default: none).
 #                    e.g. ALLOC_CONDA_ENV=bcs claude-alloc  (for bcs repo work)

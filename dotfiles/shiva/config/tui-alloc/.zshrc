@@ -5,7 +5,7 @@
 [[ -f "$HOME/.zshrc" ]] && source "$HOME/.zshrc"
 
 # Activate a conda env only if one was requested (ALLOC_CONDA_ENV). These
-# launchers are global — no project env is assumed by default.
+# launchers are global -- no project env is assumed by default.
 [[ -n "$ALLOC_CONDA_ENV" ]] && conda activate "$ALLOC_CONDA_ENV"
 
 [[ -n "$TUI_ALLOC_PWD" ]] && cd "$TUI_ALLOC_PWD"

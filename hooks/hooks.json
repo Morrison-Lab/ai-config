@@ -38,6 +38,12 @@
       "event": "Stop",
       "timeout": 10,
       "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+    },
+    {
+      "script": "no-stale-pr-status.py",
+      "event": "Stop",
+      "timeout": 10,
+      "why": "Blocks a reply asserting a PR's check state when the last status query predates the last push, so a stale reading is never reported as current."
     }
   ]
 }

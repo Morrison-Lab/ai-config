@@ -600,9 +600,22 @@
   the session was scoped with, since the API follows the transfer redirect
   server-side --- holds for every call that names the repo by `owner`/`repo`
   **strings**.
-  It does not hold for this tool, whose `threadId` is a GraphQL node ID that
-  already encodes the post-transfer repo, so the declared owner and the node
-  have to agree.
+  It does not hold for this tool, whose `threadId` is a GraphQL node ID
+  rather than a name, so the declared owner and the node have to agree.
+  Read that as an observed gate rather than as a mechanism.
+  This entry first explained it as the node "already encoding the
+  post-transfer repo", which decoding one shows is the wrong story:
+  `PRRT_kwDOShagnM6VdO1_` is MessagePack for
+  `[0, 1242996892, 2507468159]`, whose middle element is the repository's
+  database ID --- the same value carried by the repo's own node ID
+  (`R_kgDOShagnA`) and returned as `id` by the REST API.
+  A transfer leaves that number alone, so the node names an identity with no
+  pre- or post-transfer form to disagree about.
+  What the two errors below establish is only that the server compares the
+  node's repository against the declared `owner`/`repo` string and rejects
+  the pair.
+  Why that comparison fails where string-addressed calls follow the redirect
+  was not established.
   Measured on `Morrison-Lab/ai-config` (transferred from `d-morrison`),
   2026-07-31, against PR #975 --- two different gates, one per spelling:
   - `owner: d-morrison` --- `Access denied: review thread

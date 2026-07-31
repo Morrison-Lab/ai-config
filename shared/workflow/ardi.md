@@ -106,7 +106,11 @@ the bullets in this fragment record it failing at this exact boundary.
       rather than collateral from an edit's blast radius --- a reviewer reads
       every deletion as deliberate and will rationalize an accidental one.
 - [ ] **`main` was merged in** if it moved, with version parity re-checked
-      afterward, so the round costs one review run rather than two.
+      afterward, so the round costs one review run rather than two --- and any
+      whole-file count a merge can worsen (spliced changelog bullets) compared
+      before against after, since a defect caused by a *deleted* line is
+      invisible to every added-lines check
+      ([`sync-with-main`](sync-with-main.md)).
 - [ ] **Killer item: the push landed.** `git rev-parse HEAD origin/<branch>`
       agree before any reply asserting a fix.
       This one is marked because its failure is not an omission but a **false

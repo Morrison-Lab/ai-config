@@ -346,6 +346,75 @@ wired into CI before enabling one, not after.
 pre-existing instances in the same `NEWS.md`, in a repo that had no Markdown
 linting at all.)
 
+**Run that check as a whole-file count, and compare it before and after ---
+scoping it to the lines you added cannot see this defect at all.**
+The check above is the right instrument; the natural way to apply it is the
+wrong one.
+Having found the file's spliced bullets, the obvious next question is which of
+them are yours, and the obvious way to answer is to intersect them with the
+lines the branch added.
+That question is unanswerable, because the defect is a **deleted blank line**
+before a bullet that was already there.
+The bullet is *context* in the diff, never an addition, so the intersection is
+empty by construction and the check reports a confident zero.
+
+Note how this differs from the scope failures elsewhere in this corpus, where
+a check's **inputs** were too narrow --- a glob, a missing flag, a two-dot
+range.
+Here the inputs were right and the **question** was wrong, which no widening
+fixes.
+And it fails in the direction that reads as an all-clear, on the one file a
+reviewer will not re-derive.
+
+The sound form is a count delta over the whole file, which needs no judgment
+about ownership and no diff at all:
+
+```bash
+git show origin/main:NEWS.md   | awk '...' | wc -l   # before
+awk '...' NEWS.md              | wc -l               # after
+```
+
+A merge must not increase the count.
+That is an [`algorithmatize-checks`](algorithmatize-checks.md) instrument in
+the strict sense --- two integers decide it --- and it holds whoever authored
+the surrounding lines.
+
+Generalize past changelogs, because the property is about the defect rather
+than the file: **when a defect can be introduced by deleting a line, any
+instrument keyed on added lines is unsound.**
+Ask instead whether a whole-file measurement got worse.
+The version-parity rule above is the same shape --- a conflict-free merge
+leaves the branch at parity with `main`, `version-check` goes red, and there is
+nothing in the diff to point at --- which is why that rule is a direct
+comparison of two `DESCRIPTION` versions rather than a diff inspection.
+
+The shared trigger is the practical part: **a conflict-free merge is exactly
+when nothing prompts anyone to look.** Both defects arrive through one, both
+are invisible to diff-scoped checking, and the merge reports success.
+
+- **Do:** measure the whole file before and after a merge, and treat any
+  increase as the merge's fault regardless of who wrote the lines.
+- **Do:** ask, of every diff-scoped check, whether the defect it targets could
+  be caused by a deletion --- and replace it with a count if so.
+- **Don't:** intersect a whole-file finding with the branch's added lines to
+  decide ownership; for a deletion-caused defect that always returns zero.
+- **Don't:** read a conflict-free merge as a merge that changed nothing beyond
+  what the diff shows.
+
+(`ucdavis/bcs#534`, 2026-07-31: merging `main` spliced its `NEWS.md` bullet
+directly beneath the branch's own with no blank line between.
+markdownlint stayed green, since `blanks-around-lists` governs a list's
+boundaries rather than the gaps between its items.
+A pre-push check asking which flagged bullets were among the branch's added
+lines returned 0 --- `git diff -U0 origin/main...1b74899d -- NEWS.md |
+grep -c '^+\* Say that the'` --- and that zero was reported to the user as
+"none of these are mine", which was false.
+The count delta settles it: 14 spliced bullets on `origin/main`, 15 at
+`1b74899d` after the merge, 14 again at `9f5dab34` after the fix.
+Evidence filed on ucdavis/bcs#437; the `merge=union` driver proposed in
+ucdavis/bcs#438 would raise this defect's rate, so it is explicitly blocked on
+the detector landing first.)
+
 **A commit claiming "I've pulled main and resolved the merge conflicts" can be
 lying --- verify it actually merged before trusting the claim.** A genuine
 conflict-resolution commit is a merge commit (two

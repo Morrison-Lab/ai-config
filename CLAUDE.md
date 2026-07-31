@@ -38,6 +38,28 @@ What stays genuinely worth asking is **where** a learning belongs when the desti
 Write it down first, then ask.
 (Corrected 2026-07-28: a flag reading "worth running `ums` before this session ends" named a real, specific learning and still produced no pass, until the user said "you should have run ums already.")
 
+**The offer also survives being phrased as a decision, and that form is harder to see.**
+The bullet above rules out the question.
+It does not rule out the sentence that states an intention and then hands the timing back: "I'll run it now unless you'd rather I do something else first."
+
+That reads as a commitment rather than a request, which is exactly why it passes self-review.
+It is not one.
+The pass still does not start, the user still has to spend a turn, and the trailing clause is doing the same work the question did --- it just moved the gate from *whether* to *when*.
+It usually appears at the end of a long status recap, where it reads as courtesy about sequencing rather than as a request for permission.
+
+The test is mechanical, so apply it rather than judging the tone: **if the sentence about UMS contains a conditional referring to the user, it is an offer.**
+"Unless you'd rather", "if that works", "let me know if" --- all of them.
+Run the pass, then report it in the past tense, and put any genuine sequencing question in its own sentence about the *other* work.
+
+- **Do:** run the pass and say "ran UMS; here is what it recorded".
+- **Do:** ask about ordering the remaining work, once the pass is already done.
+- **Don't:** attach a user-conditional to a stated intention to run it.
+- **Don't:** read "I will" as sufficient --- the trailing clause is what decides it.
+
+(Corrected 2026-07-30, a bcs session.
+After a day of findings, a recap closed "I owe a UMS pass ... I'll run it now unless you'd rather I do something else first."
+The correction was "cai: stop asking for approval for ums passes; just run them.")
+
 **A new instruction arriving at a checkpoint does not cancel the checkpoint.**
 The bullet above covers the pass you *announce* and never run; this is the one you never announce at all, because something else arrived first.
 A merge or clean verdict is usually the exact moment I report back, so it is also the moment the next request lands.
@@ -143,6 +165,43 @@ The task will still be there; what you believed ten minutes ago will not.
 
 (Directive from the user, 2026-07-30: "when you correct your understanding of a technical issue like you just did, run ums immediately."
 The correction was a Quarto binary reported broken twice that turned out to be environment misuse both times, recorded in [`growth-mindset`](shared/workflow/growth-mindset.md)'s "First check the limitation is real" section.)
+
+**A false claim about *state* is the same trigger, and it is the one you can be wrong about without ever holding a wrong belief.**
+The bullet above covers a corrected *understanding* --- a model of how something works, which you held, and which turned out to be false.
+The commoner failure has no belief in it at all.
+You assert that a repository is public, that a PR is green, that a corpus lacks a feature, that a list has nine entries.
+None of those were things you thought.
+They are things you did not look up, or looked up once against a stale checkout and then repeated.
+
+That absence is why the trigger above does not obviously fire here.
+Nothing that feels like a belief gets corrected, so the discovery reads as a small factual fix rather than as the event this section is about.
+It also arrives mid-task, at the moment the natural impulse is to repair the claim and carry on --- which is the opposite of a checkpoint, and is exactly when nothing prompts a pass.
+
+Treat any discovery that you were wrong as the trigger, whatever kind of wrong it was.
+The class matters for what you *record*, not for whether the pass runs: a corrected belief yields the belief and its replacement, while a false state claim yields the query you should have run, which is the more reusable of the two.
+
+Two mechanisms make this survivable rather than merely mandated.
+**Delegate the pass**, per "Use subagents when helpful" below, which already pre-authorizes an owed UMS pass as sidecar work --- that is what keeps the pass from competing with the task the correction interrupted.
+And **algorithmatize the trigger** rather than relying on noticing it, per [`algorithmatize-checks`](shared/workflow/algorithmatize-checks.md): `hooks/remind-ums-after-error.py` detects a first-person admission in the transcript and injects a reminder on the next prompt when no memory, skill, or shared write followed it.
+That hook only ever *adds context*.
+An error admission must never be blocked, delayed, or suppressed --- see its own docstring, and the "Never activate a new hook before its PR merges" gate in [`README.md`](README.md).
+Building such an instrument is itself delegable sidecar work, not a reason to postpone the pass.
+
+- **Do:** run the pass the moment you discover any claim of yours was false, including one you never believed so much as asserted.
+- **Do:** record the *query that settles it* for a state claim, not just the corrected value.
+- **Do:** delegate the pass, and delegate the instrument, rather than queueing either.
+- **Don't:** treat a factual correction as too small to record because no belief changed.
+- **Don't:** wait for the task the correction interrupted to reach a checkpoint of its own.
+
+(Directive from the user, 2026-07-30: "cai: every time you find out you were wrong about something, run ums immediately (you should give this to a subagent, as always, and algorithmatize it, in addition to editing memories and skills)."
+From a `ucdavis/bcs` session carrying six such discoveries, none of which triggered a pass:
+
+- a private repo described as publicly exposed for a day, when `gh api repos/<r> --jq .private` settles it in one call
+- a claim that this corpus ships no hooks, from a grep against a checkout 27 commits behind
+- a PR reported green from a query predating three of its own pushes
+- a changelog count of 9 that was 10, from a regex matching only one of two link forms
+- a review suggestion applied without checking it resolved the same path
+- a duplicate issue filed because a dupe-check and a create ran in one command.)
 
 ## Record both the pattern and the anti-pattern
 
@@ -747,6 +806,45 @@ Asking anyway costs a round trip and returns the answer already written down.
 - **Don't:** wait for a per-session request before delegating, or ask whether to use a subagent.
 - **Don't:** hand off the blocking edit itself --- the critical-path change stays local, so progress never waits on a round trip.
 
+**"I owe you X" is a tell, not a status, and it is the one that evades the tells above.**
+Those all describe a *plan*: queued, next up, after this.
+This family describes a *debt already acknowledged to the user*: "I owe", "still owe", "I'll get to", "on my list", "pending on my side".
+Naming what you owe someone reads as accountability rather than as deferral, so it feels like the diligent thing to write, and the work stays parked exactly the same.
+
+The phrase reports work that has already been identified and scoped, which is what makes it a dispatch signal.
+If it is well enough specified to be described as owed, it is well enough specified to brief a subagent with.
+That is the whole test: could you write a self-contained brief?
+If you can, you should have.
+
+The asymmetry is what makes this a rule rather than a reminder.
+Work parked in my own queue is invisible to the user, competes with the live task for attention, and is lost outright when the session ends.
+Work handed to a subagent is none of those three.
+The limit is the mirror of that test: work that genuinely depends on this conversation's context, or a single edit cheaper to make than to describe, is not worth dispatching.
+
+**Research and reading are dispatchable by default, and the test is the size of the comprehension rather than the size of the fetch.**
+One call that returns something you then have to understand, extract from, and synthesize is a task, not an errand.
+The miss here is subtler than a deferred to-do, because "I need to read something" does not present as work at all.
+It feels like a prerequisite to thinking, so the dispatch question is never asked --- and a category of work that does not present as work cannot be caught by a rule about how to handle work.
+
+This composes with [`research-before-asking`](shared/workflow/research-before-asking.md) rather than competing with it.
+That fragment makes reading an obligation before asking a human.
+This one makes it delegable once you are doing it.
+Neither is licence to skip it.
+
+Note what makes a routing failure hard to catch at all: **it leaves no trace in the artifact**.
+The reading can be done correctly and the resulting entry can be sound, so no output, test, or reviewer would reveal anything.
+Only asking why the work was routed that way surfaces it.
+
+- **Do:** launch the subagent at the moment you would otherwise have typed "I owe you", and say in the recap what it is working on.
+- **Do:** dispatch reading and research whose comprehension is substantial, however small the fetch that starts it.
+- **Don't:** report an owed item as a status --- describing it that well is proof the brief already exists.
+- **Don't:** apply a "cheaper to do than to brief" test to the fetch when the reading is the actual work.
+
+(2026-07-30, a `ucdavis/bcs` session: recaps repeatedly closed with "I still owe you a PR for X" and "I owe a UMS pass", carried across many turns, with the user having to ask again before several of them started.
+Each was independent of the critical path.
+The directive was "when you think you 'owe me' something, ask yourself, should I have dispatched it to a subagent already?"
+The reading half surfaced separately, when the user asked why fetching and digesting a Wikipedia article had not been dispatched --- a question no output could have prompted, since the article had been read correctly.)
+
 Distinct from [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md), which governs the heavier `Workflow` tool.
 That rule is a **gate**: a fan-out across four or more verification-bearing targets is a real spend, so it has to be opted into or proposed with a cost estimate.
 This one is a **grant**: a single `Agent` call covering one sidecar task is cheap, needs no opt-in, and the cost it prevents is an idle parallel track rather than an overspend.
@@ -852,6 +950,24 @@ Don't checklist-ize skills that are mostly design judgment, exploratory
 research, or one-off improvisation.
 
 @shared/workflow/skill-checklists.md
+
+## Metacognition: monitor claims by type, and distrust the fluent ones
+
+The two rules above supply instruments and checklists for work that is already
+recognized as needing checking.
+This one covers the assertion that never raised the question --- and the
+regulation step nothing prompts.
+
+Monitor your own claims at **composition time**, as each sentence is written,
+rather than in a retrospective afterwards.
+Confidence cannot be the trigger, because it runs inversely to accuracy, so key
+on claim **type** instead: a claim about **state** gets re-queried, one about
+**scope** gets checked against the population, one about **cause** gets asked
+what else explains it, and an unexamined **default** gets named and decided.
+An answer that arrived with no deliberation owes an alternative you can name
+and reject.
+
+@shared/workflow/metacognitive-monitoring.md
 
 ## Check for merge conflicts on every merge in an ultracode session
 

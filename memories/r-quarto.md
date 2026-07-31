@@ -261,6 +261,20 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `version-check.yaml` before assuming which regime it's under. The
   `news.yaml`/changelog-entry half above is unaffected until a separate
   `news.d`-fragment capability ships (deferred; see gha#388).
+- **`read.dcf()` does not error on a DCF file with a duplicate top-level
+  field; it silently keeps whichever occurrence comes LAST.** Confirmed with
+  a live call, not assumed: a two-line `Version: 1.2.3` / `Version: 1.2.4`
+  stanza parses cleanly and returns `1.2.4`. This is the general fact
+  behind `configure-gitattributes`'s never-`merge=union`-on-`DESCRIPTION`
+  row (`skills/configure-gitattributes/SKILL.md`) --- a union-merged
+  `DESCRIPTION` with two `Version:` lines is not a loud parse failure, it's
+  a silent pick of one side, which is worse. Watch for the same trap
+  anywhere else a merged or hand-edited DCF file (`DESCRIPTION`, a
+  `Packages` index) gets read back: a check that assumes malformed DCF
+  would be caught by the parser is assuming the wrong failure mode.
+  (ai-config#979, 2026-07-31: an earlier draft of that SKILL.md row claimed
+  a duplicate `Version:` field "breaks every DCF parser (`read.dcf()`,
+  ...)", which a live `Rscript` call showed to be backwards.)
 - The **Spellcheck** job (`spelling::spell_check_package()`) fails on any word
   not in `inst/WORDLIST`. For one-off non-dictionary words in NEWS/prose, prefer
   rewording (e.g. "uncaptioned" → "without captions") over polluting WORDLIST;

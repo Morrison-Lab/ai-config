@@ -837,6 +837,15 @@ And check whether the finding still points at something real, per the mirror
 case above -- an unresolvable-looking citation is often a genuinely
 under-specified one.
 
+- **Do:** ask which paths a negative finding actually searched, and check the
+  obvious location yourself before editing anything.
+- **Do:** name the gap when the thing does exist -- paths searched versus
+  where it lives -- so the same search is not re-run the same way.
+- **Don't:** accept "it isn't there anywhere" as settled because it is stated
+  more confidently than a positive finding would be.
+- **Don't:** discard the finding once its negative result is disproved -- the
+  thing it tripped over is often a real ambiguity.
+
 (`Morrison-Lab/gha#338`, 2026-07-28: a review reported a cited section as
 nonexistent, having "checked ai-config's full tree (`shared/workflow/*.md`,
 `skills/`, `codex-skills/`)".

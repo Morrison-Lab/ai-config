@@ -272,6 +272,15 @@ State the scope with the result, too.
 "No matches" and "no matches **under these three paths**" are different
 claims, and the second is the honest one when the search was scoped.
 
+- **Do:** run the pattern against a case you know contains the thing, before
+  reporting that it contains nothing.
+- **Do:** anchor to the structure being matched, and state the paths the
+  search actually covered alongside its result.
+- **Don't:** treat a zero-hit result as a fact about the corpus when the
+  pattern has never been seen to match anything.
+- **Don't:** grep a re-serialization -- a YAML dump, a rendered page -- for a
+  string whose formatting that step may have changed.
+
 Distinct from
 [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md), and the pair is
 worth keeping apart.

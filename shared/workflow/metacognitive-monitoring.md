@@ -93,9 +93,9 @@ being corrected.
 
 ## Illusions of knowing have an exact software form
 
-The article notes that "students often mistake a lack of effort for
-understanding when evaluating themselves and their overall knowledge of a
-concept".
+The [Wikipedia article](https://en.wikipedia.org/wiki/Metacognition) notes that
+"students often mistake a lack of effort for understanding when evaluating
+themselves and their overall knowledge of a concept".
 
 The software analogue is worth naming literally, because it feels like
 verification rather than like guessing: running a command and treating its

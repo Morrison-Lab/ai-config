@@ -889,6 +889,31 @@ wants to be an instrument --- see the fragment for the procedure and tells.
 
 @shared/workflow/algorithmatize-checks.md
 
+## Deterministic tools over model judgment: write yourself out of a job
+
+The section above governs *checks*.
+This is the same instinct over the work itself: prefer deterministic,
+inspectable algorithms to model reasoning wherever one will serve, and where
+none exists, build it.
+One principle with two faces, both binding at once --- a **constraint** on the
+task in front of you (use the instrument that exists) and a **goal** over time
+(build the one that does not, so the constraint gets cheap to obey).
+The observable trigger is recurrence: after doing the same judgment task
+twice, the third time is a tool.
+
+The argument the checks fragment does not make is **inspectability**.
+An algorithm can be read before it runs, reviewed by someone who does not
+trust its author, diffed, and re-run to the same answer; model reasoning is
+none of those.
+That is why a hook beats a rule even when the model would usually follow the
+rule.
+Applies in every repo, research code included --- a hand-run analysis step or
+an eyeballed validation is the same shape as a hand-composed status line.
+Design and genuine judgment remain, but as the residue not yet automated
+rather than a fixed reserve.
+
+@shared/principles/deterministic-tools.md
+
 ## Checklists: Do-Confirm, Read-Do, pause points, killer items
 
 Where a check is mechanical but no instrument can decide it -- because it
@@ -1143,6 +1168,16 @@ The `ard`/`ardi` skill family and `use-preferred-style`/`find-ai-tells` operatio
 @shared/workflow/challenge-redundant-content.md
 
 The `ard`/`ardi` skill family and `code-review` apply this in PR/MR review; `find-overlap` (and its `consolidate-skills`/`consolidate-memory` actors) is the corpus-wide counterpart when redundancy spans more than the current diff.
+
+## Never assert a corpus gap from a grep
+
+The rule above catches redundant content once it is written.
+This one catches the belief that produces it: a phrase grep returning nothing is not evidence the corpus lacks a concept, because grep matches strings while coverage is a claim about ideas.
+Report the query and its result, not the conclusion.
+
+@shared/workflow/grep-is-not-coverage.md
+
+Fires wherever a search decides whether to author something new --- `skill-builder`'s step 0, `ums`'s step 3, and `find-overlap`, whose own instrument scores this repo's canonical same-idea pair at 0.019 phrase similarity.
 
 ## Writing style: scan for AI tells
 

@@ -1059,10 +1059,30 @@ Decide it mechanically before touching anything:
 
 ```bash
 git remote get-url origin              # which repo is this actually?
-git merge-base --is-ancestor HEAD origin/main && echo "pure upstream history"
-git rev-list --count origin/main..HEAD  # 0 => no local work here
+git merge-base --is-ancestor HEAD origin/main; case $? in
+  0) echo "pure upstream history -- nothing local to lose" ;;
+  1) echo "HAS local commits -- do not rewrite" ;;
+  *) echo "check failed (bad ref?) -- do not rewrite" ;;
+esac
 git show -s --format='%an <%ae> | %cn <%ce>' <flagged-sha>
 ```
+
+Two details in that block are deliberate, and both are easy to "helpfully"
+undo.
+
+There is **one** liveness check rather than two.
+An empty `origin/main..HEAD` range is the same fact as `--is-ancestor`
+succeeding, so running both confirms one thing twice rather than two things
+once --- see `CLAUDE.md`'s "Run `wrap-up`'s state sweep" section, which
+states that rule for the branch-deletion case.
+
+And the exit status is read with a three-arm `case` rather than
+`&& echo ... || echo ...`.
+`--is-ancestor` exits 2 or higher when a ref has been pruned away, and `&&`
+fails on any non-zero status, so the two-arm form reports a confident
+"no local work" for a check that never ran --- the
+[`fail-fast`](../shared/principles/fail-fast.md) shape where the failure
+path and the pass path print the same thing.
 
 A branch that is an **ancestor** of `origin/main` has no local work on it
 by definition, so anything flagged there is upstream history and the hook

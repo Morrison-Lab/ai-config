@@ -148,7 +148,8 @@ The correction was a Quarto binary reported broken twice that turned out to be e
 The bullet above covers a corrected *understanding* --- a model of how something works, which you held, and which turned out to be false.
 The commoner failure has no belief in it at all.
 You assert that a repository is public, that a PR is green, that a corpus lacks a feature, that a list has nine entries.
-None of those were things you thought; they are things you did not look up, or looked up once against a stale checkout and then repeated.
+None of those were things you thought.
+They are things you did not look up, or looked up once against a stale checkout and then repeated.
 
 That absence is why the trigger above does not obviously fire here.
 Nothing that feels like a belief gets corrected, so the discovery reads as a small factual fix rather than as the event this section is about.
@@ -171,7 +172,14 @@ Building such an instrument is itself delegable sidecar work, not a reason to po
 - **Don't:** wait for the task the correction interrupted to reach a checkpoint of its own.
 
 (Directive from the user, 2026-07-30: "cai: every time you find out you were wrong about something, run ums immediately (you should give this to a subagent, as always, and algorithmatize it, in addition to editing memories and skills)."
-From a `ucdavis/bcs` session carrying six such discoveries, none of which triggered a pass: a private repo described as publicly exposed for a day, when `gh api repos/<r> --jq .private` settles it in one call; a claim that this corpus ships no hooks, from a grep against a checkout 27 commits behind; a PR reported green from a query predating three of its own pushes; a changelog count of 9 that was 10, from a regex matching only one of two link forms; a review suggestion applied without checking it resolved the same path; and a duplicate issue filed because a dupe-check and a create ran in one command.)
+From a `ucdavis/bcs` session carrying six such discoveries, none of which triggered a pass:
+
+- a private repo described as publicly exposed for a day, when `gh api repos/<r> --jq .private` settles it in one call
+- a claim that this corpus ships no hooks, from a grep against a checkout 27 commits behind
+- a PR reported green from a query predating three of its own pushes
+- a changelog count of 9 that was 10, from a regex matching only one of two link forms
+- a review suggestion applied without checking it resolved the same path
+- a duplicate issue filed because a dupe-check and a create ran in one command.)
 
 ## Record both the pattern and the anti-pattern
 

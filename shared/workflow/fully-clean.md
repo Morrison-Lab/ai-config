@@ -148,7 +148,7 @@ verdict and an inline finding's heading.
 Those are legibility problems rather than disagreements, and they sit
 inside the pass and non-pass groups rather than beside them.
 Of the 24 passes, 23 used `Ready for merge` and one used the hedged
-variant above; the remaining four lexemes were `Needs more work`,
+variant above; the four non-pass lexemes were `Needs more work`,
 `Needs minor changes`, `Needs work`, and `Needs one fix`.)
 
 **What "an approving review" means here is not a review state.**

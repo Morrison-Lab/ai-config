@@ -17,7 +17,7 @@ reports that it runs the wrong way:
 > greater confidence in having performed well is associated with less accurate
 > metacognitive judgment of the performance
 
-Two further findings in the same section point the same direction.
+Two further findings in the same article point the same direction.
 Students "who were rigorously and continually evaluated reported being less
 confident but still did better on initial evaluations", and students "who
 thought their way was better/easier also seemed to perform worse on

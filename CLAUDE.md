@@ -938,6 +938,44 @@ research, or one-off improvisation.
 
 @shared/workflow/skill-checklists.md
 
+## Never pattern-match blindly: check the purpose transfers
+
+Before reusing a structure --- a template, a working script, a neighbouring
+file's shape, a pattern from another tool --- state what the original was
+**for** and what the new one is **for**, and confirm those are the same kind
+of thing.
+Structural fit is necessary and never sufficient.
+
+The tell is that every check you naturally run after adapting a template asks
+whether the *mechanism* works, and none asks whether the *purpose* survived
+the substitution: same interface, passing tests, and the thing now does the
+opposite of what it should.
+A template you wrote yourself recently gets the least scrutiny, because
+reusing something you just verified feels like consistency rather than like
+assuming --- which inverts the scrutiny the situation warrants.
+This is not an argument against reuse; it is the check that makes reuse safe.
+
+@shared/workflow/check-purpose-before-reusing.md
+
+## Avoid false dichotomies
+
+When laying out alternatives, test whether they are actually exclusive before
+presenting them as such.
+The tell is a question posed as either/or and answered with "both" --- which
+means the exclusivity was constructed rather than found.
+
+The observable action: before presenting alternatives, state what would be
+lost by taking more than one.
+If the answer is nothing, they are not alternatives --- enable multi-select,
+or present them as composable steps with an order.
+Genuinely exclusive options exist (two incompatible designs, a merge strategy,
+a name), and presenting those as combinable is its own error; the target is
+the unexamined default, not the act of choosing.
+Composes with "Present decisions one at a time" above, which governs how many
+questions to ask rather than how one question's options relate.
+
+@shared/workflow/avoid-false-dichotomies.md
+
 ## Metacognition: monitor claims by type, and distrust the fluent ones
 
 The two rules above supply instruments and checklists for work that is already

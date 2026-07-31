@@ -880,6 +880,21 @@ wants to be an instrument --- see the fragment for the procedure and tells.
 
 @shared/workflow/algorithmatize-checks.md
 
+## Derive a set of work items; never hand over an enumeration of it
+
+A brief that lists PR or issue numbers is a snapshot, stale the moment it is
+written.
+Before dispatching work scoped to a list, ask whether that set can grow or
+change while the work runs; when it can, hand over the query that derives it
+rather than the list itself.
+The failure is invisible by construction --- every agent does its job on the
+list it was given, so the items that appear *between* the lists are covered
+by nobody and no artifact reports it.
+`scripts/pr-sweep.py` is the deterministic half for open PRs, and reports
+what it examined rather than only what it found.
+
+@shared/workflow/derive-dont-enumerate.md
+
 ## Checklists: Do-Confirm, Read-Do, pause points, killer items
 
 Where a check is mechanical but no instrument can decide it -- because it

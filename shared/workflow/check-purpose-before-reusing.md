@@ -83,8 +83,8 @@ have not justified.
 Flag a diff that introduces a structure closely mirroring an existing one
 where the two serve different purposes, and ask for the purpose
 comparison rather than for the mechanism to be re-tested.
-This is the arrival path for the "wrong strategy, correct-looking
-implementation" case in
+This is the arrival path for the "correct-looking implementation of the
+wrong strategy" case in
 [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s strategic
 correctness section: the wrong strategy usually got there by copying a
 working neighbour.

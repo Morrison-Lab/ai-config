@@ -144,6 +144,35 @@ The task will still be there; what you believed ten minutes ago will not.
 (Directive from the user, 2026-07-30: "when you correct your understanding of a technical issue like you just did, run ums immediately."
 The correction was a Quarto binary reported broken twice that turned out to be environment misuse both times, recorded in [`growth-mindset`](shared/workflow/growth-mindset.md)'s "First check the limitation is real" section.)
 
+**A false claim about *state* is the same trigger, and it is the one you can be wrong about without ever holding a wrong belief.**
+The bullet above covers a corrected *understanding* --- a model of how something works, which you held, and which turned out to be false.
+The commoner failure has no belief in it at all.
+You assert that a repository is public, that a PR is green, that a corpus lacks a feature, that a list has nine entries.
+None of those were things you thought; they are things you did not look up, or looked up once against a stale checkout and then repeated.
+
+That absence is why the trigger above does not obviously fire here.
+Nothing that feels like a belief gets corrected, so the discovery reads as a small factual fix rather than as the event this section is about.
+It also arrives mid-task, at the moment the natural impulse is to repair the claim and carry on --- which is the opposite of a checkpoint, and is exactly when nothing prompts a pass.
+
+Treat any discovery that you were wrong as the trigger, whatever kind of wrong it was.
+The class matters for what you *record*, not for whether the pass runs: a corrected belief yields the belief and its replacement, while a false state claim yields the query you should have run, which is the more reusable of the two.
+
+Two mechanisms make this survivable rather than merely mandated.
+**Delegate the pass**, per "Use subagents when helpful" below, which already pre-authorizes an owed UMS pass as sidecar work --- that is what keeps the pass from competing with the task the correction interrupted.
+And **algorithmatize the trigger** rather than relying on noticing it, per [`algorithmatize-checks`](shared/workflow/algorithmatize-checks.md): `hooks/remind-ums-after-error.py` detects a first-person admission in the transcript and injects a reminder on the next prompt when no memory, skill, or shared write followed it.
+That hook only ever *adds context*.
+An error admission must never be blocked, delayed, or suppressed --- see its own docstring, and the "never activate a hook before review" gate in [`README.md`](README.md).
+Building such an instrument is itself delegable sidecar work, not a reason to postpone the pass.
+
+- **Do:** run the pass the moment you discover any claim of yours was false, including one you never believed so much as asserted.
+- **Do:** record the *query that settles it* for a state claim, not just the corrected value.
+- **Do:** delegate the pass, and delegate the instrument, rather than queueing either.
+- **Don't:** treat a factual correction as too small to record because no belief changed.
+- **Don't:** wait for the task the correction interrupted to reach a checkpoint of its own.
+
+(Directive from the user, 2026-07-30: "cai: every time you find out you were wrong about something, run ums immediately (you should give this to a subagent, as always, and algorithmatize it, in addition to editing memories and skills)."
+From a `ucdavis/bcs` session carrying six such discoveries, none of which triggered a pass: a private repo described as publicly exposed for a day, when `gh api repos/<r> --jq .private` settles it in one call; a claim that this corpus ships no hooks, from a grep against a checkout 27 commits behind; a PR reported green from a query predating three of its own pushes; a changelog count of 9 that was 10, from a regex matching only one of two link forms; a review suggestion applied without checking it resolved the same path; and a duplicate issue filed because a dupe-check and a create ran in one command.)
+
 ## Record both the pattern and the anti-pattern
 
 When I tell you what to do, or what not to do, in a `cai` or `ums` statement, write down **both** sides: the behaviour to adopt and the behaviour to stop.

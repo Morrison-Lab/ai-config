@@ -134,6 +134,31 @@
   nothing else" after the worktree was removed and re-created at the same
   path — verified the actual chapter content instead via this gh-pages
   fetch, twice, once per structural fix.)
+- **Plain git is a lighter route to the same PR-preview HTML, and the one to
+  reach for when the page structure isn't known in advance.** The
+  `get_file_contents` recipe above needs the exact path up front and returns
+  that odd pre-decoded array; fetching the branch instead avoids both and lets
+  you enumerate first:
+  `git fetch --depth=1 origin gh-pages`, then
+  `git ls-tree --name-only FETCH_HEAD:pr-preview/pr-<N>/` to see what the site
+  actually built, then `git show FETCH_HEAD:pr-preview/pr-<N>/<page>.html`
+  piped to `grep`. Nothing is written to the working tree, so it is safe to run
+  from a repo checkout mid-task. **Sample every page type, not just
+  `index.html`** --- a site can have `index`, `NEWS`, `reference`, `man/*`, and
+  `vignettes/*` pages built by different code paths. Expect a `revealjs`
+  vignette to legitimately lack website chrome (no Quarto sidebar, so no
+  sidebar-related markup at all); confirm it is a slide deck (`grep -c reveal`)
+  rather than recording it as a gap.
+- **When verifying that a `$VAR`-style placeholder actually resolved in built
+  HTML, a grep for the literal variable name false-positives on your own
+  changelog prose.** A `NEWS.md` entry that *describes* the migration in a
+  backticked span renders into `NEWS.html` as `<code>$ALTDOC_SIDEBAR_FOLD</code>`
+  --- indistinguishable from an unresolved placeholder if you only count
+  matches. Check the surrounding tags before concluding: a genuinely unresolved
+  variable appears as a header include path, not wrapped in `<code>` in body
+  text. Cost time twice on the same migration, once per repo, because the
+  second occurrence looked like confirmation of the first.
+  (`ucdavis/bcs#528`, `UCD-SERG/serocalculator#626`.)
 - **A `renv::restore()` failure downloading `https://api.github.com/repos/<owner>/<repo>/...`
   with `error code 22` can mean the GitHub-pinned `Remotes:` package was
   renamed/transferred, not a transient network blip.** `insightsengineering/cardx`

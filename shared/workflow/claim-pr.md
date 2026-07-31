@@ -69,6 +69,7 @@ Three reads settle it before you touch anything:
 ```bash
 git rev-parse HEAD^{tree}                 # your merge's tree
 git rev-parse origin/<branch>^{tree}      # theirs
+git show -s --format=%P HEAD              # your merge's parents
 git show -s --format=%P origin/<branch>   # its parents
 ```
 
@@ -85,7 +86,7 @@ merge, so the right action is `git reset --hard origin/<branch>`.
 
 (`Morrison-Lab/ai-config#965`, 2026-07-31: `main` moved one commit, a local
 `git merge origin/main` was made, and the push was rejected.
-The remote carried `b8d2273`, a merge of the same two parents whose tree was
+The remote carried `b8d2273`, a merge of the same two parents, with tree
 `1bda1bc`, identical to the local merge's.)
 
 **Handing off mid-task to another agent, on user request ("finish what you're

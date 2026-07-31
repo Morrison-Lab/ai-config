@@ -318,7 +318,7 @@ independent and don't mutate shared state — like this one.
   open PR to clean. This skill only reports; see *Why fan-out is safe here* for
   why those loops stay series.
 - **`sync-pr-branch`** — offered for any PR the table flags as behind main.
-- **`scripts/pr-sweep.py`** — the cheap deterministic sweep that says *which*
+- **`scripts/pr-sweep.py`** -- the cheap deterministic sweep that says *which*
   PRs this dashboard should be pointed at. It answers one narrower question
   ("which open PRs are stalled right now") across several repos in one
   GraphQL call, with a wall-clock staleness threshold this skill has no

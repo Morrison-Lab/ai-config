@@ -45,6 +45,22 @@ def check(name, content, expected):
     else:
         failures += 1
 
+    # Same scenario through the scoped path, with every line in scope.
+    # Whole-file mode is `changed=None` and takes a different branch at each
+    # emitter, so passing these six preservation rules there does not imply
+    # passing them under scoping -- a scope-aware emitter that mishandled a
+    # fence or an HTML comment would be invisible to the assertion above.
+    all_lines = set(range(1, len(content.split('\n')) + 1))
+    scoped = slb.reformat(content, all_lines)
+    if scoped == expected:
+        print(f"PASS: {name} [scoped]")
+        passes += 1
+    else:
+        print(f"FAIL: {name} [scoped]")
+        print(f"  Expected: {expected!r}")
+        print(f"  Got:      {scoped!r}")
+        failures += 1
+
 
 # Bug 1: @include directive must NOT be merged with a preceding HTML comment.
 check(
@@ -316,6 +332,53 @@ with tempfile.TemporaryDirectory() as repo:
         allout == ("First para one.\nFirst para two.\n\n"
                    "Edited para one.\nEdited para two.\n"),
         repr(allout),
+    )
+
+# A RELATIVE path must scope exactly as an absolute one does.
+#
+# The git calls run under `-C <file's parent>`, so passing the path as given
+# would make git resolve `docs/doc.md` as `docs/docs/doc.md` -- matching
+# nothing, which is indistinguishable from an unmodified file and falls
+# through to whole-file scope. Silently. That is the rewrite this whole
+# guard exists to prevent, so it gets its own test rather than riding on
+# the absolute-path case above.
+with tempfile.TemporaryDirectory() as repo:
+    env = dict(os.environ, GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@e',
+               GIT_COMMITTER_NAME='t', GIT_COMMITTER_EMAIL='t@e')
+
+    def git(*a):
+        return subprocess.run(['git', '-C', repo, *a], capture_output=True,
+                              text=True, env=env)
+
+    git('init', '-q', '-b', 'main')
+    os.makedirs(os.path.join(repo, 'docs'))
+    nested = Path(repo) / 'docs' / 'doc.md'
+    nested.write_text(TWO_PARAS, encoding='utf-8')
+    git('add', '-A')
+    git('commit', '-qm', 'base')
+    git('branch', '-f', 'base-ref')
+    nested.write_text(
+        "First para one. First para two.\n\nEdited one. Edited two.\n",
+        encoding='utf-8')
+    git('commit', '-qam', 'edit second')
+
+    total = len(nested.read_text(encoding='utf-8').split('\n'))
+    cwd = os.getcwd()
+    os.chdir(repo)
+    try:
+        rel_scope = slb.changed_lines_for(Path('docs/doc.md'), 'base-ref')
+    finally:
+        os.chdir(cwd)
+
+    expect(
+        "a relative path scopes to the changed line, not the whole file",
+        rel_scope == {3},
+        f"got {sorted(rel_scope)} of {total} lines "
+        f"({'WHOLE FILE' if len(rel_scope) >= total else 'partial'})",
+    )
+    expect(
+        "relative and absolute paths agree on scope",
+        rel_scope == slb.changed_lines_for(nested, 'base-ref'),
     )
 
 

@@ -850,6 +850,20 @@ That rule is a **gate**: a fan-out across four or more verification-bearing targ
 This one is a **grant**: a single `Agent` call covering one sidecar task is cheap, needs no opt-in, and the cost it prevents is an idle parallel track rather than an overspend.
 So when a task clears that fragment's three-part bar, follow it and propose the workflow; everything below that bar is a subagent to launch now.
 
+## Derive a set of work items; never hand over an enumeration of it
+
+The section above governs *whether* to dispatch.
+This governs how to **scope** what you dispatch.
+A brief that lists PR or issue numbers is a snapshot, stale the moment it is written.
+Before dispatching work scoped to a list, ask whether that set can grow or change while the work runs.
+When it can, hand over the query that derives it rather than the list itself.
+
+The failure is invisible by construction, which is why it needs a rule rather than more care.
+Every agent does its job correctly on the list it was given, so the items that appear *between* the lists are covered by nobody, and no artifact reports it --- coverage is a property of the set rather than of any member.
+`scripts/pr-sweep.py` is the deterministic half for open PRs, and reports what it examined rather than only what it found.
+
+@shared/workflow/derive-dont-enumerate.md
+
 ## Non-destructive repo and memory actions
 
 The user gives general permission to proceed with non-destructive actions such as setting up PRs, reading GitHub repository data through the API, running non-destructive Git and Perl commands, and editing shared `CLAUDE.md` memory. This includes pushing branches and opening PRs against the ai-config repo. Default to action without confirmation for reasonable non-destructive steps; ask only for destructive, ambiguous high-impact, or genuinely blocking choices. Destructive operations still require explicit instruction.
@@ -879,21 +893,6 @@ eyeballing an artifact for a property with a numeric definition, that check
 wants to be an instrument --- see the fragment for the procedure and tells.
 
 @shared/workflow/algorithmatize-checks.md
-
-## Derive a set of work items; never hand over an enumeration of it
-
-A brief that lists PR or issue numbers is a snapshot, stale the moment it is
-written.
-Before dispatching work scoped to a list, ask whether that set can grow or
-change while the work runs; when it can, hand over the query that derives it
-rather than the list itself.
-The failure is invisible by construction --- every agent does its job on the
-list it was given, so the items that appear *between* the lists are covered
-by nobody and no artifact reports it.
-`scripts/pr-sweep.py` is the deterministic half for open PRs, and reports
-what it examined rather than only what it found.
-
-@shared/workflow/derive-dont-enumerate.md
 
 ## Checklists: Do-Confirm, Read-Do, pause points, killer items
 

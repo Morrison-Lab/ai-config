@@ -525,6 +525,46 @@ generic Actions-authoring and reusable-workflow material.
   `statuses: write` that the reviewer had retracted moments earlier -- another
   instance of the standing rule that a suggestion block's literal is a claim to
   verify, not text to accept.)
+## Disabling the @claude agent in a gha-consumer repo
+
+- **Commenting out the triggers is not enough; the job also needs
+  `if: false`.** The reusable `claude.yml` **runs unattended on
+  `workflow_dispatch`** -- its gate exempts that event (and `schedule`)
+  deliberately, on the reasoning that dispatching already requires Actions
+  write access. And you cannot simply delete the `on:` block, because GitHub
+  rejects a workflow file with no trigger at all, so some placeholder has to
+  remain. Leave `workflow_dispatch:` as that placeholder and put `if: false`
+  on the job. Either mechanism alone leaves the agent runnable by anyone who
+  can press "Run workflow".
+- **Check the review stub's own triggers BEFORE disabling the agent -- you may
+  be removing the only path that starts a review.** `claude.yml` is what
+  dispatches a review on an `@claude review` mention, so in a repo whose
+  automatic `pull_request` review is already off, turning off the agent leaves
+  no review path whatsoever. The fix is the `/review` path from
+  [gha's example stub](https://github.com/Morrison-Lab/gha/blob/v2/examples/claude-code-review.yml):
+  an `issue_comment` trigger plus a `dispatch-on-comment` job gated on
+  OWNER/MEMBER/COLLABORATOR that re-enters the existing `workflow_dispatch`
+  path. A slash command rather than a mention, on purpose -- any `@claude`
+  would wake the workflow you just disabled.
+- **Turning off the `pull_request` review trigger can block every PR in the
+  repo.** If `review / require-review` (or `review / claude-review`) is a
+  **required status check** in branch protection, it stops reporting entirely
+  and PRs sit waiting for a status that never arrives. Nothing in the diff
+  reveals this -- branch protection is not in the repo -- so state it as a
+  merge precondition for a human to confirm rather than assuming either way.
+- **A `/review` dispatch should pass `--ref <pr-head-branch>`.** Without it
+  `workflow_dispatch` falls back to the default branch and the review
+  check-run lands on the wrong commit. Fork PRs are the exception: their head
+  branch does not exist in the base repo, so `--ref` cannot resolve and the
+  dispatch has to fall back to no `--ref`. Older copies of the
+  `dispatch-on-comment` job in consumer repos predate this and still need it
+  backported -- it matters most once `/review` is the *only* path that ever
+  produces a review check-run.
+- (2026-07-31, `UCD-SERG/serodynamics#282` + `UCD-SERG/serocalculator#627`:
+  agent disabled in both. serodynamics needed the `/review` path built, having
+  relied entirely on the mention; serocalculator already had it and needed the
+  `pull_request` trigger removed plus the `--ref` backport.)
+
 ## GitHub Actions — gathering prior review context in reusable workflows
 
 When a reusable workflow needs to fetch prior `claude[bot]` review comments for

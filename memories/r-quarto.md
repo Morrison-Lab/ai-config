@@ -711,6 +711,24 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   For a **non-user-visible** PR (CI/workflow-only), skip both with the
   `no changelog` + `no version increment` labels instead — see the label-bypass
   note below.
+- **The label bypass is per-repo, not a property of the shared `version-check`
+  workflow -- check before relying on it.** `bcs` and `serocalculator` both carry
+  a `check_label` step gating every later step on a `no version increment`
+  label; `UCD-SERG/serodynamics`'s copy of the same RMI-PACTA-derived workflow
+  has no such step at all, so its
+  `stopifnot(working_version > compare_version)` is unconditional and a
+  CI-only PR there **must** bump `DESCRIPTION`. The three files look alike
+  enough that the difference is easy to miss.
+- **A workflow-only PR is exactly the one that forgets the bump**, because
+  nothing in the change is about the package. The existing parity guidance
+  fires on `main` advancing past you; this case never bumps at all, so the
+  branch simply stays at parity from the first commit and `version-check`
+  goes red on a diff that touches no R code. Compare
+  `grep ^Version DESCRIPTION` against
+  `git show origin/main:DESCRIPTION | grep ^Version` before pushing any PR to
+  one of these repos, whatever the diff contains.
+  (2026-07-31: `serodynamics#282` and `serocalculator#627`, both
+  `.github/workflows/`-only, both red on `version-check` for this reason.)
 - The **Spellcheck** job (`spelling::spell_check_package()`) fails on any word
   not in `inst/WORDLIST`. For one-off non-dictionary words in NEWS/prose, prefer
   rewording (e.g. "uncaptioned" → "without captions") over polluting WORDLIST;

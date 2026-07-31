@@ -164,6 +164,14 @@ generic Actions-authoring and reusable-workflow material.
   (`git checkout <my-commit> -- CLAUDE.md`, commit), then before merging verify with
   `git diff origin/main -- CLAUDE.md` being **non-empty** (an empty diff means the
   payload was silently reverted to main), and merge promptly.
+- **The bot-resolves-version-to-`==main` failure mode below is obsolete once a
+  repo adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check`
+  capabilities (gha#390, tracking gha#388).** Once a repo migrates, PRs never
+  carry a `DESCRIPTION` version bump at all, so there is no version line left
+  for a bot merge to resolve one way or the other, and this whole bullet's
+  "re-check versions after a bot merge" step no longer applies there. Not
+  deleted here since most repos haven't migrated yet --- check whether the repo
+  in front of you has before following this recovery step.
 - **The `@claude` agent can push a `main`-merge commit to your PR branch — not just
   comment.** Triggered by PR activity, the `claude.yml` agent may merge `origin/main`
   into the branch and push it (e.g. `claude[bot]` "Merge branch 'main' into <branch>").

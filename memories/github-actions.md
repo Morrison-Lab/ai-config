@@ -400,6 +400,17 @@ common patterns.
   The bare `<username>@users.noreply.github.com` is not privacy-safe and can match a real inbox.
   For `issue_comment` events, the actor's numeric ID is in `github.event.comment.user.id`:
   `committer-email: ${{ github.event.comment.user.id }}+${{ github.actor }}@users.noreply.github.com`.
+- **The whole per-PR dev-version-bump chore below is obsolete once a repo
+  adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check`
+  capabilities (gha#390, tracking gha#388).** Those replace the "bump
+  `DESCRIPTION` above `main`, re-bump after every merge" convention with an
+  auto-bump-on-`main`-merge workflow plus an inverted `version-check` that
+  fails a PR if it touches `Version:` at all --- so once a repo migrates,
+  every bullet below about bumping, re-bumping, or the `no version increment`
+  label bypass no longer applies to that repo. Not deleted here because most
+  repos (bcs, serocalculator, serodynamics included) haven't migrated yet;
+  check whether the repo in front of you has adopted the new workflow before
+  following this chore.
 - **Both bcs PR gates have a label bypass for non-user-visible changes.** `version-check`
   (`version-check.yaml`, derived from RMI-PACTA's R-semver-check) does a pure version
   comparison and fails if the PR branch version ≤ main's, **but** it skips when the

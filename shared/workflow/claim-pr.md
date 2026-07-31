@@ -64,7 +64,7 @@ pushed is the same merge you just made.
 The reflex on a rejected push is to merge again, which would stack a
 redundant merge commit on top of an identical one.
 
-Three reads settle it before you touch anything:
+Four reads settle it before you touch anything:
 
 ```bash
 git rev-parse HEAD^{tree}                 # your merge's tree

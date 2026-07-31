@@ -447,9 +447,14 @@ heredoc.**
 Quoting is where these break, and a file removes the shell from the problem
 entirely.
 
-**Note that the instrument's silence is also not proof**, for a second
-reason: `check-new-line-breaks` is advisory and exits 0, so its green CI
-result never meant the diff was clean.
+**The maintained instrument's silence is not proof either**, for two reasons
+of its own.
+It has a blind spot: a sentence opening with a bare lowercase identifier is
+not seen as a sentence boundary, so a line of exactly the shape this corpus
+keeps writing goes unflagged
+([gha#389](https://github.com/Morrison-Lab/gha/issues/389)).
+And it is advisory, exiting 0 whatever it finds, so its green CI result never
+meant the diff was clean.
 Read its output, not its conclusion.
 
 - **Do:** run the maintained checker against your own diff before pushing,
@@ -460,7 +465,5 @@ Read its output, not its conclusion.
 - **Don't:** read an advisory check's green CI status as a verdict on content.
 
 (2026-07-31, [ai-config#964](https://github.com/Morrison-Lab/ai-config/pull/964):
-the review caught 8 of the 12 lines my own detector had missed.
-A related blind spot in the real tool -- a sentence opening with a bare
-lowercase identifier is not seen as a boundary -- is tracked as
-[gha#389](https://github.com/Morrison-Lab/gha/issues/389).)
+the review caught 8 of the 12 lines my own detector had missed, and then a
+further one that the maintained tool had missed too.)

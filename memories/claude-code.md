@@ -283,14 +283,46 @@ any of the three).
 So every `@claude` run in a gha-consuming repo loads that repo's whole
 always-loaded set before it reads a line of the diff.
 
+**That closure has now overflowed the context limit for at least one workflow
+in this repo, so the cost is a measured failure rather than a projected one.**
+`Morrison-Lab/ai-config#986` carries a comment posted at 2026-07-31T20:47:04Z
+whose body is the API's context-length error verbatim, `Prompt is too long`,
+emitted by `claude.yml@v1`'s post-step from workflow run 30664135897.
+The agent had loaded the always-loaded set and done no work of its own: its
+`Run Claude Code` step ran 36 seconds, and the job concluded `success` with no
+step failing.
+So the figure above is not merely large; it exceeds what at least one consumer
+of it can accept.
+
+The second-order effect is the part to plan around.
+An agent that cannot run in this repo cannot be asked to help shrink it, so
+the corpus's size now blocks the tool that would reduce the corpus's size.
+That argues for treating the levers above as urgent rather than tidy, and for
+preferring the ones a human or a plain script can apply without an agent.
+
+**The reviewer half of the same afternoon is inference, and is labelled that
+way deliberately.**
+`claude-review` failed at two heads with `is_error: true` alongside
+`subtype: "success"`, and has **not** been shown to hit the same limit.
+The shapes do fit: the agent died before its first call, while the reviewer
+ran 43 seconds and spent $0.97 across 2 turns, which is what a prompt sitting
+just under the line and then pushed over by tool results would look like.
+A fitting shape is not evidence, so treat the reviewer failure as an open
+question rather than as a second instance, until something reads its own error
+string.
+
 - **Do:** re-run the closure walk before making a context-budget argument ---
   the figure moves fast, and a stale one argues for the wrong lever.
 - **Do:** reach for pruning, consolidating, demoting to on-demand, or
   path-scoped rules, which are the levers that change the number.
+- **Do:** treat the closure as a ceiling already reached rather than a budget
+  still being spent, since one workflow here has now failed on it outright.
 - **Don't:** propose splitting a large `CLAUDE.md` into `@path` imports as a
   context saving; it buys organization and nothing else.
 - **Don't:** assume the always-loaded cost is paid only by interactive
   sessions.
+- **Don't:** report the `claude-review` failures as the same overflow --- that
+  is a shape match, and no error string has been read for them.
 
 ## Custom subagents (`.claude/agents/*.md`) — Bash is a write-access loophole
 

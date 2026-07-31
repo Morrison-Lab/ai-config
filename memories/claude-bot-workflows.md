@@ -683,6 +683,18 @@ not block `claude-review`.)
   terminated, not whether the job did its job.
   So read `is_error` for the verdict and treat `subtype` as narration.
   (2026-07-31.)
+- **The *agent* workflow reports an API-level error by posting it as a plain
+  PR comment, and its job still concludes `success`.**
+  When `claude.yml`'s `Run Claude Code` step ends without committing anything,
+  the later `Post Claude's response if no code was committed` step publishes
+  whatever the run produced --- including a bare API error such as
+  `Prompt is too long`, under a footer naming the step and linking the run.
+  Every step conclusion stays `success` or `skipped`, so the run is green and
+  no check, artifact, or log records a failure anywhere.
+  Read the thread rather than the run when an agent invocation appears to have
+  done nothing; see [`debugging.md`](debugging.md)'s
+  "Read the failure's own output" for the general form.
+  (`Morrison-Lab/ai-config#986`, run 30664135897, 2026-07-31.)
 - **`gh pr checks <N>` can return a momentarily-stale check entry right after a
   state-changing trigger (close/reopen, a push, `gh run rerun`).** Querying
   immediately after triggering can show the check that was current a few
@@ -810,6 +822,42 @@ fork-skip comment ending "Review it with `@claude review` instead."
 Caught in self-review before the first push; every fork skip would have
 dispatched an agent run, on the exact substring gate this file already
 documents for the human case.)
+
+**gha#342's stripper does not close the human case, because a mention can be
+quoted with no markup around it at all.**
+That fix strips blockquote lines, fenced code blocks, indented code blocks,
+and inline code spans before matching, so it catches a mention someone wrapped
+in backticks or quoted as a block.
+It cannot catch one sitting in ordinary prose, and a rule cited by its own
+title is exactly that, since quotation marks are not markup.
+
+This corpus makes that the common case rather than a rare one, because four of
+its headings carry the mention bare:
+
+```bash
+grep -rn '^#\{1,6\} .*@claude' --include=*.md . | grep -v '`@claude'
+```
+
+One of the four is `CLAUDE.md`'s "Do the review yourself when the @claude
+workflow doesn't produce a verdict", which is self-defeating in a specific
+way: the rule you reach for *because* the reviewer failed cannot be named in a
+comment without spending a real agent run.
+
+So cite such a rule by section without reproducing its title verbatim, or
+defang the mention when the title has to be quoted.
+Neither backticks nor gha#342 will do it for you.
+
+- **Do:** reword a quoted rule title that carries the mention, rather than
+  trusting a code span to neutralize it.
+- **Don't:** read gha#342 as closing the quoting hole in general --- it closes
+  the markup-quoted half only.
+
+(`Morrison-Lab/ai-config#986`, 2026-07-31: a self-review comment named that
+rule in a parenthetical, mention bare, and workflow run 30664135897 was
+created five seconds later.
+That run is the one whose `Prompt is too long` comment finally explained the
+afternoon's failures, so an accidental dispatch is the only reason the answer
+existed at all --- which is luck, and not a reason to leave the hole open.)
 
 ## `CLAUDE_CODE_OAUTH_TOKEN` carries no recoverable account identity
 

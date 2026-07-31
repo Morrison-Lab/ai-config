@@ -664,6 +664,25 @@ not block `claude-review`.)
   on "waiting for background agents" — a mechanism the summary object alone
   can't show (`d-morrison/gha#185`, `Lacaedemon/sparta` PR #615, 2026-07-03).
 - **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.** `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments. If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading. This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review. Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text. Filed with full evidence as `d-morrison/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
+- **Both bullets above presuppose `@v2`: at `@v1` the execution artifact is
+  never produced at all, so its absence is not an access problem.**
+  `claude-code-review.yml@v1` has no `Resolve and upload execution file path`
+  step, while `@v2` has two of them (one per attempt), so a run pinned at
+  `@v1` uploads nothing and every route to the artifact fails identically ---
+  which reads as a credentials or proxy problem and is not.
+  Confirm the producing step ran before diagnosing the fetch; see
+  [`debugging.md`](debugging.md)'s "An artifact you cannot retrieve may never
+  have been produced" for the general form and the one-call check. (2026-07-31.)
+- **`is_error` is the field that says whether the run failed.
+  `subtype` is not, and the two can look contradictory in the same object.**
+  A stub review reports `is_error: false` alongside real turns and cost: it
+  ran, and never stated a verdict.
+  A genuine failure reports `is_error: true`, and can carry
+  `subtype: "success"` beside it.
+  That is not a contradiction --- `subtype` describes how the SDK turn
+  terminated, not whether the job did its job.
+  So read `is_error` for the verdict and treat `subtype` as narration.
+  (2026-07-31.)
 - **`gh pr checks <N>` can return a momentarily-stale check entry right after a
   state-changing trigger (close/reopen, a push, `gh run rerun`).** Querying
   immediately after triggering can show the check that was current a few

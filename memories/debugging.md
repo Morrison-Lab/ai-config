@@ -1063,3 +1063,51 @@ root was unresolved -- so every registered submodule would have been demoted to
 the error branch on any checkout reached through a symlink.
 The function passed against the real repo throughout, since `ROOT` there is
 already `resolve()`d.)
+
+## An artifact you cannot retrieve may never have been produced
+
+Before diagnosing why a fetch failed, confirm the thing was produced.
+A retrieval failure and a nonexistent artifact present identically: every
+route returns nothing, and the routes are where the error messages come from,
+so all the available evidence describes access.
+
+That makes the wrong diagnosis the cheap one to reach and the expensive one to
+hold.
+"I cannot download it" sends you to credentials, scopes, and proxy policy.
+Worse, it is a claim about someone else's configuration, so it gets reported
+to a user or written onto an issue as a blocker they are expected to clear.
+Nothing in the repository contradicts it, because the artifact that would have
+is the one that was never written.
+
+Adding routes does not settle it either.
+Three failing routes read as stronger evidence of an access problem than one,
+when they are the same non-observation three times.
+
+Ask instead what step would have produced it, and check that step ran.
+For a GitHub Actions artifact that is one call: `actions_get`
+`get_workflow_job` on the job id returns the job's `steps` array, and a
+producing step is either named there or is not.
+The same shape works elsewhere: a log nobody configured, a report whose
+generator was skipped, a cache never populated.
+
+- **Do:** name the step that produces the artifact and confirm it ran, before
+  spending a call on fetching it.
+- **Do:** report "nothing produced it" as a different finding from "I cannot
+  reach it", since only the second is anyone else's to fix.
+- **Don't:** read several failing access routes as evidence about access ---
+  they are one non-observation repeated.
+- **Don't:** publish a retrieval blocker to a user or an issue without the
+  production check behind it.
+
+(2026-07-31, `Morrison-Lab/ai-config`: repeated attempts to download the
+`claude-code-action` execution-output artifact for failed `claude-review` runs
+were reported to the user, and on a tracking issue, as an access problem.
+MCP tools list artifacts but cannot download them, and direct fetches returned
+403 under both owner spellings, with and without a token.
+Those runs were pinned at `Morrison-Lab/gha`'s `claude-code-review.yml@v1`,
+which has no `Resolve and upload execution file path` step at all, so no
+artifact ever existed for any of them --- confirmed by
+`git show v1:.github/workflows/claude-code-review.yml`, which defines 12 named
+steps and no upload.
+See [`claude-bot-workflows.md`](claude-bot-workflows.md), whose
+artifact-download advice presupposes `@v2`.)

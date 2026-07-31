@@ -228,6 +228,70 @@ the split pays) while ai-config#700 attacked the description budget by
 removing duplication rather than by splitting anything (always-loaded, so
 splitting would not have paid).
 
+**That "splitting saves nothing" claim is Claude Code's documented behaviour,
+not an inference, and the docs name a lever this section omits.**
+Verified against <https://code.claude.com/docs/en/memory> on 2026-07-31.
+Imported files "are expanded and loaded into context at launch alongside the
+CLAUDE.md that references them"; "Splitting into `@path` imports helps
+organization but doesn't reduce context, since imported files load at launch";
+imports recurse to "a maximum depth of four hops"; and "CLAUDE.md files are
+loaded in full regardless of length, though shorter files produce better
+adherence".
+Two details worth adding to the pools above.
+Import parsing skips Markdown code spans and fenced code blocks, so a
+backticked `@README` stays literal text rather than becoming an import.
+And the docs' own recommended lever for a large instruction set is
+**path-scoped rules**, which load only when Claude works with matching files
+--- effectively a fourth pool, and one this corpus does not currently use.
+
+**Re-measure before arguing from a number: the always-loaded closure has
+roughly tripled since the 2026-07-24 figure above.**
+The instrument is a recursive walk summing `os.path.getsize` over
+whole-line `@path` matches, seeded at `CLAUDE.md`:
+
+```python
+import os, re
+IMPORT = re.compile(r"^@([\w./-]+)$", re.M)
+def closure(root, start="CLAUDE.md"):
+    seen, stack = {}, [os.path.join(root, start)]
+    while stack:
+        p = os.path.normpath(stack.pop())
+        if p in seen or not os.path.isfile(p):
+            continue
+        seen[p] = os.path.getsize(p)
+        text = open(p, encoding="utf-8", errors="replace").read()
+        stack += [os.path.join(root, m) for m in IMPORT.findall(text)]
+    return len(seen), sum(seen.values())
+```
+
+Measured 2026-07-31: ai-config's closure is **66 files, 661,750 bytes** ---
+roughly 165k tokens at a 4-bytes-per-token rule of thumb --- with all 65
+imports at depth 1, so the corpus uses one of the four available hops.
+`Morrison-Lab/gha`'s closure is 1 file, 104,462 bytes, which is the
+comparison worth holding onto: a repo with no imports at all pays about a
+sixth as much.
+
+**A CI review bot pays that closure too, so it is not only an interactive-
+session cost.**
+`claude-code-action` defaults `settingSources` to
+`["user", "project", "local"]` in `base-action/src/parse-sdk-options.ts`, and
+`"project"` is what loads the repo's own `CLAUDE.md`.
+The default is overridden only by passing `--setting-sources` in
+`claude_args`, which `Morrison-Lab/gha` does at none of `main`, `v1`, or `v2`
+(`git grep -c setting-sources <ref> -- '*.yml' '*.yaml'` returns no hits at
+any of the three).
+So every `@claude` run in a gha-consuming repo loads that repo's whole
+always-loaded set before it reads a line of the diff.
+
+- **Do:** re-run the closure walk before making a context-budget argument ---
+  the figure moves fast, and a stale one argues for the wrong lever.
+- **Do:** reach for pruning, consolidating, demoting to on-demand, or
+  path-scoped rules, which are the levers that change the number.
+- **Don't:** propose splitting a large `CLAUDE.md` into `@path` imports as a
+  context saving; it buys organization and nothing else.
+- **Don't:** assume the always-loaded cost is paid only by interactive
+  sessions.
+
 ## Custom subagents (`.claude/agents/*.md`) — Bash is a write-access loophole
 
 The `tools:` frontmatter field (comma-separated, e.g. `tools: Bash, Read,

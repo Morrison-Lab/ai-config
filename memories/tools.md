@@ -206,27 +206,40 @@ again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content
 in the file.)
 
-## `scripts/semantic-line-breaks.py` rewrites the whole file, not the part you added
+## `scripts/semantic-line-breaks.py` previews by default and scopes its writes
 
-It is an in-place reformatter over every prose paragraph in each file it is
-given --- no `--check`, no `--dry-run`, no diff scoping (`main()` takes bare
-paths and calls `path.write_text()`).
-Running it on a mature file to tidy a few lines you just appended therefore
-reflows everything else too: on `memories/r-quarto.md` a 65-line addition
+**Fixed in ai-config#951.**
+This entry is kept because the old behaviour is what most of this corpus was
+written against, and because the failure it describes is worth recognizing in
+any formatter.
+
+It used to be an unconditional in-place reformatter over every prose
+paragraph in each file it was given --- no `--check`, no `--dry-run`, no diff
+scoping, with `main()` taking bare paths and calling `path.write_text()`.
+Running it on a mature file to tidy a few lines you had just appended
+reflowed everything else too: on `memories/r-quarto.md` a 65-line addition
 came back as `273 insertions(+), 923 deletions(-)`, burying the actual change
 and rewriting `git blame` for content nobody touched.
+Measured against a copy of `CLAUDE.md`, the unguarded version changed 342 of
+1163 lines.
 
-Two consequences.
-Format new prose by hand and reserve the script for a file you intend to
-convert wholesale.
-And if you do run it by reflex, `git checkout -- <file>` and re-apply just
-your own text --- the reformat is not worth keeping as a side effect of an
-unrelated change.
+It now behaves the way the entry above used to tell you to behave by hand:
 
-Note the contrast with its CI counterpart, `check-new-line-breaks` in
-[`d-morrison/gha`](https://github.com/d-morrison/gha), which is diff-scoped
-by design so a corpus's pre-existing drift is never reflagged.
-The checker got that treatment and the formatter did not.
+- naming a path **previews** a unified diff and writes nothing
+- `--write` applies it, scoped to the lines changed against `--base`
+  (default `origin/main`)
+- `--all` widens to the whole file
+- a scope it cannot determine is a **loud error**, never a silent widening
+
+So the old advice --- format new prose by hand, and `git checkout -- <file>`
+if you ran it by reflex --- is no longer needed for its own sake, though a
+preview is still worth reading before passing `--write`.
+
+The contrast that motivated the fix: its CI counterpart,
+`check-new-line-breaks` in
+[`d-morrison/gha`](https://github.com/d-morrison/gha), was diff-scoped by
+design from the start, so a corpus's pre-existing drift is never reflagged.
+The checker got that treatment years before the formatter did.
 
 ## macOS disk cleanup: where the space actually goes
 
@@ -399,3 +412,58 @@ script will never run under bash.
 The second time, a branch sweep reported all 19 local branches as having no
 PR; the immediately preceding run of the same data had correctly shown 16 as
 `MERGED`, which is the only reason the contradiction was noticed at all.)
+
+## A hand-rolled verification check is worth nothing until it has caught something
+
+Two ad-hoc pre-push checks failed in one session, in opposite directions,
+while a maintained instrument for one of them sat in a checkout already on
+disk.
+Both reported clean.
+Both were quoted as evidence in a PR body.
+
+- A multi-sentence-line detector tested `line.count('. ') > 1`, which only
+  fires at **three** sentences on a line, so every two-sentence line passed.
+  It reported 0; the real count was 12.
+- A banned-punctuation scan was written as an inline heredoc, and shell
+  quoting collapsed its character class `'--""''x'` into one string
+  containing ASCII `"`, so it flagged any line with a double quote.
+  It reported a phantom hit on clean text.
+
+The two failure directions are what make this worth a rule rather than a
+shrug.
+One under-reported and one over-reported, so neither "it found nothing" nor
+"it found something" is self-validating.
+
+**Prefer the maintained instrument, and know where it lives.**
+For semantic line breaks that is
+`<gha-checkout>/check-new-line-breaks/check-new-line-breaks.py`, run as
+`NLB_BASE_REF=origin/main python3 <path>`.
+Reaching for a hand-rolled substitute when a real one is one path away is the
+error underneath whatever the regex got wrong, per
+[`deterministic-tools`](../shared/principles/deterministic-tools.md).
+
+**When a check must be ad hoc, write it to a file rather than an inline
+heredoc.**
+Quoting is where these break, and a file removes the shell from the problem
+entirely.
+
+**The maintained instrument's silence is not proof either**, for two reasons
+of its own.
+It has a blind spot: a sentence opening with a bare lowercase identifier is
+not seen as a sentence boundary, so a line of exactly the shape this corpus
+keeps writing goes unflagged
+([gha#389](https://github.com/Morrison-Lab/gha/issues/389)).
+And it is advisory, exiting 0 whatever it finds, so its green CI result never
+meant the diff was clean.
+Read its output, not its conclusion.
+
+- **Do:** run the maintained checker against your own diff before pushing,
+  and quote *its* output as the verification.
+- **Do:** put an unavoidable ad-hoc check in a file, and sanity-test it on an
+  input you know should fail.
+- **Don't:** cite a hand-rolled check's clean result in a PR body as evidence.
+- **Don't:** read an advisory check's green CI status as a verdict on content.
+
+(2026-07-31, [ai-config#964](https://github.com/Morrison-Lab/ai-config/pull/964):
+the review caught 8 of the 12 lines my own detector had missed, and then a
+further one that the maintained tool had missed too.)

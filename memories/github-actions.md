@@ -409,6 +409,26 @@ common patterns.
   CI-only / workflow-only PR (no user-visible R-package change), apply **both** labels
   rather than bumping `DESCRIPTION` and editing `NEWS.md`. (Verified on ucdavis/bcs#236 —
   corrects an earlier note that claimed `version-check` had no bypass.)
+- **That bypass is per-repo, not a property of the shared workflow.**
+  `UCD-SERG/serocalculator`'s `version-check.yaml` gates every later step on a
+  `check_label` step reading `no version increment`, and bcs has the bypass per the
+  note above (its mechanism not checked here).
+  `UCD-SERG/serodynamics`'s copy of the same RMI-PACTA-derived workflow has no
+  such step at all, so its `stopifnot(working_version > compare_version)` is
+  unconditional and a CI-only PR there **must** bump `DESCRIPTION`.
+  The files look alike enough that the difference is easy to miss, so run
+  `grep -c check_label .github/workflows/version-check.yaml` in the repo you are
+  actually in before reaching for the label.
+- **A workflow-only PR is the one that forgets the bump**, because nothing in the
+  diff is about the package.
+  The familiar failure is main advancing past you into parity; this one never
+  bumps at all, so the branch sits at parity from its first commit and
+  `version-check` goes red on a diff containing no R code.
+  Compare `grep ^Version DESCRIPTION` against
+  `git show origin/main:DESCRIPTION | grep ^Version` before pushing, whatever the
+  diff contains.
+  (2026-07-31: `serodynamics#282` and `serocalculator#627`, both
+  `.github/workflows/`-only, both red for this reason.)
 - **bcs `docs` build (altdoc) EXECUTES the rendered man-page examples.** altdoc
   renders each `man/*.Rd` to a `man/*.qmd` and runs the example chunk, so
   `@examplesIf FALSE` does NOT protect an example — the code still runs and a
@@ -417,27 +437,49 @@ common patterns.
   it without evaluating), matching the existing convention (e.g.
   `R/calc_ip_weights.R`). Runnable examples with self-contained synthetic data
   are fine and do execute. (Hit on ucdavis/bcs#238.)
-- **altdoc's `$ALTDOC_MAN_BLOCK` sidebar placeholder has no pkgdown-style
-  `reference:` grouping and no internal-topic exclusion --- it flat-lists
-  every `man/*.Rd` file under one ungrouped "Reference" section, internal
-  topics (`@keywords internal`) included.** Confirmed by reading
-  `d-morrison/altdoc`'s `R/settings_quarto_website.R`,
-  `.sidebar_vignettes_quarto_website()` (despite the vignettes-only-sounding
-  name, this one function handles both the `$ALTDOC_VIGNETTE_BLOCK` and
-  `$ALTDOC_MAN_BLOCK` placeholders): it globs `man/*.qmd` under the
-  render output and turns the whole list into `section: Reference` with no
-  filtering or title-based grouping, unlike pkgdown's `reference:` block in
-  `_pkgdown.yml`. To reproduce a pkgdown-style grouped index/sidebar (with
-  internal topics hidden) on an altdoc site today, hand-author the grouping
-  directly in the consuming repo's `altdoc/quarto_website.yml` --- replace
-  the `$ALTDOC_MAN_BLOCK` placeholder with explicit `section:`/`contents:`
-  entries pointing at `man/<topic>.qmd` (the same file-path convention the
-  navbar's "Documentation" entry already uses for
-  `man/serocalculator-package.qmd`), and simply omit any `.Rd` topic marked
-  `\keyword{internal}`. When migrating from an old pkgdown site, its retired
-  `_pkgdown.yml` (recoverable from git history even after deletion) is
-  usually still an accurate source for the grouping and titles to reproduce.
-  (`UCD-SERG/serocalculator#575`.)
+- **altdoc's `$ALTDOC_MAN_BLOCK` sidebar placeholder is grouped and
+  internal-aware as of 2026-07; the hand-authored workaround it used to need
+  is retired.** It formerly flat-listed every `man/*.Rd` under one ungrouped
+  "Reference" section with `@keywords internal` topics included, which is why
+  consuming repos hand-wrote `section:`/`contents:` entries pointing at
+  `man/<topic>.qmd` in `altdoc/quarto_website.yml` (`UCD-SERG/serocalculator#575`).
+  altdoc now reads an `altdoc/reference.yml` and builds BOTH surfaces from it
+  --- the reference index page and the sidebar --- so the grouping is declared
+  once and there is nothing left to keep in step. `.select_topics()` aborts the
+  render on a topic name with no backing `.Rd`, and warns by name for any
+  exported topic no section claims while dropping it into a trailing `Other`
+  section; an internal topic is excluded unless explicitly named, and naming it
+  opts it back in. `sidebar_labels: name-and-title` prefixes each entry with the
+  function name --- titles alone are genuinely ambiguous in practice, e.g.
+  serocalculator's `as_pop_data`/`load_pop_data` rendered as two adjacent
+  identical lines. Migrating off the hand-written pair is a net deletion: drop
+  `altdoc/reference.qmd`, replace the `Reference` block in
+  `quarto_website.yml` with `$ALTDOC_MAN_BLOCK`, and move the grouping into
+  `reference.yml`. Verify by generating the index from the new config and
+  diffing section names, topic order, and count against the deleted
+  `reference.qmd` --- eyeballing the built site will not catch a reordering.
+  (`UCD-SERG/serocalculator#625`.)
+- **A vendored copy of a docs feature drifts within days --- prefer altdoc's
+  own `$ALTDOC_*` variable, and remember `sidebar_fold` sets the fold control's
+  starting state without creating the control.** The sidebar-fold button began
+  as a hand-written `altdoc/sidebar-fold.html` plus a matching `styles.css`
+  block copied into two repos; within a week one repo had changed its copy to
+  start folded and the other never heard about it. altdoc now ships it:
+  `include-in-header: $ALTDOC_SIDEBAR_FOLD` under `format: html:` stages the
+  snippet into `_quarto/` at render time with script and style in one file.
+  The starting state is separate --- `sidebar_fold` in `altdoc/reference.yml`,
+  valid values `expanded` (the default) and `collapsed`. **Omitting it on a
+  repo that previously started folded silently reverts to open**: the site
+  renders fine and nothing warns, so a repo carrying non-default behavior must
+  set it explicitly during the migration. `check_altdoc()` reports a
+  `sidebar_fold` set with no settings file referencing `$ALTDOC_SIDEBAR_FOLD`
+  (and one set for a non-`quarto_website` generator), which is the check that
+  catches the half-wired case --- but it is opt-in, so it will not fire during
+  an ordinary `render_docs()`. An unrecognized `$ALTDOC_*` variable is left in
+  the settings file verbatim rather than dropped, so pointing
+  `include-in-header` at one before the altdoc pin supports it fails the Quarto
+  build outright rather than degrading. (`d-morrison/altdoc#103`/`#104`,
+  `ucdavis/bcs#528`, `UCD-SERG/serocalculator#626`.)
 - **`NEWS.md` section headers need a blank line before them.** A bullet that ends
   immediately before a `## Next-section` heading (no blank line) can cause
   `utils::news()` to misparse adjacent sections. Always leave one blank line

@@ -9,8 +9,16 @@ Preserves: YAML frontmatter, fenced code blocks (including nested fences),
 tables, headings, horizontal rules, HTML comments, @-import directives, and
 list items inside blockquotes.
 Reformats: prose paragraphs, bullet continuation text, and blockquote prose.
+
+Writing is opt-in, and its scope is opt-in separately. A run that names a
+path previews the reformat and writes nothing; `--write` applies it, scoped
+by default to the lines the branch changed against a base ref; `--all`
+widens that scope to the whole file. See `main()` for the rationale.
 """
+import argparse
+import difflib
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -107,14 +115,129 @@ def _flush_bq_prose(bq_lines: list[str], output: list[str]) -> None:
             output.append(bq_prefix + s)
 
 
+# Diff scoping
+
+class ScopeError(RuntimeError):
+    """Raised when the changed-line scope cannot be determined."""
+
+
+_HUNK_RE = re.compile(r'^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@')
+
+
+def parse_changed_lines(diff_text: str) -> set[int]:
+    """
+    Return the 1-based line numbers present in the post-image of a unified
+    diff, read from its hunk headers.
+
+    A hunk header `@@ -a,b +c,d @@` means d lines starting at c. A pure
+    deletion has d == 0 and contributes no post-image lines; the line it
+    was deleted from is still worth reformatting, so attribute the deletion
+    to the line it now abuts.
+    """
+    changed: set[int] = set()
+    for line in diff_text.split('\n'):
+        m = _HUNK_RE.match(line)
+        if not m:
+            continue
+        start = int(m.group(1))
+        count = 1 if m.group(2) is None else int(m.group(2))
+        if count == 0:
+            changed.add(max(start, 1))
+        else:
+            changed.update(range(start, start + count))
+    return changed
+
+
+def changed_lines_for(path: Path, base: str) -> set[int]:
+    """
+    Line numbers in `path` that differ from `base`, via `git diff`.
+
+    Raises ScopeError rather than falling back to whole-file scope: a
+    scope we could not determine must fail loudly, since the silent
+    fallback is exactly the whole-file rewrite this guard exists to
+    prevent.
+
+    Every git call is anchored with `-C` on the file's own directory, so
+    the scope depends on where the file is rather than on the caller's
+    working directory.
+
+    The pathspec passed to git is therefore the BARE FILENAME, not the path
+    as given. Passing a relative path such as `docs/foo.md` while running
+    under `-C docs` makes git resolve it as `docs/docs/foo.md`, which
+    matches nothing -- and an empty match is indistinguishable from an
+    unmodified file, so it would fall through to the untracked branch below
+    and silently widen to whole-file scope. That silent widening is the
+    exact rewrite this guard exists to prevent.
+    """
+    anchor = str(path.parent)
+    name = path.name
+
+    def git(*args: str) -> subprocess.CompletedProcess:
+        try:
+            return subprocess.run(
+                ['git', '-C', anchor, *args], capture_output=True, text=True,
+            )
+        except OSError as e:
+            raise ScopeError(f'could not run git: {e}') from e
+
+    proc = git('diff', '--unified=0', f'{base}...HEAD', '--', name)
+    if proc.returncode != 0:
+        raise ScopeError(
+            f'`git -C {anchor} diff {base}...HEAD -- {name}` failed '
+            f'(exit {proc.returncode}): {proc.stderr.strip() or "no stderr"}'
+        )
+
+    changed = parse_changed_lines(proc.stdout)
+
+    # A file git does not know about has no diff against the base, which is
+    # indistinguishable from an unmodified one by the hunk headers alone.
+    # Treat an untracked file as wholly new rather than as wholly unchanged.
+    if not changed:
+        tracked = git('ls-files', '--error-unmatch', name)
+        if tracked.returncode != 0:
+            return set(range(1, len(path.read_text(encoding='utf-8').split('\n')) + 1))
+
+    # Uncommitted edits are invisible to a `base...HEAD` range, so fold in
+    # the working tree's own diff against HEAD.
+    worktree = git('diff', '--unified=0', 'HEAD', '--', name)
+    if worktree.returncode == 0:
+        changed |= parse_changed_lines(worktree.stdout)
+
+    return changed
+
+
+def _in_scope(start: int, end: int, changed: set[int] | None) -> bool:
+    """True if the block spanning 0-based lines [start, end) should be reformatted."""
+    if changed is None:
+        return True
+    return any((n + 1) in changed for n in range(start, end))
+
+
 # File processor
 
-def process_file(path: Path) -> bool:
+def process_file(path: Path, changed: set[int] | None = None) -> bool:
     """
     Process a single Markdown file in-place.
     Returns True if the file was modified, False if unchanged.
+
+    `changed` is the set of 1-based line numbers in scope; None means the
+    whole file.
     """
     original = path.read_text(encoding='utf-8')
+    result = reformat(original, changed)
+    if result != original:
+        path.write_text(result, encoding='utf-8')
+        return True
+    return False
+
+
+def reformat(original: str, changed: set[int] | None = None) -> str:
+    """
+    Return `original` with prose reformatted to semantic line breaks.
+
+    Pure: takes text, returns text. Blocks outside `changed` are emitted
+    verbatim, so a scoped run leaves untouched regions byte-identical.
+    """
     lines = original.split('\n')
     output: list[str] = []
 
@@ -206,6 +329,7 @@ def process_file(path: Path) -> bool:
             # Process the blockquote line-by-line, tracking fence state so
             # code blocks nested inside blockquotes are emitted verbatim.
             j = i
+            block_out: list[str] = []
             bq_prose: list[str] = []   # accumulated prose lines to sentence-split
             in_bq_code = False
 
@@ -214,24 +338,25 @@ def process_file(path: Path) -> bool:
                 inner = re.sub(r'^\s*>\s?', '', bq_line)
                 if _FENCE_RE.match(inner):
                     # Flush any buffered prose before toggling code state.
-                    _flush_bq_prose(bq_prose, output)
+                    _flush_bq_prose(bq_prose, block_out)
                     bq_prose = []
                     in_bq_code = not in_bq_code
-                    output.append(bq_line)
+                    block_out.append(bq_line)
                 elif in_bq_code:
-                    output.append(bq_line)
+                    block_out.append(bq_line)
                 elif _BULLET_RE.match(inner) or _BLANK_RE.match(inner):
                     # List items and blank separator lines inside blockquotes:
                     # flush any preceding prose and pass through verbatim.
-                    _flush_bq_prose(bq_prose, output)
+                    _flush_bq_prose(bq_prose, block_out)
                     bq_prose = []
-                    output.append(bq_line)
+                    block_out.append(bq_line)
                 else:
                     bq_prose.append(bq_line)
                 j += 1
 
             # Flush any trailing prose.
-            _flush_bq_prose(bq_prose, output)
+            _flush_bq_prose(bq_prose, block_out)
+            output.extend(block_out if _in_scope(i, j, changed) else lines[i:j])
             i = j
             continue
 
@@ -266,6 +391,11 @@ def process_file(path: Path) -> bool:
                 all_text += ' ' + ns
                 j += 1
 
+            if not _in_scope(i, j, changed):
+                output.extend(lines[i:j])
+                i = j
+                continue
+
             # Split into sentences and re-emit.
             sentences = split_sentences(all_text)
             if not sentences:
@@ -298,6 +428,11 @@ def process_file(path: Path) -> bool:
             para_text += ' ' + ns
             j += 1
 
+        if not _in_scope(i, j, changed):
+            output.extend(lines[i:j])
+            i = j
+            continue
+
         para_text = re.sub(r'\s+', ' ', para_text).strip()
         sentences = split_sentences(para_text)
 
@@ -311,45 +446,101 @@ def process_file(path: Path) -> bool:
 
         i = j
 
-    # Reconstruct and write if changed.
     result = '\n'.join(output)
     if not result.endswith('\n'):
         result += '\n'
-
-    if result != original:
-        path.write_text(result, encoding='utf-8')
-        return True
-    return False
+    return result
 
 
 # Entry point
 
-def main():
-    if len(sys.argv) < 2:
-        print(f'Usage: {sys.argv[0]} <file> [file ...]', file=sys.stderr)
-        sys.exit(1)
+def _diff_preview(path: Path, before: str, after: str) -> list[str]:
+    """A unified diff of one file's reformat, for preview output."""
+    return list(difflib.unified_diff(
+        before.split('\n'), after.split('\n'),
+        fromfile=f'{path} (current)', tofile=f'{path} (reformatted)',
+        lineterm='',
+    ))
 
-    changed = 0
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description='Reformat Markdown prose to semantic line breaks.',
+        epilog=(
+            'Writing is opt-in and its scope is opt-in separately. Naming a '
+            'path previews the reformat and writes nothing. --write applies '
+            'it, scoped to the lines this branch changed against --base. '
+            '--all widens that to the whole file.'
+        ),
+    )
+    parser.add_argument('paths', nargs='+', type=Path, help='Markdown files')
+    parser.add_argument(
+        '--write', action='store_true',
+        help='apply the reformat (default: preview only, write nothing)',
+    )
+    parser.add_argument(
+        '--all', action='store_true',
+        help='widen scope from changed lines to the whole file',
+    )
+    parser.add_argument(
+        '--base', default='origin/main',
+        help='base ref the changed-line scope is computed against '
+             '(default: origin/main)',
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    changed_files = 0
     unchanged = 0
     errors = 0
 
-    for arg in sys.argv[1:]:
-        p = Path(arg)
+    for path in args.paths:
         try:
-            modified = process_file(p)
-            if modified:
-                changed += 1
-                print(f'  changed: {arg}')
-            else:
+            before = path.read_text(encoding='utf-8')
+
+            # Whole-file scope is opt-in. Failing to determine the changed-line
+            # scope is a loud error rather than a silent widening to the whole
+            # file, since that silent widening is the rewrite this guard exists
+            # to prevent.
+            scope = None if args.all else changed_lines_for(path, args.base)
+            after = reformat(before, scope)
+
+            if after == before:
                 unchanged += 1
+                continue
+
+            changed_files += 1
+            if args.write:
+                path.write_text(after, encoding='utf-8')
+                print(f'  written: {path}')
+            else:
+                for line in _diff_preview(path, before, after):
+                    print(line)
+        except ScopeError as e:
+            errors += 1
+            print(f'  ERROR:   {path}: {e}', file=sys.stderr)
+            print(
+                '           Refusing to widen to whole-file scope. '
+                'Pass --all to reformat the entire file deliberately.',
+                file=sys.stderr,
+            )
         except Exception as e:
             errors += 1
-            print(f'  ERROR:   {arg}: {e}', file=sys.stderr)
+            print(f'  ERROR:   {path}: {e}', file=sys.stderr)
 
-    print(f'\nDone: {changed} changed, {unchanged} unchanged, {errors} errors')
-    if errors:
-        sys.exit(1)
+    scope_label = 'whole file' if args.all else f'lines changed vs {args.base}'
+    verb = 'written' if args.write else 'would change'
+    print(
+        f'\nDone ({scope_label}): {changed_files} {verb}, '
+        f'{unchanged} unchanged, {errors} errors'
+    )
+    if not args.write and changed_files:
+        print('Preview only -- nothing was written. Re-run with --write to apply.')
+    return 1 if errors else 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

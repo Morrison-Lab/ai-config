@@ -109,6 +109,57 @@ having checked what it covered.
 this family; the general form is that an instrument's answer is only as wide
 as its input.
 
+## Writing is the instrument, when the claim can be wrong
+
+The article establishes that self-assessment is unreliable and that confidence
+points the wrong way.
+It does not say what to use instead.
+Leslie Lamport does, in a
+[2019 interview](https://mentors.fm/2019/08/13/think-and-write-with-leslie-lamport/):
+
+> Writing is nature's way of showing you how fuzzy your thinking is.
+
+> If you think you understand something, and don't write down your ideas, you
+> only think you're thinking.
+
+That second sentence is the "illusions of knowing" finding above, arriving from
+a different tradition.
+Read the two as converging rather than as two independent supports.
+
+Writing is the **manual** instrument, and so the humane counterpart to
+[`algorithmatize-checks`](algorithmatize-checks.md).
+Where a check cannot be mechanized, writing the claim down precisely is the
+next-best forcing function, because vagueness survives in the head and does not
+survive on the page.
+Lamport puts the same point upstream of the act: "You should think before you
+do anything, because it will help you understand what you're doing, which will
+help you to do it better", and "To think clearly, you need to be able to write
+down your ideas clearly, which requires being able to write well".
+
+**Not all writing tests, and the kind that does not is the kind that feels most
+like work.**
+Writing done *after* a conclusion is reached, summarizing what was decided, is
+documentation.
+It cannot fail, so it cannot function as a test --- and it is effortful and
+yields a polished artifact, which is exactly why it gets mistaken for one.
+
+So write the thing that **can be wrong**.
+A specification, a prediction, a precise claim about state, a stated mechanism:
+each can be contradicted by something.
+A summary of what was already concluded cannot.
+
+(Same session: writing a docstring that had to state precisely how a correction
+behaved across two study arms is what exposed the claim "relative error is
+identical across arms" as false, because the precision forced a computation
+that contradicted it.
+Tabulating the node types in a diagram is what exposed that four of them sat on
+three different scales.
+Against that, most of that hour's writing was post-hoc recaps: well organized,
+tabulated, and incapable of surfacing anything, since everything in them was
+settled before composition began.
+The user corrected roughly every three minutes throughout, several times on the
+same underlying failure, while the polished output continued.)
+
 ## Do and don't
 
 - **Do:** classify each assertion as state, scope, cause, or default before it
@@ -117,6 +168,11 @@ as its input.
   cheap.
 - **Do:** treat a fluent, undeliberated answer as owing an alternative you can
   name and reject.
+- **Do:** write the claim that can be wrong --- a specification, a prediction, a
+  precise statement of mechanism --- early enough that being wrong still costs
+  little.
+- **Don't:** treat a polished retrospective as evidence that thinking happened;
+  a summary of settled conclusions cannot fail, so it cannot test anything.
 - **Don't:** use confidence as the signal to stop checking --- it runs the
   wrong way.
 - **Don't:** read a command's output as settling a question without checking

@@ -47,6 +47,11 @@ jobs:
         # consumer directory (~/.claude) that no CI runner has, so on a runner
         # it correctly reports "nothing installed to check" and proves nothing.
         run: python3 scripts/test_check_install.py
+      - name: Run token-rotation tool tests
+        # Only the tests run here. rotate-claude-token.py itself mutates
+        # repository secrets across the estate, so it is a local operator tool
+        # that must never run unattended in CI (ai-config#952).
+        run: python3 scripts/test_rotate_claude_token.py
       - name: Run PR-sweep tests
         # Only the tests run here. pr-sweep.py itself queries the GitHub API
         # via `gh`, which a runner cannot do unauthenticated, so running the

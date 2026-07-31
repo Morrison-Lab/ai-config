@@ -124,7 +124,10 @@ Flag these with the same weight as the other principle-level findings:
 ai in agentic work; maximize use of deterministic, inspectable algorithms
 (like hooks)", then "cai: our goal in developing tools, like in all
 programming work, is to write ourselves out of a job", "that goes for the
-ai-tools repo and everything else we do", "automate everything", and ---
+ai-tools repo and everything else we do"
+(quoted as said; no repo of that name exists under any of our owners,
+so read it as our AI tooling broadly, this corpus included),
+"automate everything", and ---
 correcting a framing that had set the two halves against each other ---
 "it's both a constraint and a goal".
 From a session with three judgment tasks done repeatedly by hand: a

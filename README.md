@@ -216,6 +216,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
 | `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
+| `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
 
 `bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
 directory, so the scripts arrive with no extra step.
@@ -244,6 +245,53 @@ cases it must block *and* the near-misses it must let through.
 `require-gh-repo-flag.py` is the cautionary example --- its first version
 fired on any command whose text merely contained a gated `gh` invocation,
 including a heredoc documenting one.
+
+**Never activate a new hook before its PR merges.**
+Writing the script into `hooks/` and testing it is *authoring*, and needs no
+permission.
+Adding the entry to `~/.claude/settings.json` --- by hand or via
+`install-hooks.py --fix` --- is *activation*, and it waits for review.
+That line is what makes this checkable rather than a general instruction to be
+careful: the file existing is harmless, the registration is not.
+
+This makes hooks the deliberate exception to the ordering
+[`record-learnings`](skills/record-learnings/SKILL.md) states for a new skill,
+where "the skill becomes available locally immediately (via symlink)" is
+listed as a feature.
+The mechanism is what separates them, and it is what makes the exception cheap
+to honour: a skill goes live by symlink whether you like it or not, whereas a
+hook goes live only when someone deliberately runs `install-hooks.py --fix`.
+Declining to run it is the entire cost of compliance.
+
+CI already takes this position.
+`claude-code-action`'s `restoreConfigFromBase` restores `.claude/` from `main`
+on every PR precisely so a branch cannot inject hooks or settings, so a hook
+that has not merged is one the bot already refuses to honour.
+This gate is the local-session counterpart of a rule the CI side enforces
+mechanically.
+
+A hook is unlike anything else this repo ships, in two ways that make
+self-activation worse than merging an unreviewed skill.
+It runs **automatically and invisibly**, on every matching event, with no
+invocation anyone chose --- a bad skill is inert until called, while a bad hook
+is already running.
+And a `Stop` hook sits **between the model and the user**, so a wrong one
+changes what the user is told: the mechanism that would normally surface the
+mistake is the mechanism that is broken.
+
+- **Do:** author the script, write its test, run both directions, open the PR,
+  and register it only after that PR merges.
+- **Do:** say in the PR which event it binds to and what it does when it fires,
+  since a reviewer cannot tell blocking from advisory by reading the manifest.
+- **Don't:** run `install-hooks.py --fix` for a hook whose PR is still open.
+- **Don't:** treat a passing test suite as authorization --- the tests
+  establish that the mechanism works, never that it should exist.
+
+(Corrected 2026-07-30: a `Stop` hook was written into `~/.claude/hooks/` and
+registered in `settings.json` before its PR was opened, so a guard able to
+block outgoing messages ran on the user's machine unreviewed.
+The user's correction was "all new hooks must go through pr review before being
+activated.")
 
 ## What's tracked
 

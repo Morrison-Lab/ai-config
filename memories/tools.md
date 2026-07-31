@@ -208,9 +208,10 @@ in the file.)
 
 ## `scripts/semantic-line-breaks.py` previews by default and scopes its writes
 
-**Fixed in ai-config#951. This entry is kept because the old behaviour is
-what most of this corpus was written against, and because the failure it
-describes is worth recognizing in any formatter.**
+**Fixed in ai-config#951.**
+This entry is kept because the old behaviour is what most of this corpus was
+written against, and because the failure it describes is worth recognizing in
+any formatter.
 
 It used to be an unconditional in-place reformatter over every prose
 paragraph in each file it was given --- no `--check`, no `--dry-run`, no diff

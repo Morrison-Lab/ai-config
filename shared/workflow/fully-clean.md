@@ -752,7 +752,7 @@ produced it.
 Widening scope is therefore the moment to demand the same evidence again,
 rather than the moment to accept a weaker kind.
 
-Two disconfirming signals are cheap and general enough to look for by name.
+Three disconfirming signals are cheap and general enough to look for by name.
 
 - **How far the pipeline got.**
   A run that produced two attempt artifacts reached a retry path, and a run
@@ -763,6 +763,20 @@ Two disconfirming signals are cheap and general enough to look for by name.
 - **The error text itself.**
   Two failures printing different messages came from different code paths,
   and both strings are usually already in front of you.
+- **Whether the run produced the artifact the check exists to gate.**
+  For a review job that means asking whether a verdict is on the PR, which
+  is a different question from whether the job went red.
+
+That third one is the last resort and the sharpest, because it is the only
+one that survives the two above agreeing.
+Two runs can print the identical error, from the identical code path, at the
+identical stage, and still be opposite phenomena -- one where the reviewer
+failed, and one where the reviewer succeeded and the guard failed it anyway.
+Nothing in the run data distinguishes those, because the distinguishing fact
+is not in the run: it is on the PR.
+
+So when a check's own output is the only evidence, remember that a check is a
+claim about an artifact, and go read the artifact.
 
 The cost is not only a mislabelled case.
 Dropping the second repository also removed the support for a real inference
@@ -790,6 +804,14 @@ Both of those reads were #986's own two runs, though.
 day, with no result object read for either -- so that grouping was already
 the pattern this section condemns, one step before the one it was written
 about.
+Reading them later made it worse rather than merely unverified: both had
+posted complete **Ready for merge** verdicts, minutes before their guards
+failed the check.
+They were the *opposite* phenomenon -- the reviewer succeeded and the check
+was wrong -- filed as instances of the reviewer failing.
+Neither signal above would have caught it, since their error text and their
+stage are identical to #986's; only the third one is, and it was added to
+this list because of them.
 The duration rule above was invoked explicitly to confirm that #986's
 9-minute and 53-second runs were the same bug.
 Morrison-Lab/gha#390 was then added to the group because its own

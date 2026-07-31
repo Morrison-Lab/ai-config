@@ -38,6 +38,27 @@
       "event": "Stop",
       "timeout": 10,
       "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+    },
+    {
+      "script": "no-stale-pr-status.py",
+      "event": "Stop",
+      "timeout": 10,
+      "why": "Blocks a reply asserting a PR's check state when the last status query predates the last push, so a stale reading is never reported as current."
+    },
+    {
+      "_note_not_a_stop_hook": [
+        "Deliberately UserPromptSubmit rather than Stop, which is the shape",
+        "the three guards above use. A Stop guard suppresses a message that is",
+        "wrong to send. An error admission is RIGHT to send: blocking it would",
+        "suppress the honest correction, delay it reaching the user, and remove",
+        "the very signal that surfaces the mistake. So this reminds on the next",
+        "prompt and can only ever ADD context -- there is no code path in it",
+        "that suppresses, delays, or alters a message."
+      ],
+      "script": "remind-ums-after-error.py",
+      "event": "UserPromptSubmit",
+      "timeout": 10,
+      "why": "CLAUDE.md 'Run UMS proactively' -- discovering you were wrong is a trigger with no artifact, so nothing else prompts the pass; this injects a reminder naming the admitted error when no memory/skill write followed it."
     }
   ]
 }

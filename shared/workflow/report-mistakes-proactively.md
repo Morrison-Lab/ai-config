@@ -131,6 +131,54 @@ The user's correction was that filing is not a thing to ask about.
 The issue --- `ucdavis/bcs#466` --- was filed immediately afterward, which is
 the evidence that nothing was blocking it in the first place.)
 
+## Offering to hand over work you have already finished
+
+Both sections above concern work not yet done, where the offer at least
+proposes spending something.
+The version that survives them offers an artifact that **already exists**:
+the comment is drafted, the file is written, the diff is staged --- and the
+reply says "say the word and I'll post it" rather than posting it.
+
+It is the most defensible-feeling offer of the three and the emptiest.
+The two asymmetries in "Filing is not gated on approval" both collapse here,
+because the cost side is zero: there is no duplicate work to risk and no
+spend to authorize.
+The only thing the offer purchases is a round trip.
+
+Two things make it feel like courtesy rather than avoidance.
+The work being done drains the urgency --- nothing is outstanding from the
+inside, so holding it reads as consideration for the user's attention rather
+than as withholding.
+And the artifact is usually sitting in a scratch file, which feels like
+*somewhere*, so it does not feel at risk.
+It is: a scratch file dies with the container, and the user cannot read it.
+An artifact nobody has been shown has the same value as one never written.
+
+The fix is positional rather than procedural.
+The moment you find yourself writing that a deliverable exists, that sentence
+is the place to deliver it --- inline, in the same message.
+Where genuine discretion remains, it attaches to what happens *next* (open
+the PR, post it publicly under their name), never to whether they may see
+what you already made.
+
+- **Do:** put the finished artifact in the message where you first mention
+  it exists.
+- **Do:** keep the question for the irreversible or outward-facing step that
+  follows, and ask it in the past tense about the delivery ("here it is ---
+  want me to post it?").
+- **Don't:** offer to show, print, paste, or summarize something already
+  written; that is not a decision the user has.
+- **Don't:** treat a scratch-file path as delivery --- naming where it lives
+  is not the same as handing it over.
+
+(Corrected 2026-07-30: a drafted answer for a GitHub discussion sat complete
+in a scratchpad file across two replies, each offering to print it on
+request, while the surrounding messages explained at length why posting it
+directly was blocked.
+The user's correction was "why haven't you done it already then?".
+It was printed in full in the next message, which is the evidence that
+nothing was blocking it.)
+
 ## Never name an issue number before the issue exists
 
 The rule above pushes filing earlier, and step 4 asks you to link the filed

@@ -551,3 +551,52 @@ The nearest pair is 38 seconds apart: the run on altdoc#95 failed
 So the service was fine and the `d-morrison` credential was not, which no
 number of re-runs would have shown.
 Tracked in d-morrison/altdoc#99.)
+
+**That duration signature does not run backwards, and reading it in reverse
+is how several unrelated bugs get filed as one.**
+The paragraph above offers a short run as **corroboration**, once a credential
+is already the hypothesis on other grounds.
+It is not a test that *produces* the hypothesis, and the difference is easy to
+lose because the sentence reads the same in both directions.
+
+The reason it cannot run backwards is that every failure occurring before the
+model call takes about the same time.
+A job that dies at checkout, at the App token exchange, or at authentication
+has spent its whole life on setup, so 13 seconds and 28 seconds are the same
+observation.
+The duration tells you the run stopped early.
+It says nothing about **which** early step stopped it, and a credential
+problem is only one of several candidates.
+
+The failure this produces is worse than an ordinary wrong guess, because it
+**merges** distinct bugs.
+Reading a cluster of short failures as one credential fault yields a single
+tidy story covering all of them, and every separate root cause underneath it
+goes unfiled.
+Grouping by symptom feels like pattern recognition, which is why nothing about
+it prompts a second look.
+
+So read each job's own terminal error before naming any cause, and expect
+short failures sharing a repo and an afternoon to have nothing to do with each
+other.
+
+- **Do:** open the log and quote the line the job actually died on.
+- **Do:** treat a cluster of short failures as several candidate bugs until
+  each one's error says otherwise.
+- **Don't:** infer a credential or quota problem from a short duration alone.
+- **Don't:** let one explanation absorb every failure that resembles it.
+
+(2026-07-30, auditing which repos held a `CLAUDE_CODE_OAUTH_TOKEN`: three
+failures in the 13-to-28-second band were reported as one App-permissions
+problem.
+They had three unrelated causes.
+`UCD-SERG/ucd-serg.github.io` run 30529959398 (25s) failed
+`App token exchange failed: 401 Unauthorized - User does not have write access
+on this repository`, because the triggering actor was the `Copilot` coding
+agent, which is not a collaborator -- filed as ucd-serg.github.io#84.
+Run 30509709695 (13s) on the same repo logged `Actor has write access: write`
+and then failed
+`Command failed: git fetch origin --depth=20 pull/77/head:main`.
+`d-morrison/qwt` run 30391041128 (28s) reached the model and returned
+`is_error:true` after a workflow-modification denial.
+Only the first was about permissions at all.)

@@ -68,7 +68,7 @@ This is [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-d
 - **Don't:** treat "every item on my list was handled" as evidence that everything was handled --- that is the claim the list cannot support.
 
 (Morrison-Lab/ai-config#960, 2026-07-30/31: agents were dispatched with enumerated PR numbers, and one brief said "#937, #939, #943, #946 are already CLEAN --- leave them alone", which was true when written.
-#943 and #946 each gained an open review thread within minutes, and nothing was watching them for 73 minutes.
-#953 and #954 were opened by other sessions afterward, so no brief contained them, and #954 sat with two failing checks for 26 minutes.
-#957 was opened later still.
+Both #943 and #946 gained an open review thread within minutes, and nothing was watching them for 73 minutes.
+Then #953 and #954 were opened by other sessions afterward, so no brief contained them, and #954 sat with two failing checks for 26 minutes.
+Later still came #957.
 Running the sweep built for this issue at 07:35Z reported #943 and #946 stalled at 83.5 and 81.7 idle minutes with unresolved threads, and #954 stalled with a genuinely failing `validate` --- the three PRs no list contained.)

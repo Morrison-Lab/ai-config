@@ -140,11 +140,13 @@ and #925 --- #934's verdict line *is* the hedge, reading
 Both opposite-direction cases were on
 [gha#371](https://github.com/Morrison-Lab/gha/pull/371), which returned
 `**Needs minor changes**` over "two non-blocking, fact/scope findings".
-Four further comments were unclear for a different reason --- a verdict
-restated or hyperlinked from an earlier review, or `Needs work` doing
-double duty as both the verdict and an inline finding's heading --- and
-are counted out, since those are legibility problems rather than
-disagreements.
+Four other comments within the same 38 are counted out as unclear for a
+different reason: three of them passes --- two with the verdict restated
+or hyperlinked from an earlier review, one whose findings never reached
+the PR --- plus one where `Needs work` did double duty as both the
+verdict and an inline finding's heading.
+Those are legibility problems rather than disagreements, and they sit
+inside the pass and non-pass groups rather than beside them.
 Of the 24 passes, 23 used `Ready for merge` and one used the hedged
 variant above; the remaining four lexemes were `Needs more work`,
 `Needs minor changes`, `Needs work`, and `Needs one fix`.)

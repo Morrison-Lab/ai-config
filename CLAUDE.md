@@ -854,16 +854,16 @@ So when a task clears that fragment's three-part bar, follow it and propose the 
 
 Two rules, one incident, and the second is the general form of the first.
 
-**Assign the worktree on the `Agent` call.**
-Set `isolation` yourself rather than leaving each subagent to organize its own working directory, and brief every agent you isolate to stay inside the worktree it was given and to **push early** --- a pushed commit survives anything that happens to a working tree.
-Deciding that a particular agent does not need one is fine; leaving it unmarked is what is not.
+**Assign the worktree on the `Agent` call.** Set `isolation` yourself rather than leaving each subagent to organize its own working directory, and brief every agent you isolate to stay inside the worktree it was given and to **push early** --- a pushed commit survives anything that happens to a working tree.
+Deciding that a particular agent does not need one is fine.
+Leaving it unmarked is what is not.
 `hooks/flag-unassigned-worktree.py` mechanizes exactly this, and warns rather than blocks.
 
-**The general rule is the more valuable half.**
-When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
+**The general rule is the more valuable half.** When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
 A repealed decision changes no artifact, so review, tests, and hooks are all blind to it by construction, and the only detector is someone who remembers.
 It is more dangerous than ordinary drift because the incident supplies an apparent reason, so from the inside it feels like having learned something rather than like lapsing.
-If you cannot point at the message where a decision was reversed, it was not reversed; it lapsed.
+If you cannot point at the message where a decision was reversed, it was not reversed.
+It lapsed.
 
 @shared/workflow/incidents-dont-repeal-decisions.md
 

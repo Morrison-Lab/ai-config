@@ -48,6 +48,7 @@ python3 scripts/pr-sweep.py -R owner/name --stale-minutes 15 --json
 
 It always reports what it examined, not only what it found, so a sweep that examined nothing is distinguishable from a clean one.
 Per [`algorithmatize-checks`](algorithmatize-checks.md), "which PRs are stalled" has a numeric definition over data the API already returns, so it should not cost model reasoning.
+The script is also an instance of [`deterministic-tools`](../principles/deterministic-tools.md): judging coverage by eye is exactly the recurring judgment task that fragment says should become a tool.
 
 It is **read-only reporting, not authorization**.
 [`ardi`](ardi.md) limits its monitoring mandate to PRs a session owns or has explicitly claimed, and a PR appearing in this sweep does not transfer ownership.

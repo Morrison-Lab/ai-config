@@ -45,7 +45,7 @@ It does not rule out the sentence that states an intention and then hands the ti
 That reads as a commitment rather than a request, which is exactly why it passes self-review.
 It is not one.
 The pass still does not start, the user still has to spend a turn, and the trailing clause is doing the same work the question did --- it just moved the gate from *whether* to *when*.
-Note that it usually appears at the end of a long status recap, where it reads as courtesy about sequencing rather than as a request for permission.
+It usually appears at the end of a long status recap, where it reads as courtesy about sequencing rather than as a request for permission.
 
 The test is mechanical, so apply it rather than judging the tone: **if the sentence about UMS contains a conditional referring to the user, it is an offer.**
 "Unless you'd rather", "if that works", "let me know if" --- all of them.

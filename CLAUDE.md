@@ -783,9 +783,11 @@ The key points, restated here because a bare pointer is invisible to a consumer 
   Both are measurable, so compare them rather than judging: `git log origin/main --first-parent -10 --format='%ct'` for the merge rate, and the review check's own `startedAt`/`completedAt` for the round.
   Count **first-parent** commits, not merge commits --- `git log --merges` reports nothing in a squash-merging repo.
 - **A `DIRTY` flag means stale or defective, and only the second is a defect.**
-  A PR whose content is clean but whose base moved is stale; staleness resolves once, at merge time, so re-syncing it eagerly spends a CI cycle and a review round on a state that expires within one merge interval.
+  A PR whose content is clean but whose base moved is stale rather than broken.
+  Staleness resolves once, at merge time, so re-syncing it eagerly spends a CI cycle and a review round on a state that expires within one merge interval.
 - **Independent per-PR checking cannot see pair collisions.**
-  Every PR can be clean against `main` while two of them conflict with each other; only a pairwise `git merge-tree` between PR heads finds that.
+  Every PR can be clean against `main` while two of them conflict with each other.
+  Only a pairwise `git merge-tree` between PR heads finds that.
 - **Any sweep needs a negative control**, run first.
   A zero matrix is indistinguishable from a detector that never ran, and `merge-tree` has two ways of producing one: the legacy three-arg form always exits 0, and its conflict markers are diff-indented, so `grep '^<<<<<<<'` misses them.
   Report how many pairs were examined, not only how many conflicted.

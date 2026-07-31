@@ -68,8 +68,8 @@ and a review round to reach a state that will expire again within one merge
 interval.
 
 Tell them apart by asking whether the conflicting hunks are yours.
-A conflict confined to regions your branch never edited is staleness; a conflict
-inside your own added lines is a real disagreement.
+A conflict confined to regions your branch never edited is staleness.
+A conflict inside your own added lines is a real disagreement.
 
 - **Do:** batch the stale ones and resolve them in a single pass close to when
   they will actually merge.

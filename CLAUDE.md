@@ -1160,6 +1160,16 @@ The `ard`/`ardi` skill family and `use-preferred-style`/`find-ai-tells` operatio
 
 The `ard`/`ardi` skill family and `code-review` apply this in PR/MR review; `find-overlap` (and its `consolidate-skills`/`consolidate-memory` actors) is the corpus-wide counterpart when redundancy spans more than the current diff.
 
+## Never assert a corpus gap from a grep
+
+The rule above catches redundant content once it is written.
+This one catches the belief that produces it: a phrase grep returning nothing is not evidence the corpus lacks a concept, because grep matches strings while coverage is a claim about ideas.
+Report the query and its result, not the conclusion.
+
+@shared/workflow/grep-is-not-coverage.md
+
+Fires wherever a search decides whether to author something new --- `skill-builder`'s step 0, `ums`'s step 3, and `find-overlap`, whose own instrument scores this repo's canonical same-idea pair at 0.019 phrase similarity.
+
 ## Writing style: scan for AI tells
 
 The detector counterpart to the plain-prose guide above.

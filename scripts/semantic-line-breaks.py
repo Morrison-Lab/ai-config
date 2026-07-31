@@ -156,16 +156,26 @@ def changed_lines_for(path: Path, base: str) -> set[int]:
     scope we could not determine must fail loudly, since the silent
     fallback is exactly the whole-file rewrite this guard exists to
     prevent.
+
+    Every git call is anchored with `-C` on the file's own directory, so
+    the scope depends on where the file is rather than on the caller's
+    working directory.
     """
-    cmd = ['git', 'diff', '--unified=0', f'{base}...HEAD', '--', str(path)]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-    except OSError as e:
-        raise ScopeError(f'could not run git: {e}') from e
+    anchor = str(path.parent if str(path.parent) else '.')
+
+    def git(*args: str) -> subprocess.CompletedProcess:
+        try:
+            return subprocess.run(
+                ['git', '-C', anchor, *args], capture_output=True, text=True,
+            )
+        except OSError as e:
+            raise ScopeError(f'could not run git: {e}') from e
+
+    proc = git('diff', '--unified=0', f'{base}...HEAD', '--', str(path))
     if proc.returncode != 0:
         raise ScopeError(
-            f'`{" ".join(cmd)}` failed (exit {proc.returncode}): '
-            f'{proc.stderr.strip() or "no stderr"}'
+            f'`git -C {anchor} diff {base}...HEAD -- {path}` failed '
+            f'(exit {proc.returncode}): {proc.stderr.strip() or "no stderr"}'
         )
 
     changed = parse_changed_lines(proc.stdout)
@@ -174,19 +184,13 @@ def changed_lines_for(path: Path, base: str) -> set[int]:
     # indistinguishable from an unmodified one by the hunk headers alone.
     # Treat an untracked file as wholly new rather than as wholly unchanged.
     if not changed:
-        tracked = subprocess.run(
-            ['git', 'ls-files', '--error-unmatch', str(path)],
-            capture_output=True, text=True,
-        )
+        tracked = git('ls-files', '--error-unmatch', str(path))
         if tracked.returncode != 0:
             return set(range(1, len(path.read_text(encoding='utf-8').split('\n')) + 1))
 
     # Uncommitted edits are invisible to a `base...HEAD` range, so fold in
     # the working tree's own diff against HEAD.
-    worktree = subprocess.run(
-        ['git', 'diff', '--unified=0', 'HEAD', '--', str(path)],
-        capture_output=True, text=True,
-    )
+    worktree = git('diff', '--unified=0', 'HEAD', '--', str(path))
     if worktree.returncode == 0:
         changed |= parse_changed_lines(worktree.stdout)
 

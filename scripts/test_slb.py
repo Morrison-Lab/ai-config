@@ -279,47 +279,44 @@ with tempfile.TemporaryDirectory() as repo:
         encoding='utf-8')
     git('commit', '-qam', 'edit second para')
 
-    cwd = os.getcwd()
-    os.chdir(repo)
-    try:
-        pristine = doc.read_text(encoding='utf-8')
+    # Deliberately NOT chdir'ing into the repo: the scope must resolve from
+    # the file's own location, not from the caller's working directory.
+    pristine = doc.read_text(encoding='utf-8')
 
-        # Preview by default: emits a diff, writes nothing.
-        code, out, err = _run_main([str(doc), '--base', 'base-ref'])
-        expect("preview exits 0", code == 0, f"exit={code} err={err}")
-        expect(
-            "preview writes nothing",
-            doc.read_text(encoding='utf-8') == pristine,
-        )
-        expect(
-            "preview says nothing was written",
-            'Preview only' in out and 'nothing was written' in out,
-            out,
-        )
-        expect("preview emits a unified diff", '@@' in out, out)
+    # Preview by default: emits a diff, writes nothing.
+    code, out, err = _run_main([str(doc), '--base', 'base-ref'])
+    expect("preview exits 0", code == 0, f"exit={code} err={err}")
+    expect(
+        "preview writes nothing",
+        doc.read_text(encoding='utf-8') == pristine,
+    )
+    expect(
+        "preview says nothing was written",
+        'Preview only' in out and 'nothing was written' in out,
+        out,
+    )
+    expect("preview emits a unified diff", '@@' in out, out)
 
-        # --write, scoped: reformats the edited paragraph only.
-        code, out, err = _run_main([str(doc), '--base', 'base-ref', '--write'])
-        after = doc.read_text(encoding='utf-8')
-        expect("scoped --write exits 0", code == 0, f"exit={code} err={err}")
-        expect(
-            "scoped --write reflows only the changed paragraph",
-            after == ("First para one. First para two.\n\n"
-                      "Edited para one.\nEdited para two.\n"),
-            repr(after),
-        )
+    # --write, scoped: reformats the edited paragraph only.
+    code, out, err = _run_main([str(doc), '--base', 'base-ref', '--write'])
+    after = doc.read_text(encoding='utf-8')
+    expect("scoped --write exits 0", code == 0, f"exit={code} err={err}")
+    expect(
+        "scoped --write reflows only the changed paragraph",
+        after == ("First para one. First para two.\n\n"
+                  "Edited para one.\nEdited para two.\n"),
+        repr(after),
+    )
 
-        # --all widens to the whole file, including the untouched paragraph.
-        code, out, err = _run_main([str(doc), '--base', 'base-ref', '--all', '--write'])
-        allout = doc.read_text(encoding='utf-8')
-        expect(
-            "--all reflows the untouched paragraph too",
-            allout == ("First para one.\nFirst para two.\n\n"
-                       "Edited para one.\nEdited para two.\n"),
-            repr(allout),
-        )
-    finally:
-        os.chdir(cwd)
+    # --all widens to the whole file, including the untouched paragraph.
+    code, out, err = _run_main([str(doc), '--base', 'base-ref', '--all', '--write'])
+    allout = doc.read_text(encoding='utf-8')
+    expect(
+        "--all reflows the untouched paragraph too",
+        allout == ("First para one.\nFirst para two.\n\n"
+                   "Edited para one.\nEdited para two.\n"),
+        repr(allout),
+    )
 
 
 print(f"\n{passes} passed, {failures} failed")

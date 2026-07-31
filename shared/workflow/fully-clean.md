@@ -151,6 +151,49 @@ Of the 24 passes, 23 used `Ready for merge` and one used the hedged
 variant above; the four non-pass lexemes were `Needs more work`,
 `Needs minor changes`, `Needs work`, and `Needs one fix`.)
 
+**A reviewer's own verification block can be wrong while its verdict is
+right.**
+The verdict-versus-findings test above needs a disagreement to spot.
+This one offers none: the verdict is right, the findings section is empty and
+correctly so, and the defect sits in the arithmetic the reviewer posts to show
+its work.
+
+A block labelled "verification" is the part of a review *least* likely to be
+re-checked, because it presents as the checking already having been done.
+That is what makes a wrong one worse than no block at all.
+It will usually sum, too, since a balancing partition is what the reviewer was
+aiming for, so only the composition is wrong.
+
+Re-derive the groups rather than the total.
+Arriving at the right number says nothing about which groups the parts came
+from, and that is exactly the error a table that balances conceals.
+
+Read it as the mirror of [`ardi`](ardi.md)'s "A systematic audit done by
+skimming is worse than the one-at-a-time version it replaces".
+That entry governs an audit *you* produce; this one governs an audit arriving
+*as evidence*.
+
+The secondary signal is worth acting on rather than merely noting.
+A reviewer's reconstruction error usually traces to something genuinely
+ambiguous in the diff, so treat it as evidence about your own prose and not
+only about the reviewer.
+
+- **Do:** re-derive a posted verification's groups, not just its total.
+- **Do:** fix the wording that invited a wrong reconstruction, even when
+  nothing in the diff was false.
+- **Don't:** let the word "verification" stand in for having verified.
+- **Don't:** read a table that sums as one that partitions correctly.
+
+(Morrison-Lab/ai-config#957 round 2, 2026-07-31: `claude-review` returned
+**Ready for merge** with no findings, above a table partitioning the same 38
+comments as 24 passes + 10 blocking + 4 unclear.
+That sums, and the composition is wrong: the sample is 24 passes and 14
+non-passes, with the four counted-out comments sitting inside those groups
+(three passes, one non-pass) rather than beside them.
+It balanced only because the four were subtracted from the wrong group.
+Nothing in the diff was false, but "Four further comments" read as a disjoint
+third bucket, which is how a careful reader reached the wrong partition.)
+
 **What "an approving review" means here is not a review state.**
 Across the 25 most recent merged PRs, all 106 posted reviews are `COMMENTED` and
 none is `APPROVED` --- `d-morrison`'s own included, so this is not a bot
@@ -289,6 +332,36 @@ safety rule was false on one code path.
 The review's own closing line said as much, noting that because no
 `--comment` argument was passed, it had not posted the findings to the PR.
 Every count-based check called that PR ready.)
+
+**A review comment's header SHA can be stale, so take the reviewed commit from
+the run's own `head_sha`.**
+Criterion 2 requires the verdict to sit at the current head, and the obvious
+instrument for checking that is the unreliable one: the commit named in the
+comment's own caption.
+A verdict captioned with a superseded commit can be a current-head review
+whose caption simply names a different commit than the run checked out.
+
+The failure direction is the expensive one.
+It reads as a stale review, which invites a needless re-trigger, and a
+re-trigger can cancel a run already in flight (see
+[`pr-on-claim`](pr-on-claim.md) for that race).
+So the caption costs you the verdict it was making you doubt.
+
+The run's `head_sha` settles it, and the comment links the run it came from,
+so the check is one call.
+This is [`algorithmatize-checks`](algorithmatize-checks.md) applied to a
+verdict: prefer the API field over the prose caption.
+
+- **Do:** follow the job link in the comment and read that run's `head_sha`.
+- **Don't:** treat the SHA in a comment's heading as the commit reviewed.
+
+(Morrison-Lab/ai-config#957, 2026-07-31: the `Ready for merge` comment is
+captioned "Review of `de72464`" while the run it links, `30614782680`, records
+`head_sha: c8d5d8a` --- the PR's head at the time, since a `main` merge had
+superseded `de72464` 64 seconds earlier.
+Both facts came from `get_workflow_run`; the caption was never rewritten, and
+the cancelled prior run `30614715159` is the one that actually ran at
+`de72464`.)
 
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---

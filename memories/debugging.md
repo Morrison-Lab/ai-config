@@ -429,6 +429,56 @@ the exit status explicitly (`rc=$?; case $rc in 0) ...;; 1) ...;; *) echo
 glyphs" without having scanned anything; caught only by re-reading the
 command's own stderr, which was sitting in the same output.)
 
+## An error quotes the failing call, so its ARGUMENTS are not your data
+
+An error prints the call that raised it, arguments included.
+Those arguments belong to the *library*, not to your input --- but they share a
+line with the failure, so a distinctive-looking literal among them reads as the
+thing that was flagged.
+
+The shape: a call with a hard-coded search/pattern/sentinel argument fails on
+*separate* input, and the message shows both.
+
+```
+Error in chartr("<U+2019>", "'", as.character(add_words)) :
+  invalid input multibyte string 5
+```
+
+`<U+2019>` is `chartr()`'s **search** argument --- `hunspell:::dictionary_load()`
+normalizing curly apostrophes, hard-coded in the package --- rendered as an
+escape only because a non-UTF-8 locale cannot print it.
+The real bad input is element `5` of `add_words`, an accented author name in
+`inst/WORDLIST`.
+Reading the escape as flagged data sends you hunting a smart quote the file
+does not contain, and `grep -c $'’' <file>` returning `0` then reads as a
+puzzle rather than as the answer.
+
+The tell is a literal in the error that you cannot find in your own input.
+Before concluding your data contains it, check whether it is a *parameter of
+the call*: deparse the function
+(`grep("chartr", deparse(pkg:::fn), value = TRUE)`) or read its source, and see
+whether the literal is written there.
+That also reveals which package really owns the frame --- worth knowing before
+naming one in a doc or a bug report, since the failing frame is often a
+dependency of the package you invoked rather than that package itself.
+
+- **Do:** locate a suspicious literal in the callee's source before assuming it
+  came from your input.
+- **Do:** trust the index in the message (`... string 5`) over the eye-catching
+  literal --- the index points at real data.
+- **Don't:** treat an escape sequence in an error as evidence your input holds
+  that character; a C locale escapes anything non-ASCII, the library's own
+  constants included.
+- **Don't:** name the package you called as the owner of the failing frame
+  without checking --- `spelling` surfaced this one, `hunspell` owns it.
+
+(`ucdavis/bcs#532`, 2026-07-31: a `CLAUDE.md` note blamed a curly apostrophe in
+`inst/WORDLIST`; the file has none, and `grep -nP '[^\x00-\x7F]'` returns five
+accented names.
+The wrong cause shipped and was caught in review; the corrected note then
+attributed `dictionary_load()` to `spelling` rather than `hunspell` --- the same
+misreading one level down, caught by the next round.)
+
 ## Verifying R-package tests: install + testthat, never `source()` the R files
 Hit on ucdavis/ettbc#14. The env had no `devtools`/`renv`, so I "verified" the new
 tests by `sys.source()`-ing every `R/*.R` file and re-running the assertions by

@@ -134,6 +134,7 @@
   Stopping at a local edit leaves the change uncommitted and invisible to reviewers.
 - `dem-extra1/ai-config` is a FORK of the upstream `d-morrison/ai-config`.
   When working in that fork, open PRs against the upstream original (`d-morrison/ai-config`, base `main`) as a cross-fork PR with head `dem-extra1:<branch>` — NOT against the fork's own `main`. (If a remote/web session is scoped only to `dem-extra1/ai-config` with no `add_repo` tool, the cross-fork PR can't be created from that session; push the branch and surface that the upstream PR must be opened where `d-morrison/ai-config` is in scope.)
+  **There is a third layer above both: `d-morrison/ai-config` is itself a fork of `Morrison-Lab/ai-config`, which is where PRs actually land.** A cross-fork PR created with head `d-morrison:<branch>` opens on `Morrison-Lab/ai-config` and receives a `Morrison-Lab` PR number, even though every push went to the `d-morrison` remote. Two consequences in a scoped remote session. `add_repo` **cannot** reach `Morrison-Lab` once the session already holds `d-morrison`/`ucd-serg`/`ucdavis` repos — it refuses as a cross-tier add ("session already has repos from owner(s) [...]"), so expect that rather than discovering it after the PR is open. And `pull_request_read` against `Morrison-Lab/ai-config` returns "Access denied", so the PR's own state is unreadable from that session: webhook events still arrive (the subscription registers normally) and the branch stays readable over git, but merge status cannot be polled on demand — say so plainly rather than guessing when asked. (2026-07-31, this exact sequence on an ai-config UMS PR.)
 - Always include `Closes #N` in MR/PR descriptions to auto-close the linked issue on merge.
 - On GitLab, assign MRs to `demorrison`.
 - Before committing code changes, run the repo checks that CI enforces
@@ -669,3 +670,17 @@ safer/preferred choice merely because the repo has external consumers.
 - Never leave durable memories or skills as local-only files (e.g., directly under `~/.codex/`).
 - Commit cross-project memories/skills to `d-morrison/ai-config`; commit project-specific guidance to that project's own repo.
 - If ai-config is temporarily out of scope in the current session, treat local storage as short-lived staging and hand off the required upstream PR.
+- **Never hesitate to run UMS — just run it.** Don't ask whether a pass is
+  worth it, don't offer it as an option, and don't weigh a small increment
+  against the cost of a PR. The owner has said this directly: "never hesitate
+  to run ums, just do it."
+  The `ums` skill already lists the triggers; this rule removes the judgment
+  call about whether a given trigger is big enough to bother with.
+- **Never present losing a lesson as an available option.** Offering "capture
+  these first, or archive now and they're lost with the context" frames data
+  loss as a legitimate branch and invites the user to pick it. It is not a
+  choice to put in front of them — capture first, then report. The same
+  applies to any wrap-up point where context is about to end: `/clear`,
+  archiving a session, handing off, or a container being reclaimed.
+  (2026-07-31: offered exactly that framing at the end of a session; the
+  owner's reply was "never risk letting work or lessons get lost.")

@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""PreToolUse guard: surface a write-capable `Agent` launch with no `isolation`.
+
+We decided that subagent worktrees are **assigned by the orchestrator** --
+`isolation` set on the `Agent` call -- rather than left to each agent to
+organize for itself. Then `isolation: "worktree"` reclaimed an agent's worktree
+mid-run, and the parameter silently stopped being passed. No decision was made
+to stop; the practice simply lapsed, and nothing reported it.
+
+That is the whole reason this is a hook and not a sentence. The lapse changed
+no artifact, so no review, test, or lint could see it: the omission lives in a
+tool call, which is the one surface none of them inspect. It surfaced only when
+the maintainer remembered the decision and asked about it.
+
+What the lapse cost, once: 8 concurrent agents, 7 of which created their own
+worktrees and 1 of which took the shared checkout, switched its branch away
+from a PR branch being actively pushed to, and left uncommitted work there. A
+commit then landed on the wrong PR's branch, so that PR's diff carried a
+byte-identical copy of another PR's entire change; separating them took a
+history rewrite and a force-push. Nothing failed at the time. The only signal
+was `git worktree list`.
+
+## Why this warns rather than denies
+
+Measured over 122 real `Agent` launches in this machine's transcripts, 60 (49%)
+are write-capable with no `isolation`. Denying half of all agent launches is
+not a proportionate response to a visibility problem, and it would be wrong on
+the merits besides:
+
+  - Not every write-capable agent needs a worktree. A single agent editing a
+    repo with no concurrent work is fine, and the decision that lapsed was
+    "the orchestrator decides", not "everything is isolated".
+  - A deny cannot tell "forgot" from "deliberately none", so it would force the
+    parameter onto calls that correctly omit it, with no way to say so.
+  - The failure being fixed is *invisibility*. A warning at the moment of the
+    call fixes that completely. Blocking adds cost without adding visibility.
+
+So this only ever ADDS context. There is no code path in it that denies,
+escalates, or auto-approves -- in particular it never emits
+`permissionDecision: "allow"`, which would BYPASS the normal permission prompt
+and make the harness more permissive than it was without the hook.
+
+Read the 49% as a measurement of the lapse, not a noise forecast: it is high
+because the practice stopped, and it falls toward zero as the practice resumes.
+It is still the number to weigh before activating this, since a check that
+fires constantly trains everyone to ignore it.
+
+## Classifying write-capable
+
+`subagent_type` is the only reliable signal in the payload; prompt text is not.
+`Explore` and `Plan` are read-only by definition (the harness grants neither
+`Edit`, `Write`, nor `NotebookEdit`), so they are exempt. Everything else warns,
+including `claude-code-guide`, which has no editing tools but does have `Bash`.
+
+A **missing** `subagent_type` warns too, and that case is real rather than
+theoretical: 3 of the 122 records carry no `subagent_type` at all. Treating an
+absent field as "unknown, skip" would have silently exempted every one of them,
+which is the shape where a check's pass path and its examined-nothing path look
+identical.
+
+The allowlist is a heuristic and its failure direction is stated deliberately:
+a project-defined agent named `Explore` that did have write tools would be
+wrongly exempted. For a warn-only hook that costs a missed warning, never a
+wrong block, which is the right direction for the error to run.
+
+Fails OPEN on any parse trouble. A guard that breaks every agent launch when
+its input is malformed costs more than the omission it reports.
+"""
+import json
+import sys
+
+# Read-only by definition in the harness's own agent roster: neither is granted
+# Edit, Write, or NotebookEdit. Any other value -- and a missing value -- is
+# treated as write-capable.
+READ_ONLY = {"Explore", "Plan"}
+
+NOTE = (
+    "No `isolation` on this Agent launch, and `{subagent_type}` is write-capable.\n\n"
+    "We decided subagent worktrees are ASSIGNED by the orchestrator rather than "
+    "left to each agent. That practice lapsed once after an unrelated incident, "
+    "and the lapse put a commit on the wrong PR's branch.\n\n"
+    "Either pass `isolation: \"worktree\"`, or decide deliberately that this one "
+    "does not need it and say so. Both are fine; leaving it unmarked is what is "
+    "not.\n\n"
+    "If you do assign one: brief the agent to stay inside its assigned worktree, "
+    "and to push early. A pushed commit survives anything that happens to a "
+    "working tree."
+)
+
+
+def unassigned(payload):
+    """Return the subagent_type to warn about, or None to stay silent."""
+    if payload.get("tool_name") != "Agent":
+        return None
+
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return None
+
+    if tool_input.get("isolation"):
+        return None
+
+    subagent_type = tool_input.get("subagent_type")
+    if subagent_type in READ_ONLY:
+        return None
+
+    return subagent_type or "(unspecified, defaults to write-capable)"
+
+
+def main() -> int:
+    try:
+        payload = json.load(sys.stdin)
+    except Exception as exc:  # fail open, but say so
+        print(f"flag-unassigned-worktree: unreadable hook input ({exc})",
+              file=sys.stderr)
+        return 0
+
+    if not isinstance(payload, dict):
+        print("flag-unassigned-worktree: hook input was not an object",
+              file=sys.stderr)
+        return 0
+
+    subagent_type = unassigned(payload)
+    if subagent_type is None:
+        return 0
+
+    note = NOTE.format(subagent_type=subagent_type)
+
+    # No `permissionDecision` key at all: an absent decision defers to the
+    # normal permission flow, which is exactly the intent. Naming "allow" here
+    # would suppress a prompt the user would otherwise have seen.
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": note,
+        },
+        "systemMessage": (
+            f"Agent launch without `isolation` (subagent_type: {subagent_type}). "
+            "Assign a worktree or decide deliberately not to."
+        ),
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

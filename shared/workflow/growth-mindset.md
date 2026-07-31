@@ -104,10 +104,10 @@ The shape is a refusal whose text distinguishes *this route is closed* from
 *you are not allowed to do this*:
 
 ```console
-$ curl -X POST https://api.github.com/graphql ...
-{"message": "This GraphQL query is not enabled for this session -- only the
- pinned set of PR-review operations is served. Use REST via
- `gh api repos/{owner}/{repo}/...` instead."}
+$ curl -X POST https://api.github.com/graphql ... | jq -r .message
+This GraphQL query is not enabled for this session - only the pinned set of
+PR-review operations is served. Use REST via `gh api repos/{owner}/{repo}/...`
+instead.
 ```
 
 That is a routing instruction wearing a denial's status code.
@@ -128,8 +128,17 @@ prompted the search.
   missing, and try any alternative it names.
 - **Do:** treat "acquire the capability" as the fallback *after* the named
   route fails, not the first response to a non-2xx.
-- **Don't:** stop at the status code -- 401, 403, and 404 are all routinely
-  attached to messages that say what to do instead.
+- **Don't:** stop at the status code -- a 401 or 403 is the usual carrier of
+  an actionable alternative, since something deliberately refused you and had
+  a reason to state.
+
+A 404 rarely carries one, and is worth naming as the exception rather than
+lumping in: it usually means the route does not exist, so there is nothing to
+route you to.
+The same session that produced the 403 above also got a bare
+`{"message": "Not Found"}` from `POST .../discussions/{n}/comments`, which
+said nothing and settled nothing -- reading the body cost one glance and was
+still the right move, but it is the case where reading it does not help.
 - **Don't:** reach for installing something to get past a sandbox boundary;
   what you install inherits the boundary.
 

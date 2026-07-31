@@ -48,6 +48,52 @@ The four are worth keeping as a list rather than collapsing into "check your
 claims", because each names a different *repair*, and the repair is the part
 that is easy to skip.
 
+## A premise you were handed is still a claim
+
+All four types above describe assertions **you** generate, so all four trigger
+on the act of writing one.
+A premise supplied by the user triggers on nothing.
+It arrives as context rather than as a claim, you did not reason your way to
+it, and adopting it feels like listening rather than like asserting.
+
+That makes it the highest-leverage error available, because a premise sits
+*underneath* a conclusion rather than beside it.
+Every downstream claim can be individually checked, correctly reported, and
+wrong together.
+Worse, the work built on it usually looks like careful analysis -- tables,
+counts, a classification -- so the polish vouches for the foundation nothing
+tested.
+
+The tell is cheap and lexical: **a hedge in the source**.
+"I think", "wasn't it", "probably", a trailing question mark.
+The user marking their own uncertainty is an invitation to verify, and it is
+routinely read as a mere softening of delivery.
+Treat a hedged premise as the single most important thing to check, not the
+least.
+
+Ask what observation would show the premise false, and whether it is already
+within reach.
+Often it is, and often the user can produce it in one step.
+
+- **Do:** restate a load-bearing premise explicitly and name what would
+  falsify it, before building on it.
+- **Do:** read a hedge in the user's own wording as a request for
+  verification.
+- **Don't:** treat "the user told me" as having checked -- it establishes what
+  they believe, not what is true.
+- **Don't:** report a classification built on an unverified premise without
+  saying which premise it rests on.
+
+(2026-07-30, auditing Claude token provenance: the user offered "this account
+was out of tokens since Sunday I think?" and an entire repo classification was
+built on it -- any review succeeding after that Sunday must belong to the other
+account.
+The hedge went unread.
+The user then posted their usage chart, showing continuous usage across the
+whole week and peaking the day after the supposed cutoff, which refuted the
+premise and voided the classification.
+The chart was one screenshot away the entire time.)
+
 ## Question the answer that arrives without deliberation
 
 This is distinct from the confidence point above, and harder to catch.

@@ -621,6 +621,30 @@ Before adding commits to a branch you didn't just create, fetch `origin/main` an
 If the branch's own PR already merged, don't build on top of it — start clean: `git checkout -b <branch> origin/main`, then `git cherry-pick` only the genuinely new commit(s).
 If you've already pushed a bloated diff, the same fix applies retroactively: rebuild the branch from `origin/main` plus a cherry-pick of the new work, then `git push --force-with-lease`. (Seen on gha#161 → gha#162 and ai-config#344 → ai-config#354, both squash-merged.)
 
+**A stacked PR reaches that bloated state with no push of yours at all, and it announces itself as a merge conflict.**
+The rule above is written around an action you take: you add commits to a stale branch, so the check fires when you are about to commit.
+A PR stacked on another PR's branch needs nothing from you.
+When the base PR squash-merges, GitHub **auto-retargets** the stacked PR to `main`.
+The same orphaning then happens retroactively, to a branch that has been sitting untouched.
+
+What makes it worth its own entry is the symptom.
+The bloat presents as `mergeable_state: dirty` --- a conflict --- which invites conflict resolution.
+Resolving those conflicts would mean re-litigating already-merged content line by line.
+The diff and commit count are the tell that it is not a real conflict:
+
+| | before the base merged | after |
+| --- | --- | --- |
+| `mergeable_state` | `clean` | `dirty` |
+| diff | `+82/-0` | `+122/-0` |
+| commits | 2 | 9 |
+
+So when a stacked PR goes dirty, check ancestry before touching the conflicts.
+`git merge-base --is-ancestor <base-PR-commit> origin/main` returning false means the base squash-merged, and the fix is the rebuild above rather than a merge.
+Confirm the base PR's content is genuinely on `main` first, since that is what makes discarding those commits safe.
+Normalize whitespace and backticks when you check (`git show origin/main:<path>`), because this corpus breaks lines mid-phrase.
+(Morrison-Lab/ai-config#957 → #974, 2026-07-31: #974 sat untouched while #957 squash-merged as `3893dd51`.
+The rebuild restored `+82/-0` over 2 commits and `mergeable_state: clean`, and both cherry-picks applied without conflict.)
+
 **A live variant of the same check: the human can merge the branch's PR out from under an in-flight push, not just leave a stale branch to discover later.** Pushing a commit right as its own PR merges lands in a race in repos that auto-delete head branches on merge: GitHub deletes the head branch, and the in-flight push silently recreates it under the same name --- but now as a brand-new, orphaned branch with no PR, built on top of commits that (for a real merge commit, unlike the squash case above) *are* ancestors of `main`'s new tip. `git status`/`git push` report success --- but the push is not quite silent, and its one tell is worth knowing, because it fires at the moment of the race rather than hours later. A push onto a branch that still exists prints a SHA range (`f7bf71f..899e5de  <branch> -> <branch>`); a push that *recreates* a deleted branch prints `* [new branch]      <branch> -> <branch>` instead. Seeing `* [new branch]` for a branch you have already been pushing to means the remote branch was deleted underneath you, which on a PR branch means the PR merged. Read the push output rather than only its exit status, and run the ancestry check immediately when that line appears. Recovery is the same ancestry check as above (`git merge-base --is-ancestor <branch-tip> origin/main`), then cherry-pick the orphaned commit onto a fresh branch off the new `origin/main`; note that this check's *answer* depends on the repo's merge strategy and so is not itself the signal --- it comes back true where the PR merged as a real merge commit (the serocalculator case below) and false in a squash-merge repo, where `main` carries a new single commit your branch never saw. Either answer leaves the recovery the same, and in the squash case the orphaned commit is genuinely absent from `main`, so check whether its content actually landed (`git show origin/main:<path> | grep`) rather than inferring it from the merge notification; delete the stray local and (if push-permitted) remote branch. If the orphaned commit is genuinely new work --- not a fix that belongs in the now-merged PR --- treat this as the natural start of a new, stacked issue + PR rather than trying to reopen or append to the merged one. (`UCD-SERG/serocalculator#568` → `#572`, 2026-07-20: pushed a `Var(y_obs | y_true)` derivation commit just as #568 merged; recovered by cherry-picking it onto a new branch off `main`, filing #571 to track the follow-on `Var(y_obs | T=t)` derivation it was a prerequisite for, and opening #572 stacked on nothing but current `main`.) (`ai-config#778` → `#783`, 2026-07-28: the squash-merge counterpart. A commit fixing a review nit was mid-push when #778 merged; `git push` printed `* [new branch]`, `git merge-base --is-ancestor` returned false, and `git show origin/main:<path>` confirmed the fix was absent from `main` --- so a PR comment claiming the nit was addressed would have been false. Recovered by cherry-picking onto a fresh branch off current `main` and opening #783, with a comment on #778 saying which of its findings did not ship in that merge.)
 
 **The harness-assigned branch name itself can already exist locally, pointing at unrelated stale content from an earlier session in the same container.** A fresh container doesn't guarantee a fresh local branch state --- `git checkout -b <harness-branch> origin/<existing-PR-branch>` can fail with "a branch named `<harness-branch>` already exists" if a prior session in this container created one under that same name and left it pointing at old work. Don't assume it's safe to reuse or that it reflects the actual PR: check `git merge-base --is-ancestor <local-tip> origin/main` first --- if the local tip is already an ancestor of `main` (i.e. it was old, already-merged content, not in-flight work), it's safe to discard by force-checking out the real PR branch under that same name with `git checkout -B <harness-branch> origin/<existing-PR-branch>` (uppercase `-B` resets the branch in place instead of erroring). (ai-config#481: the assigned branch name `claude/resolve-pr-481-conflicts-dz9v4w` already existed locally, pointing at a commit that turned out to be an ancestor of `main` from an earlier session --- switched to the actual PR branch instead, per this section's own primary rule.)
@@ -665,6 +689,15 @@ Its second half is the general principle: best practice outranks repo precedent 
 The proactive counterpart to issue-first above: when a mistake shows up in any medium — code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else — even out of scope for the current task, flag it in chat (`⚠️ FLAG`) and file a tracking issue immediately, in a repo we administrate.
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.
 The `defer-issue` skill covers the user-initiated version of this; this rule is self-initiated.
+
+## Say when a practice is slipping, not only when an artifact is wrong
+
+@shared/workflow/flag-practice-slippage.md
+
+The counterpart to the rule above, for *practice* rather than for artifacts: that one governs a mistake in a thing and its deliverable is a filed issue, this one governs how the work is being done and its deliverable is one sentence at the moment it is actionable.
+The outward direction is already covered by the review fragments and needs no restatement.
+The two that need stating are inward, unprompted and outside any review loop, and **upward** --- telling me when *my* practice is slipping, which will not happen by default because deference costs nothing at the moment it is chosen and reads as politeness.
+Name the specific practice and gap, cite the rule or label the opinion as an opinion, say it before the action rather than in the retrospective, and say it once --- the decision stays mine, and this is not a licence to relitigate it.
 
 ## Tracking issues in upstream repos
 
@@ -937,6 +970,44 @@ Don't checklist-ize skills that are mostly design judgment, exploratory
 research, or one-off improvisation.
 
 @shared/workflow/skill-checklists.md
+
+## Never pattern-match blindly: check the purpose transfers
+
+Before reusing a structure --- a template, a working script, a neighbouring
+file's shape, a pattern from another tool --- state what the original was
+**for** and what the new one is **for**, and confirm those are the same kind
+of thing.
+Structural fit is necessary and never sufficient.
+
+The tell is that every check you naturally run after adapting a template asks
+whether the *mechanism* works, and none asks whether the *purpose* survived
+the substitution: same interface, passing tests, and the thing now does the
+opposite of what it should.
+A template you wrote yourself recently gets the least scrutiny, because
+reusing something you just verified feels like consistency rather than like
+assuming --- which inverts the scrutiny the situation warrants.
+This is not an argument against reuse; it is the check that makes reuse safe.
+
+@shared/workflow/check-purpose-before-reusing.md
+
+## Avoid false dichotomies
+
+When laying out alternatives, test whether they are actually exclusive before
+presenting them as such.
+The tell is a question posed as either/or and answered with "both" --- which
+means the exclusivity was constructed rather than found.
+
+The observable action: before presenting alternatives, state what would be
+lost by taking more than one.
+If the answer is nothing, they are not alternatives --- enable multi-select,
+or present them as composable steps with an order.
+Genuinely exclusive options exist (two incompatible designs, a merge strategy,
+a name), and presenting those as combinable is its own error; the target is
+the unexamined default, not the act of choosing.
+Composes with "Present decisions one at a time" above, which governs how many
+questions to ask rather than how one question's options relate.
+
+@shared/workflow/avoid-false-dichotomies.md
 
 ## Metacognition: monitor claims by type, and distrust the fluent ones
 

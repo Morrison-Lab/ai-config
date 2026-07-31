@@ -73,7 +73,11 @@ def scan(path):
                 if not isinstance(b, dict):
                     continue
                 if b.get("type") == "tool_use":
-                    blob = json.dumps(b.get("input") or {})
+                    # The name matters as much as the input: an MCP write names
+                    # its verb only there (mcp__github__push_files), while the
+                    # MCP read names its own in a `method` input parameter.
+                    blob = (b.get("name") or "") + " " + json.dumps(
+                        b.get("input") or {})
                     if RX_PUSH.search(blob):
                         last_push = i
                     if RX_QUERY.search(blob):
@@ -109,7 +113,8 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w").close()
+        with open(sentinel, "w"):
+            pass
     except Exception:
         pass
 

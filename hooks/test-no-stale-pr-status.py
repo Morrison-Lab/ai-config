@@ -21,6 +21,13 @@ QUERY = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"command": "gh pr checks 493 -R o/r"}}]}}
 MCP_QUERY = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {"method": "get_check_runs", "pullNumber": 493}}]}}
+# An MCP write carries its verb in the tool NAME, not in the input -- verified
+# against real transcripts, where the input holds only owner/repo/branch/files.
+# So a scan reading the input alone never sees this as a push.
+MCP_PUSH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "mcp__github__push_files",
+     "input": {"owner": "o", "repo": "r", "branch": "main",
+               "files": [{"path": "f.py", "content": "x"}]}}]}}
 
 
 def say(text):
@@ -36,9 +43,13 @@ CASES = [
      "counts quoted from a pre-push reading"),
     ([QUERY, PUSH, say("All checks green at this head.")], True,
      "'all green' after a push"),
+    ([QUERY, MCP_PUSH, say("All checks green, ready to merge.")], True,
+     "an MCP push_files is a push -- the reading predates it"),
 
     ([PUSH, QUERY, say("493 is green: 11 pass.")], False,
      "queried AFTER the push -- the claim is current"),
+    ([MCP_PUSH, QUERY, say("493 is green: 11 pass.")], False,
+     "queried after the MCP push -- the same claim is current"),
     ([PUSH, MCP_QUERY, say("All green, 0 fail.")], False,
      "MCP get_check_runs counts as a query too"),
     ([QUERY, PUSH, say("Pushed the fix; checks are running now.")], False,

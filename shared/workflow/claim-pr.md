@@ -55,6 +55,40 @@ reply, claiming a fix "Addressed... Pushed in 3fb8c5b" that this session
 hadn't made; verified real via `get_commits` before proceeding --- a second
 live session, not injection.)
 
+**The git-level variant of that check: a rejected push whose remote commit is
+byte-for-byte what you were about to push.**
+The section above covers a *comment* claiming work was done.
+Here the parallel session makes no claim at all.
+Your `git push` is simply rejected because it pushed first, and what it
+pushed is the same merge you just made.
+The reflex on a rejected push is to merge again, which would stack a
+redundant merge commit on top of an identical one.
+
+Four reads settle it before you touch anything:
+
+```bash
+git rev-parse HEAD^{tree}                 # your merge's tree
+git rev-parse origin/<branch>^{tree}      # theirs
+git show -s --format=%P HEAD              # your merge's parents
+git show -s --format=%P origin/<branch>   # its parents
+```
+
+An identical tree plus identical parents means the two merges are the same
+merge, so the right action is `git reset --hard origin/<branch>`.
+
+- **Do:** compare trees and parents before deciding what a rejected push
+  means.
+- **Do:** discard your local merge with `git reset --hard origin/<branch>`
+  once both match.
+- **Don't:** re-merge reflexively on a rejected push --- that is what
+  produces the redundant merge commit.
+- **Don't:** force-push over the other session's commit.
+
+(`Morrison-Lab/ai-config#965`, 2026-07-31: `main` moved one commit, a local
+`git merge origin/main` was made, and the push was rejected.
+The remote carried `b8d2273`, a merge of the same two parents, with tree
+`1bda1bc`, identical to the local merge's.)
+
 **Handing off mid-task to another agent, on user request ("finish what you're
 doing, then relinquish holds; I'll put another agent on them"):** don't just
 stop --- leave the next agent a clean starting point. On each claimed PR/issue:

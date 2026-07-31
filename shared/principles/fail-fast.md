@@ -233,6 +233,69 @@ classifier denied minutes earlier.
 A later run of the fixed script reported 910 of 947, which is how the
 rate-limit truncation above was found.)
 
+### The pattern itself is the other half, and it fails without erroring
+
+Everything above is about a check that *cannot report* its own failure.
+The sibling case is a check that runs perfectly, exits 0, and answers the
+wrong question, because the pattern was looser or narrower than intended.
+There is no error to swallow here and no exit status to inspect -- the
+instrument works, and its verdict is simply false.
+
+Two directions, both seen in one session:
+
+- **Too loose -> phantom finding.**
+  `grep "uses: [a-z]"`, written to find unpinned GitHub Actions, also
+  matches the tail of `statuses: write`.
+  It reported a pinning regression in a repo that had none.
+- **Too narrow -> false all-clear, which is the dangerous direction.**
+  A detector that serialized each CI job to YAML and searched the dump for
+  `git push` cleared a job that runs `git push --force`, because the dump
+  had line-wrapped the string.
+  Acting on that would have stripped the push credential from a job that
+  pushes.
+  Separately, grepping a Markdown file for a section title returned nothing
+  although the title was there, because the phrase spanned two source lines
+  and was interrupted by backticks.
+
+The fix is not "be careful with regexes".
+It is to **test the instrument against a known positive before trusting a
+negative**.
+A grep that should find something, run against a case you know contains it,
+either matches or exposes the assumption that was wrong.
+Where the thing being matched has structure -- a YAML key, a Markdown
+heading -- anchor to that structure (`^[[:space:]]*(- )?uses:`) rather than
+to a substring that happens to appear inside it, and search the source text
+rather than a re-serialization of it, since dumping and reformatting can
+move or wrap the very string being looked for.
+
+State the scope with the result, too.
+"No matches" and "no matches **under these three paths**" are different
+claims, and the second is the honest one when the search was scoped.
+
+- **Do:** run the pattern against a case you know contains the thing, before
+  reporting that it contains nothing.
+- **Do:** anchor to the structure being matched, and state the paths the
+  search actually covered alongside its result.
+- **Don't:** treat a zero-hit result as a fact about the corpus when the
+  pattern has never been seen to match anything.
+- **Don't:** grep a re-serialization -- a YAML dump, a rendered page -- for a
+  string whose formatting that step may have changed.
+
+Distinct from
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md), and the pair is
+worth keeping apart.
+That fragment governs a **sound** command whose conclusion overreaches --- the
+null result is a real fact about the pattern, and only the step to "the corpus
+lacks this" is wrong.
+Here the command itself is unsound, so the result is not a fact about anything.
+Read that one before concluding a concept is absent; read this one before
+trusting any grep as an instrument.
+
+(Morrison-Lab/gha#328/#329, 2026-07-31: the unanchored `uses: [a-z]` was
+published in an issue and a merged PR body as *the* verification command
+for a security invariant, so the phantom it produced was reported as a
+regression before the pattern was re-read.)
+
 ## In a guard you ship: partial is worse than absent
 
 Everything above concerns a check whose failure is invisible **at runtime**,

@@ -160,6 +160,52 @@ settled before composition began.
 The user corrected roughly every three minutes throughout, several times on the
 same underlying failure, while the polished output continued.)
 
+## Stripping is the part that tests
+
+Lamport says writing reveals fuzzy thinking, and the section above says to
+write the thing that can be wrong.
+Neither says *which part of the writing does the work*.
+[R4DS](https://r4ds.hadley.nz/workflow-help.html) does, for the reprex:
+
+> 80% of the time, creating an excellent reprex reveals the source of your
+> problem.
+
+It names two components, and only one of them is diagnostic.
+**Reproducible** asks you to "capture everything, i.e. include any `library()`
+calls and create all necessary objects".
+**Minimal** asks you to "Strip away everything that is not directly related to
+your problem".
+
+The asymmetry is the point.
+Self-containment asks "is everything present?", which is satisfied by
+including *more*, and including more never tests anything.
+Minimization asks, of every element, "does the problem actually depend on
+this?" --- and that question is answerable only by checking.
+So a document can be complete, look thorough, and reveal nothing.
+
+[`reprexes`](../../skills/reprexes/SKILL.md) already carries this for code,
+and states the mechanism in the same terms: "the noise you strip away was
+hiding it."
+The increment here is that the property is not about code.
+It holds for any self-contained artifact you write, and the one worth naming
+is the **subagent brief**, because it is self-contained *by force* --- the
+agent has no shared context --- and minimal only *by choice*.
+An issue body and a PR description sit in the same position.
+[`issue-first`](issue-first.md) already asks for a reprex in a bug report; the
+addition is that writing one pays before anyone reads it, so it is worth doing
+even when nobody will.
+
+So: write it self-contained, then strip it, and treat whatever resists
+stripping as the actual problem.
+The stripping pass is not editing for length.
+It is the diagnostic.
+
+(2026-07-30, this task's own brief: long, complete, and carrying several false
+claims about this corpus that survived precisely because writing it required
+justifying nothing.
+One --- "model on the two existing `Stop` hooks" --- would have had to earn its
+place under a stripping pass, and one `ls` settles it.)
+
 ## Do and don't
 
 - **Do:** classify each assertion as state, scope, cause, or default before it
@@ -173,6 +219,10 @@ same underlying failure, while the polished output continued.)
   little.
 - **Don't:** treat a polished retrospective as evidence that thinking happened;
   a summary of settled conclusions cannot fail, so it cannot test anything.
+- **Do:** strip a brief, issue, or PR body after writing it, asking of each
+  element whether the task actually depends on it.
+- **Don't:** mistake a complete document for a tested one --- completeness is
+  satisfied by adding, and adding tests nothing.
 - **Don't:** use confidence as the signal to stop checking --- it runs the
   wrong way.
 - **Don't:** read a command's output as settling a question without checking

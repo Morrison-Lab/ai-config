@@ -261,3 +261,9 @@ the issue's priority, not whether it's recorded.
 - [`ardi`](ardi.md)'s Defer step already tracks out-of-scope **review
   findings**; this rule generalizes the same habit to any mistake noticed
   in any task.
+- [`flag-practice-slippage`](flag-practice-slippage.md) is the same habit
+  aimed at **practice** rather than at an artifact --- how the work is being
+  done, including the user's own conduct.
+  Every medium enumerated above is a thing, so nothing here fires on a
+  behaviour, and the deliverable differs too: a filed issue there, one
+  sentence at the actionable moment here.

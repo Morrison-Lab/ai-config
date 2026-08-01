@@ -2,13 +2,36 @@
 
 ## Conda activation before Quarto validation
 
-- **Activate conda, do not rely on `conda run`, before checking a project
-  toolchain.** In this environment `conda run -n bcs <command>` left the
-  environment's `quarto` executable off `PATH`, even though it was installed.
-  Use `source /home/demorrison/miniconda3/etc/profile.d/conda.sh && conda
-  activate bcs` before `quarto --version` or rendering, and confirm the
-  executable path first. `conda run` can still suit a self-contained R
-  invocation, but is not a substitute for verifying full shell activation.
+- **Activate the conda environment before checking a project toolchain; `conda
+  run` is not equivalent.** In this environment `conda run -n bcs quarto ...`
+  found and started `quarto` --- the executable is on `PATH` under `conda run`
+  --- but Quarto then failed to locate its own **bundled Deno helper**, dying
+  with `bin/tools/x86_64/deno: No such file or directory`.
+  The failure is in activation-dependent helper resolution, not in executable
+  lookup, and the distinction matters because it points debugging somewhere
+  different: `which quarto` succeeds and tells you nothing.
+  Activate properly instead, deriving conda's own base rather than hard-coding
+  one host's layout:
+  ```bash
+  source "$(conda info --base)/etc/profile.d/conda.sh" && conda activate bcs
+  quarto --version
+  ```
+  `conda run` can still suit a self-contained R invocation, but it is not a
+  substitute for full shell activation when the tool shells out to its own
+  bundled helpers.
+  - **Do:** activate, then re-run the failing command, before reporting a
+    toolchain broken.
+  - **Do:** derive the conda base with `conda info --base`, since `conda` is
+    already on `PATH` if you got as far as `conda run`.
+  - **Don't:** describe this as the executable being off `PATH` --- that
+    records a failure model the observed error contradicts.
+  - **Don't:** paste an absolute `/home/<user>/miniconda3/...` path into a
+    recorded recovery command; it fails for every other user and install
+    location.
+
+  [`growth-mindset`](../shared/workflow/growth-mindset.md) owns the incident
+  this comes from and the broader rule (do not accept a tool as broken on one
+  invocation); this entry is the operational half.
 
 ## renv.lock — adding a package that's only referenced via another package's Suggests
 

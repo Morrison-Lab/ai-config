@@ -8,15 +8,27 @@
 #     `LaunchParameters = (null)`, so salloc's use_interactive_step is off --
 #     it prints "Nodes c2 are ready for job" and then runs your shell on
 #     shiva anyway. `srun --pty` is what actually moves you.
-#   * zsh is NOT installed on the compute nodes (c2/c3/c4 confirmed), so
-#     `srun --pty zsh` dies with `execve(): zsh: No such file or directory`.
-#     conda's own zsh 5.9 at ~/miniconda3/bin/zsh does run there, and $HOME
-#     is shared storage, so it is reachable -- just not on PATH.
+#   * shiva ships no system zsh on any node, login node included -- there is
+#     no /usr/bin/zsh to fall back on. The only zsh is conda's 5.9 at
+#     ~/miniconda3/bin/zsh, on shared storage, which every node can reach.
+#
+# That conda zsh IS on PATH, so `srun --pty zsh` resolves today; the absolute
+# path below is belt-and-braces for a session whose PATH has been stripped,
+# not a workaround for an unreachable binary. Earlier revisions of this
+# comment claimed it was off PATH, which tui-alloc's own history disproves:
+# tui-alloc resolves it with `command -v zsh` and has never hit its bash
+# fallback on c2, c3, or c4, each of which has a zsh 5.9 completion dump in
+# ~/.config/tui-alloc to show for it.
 #
 # Conda is deliberately NOT activated here. `--pty` propagates the current
 # environment, so activating on the head node first carries it in; otherwise
 # activate inside with the line printed on entry.
 set -euo pipefail
+
+# Shared with tui-alloc; resolve through the install symlink to find it.
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=../lib/slurm-guard.sh
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../lib/slurm-guard.sh"
 
 CPUS="${CNODE_CPUS:-8}"
 MEM="${CNODE_MEM:-32G}"
@@ -29,19 +41,8 @@ if [ ! -x "$ZSH_BIN" ]; then
   exit 1
 fi
 
-# Refuse to nest. A second srun inside an existing allocation contends with
-# that allocation's own step rather than getting a fresh one -- on 2026-07-31
-# this deadlocked two jobs, one holding c1 while the other sat in PENDING
-# (Resources). Better to say so than to hang.
-if command -v sinfo >/dev/null 2>&1; then
-  host="$(uname -n)"; host="${host%%.*}"
-  if sinfo -h -N -o %N 2>/dev/null | grep -qxF "$host"; then
-    echo "cnode: already on compute node $host (job ${SLURM_JOB_ID:-?})." >&2
-    echo "       Nesting srun here contends with this allocation. Just run zsh:" >&2
-    echo "           exec $ZSH_BIN -i" >&2
-    exit 1
-  fi
-fi
+# Refuse to nest; lib/slurm-guard.sh records the deadlock this prevents.
+refuse_if_nested "exec $ZSH_BIN -i"
 
 echo "cnode: ${CPUS} cpu, ${MEM}, ${TIME}. Inside, for R 4.6:"
 echo "    source ~/miniconda3/etc/profile.d/conda.sh && conda activate bcs"

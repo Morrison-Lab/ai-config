@@ -409,6 +409,61 @@ published in an issue and a merged PR body as *the* verification command
 for a security invariant, so the phantom it produced was reported as a
 regression before the pattern was re-read.)
 
+## In a guard you ship: partial is worse than absent
+
+Everything above concerns a check whose failure is invisible **at runtime**,
+because its failure path prints what its pass path prints.
+A guard applied to only some of the paths that need it fails one level earlier,
+and in the opposite medium: it is perfectly loud wherever it runs, and it
+simply does not run on the paths that were left out.
+What goes wrong is what a **reader** infers from the source.
+
+An absent guard is discoverable.
+Someone reading the file sees an unguarded write and asks about it.
+A guard present once answers that question before it is asked --- the reader
+finds the guard, recognizes the hazard as handled, and stops looking for the
+two places it is not.
+So the partial version does not merely leave the bug in place; it spends the
+one signal that would have surfaced it, which is the same trade
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md) prices for a
+vacuous assertion: "worse than no test, because it reads as coverage".
+
+The shape is a hazard handled at one site out of several, where the sites are
+siblings rather than a sequence: three emitters, four entry points, both
+directions of a conversion.
+It is the author-side, no-reviewer sibling of
+[`address-every-comment`](../workflow/address-every-comment.md)'s rule that a
+reviewer-flagged pattern must be fixed everywhere it recurs.
+That rule needs a finding to convert into N fixes; here nobody flagged
+anything, so nothing fires, and the cost is a shipped bug rather than an extra
+review round.
+
+Enumerate the sites before writing the guard, and make the enumeration
+mechanical where it can be --- grep for the operation being guarded, not for
+the guard, since grepping for the guard finds the site you already fixed.
+Where the sites genuinely differ, say in a comment why an unguarded one is
+safe, so the next reader inherits a decision instead of an apparent oversight.
+
+- **Do:** list every site that performs the guarded operation, then check the
+  guard against that list rather than against the site that prompted it.
+- **Do:** grep for the operation, not for the guard.
+- **Don't:** ship a guard on one of several sibling paths without a comment
+  saying why the others need none.
+- **Don't:** read a guard's presence in a file as evidence the file is guarded
+  --- that inference is precisely what a partial guard supplies for free.
+
+(ai-config#950/#951, 2026-07-30/31: `scripts/semantic-line-breaks.py` has three
+emitters --- its own docstring lists "prose paragraphs, bullet continuation
+text, and blockquote prose" --- and a draft of the scope fix guarded only the
+blockquote one, leaving the two that do the bulk of the reflowing unscoped.
+The script therefore still rewrote whole files while its source visibly
+contained the fix; the unguarded behaviour changed 342 of `CLAUDE.md`'s 1163
+lines.
+Caught before it was committed, so the landed fix at `39b98c7b` already calls
+`_in_scope` at all three sites --- which is why git history shows no trace of
+the partial state, and why the enumeration has to happen while the guard is
+being written rather than afterwards.)
+
 ## In review
 
 Flag error handling that hides failure — swallowed exceptions, silent
@@ -419,6 +474,12 @@ Flag a handler that identifies a condition by matching its message text,
 too, and ask for a class.
 Ask for the explicit form: an early validation, a loud error, or a
 documented, observable fallback.
+
+Flag a guard applied to one of several sibling paths as well, and ask either
+for the remaining ones or for a comment saying why they are safe.
+This is the finding most likely to be missed by reading, since the diff shows
+the guard being added rather than the sites it skipped --- so check it against
+a grep for the guarded operation, not against the diff.
 
 This serves the Reliable goal in the
 [principles catalog](README.md): a loud failure is easier to catch than

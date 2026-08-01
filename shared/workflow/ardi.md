@@ -106,7 +106,11 @@ the bullets in this fragment record it failing at this exact boundary.
       rather than collateral from an edit's blast radius --- a reviewer reads
       every deletion as deliberate and will rationalize an accidental one.
 - [ ] **`main` was merged in** if it moved, with version parity re-checked
-      afterward, so the round costs one review run rather than two.
+      afterward, so the round costs one review run rather than two --- and any
+      whole-file count a merge can worsen (spliced changelog bullets) compared
+      before against after, since a defect caused by a *deleted* line is
+      invisible to every added-lines check
+      ([`sync-with-main`](sync-with-main.md)).
 - [ ] **Killer item: the push landed.** `git rev-parse HEAD origin/<branch>`
       agree before any reply asserting a fix.
       This one is marked because its failure is not an omission but a **false
@@ -495,6 +499,50 @@ This is the ownerless cousin of the parallel-session case in
 [`claim-pr`](claim-pr.md), which assumes a real commit exists to cross-check;
 here there was none.)
 
+**Run that same command before *any* readiness claim, not only against an
+inherited one --- a PR whose branch carries no implementation is green on
+every check.**
+The bullet above uses `gh pr diff <N> --name-only` **differentially**: it has
+a claim naming files, and it asks whether those files are in the list.
+That test needs a claim as input, so when nobody claimed anything it never
+runs, and the readiness path is exactly the case where nobody has.
+The **existential** question --- does the list have anything in it at all ---
+is the one no rule was asking.
+
+[`pr-on-claim`](pr-on-claim.md) manufactures the hazard by design, and is
+right to: it opens the PR from `git commit --allow-empty` so the branch has a
+diff before any code exists.
+Merge `main` in later and the branch carries two commits, a real history, and
+no implementation.
+Every instrument then works perfectly and certifies nothing, because a check
+that finds no fault in an empty diff and a reviewer that raises no finding
+against one are both answering a narrower question than the one being asked.
+
+Note which nearby checks *pass* on such a branch, since their passing is what
+makes the state feel verified.
+`git rev-parse HEAD origin/<branch>` agree, so the pre-push checklist's killer
+item is satisfied.
+The branch is not behind `main`.
+`get_commits` returns two, so a sweep keyed on zero commits does not flag it.
+[`fully-clean`](fully-clean.md)'s two criteria are each satisfied **maximally**
+by an empty diff, since neither has a term about content.
+
+- **Do:** run `gh pr diff <N> --name-only` before reporting a PR ready, and
+  read the returned paths against what the PR says it does.
+- **Do:** treat an empty return, or a return holding only a `main` merge's
+  incidental paths, as the PR carrying no implementation.
+- **Don't:** count the claim commit or a `main` merge as work --- neither is
+  implementation, and both give the branch a plausible history.
+- **Don't:** read all-green CI plus a finding-free review as evidence a PR
+  contains anything; on an empty diff that is the expected result.
+
+(2026-07-30/31, a `ucdavis/bcs` session: a PR was reported `CLEAN` with every
+check passing, on a branch holding the empty claim commit plus a `main` merge
+and nothing else.
+Nothing had gone wrong with any instrument.
+The implementation had never been pushed, and no check, no reviewer, and no
+rule in this file was asking whether there was one.)
+
 **When the change affects downstream consumers, validate it against a real
 consumer repo before reporting the PR ready --- a package's own test
 fixtures are built to exercise its code, not to resemble the packages that
@@ -633,6 +681,62 @@ The review had already absorbed the caveat --- it listed those anchors as
 "unverified per the PR body's own caveat ... not a new finding" --- so
 leaving it would have shipped a limitation that no longer existed, blessed
 by a reviewer who could not have known.)
+
+**Landing a fix falsifies whatever prose documented the defect, and that prose
+is never in your diff --- so grep for it rather than expecting to be reminded.**
+The bullet above covers a caveat **you** published on **this** PR, which the
+environment then moved out from under.
+This is the case where you moved it yourself, and where the stale text lives in
+the standing corpus rather than on the PR: a memory bullet describing the
+hazard, a README warning about it, a docstring asserting the behaviour you just
+changed.
+
+The sync rules in
+[`address-every-comment`](address-every-comment.md) all end at the PR's own
+artifacts --- the changelog, the PR body, a skill's inline restatement --- and
+each prescribes grepping the diff.
+Documentation of a defect cannot be found that way, because not being in the
+diff is the entire property that makes it survive.
+So the trigger has to be the fix itself, and the search has to leave the files
+you edited.
+
+Two shapes, and the second is worse because it was never true.
+
+- **Prose staled by the fix.**
+  It was accurate when written, so nothing about it reads as a defect, and a
+  workaround it prescribes becomes active misdirection the moment the thing it
+  worked around is gone.
+  Keep the entry where the old behaviour explains something --- most of a
+  corpus is written against it --- but mark plainly that it is history and name
+  the change that ended it.
+- **Prose asserting conformance to a reference.**
+  A docstring saying the code "follows" some reference implementation is a
+  claim about two artifacts, and your own divergence falsifies it.
+  This one is not staleness at all: it was false before you arrived, and it is
+  load-bearing, because a reader checking the code against the reference stops
+  at the sentence saying someone already did.
+
+- **Do:** grep the repository for the defect, the workaround, and the behaviour
+  you changed, before calling a fix complete.
+- **Do:** mark a superseded entry as history and name the change that ended it,
+  rather than deleting it, when the old behaviour still explains other text.
+- **Don't:** treat a clean grep over the diff as coverage --- the stale prose is
+  outside it by construction.
+- **Don't:** leave a doc asserting conformance to a reference standing when the
+  code diverges; correct the claim in the same change that establishes the
+  divergence.
+
+(`ucdavis/bcs#534`, 2026-07-30/31: standardizing a G-computation CIF over the
+observed age distribution falsified two documents at once.
+`compute_gcomp_cif_ab507bs()`'s roxygen had read "this function follows the SAS
+pipeline's plug-in-at-the-mean approach", which the SAS program does not do ---
+false before the fix, and quoted by the fix's own changelog entry as such.
+A row in `inst/docs/program_steps.qmd` described the retired behaviour and was
+refreshed in a separate commit.
+Concurrently, ai-config#951 diff-scoped `scripts/semantic-line-breaks.py`, which
+falsified `memories/tools.md`'s entry prescribing "format new prose by hand" as
+the workaround; that entry was kept and marked `**Fixed in ai-config#951.**`,
+which is the first shape handled correctly.)
 
 **An instruction's own suggested code is not exempt from the
 project-conventions self-review above.**

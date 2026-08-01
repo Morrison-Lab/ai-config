@@ -88,6 +88,17 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   So this needs no external `jq` and no `date -d`, which is GNU-only and absent on macOS.
   (Morrison-Lab/ai-config#908, 2026-07-30: the `clean-worktrees` merged-PR guard shipped the string comparison.
   Review caught it, and the repro above confirmed the failure direction before the fix went in.)
+- **`gh pr list --state merged` plus a low `--limit` can miss recent merges:**
+  The list is ordered by PR list order, effectively number/creation, before your `--jq` filter runs.
+  That means an old, low-numbered PR that merged recently can sit below a page of higher-numbered PRs and never reach the filter.
+  The result looks scoped by time while silently excluding the very merge checkpoint you were polling for.
+  Use a query whose filter matches the question, such as `gh search prs --repo <owner>/<repo> --merged-at ">=<date>"`, or query each PR of interest directly.
+  If you use `gh pr list --state merged`, set `--limit` far beyond the expected count and report how many merged PRs the command examined, not only how many passed the `mergedAt` filter.
+  - **Do:** use `gh search prs --repo <owner>/<repo> --merged-at ">=<date>"`, direct `gh pr view <N>`, or an intentionally over-wide list with an examined count when answering "what merged since T".
+  - **Don't:** trust `gh pr list --state merged --limit N --json mergedAt --jq '.[] | select(.mergedAt > T)'` as a time-window query.
+  (Morrison-Lab/ai-config#969, 2026-08-01: `gh pr list --state merged --limit 15 --json number,mergedAt` plus a `mergedAt > 2026-08-01T08:00:00Z` filter returned only #1019, merged at `09:03:13Z`, and missed #969, merged at `09:14:38Z`.
+  Raw `--limit 6` output showed #1013 at `05:36Z` before #1012 at `05:45Z`, proving the page was not sorted by merge time.
+  Raising the limit to 30 returned both #1019 and #969.)
 - **`gh pr edit` exits 1 on repos with Projects Classic — use `gh api` to update PR body.** `gh pr edit <N> --body "..."` / `--body-file <f>` returns exit code 1 with a GraphQL deprecation warning (`Projects (classic) is being deprecated…`). Sometimes the edit lands anyway; **sometimes it does not apply at all** (seen on sparta 2026-06-30: three `gh pr edit --body-file` attempts left the body unchanged with the `SHA_PLACEHOLDER` still in place). Either way, don't trust it — verify with `gh api repos/<o>/<r>/pulls/<N> --jq .body`, and just use the REST PATCH directly, which always exits 0 and applies: `gh api -X PATCH repos/<o>/<r>/pulls/<N> -f body="..."`. For a multi-line body, read it from a file with `-F body=@<path>` (capital `-F` to pull the field value from the file) rather than cramming it into `-f body="..."`.
 - **PR description image embeds: use `raw.githubusercontent.com`, not `github.com/.../raw/...`.** Embedding a committed file in a PR body with `![](https://github.com/<owner>/<repo>/raw/<sha>/<path>)` may not render — the reviewer will flag it. The correct raw-content domain is `https://raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`. Reference the full commit SHA so the image keeps rendering after the branch is deleted on merge.
 - **`raw.githubusercontent.com` FOLLOWS repository-rename redirects, so a `200` under the OLD owner proves nothing — only a `200` under the NEW owner is decisive.** To test whether a repo has moved, probe the *new* name and treat `404` there as "did not move". Run a known-moved repo as a control first, or the probe silently answers backwards: `d-morrison/gha` still returned `200` on `raw.githubusercontent.com` well after it became `Morrison-Lab/gha`, so an old-name probe reports every repo as "not moved". The REST API is not a substitute — behind an agent proxy `api.github.com/repos/<o>/<r>` can return `403` for every repo regardless of existence, which answers nothing in either direction. This matters before any blanket owner rewrite: probing all nine `d-morrison/*` references in ucdavis/bcs under the new owner showed only `gha` and `ai-config` had moved, so a find-and-replace would have broken `macros`, `altdoc`, `snapr`, `stats-allowlist`, `diffviewer`, `equation-anchors`, and `rme`. Note the bare `d-morrison` *username* (a `reviewer:` input, author metadata) is unaffected by a repo/org rename and must not be swept along. The Actions-side consequences of the same rename are in `github-actions.md` ("A repo/org rename breaks Actions `uses:` refs"). (2026-07-28.)
@@ -147,6 +158,55 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
   The operational advice does not depend on resolving it.
   Don't spend a call on this endpoint either way -- the ruleset already requests the review, and neither response tells you whether one is pending.
+- **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
+  when its output is not a terminal --- which is always, for an agent.**
+  A cancellation and a real failure are therefore the same word in the column
+  most people read, and they want opposite responses: a re-run versus a
+  debugging round.
+  `gh` itself distinguishes them internally and then discards the distinction
+  on the way out.
+  In `cli/cli` v2.92.0 (the installed version, checked with `gh --version`),
+  `pkg/cmd/pr/checks/aggregate.go` gives `CANCELLED` its own bucket, separate
+  from `ERROR`/`FAILURE`/`TIMED_OUT`/`ACTION_REQUIRED`:
+  ```go
+  case "CANCELLED":
+      item.Bucket = "cancel"
+  ```
+  `pkg/cmd/pr/checks/output.go` renders that bucket as a muted `-` in a TTY,
+  identically to `skipping` --- and then, for the non-TTY table:
+  ```go
+  if o.Bucket == "cancel" {
+      tp.AddField("fail")
+  } else {
+      tp.AddField(o.Bucket)
+  }
+  ```
+  So a human at a terminal sees a cancellation as a dash, and a piped or
+  captured run sees `fail`.
+  Two consequences worth keeping apart.
+  A human's report of what they saw and an agent's are not describing the same
+  output, so "it's showing as failing" from one is not corroboration for the
+  other.
+  And the fix is one flag, not a heuristic: **`--json name,state,bucket`**
+  preserves `bucket: "cancel"` and `state: "CANCELLED"` distinctly from `fail`,
+  which decides it exactly rather than by inference
+  ([`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)).
+  Duration is a decent corroborating tell --- a review job cancelled by a
+  concurrency race dies in seconds where a real one takes minutes --- but take
+  it from `completed_at` minus `started_at` on a completed run, never from
+  `status`, per [`fully-clean`](../shared/workflow/fully-clean.md) criterion 1.
+  Prefer the flag to the tell: the flag is exact and the duration is a prior.
+  For the cause of these cancellations, and why the *gate* job then reports
+  failure too, see the `cancel-in-progress` entries in
+  [`memories/debugging.md`](debugging.md) and
+  [`pr-on-claim`](../shared/workflow/pr-on-claim.md).
+  (2026-07-31: a 6-second "failing" `review / claude-review` was read as a real
+  failure and debugged as one; it was a concurrency cancellation, and needed
+  only a re-run.
+  Confirmed against a real cancelled run on Morrison-Lab/ai-config commit
+  `7b006485`, whose `review / claude-review` check run carries
+  `conclusion: cancelled` while its dependent `review / require-review` carries
+  `conclusion: failure`.)
 
 ## gh — stale remote URL causes cryptic `gh pr create` failure
 - `gh pr create` fails with `Head sha can't be blank, Base sha can't be blank, No commits between <owner>:main and <other-owner>:<branch>` when `origin` points to an **old repo URL** (e.g. after a GitHub repo transfer/rename).

@@ -3,9 +3,11 @@
 The GitHub MCP tool surface used in remote/web sessions where the `gh`
 CLI is unavailable --- tool selection, scope and owner-string quirks,
 review/comment/thread mechanics, and the specific failure modes each
-tool has shown in practice. Split out of `github.md` when that file
-crossed the 1200-line gate (`scripts/check-memory-file-size.py`); see
-ai-config#694 for the precedent.
+tool has shown in practice.
+Split out of `github.md` pre-emptively at 1199 lines, just under
+`scripts/check-memory-file-size.py`'s gate --- that check fires strictly
+above 1200 lines, so the file never actually tripped it.
+See ai-config#694 for the precedent.
 
 - In remote/web sessions the authenticated GitHub identity is the repo owner
   (`d-morrison`), so requesting `d-morrison` as a PR reviewer fails with
@@ -42,7 +44,7 @@ ai-config#694 for the precedent.
   that same command does not.
   Write placeholders in a body without brackets --- `OWNER/REPO`, `PATH`, `N`
   --- and re-read the body after posting whenever the exact text matters.
-  This is the "Postcondition gate" bullet at the top of this file made concrete:
+  This is the "Postcondition gate" bullet in [`github.md`](github.md) made concrete:
   nothing errors, the object is created exactly as asked, and only reading the
   stored result back shows the content is not what was sent.
   (ai-config#734, 2026-07-26: caught only because the mangled URL happened to be

@@ -893,6 +893,33 @@ If you and the reviewer reach an impasse on a single item (your rebuttal didn't 
 (Another instance of **never assume; always verify** — `git fetch` to check main's actual position instead of assuming the branch is current.
 The `sync-pr-branch` / `merge-main` skill runs this.)
 
+## Batch merge and resolve, always
+
+The section above is one branch against `main`.
+When **several** open PRs need syncing or conflict resolution, do them together in one pass rather than chasing each one's conflict flag as it appears.
+The batch pass is the default, not a recovery step for when serial chasing has already failed.
+
+@shared/workflow/batch-merge-and-resolve.md
+
+The key points, restated here because a bare pointer is invisible to a consumer that doesn't load the fragment:
+
+- **Serial chasing cannot converge when the base's merge interval is shorter than a review round.**
+  Both are measurable, so compare them rather than judging: `git log origin/main --first-parent -10 --format='%ct'` for the merge rate, and the review check's own `startedAt`/`completedAt` for the round.
+  Count **first-parent** commits, not merge commits --- `git log --merges` reports nothing in a squash-merging repo.
+- **A `DIRTY` flag means stale or defective, and only the second is a defect.**
+  A PR whose content is clean but whose base moved is stale rather than broken.
+  Staleness resolves once, at merge time, so re-syncing it eagerly spends a CI cycle and a review round on a state that expires within one merge interval.
+- **Independent per-PR checking cannot see pair collisions.**
+  Every PR can be clean against `main` while two of them conflict with each other.
+  Only a pairwise `git merge-tree` between PR heads finds that.
+- **Any sweep needs a negative control**, run first.
+  A zero matrix is indistinguishable from a detector that never ran, and `merge-tree` has two ways of producing one: the legacy three-arg form always exits 0, and its conflict markers are diff-indented, so `grep '^<<<<<<<'` misses them.
+  Report how many pairs were examined, not only how many conflicted.
+- **`merge=union` raises the stakes rather than lowering them**, since it resolves append collisions with no conflict to review.
+- **"No conflict" is not an all-clear.**
+  Version parity and Markdown list-item splices both arrive through cleanly-resolved merges with nothing red to point at.
+  The transferable lesson: when a defect can be introduced by **deleting** a line, any instrument keyed on added lines is unsound for it --- use a count delta across the merge instead.
+
 ## Move referenced assets along with content that migrates or gets removed
 
 <!-- Not yet shared with the lab manual; edit shared/workflow/migrate-referenced-assets.md, not here. -->
@@ -1131,6 +1158,25 @@ An answer that arrived with no deliberation owes an alternative you can name
 and reject.
 
 @shared/workflow/metacognitive-monitoring.md
+
+## Question the assignment, not only the claims
+
+The rule above governs **claims** --- the ones you generate as much as the ones
+you are handed.
+This one governs what you are asked to **do** --- a brief, an issue body, a
+plan, a convention document, or the option set in a posed question.
+None of those assert anything, so no claim-checking rule fires on them, and
+adopting one feels like compliance rather than like skipping a step.
+A wrong claim spoils a sentence; a wrong assignment spoils the whole task,
+while every step inside it stays correct and checks green.
+
+Two written lines bound the check: before starting, name the premise the work
+rests on and what would show it false; in the report, name one thing in the
+assignment you actually checked.
+For a posed choice, state what its options presuppose before answering within
+them.
+
+@shared/workflow/challenge-the-assignment.md
 
 ## Check for merge conflicts on every merge in an ultracode session
 

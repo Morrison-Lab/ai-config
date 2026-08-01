@@ -111,7 +111,9 @@ For those the prose rule is the whole mechanism, and saying so plainly is better
 
 ## Relationship to other rules
 
-The nearest neighbour is `flag-practice-slippage`, proposed in ai-config#959 and still open as of 2026-07-31 -- once that merges the fragment will live at `shared/workflow/flag-practice-slippage.md`.
+The nearest neighbour is
+[`flag-practice-slippage`](flag-practice-slippage.md), which merged as
+ai-config#959 on 2026-07-31.
 It is a different rule.
 It covers drift by **neglect** -- a sweep skipped, a check run against a stale checkout -- and its remedy is to say so, in a form the user can act on.
 This fragment covers drift caused by an **incident that supplied an apparent reason**, which that rule will not fire on, because from the inside it does not present as neglect at all.

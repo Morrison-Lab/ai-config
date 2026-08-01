@@ -22,7 +22,7 @@ was `git worktree list`.
 
 ## Why this warns rather than denies
 
-Measured over 122 real `Agent` launches in this machine's transcripts, 60 (49%)
+Measured over 121 real `Agent` launches in this machine's transcripts, 60 (49%)
 are write-capable with no `isolation`. Denying half of all agent launches is
 not a proportionate response to a visibility problem, and it would be wrong on
 the merits besides:
@@ -48,12 +48,20 @@ fires constantly trains everyone to ignore it.
 ## Classifying write-capable
 
 `subagent_type` is the only reliable signal in the payload; prompt text is not.
-`Explore` and `Plan` are read-only by definition (the harness grants neither
-`Edit`, `Write`, nor `NotebookEdit`), so they are exempt. Everything else warns,
-including `claude-code-guide`, which has no editing tools but does have `Bash`.
+`Explore` and `Plan` are exempt because the harness defines them as read-only
+**roles**: it grants neither `Edit`, `Write`, nor `NotebookEdit` to either.
+Everything else warns, `claude-code-guide` included.
+
+Be precise about what that exemption rests on, because the shorter reason is
+wrong and was stated here in an earlier revision. It is **not** tool
+inventory. `Explore` and `Plan` are both granted `Bash`, so on a strict
+can-this-touch-a-file test neither would qualify and the allowlist would be
+empty. The exemption rests on the declared role contract, and `Bash` is the
+hole in that contract --- which is the same heuristic the paragraph below
+already owns, rather than a separate weakness.
 
 A **missing** `subagent_type` warns too, and that case is real rather than
-theoretical: 3 of the 122 records carry no `subagent_type` at all. Treating an
+theoretical: 3 of the 121 records carry no `subagent_type` at all. Treating an
 absent field as "unknown, skip" would have silently exempted every one of them,
 which is the shape where a check's pass path and its examined-nothing path look
 identical.

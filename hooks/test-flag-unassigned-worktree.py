@@ -2,7 +2,7 @@
 
 The payloads below are not invented. Every `tool_input` key set here was
 observed in real `Agent` tool_use records in this machine's Claude Code
-transcripts (`~/.claude/projects/**/*.jsonl`), across 122 launches:
+transcripts (`~/.claude/projects/**/*.jsonl`), across 121 launches:
 
     48  (description, prompt, subagent_type)
     33  (description, prompt, run_in_background, subagent_type)

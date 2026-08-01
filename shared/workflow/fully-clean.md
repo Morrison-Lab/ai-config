@@ -463,10 +463,16 @@ That is what lets this survive a long investigation rather than a careless one.
 Every reading of the run data is correct, and the natural check against the
 case above, whether the guard misfired, comes back **no**, which reads as
 confirmation that the red can be trusted.
-Nothing in the run's conclusion, result object, step list, or logs differs
-between "the reviewer produced nothing" and "the reviewer produced a full
-verdict and then errored", because the distinguishing fact was never in the
-run.
+Nothing in the run's conclusion, result object, or step list differs between
+"the reviewer produced nothing" and "the reviewer produced a full verdict and
+then errored", because the verdict is an artifact on the PR rather than a field
+of the run.
+Be precise about how far that goes: at `@v2` the execution output does carry
+the posted text, so the fact is present in the run and merely unreachable ---
+the guard exits above the scan that would read it --- while at `@v1` there is
+no such scan to reach.
+Gated by control flow rather than absent, and on neither version does any path
+the guard takes evaluate it.
 
 So read the guard's own failure branch once, and let it tell you what its red
 is worth.
@@ -474,10 +480,13 @@ A branch that exits before evaluating the artifact yields a red carrying no
 information about that artifact, which is the mirror of the benchmark-check
 case this file records, whose green carries none about its content.
 Two timestamps then localize it exactly, per
-[`algorithmatize-checks`](algorithmatize-checks.md): the verdict comment's
-`updated_at` against the guard step's `started_at`.
-A comment finished before the guard began is not a comment the guard was
-reacting to.
+[`algorithmatize-checks`](algorithmatize-checks.md): bracket the verdict
+comment's `updated_at` inside the **review** step's own `started_at` and
+`completed_at`.
+A comment written while that step was running is a comment that run produced.
+Comparing it against the guard step's `started_at` instead does not
+discriminate, since the guard always runs after the review step in the same
+job, so a stale comment from any earlier round clears that bar just as easily.
 
 - **Do:** read the PR's own comments before accepting that a failed review run
   produced no verdict.

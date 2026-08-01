@@ -287,15 +287,22 @@
   separate consumer of that checkout, which is why switching branches
   underneath it does not feel like switching branches out from under anybody.
   Nothing errors when you do.
-  Every working-tree read the agent makes silently becomes an answer about your
+  Every read the agent resolves through `HEAD` --- the working tree, the index,
+  and `git show HEAD:<file>` alike --- silently becomes an answer about your
   branch instead of its own.
   The symptom is the expensive part: `git show HEAD:<file>` returns the
   pre-edit text, which is indistinguishable from the agent's own commit having
   been reverted, so it may redo finished work or report the work as lost, and
   both readings are wrong.
-  Settle it from the **committed blob** rather than the working tree ---
-  `git show <its-branch>:<file>` and `git ls-remote origin <its-branch>` are
-  unaffected by whatever `HEAD` now points at.
+  Note what that command is **not**, because the obvious remedy does not fix
+  it: `git show HEAD:<file>` already reads a committed blob and never touches
+  the working tree, so switching from the tree to a commit changes nothing.
+  What moved is the **ref**.
+  `HEAD` follows the parent's `git checkout` or cherry-pick; a branch name does
+  not.
+  So name the branch --- `git show <its-branch>:<file>` and
+  `git ls-remote origin <its-branch>` are unaffected by whatever `HEAD` now
+  points at.
   - **Do:** pass `isolation: "worktree"` for a single delegated agent that will
     commit or change branches, not only for a fan-out of several.
   - **Do:** answer a suspected revert from the branch ref and the remote.

@@ -195,6 +195,40 @@ Dropped before implementation, with the reasoning recorded in both the issue
 and the PR body, and the neighbouring fragments cross-linked to the skill
 instead.)
 
+**A routine merge from `main` can create the duplicate inside your own diff.**
+The collision above lands before you write, so the duplicate is redundant on
+arrival.
+A later `main` merge is quieter: both branches were non-duplicative when they
+were written, and the duplicate appears only when you bring the other branch's
+text into yours.
+Git reports a clean merge because the two copies sit in different files.
+Diff-scoped added-line checks do not help either, because the duplicated lines
+already existed on one side or the other.
+So after merging `main` into a prose branch, run the duplicate check against
+the branch's full current diff and the neighbouring corpus, not only against
+lines added by the merge commit.
+
+- **Do:** after a `main` merge, re-run a cross-file duplication check over the
+  merged branch's whole prose diff.
+- **Do:** treat a reviewer finding on such duplication as correct even when
+  each copy was independently right before the merge.
+- **Don't:** assume a conflict-free `main` merge preserved DRY, or that the
+  duplicate would have appeared in an added-lines-only scan.
+- **Don't:** answer by asking which branch "introduced" the duplication;
+  the merge introduced the state that made both copies coexist.
+
+(Morrison-Lab/ai-config#969, 2026-08-01: #969 added
+`shared/workflow/batch-merge-and-resolve.md` with a blockquote generalizing
+that an added-lines-only instrument is unsound when a defect can be introduced
+by deleting a line.
+PR #966 independently added the same generalization to
+`shared/workflow/sync-with-main.md` and merged after #969's branch was written.
+`git show 50afe818:shared/workflow/sync-with-main.md`, normalized for
+whitespace and markup, did not contain the phrase, so the duplication did not
+exist at #969's pre-merge head.
+The round-2 merge from `main` brought #966's copy in, and the round-3 review
+correctly flagged the two uncited copies.)
+
 **Two PRs that each append a new terminal numbered subsection to the same
 file (e.g. `### 5. ...` in a `CLAUDE.md` review-guidelines list) will
 conflict on merge even when neither side's content actually disagrees.**

@@ -513,6 +513,38 @@ Matching whole lines against the tag -- how bash itself ends a heredoc --
 removed the whole lazy-quantifier/anchor failure mode instead of narrowing
 it; the reply carried the failing output of the suggested form.)
 
+**A reviewer's corrected citation is another factual claim, so verify the
+replacement before adopting it.**
+The finding can be right: the citation in the PR can name the wrong source.
+That does not make the reviewer's proposed source right.
+A replacement issue or PR number is a fresh provenance claim, and it needs the
+same check as the original citation.
+For text provenance, prefer history over word association:
+`git log -S "<exact line>" -- <file>` asks which commit introduced the line,
+while matching a word in another PR plus a nearby merge time only builds a
+story.
+Keep the review's conclusion when it is right, but set aside the replacement
+when the evidence points elsewhere, and say which query decided it.
+
+- **Do:** verify a proposed replacement citation with the source's own history
+  before editing the PR to use it.
+- **Do:** use `git log -S "<exact line>" -- <file>` or an equivalent
+  provenance query when the question is which PR introduced text.
+- **Don't:** adopt a reviewer's corrected issue or PR number because the
+  original was wrong.
+- **Don't:** use word overlap and same-day timing as a substitute for source
+  history.
+
+(Morrison-Lab/ai-config#971 round 2, 2026-08-01: a review correctly found that
+PR #955 did not cover a "default nobody chose" case record.
+It then proposed #951 as the source because #951's `memories/tools.md` entry
+used the word "default" and merged the same day.
+That was the wrong default and the wrong file: #951 did not touch
+`shared/workflow/metacognitive-monitoring.md`.
+`git log -S "An unexamined default" -- shared/workflow/metacognitive-monitoring.md`
+identified #947 as the source for the default half, while #955 supplied the
+handed-premise half in the same fragment.)
+
 **The highest-yield version of that check: when a comment names an edge case
 in its own prose and also supplies a fix, run the fix against that edge
 case.**

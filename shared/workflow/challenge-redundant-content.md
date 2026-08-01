@@ -42,3 +42,39 @@ the same procedure copied into several unrelated places), say so and route it
 to `find-overlap` (or `consolidate-skills`/`consolidate-memory` for
 skills/memories), rather than trying to fix everything found along the way in
 the current review.
+
+## Use the overlap instrument, not literal grep
+
+A redundancy finding is exactly where phrase grep is most tempting, and where
+it is least trustworthy.
+This corpus uses semantic line breaks and inline markup, so a copied claim can
+span a newline or differ only by backticks while still being the same prose.
+Use the existing n-gram shingle instrument first:
+`scripts/find-near-duplicates.py` ranks corpus pairs by normalized word
+shingles and reports the number of units and pairs it examined.
+Its score is only a reading list, not a verdict, so still apply the litmus test
+above by reading the candidate bodies.
+When the question is a narrower single-file audit, use the same shape:
+normalize whitespace and markup on both sides, lower-case, compare word
+n-grams, and report the examined scope.
+
+- **Do:** run `scripts/find-near-duplicates.py` or an equivalent normalized
+  n-gram shingle comparison before claiming a redundancy search is clean.
+- **Do:** report the examined files or pairs alongside any overlap found, then
+  read the overlapping bodies before deciding whether consolidation loses
+  nothing.
+- **Don't:** use literal grep as evidence that no matching prose exists in a
+  semantic-line-break corpus.
+- **Don't:** treat a high shingle score as the disposition; it is a pointer to
+  read, not a duplicate verdict.
+
+(Morrison-Lab/ai-config#969, 2026-08-01: after review flagged one uncited
+copy between `batch-merge-and-resolve.md` and `sync-with-main.md`, a
+10-gram shingle sweep normalized backticks, asterisks, underscores, whitespace,
+and case across `shared/workflow/`, `shared/writing/`, and
+`shared/principles/`.
+It found four overlapping runs: the flagged generalization, a second uncited
+copy about `markdownlint`'s `blanks-around-lists` explanation that review had
+missed, and two already-cited overlaps.
+A literal grep for the `blanks-around-lists` wording in `sync-with-main.md`
+returned nothing because the phrase crossed a semantic line break.)

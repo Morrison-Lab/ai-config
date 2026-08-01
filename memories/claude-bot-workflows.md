@@ -664,6 +664,37 @@ not block `claude-review`.)
   on "waiting for background agents" — a mechanism the summary object alone
   can't show (`d-morrison/gha#185`, `Lacaedemon/sparta` PR #615, 2026-07-03).
 - **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.** `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments. If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading. This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review. Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text. Filed with full evidence as `d-morrison/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
+- **Both bullets above presuppose `@v2`: at `@v1` the execution artifact is
+  never produced at all, so its absence is not an access problem.**
+  `claude-code-review.yml@v1` has no `Resolve and upload execution file path`
+  step, while `@v2` has two of them (one per attempt), so a run pinned at
+  `@v1` uploads nothing and every route to the artifact fails identically ---
+  which reads as a credentials or proxy problem and is not.
+  Confirm the producing step ran before diagnosing the fetch; see
+  [`debugging.md`](debugging.md)'s "An artifact you cannot retrieve may never
+  have been produced" for the general form and the one-call check. (2026-07-31.)
+- **`is_error` is the field that says whether the run failed.
+  `subtype` is not, and the two can look contradictory in the same object.**
+  A stub review reports `is_error: false` alongside real turns and cost: it
+  ran, and never stated a verdict.
+  A genuine failure reports `is_error: true`, and can carry
+  `subtype: "success"` beside it.
+  That is not a contradiction --- `subtype` describes how the SDK turn
+  terminated, not whether the job did its job.
+  So read `is_error` for the verdict and treat `subtype` as narration.
+  (2026-07-31.)
+- **The *agent* workflow reports an API-level error by posting it as a plain
+  PR comment, and its job still concludes `success`.**
+  When `claude.yml`'s `Run Claude Code` step ends without committing anything,
+  the later `Post Claude's response if no code was committed` step publishes
+  whatever the run produced --- including a bare API error such as
+  `Prompt is too long`, under a footer naming the step and linking the run.
+  Every step conclusion stays `success` or `skipped`, so the run is green and
+  no check, artifact, or log records a failure anywhere.
+  Read the thread rather than the run when an agent invocation appears to have
+  done nothing; see [`debugging.md`](debugging.md)'s
+  "Read the failure's own output" for the general form.
+  (`Morrison-Lab/ai-config#986`, run 30664135897, 2026-07-31.)
 - **`gh pr checks <N>` can return a momentarily-stale check entry right after a
   state-changing trigger (close/reopen, a push, `gh run rerun`).** Querying
   immediately after triggering can show the check that was current a few
@@ -791,6 +822,77 @@ fork-skip comment ending "Review it with `@claude review` instead."
 Caught in self-review before the first push; every fork skip would have
 dispatched an agent run, on the exact substring gate this file already
 documents for the human case.)
+
+**gha#342's stripper does not close the human case, because a mention can be
+quoted with no markup around it at all.**
+That fix strips blockquote lines, fenced code blocks, indented code blocks,
+and inline code spans before matching, so *upstream* it catches a mention
+someone wrapped in backticks or quoted as a block.
+It cannot catch one sitting in ordinary prose, and a rule cited by its own
+title is exactly that, since quotation marks are not markup.
+
+**Two things stop that from being the whole story here, and the first is the
+pin.**
+The stripper ships in `@v2`, and this repo's `claude-bot.yml` still calls
+`claude.yml@v1`.
+Check it by content rather than by tag date, since `v1` is frozen on a
+diverged line and is not an ancestor of the fix:
+
+```bash
+git show v1:.github/workflows/claude.yml | grep -c detect-bot-mention   # 0
+git show v2:.github/workflows/claude.yml | grep -c detect-bot-mention   # 1
+```
+
+So a backticked mention in a comment on *this* repo fires exactly like a bare
+one, and none of the markup reasoning above applies until the pin moves.
+Note that #998 moved `claude-review.yml` to `@v2` and left `claude-bot.yml`
+alone, so the two callers disagree and reading either one settles nothing
+about the other.
+
+The second reason holds even after the pin moves.
+`claude.yml@v2`'s own job-level `if:` still tests the raw body with
+`contains()`, because a GitHub expression cannot strip Markdown, so the job
+starts and the runner spins up regardless.
+What the stripper buys is the billed agent run and the review re-dispatch, not
+silence.
+So a code span is the wrong thing to trust under either pin, which is what the
+Do bullet below is about.
+
+This corpus makes the bare case the common one rather than a rare one, because
+four of its headings carry the mention with no markup at all:
+
+```bash
+grep -rn '^#\{1,6\} .*@claude' --include=*.md . | grep -v '`@claude'
+```
+
+Read that `grep -v` as isolating the bare subset, not as clearing what it
+drops.
+It filters out three further headings whose mention is backticked, and at
+`@v1` those are no safer than the four it keeps.
+
+One of the four is `CLAUDE.md`'s "Do the review yourself when the @claude
+workflow doesn't produce a verdict", which is self-defeating in a specific
+way: the rule you reach for *because* the reviewer failed cannot be named in a
+comment without spending a real agent run.
+
+So cite such a rule by section without reproducing its title verbatim, or
+defang the mention when the title has to be quoted.
+Neither backticks nor gha#342 will do it for you.
+
+- **Do:** reword a quoted rule title that carries the mention, rather than
+  trusting a code span to neutralize it.
+- **Do:** read the caller's own pin before reasoning about the stripper at
+  all, since `@v1` does not carry it.
+- **Don't:** read gha#342 as closing the quoting hole in general --- upstream
+  it closes the markup-quoted half only, and at `@v1` it is not in play at
+  all.
+
+(`Morrison-Lab/ai-config#986`, 2026-07-31: a self-review comment named that
+rule in a parenthetical, mention bare, and workflow run 30664135897 was
+created five seconds later.
+That run is the one whose `Prompt is too long` comment finally explained the
+afternoon's failures, so an accidental dispatch is the only reason the answer
+existed at all --- which is luck, and not a reason to leave the hole open.)
 
 ## `CLAUDE_CODE_OAUTH_TOKEN` carries no recoverable account identity
 

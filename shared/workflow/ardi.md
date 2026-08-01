@@ -610,9 +610,55 @@ version `DESCRIPTION` pins --- was unavailable, inferred from one failed
 `install.packages()` disproved it, and the regeneration landed in the same
 round the finding did.)
 
+**Name the specific gate when you report a blocker, not a category word that
+happens to be one of several.**
+The rule above governs *whether* something is blocked, and its remedy is to
+attempt the thing once.
+This governs *why*, and it fires after that remedy has already succeeded: the
+call was attempted, it genuinely failed, and the blocker is real.
+Only the attribution is wrong, which is why nothing about it feels like an
+unverified claim -- the part that usually goes unchecked has, this time, been
+checked.
+
+The hazard is a platform with two gates whose refusals read alike.
+`resolve_review_thread` on a transferred repo fails under either spelling of
+the owner, saying `Access denied` both times, for unrelated reasons: the old
+owner trips a comparison between the thread's node and the declared
+`owner`/`repo` string, and the new owner trips the session's own repository
+allowlist.
+Only the second of those is scope.
+So "blocked for scope reasons" is not a loose summary of the first.
+It names a mechanism that was not involved, and it names one that genuinely
+exists on that platform, which is what lets it survive re-reading.
+
+That last point is the whole cost.
+A category word that is also the proper name of one mechanism cannot double as
+the generic term for its family, because a reader cannot tell which you meant,
+and the wrong reading is actionable: someone told a call failed on scope will
+reach for the other owner, which fails too.
+Quote the error's distinguishing clause instead of classifying it.
+The quote is usually shorter than the paraphrase, it is checkable, and it
+stays correct even when your model of the platform is not.
+
+- **Do:** quote the clause that distinguishes the failure, and name the gate
+  it belongs to.
+- **Do:** re-read a blocker you have restated several times, since a
+  paraphrase repeated across status reports hardens into the record.
+- **Don't:** use one mechanism's own name as a generic word for its category.
+- **Don't:** treat having verified *that* something is blocked as having
+  verified *why*.
+
+(2026-08-01, `Morrison-Lab/ai-config` worked from a `d-morrison`-scoped
+session: an unresolvable review thread was reported as blocked "for scope
+reasons" across roughly six status updates, while the failure actually
+observed under that spelling was the node-versus-declared-string comparison.
+`memories/github.md` records both gates and their verbatim errors.)
+
 **A blocker that was true when you published it can stop being true while
 the PR is open, and withdrawing it is your job, not the reviewer's.**
-The bullet above covers a blocker that was never true.
+The verify-a-blocker bullet above covers a blocker that was never true, and
+the gate-naming bullet between it and this one covers a real blocker whose
+mechanism was misnamed.
 This is the harder case, because the caveat was correct and diligent when
 written, so nothing about it reads as a defect later --- and a sentence
 saying "this could not be checked" is one nobody re-checks, least of all
@@ -917,8 +963,8 @@ where it would have argued against porting the fix that actually worked.)
 **Verify a command, path, or flag *you* write into a doc, with the same rigor
 [`address-every-comment`](address-every-comment.md) demands for one a reviewer
 suggests.**
-That rule and the blocker rule above both point outward, at a claim someone
-else made or at a limit you hit.
+That rule and the verify-a-blocker rule above both point outward, at a claim
+someone else made or at a limit you hit.
 This is the one you author from scratch, and it is easier to miss than either,
 because inventing a plausible command does not feel like making a claim at
 all --- it feels like remembering one.

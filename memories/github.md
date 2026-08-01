@@ -467,6 +467,30 @@
   (`d-morrison/altdoc#61`, 2026-07-25: three instances in one afternoon ---
   `test-coverage`, `docs-check` (completed `21:12:56`, still reported
   `in_progress` after), and one true negative.)
+- **`list_pull_requests` reports `merged: false` for every PR, merged ones
+  included; `merged_at` is the field that discriminates.**
+  The two bullets above are about *staleness*, where a field is sometimes
+  wrong; here it is **constant**, so it is wrong for every merged PR while
+  looking correct on any unmerged one you spot-check it against.
+  A constant carries no information, the argument
+  [`fully-clean`](../shared/workflow/fully-clean.md) also makes for `.state`.
+  Measured on `d-morrison/ai-config`, 2026-08-01, over 101 rows all `false`:
+
+  | field | open (#1006) | merged (#1005) | closed unmerged (#505) |
+  |---|---|---|---|
+  | `list` `merged` | `false` | `false` | `false` |
+  | `list` `merged_at` | absent | present | absent |
+  | `get` `merged` | `false` | `true` | `false` |
+
+  **It is not the `fields` projection**, the first thing to suspect and a
+  different remedy: passing no `fields` argument at all returns the same value.
+  `merged_by` is no fallback either, never served in a list response even when
+  named in `fields` -- consistent with the list endpoint returning GitHub's
+  smaller representation, though that is inferred rather than read from source.
+  - **Do:** decide merged-versus-closed from `merged_at`, and call
+    `pull_request_read` `get` when you need `merged` itself.
+  - **Don't:** report a PR as closed-unmerged on a list response's `merged`
+    field -- it says that about every PR in the repo.
 - **`mcp__github__actions_list` (`list_workflow_runs`) returns a full repository
   object per run -- budget accordingly, and prefer a cheaper call.** Each run in
   the response carries `repository`, `head_repository`, `actor`, and

@@ -149,6 +149,51 @@ Neither surfaced from re-reading the code.
 Both surfaced from tests, and the first only from the test that pasted the
 reported line in unaltered.)
 
+## A negative control must enter at the real input
+
+The section above says to test a guard against the incident that prompted it.
+This is the same demand made of any multi-stage instrument, and it fails in a
+way that is harder to notice, because the control **works**.
+
+An instrument is usually a pipeline: extract candidates, filter them, judge
+what survives.
+Feeding a known-bad case straight to the judging step proves that step and
+nothing else --- while feeling like proof of the whole, since the instrument
+does flag it, exactly as predicted.
+
+So plant the failing case at the **real input**.
+If the instrument reads a diff, put it in the diff.
+If it reads a log, write the line into the log.
+A control that skips extraction cannot detect an extraction that drops the
+very class you care about, and extraction is the usual culprit precisely
+because it looks like plumbing rather than logic.
+
+State which stages your control travelled when you report the result.
+"Clean, and the control exercised all three stages" is interpretable; "clean,
+and the control failed as expected" is not, because it does not say where the
+control entered.
+
+- **Do:** inject the control at the instrument's real input, and let it travel
+  the whole path.
+- **Do:** name the stages the control covered alongside the clean result.
+- **Don't:** hand the control to the stage you already trusted.
+- **Don't:** call an instrument trustworthy on a control that skipped its
+  weakest step.
+
+(2026-07-31, `ucdavis/bcs#539`: a three-step spelling check --- extract
+candidates from the diff, drop those already present on a green `main`, look
+the rest up in a dictionary --- reported 52 candidates, 3 unproven, 0 unknown,
+and was called trustworthy on the strength of a control fed directly to the
+dictionary step.
+CI then failed on `SAS's`, a possessive added by the same commit the check had
+just cleared.
+Its extraction was `grep -oE '\b[a-z]{7,}\b'`: lowercase, seven or more
+characters, no apostrophes, so the word was excluded on all three counts and
+never became a candidate.
+The filtering step was sound --- against green `main` it separated the four
+possessives exactly, `arm's` 4 files, `manuscript's` 2, `simulation's` 6, and
+`SAS's` 0 --- which is what makes the extraction the whole of the defect.)
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

@@ -139,9 +139,9 @@
   GitHub keeps the pre-transfer path working, so `d-morrison/ai-config` remotes, clones, and API calls all silently redirect to `Morrison-Lab`; a push to a `d-morrison` remote lands on `Morrison-Lab`, and `create_pull_request` with `owner: "d-morrison"` opens a PR that comes back with a `Morrison-Lab` URL and number.
   **In a scoped remote session, pass the PRE-MOVE owner to every GitHub MCP call.** A session whose scope lists `d-morrison/ai-config` gets "Access denied" for `owner: "Morrison-Lab"`, since scope is matched against the literal owner string and the redirect does not extend it.
   The same call with `owner: "d-morrison"` redirects server-side and **works**, for reads as well as writes: `create_pull_request`, `update_pull_request`, and `issue_write` all land on `Morrison-Lab`, and so do `pull_request_read`, `get_job_logs`, and `actions_run_trigger`.
-  So the repo is fully reachable; only the spelling of the owner matters.
-  `add_repo` is the one exception, and it fails for an unrelated reason: it refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `d-morrison`/`ucd-serg`/`ucdavis` repos.
-  That is a session-composition limit, not a scope or redirect one, and it does not block anything above.
+  So the repo is fully reachable for most calls; only the spelling of the owner matters for them.
+  Two exceptions, for unrelated reasons. `add_repo` refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `d-morrison`/`ucd-serg`/`ucdavis` repos; that is a session-composition limit, not a scope or redirect one, and it does not block anything above.
+  `mcp__github__resolve_review_thread` is unreachable under **either** owner spelling for this repo (see `memories/github-mcp-tools.md`), which is a genuine gap rather than a spelling issue.
   **Do not conclude a repo is unreachable from one denied call.** Trying `owner: "Morrison-Lab"`, getting "Access denied", and stopping there produced a published claim that a PR's state "cannot be polled on demand", repeated in a memory entry and a PR body, and used to justify polling the branch over git instead.
   It was false the whole time; the writes going through the pre-move owner were sitting right there as the counter-example.
   When one owner spelling is denied, try the other before recording a limitation. (2026-07-31.)

@@ -652,7 +652,7 @@ stays correct even when your model of the platform is not.
 session: an unresolvable review thread was reported as blocked "for scope
 reasons" across roughly six status updates, while the failure actually
 observed under that spelling was the node-versus-declared-string comparison.
-`memories/github.md` records both gates and their verbatim errors.)
+`memories/github-mcp-tools.md` records both gates and their verbatim errors.)
 
 **A blocker that was true when you published it can stop being true while
 the PR is open, and withdrawing it is your job, not the reviewer's.**

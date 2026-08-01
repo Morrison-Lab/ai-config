@@ -35,17 +35,27 @@ set -euo pipefail
 
 CMD="${1:?usage: tui-alloc <command> [salloc args...]}"; shift
 
+# Refuse to nest; lib/slurm-guard.sh records the deadlock this prevents.
+# Shared with cnode; resolve through the install symlink to find it.
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=../lib/slurm-guard.sh
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../lib/slurm-guard.sh"
+refuse_if_nested "$CMD"
+
 RCDIR="$HOME/.config/tui-alloc"
 
 export TUI_ALLOC_CMD="$CMD"
 export TUI_ALLOC_PWD="$PWD"
 
-# Node-side guard. zsh lives at /usr/bin/zsh on the login node but isn't
-# provisioned on every compute node, so `zsh -i` there dies with a cryptic
-# `env: 'zsh': No such file or directory` (exit 127). A shared-filesystem zsh
-# on PATH (`conda install -n base -c conda-forge zsh`) makes it visible on all
-# nodes; if that's ever missing, drop to an interactive bash with a clear hint
-# instead. Runs inside the srun step, so it checks the node, not the login host.
+# Node-side guard. shiva ships no system zsh on any node -- there is no
+# /usr/bin/zsh, on the compute nodes or the login node -- so `zsh -i` resolves
+# only because a shared-filesystem zsh sits on PATH
+# (`conda install -n base -c conda-forge zsh` -> ~/miniconda3/bin/zsh). Before
+# that install the step died with a cryptic
+# `env: 'zsh': No such file or directory` (exit 127); if it ever goes missing
+# again, drop to an interactive bash with a clear hint instead. Runs inside the
+# srun step, so it checks the node, not the login host.
+# shellcheck disable=SC2016  # deliberate: this body must reach the node unexpanded
 NODE_GUARD='command -v zsh >/dev/null && exec zsh -i
 echo "tui-alloc: no zsh on this node ($(hostname)); falling back to bash." >&2
 echo "  fix: conda install -n base -c conda-forge zsh  (shared /home makes it visible on all nodes)" >&2

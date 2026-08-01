@@ -127,8 +127,8 @@ Where the assignment is sound, the whole cost is one sentence.
   conventions before pushing.
   This is the general one, covering the prose directive that snippet sat in,
   at the start of the work rather than at its end.
-- A companion rule on **posing** non-exclusive options as alternatives is
-  proposed in ai-config#946; once it merges, read that for the asking side and
+- A companion rule on **posing** non-exclusive options as alternatives lives in
+  [`avoid-false-dichotomies`](avoid-false-dichotomies.md); read that for the asking side and
   this for the answering side.
 
 (2026-07-30, `ucdavis/bcs`: that repo's `CLAUDE.md` asserts, as a section

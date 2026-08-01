@@ -52,6 +52,12 @@ jobs:
         # repository secrets across the estate, so it is a local operator tool
         # that must never run unattended in CI (ai-config#952).
         run: python3 scripts/test_rotate_claude_token.py
+      - name: Run PR-sweep tests
+        # Only the tests run here. pr-sweep.py itself queries the GitHub API
+        # via `gh`, which a runner cannot do unauthenticated, so running the
+        # sweep in CI would prove nothing. Its classification logic is pure
+        # over the GraphQL payload shape, so the tests cover it offline.
+        run: python3 scripts/test_pr_sweep.py
       - name: Check for oversized memory files (advisory)
         # Non-blocking (ai-config#695): memory files are read on demand, so
         # length is a real per-use cost -- but crossing the threshold is a

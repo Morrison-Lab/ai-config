@@ -304,6 +304,20 @@ common patterns.
   re-dispatched `workflow_dispatch`, automatic `pull_request`, same-repo or cross-repo),
   with no conditional branching on `job_workflow_ref` needed. (d-morrison/gha#197,
   `.github/actions/run-review-guard/`.)
+  **The checkout half of this recurred in a brand-new reusable workflow, not
+  an existing one that broke in production.** A `workflow_call` reusable
+  workflow's own job step -- not a nested composite -- assumed the same
+  thing: `version-check.yml`'s "Compare versions" step ran
+  `Rscript working/.github/workflows/scripts/check-dev-version.R` straight
+  after `actions/checkout` steps with no `repository:` input, so the script
+  path would never exist on any real consumer's checkout, since those
+  checkouts are the CALLER's repo, never gha's own.
+  Caught by self-review before merge rather than by a live consumer
+  failure, and fixed the same way: route through the already-built
+  `check-dev-version` composite
+  instead of hand-rolling the `Rscript` call, so the script resolves via
+  `github.action_path` regardless of what `workflow_call` checked out.
+  (Morrison-Lab/gha#390, 2026-07-31.)
 - **A fix that's only unit-tested against the extracted logic in isolation, never against
   the actual `uses:` invocation, can ship a broken integration point undetected.** #191's
   own test (`parse-workflow-ref/tests/run-tests.sh`) fed hardcoded ref strings straight to
@@ -400,6 +414,17 @@ common patterns.
   The bare `<username>@users.noreply.github.com` is not privacy-safe and can match a real inbox.
   For `issue_comment` events, the actor's numeric ID is in `github.event.comment.user.id`:
   `committer-email: ${{ github.event.comment.user.id }}+${{ github.actor }}@users.noreply.github.com`.
+- **The whole per-PR dev-version-bump chore below is obsolete once a repo
+  adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check`
+  capabilities (gha#390, tracking gha#388).** Those replace the "bump
+  `DESCRIPTION` above `main`, re-bump after every merge" convention with an
+  auto-bump-on-`main`-merge workflow plus an inverted `version-check` that
+  fails a PR if it touches `Version:` at all --- so once a repo migrates,
+  every bullet below about bumping, re-bumping, or the `no version increment`
+  label bypass no longer applies to that repo. Not deleted here because most
+  repos (bcs, serocalculator, serodynamics included) haven't migrated yet;
+  check whether the repo in front of you has adopted the new workflow before
+  following this chore.
 - **Both bcs PR gates have a label bypass for non-user-visible changes.** `version-check`
   (`version-check.yaml`, derived from RMI-PACTA's R-semver-check) does a pure version
   comparison and fails if the PR branch version ≤ main's, **but** it skips when the
@@ -835,6 +860,50 @@ only `dist/`, which was the wrong reason --- but a `grep -n` settled the real
 question in one command, and the same off-by-one had already shipped into the
 workflow comment that makes the same claim.)
 
+## A job's step list identifies which version of a reusable workflow ran
+
+The `referenced_workflows[].sha` bullet above answers "which commit did this
+run resolve", and it is the right instrument when you have it.
+A job's own **step list** answers the same question independently, from a
+different endpoint, and needs no reasoning about re-run modes: `actions_get`
+`get_workflow_job` returns the `steps` array, and the steps are whatever that
+version of the workflow defines.
+
+Prefer step **names** to a step **count**.
+A count drifts with every step added; a name present in one version and absent
+from the other keeps working.
+For `Morrison-Lab/gha`'s `claude-code-review.yml`, measured against the tags
+on 2026-07-31 with `git show v1:.github/workflows/claude-code-review.yml` and
+the same for `v2`:
+
+- **`@v1` only:** `Fail the check if the review did not complete` (unsuffixed).
+- **`@v2` only:** `Fail the check if the review did not complete (attempt 1)`,
+  `Fail the check if the retry also did not complete`,
+  `Parse caller workflow ref`, `Install packages`,
+  `Resolve and upload execution file path` (twice, one per attempt),
+  `Retry Claude Code Review after a stub result`, `Sum attempt costs`, and
+  `Resolve final review outcome`.
+
+The fail-check name is the cheapest single tell: `@v1` has one such step,
+`@v2` splits it into an attempt-1 step plus a retry counterpart.
+Gross size is a usable first glance --- `@v1` defines 12 named steps against
+`@v2`'s 25 --- but read a runtime count as approximate, since a job's `steps`
+array also carries the runner's own setup and teardown entries and so will not
+equal the file's named-step count.
+
+- **Do:** key on a distinguishing step name when you need to know which
+  version ran.
+- **Do:** treat this as independent corroboration of
+  `referenced_workflows[].sha`; two endpoints agreeing is a stronger answer
+  than either alone.
+- **Don't:** key on a raw step count without allowing for runner-injected
+  steps and for the file's own step count changing between releases.
+
+(2026-07-31: `Morrison-Lab/ai-config` review runs were diagnosed against
+`@v2`'s behaviour while actually running `@v1`, which is what explained a
+missing execution artifact --- see
+[`claude-bot-workflows.md`](claude-bot-workflows.md).)
+
 ## Which ref a workflow runs from decides whether a trigger change takes effect before merge
 
 Editing a workflow's `on:` block has different reach depending on which event
@@ -863,3 +932,23 @@ of a run for the new event is the addition being inert rather than broken.
 `list_workflow_runs` for that workflow on the branch returned exactly one run,
 at the empty claim commit predating the change, and none for the
 `ready_for_review` event the old file would have fired on.)
+
+**The same head-ref rule governs the `uses:` line, not just the `on:` block,
+so a pin-bump PR self-tests before it merges.**
+A `pull_request`-triggered run reads the **caller** workflow file from the PR
+branch, and that file is where the `uses: .../<workflow>.yml@<ref>` line
+lives.
+So a PR that changes a call from `@v1` to `@v2` exercises `@v2` in its own
+pre-merge run, with no tag slide and no merge required.
+That is the reverse of the reusable-workflow bootstrapping gap described
+above, and it is worth knowing in both directions.
+
+- **Do:** treat a pin-bump PR's own run as a real test of the new pin, and
+  read its step list to confirm which version answered, per the section
+  above.
+- **Don't:** read a step list from such a run as evidence about what the
+  **base** branch is pinned to --- the branch's own file is what ran.
+
+(`Morrison-Lab/ai-config#998`, 2026-07-31: the PR repointing `claude-review`
+from the frozen `@v1` to `@v2` showed `@v2`'s step shape on its own run before
+merging.)

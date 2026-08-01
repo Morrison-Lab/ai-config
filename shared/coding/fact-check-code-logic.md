@@ -180,6 +180,52 @@ which held, and the reviewer independently confirmed each one --- so the
 cost of being wrong here was one wrong sentence caught before review rather
 than a finding.)
 
+## Matching values is not matching roles
+
+When checking whether our code follows a reference implementation, confirm the
+matched quantity plays the **same role** in both systems.
+Equal values are not agreement.
+
+The failure is a `grep` for a constant that finds it in the reference and
+stops there.
+Two things make it more persuasive than an ordinary bad lookup.
+A matching number feels like *verification* rather than inference, so the
+check feels finished the moment the grep returns.
+And the coincidence is often structural rather than lucky: when both
+quantities derive from the same underlying schedule, geometry, or protocol,
+they are *bound* to share values while meaning different things --- which is
+exactly when this error is likeliest and least visible.
+
+Read what surrounds the match rather than the match alone.
+One line of context usually names the role: the comment above it, the
+assignment target, the procedure it feeds.
+Then state the role in the finding, since "the reference uses 18 months to
+filter exams and we use it as a readout horizon" is falsifiable while "the
+reference uses 18 months too" is not.
+
+Be most careful when the match *confirms* something already decided.
+A coincidence that agrees with the expected answer gets less scrutiny than a
+surprising one, and it arrives at the moment it will be acted on.
+
+- **Do:** name what the number does in each system before reporting agreement.
+- **Do:** treat a shared origin as grounds for more care, not as corroboration.
+- **Don't:** conclude one implementation follows another because a constant
+  appears in both.
+- **Don't:** relax the check because the match supports a decision already
+  taken.
+
+(2026-07-31, `ucdavis/bcs#539`: R constants of 18 and 30 months were reported
+as following the SAS, on the strength of finding both numbers in the SAS
+source.
+The SAS comment one line up reads "ignore a diagnostic exam if the difference
+between this diagnostic examdate and the previous examdate is outside the
+annual screening window 11-18 months" --- exam eligibility, not an estimation
+horizon.
+Both quantities derive from the same screening schedule, which is why they
+coincide.
+Withdrawn the following round, when review also found the R constants live in
+simulation-validation code the real pipeline never calls.)
+
 ## What to report
 
 For each issue found, state:

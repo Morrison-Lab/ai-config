@@ -139,6 +139,54 @@ bug the local patch would have shipped, since normalizing `\r` only for
 the terminator comparison leaves stray carriage returns in the posted
 body. `v2` had since been slid, so consumers already had it.)
 
+**The mirror direction, where the remedy above becomes the cause.**
+Everything above assumes you are fixing a bug going forward, so reading
+`main` is right.
+When you are instead explaining a **run that already happened**, reading
+`main` is the mistake: the run used whatever ref it was pinned to, and a
+file read at `main` may describe code that never executed.
+
+What makes this survive scrutiny is that no individual step is wrong.
+The file is real, you read it rather than recalling it, and you quoted it
+correctly, so every "did you actually check this?" prompt fires and passes.
+The error is entirely in the **join**: the run belongs to one ref, the file
+was read at another, and neither artifact mentions the other.
+Nothing you are looking at can tell you the evidence and the subject are
+different versions of the same thing.
+
+So split the trigger by what you are producing.
+A fix for the future reads the default branch.
+An explanation of a past run resolves that run's ref **first**, then reads
+the file at it.
+For a reusable workflow, `referenced_workflows[].sha` on the run gives the
+resolved commit directly (`actions_get`, `get_workflow_run`); for a pinned
+action, the caller's own `uses:` line at that commit does.
+Then `git show REF:path`, never the working tree's current branch.
+
+Note the conclusion can survive the join being wrong, which is why getting a
+plausible answer is not evidence that the ref was right.
+
+- **Do:** resolve the ref a run used before opening any file from the
+  dependency, and read the file at that ref.
+- **Do:** keep reading the default branch when the deliverable is a fix
+  rather than an explanation.
+- **Don't:** quote a dependency's `main` as the mechanism behind a run pinned
+  to a tag, however carefully you read it.
+- **Don't:** treat a mechanism that explains the observed behaviour as
+  confirmation that you read the right version.
+
+(`Morrison-Lab/gha#391` / `Morrison-Lab/ai-config#984`, 2026-07-31: a review
+guard's control flow was quoted from `check-review-execution.sh`, read from a
+local `gha` checkout sitting on `main`, and published as the explanation for
+CI failures in a repo pinned at `@v1`.
+`git cat-file -e v1:.github/workflows/scripts/check-review-execution.sh`
+fails and the `v2` equivalent succeeds, because at `@v1` the guard is inline
+in `claude-code-review.yml` and carries no verdict test at all.
+The conclusion held anyway, since both versions fail an errored run without
+asking whether a verdict was posted, which is precisely why the wrong ref
+went unnoticed.
+The attribution was retracted on gha#391.)
+
 ## When rolling our own is right
 
 This is a default, not an absolute rule.

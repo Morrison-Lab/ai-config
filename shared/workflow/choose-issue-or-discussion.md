@@ -107,6 +107,36 @@ lacking discussion write --
 so treat writes as GraphQL-only until something demonstrates otherwise,
 and re-test rather than trusting this paragraph if it matters.
 
+**When you do re-test, expect the GraphQL refusal to send you somewhere that
+does not work.**
+A proxy that blocks GraphQL can refuse it with advice attached:
+
+```
+403  This GraphQL query is not enabled for this session -- only the pinned set
+     of PR-review operations is served.
+     Use REST via `gh api repos/{owner}/{repo}/...` instead.
+```
+
+That advice is right about most of the API and wrong about this corner of it,
+since the REST discussion-comment route 404s.
+So the error hands you a remedy, the remedy fails, and the natural reading of
+the 404 is that your call was malformed rather than that the route is closed.
+
+Read the two together instead: a 403 naming a session policy plus a 404 on the
+REST equivalent is the *same* answer twice, not two separate problems to debug.
+The write half is closed; stop and hand the text to a human.
+
+- **Do:** treat a 403-with-advice and a 404 on the advised route as one
+  finding.
+- **Don't:** spend calls varying the REST request after the 403 --- the
+  suggestion was generic, not endpoint-specific.
+
+(Re-measured 2026-07-31 against the same discussion, from a different session:
+GraphQL `POST` 403 with the message above, REST `POST .../comments` 404, REST
+`GET` still 200.
+The failed probe created nothing --- the discussion still reported 0 comments
+afterward --- so a probe of this shape is safe to run.)
+
 There is also **no issue-to-discussion conversion mutation** in the public
 schema.
 `createDiscussion`, `updateDiscussion`, and `closeDiscussion` all exist;

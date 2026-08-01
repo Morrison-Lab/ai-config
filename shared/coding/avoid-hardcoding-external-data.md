@@ -199,5 +199,11 @@ repo whose default branch is literally `main`, which is why they are written
 that way here and why they did not surface the hard-coding".
 `skills/gip/SKILL.md` keeps `fatal: invalid reference: origin/main` as the
 error a reader will actually see.
-The judgment was made correctly in both files and never written down, so the
-next sweep over the same files had nothing to consult.)
+Both files state their reasoning in place --- `preferences.md` in the sentence
+quoted above, `gip/SKILL.md` at the line that says hard-coding "fails with
+`fatal: invalid reference: origin/main` on any repo whose default is named
+otherwise".
+So the judgment was written down, and a sweep still re-flagged them, because an
+in-file rationale is not something a `grep` for `main` can consult.
+That is the transferable part: recording *why* an instance is exempt protects a
+reader, not a mechanical sweep, and the two need different affordances.)

@@ -152,18 +152,28 @@ reviewer standing on it.
 dispositioned, and reported to the user as established fact, each without the
 one cheap check that would have confirmed it, and the user re-sent the same
 link three times before one was run.
-Across the five findings checked afterward the conclusion held in five of five
-and the particulars were wrong in five of five -- a guard whose failure was
-broader than reported, a script that was not the one running, a cited line
-number with nothing at it, a hardcoded-value scope that named 2 of 6 sites, and
+A fifth surfaced while this entry was being drafted, so five were checked in
+the end.
+Across those five the conclusion held in five of five and the particulars were
+wrong in five of five -- a guard whose failure was broader than reported, a
+script that was not the one running, a cited line number with nothing at it, a
+hardcoded-value scope that named 2 of 6 sites, and
 a two-command failure whose first command failed with an error the finding
 never mentioned.
-The shape then recurred while this entry was being written.
+The shape then recurred while this entry was being written, and the sixth
+instance breaks the pattern the sentence above states.
 The observation recorded in
 [`fully-clean`](fully-clean.md)'s fifth case was handed over with a completion
-time of `04:08:13Z`; the check run reports `04:50:41Z`.
-Its conclusion -- a green reviewer check with no review behind it -- was exactly
-right.)
+time of `04:08:13Z` and corrected here to `04:50:41Z`, which felt like the
+check working.
+Both are wrong: `#1008` carries no Copilot-attributable check run at all, so
+its conclusion -- a green reviewer check with no review behind it -- was **not**
+right, and this correction propagated an invented particular into
+`fully-clean.md` rather than catching one.
+So read "the conclusion held" as five of six, not as a rule.
+A verification that only ever adjusts a figure, never asks whether the thing
+being measured exists, can carry a fabrication forward while reading as
+diligence.)
 
 ## Question the answer that arrives without deliberation
 

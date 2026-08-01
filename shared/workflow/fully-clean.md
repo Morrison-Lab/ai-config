@@ -527,6 +527,60 @@ Three consequences for driving a PR to fully clean:
 The mechanics of detecting a refusal (it arrives as a posted review, not an API error, so the request call's success proves nothing) are in [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md).
 (`ucdavis/rampp#111`, 2026-07-24/25: Copilot refused three times across two heads for quota while `claude-review` posted genuine verdicts at both; the PR was reported clean --- and merged --- on `claude-review`'s verdict, with Copilot's absence stated in the ready-for-merge comment rather than papered over.)
 
+**The same reviewer has a third state, and it is worse for a reader than the refusal: the check goes green and no review is posted at all.**
+A refusal at least leaves a record.
+It costs a review and says so, in a comment anyone scanning the thread will see.
+The silent state costs the same review and says nothing.
+Nothing on the check surface reports it either way: on the PRs below this
+reviewer contributed **no check run at all** --- not when it refused, and not
+when it stayed silent --- so a reader scanning checks sees every context green
+and has no Copilot-attributable signal to read in either direction.
+The review list then carries no entry from it, and nothing anywhere reports
+that a configured reviewer did not weigh in.
+
+Do not soften that into "its check run went green".
+The distinction decides which surface can answer the question: a green *Copilot*
+check would at least be a signal read wrongly, whereas an absent one means the
+check surface is silent about that reviewer by construction, and no amount of
+care reading checks recovers the fact.
+Whether other repos or configurations emit such a check was not established
+here; what was measured is that these did not.
+
+Note which remedy already in this file the silent state defeats.
+The "no verdict is its own state" bullet in criterion 2's four-surfaces list covers a job that posts nothing, and the instrument it prescribes is to read the job's own outcome rather than infer from the absence of comments.
+That works there because the job **failed**.
+Here it succeeded, so the outcome reads `success` and points away from the gap the bullet exists to expose.
+
+What decides it is the review list filtered by the reviewer's own login, never the check run.
+**Mind which surface you filter on, because the field name and the value both differ**, and getting either wrong returns zero hits and reads as "this reviewer did not review":
+
+| surface | field | value |
+|---|---|---|
+| REST `pulls/<N>/reviews`, and `pull_request_read` `get_reviews` | `user.login` | `copilot-pull-request-reviewer[bot]` |
+| `gh pr view <N> --json reviews` | `author.login` | `copilot-pull-request-reviewer` (no `[bot]`) |
+
+Measured on `Morrison-Lab/ai-config#1005`, which carries a real Copilot review.
+So a reader who takes the field name from one surface and the value from the other reproduces the exact false negative this section warns about.
+A green check answers whether the app ran.
+Only the review list answers whether it reviewed.
+Read past the first page before concluding an entry is absent, since a busy PR can carry more reviews than one page returns.
+
+- **Do:** confirm each external reviewer by an entry in `get_reviews`, not by the conclusion of its check run.
+- **Do:** name a silent reviewer in the ready-for-merge report, exactly as the bullets above ask for a refusing one.
+- **Don't:** read a green reviewer check as a verdict --- it survives a refusal, and it survives silence.
+- **Don't:** reach for the job-outcome remedy above here.
+  It is scoped to a job that failed, and this one succeeded.
+
+(`Morrison-Lab/ai-config`#1005 and #1008, 2026-07-31/08-01, both merged.
+On #1005 `copilot-pull-request-reviewer[bot]` posted its quota refusal as a `COMMENTED` review at `23:59:46Z`, which is the refusal above exactly.
+Under five hours later on #1008 it posted nothing at all.
+`get_reviews` returned eight reviews there, four from the repo's own review bot and four from the maintainer, none from Copilot, with page 2 confirmed empty.
+Neither PR's check rollup carries a single Copilot-attributable context: `#1005` has 8 checks and `#1008` has 10, and filtering either for a name matching `opilot` returns **0**.
+Every other check on both heads was green, so no signal short of the login-filtered review-list query distinguished a reviewer that had approved from one that never spoke.
+An earlier revision of this record claimed Copilot's own check run completed `success` at `04:50:41Z` on #1008.
+That was wrong and is worth leaving visible rather than quietly deleting: there is no such check run, the timestamp belongs to nothing Copilot-attributable, and the claim reached this file from a self-check recorded in
+[`metacognitive-monitoring`](metacognitive-monitoring.md) --- which is to say a verification step propagated the invented particular it was run to catch.)
+
 **A sixth case runs the other way from all five above: the review is genuine and complete, but the workflow posts the reviewer's own tool invocation instead of the review body.**
 The comment opens with a literal `gh pr comment <N> --repo <owner>/<repo> --body "$(cat <<'EOF'` and closes with `EOF\n)"`, wrapping a real, correct verdict as unrendered text --- the model emitted a shell command as its final response and the workflow posted that string verbatim.
 Nothing is lost, and the same body usually also lands as a properly-rendered sibling comment, so the PR carries the review twice.

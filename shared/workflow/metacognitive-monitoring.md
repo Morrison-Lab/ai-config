@@ -94,6 +94,87 @@ whole week and peaking the day after the supposed cutoff, which refuted the
 premise and voided the classification.
 The chart was one screenshot away the entire time.)
 
+**The source need not be the user, and a reviewer's finding is the variant this
+section's own tell cannot catch.**
+Everything above describes a premise a person hands you, and the detector it
+offers is lexical: a hedge in the source.
+A review comment carries no hedge.
+It states its finding flatly, cites a file and a line, and reads as the output
+of something that has already looked.
+So the one signal this section supplies is silent exactly where the handed
+premise arrives most often.
+
+Two things then make such a premise feel checked when nothing has checked it.
+
+**Comprehension feels like verification from the inside.**
+Reading a finding closely enough to disposition it is real work, and the effort
+goes into understanding what is claimed rather than into testing whether it
+holds.
+Effort spent is what usually licenses the sense of having verified, so the
+finding you worked hardest to understand is the one you are least likely to
+confirm.
+
+**Delegating the check feels like having made it.**
+Handing the verification to a subagent turns an open question into a dispatched
+task, and a dispatched task reads as settled.
+It is settled when its answer comes back and you read it, not when it is sent.
+
+The asymmetry is what makes this a rule rather than a caution, because it says
+which half to spend the check on.
+A competent reviewer's **conclusion** is usually sound: there is something
+wrong at that spot.
+Its **particulars** are much less reliable -- which guard, which script, which
+line, how many call sites, which of two commands failed and with what error.
+Particulars are what decide the edit list, so relaying them unverified
+propagates a wrong list of lines to change underneath a conclusion that is
+right.
+
+That is also why this failure survives a clean outcome.
+The fix lands, the reviewer is satisfied, and the only thing left wrong is the
+account you gave of it.
+
+[`address-every-comment`](address-every-comment.md) already carries the
+per-component versions of this check: verify a suggestion block's literals,
+read a cited source, test a negative result's search scope.
+Each of those governs what you do **to the PR**.
+This one governs what you **assert**, which is a separate surface with no
+reviewer standing on it.
+
+- **Do:** verify a finding's particulars before restating them as fact, even
+  when its conclusion is obviously right.
+- **Do:** name the check you ran, so a relayed finding stays distinguishable
+  from a confirmed one.
+- **Don't:** read a reviewer's flat, cited phrasing as evidence that anything
+  was checked -- confidence is the house style of that genre, not a signal.
+- **Don't:** count a dispatched verification as a completed one.
+
+(2026-08-01, a six-PR session in this repo: four findings were read,
+dispositioned, and reported to the user as established fact, each without the
+one cheap check that would have confirmed it, and the user re-sent the same
+link three times before one was run.
+A fifth surfaced while this entry was being drafted, so five were checked in
+the end.
+Across those five the conclusion held in five of five and the particulars were
+wrong in five of five -- a guard whose failure was broader than reported, a
+script that was not the one running, a cited line number with nothing at it, a
+hardcoded-value scope that named 2 of 6 sites, and
+a two-command failure whose first command failed with an error the finding
+never mentioned.
+The shape then recurred while this entry was being written, and the sixth
+instance breaks the pattern the sentence above states.
+The observation recorded in
+[`fully-clean`](fully-clean.md)'s fifth case was handed over with a completion
+time of `04:08:13Z` and corrected here to `04:50:41Z`, which felt like the
+check working.
+Both are wrong: `#1008` carries no Copilot-attributable check run at all, so
+its conclusion -- a green reviewer check with no review behind it -- was **not**
+right, and this correction propagated an invented particular into
+`fully-clean.md` rather than catching one.
+So read "the conclusion held" as five of six, not as a rule.
+A verification that only ever adjusts a figure, never asks whether the thing
+being measured exists, can carry a fabrication forward while reading as
+diligence.)
+
 ## Question the answer that arrives without deliberation
 
 This is distinct from the confidence point above, and harder to catch.

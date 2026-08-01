@@ -105,6 +105,17 @@ and commits never collide on one checkout. (This is the subagent form of the
 same isolation [`session-lock`](../session-lock/SKILL.md) sets up for
 independent top-level sessions.)
 
+**That parameter errors when the session's own cwd is not inside a git
+repository** -- `Cannot create agent worktree: not in a git repository and no
+WorktreeCreate hooks are configured` -- which is the normal layout in a harness
+whose cwd merely *holds* repos as subdirectories.
+Don't read that as isolation being unavailable and fall back to a shared
+checkout; create each worktree explicitly instead
+(`git -C <repo> worktree add <path> main`, then realign it onto
+`origin/main`) and hand the subagent its path.
+See [`memories/preferences.md`](../../memories/preferences.md) for the full
+precondition and the stale-local-`main` trap in that fallback.
+
 A subagent starts **fresh** — it sees only the prompt you hand it, not this
 skill file — so **inline the entire per-issue procedure**. Don't point it at
 `gi`/`ardi`; restate the steps. Fill in `<N>`, `<title>`, `<owner>`, `<repo>`,

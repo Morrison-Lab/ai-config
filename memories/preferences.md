@@ -316,6 +316,47 @@
   commit `8cc7ae3` in fact carried both files it had touched and its branch ref
   and `origin` both pointed at it.
   No `isolation` argument had been passed, which is the whole cause.)
+- **That remedy has a precondition nobody states: `isolation: "worktree"`
+  needs the *session's own cwd* to be inside a git repository, so it errors in
+  a session whose cwd merely holds repos as subdirectories.**
+  The Agent tool refuses with `Cannot create agent worktree: not in a git
+  repository and no WorktreeCreate hooks are configured.`
+  Both clauses of that message are separate preconditions, and a harness can
+  fail the first while providing nothing to satisfy the second.
+  The rule is not wrong, it is stated without its precondition, in both places
+  a reader meets it: the bullet directly above, and
+  [`gip`](../skills/gip/SKILL.md)'s "give **every** subagent
+  `isolation: \"worktree\"`".
+  Read as written, each prescribes a parameter that errors here, which invites
+  the reader to conclude isolation is unavailable and share the checkout after
+  all -- the exact outcome the bullet above exists to prevent.
+  The explicit fallback gives identical isolation for two commands, so reach
+  for it rather than standing down:
+  `git -C <repo> fetch origin main`, then
+  `git -C <repo> worktree add <path> main`.
+  Two details decide whether that fallback is actually clean.
+  Use `git -C` rather than `cd`, per the persisting-cwd bullet further down.
+  And `worktree add <path> main` checks out the **local** `main`, which in a
+  container is routinely behind `origin/main`, so verify with
+  `git log --oneline -1` and realign before branching.
+  - **Do:** create the worktree explicitly with `git -C <repo> worktree add`
+    when `isolation: "worktree"` errors, and brief the agent with that path.
+  - **Do:** check what commit the new worktree actually landed on, since a
+    stale local `main` silently bases the branch several commits back.
+  - **Don't:** read the isolation error as "isolation is unavailable here" and
+    let the agent share the parent's checkout.
+  - **Don't:** infer that the session's cwd is a repository from the fact that
+    the work is in one -- a cwd holding several repos satisfies neither clause.
+  (2026-08-01, this session: `git rev-parse --show-toplevel` in the default cwd
+  `/home/user` returns `fatal: not a git repository`, with `ai-config`, `gha`,
+  `qbt`, `qwt`, `rpt`, and `workflows` one level below it, and no
+  `settings.json` exists at `~/.claude/` or `/root/.claude/` -- so both named
+  preconditions are independently false here.
+  The error text is quoted from the parent session's own attempt; this agent
+  has no Agent tool and did not re-run it.
+  The stale-`main` half was hit directly: `git worktree add /tmp/wt-ums main`
+  checked out `a30a2e1` while `origin/main` was five commits ahead at
+  `d0994c2`.)
 - Bash's cwd PERSISTS across separate calls within a session (it does not silently reset between calls) — so a `cd` in one call carries forward into the next unless a later call `cd`s elsewhere. This one mechanism causes two mirror-image mistakes depending on the session's layout:
   - **Session runs INSIDE a worktree:** do NOT prefix git commands with `cd <main-checkout>`. Because cwd persists, that `cd` doesn't just affect the current call — any *later* call that omits its own `cd` stays in the main checkout too, silently working against a different branch (often another session's) instead of your worktree. Run git in the worktree with no `cd` at all; if you must touch another checkout, use `git -C <path>` instead of `cd`-ing into it. `gh` commands keyed by PR or issue number are cwd-agnostic, so only `git` breaks. Run `git branch --show-current` before committing or pushing to confirm. Learned on PR #62: a `cd`-prefixed push hit `main` and made my own worktree commits look missing.
   - **Session juggles several full (non-worktree) repo checkouts side by side:** a call with no `cd` silently runs against whichever repo an earlier call last `cd`'d into, not the repo you mean this time. Never omit an explicit `cd <repo>` in any Bash call when more than one repo checkout is in play, and re-verify with `pwd` or `git remote -v` after any call whose target repo matters. This bites hardest in back-to-back "same shape, different repo" calls (e.g. an identical empty claim-commit pushed to two sibling PRs one after another) — the second call looks correct in isolation but silently repeats the first call's repo. Caught it by checking `mergeable_state` output afterward; recovery was a `git reset --hard` to the last-good local commit plus `git push --force-with-lease` to undo the wrong-repo push before redoing it with an explicit `cd`. (Learned on ai-config#454/gha#215: an empty commit meant for `gha` landed on `ai-config`'s branch instead.)

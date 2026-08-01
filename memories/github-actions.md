@@ -304,6 +304,20 @@ common patterns.
   re-dispatched `workflow_dispatch`, automatic `pull_request`, same-repo or cross-repo),
   with no conditional branching on `job_workflow_ref` needed. (d-morrison/gha#197,
   `.github/actions/run-review-guard/`.)
+  **The checkout half of this recurred in a brand-new reusable workflow, not
+  an existing one that broke in production.** A `workflow_call` reusable
+  workflow's own job step -- not a nested composite -- assumed the same
+  thing: `version-check.yml`'s "Compare versions" step ran
+  `Rscript working/.github/workflows/scripts/check-dev-version.R` straight
+  after `actions/checkout` steps with no `repository:` input, so the script
+  path would never exist on any real consumer's checkout, since those
+  checkouts are the CALLER's repo, never gha's own.
+  Caught by self-review before merge rather than by a live consumer
+  failure, and fixed the same way: route through the already-built
+  `check-dev-version` composite
+  instead of hand-rolling the `Rscript` call, so the script resolves via
+  `github.action_path` regardless of what `workflow_call` checked out.
+  (Morrison-Lab/gha#390, 2026-07-31.)
 - **A fix that's only unit-tested against the extracted logic in isolation, never against
   the actual `uses:` invocation, can ship a broken integration point undetected.** #191's
   own test (`parse-workflow-ref/tests/run-tests.sh`) fed hardcoded ref strings straight to

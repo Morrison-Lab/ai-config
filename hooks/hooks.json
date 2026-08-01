@@ -46,6 +46,29 @@
       "why": "Blocks a reply asserting a PR's check state when the last status query predates the last push, so a stale reading is never reported as current."
     },
     {
+      "_note_warns_never_blocks": [
+        "Emits `additionalContext` and a `systemMessage` and nothing else --",
+        "no `permissionDecision` key at all, so the normal permission flow is",
+        "untouched. Naming `allow` there would BYPASS a prompt the user would",
+        "otherwise have seen, which is a hook making the harness more",
+        "permissive than it was without it.",
+        "",
+        "Deny was considered and rejected on the numbers: 60 of 121 real Agent",
+        "launches in this machine's transcripts are write-capable with no",
+        "`isolation`, so a blocking guard would interrupt 49% of agent",
+        "launches. The lapse it catches is a visibility failure, and a warning",
+        "at the moment of the call fixes visibility completely.",
+        "",
+        "NOT REGISTERED on any machine yet. Activation is a separate decision",
+        "after review -- run scripts/install-hooks.py --fix to opt in."
+      ],
+      "script": "flag-unassigned-worktree.py",
+      "event": "PreToolUse",
+      "matcher": "Agent",
+      "timeout": 10,
+      "why": "Surfaces a write-capable Agent launch with no `isolation`, so a decided practice cannot lapse silently -- the omission lives in a tool call, the one surface review, tests, and lint all miss."
+    },
+    {
       "_note_not_a_stop_hook": [
         "Deliberately UserPromptSubmit rather than Stop, which is the shape",
         "the three guards above use. A Stop guard suppresses a message that is",

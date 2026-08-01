@@ -1015,6 +1015,23 @@ Every agent does its job correctly on the list it was given, so the items that a
 
 @shared/workflow/derive-dont-enumerate.md
 
+## Subagent worktrees are assigned, and an incident never silently repeals a decision
+
+Two rules, one incident, and the second is the general form of the first.
+
+**Assign the worktree on the `Agent` call.** Set `isolation` yourself rather than leaving each subagent to organize its own working directory, and brief every agent you isolate to stay inside the worktree it was given and to **push early** --- a pushed commit survives anything that happens to a working tree.
+Deciding that a particular agent does not need one is fine.
+Leaving it unmarked is what is not.
+`hooks/flag-unassigned-worktree.py` mechanizes exactly this, and warns rather than blocks.
+
+**The general rule is the more valuable half.** When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
+A repealed decision changes no artifact, so review, tests, and hooks are all blind to it by construction, and the only detector is someone who remembers.
+It is more dangerous than ordinary drift because the incident supplies an apparent reason, so from the inside it feels like having learned something rather than like lapsing.
+If you cannot point at the message where a decision was reversed, it was not reversed.
+It lapsed.
+
+@shared/workflow/incidents-dont-repeal-decisions.md
+
 ## Non-destructive repo and memory actions
 
 The user gives general permission to proceed with non-destructive actions such as setting up PRs, reading GitHub repository data through the API, running non-destructive Git and Perl commands, and editing shared `CLAUDE.md` memory. This includes pushing branches and opening PRs against the ai-config repo. Default to action without confirmation for reasonable non-destructive steps; ask only for destructive, ambiguous high-impact, or genuinely blocking choices. Destructive operations still require explicit instruction.

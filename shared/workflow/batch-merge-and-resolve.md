@@ -191,10 +191,12 @@ Compare the two directly after every merge, per
 **List-item splices.**
 A clean merge can splice two Markdown bullets together by collapsing the blank
 line between them.
-Git resolves it as an ordinary insertion.
-`markdownlint`'s `blanks-around-lists` governs the boundaries **of** a list, not
-the gaps **between** its items, so nothing turns red, and the result is a valid
-tight item that renders inconsistently beside its loose neighbours.
+Git resolves it as an ordinary insertion, and nothing turns red: as
+[`sync-with-main`](sync-with-main.md) explains in the section that owns this
+defect, `markdownlint`'s `blanks-around-lists` governs a list's **boundaries**
+rather than the gaps **between** its items.
+The result is a valid tight item that renders inconsistently beside its loose
+neighbours.
 
 ### The instrument lesson, which is the transferable part
 

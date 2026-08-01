@@ -144,8 +144,10 @@ above: no single reader invented it, and each one found it corroborated.)
 (2026-07-31, this fragment's own brief: it named four areas as likely
 uncovered.
 Two --- a premise handed down as settled, and a default nobody chose --- had
-been closed hours earlier by ai-config#955, whose fragment names both
-explicitly.
+been closed hours earlier, both of them in
+[`metacognitive-monitoring`](metacognitive-monitoring.md): the unexamined
+default by ai-config#947, merged 06:28Z, and the handed premise by
+ai-config#955, merged 07:13Z.
 The brief also pointed at a checkout that was 37 commits behind `origin/main`,
 so every search run there would have understated coverage.
 The brief asked to be questioned, which is why this was caught; the general

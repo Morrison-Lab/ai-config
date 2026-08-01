@@ -939,3 +939,60 @@ mattering.
 org-level Claude secrets, provisioned in three batches between 2026-05-09 and
 2026-07-14.
 Attribution proved unrecoverable by any of the three surfaces above.)
+
+## `pull_request_target` is rejected by the App-token exchange
+
+Anthropic's `github-app-token-exchange` endpoint rejects OIDC tokens minted for
+`pull_request_target` events, with
+`App token exchange failed: 401 Unauthorized - Invalid OIDC token`.
+The job dies in about 25 seconds, before the model is reached.
+
+The trap is that the action's **own** side supports the event.
+claude-code-action#347, "Can't use action in workflow triggered by
+`pull_request_target`", is closed as completed, and `docs/security.md` carries a
+section on using the action with that trigger --- so the workflow reads as both
+correct and documented.
+Only the server side refuses it.
+(Issue #713's body credits the support to "PR #759".
+That number is an unrelated open bug report in the same repo, so cite #347
+instead of repeating it.)
+Tracked as
+[anthropics/claude-code-action#713](https://github.com/anthropics/claude-code-action/issues/713),
+open since 2025-12-02, whose stated workaround is to use `pull_request`.
+
+So `pull_request_target` is not an available fix for fork PRs, whatever else
+recommends it.
+Nor would it be sufficient if the exchange worked: the action still refuses to run
+for a contributor without write access unless `allowed_non_write_users` is set,
+which `docs/security.md` documents as a significant security risk.
+Read a proposal to switch a review workflow to this trigger as a regression, and
+leave a comment in the workflow naming the upstream issue so it does not get
+re-applied.
+
+Two neighbouring 401s at the same step have different causes, and the message is
+what separates them:
+
+- `Invalid OIDC token` --- the trigger event, this entry.
+- `User does not have write access on this repository` --- the triggering actor is
+  not a collaborator, e.g. the Copilot coding agent
+  (`UCD-SERG/ucd-serg.github.io#84`).
+- `Workflow validation failed ... identical content to the version on the
+  repository's default branch` --- not a failure at all.
+  The action **skips** and exits 0, so a green check on a PR that edits the review
+  workflow is not a review.
+  See the self-mod skip bullet above for gha's own guard against this.
+
+This is a fourth distinct cause in the same short-duration band on the same
+repository, which is why
+[`fully-clean`](../shared/workflow/fully-clean.md)'s "a short duration is
+corroboration, not a test" holds: three of the four run 25 seconds or less and
+none of them is about credentials.
+
+(`UCD-SERG/ucd-serg.github.io`, 2026-07-31: PR #83 switched the review workflow to
+`pull_request_target`, and all five subsequent runs failed this way while the two
+`pull_request` runs immediately before it succeeded.
+Reverted in #89, tracked as #88.
+The revert PR's own `pull_request` run then stopped at *workflow validation*
+instead --- same repo, same secret, same minute as a `pull_request_target` run
+rejected at the token --- which is the cleanest available demonstration, since the
+trigger is the only variable.)

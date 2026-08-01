@@ -983,6 +983,42 @@ The message is what separates them:
   workflow is not a review.
   See the self-mod skip bullet above for gha's own guard against this.
 
+A fourth way a green `claude-review` means no review, and it produces no message at
+that step at all: the run reaches the model, produces a review, and is **denied
+when it tries to post it**.
+
+`pull-requests: read` in the workflow's `permissions:` block is enough to cause
+this.
+The action's app token covers its own bookkeeping, but the review is posted by
+Claude's tool calls running under `GITHUB_TOKEN`, so a read-only token loses the
+review after paying for it.
+The tell sits in the execution output rather than in any error:
+`"permission_denials_count": 8` alongside `is_error: false`.
+
+That makes three distinct green-but-no-review states on one workflow --- denied at
+posting, skipped at workflow validation, and rejected before the model ran.
+Only the log distinguishes them.
+But the question that settles all three at once is not about any mechanism:
+**ask whether a `claude`-authored comment exists on the PR**, which is one query,
+rather than reasoning about which token ought to be able to post.
+
+- **Do:** grant `pull-requests: write` to a review workflow on the `pull_request`
+  trigger.
+  GitHub forces a read-only `GITHUB_TOKEN` on fork PRs regardless, so this widens
+  nothing for untrusted contributors.
+- **Don't:** infer from a green check, or from an argument about token scopes, that
+  a review was posted.
+
+(`UCD-SERG/ucd-serg.github.io`, 2026-08-01: `pull-requests: read` had been in that
+workflow since its first commit, and `claude` had **never** posted a review comment
+on the repository --- PRs #78, #79, #80, and #86 all ran green with zero.
+It surfaced only because #89 restored `read` while asserting it was safe on the
+grounds that "the action posts with its own app token", and two Copilot reviews on
+#89 restated that premise without objection.
+Fixed in #91.
+A single query for a `claude` comment on any earlier PR would have caught it at any
+point in the preceding month.)
+
 This is a fourth distinct cause in the short-duration band that
 [`fully-clean`](../shared/workflow/fully-clean.md) already records three for,
 under "That duration signature does not run backwards".

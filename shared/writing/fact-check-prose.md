@@ -154,3 +154,41 @@ That figure is only possible if `du` reports physical blocks, which is what
 it does.
 The review caught it by citing the entry's own number back at it; a direct
 test then showed `du` = `0B` against `ls -l` = 276 MB on one placeholder.)
+
+
+## Check that a stated trigger actually fired
+
+A justification for why a file was split, a check was added, or a workflow was
+changed is a factual claim.
+It often reads as background rather than as the change itself, which makes it
+less likely to be checked than the mechanics it justifies.
+That is exactly why it needs the same fact-check as any other claim.
+If the sentence says a threshold, gate, or rule caused the action, read that
+gate's source and compare it with the measured state before publishing.
+This is an [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
+case: one comparison against the threshold decides it.
+
+Duplicating the justification makes the problem worse, not safer.
+Two independently authored copies can share the same false reason when both
+sessions inferred the motivation from the same visible action.
+A reviewer then sees agreement across files and reads it as corroboration,
+although neither copy was ever measured.
+
+- **Do:** verify a stated motivation against the source of the gate or threshold
+  it names, and quote the command or value that settles it.
+- **Do:** re-check every duplicate copy of the justification, because agreement
+  between copies is not evidence that either one was checked.
+- **Don't:** treat a sentence about why work was done as less factual than a
+  sentence about what changed.
+- **Don't:** infer that a threshold fired from the fact that someone took the
+  action the threshold would have suggested.
+
+(Morrison-Lab/ai-config#966 and #973 both wrote that
+`memories/github-mcp-tools.md` was split out of `memories/github.md` when that
+file crossed the 1200-line gate in `scripts/check-memory-file-size.py`.
+The gate is `if len(lines) > max_lines` with `DEFAULT_MAX_LINES = 1200`, so it
+fires only above 1200 lines.
+Walking `memories/github.md` on `main` found a peak of 1199 lines at
+`3eb15a4c`, so the gate never fired and the split was pre-emptive.
+The same false justification appeared in the new file's header and in
+`memories/MEMORY.md`'s index row.)

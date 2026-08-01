@@ -53,3 +53,88 @@ algorithm, a default chosen by this project) is not "hard-coded data" in this
 sense --- it is just a value. The target is duplicated *ownership* of a fact:
 if updating the external source should have updated this value too, and
 didn't, that is the bug this guidance prevents.
+
+### A count in the prose above a block is the same duplicate, one line away
+
+The section above describes a list mirroring something *elsewhere* --- a
+directory the sentence cannot see, drifting over weeks as files land.
+The tighter case is a count of the items in the block directly beneath it:
+"Three reads settle it", above three commands.
+Same defect, since the count is a hand-maintained copy of something the block
+already enumerates.
+What differs is who invalidates it and when.
+Nobody adding a file to some other directory breaks this one.
+**You** break it, in the same review round, by fixing the block the count
+describes.
+
+Two things keep it out of view at exactly that moment.
+
+The count was **correct when written**, so it was never a mistake to notice
+and carry forward --- it became false only when the block gained a command.
+And a review finding points at the block, so correcting the block feels like
+the whole action.
+The sentence introducing it is not part of what the reviewer flagged, so
+nothing prompts a re-read.
+
+The second is that adjacency reads as safe.
+A count of items in a distant file is obviously fragile, and that visible
+fragility is what makes anyone check it.
+A count one line above the thing it counts feels like it cannot drift, since
+both are on the screen at once --- which is precisely why nobody looks at the
+prose while editing the block.
+
+**The remedy above does not transfer, so do not reach for it.**
+That section says to replace the list with a pointer to its source, and a
+count has no source to point at: "every fragment under `shared/coding/`"
+works because a directory can be named, whereas the number three cannot be
+delegated to anything.
+Two options that do work:
+
+- **Drop the count.**
+  The block is immediately below, so "These reads settle it" loses nothing a
+  reader could not get by looking down.
+  This is the better answer whenever the number carries no argument.
+- **Re-derive it mechanically before pushing**, when the number is doing real
+  work in the sentence.
+  One command decides it exactly, which makes this an
+  [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) case rather
+  than something to settle by recollection.
+
+  **Scope that command to the block, not to the whole file.**
+  A file-wide `grep -c` is right only while the pattern happens to match
+  nothing outside the block, which is a property of the file today rather
+  than of the command.
+  An unrelated edit that adds one matching line anywhere else silently
+  inflates the count, so the instrument acquires exactly the failure mode it
+  was reached for to prevent.
+  Bracket the block with two unique anchors instead:
+
+```bash
+awk '/^Four reads settle it/,/^An identical tree/' shared/workflow/claim-pr.md |
+  grep -c '^git '
+```
+
+Count list items, bullets, or numbered steps the same way.
+Two habits keep the range honest.
+Confirm each anchor matches exactly once (`grep -c` on the anchor itself)
+before trusting it, since a repeated start anchor makes an `awk` range
+restart and silently widen.
+And run the range once without the counting stage, to see that the lines it
+selects are the ones you meant.
+
+- **Do:** re-read the sentence introducing a block whenever a review finding
+  changes what is in that block.
+- **Do:** delete a count the neighbouring block already states, and re-derive
+  by command any count you keep.
+- **Don't:** treat a fix to the block as complete because the finding named
+  only the block.
+- **Don't:** read adjacency as protection --- the nearest duplicate is the one
+  your own edit falsifies first.
+
+(Morrison-Lab/ai-config#975, 2026-07-31: a new section in
+`shared/workflow/claim-pr.md` opened "Three reads settle it before you touch
+anything:" above a fenced block of `git` commands.
+Review round 1 correctly found the block needed a fourth command, and that
+fix is what made the preamble false.
+Round 2 flagged the stale count, fixed in `42214b0` as "Four reads settle it
+before you touch anything:".)

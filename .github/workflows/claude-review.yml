@@ -44,7 +44,7 @@ jobs:
       issues: write
       id-token: write
       actions: read   # lets the reviewer read CI status (github_ci MCP server)
-    uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v1
+    uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
     secrets: inherit
     with:
       pr-number: ${{ inputs.pr_number }}

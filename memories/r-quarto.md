@@ -234,13 +234,49 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
 
 ## R-package PR CI gates (d-morrison / UCD-SERG R packages, e.g. `bcs`)
 - These repos gate PRs on a **changelog check** (`news.yaml` / "Check Changelog
-  Action") and a **version-check**. A user-visible PR needs **both** a
-  `NEWS.md` entry under `# <pkg> (development version)` **and** a `DESCRIPTION`
-  `Version:` dev-bump (e.g. `0.0.0.9053` → `.9054`), or CI fails. Add them up
-  front rather than waiting for the red check. (Observed on ucdavis/bcs#223.)
-  For a **non-user-visible** PR (CI/workflow-only), the `no changelog` +
-  `no version increment` labels may skip both, but that bypass is per-repo and
-  serodynamics has none: see the label-bypass note in `memories/github-actions.md`.
+  Action") and a **version-check**. Historically a user-visible PR needed
+  **both** a `NEWS.md` entry under `# <pkg> (development version)` **and** a
+  `DESCRIPTION` `Version:` dev-bump (e.g. `0.0.0.9053` → `.9054`), or CI
+  failed. Add them up front rather than waiting for the red check. (Observed
+  on ucdavis/bcs#223.) For a **non-user-visible** PR (CI/workflow-only), the
+  `no changelog` + `no version increment` labels may skip both, but that
+  bypass is per-repo and serodynamics has none: see the label-bypass note in
+  `memories/github-actions.md`.
+  **This per-PR dev-bump convention is what `Morrison-Lab/gha`'s new
+  `bump-dev-version`/`version-check` capabilities (gha#390, tracking gha#388)
+  exist to retire** --- both were engineered as a direct fix for the
+  merge-conflict-on-`DESCRIPTION` problem this convention structurally
+  guarantees (every PR bumping the same `Version:` line collides with every
+  other open PR doing the same). Once a repo migrates: `DESCRIPTION`'s
+  `Version:` is bumped automatically by a bot PR after every merge to `main`,
+  never by hand in a feature PR; `version-check` inverts to fail a PR if its
+  `DESCRIPTION` differs from `main`'s **at all** (rather than requiring it to
+  exceed `main`'s), with the same `no version increment` label as an escape
+  hatch for a genuine manual release-version bump
+  (`usethis::use_version()`, which still exists outside this automation);
+  and the whole "bump above main, re-bump after every merge" chore described
+  above and in `memories/github-actions.md`/`memories/claude-bot-workflows.md`
+  no longer applies. As of this writing (2026-07-31) no lab repo has migrated
+  yet --- check a given repo's own `.github/workflows/version-check.yml` /
+  `version-check.yaml` before assuming which regime it's under. The
+  `news.yaml`/changelog-entry half above is unaffected until a separate
+  `news.d`-fragment capability ships (deferred; see gha#388).
+- **`read.dcf()` does not error on a DCF file with a duplicate top-level
+  field; it silently keeps whichever occurrence comes LAST.** Confirmed with
+  a live call, not assumed: a two-line `Version: 1.2.3` / `Version: 1.2.4`
+  stanza parses cleanly and returns `1.2.4`.
+  This is the general fact behind `configure-gitattributes`'s
+  never-`merge=union`-on-`DESCRIPTION` row
+  (`skills/configure-gitattributes/SKILL.md`) --- a union-merged
+  `DESCRIPTION` with two `Version:` lines is not a loud parse failure, it's
+  a silent pick of one side, which is worse.
+  Watch for the same trap anywhere else a merged or hand-edited DCF file
+  (`DESCRIPTION`, a `Packages` index) gets read back: a check that assumes
+  malformed DCF would be caught by the parser is assuming the wrong
+  failure mode.
+  (ai-config#979, 2026-07-31: an earlier draft of that SKILL.md row claimed
+  a duplicate `Version:` field "breaks every DCF parser (`read.dcf()`,
+  ...)", which a live `Rscript` call showed to be backwards.)
 - The **Spellcheck** job (`spelling::spell_check_package()`) fails on any word
   not in `inst/WORDLIST`. For one-off non-dictionary words in NEWS/prose, prefer
   rewording (e.g. "uncaptioned" → "without captions") over polluting WORDLIST;

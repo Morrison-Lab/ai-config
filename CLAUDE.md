@@ -621,7 +621,122 @@ Before adding commits to a branch you didn't just create, fetch `origin/main` an
 If the branch's own PR already merged, don't build on top of it — start clean: `git checkout -b <branch> origin/main`, then `git cherry-pick` only the genuinely new commit(s).
 If you've already pushed a bloated diff, the same fix applies retroactively: rebuild the branch from `origin/main` plus a cherry-pick of the new work, then `git push --force-with-lease`. (Seen on gha#161 → gha#162 and ai-config#344 → ai-config#354, both squash-merged.)
 
+**A stacked PR reaches that bloated state with no push of yours at all, and it announces itself as a merge conflict.**
+The rule above is written around an action you take: you add commits to a stale branch, so the check fires when you are about to commit.
+A PR stacked on another PR's branch needs nothing from you.
+When the base PR squash-merges, GitHub **auto-retargets** the stacked PR to `main`.
+The same orphaning then happens retroactively, to a branch that has been sitting untouched.
+
+What makes it worth its own entry is the symptom.
+The bloat presents as `mergeable_state: dirty` --- a conflict --- which invites conflict resolution.
+Resolving those conflicts would mean re-litigating already-merged content line by line.
+The diff and commit count are the tell that it is not a real conflict:
+
+| | before the base merged | after |
+| --- | --- | --- |
+| `mergeable_state` | `clean` | `dirty` |
+| diff | `+82/-0` | `+122/-0` |
+| commits | 2 | 9 |
+
+So when a stacked PR goes dirty, check ancestry before touching the conflicts.
+`git merge-base --is-ancestor <base-PR-commit> origin/main` returning false means the base squash-merged, and the fix is the rebuild above rather than a merge.
+Confirm the base PR's content is genuinely on `main` first, since that is what makes discarding those commits safe.
+Normalize whitespace and backticks when you check (`git show origin/main:<path>`), because this corpus breaks lines mid-phrase.
+(Morrison-Lab/ai-config#957 → #974, 2026-07-31: #974 sat untouched while #957 squash-merged as `3893dd51`.
+The rebuild restored `+82/-0` over 2 commits and `mergeable_state: clean`, and both cherry-picks applied without conflict.)
+
 **A live variant of the same check: the human can merge the branch's PR out from under an in-flight push, not just leave a stale branch to discover later.** Pushing a commit right as its own PR merges lands in a race in repos that auto-delete head branches on merge: GitHub deletes the head branch, and the in-flight push silently recreates it under the same name --- but now as a brand-new, orphaned branch with no PR, built on top of commits that (for a real merge commit, unlike the squash case above) *are* ancestors of `main`'s new tip. `git status`/`git push` report success --- but the push is not quite silent, and its one tell is worth knowing, because it fires at the moment of the race rather than hours later. A push onto a branch that still exists prints a SHA range (`f7bf71f..899e5de  <branch> -> <branch>`); a push that *recreates* a deleted branch prints `* [new branch]      <branch> -> <branch>` instead. Seeing `* [new branch]` for a branch you have already been pushing to means the remote branch was deleted underneath you, which on a PR branch means the PR merged. Read the push output rather than only its exit status, and run the ancestry check immediately when that line appears. Recovery is the same ancestry check as above (`git merge-base --is-ancestor <branch-tip> origin/main`), then cherry-pick the orphaned commit onto a fresh branch off the new `origin/main`; note that this check's *answer* depends on the repo's merge strategy and so is not itself the signal --- it comes back true where the PR merged as a real merge commit (the serocalculator case below) and false in a squash-merge repo, where `main` carries a new single commit your branch never saw. Either answer leaves the recovery the same, and in the squash case the orphaned commit is genuinely absent from `main`, so check whether its content actually landed (`git show origin/main:<path> | grep`) rather than inferring it from the merge notification; delete the stray local and (if push-permitted) remote branch. If the orphaned commit is genuinely new work --- not a fix that belongs in the now-merged PR --- treat this as the natural start of a new, stacked issue + PR rather than trying to reopen or append to the merged one. (`UCD-SERG/serocalculator#568` → `#572`, 2026-07-20: pushed a `Var(y_obs | y_true)` derivation commit just as #568 merged; recovered by cherry-picking it onto a new branch off `main`, filing #571 to track the follow-on `Var(y_obs | T=t)` derivation it was a prerequisite for, and opening #572 stacked on nothing but current `main`.) (`ai-config#778` → `#783`, 2026-07-28: the squash-merge counterpart. A commit fixing a review nit was mid-push when #778 merged; `git push` printed `* [new branch]`, `git merge-base --is-ancestor` returned false, and `git show origin/main:<path>` confirmed the fix was absent from `main` --- so a PR comment claiming the nit was addressed would have been false. Recovered by cherry-picking onto a fresh branch off current `main` and opening #783, with a comment on #778 saying which of its findings did not ship in that merge.)
+
+**That tell's precondition is a repo setting, so check the setting rather than
+assuming it in either direction --- and a branch that still resolves after your
+own late push cannot tell you what the setting is.**
+The paragraph above names its precondition, "in repos that auto-delete head
+branches on merge", and never says how to find out whether it holds.
+Here it holds.
+`Morrison-Lab/ai-config` does delete merged head branches, so the tell was
+available and the push that followed the merge did print it.
+What failed was not the signal.
+
+The evidence that looks like it settles the question is the one that cannot.
+After a late push to an already-merged PR's branch, `git ls-remote` resolves
+that branch under both hypotheses: the branch was never deleted, or it was
+deleted at merge and your own push recreated it.
+Both end with the branch present at the pushed commit, so a resolving ref is a
+true observation that answers neither hypothesis, and reading it as "this repo
+keeps merged head branches" reads a settled fact out of evidence that does not
+discriminate.
+
+Two checks do discriminate, and both are cheap.
+Other merged PRs' head branches, which no late push has touched, either resolve
+or do not.
+And the PR's own timeline records the deletion in as many words, since GitHub
+logs an auto-delete the same way it logs a manual one.
+
+What is genuinely narrower here than in the paragraph above is the **trigger**,
+not the tell.
+There the push is concurrent with the merge, so the race is the thing you are
+already watching for.
+Here minutes had passed and the PR's state had not been re-read since the
+review, so nothing prompted a look at the push output at all.
+The "Check whether the branch's own PR merged before adding more commits to it"
+rule earlier in this section has the same gap: "a branch you didn't just
+create" reads as inapplicable on a branch you have been driving continuously
+all session, which is exactly the branch this happens on.
+
+Do not reach for that rule's ancestry check as the alternative, though.
+This repo squash-merges, and `git merge-base --is-ancestor <branch-tip>
+origin/main` returns non-ancestor for an **open** PR's branch too, whose
+commits do not reach `main` until the squash.
+Measured both ways: the orphaned commit below and this entry's own branch while
+its PR was open each came back non-ancestor.
+So the check cannot separate "still open" from "just merged", which is the
+paragraph above's own warning that its answer depends on the merge strategy and
+so is not itself the signal.
+Re-reading the PR's `merged` field and `head.sha` is what discriminates.
+
+What the failure costs is a claim rather than a commit.
+The fix lands on a real remote branch attached to nothing, so the inline thread
+gets resolved against a commit that never reached `main`, and the round's
+status reads "finding Addressed, thread resolved" when that is true of a branch
+and false of the PR.
+This is the shape [`ardi`](shared/workflow/ardi.md)'s "a fix is not 'pushed'
+until it is on the PR's head commit" bullet describes, one step further out:
+there the fix never left the working tree, here it reached a remote branch that
+was no longer attached to a PR.
+
+- **Do:** re-read the PR's `merged` field and `head.sha` immediately before
+  pushing a fix to a branch whose PR you have not re-read this round.
+- **Do:** read `git push`'s own output on that push, and treat `* [new branch]`
+  on a branch you have been pushing to as the PR having merged.
+- **Do:** settle whether a repo deletes merged head branches from other merged
+  PRs' branches, or from the PR's timeline, before concluding that a tell was
+  unavailable.
+- **Don't:** read a branch that still resolves after your own late push as
+  evidence it was never deleted; the push recreated it.
+- **Don't:** substitute the ancestry check for re-reading the PR's state in a
+  squash-merge repo, where it returns non-ancestor for an open PR too.
+- **Don't:** report a finding as Addressed on the strength of a pushed commit
+  without checking which ref that commit is reachable from.
+
+(`Morrison-Lab/ai-config#986`, 2026-07-31: the review posted a verdict plus a
+non-blocking inline finding at head `147ee69` at `23:08:35Z`, the PR merged at
+`23:27:15Z`, and the fix for that finding was pushed as `7416b16` at
+`23:32:46Z`, five minutes later.
+`git merge-base --is-ancestor 7416b16 origin/main` returns non-ancestor, and a
+whitespace- and backtick-normalized comparison found 25 of the commit's 26
+prose additions absent from `main`, so the finding shipped unaddressed.
+The PR's timeline records "deleted the ums/push-reported-success-wrong-ref
+branch" at `23:27`, so the branch was already gone when that push ran and the
+push recreated it, which is the `* [new branch]` case.
+Three head branches merged around the same time
+(`chore/claude-review-v2-pin`, `docs/fully-clean-verdict-measurement`,
+`ums/prose-count-adjacent-to-block`) no longer resolve; this one does, at
+`7416b16` rather than at the merged head `147ee69`, which is the recreation.
+The push's own output is not in the record, so whether it was read and
+misjudged or never read at all cannot be established.
+What is in the record is a later comment on that thread asserting the tell was
+unavailable here, which each of these checks refutes.
+Recovered as #1003.)
 
 **The harness-assigned branch name itself can already exist locally, pointing at unrelated stale content from an earlier session in the same container.** A fresh container doesn't guarantee a fresh local branch state --- `git checkout -b <harness-branch> origin/<existing-PR-branch>` can fail with "a branch named `<harness-branch>` already exists" if a prior session in this container created one under that same name and left it pointing at old work. Don't assume it's safe to reuse or that it reflects the actual PR: check `git merge-base --is-ancestor <local-tip> origin/main` first --- if the local tip is already an ancestor of `main` (i.e. it was old, already-merged content, not in-flight work), it's safe to discard by force-checking out the real PR branch under that same name with `git checkout -B <harness-branch> origin/<existing-PR-branch>` (uppercase `-B` resets the branch in place instead of erroring). (ai-config#481: the assigned branch name `claude/resolve-pr-481-conflicts-dz9v4w` already existed locally, pointing at a commit that turned out to be an ancestor of `main` from an earlier session --- switched to the actual PR branch instead, per this section's own primary rule.)
 

@@ -119,6 +119,7 @@
   Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch and resolve conflicts — don't wait for a branch to show DIRTY or for the next review trigger.
   In R packages the recurring conflicts are DESCRIPTION `Version:` (bump above main) and NEWS.md (union-merge, keeping both sides' bullets and one subsection per heading); the `@claude` bot auto-syncs non-conflicting branches but does NOT resolve these real DESCRIPTION/NEWS conflicts.
   Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable; parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners. (Learned on ucdavis/bcs.)
+  **The DESCRIPTION half of this cascade is obsolete once a repo adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check` capabilities (gha#390, tracking gha#388)** --- PRs stop touching `Version:` at all, so there's no version-bump conflict left to cascade down the stack. The NEWS.md union-merge half is unaffected until a separate `news.d`-fragment capability ships (deferred, see gha#388). Check whether the repo you're stacking PRs in has migrated before applying the DESCRIPTION-bump advice above.
 - **Before grabbing any issue (GI/GII), check that no other session is already on it.** Two signals must BOTH be clear: (1) the issue's most recent comment does NOT contain "Working on this" or equivalent claim; (2) there is NO open PR referencing the issue — by branch name or title, or via a cross-reference event on the issue (which covers most `#N` / `Closes #N` body mentions).
   If either signal fires, skip that issue — don't open a competing PR or claim it. (Twice grabbed issues already in-flight: sparta#325 had PR #327 open; sparta#292 had PR #329 open.
   Both required closing a duplicate.)
@@ -269,6 +270,52 @@
   The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
   This applies to EVERY repo, not just ai-config — bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs — that silently changes the branch out from under any other session or task pointed at that path. Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task — both risk clobbering a concurrent agent.)
+- **A delegated subagent runs in the parent session's working tree, so the
+  branch-switching rule directly above governs your own agents, not only other
+  sessions.**
+  The remedy is already written down: [`gip`](../skills/gip/SKILL.md) says to
+  give every subagent `isolation: "worktree"`, and
+  [`ultracode-merge-conflicts`](../shared/workflow/ultracode-merge-conflicts.md)
+  assumes the same parameter.
+  Both frame the hazard as agents colliding with **each other** across a
+  fan-out, though, so the rule reads as inapplicable when you launch exactly
+  one agent and it has no siblings to collide with.
+  It is not.
+  The parent is a colliding party too, and a lone agent is fully exposed to the
+  parent's own `git checkout` or cherry-pick in the shared checkout.
+  An agent you launched also reads as part of your session rather than as a
+  separate consumer of that checkout, which is why switching branches
+  underneath it does not feel like switching branches out from under anybody.
+  Nothing errors when you do.
+  Every read the agent resolves through `HEAD` --- the working tree, the index,
+  and `git show HEAD:<file>` alike --- silently becomes an answer about your
+  branch instead of its own.
+  The symptom is the expensive part: `git show HEAD:<file>` returns the
+  pre-edit text, which is indistinguishable from the agent's own commit having
+  been reverted, so it may redo finished work or report the work as lost, and
+  both readings are wrong.
+  Note what that command is **not**, because the obvious remedy does not fix
+  it: `git show HEAD:<file>` already reads a committed blob and never touches
+  the working tree, so switching from the tree to a commit changes nothing.
+  What moved is the **ref**.
+  `HEAD` follows the parent's `git checkout` or cherry-pick; a branch name does
+  not.
+  So name the branch --- `git show <its-branch>:<file>` and
+  `git ls-remote origin <its-branch>` are unaffected by whatever `HEAD` now
+  points at.
+  - **Do:** pass `isolation: "worktree"` for a single delegated agent that will
+    commit or change branches, not only for a fan-out of several.
+  - **Do:** answer a suspected revert from the branch ref and the remote.
+  - **Don't:** change branches in a checkout one of your own subagents is
+    using, on the grounds that it is your session.
+  - **Don't:** read a working tree that disagrees with a commit you just made
+    as evidence the commit did not happen.
+  (2026-07-31, ai-config: a subagent committing in `/home/user/ai-config` had
+  the parent cherry-pick onto a new branch in the same checkout mid-run.
+  The agent then read `git show HEAD:<file>` as its edits reverted, while its
+  commit `8cc7ae3` in fact carried both files it had touched and its branch ref
+  and `origin` both pointed at it.
+  No `isolation` argument had been passed, which is the whole cause.)
 - Bash's cwd PERSISTS across separate calls within a session (it does not silently reset between calls) — so a `cd` in one call carries forward into the next unless a later call `cd`s elsewhere. This one mechanism causes two mirror-image mistakes depending on the session's layout:
   - **Session runs INSIDE a worktree:** do NOT prefix git commands with `cd <main-checkout>`. Because cwd persists, that `cd` doesn't just affect the current call — any *later* call that omits its own `cd` stays in the main checkout too, silently working against a different branch (often another session's) instead of your worktree. Run git in the worktree with no `cd` at all; if you must touch another checkout, use `git -C <path>` instead of `cd`-ing into it. `gh` commands keyed by PR or issue number are cwd-agnostic, so only `git` breaks. Run `git branch --show-current` before committing or pushing to confirm. Learned on PR #62: a `cd`-prefixed push hit `main` and made my own worktree commits look missing.
   - **Session juggles several full (non-worktree) repo checkouts side by side:** a call with no `cd` silently runs against whichever repo an earlier call last `cd`'d into, not the repo you mean this time. Never omit an explicit `cd <repo>` in any Bash call when more than one repo checkout is in play, and re-verify with `pwd` or `git remote -v` after any call whose target repo matters. This bites hardest in back-to-back "same shape, different repo" calls (e.g. an identical empty claim-commit pushed to two sibling PRs one after another) — the second call looks correct in isolation but silently repeats the first call's repo. Caught it by checking `mergeable_state` output afterward; recovery was a `git reset --hard` to the last-good local commit plus `git push --force-with-lease` to undo the wrong-repo push before redoing it with an explicit `cd`. (Learned on ai-config#454/gha#215: an empty commit meant for `gha` landed on `ai-config`'s branch instead.)

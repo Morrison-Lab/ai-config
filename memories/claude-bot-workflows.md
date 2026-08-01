@@ -999,7 +999,22 @@ warns about, in the entry invoking its authority.
 `pull_request_target`, and all five subsequent runs failed this way while the two
 `pull_request` runs immediately before it succeeded.
 Reverted in #89, tracked as #88.
-The revert PR's own `pull_request` run then stopped at *workflow validation*
-instead --- same repo, same secret, same minute as a `pull_request_target` run
-rejected at the token --- which is the cleanest available demonstration, since the
-trigger is the only variable.)
+The revert PR's own two runs are the cleanest demonstration available, because the
+trigger is the only variable between them.
+Run 30680266779 (`pull_request_target`) was rejected at the token with
+`401 Invalid OIDC token`.
+Run 30680266785 (`pull_request`) had its token *accepted* and got as far as
+workflow validation, where it skipped and exited 0 --- so its check reads
+`success` while the action never reviewed anything.
+Same repo, same secret, 15 seconds apart.
+
+That second run is also a worked example of the skip bullet above, and of how it
+misleads a careful reader.
+Round 2 of this PR's own review read that `success` conclusion and reported the
+sentence describing it as a fabricated claim, on the reasoning that a run which
+succeeded cannot have stopped early.
+It can, and this one did: the log carries
+`Skipping action due to workflow validation` and `Exiting due to workflow
+validation skip`.
+Read the log rather than the conclusion, on any job whose action can exit 0
+without doing its work.)

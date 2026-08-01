@@ -713,3 +713,116 @@ and then failed
 `d-morrison/qwt` run 30391041128 (28s) reached the model and returned
 `is_error:true` after a workflow-modification denial.
 Only the first was about permissions at all.)
+
+**A group established on real discriminating evidence can still admit a case
+that was never held to it, and widening scope is when that happens.**
+The section above concerns a weak signal, duration, being read as though it
+produced a hypothesis rather than corroborating one.
+This one fires later and is narrower.
+The signature is strong, it was established correctly, and the defect is in
+what gets added to the group afterward.
+
+The shape is a first pass done properly, followed by an admission done on
+less.
+You read two or three failures' own output, find a genuine shared signature,
+and group them.
+Then a further case turns up sharing only the **symptom** that made you look
+at it, which is usually no more than "this check failed today", plus a
+plausible shared cause story.
+It goes into the group without anyone rereading a log.
+
+So the check is one question, asked of every case after the first.
+Does this match on the **discriminating evidence** that defined the group, or
+only on the symptom that made me look?
+
+Note that the remedy above does not catch this on its own.
+It says to open the log and quote the line the job died on, and that is
+exactly what was done for the cases that formed the group.
+Applying a standard to the first N cases is what makes the N+1th feel already
+covered by it.
+
+**A cross-repo or cross-project case is the likeliest to be admitted this
+way, and the one that most needs the bar raised.**
+It arrives feeling like independent corroboration rather than like another
+instance, so it reads as strengthening the finding rather than extending it.
+A scope claim is also the most quotable thing you will write about a bug.
+"This affects two repositories" is what other people act on, and it usually
+gets published in a tracking issue, where it outlives the session that
+produced it.
+Widening scope is therefore the moment to demand the same evidence again,
+rather than the moment to accept a weaker kind.
+
+Three disconfirming signals are cheap and general enough to look for by name.
+
+- **How far the pipeline got.**
+  A run that produced two attempt artifacts reached a retry path, and a run
+  whose guard rejected it before any retry cannot have produced a second
+  attempt.
+  A structural difference in progress is evidence about which failure this
+  is, independent of any log line.
+- **The error text itself.**
+  Two failures printing different messages came from different code paths,
+  and both strings are usually already in front of you.
+- **Whether the run produced the artifact the check exists to gate.**
+  For a review job that means asking whether a verdict is on the PR, which
+  is a different question from whether the job went red.
+
+That third one is the last resort and the sharpest, because it is the only
+one that survives the two above agreeing.
+Two runs can print the identical error, from the identical code path, at the
+identical stage, and still be opposite phenomena -- one where the reviewer
+failed, and one where the reviewer succeeded and the guard failed it anyway.
+Nothing in the run data distinguishes those, because the distinguishing fact
+is not in the run: it is on the PR.
+
+So when a check's own output is the only evidence, remember that a check is a
+claim about an artifact, and go read the artifact.
+
+The cost is not only a mislabelled case.
+Dropping the second repository also removed the support for a real inference
+that had been drawn from it, that two repositories sharing one action implies
+the bug lives in the action.
+That support was never real, so the false claim cost an inference on top of a
+case record.
+The retraction only revealed the loss rather than causing it.
+
+- **Do:** re-read the new case's own terminal error before adding it to an
+  existing group, however well established that group is.
+- **Do:** compare the attempt or artifact count for a structural difference
+  in how far each run got, before treating two failures as the same one.
+- **Don't:** admit a case on a shared symptom plus a shared cause story when
+  every earlier member was admitted on quoted evidence.
+- **Don't:** publish a widened scope claim without holding the added case to
+  the standard the original ones met.
+
+(2026-07-31, `claude-review` failures on Morrison-Lab/ai-config #984, #985,
+and #986: two run results were read directly and shared a genuine signature,
+`is_error: true` alongside `subtype: "success"` after real work
+($4.10 over 13 turns, $0.97 over 2 turns).
+Both of those reads were #986's own two runs, though.
+PRs #984 and #985 were admitted on nothing but a `claude-review` failure the
+same day, with no result object read for either -- so that grouping was
+already the pattern this section condemns, one step before the one it was
+written about.
+Reading them later made it worse rather than merely unverified: both had
+posted complete **Ready for merge** verdicts, minutes before their guards
+failed the check.
+They were the *opposite* phenomenon -- the reviewer succeeded and the check
+was wrong -- filed as instances of the reviewer failing.
+Neither signal above would have caught it, since their error text and their
+stage are identical to #986's; only the third one is, and it was added to
+this list because of them.
+The duration rule above was invoked explicitly to confirm that #986's
+9-minute and 53-second runs were the same bug.
+Morrison-Lab/gha#390 was then added to the group because its own
+`claude-review` had failed the same day, and a scope correction widening the
+finding to two repositories was posted to the tracking issue,
+Morrison-Lab/gha#391.
+It was a different bug.
+That PR's log reads `Attempt 1 produced a stub review (gha#185) and the retry
+ALSO ended without a verdict with a low denial count`, a path reachable only
+when `is_error` is false, so the grouped signature is rejected by the guard
+before any retry can happen.
+The two attempt artifacts and the differing guard wording were both visible
+at the time.
+The claim was retracted on the same issue.)

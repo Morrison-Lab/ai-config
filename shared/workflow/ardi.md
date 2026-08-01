@@ -343,13 +343,13 @@ the prior commit `4bf5063`.
 `pull_request_read` `get` returned `9a3e722` moments later, so the two
 surfaces disagreed and the git-native one was right.)
 
-**The write side can fail in the same direction, so the local two-ref
-comparison above is not sufficient on a brand-new branch.**
+**A brand-new branch can read back at the wrong commit, so the local two-ref
+comparison above is not sufficient there.**
 That bullet offers `git rev-parse HEAD origin/<branch>` as the pair that
 settles the question, on the grounds that local refs cannot lag.
 They cannot.
-What they can do is agree with a remote ref the push itself created at the
-wrong commit, and then the pair reports the push as landed.
+What they can do is agree with a remote ref that reads back at the wrong
+commit, and then the pair reports the push as landed.
 
 The failure direction inverts, which is what makes this worth separating.
 A read-side lag is a false alarm, correctly called the safe one there.
@@ -363,9 +363,38 @@ upstream, and exited 0, because that is the least suspicious moment in the
 round.
 
 `git ls-remote origin <branch>` reads the remote directly rather than through
-a tracking ref, so it is the instrument that decides it.
+a tracking ref, so it is the instrument that catches it.
 The corrective push is an explicit refspec:
 `git push origin HEAD:refs/heads/<branch>`.
+
+**The likeliest explanation is a local one, and it reproduces offline.**
+`git push -u origin <branch>` pushes the **branch ref**, not `HEAD`.
+So a local branch left behind at `main`'s tip, while `HEAD` carries the new
+commit, produces this whole signature with nothing on the server going wrong.
+Reproduced in a local bare repo, where no replica and no race exists: the
+push printed `* [new branch]` and exited 0, `git ls-remote` and the tracking
+ref both read `main`'s tip, `main..<branch>` held zero commits, and
+`git push origin HEAD:refs/heads/<branch>` then reported a real range.
+That last command is a test as much as a fix, since it answers
+`Everything up-to-date` when the branch ref and `HEAD` already agree.
+
+Two things weigh against the read-side story, which an earlier draft of this
+entry weighted equally against the write-side one.
+A lagging replica cannot invent a value for a ref that never existed before,
+so its failure mode is the ref reading **absent** rather than reading one
+specific wrong commit.
+And a tracking ref is set from what the push sent, which makes its value a
+client-side fact rather than a later network read.
+
+What stays genuinely unsettled is narrower than either reading claimed: the
+branch ref's own value at push time was never recorded, so the local
+explanation is the best supported one rather than a proven one.
+Note the shape of that, since it is the failure this entry is about.
+The entry has now over-claimed twice, first asserting a write-side fault, then
+asserting a parity between two hypotheses that the record does not support
+either.
+The practical advice survives all three readings, because the checks below
+are cheap whichever is right.
 
 Two things about diagnosing one of these.
 The downstream error misdirects, because opening the PR fails with
@@ -377,17 +406,28 @@ exist before, **not** the deleted-underneath-you signal `CLAUDE.md`'s
 There the line is diagnostic precisely because the branch had already been
 pushed to; here it is expected, so the two cases must not be conflated.
 
-What was not established is **why** `push -u` created the ref at `main`'s tip
-rather than at `HEAD`.
-Read this as an observed effect with a detection instrument and a fix, not as
-a mechanism.
+The wrong value is the informative part, and it reads at first like noise.
+A race or a server fault has no reason to land on `main`'s tip in particular,
+whereas a branch ref cut from `main` and never advanced sits there by
+construction.
+So read a wrong value that happens to equal `main`'s tip as pointing at the
+local ref rather than at the network.
 
 - **Do:** run `git ls-remote origin <branch>` after the first push to a new
   branch, and compare its SHA against `git rev-parse HEAD`.
-- **Do:** re-push with `git push origin HEAD:refs/heads/<branch>` when those
-  two disagree, and read the SHA range it prints as the confirmation.
+- **Do:** run `git rev-parse HEAD <branch>` first when those two disagree,
+  since a branch ref left behind accounts for the whole signature (and note
+  that `--short` rejects a second revision, so pass neither).
+- **Do:** re-run plain `git ls-remote` as well, so a ref that self-corrects
+  stays distinguishable from one a re-push repaired.
+- **Do:** re-push with `git push origin HEAD:refs/heads/<branch>` when the
+  mismatch persists, and read the SHA range it prints as the confirmation.
 - **Don't:** treat a `git push` that exited 0 and printed `* [new branch]` as
   evidence the commit reached the remote.
+- **Don't:** assume `git push -u origin <branch>` sent the commit you just
+  made -- it sends the branch ref, which `HEAD` may have moved past.
+- **Don't:** credit a corrective re-push with having repaired a remote-side
+  fault when neither of those two controls was run.
 - **Don't:** answer a `No commits between main and <branch>` error by
   re-checking the base branch argument before checking where the head ref
   actually points.
@@ -401,7 +441,12 @@ value, so the two-ref comparison reported the push as landed.
 `create_pull_request` then returned a 422 reading
 `No commits between main and ums/prose-count-adjacent-to-block`.
 `git push origin HEAD:refs/heads/ums/prose-count-adjacent-to-block` reported
-`98102a2..1611ccc`.)
+`98102a2..1611ccc`.
+Neither `git rev-parse ums/prose-count-adjacent-to-block` nor a second plain
+`git ls-remote` was run, so the branch ref's own value at push time is the
+fact the record is missing.
+Describing that push as "carrying commit `1611ccc`" was an inference from the
+commit just made, not a reading of the ref that was pushed.)
 
 **The same false claim arrives as *incoming* state when you pick a PR up
 mid-flight, and there the SHA comparison usually has nothing to compare.**

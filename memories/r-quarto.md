@@ -1,5 +1,15 @@
 # R, Quarto & the R toolchain
 
+## Conda activation before Quarto validation
+
+- **Activate conda, do not rely on `conda run`, before checking a project
+  toolchain.** In this environment `conda run -n bcs <command>` left the
+  environment's `quarto` executable off `PATH`, even though it was installed.
+  Use `source /home/demorrison/miniconda3/etc/profile.d/conda.sh && conda
+  activate bcs` before `quarto --version` or rendering, and confirm the
+  executable path first. `conda run` can still suit a self-contained R
+  invocation, but is not a substitute for verifying full shell activation.
+
 ## renv.lock — adding a package that's only referenced via another package's Suggests
 
 Using a function that requires an **optional** dependency of an already-locked

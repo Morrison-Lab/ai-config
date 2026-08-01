@@ -152,6 +152,32 @@ these.
     install is the only zsh on the cluster rather than merely the portable
     one.
   - Full usage/exit doc: `~/.config/tui-alloc/README.md`.
+  - **The launcher sources are tracked** in ai-config under
+    `dotfiles/shiva/`, installed by `dotfiles/shiva/install.sh` (which
+    `bootstrap.sh` runs).
+    Edit them there, not in `~/bin` --- the installed copies are symlinks back
+    into the checkout.
+- **`cnode` is the agentless sibling**: a plain interactive zsh on a compute
+  node, for when you want a shell rather than a coding agent.
+  It differs from the `tui-alloc` family in four ways worth knowing.
+  - **Bare `srun`, not `salloc` plus a step.** One layer, so one `exit`
+    releases it, where the `tui-alloc` layering needs two.
+  - **No `--exclude=c1`**, so it can land on the GPU node.
+  - **`CNODE_CPUS` / `CNODE_MEM` / `CNODE_TIME` / `CNODE_ZSH`**, not the
+    `ALLOC_*` names, and its walltime default is `1-00:00:00`.
+  - **It hardcodes `~/miniconda3/bin/zsh`** rather than resolving `zsh` on
+    PATH.
+    That is belt-and-braces, not a workaround: the conda zsh IS on PATH on
+    every node, which is what lets `tui-alloc` use `command -v zsh`.
+- **Both refuse to nest.** `refuse_if_nested` (in
+  `dotfiles/shiva/lib/slurm-guard.sh`, shared by `cnode` and `tui-alloc`)
+  exits rather than grabbing a second allocation from inside an existing one,
+  because a nested `srun`/`salloc` contends with its parent allocation's own
+  step instead of getting new resources.
+  Measured 2026-07-31: that deadlocked two jobs, one holding c1 while the
+  other sat PENDING on Resources.
+  It keys on `$SLURM_JOB_ID` first, falling back to checking `sinfo`'s node
+  list for a shell that reached a compute node without one.
 
 ## Fact-check code comments' factual claims — a false one can survive many review rounds
 

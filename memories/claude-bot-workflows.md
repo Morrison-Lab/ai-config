@@ -1013,8 +1013,8 @@ rather than reasoning about which token ought to be able to post.
 workflow since its first commit, and `claude` had **never** posted a review comment
 on the repository --- PRs #78, #79, #80, and #86 all ran green with zero.
 It surfaced only because #89 restored `read` while asserting it was safe on the
-grounds that "the action posts with its own app token", and two Copilot reviews on
-#89 restated that premise without objection.
+grounds that "the action posts with its own app token".
+Two Copilot reviews on that PR restated the premise without objection.
 Fixed in #91.
 A single query for a `claude` comment on any earlier PR would have caught it at any
 point in the preceding month.)

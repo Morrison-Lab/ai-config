@@ -68,7 +68,11 @@ The GitHub MCP tool surface used in remote/web sessions lives in
       '[.[][] | select(.id > $baseline and (.body | startswith("**Claude finished")))] | last | .body'
     ```
     When polling for the *first* run on a fresh thread (no prior completed comment to collide with), the simpler unscoped form still needs `--paginate` for the same >30-comment reason (a REST issue-comments page is oldest-first, so page 1 alone can miss the newest comment entirely once a thread grows past one page): `gh api repos/<o>/<r>/issues/<N>/comments --paginate | jq -s '[.[][] | select(.body | startswith("**Claude finished"))] | last | .body'`. (Cost two wasted watch rounds on ai-config#357 before keying on the marker; the login-filtered version of this command was flagged as stale by review on ai-config#636; the unscoped-across-reruns version was flagged by a follow-up review on ai-config#637 and confirmed concretely on gha#278, whose thread holds two separate `**Claude finished` comments, one per run; and the `gh api --jq --argjson`/pagination gaps in *that* fix were themselves flagged by a still-later review on the same PR, caught only after #637 had already merged.)
-- **A reply posted via `gh pr comment`/`gh api` from within a session shows up under the *human user's own* GitHub account, not a bot identity — don't mistake it for an independent human review when auditing a PR's review state.** `gh` authenticates as whatever account is logged in locally (often the user's own, e.g. seen as `dem-extra1` on `Lacaedemon/sparta`), so when an agent (or a dispatched subagent) replies to an inline review comment on the user's behalf, `gh api repos/<o>/<r>/pulls/<N>/reviews` lists it as a `COMMENTED` review authored by the user — indistinguishable at a glance from the user genuinely opening the PR in a browser and typing a reply themselves. Before treating an unexpected review entry as a signal that the human intervened, check whether its body/inline-comment content reads like the agent's own scripted reply (referencing a specific commit SHA, restating verification numbers) rather than free-form human commentary — if so, it's the session's own tooling, not new human input.
+- **A reply posted via `gh pr comment`/`gh api` from within a session shows up under the *human user's own* GitHub account, not a bot identity — don't mistake it for an independent human review when auditing a PR's review state.** `gh` authenticates as whatever account is logged in locally (often the user's own, e.g. seen as `dem-extra1` on `Lacaedemon/sparta`), so when an agent (or a dispatched subagent) replies to an inline review comment on the user's behalf, `gh api repos/<o>/<r>/pulls/<N>/reviews` lists it as a `COMMENTED` review authored by the user — indistinguishable at a glance from the user genuinely opening the PR in a browser and typing a reply themselves.
+  Before treating an unexpected review entry as a signal that the human intervened, check whether its body/inline-comment content reads like the agent's own scripted reply (referencing a specific commit SHA, restating verification numbers) rather than free-form human commentary — if so, it's the session's own tooling, not new human input.
+  **The same ambiguity runs the other way, and there it arrives as a positive claim rather than an inference you might draw.** An automated reviewer reading the PR's own history sees that same bot-account commit and can describe it *in its review body* as the work of a human, e.g. "that finding was confirmed and fixed by a human reviewer (`dem-extra1`) in commit `<sha>`", stating as fact something no API field asserts.
+  That is worse than the inference case above, because the claim is now published prose a later reader inherits, and "a human already verified this" is precisely the sentence that stops the next person checking.
+  Correct it in the thread when you see it, naming which account is actually a session identity; don't let it stand just because the surrounding verdict was clean. (`ucdavis/bcs#532`, 2026-07-31: a `claude-review` pass reported a fix as human-confirmed when `dem-extra1` was the Claude session that made it, and no human had touched the PR at that point.)
 - **`gh pr view --json` does not accept `merged` as a field.** Use `state` (returns `"MERGED"`) and `mergedAt` (ISO timestamp, null if not merged) to check merge status. Example: `gh pr view <N> --json state,mergedAt`.
   **Never compare that `mergedAt` against a git timestamp as strings --- convert both to epochs first.**
   Every GitHub API timestamp is UTC (`...Z`), while git's `%cI`/`%cd` render in the *machine's local zone*, so a lexicographic `<` between them compares clock faces from two different zones and silently answers wrong.
@@ -143,6 +147,55 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
   The operational advice does not depend on resolving it.
   Don't spend a call on this endpoint either way -- the ruleset already requests the review, and neither response tells you whether one is pending.
+- **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
+  when its output is not a terminal --- which is always, for an agent.**
+  A cancellation and a real failure are therefore the same word in the column
+  most people read, and they want opposite responses: a re-run versus a
+  debugging round.
+  `gh` itself distinguishes them internally and then discards the distinction
+  on the way out.
+  In `cli/cli` v2.92.0 (the installed version, checked with `gh --version`),
+  `pkg/cmd/pr/checks/aggregate.go` gives `CANCELLED` its own bucket, separate
+  from `ERROR`/`FAILURE`/`TIMED_OUT`/`ACTION_REQUIRED`:
+  ```go
+  case "CANCELLED":
+      item.Bucket = "cancel"
+  ```
+  `pkg/cmd/pr/checks/output.go` renders that bucket as a muted `-` in a TTY,
+  identically to `skipping` --- and then, for the non-TTY table:
+  ```go
+  if o.Bucket == "cancel" {
+      tp.AddField("fail")
+  } else {
+      tp.AddField(o.Bucket)
+  }
+  ```
+  So a human at a terminal sees a cancellation as a dash, and a piped or
+  captured run sees `fail`.
+  Two consequences worth keeping apart.
+  A human's report of what they saw and an agent's are not describing the same
+  output, so "it's showing as failing" from one is not corroboration for the
+  other.
+  And the fix is one flag, not a heuristic: **`--json name,state,bucket`**
+  preserves `bucket: "cancel"` and `state: "CANCELLED"` distinctly from `fail`,
+  which decides it exactly rather than by inference
+  ([`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)).
+  Duration is a decent corroborating tell --- a review job cancelled by a
+  concurrency race dies in seconds where a real one takes minutes --- but take
+  it from `completed_at` minus `started_at` on a completed run, never from
+  `status`, per [`fully-clean`](../shared/workflow/fully-clean.md) criterion 1.
+  Prefer the flag to the tell: the flag is exact and the duration is a prior.
+  For the cause of these cancellations, and why the *gate* job then reports
+  failure too, see the `cancel-in-progress` entries in
+  [`memories/debugging.md`](debugging.md) and
+  [`pr-on-claim`](../shared/workflow/pr-on-claim.md).
+  (2026-07-31: a 6-second "failing" `review / claude-review` was read as a real
+  failure and debugged as one; it was a concurrency cancellation, and needed
+  only a re-run.
+  Confirmed against a real cancelled run on Morrison-Lab/ai-config commit
+  `7b006485`, whose `review / claude-review` check run carries
+  `conclusion: cancelled` while its dependent `review / require-review` carries
+  `conclusion: failure`.)
 
 ## gh — stale remote URL causes cryptic `gh pr create` failure
 - `gh pr create` fails with `Head sha can't be blank, Base sha can't be blank, No commits between <owner>:main and <other-owner>:<branch>` when `origin` points to an **old repo URL** (e.g. after a GitHub repo transfer/rename).

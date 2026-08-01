@@ -3,9 +3,11 @@
 The GitHub MCP tool surface used in remote/web sessions where the `gh`
 CLI is unavailable --- tool selection, scope and owner-string quirks,
 review/comment/thread mechanics, and the specific failure modes each
-tool has shown in practice. Split out of `github.md` when that file
-crossed the 1200-line gate (`scripts/check-memory-file-size.py`); see
-ai-config#694 for the precedent.
+tool has shown in practice.
+Split out of `github.md` pre-emptively at 1199 lines, just under
+`scripts/check-memory-file-size.py`'s gate --- that check fires strictly
+above 1200 lines, so the file never actually tripped it.
+See ai-config#694 for the precedent.
 
 - In remote/web sessions the authenticated GitHub identity is the repo owner
   (`d-morrison`), so requesting `d-morrison` as a PR reviewer fails with
@@ -42,7 +44,7 @@ ai-config#694 for the precedent.
   that same command does not.
   Write placeholders in a body without brackets --- `OWNER/REPO`, `PATH`, `N`
   --- and re-read the body after posting whenever the exact text matters.
-  This is the "Postcondition gate" bullet at the top of this file made concrete:
+  This is the "Postcondition gate" bullet in [`github.md`](github.md) made concrete:
   nothing errors, the object is created exactly as asked, and only reading the
   stored result back shows the content is not what was sent.
   (ai-config#734, 2026-07-26: caught only because the mangled URL happened to be
@@ -208,55 +210,6 @@ ai-config#694 for the precedent.
   (`ucdavis/rampp#111`: Copilot had prepared the `DESCRIPTION` version bump
   that `version-check` was failing on and was rejected with that error; the
   identical fix pushed fine from this session as `0c72d81`.)
-- **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
-  when its output is not a terminal --- which is always, for an agent.**
-  A cancellation and a real failure are therefore the same word in the column
-  most people read, and they want opposite responses: a re-run versus a
-  debugging round.
-  `gh` itself distinguishes them internally and then discards the distinction
-  on the way out.
-  In `cli/cli` v2.92.0 (the installed version, checked with `gh --version`),
-  `pkg/cmd/pr/checks/aggregate.go` gives `CANCELLED` its own bucket, separate
-  from `ERROR`/`FAILURE`/`TIMED_OUT`/`ACTION_REQUIRED`:
-  ```go
-  case "CANCELLED":
-      item.Bucket = "cancel"
-  ```
-  `pkg/cmd/pr/checks/output.go` renders that bucket as a muted `-` in a TTY,
-  identically to `skipping` --- and then, for the non-TTY table:
-  ```go
-  if o.Bucket == "cancel" {
-      tp.AddField("fail")
-  } else {
-      tp.AddField(o.Bucket)
-  }
-  ```
-  So a human at a terminal sees a cancellation as a dash, and a piped or
-  captured run sees `fail`.
-  Two consequences worth keeping apart.
-  A human's report of what they saw and an agent's are not describing the same
-  output, so "it's showing as failing" from one is not corroboration for the
-  other.
-  And the fix is one flag, not a heuristic: **`--json name,state,bucket`**
-  preserves `bucket: "cancel"` and `state: "CANCELLED"` distinctly from `fail`,
-  which decides it exactly rather than by inference
-  ([`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)).
-  Duration is a decent corroborating tell --- a review job cancelled by a
-  concurrency race dies in seconds where a real one takes minutes --- but take
-  it from `completed_at` minus `started_at` on a completed run, never from
-  `status`, per [`fully-clean`](../shared/workflow/fully-clean.md) criterion 1.
-  Prefer the flag to the tell: the flag is exact and the duration is a prior.
-  For the cause of these cancellations, and why the *gate* job then reports
-  failure too, see the `cancel-in-progress` entries in
-  [`memories/debugging.md`](debugging.md) and
-  [`pr-on-claim`](../shared/workflow/pr-on-claim.md).
-  (2026-07-31: a 6-second "failing" `review / claude-review` was read as a real
-  failure and debugged as one; it was a concurrency cancellation, and needed
-  only a re-run.
-  Confirmed against a real cancelled run on Morrison-Lab/ai-config commit
-  `7b006485`, whose `review / claude-review` check run carries
-  `conclusion: cancelled` while its dependent `review / require-review` carries
-  `conclusion: failure`.)
 - **`get_status` can return "pending / 0 checks" even after CI has finished.**
   Use `get_check_runs` for the real job conclusions (`success`, `failure`,
   `skipped`) --- but see the bullet below: it is the more reliable of the two,

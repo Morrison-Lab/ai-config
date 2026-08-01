@@ -235,3 +235,17 @@ Caught before pushing by checking the diff's size against the single-line
 finding it was meant to answer; recovered via `git checkout -- <file>`
 against the still-staged pre-replace version, since the file had been
 `git add`-ed before the mistake.)
+
+**The mistake recurs even while actively self-reviewing for exactly this
+rule, and the scale grows with the number of files touched at once.**
+Fixing multiple flagged glyphs across several files in one pass invites
+running one `str.replace()` loop over all of them, rather than a separate
+targeted edit per occurrence --- and the same "does the diff size match the
+finding" check catches it just as cheaply here as it does for a single file.
+(Morrison-Lab/ai-config#973, 2026-08-01: a self-review found 8 flagged
+em-dashes across three memory files.
+A first pass ran a global `text.replace(em_dash, " --- ")` per file, which
+touched 663 removed lines across the three files against an expected ~50 ---
+caught by `git diff --stat` before pushing, reverted with
+`git checkout -- <files>`, and redone with anchored, uniqueness-asserted
+substitutions for only the 8 flagged lines.)

@@ -391,9 +391,8 @@ best-effort. (Sparta gii-ffdb93 session, 2026-07-14.)
 ## `CronCreate`'s job store can silently lose a scheduled job mid-session, so it is a weak fallback for a check-in you have promised a time for
 
 The `send_later`-can-become-unavailable-mid-session bullet in
-[`memories/github.md`](github.md), under its "GitHub MCP tools (Claude Code
-remote/web sessions)" heading, recommends `CronCreate` as the fallback when
-`send_later` disappears.
+[`memories/github-mcp-tools.md`](github-mcp-tools.md) recommends
+`CronCreate` as the fallback when `send_later` disappears.
 It works, but its jobs are in-memory and session-only by design, and they can
 vanish **before their fire time** with no error and no notification.
 

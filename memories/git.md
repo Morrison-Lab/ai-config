@@ -771,6 +771,71 @@ A scan reporting `0 banned-punctuation hits` looks identical whether it read the
 The count was the only thing that gave it away;
 staging first and re-running scanned all 85.)
 
+## An untracked copy sitting where a tracked file lives on another branch runs instead of it
+
+The entry above is about a check that cannot **see** an untracked file.
+This is the inverse and the worse half: an untracked file you cannot help but
+**run**.
+A scratch copy of a script, left at the same relative path as the tracked
+version that lives on some other branch, is what `./scripts/<name>.sh`
+resolves to.
+The inputs are fine, the invocation is right, and the binary is wrong.
+
+Nothing at the call site distinguishes them.
+Same path, same name, executable, plausible output.
+`git status --short` marks it `??`, but an untracked file among a working
+tree's other untracked files is unremarkable, and the checkout around it is
+fresh --- which is what makes this harder to spot than an ordinary stale
+checkout, where at least everything is stale together.
+
+The failure is also **self-confirming**, not merely silent.
+A stale copy's already-fixed bug presents as a genuine finding, so the wrong
+binary generates apparently productive work: a diagnosis, a fix, a test.
+A wrong *artifact* would eventually contradict something; this produces a
+correct fix to a problem that no longer exists, and every step after the first
+looks like progress.
+
+One command settles it before you trust any behaviour you observed:
+
+```bash
+git ls-files --error-unmatch scripts/<name>.sh    # exit 0 = tracked here
+```
+
+Non-zero on a path you expected to be tracked is the tell.
+Then ask the second question, which the first does not answer: **is this branch
+the one that owns the file?**
+A path untracked on `main` and tracked on a feature branch is exactly the
+shape, so check the owning PR's copy before concluding anything about the
+script's behaviour --- and diff the two rather than assuming yours is behind
+only where you noticed.
+
+`ucdavis/bcs`'s own `CLAUDE.md` already leans on this command for a different
+purpose (deciding whether a path under `inst/extdata/` is restricted data), so
+it is a cheap habit with two payoffs rather than a new one.
+
+- **Do:** run `git ls-files --error-unmatch <path>` before treating a script's
+  behaviour as the artifact's behaviour.
+- **Do:** compare against the copy on the branch that owns the file, and read
+  its version before writing a fix.
+- **Don't:** read a fresh checkout as evidence that every file in it is the
+  tracked one.
+- **Don't:** trust a bug you found by running a script until you have confirmed
+  which copy ran --- an already-fixed bug reads exactly like a new one.
+
+(`ucdavis/bcs#530`, 2026-07-31: `scripts/resolve-version-conflict.sh` lives on
+that PR's branch, and an untracked copy of an earlier revision sat at the same
+path in the main checkout, where `git status` showed it as `??`.
+Running it exercised the stale copy, whose final "still unmerged elsewhere"
+guard counted the file it had just resolved --- it never staged it --- so it
+exited 1 on its own success path.
+That bug was diagnosed correctly, fixed, and tested in both directions, all of
+it redundant: #530's copy already fixed it, and additionally guards on
+`git rev-parse --is-inside-work-tree`, where the independently-written fix would
+have aborted under `set -e` outside a work tree.
+Running the same three-case fixture against #530's copy gave exit 0 on the
+handled case, exit 1 naming the genuine second conflict, and exit 0 outside a
+work tree.)
+
 ## A pattern resolved by `git ls-files` is a pathspec, not a shell glob -- `*.md` is recursive and `**/*.md` drops root-level files
 
 Any tool that selects files by handing a pattern to `git ls-files -- <pattern>`

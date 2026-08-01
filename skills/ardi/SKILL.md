@@ -176,9 +176,11 @@ finding → push → post summary → re-request review → repeat until clean.
    git merge origin/main
    ```
    Resolve conflicts, run the repo's pre-commit checks, then re-scan the
-   PR's touched files for merge-status hedges that `main` may have falsified
-   (`still open`, `not yet merged`, `once that merges`, `as of`, `will live at`,
-   `proposed in`) before pushing.
+   PR's touched files with whitespace-normalizing search for merge-status
+   hedges that `main` may have falsified (`still open`, `not yet merged`,
+   `once that merges`, `as of`, `will live at`, `proposed in`) before pushing.
+   Do not use line-oriented literal grep; semantic line breaks can split the
+   phrase this check needs to find.
    Don't rebase/squash a published branch -- a
    merge commit matches GitHub's "Update branch" button. (The
    `sync-pr-branch` skill does exactly this.)
@@ -293,8 +295,9 @@ Do-Confirm; per
       Compare the review run's `started_at` against your last reply and the
       head SHA.
 - [ ] Every finding from that review has an ARD disposition.
-- [ ] If code changed, main was synced in first when needed, then fixes were
-      pushed.
+- [ ] If code changed, main was synced in first when needed, merge-status
+      hedges in touched files were re-scanned with whitespace normalization,
+      then fixes were pushed.
 - [ ] ARD summary was posted and corresponding inline-thread replies/resolutions
       were handled.
 - [ ] Re-review trigger was chosen correctly: push-trigger only when code was

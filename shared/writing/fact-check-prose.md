@@ -167,10 +167,12 @@ replacement for the disputed number.
 It is a new unverifiable number, and publishing it upgrades the claim beyond
 what the evidence supports.
 
-Use the part the reader can check without trusting your local data.
+Use the part the reader can check without trusting your local data, but do not
+pretend the mismatch identifies its own source.
 An itemized breakdown and its total are an internal-consistency test: when the
-rows sum to one value and the total prints another, the total is wrong even if
-nobody can reconstruct the original sample.
+rows sum to one value and the total prints another, one side is wrong.
+Prefer the rows only when their completeness is itself inspectable or stated as
+a remaining premise; otherwise report the discrepancy without selecting a side.
 Then bound the downstream effect rather than leaving the correction open-ended:
 check whether derived percentages or labels still hold, and say when they do
 not.
@@ -183,8 +185,9 @@ match the cited source.
 
 - **Do:** report the attempted recount's scope and result, including why it does
   not reproduce the cited source.
-- **Do:** use the itemized breakdown over a disagreeing total, and state which
-  derived claims survive the correction.
+- **Do:** use the itemized breakdown over a disagreeing total only when the
+  rows' completeness is checkable, and state which derived claims survive the
+  correction.
 - **Don't:** assert a fresh recounted number when the source population rotated,
   lived on another machine, or otherwise cannot be reached.
 - **Don't:** replace one unverifiable figure with another merely because the new
@@ -197,9 +200,10 @@ A recount over local `~/.claude/projects/**/*.jsonl` transcripts before
 2026-08-01 returned 8 `Agent` `tool_use` records in one key shape, not 121
 records spread over the six rows, so the original sample had rotated or lived
 on another machine.
-The fix therefore used the internally checkable total, 121, and stated that the
-60-row share changes under whole-percent rounding: 60/122 is 49%, while 60/121
-is 50%.)
+The fix therefore used the internally checkable row sum, 121, while naming the
+remaining assumption that the rows were complete.
+It also corrected the derived label: under whole-percent rounding, 60/122 is
+49%, while 60/121 is 50%.)
 
 
 ## Check that a stated trigger actually fired

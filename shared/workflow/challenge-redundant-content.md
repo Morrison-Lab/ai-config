@@ -30,12 +30,11 @@ intended.
 If the predicates differ, DRY may still be right, but the helper's name and
 call sites need to state the chosen predicate rather than smuggling it in as a
 cleanup.
-When a reviewer hedges because the answer depends on environment not visible in
-the diff, check whether the unchanged context in front of you contains that
-environment fact before dismissing the hedge.
+When the triggering state depends on an environment fact, check the unchanged
+context in front of you for that fact before treating the finding as speculative.
 That is the same move
-[`address-every-comment`](address-every-comment.md) requires for hedged
-findings whose evidence is outside the reviewer-visible diff.
+[`address-every-comment`](address-every-comment.md) requires for findings whose
+evidence is outside the reviewer-visible diff.
 
 - **Do:** write each call site's old predicate down before extracting a shared
   helper, including newly guarded sites whose old predicate was "no guard".
@@ -43,21 +42,23 @@ findings whose evidence is outside the reviewer-visible diff.
   uncommon state that distinguishes the call sites.
 - **Don't:** infer that two checks are redundant because they agree in the case
   you usually see.
-- **Don't:** treat a medium-confidence environment-dependent finding as
-  speculative when the PR's unchanged context gives you the missing
-  environment fact.
+- **Don't:** treat an environment-dependent finding as speculative when the PR's
+  unchanged context gives you the missing environment fact.
 
-(Morrison-Lab/ai-config#994, merged 2026-08-01T20:29:11Z: `cnode` had a
-refuse-to-nest guard and `tui-alloc` gained the shared guard during the
-cleanup.
+(Morrison-Lab/ai-config#994, merged 2026-08-01T20:29:11Z: at head `11b5a3d`,
+`cnode` had a refuse-to-nest guard and `tui-alloc` gained the shared guard
+during the cleanup.
 `cnode`'s old guard tested whether the hostname was in `sinfo`'s node list,
-while the new shared `refuse_if_nested` tested only `[ -n "$SLURM_JOB_ID" ]`.
+while the extracted `refuse_if_nested` draft tested only `[ -n "$SLURM_JOB_ID" ]`.
 On shiva those differ because `LaunchParameters = (null)` leaves a bare
 `salloc` shell on the login node while setting `SLURM_JOB_ID`; only
 `srun --pty` moves the session to a compute node.
-The shared guard therefore fired after a bare `salloc`, printed
+That draft therefore fired after a bare `salloc`, printed
 `already inside SLURM job 4242 on shiva` while naming the login host, and
-advised the bare command that would have run on the login node.)
+advised the bare command that would have run on the login node.
+Review caught the widened trigger before merge, and commit `bd1bf356` restored
+the missing branch by checking `on_compute_node()` inside the `SLURM_JOB_ID`
+case.)
 
 ## What this looks like in each domain
 

@@ -105,8 +105,15 @@ all-clear if you do not know them:
 - **The legacy three-arg form always exits 0**, whatever it finds.
   Keying a sweep on its exit status reports every pair clean.
   `git merge-tree --write-tree` does report conflicts by exit status, but it
-  does not exist before git 2.38, and older git rejects the flag with **129** ---
-  which also reads as "no conflict" to a caller testing for non-zero.
+  does not exist before git 2.38, and older git rejects the flag with **129**.
+  Which direction that fails in depends on how the sweep reads the command.
+  An exit-status sweep testing for non-zero reads 129 as a conflict on *every*
+  pair, so it fails loudly and gets noticed.
+  The grep form below fails quietly instead: the rejection goes to stderr and
+  leaves stdout **empty**, so `grep -c` returns 0 and every pair reads clean.
+  (Measured on git 2.53.0 against a known-conflicting pair: the legacy
+  three-arg form exits 0, `--write-tree` exits 1, and an unknown flag exits 129
+  having written nothing at all to stdout.)
 - **Its conflict markers sit inside a unified-diff body**, so they are indented
   by the diff's own leading character.
   `grep -c '^<<<<<<<'` returns 0 on a genuine conflict.
@@ -162,7 +169,9 @@ A queue whose changelog is union-merged will show fewer dirty flags and carry
 more unreviewed splices, which is the opposite of what the quiet flags suggest.
 Note also that GitHub's own mergeable indicator does not evaluate merge drivers
 at all, so the platform's flag and a real local merge can disagree in either
-direction.
+direction --- see
+[`ultracode-merge-conflicts`](ultracode-merge-conflicts.md), which owns that
+fact.
 
 ## Two silent failure modes arrive through a conflict-free merge
 
@@ -202,6 +211,8 @@ Generalize it:
 
 The working instrument is a **count delta**: a merge must not increase the
 number of spliced bullets.
+The predicate itself is [`sync-with-main`](sync-with-main.md)'s own splice
+detector, reused unchanged; only the count-delta framing around it is new.
 
 ```bash
 splices() { awk 'prev !~ /^[[:space:]]*$/ && /^[*+-] / {n++} {prev=$0} END{print n+0}' "$1"; }

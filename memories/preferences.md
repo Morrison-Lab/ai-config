@@ -332,34 +332,42 @@
   all -- the exact outcome the bullet above exists to prevent.
   The explicit fallback gives identical isolation for two commands, so reach
   for it rather than standing down:
-  `git -C <repo> fetch origin main`, then
-  `git -C <repo> worktree add --detach <path> origin/main`.
+  `git -C <repo> fetch origin <default-branch>`, then
+  `git -C <repo> worktree add --detach <path> origin/<default-branch>`.
+  Resolve `<default-branch>` from the repo rather than assuming `main`, the way
+  [`gip`](../skills/gip/SKILL.md)'s step 0 and [`ums`](../skills/ums/SKILL.md)
+  both already do: hard-coding it dies with
+  `fatal: invalid reference: origin/main` wherever the default is `master` or
+  `develop`, which is precisely where a fallback is worth having.
   Each part of that pair is load-bearing, and the naive spelling
-  `worktree add <path> main` is wrong in more than one way at once.
+  `worktree add <path> <default-branch>` is wrong in more than one way at once.
   Use `git -C` rather than `cd`, because Bash's cwd persists across separate
   calls in a session, so a `cd` here silently carries into later ones.
-  Name `origin/main` rather than `main`, because a branch is meant to live in
-  one worktree: `add <path> main` refuses whenever `main` is checked out
-  anywhere, which is this corpus's own session-start state, and which after the
-  first subagent is every later one in a fan-out.
+  Name `origin/<default-branch>` rather than the bare branch, because a branch
+  is meant to live in one worktree: `add <path> <default-branch>` refuses
+  whenever that branch is checked out anywhere, which is this corpus's own
+  session-start state, and which after the first subagent is every later one in
+  a fan-out.
   Worse, that guard is not atomic, so a genuinely concurrent fan-out can slip
-  several worktrees onto `main` at once and lose the isolation with no error at
-  all -- the loud refusal is the good outcome here.
+  several worktrees onto that one branch at once and lose the isolation with no
+  error at all -- the loud refusal is the good outcome here.
   That same substitution fixes the stale-base trap in one stroke, since
-  `fetch origin main` advances `origin/main` while leaving the local `main` ref
-  where it was.
+  `fetch origin <default-branch>` advances the remote-tracking ref while
+  leaving the local branch where it was.
   And prefer `--detach` over a plain `-b <slug>`, because creating a branch
   *that tracks* a remote ref writes upstream config under a `.git/config` lock
   that concurrent subagents lose races on; the agent cuts its own branch inside
   the worktree afterward, which is what its brief already tells it to do.
   - **Do:** create the worktree explicitly with
-    `git -C <repo> worktree add --detach <path> origin/main` when
+    `git -C <repo> worktree add --detach <path> origin/<default-branch>` when
     `isolation: "worktree"` errors, and brief the agent with that path.
-  - **Do:** base it on `origin/main`, which sidesteps the already-checked-out
-    refusal and the stale-local-`main` base at the same time.
-  - **Don't:** name the bare branch `main` -- sequentially that refuses from the
+  - **Do:** base it on `origin/<default-branch>`, which sidesteps the
+    already-checked-out refusal and the stale local base at the same time.
+  - **Don't:** name the bare branch -- sequentially that refuses from the
     second agent onward, and concurrently it can silently share one branch
     across several worktrees instead.
+  - **Don't:** hard-code `main` in either command, which dies outright on a
+    repo whose default branch is named anything else.
   - **Don't:** read the isolation error as "isolation is unavailable here" and
     let the agent share the parent's checkout.
   - **Don't:** infer that the session's cwd is a repository from the fact that
@@ -393,7 +401,14 @@
   `--detach` and `-b <slug> --no-track` each scored 5/5 in all five concurrent
   rounds, and the full flow -- detach, `checkout -b`, commit, five at once --
   scored 5/5 in three more, every worktree based on `origin/main` rather than
-  the stale local ref.)
+  the stale local ref.
+  Those runs all used a repo whose default branch is literally `main`, which is
+  why they are written that way here and why they did not surface the
+  hard-coding: measured separately against one whose default is `develop`,
+  `fetch origin main` returns `fatal: couldn't find remote ref main` and
+  `worktree add --detach <path> origin/main` returns
+  `fatal: invalid reference: origin/main`, while both succeed against
+  `origin/develop`.)
 - Bash's cwd PERSISTS across separate calls within a session (it does not silently reset between calls) — so a `cd` in one call carries forward into the next unless a later call `cd`s elsewhere. This one mechanism causes two mirror-image mistakes depending on the session's layout:
   - **Session runs INSIDE a worktree:** do NOT prefix git commands with `cd <main-checkout>`. Because cwd persists, that `cd` doesn't just affect the current call — any *later* call that omits its own `cd` stays in the main checkout too, silently working against a different branch (often another session's) instead of your worktree. Run git in the worktree with no `cd` at all; if you must touch another checkout, use `git -C <path>` instead of `cd`-ing into it. `gh` commands keyed by PR or issue number are cwd-agnostic, so only `git` breaks. Run `git branch --show-current` before committing or pushing to confirm. Learned on PR #62: a `cd`-prefixed push hit `main` and made my own worktree commits look missing.
   - **Session juggles several full (non-worktree) repo checkouts side by side:** a call with no `cd` silently runs against whichever repo an earlier call last `cd`'d into, not the repo you mean this time. Never omit an explicit `cd <repo>` in any Bash call when more than one repo checkout is in play, and re-verify with `pwd` or `git remote -v` after any call whose target repo matters. This bites hardest in back-to-back "same shape, different repo" calls (e.g. an identical empty claim-commit pushed to two sibling PRs one after another) — the second call looks correct in isolation but silently repeats the first call's repo. Caught it by checking `mergeable_state` output afterward; recovery was a `git reset --hard` to the last-good local commit plus `git push --force-with-lease` to undo the wrong-repo push before redoing it with an explicit `cd`. (Learned on ai-config#454/gha#215: an empty commit meant for `gha` landed on `ai-config`'s branch instead.)

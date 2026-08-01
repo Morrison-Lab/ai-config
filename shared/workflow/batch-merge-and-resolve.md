@@ -204,10 +204,14 @@ appears in the diff as context, not as an addition.
 So the whole family of diff-scoped, added-line checks this corpus relies on
 cannot see it, however carefully they are written.
 
-Generalize it:
+[`sync-with-main`](sync-with-main.md) states the generalization this case fits,
+and owns it:
 
-> When a defect can be introduced by **deleting** a line, any instrument keyed on
-> added lines is unsound for that defect.
+> when a defect can be introduced by **deleting** a line, any instrument keyed
+> on added lines is unsound.
+
+Quoted rather than pointed at because the count-delta instrument below is
+unreadable without it.
 
 The working instrument is a **count delta**: a merge must not increase the
 number of spliced bullets.

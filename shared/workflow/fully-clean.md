@@ -151,6 +151,49 @@ Of the 24 passes, 23 used `Ready for merge` and one used the hedged
 variant above; the four non-pass lexemes were `Needs more work`,
 `Needs minor changes`, `Needs work`, and `Needs one fix`.)
 
+**A reviewer's own verification block can be wrong while its verdict is
+right.**
+The verdict-versus-findings test above needs a disagreement to spot.
+This one offers none: the verdict is right, the findings section is empty and
+correctly so, and the defect sits in the arithmetic the reviewer posts to show
+its work.
+
+A block labelled "verification" is the part of a review *least* likely to be
+re-checked, because it presents as the checking already having been done.
+That is what makes a wrong one worse than no block at all.
+It will usually sum, too, since a balancing partition is what the reviewer was
+aiming for, so only the composition is wrong.
+
+Re-derive the groups rather than the total.
+Arriving at the right number says nothing about which groups the parts came
+from, and that is exactly the error a table that balances conceals.
+
+Read it as the mirror of [`ardi`](ardi.md)'s "A systematic audit done by
+skimming is worse than the one-at-a-time version it replaces".
+That entry governs an audit *you* produce; this one governs an audit arriving
+*as evidence*.
+
+The secondary signal is worth acting on rather than merely noting.
+A reviewer's reconstruction error usually traces to something genuinely
+ambiguous in the diff, so treat it as evidence about your own prose and not
+only about the reviewer.
+
+- **Do:** re-derive a posted verification's groups, not just its total.
+- **Do:** fix the wording that invited a wrong reconstruction, even when
+  nothing in the diff was false.
+- **Don't:** let the word "verification" stand in for having verified.
+- **Don't:** read a table that sums as one that partitions correctly.
+
+(Morrison-Lab/ai-config#957 round 2, 2026-07-31: `claude-review` returned
+**Ready for merge** with no findings, above a table partitioning the same 38
+comments as 24 passes + 10 blocking + 4 unclear.
+That sums, and the composition is wrong: the sample is 24 passes and 14
+non-passes, with the four counted-out comments sitting inside those groups
+(three passes, one non-pass) rather than beside them.
+It balanced only because the four were subtracted from the wrong group.
+Nothing in the diff was false, but "Four further comments" read as a disjoint
+third bucket, which is how a careful reader reached the wrong partition.)
+
 **What "an approving review" means here is not a review state.**
 Across the 25 most recent merged PRs, all 106 posted reviews are `COMMENTED` and
 none is `APPROVED` --- `d-morrison`'s own included, so this is not a bot
@@ -290,6 +333,36 @@ The review's own closing line said as much, noting that because no
 `--comment` argument was passed, it had not posted the findings to the PR.
 Every count-based check called that PR ready.)
 
+**A review comment's header SHA can be stale, so take the reviewed commit from
+the run's own `head_sha`.**
+Criterion 2 requires the verdict to sit at the current head, and the obvious
+instrument for checking that is the unreliable one: the commit named in the
+comment's own caption.
+A verdict captioned with a superseded commit can be a current-head review
+whose caption simply names a different commit than the run checked out.
+
+The failure direction is the expensive one.
+It reads as a stale review, which invites a needless re-trigger, and under
+`concurrency: cancel-in-progress` that re-trigger cancels the run already
+in flight at the real head.
+So the caption costs you the verdict it was making you doubt.
+
+The run's `head_sha` settles it, and the comment links the run it came from,
+so the check is one call.
+This is [`algorithmatize-checks`](algorithmatize-checks.md) applied to a
+verdict: prefer the API field over the prose caption.
+
+- **Do:** follow the job link in the comment and read that run's `head_sha`.
+- **Don't:** treat the SHA in a comment's heading as the commit reviewed.
+
+(Morrison-Lab/ai-config#957, 2026-07-31: the `Ready for merge` comment is
+captioned "Review of `de72464`" while the run it links, `30614782680`, records
+`head_sha: c8d5d8a` --- the PR's head at the time, since a `main` merge had
+superseded `de72464` 64 seconds earlier.
+Both facts came from `get_workflow_run`; the caption was never rewritten, and
+the cancelled prior run `30614715159` is the one that actually ran at
+`de72464`.)
+
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---
 including gaining its own independent addition that collides with yours
@@ -357,6 +430,85 @@ mechanical sweep of all seven threads.)
 The inverse, easy to miss: a review job reporting FAILURE can still have posted a complete, genuine "Ready for merge" verdict with real findings-review content --- some guard scripts that gate the job's own pass/fail on detecting a verdict string can misfire and report failure even though a full review ran and passed.
 Read the posted comment body, not just the check conclusion, before concluding a PR is or isn't clean.
 If the check is a **required** check and you've independently confirmed the posted content is genuinely clean, that is still not authorization to merge past it yourself --- a required check failing is exactly the "stop and ask" case even under a merge-when-confident grant (see `mwc`'s scope note); report the evidence and let the human decide whether to override, fix the guard script, or relax branch protection. (Learned on sparta#590/#594/#598, 2026-07-02: two independent PRs hit the inverse misfire in the same session, and an attempt to merge past the required check on verified-clean content was correctly blocked by the harness's own permission system.)
+
+**That inverse has a second mechanism, and under this one the guard is not
+misfiring at all.**
+The sparta case above is a guard that reads the transcript for a verdict and
+gets the answer wrong, so the red is a defect, and finding the defect explains
+everything.
+A guard can also fail a run **before** it ever asks about a verdict, and then
+nothing is malfunctioning.
+
+`Morrison-Lab/gha`'s review guard is built that way, in both shipped versions.
+It reads the run's result object and, on `is_error == "true"`, prints
+`Claude review ended in an error state` and exits 1, with a single carve-out
+for the quota case (`total_cost` 0 at `num_turns` 1).
+At `@v1` the step is inline in `claude-code-review.yml` and contains no verdict
+test whatsoever.
+At `@v2` the logic moved into `check-review-execution.sh`, which does scan for
+a verdict, but every line of that scan sits below the `is_error` branch, on the
+`is_error: false` path.
+So an errored run is failed without either version asking whether a review was
+posted, and the version that ran is not the variable.
+
+The claim the guard makes is therefore true, and narrower than it looks: the
+run ended in an error state.
+The false step is the reader's.
+A review reaches the PR through tool calls **as it works**, so its comment can
+be complete minutes before the run's own result object reports a failure.
+Read `is_error` as a fact about how a run **ended**, never about what it
+**accomplished**.
+
+That is what lets this survive a long investigation rather than a careless one.
+Every reading of the run data is correct, and the natural check against the
+case above, whether the guard misfired, comes back **no**, which reads as
+confirmation that the red can be trusted.
+Nothing in the run's conclusion, result object, or step list differs between
+"the reviewer produced nothing" and "the reviewer produced a full verdict and
+then errored", because the verdict is an artifact on the PR rather than a field
+of the run.
+Be precise about how far that goes: at `@v2` the execution output does carry
+the posted text, so the fact is present in the run and merely unreachable ---
+the guard exits above the scan that would read it --- while at `@v1` there is
+no such scan to reach.
+Gated by control flow rather than absent, and on neither version does any path
+the guard takes evaluate it.
+
+So read the guard's own failure branch once, and let it tell you what its red
+is worth.
+A branch that exits before evaluating the artifact yields a red carrying no
+information about that artifact, which is the mirror of the benchmark-check
+case this file records, whose green carries none about its content.
+Two timestamps then localize it exactly, per
+[`algorithmatize-checks`](algorithmatize-checks.md): bracket the verdict
+comment's `updated_at` inside the **review** step's own `started_at` and
+`completed_at`.
+A comment written while that step was running is a comment that run produced.
+Comparing it against the guard step's `started_at` instead does not
+discriminate, since the guard always runs after the review step in the same
+job, so a stale comment from any earlier round clears that bar just as easily.
+
+- **Do:** read the PR's own comments before accepting that a failed review run
+  produced no verdict.
+- **Do:** read a guard's failure branch to learn whether its red is evidence
+  about the artifact at all, rather than keeping "go look" as a habit to
+  remember.
+- **Don't:** infer that a run produced nothing from a true report that it ended
+  in an error.
+- **Don't:** treat "the guard did not misfire" as establishing that its red is
+  informative.
+
+(`Morrison-Lab/ai-config#984`, 2026-07-31, job `91208954246`:
+`Run Claude Code Review` concluded **success** over `16:17:16Z` to `16:28:13Z`;
+the review's comment carries a `### Verdict` heading reading
+**Ready for merge** above a substantive findings review, last updated
+`16:28:12Z`; `Fail the check if the review did not complete` then failed at
+`16:28:13Z`, and the job went red.
+A session spent several hours on that failure and its siblings, asserting
+throughout that the runs had produced no verdict, without reading either PR.
+The unsuffixed step name is the `@v1` tell, and `@v1` is the version with no
+verdict test at all, which is why the mechanism had to be read at both tags
+rather than at the one the extracted script lives in.)
 
 **A third case, distinct from either misfire above: some checks are designed to NEVER fail regardless of their own posted content, so their green color carries zero signal at all.** A CI-runner-relative benchmark check that gates a soft threshold (e.g. "regressed beyond 20% vs. baseline") may deliberately report success/pass at the GitHub-check level even when it posts a `:warning:` regression comment, precisely because the project has decided that threshold is "a human call, not an auto-block" rather than a hard gate. `gh pr checks` (or the equivalent status API) showing this check as PASS is consequently not evidence there is nothing to look at --- it only means the check ran, not that its content was clean. Read the check's own posted comment body every time, the same discipline the review-job case above already demands, but don't expect the check's pass/fail conclusion to ever flip for this class of check even on a real, large regression. (Sparta#995/#998/#999, 2026-07-19: `gh pr checks` reported `benchmark` as PASS across three separate PRs while the actual posted comment showed regressions of 45%, 38.8%, and 36.9% respectively against the CI-runner baseline --- two were real, fixable redundant-computation bugs; the third traced to a stale baseline that predated an earlier PR's own accepted cost increase and hadn't been refreshed yet, since the refresh workflow only runs on a weekly schedule, not on every main push.)
 
@@ -592,6 +744,57 @@ So the service was fine and the `d-morrison` credential was not, which no
 number of re-runs would have shown.
 Tracked in d-morrison/altdoc#99.)
 
+**A check-run reading `failure` is a fact about one *attempt*, not about the
+whole `run_id` -- a later attempt of that same run can still resolve on its
+own, with nobody having triggered it.**
+The section above is right that repeated *identical* failures at the same
+short duration point to a durable cause, and that retrying blindly is
+wasted motion once that pattern is established.
+It does not say the reverse: that a run which has failed once, or even
+twice, is done.
+GitHub records each `rerun_failed_jobs`/`rerun_workflow_run` as a new
+**attempt** of the same `run_id`, and `actions_get`'s `get_workflow_run`
+exposes that directly via `run_attempt`, `run_started_at`, and
+`previous_attempt_url`.
+A check-run's `failure` conclusion describes the attempt it belongs to; it
+says nothing about whether attempt 3 of the same `run_id` might still post a
+genuine verdict, from anyone -- a scheduled retry, a maintainer's manual
+re-run, or a mechanism this session never identified.
+
+So don't infer "this run_id is exhausted" from a failed attempt, however
+many rounds have already failed.
+Read `run_attempt` before writing that off, and treat a later successful
+attempt as the real, final verdict -- not as an anomaly to explain away.
+
+- **Do:** check `run_attempt`/`run_started_at`/`previous_attempt_url` on the
+  actual `run_id` before declaring a review permanently stuck, even after
+  more than one failed attempt.
+- **Do:** accept a later attempt's genuine verdict as authoritative, without
+  needing to know who or what triggered it.
+- **Don't:** assume a `run_id` is done because its most recent check-run you
+  read was `failure` -- fetch the run fresh rather than trusting a cached
+  conclusion.
+- **Don't:** claim a specific cause (a scheduled retry, an org-level rerun)
+  for an attempt you did not trigger yourself, without evidence naming it.
+- **Don't:** trust a contemporaneous explanation for why a prior attempt
+  failed -- your own included -- without checking it against that attempt's
+  actual job logs.
+
+(Morrison-Lab/gha#390, 2026-07-31: run `30646364412` failed twice --
+attempts 1 and 2 both stubs (no verdict, low denial count, on both the
+initial call and its own built-in gha#185 in-job retry), confirmed against
+attempt 2's own job logs rather than recalled -- and was treated as
+reproducibly stuck, with self-review relied on instead of a further retry.
+Attempt 3, `run_started_at: 2026-07-31T23:34:41Z`, `previous_attempt_url`
+pointing at attempt 2, resolved with `conclusion: success` and posted a
+genuine, itemized "Needs more work" verdict -- without this session
+triggering it, and with nothing on the PR explaining who or what did.
+A same-thread comment offered a different, already-documented explanation
+for the earlier failures (a downstream guard misreporting failure after a
+real verdict had posted) -- checked against attempt 2's actual job logs and
+found not to match: both prior attempts genuinely produced no verdict at
+all, so that explanation was itself an unverified guess, not a checked one.)
+
 **That duration signature does not run backwards, and reading it in reverse
 is how several unrelated bugs get filed as one.**
 The paragraph above offers a short run as **corroboration**, once a credential
@@ -640,3 +843,116 @@ and then failed
 `d-morrison/qwt` run 30391041128 (28s) reached the model and returned
 `is_error:true` after a workflow-modification denial.
 Only the first was about permissions at all.)
+
+**A group established on real discriminating evidence can still admit a case
+that was never held to it, and widening scope is when that happens.**
+The section above concerns a weak signal, duration, being read as though it
+produced a hypothesis rather than corroborating one.
+This one fires later and is narrower.
+The signature is strong, it was established correctly, and the defect is in
+what gets added to the group afterward.
+
+The shape is a first pass done properly, followed by an admission done on
+less.
+You read two or three failures' own output, find a genuine shared signature,
+and group them.
+Then a further case turns up sharing only the **symptom** that made you look
+at it, which is usually no more than "this check failed today", plus a
+plausible shared cause story.
+It goes into the group without anyone rereading a log.
+
+So the check is one question, asked of every case after the first.
+Does this match on the **discriminating evidence** that defined the group, or
+only on the symptom that made me look?
+
+Note that the remedy above does not catch this on its own.
+It says to open the log and quote the line the job died on, and that is
+exactly what was done for the cases that formed the group.
+Applying a standard to the first N cases is what makes the N+1th feel already
+covered by it.
+
+**A cross-repo or cross-project case is the likeliest to be admitted this
+way, and the one that most needs the bar raised.**
+It arrives feeling like independent corroboration rather than like another
+instance, so it reads as strengthening the finding rather than extending it.
+A scope claim is also the most quotable thing you will write about a bug.
+"This affects two repositories" is what other people act on, and it usually
+gets published in a tracking issue, where it outlives the session that
+produced it.
+Widening scope is therefore the moment to demand the same evidence again,
+rather than the moment to accept a weaker kind.
+
+Three disconfirming signals are cheap and general enough to look for by name.
+
+- **How far the pipeline got.**
+  A run that produced two attempt artifacts reached a retry path, and a run
+  whose guard rejected it before any retry cannot have produced a second
+  attempt.
+  A structural difference in progress is evidence about which failure this
+  is, independent of any log line.
+- **The error text itself.**
+  Two failures printing different messages came from different code paths,
+  and both strings are usually already in front of you.
+- **Whether the run produced the artifact the check exists to gate.**
+  For a review job that means asking whether a verdict is on the PR, which
+  is a different question from whether the job went red.
+
+That third one is the last resort and the sharpest, because it is the only
+one that survives the two above agreeing.
+Two runs can print the identical error, from the identical code path, at the
+identical stage, and still be opposite phenomena -- one where the reviewer
+failed, and one where the reviewer succeeded and the guard failed it anyway.
+Nothing in the run data distinguishes those, because the distinguishing fact
+is not in the run: it is on the PR.
+
+So when a check's own output is the only evidence, remember that a check is a
+claim about an artifact, and go read the artifact.
+
+The cost is not only a mislabelled case.
+Dropping the second repository also removed the support for a real inference
+that had been drawn from it, that two repositories sharing one action implies
+the bug lives in the action.
+That support was never real, so the false claim cost an inference on top of a
+case record.
+The retraction only revealed the loss rather than causing it.
+
+- **Do:** re-read the new case's own terminal error before adding it to an
+  existing group, however well established that group is.
+- **Do:** compare the attempt or artifact count for a structural difference
+  in how far each run got, before treating two failures as the same one.
+- **Don't:** admit a case on a shared symptom plus a shared cause story when
+  every earlier member was admitted on quoted evidence.
+- **Don't:** publish a widened scope claim without holding the added case to
+  the standard the original ones met.
+
+(2026-07-31, `claude-review` failures on Morrison-Lab/ai-config #984, #985,
+and #986: two run results were read directly and shared a genuine signature,
+`is_error: true` alongside `subtype: "success"` after real work
+($4.10 over 13 turns, $0.97 over 2 turns).
+Both of those reads were #986's own two runs, though.
+PRs #984 and #985 were admitted on nothing but a `claude-review` failure the
+same day, with no result object read for either -- so that grouping was
+already the pattern this section condemns, one step before the one it was
+written about.
+Reading them later made it worse rather than merely unverified: both had
+posted complete **Ready for merge** verdicts, minutes before their guards
+failed the check.
+They were the *opposite* phenomenon -- the reviewer succeeded and the check
+was wrong -- filed as instances of the reviewer failing.
+Neither signal above would have caught it, since their error text and their
+stage are identical to #986's; only the third one is, and it was added to
+this list because of them.
+The duration rule above was invoked explicitly to confirm that #986's
+9-minute and 53-second runs were the same bug.
+Morrison-Lab/gha#390 was then added to the group because its own
+`claude-review` had failed the same day, and a scope correction widening the
+finding to two repositories was posted to the tracking issue,
+Morrison-Lab/gha#391.
+It was a different bug.
+That PR's log reads `Attempt 1 produced a stub review (gha#185) and the retry
+ALSO ended without a verdict with a low denial count`, a path reachable only
+when `is_error` is false, so the grouped signature is rejected by the guard
+before any retry can happen.
+The two attempt artifacts and the differing guard wording were both visible
+at the time.
+The claim was retracted on the same issue.)

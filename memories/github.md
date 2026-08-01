@@ -216,6 +216,27 @@
   stored result back shows the content is not what was sent.
   (ai-config#734, 2026-07-26: caught only because the mangled URL happened to be
   re-read during an unrelated check.)
+  **A later observation narrows what "angle-bracket" means here, and its
+  mechanism is unconfirmed.**
+  A PR body posted through `create_pull_request` on 2026-07-31 came back
+  missing `<branch>`, `<gha-checkout>`, and `<base>`, leaving a documented
+  command with no path and a `git reset --hard origin/` with no branch --- so
+  the stored body carried instructions a reader would run and get wrong.
+  Two contrasts stop that from reducing to "angle brackets are stripped".
+  In the same body `<=` survived, stored as the escaped entity `&lt;=`, so
+  only tag-shaped tokens went.
+  And `<branch>` survived intact in a PR comment posted through
+  `add_issue_comment` in the same session (ai-config#965), inside backticks in
+  a blockquote, so the two write surfaces did not behave alike.
+  Which layer strips --- the MCP tool, GitHub's sanitizer, or the two
+  composed --- was not established, so read this as an observed effect rather
+  than as a mechanism, and do not generalize either surface's behaviour to the
+  other.
+  The mitigation is unchanged and cheap: spell a placeholder in caps
+  (`BRANCH`, `GHA-CHECKOUT`, `BASE`) in any body, where nothing can read it as
+  a tag.
+  Files in the diff were unaffected, as above --- the angle-bracket form
+  inside a fenced code block is correct there and should stay.
 - **`mcp__github__actions_run_trigger` can't re-run CI jobs in these sessions —
   it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`, and
   `cancel_workflow_run` -- the whole `actions: write` family, so you can neither
@@ -397,6 +418,30 @@
   (`d-morrison/altdoc#61`, 2026-07-25: three instances in one afternoon ---
   `test-coverage`, `docs-check` (completed `21:12:56`, still reported
   `in_progress` after), and one true negative.)
+- **`list_pull_requests` reports `merged: false` for every PR, merged ones
+  included; `merged_at` is the field that discriminates.**
+  The two bullets above are about *staleness*, where a field is sometimes
+  wrong; here it is **constant**, so it is wrong for every merged PR while
+  looking correct on any unmerged one you spot-check it against.
+  A constant carries no information, the argument
+  [`fully-clean`](../shared/workflow/fully-clean.md) also makes for `.state`.
+  Measured on `d-morrison/ai-config`, 2026-08-01, over 101 rows all `false`:
+
+  | field | open (#1006) | merged (#1005) | closed unmerged (#505) |
+  |---|---|---|---|
+  | `list` `merged` | `false` | `false` | `false` |
+  | `list` `merged_at` | absent | present | absent |
+  | `get` `merged` | `false` | `true` | `false` |
+
+  **It is not the `fields` projection**, the first thing to suspect and a
+  different remedy: passing no `fields` argument at all returns the same value.
+  `merged_by` is no fallback either, never served in a list response even when
+  named in `fields` -- consistent with the list endpoint returning GitHub's
+  smaller representation, though that is inferred rather than read from source.
+  - **Do:** decide merged-versus-closed from `merged_at`, and call
+    `pull_request_read` `get` when you need `merged` itself.
+  - **Don't:** report a PR as closed-unmerged on a list response's `merged`
+    field -- it says that about every PR in the repo.
 - **`mcp__github__actions_list` (`list_workflow_runs`) returns a full repository
   object per run -- budget accordingly, and prefer a cheaper call.** Each run in
   the response carries `repository`, `head_repository`, `actor`, and
@@ -573,6 +618,81 @@
   on `method`; don't generalize either one across it.
   (Guessed twice in one `d-morrison/altdoc#78` session, 2026-07-27,
   costing two failed calls before fetching properly.)
+- **A repository transfer breaks `mcp__github__resolve_review_thread`
+  specifically, and neither owner spelling works.**
+  The standing advice for a transferred repo --- keep using whichever owner
+  the session was scoped with, since the API follows the transfer redirect
+  server-side --- holds for every call that names the repo by `owner`/`repo`
+  **strings**.
+  It does not hold for this tool, whose `threadId` is a GraphQL node ID
+  rather than a name, so the declared owner and the node have to agree.
+  Read that as an observed gate rather than as a mechanism.
+  This entry first explained it as the node "already encoding the
+  post-transfer repo", which decoding one shows is the wrong story:
+  `PRRT_kwDOShagnM6VdO1_` is MessagePack for
+  `[0, 1242996892, 2507468159]`, whose middle element is the repository's
+  database ID --- the same value carried by the repo's own node ID
+  (`R_kgDOShagnA`) and returned as `id` by the REST API.
+  A transfer leaves that number alone, so the node names an identity with no
+  pre- or post-transfer form to disagree about.
+  What the first error below establishes is only that the server compares the
+  node's repository against the declared `owner`/`repo` string and rejects
+  the pair.
+  The second establishes a separate gate, the session's own repository scope
+  list, which never examines the node at all.
+  It is not the first comparison in different words: `Morrison-Lab/ai-config`
+  is the node's own repository, so that comparison would have matched.
+  Why that first comparison fails where string-addressed calls follow the
+  redirect was not established.
+  Measured on `Morrison-Lab/ai-config` (transferred from `d-morrison`),
+  2026-07-31, against PR #975 --- two different gates, one per spelling:
+  - `owner: d-morrison` --- `Access denied: review thread
+    PRRT_kwDOShagnM6VdO1_ does not belong to the declared repo
+    "d-morrison/ai-config".`
+  - `owner: Morrison-Lab` --- `Access denied: repository
+    "morrison-lab/ai-config" is not configured for this session.
+    Allowed repositories: d-morrison/gha, d-morrison/workflows,
+    d-morrison/ai-config, d-morrison/rpt, d-morrison/qwt, d-morrison/qbt`
+
+  The second is the session's own repo-scope list, which is fixed at session
+  start, and `add_repo` refuses a cross-owner add --- so this is **not
+  transient**, and re-testing it each polling round buys nothing.
+  Every other tool used in that session worked normally under
+  `owner: d-morrison`: `pull_request_read` (every method),
+  `add_issue_comment`, `add_reply_to_pull_request_comment`,
+  `update_pull_request`, `request_copilot_review`, and
+  `subscribe_pr_activity`.
+  So the split is between string-addressed and node-addressed calls, not
+  between read and write.
+
+  The consequence is worth stating plainly, because it is easy to mistake for
+  work left undone.
+  [`fully-clean`](../shared/workflow/fully-clean.md) makes "every inline
+  review thread is resolved" a criterion for calling a PR clean, so in a
+  transferred-repo session that criterion is **structurally unreachable**:
+  every finding can be Addressed and replied to, and the PR still cannot be
+  reported fully clean from this session.
+  Resolve the threads from the GitHub UI, or from a session scoped to the new
+  owner.
+
+  One untested alternative, recorded so the next session tries it before the
+  UI.
+  `pull_request_review_write` with `method: resolve_thread` is a separate tool
+  whose own schema says the `owner`, `repo`, and `pullNumber` it still
+  requires "are not used for this method", so passing the session's own owner
+  should clear the scope gate and then be ignored.
+  That is an inference from the tool descriptions rather than a measurement,
+  so treat it as one call worth spending, not as a known route.
+
+  - **Do:** resolve the threads in the GitHub UI, or from a session scoped to
+    the new owner, once this failure appears.
+  - **Do:** say in the status report that the findings are addressed and
+    replied to but the fully-clean criterion cannot be met from this session,
+    naming the tool.
+  - **Don't:** re-test the call each polling round --- the scope list is fixed
+    at session start and `add_repo` cannot widen it.
+  - **Don't:** report the PR fully clean because every finding was addressed;
+    unresolved threads fail that criterion whatever the reason.
 - **`mergeable_state` glossary — `unstable` is NOT a merge conflict.** GitHub's
   `pull_request_read` `get` returns `mergeable_state` alongside `mergeable`;
   the common values: `clean` (mergeable, all checks passing), `unstable`

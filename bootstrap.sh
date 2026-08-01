@@ -25,34 +25,14 @@ COPILOT_MEMORY_DIR="${COPILOT_MEMORY_DIR:-$HOME/Library/Application Support/Code
 
 mkdir -p "$CLAUDE_DIR"
 
-# Symlink $src -> $dest unless something is already there.
-link_one() {
-  local src="$1" dest="$2" name
-  name="$(basename "$dest")"
-
-  if [ -L "$dest" ]; then
-    local current
-    current="$(readlink "$dest")"
-    if [ "$current" = "$src" ]; then
-      printf 'ok    %s (already linked)\n' "$name"
-    else
-      printf 'skip  %s (symlink points elsewhere: %s)\n' "$name" "$current"
-    fi
-    return
-  fi
-
-  # A real (non-symlink) path is already here: never clobber it. In a per-child
-  # merge this also means a tracked skill/command whose name collides with a
-  # built-in already in ~/.claude (e.g. skills/) is skipped — it can't shadow
-  # the built-in in remote sessions. Rename ours if that's not what you want.
-  if [ -e "$dest" ]; then
-    printf 'skip  %s (real path exists at %s -- run scripts/check-install.py --fix to replace it with a link, or merge manually)\n' "$name" "$dest"
-    return
-  fi
-
-  ln -s "$src" "$dest"
-  printf 'link  %s -> %s\n' "$name" "$src"
-}
+# Symlink $src -> $dest unless something is already there. Shared with the
+# per-machine installers under dotfiles/, so both resolve collisions the same
+# way; the hint below is the part that differs, since check-install.py only
+# knows about ~/.claude.
+# shellcheck disable=SC2034  # consumed by the sourced link-one.sh
+LINK_ONE_FIX_HINT="run scripts/check-install.py --fix to replace it with a link, or merge manually"
+# shellcheck source=scripts/lib/link-one.sh
+. "$SCRIPT_DIR/scripts/lib/link-one.sh"
 
 # --- Top-level files (CLAUDE.md, etc.) ---
 shopt -s nullglob
@@ -71,7 +51,9 @@ for src in "$SCRIPT_DIR"/*/; do
     # references/ is documentation/example material, not consumable config, so
     # it is deliberately NOT symlinked into ~/.claude.
     # codex-skills/ is linked into ~/.codex/skills below, not ~/.claude.
-    .git|node_modules|references|codex-skills) continue ;;
+    # dotfiles/ is machine-specific shell tooling installed into ~/bin and
+    # friends by its own per-machine installer at the bottom of this script.
+    .git|node_modules|references|codex-skills|dotfiles) continue ;;
   esac
 
   dest="$CLAUDE_DIR/$name"
@@ -155,3 +137,16 @@ if [ -f "$SCRIPT_DIR/GEMINI.md" ]; then
   mkdir -p "$GEMINI_DIR"
   link_one "$SCRIPT_DIR/GEMINI.md" "$GEMINI_DIR/GEMINI.md"
 fi
+
+# --- Machine-specific dotfiles ---
+# Each dotfiles/<machine>/install.sh gates on its own host and exits quietly
+# when this isn't that machine, so running them all here is safe anywhere.
+# They install outside ~/.claude (~/bin, ~/.local/bin, ~/.config/...), which is
+# why dotfiles/ is excluded from the directory loop above.
+shopt -s nullglob
+for installer in "$SCRIPT_DIR"/dotfiles/*/install.sh; do
+  [ -x "$installer" ] || continue
+  printf '\n--- dotfiles/%s ---\n' "$(basename "$(dirname "$installer")")"
+  # Don't let one machine's installer abort the whole bootstrap.
+  "$installer" || printf 'warn  %s exited %d\n' "$installer" "$?"
+done

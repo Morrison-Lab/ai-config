@@ -119,8 +119,10 @@ Where the assignment is sound, the whole cost is one sentence.
 - [`growth-mindset`](growth-mindset.md) challenges a **limitation** you
   believe you are under.
   This challenges a **task** you believe you are under.
-- The `challenge-*` fragments in this directory are review-side, applying to a
-  diff or prose under review.
+- [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md),
+  [`challenge-redundant-content`](challenge-redundant-content.md), and
+  [`challenge-unnecessary-complexity`](challenge-unnecessary-complexity.md) are
+  review-side, applying to a diff or prose under review.
   This applies before any artifact exists.
 - [`ardi`](ardi.md)'s "an instruction's own suggested code is not exempt" is
   the narrow case: a code snippet inside an issue, checked against project

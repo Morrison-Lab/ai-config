@@ -969,8 +969,9 @@ Read a proposal to switch a review workflow to this trigger as a regression, and
 leave a comment in the workflow naming the upstream issue so it does not get
 re-applied.
 
-Two neighbouring 401s at the same step have different causes, and the message is
-what separates them:
+Three messages arrive at that same exchange step, and only the first two are
+401s.
+The message is what separates them:
 
 - `Invalid OIDC token` --- the trigger event, this entry.
 - `User does not have write access on this repository` --- the triggering actor is
@@ -982,11 +983,17 @@ what separates them:
   workflow is not a review.
   See the self-mod skip bullet above for gha's own guard against this.
 
-This is a fourth distinct cause in the same short-duration band on the same
-repository, which is why
-[`fully-clean`](../shared/workflow/fully-clean.md)'s "a short duration is
-corroboration, not a test" holds: three of the four run 25 seconds or less and
-none of them is about credentials.
+This is a fourth distinct cause in the short-duration band that
+[`fully-clean`](../shared/workflow/fully-clean.md) already records three for,
+under "That duration signature does not run backwards".
+Three of the four run 25 seconds or less, and none of them is about credentials,
+which is that section's point: a short run corroborates a credential hypothesis
+you already hold on other grounds, and never produces one.
+
+Three of the four are on `UCD-SERG/ucd-serg.github.io` and one is on
+`d-morrison/qwt`, so the band is the thing they share rather than the repo.
+Saying otherwise would be the grouping-by-symptom overreach that same section
+warns about, in the entry invoking its authority.
 
 (`UCD-SERG/ucd-serg.github.io`, 2026-07-31: PR #83 switched the review workflow to
 `pull_request_target`, and all five subsequent runs failed this way while the two

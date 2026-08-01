@@ -285,6 +285,51 @@ it into `CLAUDE.md`; `#501` added a second copy of the same fragment plus the
 missing `CLAUDE.md` wiring. Resolved by keeping `main`'s published fragment
 and `#501`'s wiring, turning a `dirty` merge into a clean `+8/-0` diff.)
 
+**The same parallel resolution can be a whole-file split, and then files can
+vanish from your diff with no deletion hunk to read.**
+The add/add and duplicate-issue cases above both say to keep `main` when a
+sibling PR already published the same new file.
+The split case adds a second check, because resolving the one conflict can also
+make other files disappear from your PR's diff entirely.
+Those files look harmlessly gone, and there is no deleted line for
+[`ardi`](ardi.md)'s pre-push deletion sweep to inspect.
+Two causes are indistinguishable from the final diff alone:
+`main` absorbed your cross-reference edit, or the merge dropped your work.
+So verify each vanished file against the pre-merge head before calling the
+collapse correct.
+For each file that left the diff, compare the original head against the
+merge-base to recover what your branch intended, then confirm current `main`
+now carries that same change.
+Only after that per-file check is it safe to treat the smaller diff as a
+successful conflict resolution rather than as lost work.
+
+- **Do:** save or read the original pre-merge head, list the files that left
+  the PR diff after the merge, and verify each one's intended change is already
+  on `main`.
+- **Do:** keep `main`'s version for the overlapping split file when the sibling
+  PR has already published the same refactor, then carry forward only this
+  PR's distinct remainder.
+- **Don't:** infer that a vanished file was safely absorbed merely because the
+  final diff got smaller.
+- **Don't:** rely on the deleted-lines sweep for this case; content that left
+  the diff has no deletion hunk for that sweep to show.
+
+(Morrison-Lab/ai-config#966, merging `origin/main` after #973 landed as
+`ea11bc9a`, hit `CONFLICT (add/add)` on `memories/github-mcp-tools.md`.
+Both branches had split that file out of `memories/github.md`; the two split
+versions were byte-identical apart from #966's own 49-line addition, so keeping
+`origin/main:memories/github-mcp-tools.md` was correct.
+The final PR diff collapsed from 13 files, 1093 insertions, and 661 deletions
+to 8 files, 429 insertions, and 6 deletions.
+Five files disappeared entirely:
+`memories/claude-bot-workflows.md`, `memories/claude-code.md`,
+`shared/workflow/efficient-pr-babysitting.md`,
+`shared/workflow/fully-clean.md`, and
+`skills/purge-hallucinations/SKILL.md`.
+Each had contained only a cross-reference repointing from `memories/github.md`
+to `memories/github-mcp-tools.md`, and
+`git show origin/main:<file> | grep -c github-mcp-tools` returned `1` for each.)
+
 **A merge into a growing numbered list (e.g. `gha`'s `CLAUDE.md` "Code
 review guidelines" section) can produce zero blank lines between two
 adjacent headings

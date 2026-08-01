@@ -98,14 +98,29 @@ Two options that do work:
   work in the sentence.
   One command decides it exactly, which makes this an
   [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) case rather
-  than something to settle by recollection:
+  than something to settle by recollection.
+
+  **Scope that command to the block, not to the whole file.**
+  A file-wide `grep -c` is right only while the pattern happens to match
+  nothing outside the block, which is a property of the file today rather
+  than of the command.
+  An unrelated edit that adds one matching line anywhere else silently
+  inflates the count, so the instrument acquires exactly the failure mode it
+  was reached for to prevent.
+  Bracket the block with two unique anchors instead:
 
 ```bash
-grep -c '^git ' shared/workflow/claim-pr.md
+awk '/^Four reads settle it/,/^An identical tree/' shared/workflow/claim-pr.md |
+  grep -c '^git '
 ```
 
-Count list items, bullets, or numbered steps the same way for a block of
-those.
+Count list items, bullets, or numbered steps the same way.
+Two habits keep the range honest.
+Confirm each anchor matches exactly once (`grep -c` on the anchor itself)
+before trusting it, since a repeated start anchor makes an `awk` range
+restart and silently widen.
+And run the range once without the counting stage, to see that the lines it
+selects are the ones you meant.
 
 - **Do:** re-read the sentence introducing a block whenever a review finding
   changes what is in that block.

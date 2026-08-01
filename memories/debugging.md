@@ -1113,3 +1113,108 @@ root was unresolved -- so every registered submodule would have been demoted to
 the error branch on any checkout reached through a symlink.
 The function passed against the real repo throughout, since `ROOT` there is
 already `resolve()`d.)
+
+## Read the failure's own output --- the PR thread is one of its surfaces
+
+`Morrison-Lab/gha`'s `CLAUDE.md` states the rule under "Never just theorize
+-- investigate empirically": read the failure's own output before theorizing
+about its cause.
+Agreeing with it is not the hard part.
+The hard part is that "the failure's own output" names a place, and which
+places get searched is decided by habit rather than by where the string is.
+
+Check runs, job step lists, artifacts, and job logs are the habitual four,
+and they share one assumption: that a failure registers as a failure
+somewhere.
+An agent run can break that assumption outright.
+Its post-step reports the error by **posting a plain comment on the PR**, and
+the job itself finishes green, so every step conclusion reads `success` or
+`skipped` and there is no failure surface left to inspect.
+
+That is what makes the wrong conclusion the end of a *thorough* search rather
+than a careless one.
+Nothing was hidden, nothing needed credentials, and the string sat in plain
+text on the thread throughout --- in the one place a CI investigation does not
+look, because a PR comment does not read as CI output.
+
+So list the PR's own comments early, before concluding an error string cannot
+be recovered.
+It costs one call and needs no credentials.
+Then generalize past PR comments to the shape: any surface the failing system
+*writes to* can carry its error, including an issue thread, a commit status
+description, and a check run's summary text.
+
+- **Do:** read the PR's comment list before reporting a failure's output as
+  unavailable.
+- **Do:** read the job's own conclusion first, since an all-green job means
+  the error is on no failure surface and the search has to move elsewhere.
+- **Don't:** treat check runs, step lists, artifacts, and logs as exhausting
+  where a failure reports itself.
+- **Don't:** read a thorough search of those four as evidence that the string
+  does not exist.
+
+(`Morrison-Lab/ai-config#986`, 2026-07-31: a session read check runs, job step
+lists, and artifact listings across several failed review runs, concluded the
+underlying error string was unrecoverable, and published that conclusion
+twice.
+The string was a PR comment posted at 20:47:04Z reading `Prompt is too long`,
+the API's context-length error verbatim, under a footer naming the posting
+step and linking workflow run 30664135897.
+That run is the agent, `claude-bot.yml` calling `claude.yml@v1`, and its one
+job `claude / claude` concluded **success** with every step `success` or
+`skipped`: step 19 `Run Claude Code` ran 36 seconds, and step 23
+`Post Claude's response if no code was committed` completed one second after
+the comment's own timestamp.
+The maintainer found it by reading the thread.)
+
+## An artifact you cannot retrieve may never have been produced
+
+This narrows the section above rather than standing beside it.
+It explains why one route came back empty, and it is not why the answer was
+missed, since the answer was on the thread the whole time.
+
+Before diagnosing why a fetch failed, confirm the thing was produced.
+A retrieval failure and a nonexistent artifact present identically: every
+route returns nothing, and the routes are where the error messages come from,
+so all the available evidence describes access.
+
+That makes the wrong diagnosis the cheap one to reach and the expensive one to
+hold.
+"I cannot download it" sends you to credentials, scopes, and proxy policy.
+Worse, it is a claim about someone else's configuration, so it gets reported
+to a user or written onto an issue as a blocker they are expected to clear.
+Nothing in the repository contradicts it, because the artifact that would have
+is the one that was never written.
+
+Adding routes does not settle it either.
+Three failing routes read as stronger evidence of an access problem than one,
+when they are the same non-observation three times.
+
+Ask instead what step would have produced it, and check that step ran.
+For a GitHub Actions artifact that is one call: `actions_get`
+`get_workflow_job` on the job id returns the job's `steps` array, and a
+producing step is either named there or is not.
+The same shape works elsewhere: a log nobody configured, a report whose
+generator was skipped, a cache never populated.
+
+- **Do:** name the step that produces the artifact and confirm it ran, before
+  spending a call on fetching it.
+- **Do:** report "nothing produced it" as a different finding from "I cannot
+  reach it", since only the second is anyone else's to fix.
+- **Don't:** read several failing access routes as evidence about access ---
+  they are one non-observation repeated.
+- **Don't:** publish a retrieval blocker to a user or an issue without the
+  production check behind it.
+
+(2026-07-31, `Morrison-Lab/ai-config`: repeated attempts to download the
+`claude-code-action` execution-output artifact for failed `claude-review` runs
+were reported to the user, and on a tracking issue, as an access problem.
+MCP tools list artifacts but cannot download them, and direct fetches returned
+403 under both owner spellings, with and without a token.
+Those runs were pinned at `Morrison-Lab/gha`'s `claude-code-review.yml@v1`,
+which has no `Resolve and upload execution file path` step at all, so no
+artifact ever existed for any of them --- confirmed by
+`git show v1:.github/workflows/claude-code-review.yml`, which defines 12 named
+steps and no upload.
+See [`claude-bot-workflows.md`](claude-bot-workflows.md), whose
+artifact-download advice presupposes `@v2`.)

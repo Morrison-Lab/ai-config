@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# yield-array -- temporarily throttle your own SLURM array job(s) so an
+# interactive session can grab a slice, then restore the original throttle.
+#
+# The deliberate, explicit counterpart to the launchers: throttling *other*
+# jobs is a side effect that should never be hidden inside claude-alloc, so it
+# lives here as its own named command.
+#
+# Usage:
+#   yield-array [-t THROTTLE] [-f FREE] [-n] JOBID [JOBID...] [-- COMMAND...]
+#
+#   -t THROTTLE  set ArrayTaskThrottle to THROTTLE for each job (explicit cap).
+#   -f FREE      otherwise hold back FREE running tasks: throttle = running-FREE
+#                (default 4). Ignored when -t is given.
+#   -n           dry run: show the planned throttle changes, change nothing.
+#   JOBID...     one or more array job IDs you own (e.g. 138948).
+#   COMMAND      what to run while throttled (default: claude-alloc).
+#
+# On return (normal exit or Ctrl-C) the original throttle is restored.
+#
+# CAVEAT: a hard kill (SIGKILL), node/walltime death, or a dropped SSH session
+# will NOT run the restore -- the array stays throttled. Undo manually with:
+#   scontrol update jobid=<id> ArrayTaskThrottle=<orig>   (0 = unlimited)
+
+set -eu
+
+THROTTLE=""
+FREE=4
+DRYRUN=0
+
+usage() {
+  echo "usage: yield-array [-t THROTTLE] [-f FREE] [-n] JOBID [JOBID...] [-- COMMAND...]" >&2
+  exit 2
+}
+
+while getopts ":t:f:n" opt; do
+  case "$opt" in
+    t) THROTTLE="$OPTARG" ;;
+    f) FREE="$OPTARG" ;;
+    n) DRYRUN=1 ;;
+    *) usage ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+# Split JOBIDs from the trailing COMMAND at `--`.
+JOBIDS=()
+while [[ $# -gt 0 && "$1" != "--" ]]; do JOBIDS+=("$1"); shift; done
+[[ "${1:-}" == "--" ]] && shift
+CMD=( "$@" )
+[[ ${#CMD[@]} -eq 0 ]] && CMD=( claude-alloc )
+[[ ${#JOBIDS[@]} -eq 0 ]] && usage
+
+ME="$(id -un)"
+
+# Validate each job and capture its original throttle (0 = unlimited/unset).
+declare -A ORIG
+for jid in "${JOBIDS[@]}"; do
+  info="$(scontrol show job "$jid" 2>/dev/null)" \
+    || { echo "yield-array: no such job $jid" >&2; exit 1; }
+  owner="$(sed -n 's/.*UserId=\([^(]*\).*/\1/p' <<<"$info" | head -1)"
+  [[ "$owner" == "$ME" ]] \
+    || { echo "yield-array: $jid is not yours (UserId=$owner)" >&2; exit 1; }
+  grep -q "ArrayJobId=" <<<"$info" \
+    || { echo "yield-array: $jid is not an array job" >&2; exit 1; }
+  t="$(grep -o 'ArrayTaskThrottle=[0-9]*' <<<"$info" | head -1 | cut -d= -f2)"
+  ORIG["$jid"]="${t:-0}"
+done
+
+# Compute the target throttle for each job.
+declare -A TARGET
+for jid in "${JOBIDS[@]}"; do
+  if [[ -n "$THROTTLE" ]]; then
+    newt="$THROTTLE"
+  else
+    running="$(squeue -h -j "$jid" -t RUNNING -r -o '%i' 2>/dev/null | wc -l | tr -d ' ')"
+    newt=$(( running - FREE ))
+    if (( newt < 1 )); then newt=1; fi
+  fi
+  TARGET["$jid"]="$newt"
+done
+
+if (( DRYRUN )); then
+  echo "yield-array: DRY RUN -- no changes made" >&2
+  for jid in "${JOBIDS[@]}"; do
+    echo "  $jid: ArrayTaskThrottle ${ORIG[$jid]} -> ${TARGET[$jid]}" >&2
+  done
+  echo "  would then run: ${CMD[*]}" >&2
+  exit 0
+fi
+
+restore() {
+  echo "yield-array: restoring throttles..." >&2
+  for jid in "${JOBIDS[@]}"; do
+    if scontrol update "jobid=$jid" "ArrayTaskThrottle=${ORIG[$jid]}"; then
+      echo "  $jid -> ArrayTaskThrottle=${ORIG[$jid]}" >&2
+    else
+      echo "  $jid: restore FAILED -- run: scontrol update jobid=$jid ArrayTaskThrottle=${ORIG[$jid]}" >&2
+    fi
+  done
+}
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap restore EXIT
+
+for jid in "${JOBIDS[@]}"; do
+  scontrol update "jobid=$jid" "ArrayTaskThrottle=${TARGET[$jid]}"
+  echo "yield-array: $jid ArrayTaskThrottle ${ORIG[$jid]} -> ${TARGET[$jid]} (0 = unlimited)" >&2
+done
+
+echo "yield-array: launching: ${CMD[*]}" >&2
+"${CMD[@]}"

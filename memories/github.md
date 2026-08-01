@@ -419,6 +419,30 @@
   (`d-morrison/altdoc#61`, 2026-07-25: three instances in one afternoon ---
   `test-coverage`, `docs-check` (completed `21:12:56`, still reported
   `in_progress` after), and one true negative.)
+- **`list_pull_requests` reports `merged: false` for every PR, merged ones
+  included; `merged_at` is the field that discriminates.**
+  The two bullets above are about *staleness*, where a field is sometimes
+  wrong; here it is **constant**, so it is wrong for every merged PR while
+  looking correct on any unmerged one you spot-check it against.
+  A constant carries no information, the argument
+  [`fully-clean`](../shared/workflow/fully-clean.md) also makes for `.state`.
+  Measured on `d-morrison/ai-config`, 2026-08-01, over 101 rows all `false`:
+
+  | field | open (#1006) | merged (#1005) | closed unmerged (#505) |
+  |---|---|---|---|
+  | `list` `merged` | `false` | `false` | `false` |
+  | `list` `merged_at` | absent | present | absent |
+  | `get` `merged` | `false` | `true` | `false` |
+
+  **It is not the `fields` projection**, the first thing to suspect and a
+  different remedy: passing no `fields` argument at all returns the same value.
+  `merged_by` is no fallback either, never served in a list response even when
+  named in `fields` -- consistent with the list endpoint returning GitHub's
+  smaller representation, though that is inferred rather than read from source.
+  - **Do:** decide merged-versus-closed from `merged_at`, and call
+    `pull_request_read` `get` when you need `merged` itself.
+  - **Don't:** report a PR as closed-unmerged on a list response's `merged`
+    field -- it says that about every PR in the repo.
 - **`mcp__github__actions_list` (`list_workflow_runs`) returns a full repository
   object per run -- budget accordingly, and prefer a cheaper call.** Each run in
   the response carries `repository`, `head_repository`, `actor`, and
@@ -601,9 +625,26 @@
   the session was scoped with, since the API follows the transfer redirect
   server-side --- holds for every call that names the repo by `owner`/`repo`
   **strings**.
-  It does not hold for this tool, whose `threadId` is a GraphQL node ID that
-  already encodes the post-transfer repo, so the declared owner and the node
-  have to agree.
+  It does not hold for this tool, whose `threadId` is a GraphQL node ID
+  rather than a name, so the declared owner and the node have to agree.
+  Read that as an observed gate rather than as a mechanism.
+  This entry first explained it as the node "already encoding the
+  post-transfer repo", which decoding one shows is the wrong story:
+  `PRRT_kwDOShagnM6VdO1_` is MessagePack for
+  `[0, 1242996892, 2507468159]`, whose middle element is the repository's
+  database ID --- the same value carried by the repo's own node ID
+  (`R_kgDOShagnA`) and returned as `id` by the REST API.
+  A transfer leaves that number alone, so the node names an identity with no
+  pre- or post-transfer form to disagree about.
+  What the first error below establishes is only that the server compares the
+  node's repository against the declared `owner`/`repo` string and rejects
+  the pair.
+  The second establishes a separate gate, the session's own repository scope
+  list, which never examines the node at all.
+  It is not the first comparison in different words: `Morrison-Lab/ai-config`
+  is the node's own repository, so that comparison would have matched.
+  Why that first comparison fails where string-addressed calls follow the
+  redirect was not established.
   Measured on `Morrison-Lab/ai-config` (transferred from `d-morrison`),
   2026-07-31, against PR #975 --- two different gates, one per spelling:
   - `owner: d-morrison` --- `Access denied: review thread

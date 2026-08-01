@@ -53,7 +53,7 @@
         "otherwise have seen, which is a hook making the harness more",
         "permissive than it was without it.",
         "",
-        "Deny was considered and rejected on the numbers: 60 of 122 real Agent",
+        "Deny was considered and rejected on the numbers: 60 of 121 real Agent",
         "launches in this machine's transcripts are write-capable with no",
         "`isolation`, so a blocking guard would interrupt 49% of agent",
         "launches. The lapse it catches is a visibility failure, and a warning",

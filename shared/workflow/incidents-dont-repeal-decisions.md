@@ -91,7 +91,7 @@ So the operative move is a timing change, not a new system.
 The asymmetry is large: the hook is an hour, and discovering the lapse cost a history rewrite.
 
 **Retrospective detection is also feasible, and cheaper than it sounds.** A lapse in a decision about tool use is visible in the transcripts, which record every tool call with its arguments.
-Counting is enough: 122 real `Agent` launches on this machine, 60 of them write-capable with no `isolation`, is a number a periodic audit can produce without any judgment at all.
+Counting is enough: 121 real `Agent` launches on this machine, 60 of them write-capable with no `isolation`, is a number a periodic audit can produce without any judgment at all.
 That is a real follow-up rather than a hypothetical one, because the count above was produced that way.
 
 What stays genuinely manual is a decision with no mechanizable surface -- about how to argue, what to prioritize, when to escalate.

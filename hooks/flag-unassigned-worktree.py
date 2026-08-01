@@ -77,9 +77,12 @@ its input is malformed costs more than the omission it reports.
 import json
 import sys
 
-# Read-only by definition in the harness's own agent roster: neither is granted
-# Edit, Write, or NotebookEdit. Any other value -- and a missing value -- is
-# treated as write-capable.
+# The harness declares these two read-only ROLES; that contract, not their tool
+# inventory, is what the exemption rests on. Both are granted Bash, so a strict
+# can-this-touch-a-file test would exempt nothing. See "Classifying
+# write-capable" above for why Bash is the hole in the contract rather than a
+# separate weakness. Any other value -- and a missing value -- is treated as
+# write-capable.
 READ_ONLY = {"Explore", "Plan"}
 
 NOTE = (

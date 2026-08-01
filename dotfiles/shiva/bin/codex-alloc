@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Launch a Codex CLI session inside an interactive SLURM slice on shiva.
+# Resource overrides: ALLOC_CPUS / ALLOC_MEM / ALLOC_TIME. See tui-alloc.
+exec "$(dirname "$0")/tui-alloc" codex "$@"

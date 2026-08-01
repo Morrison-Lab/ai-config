@@ -111,10 +111,18 @@ WorktreeCreate hooks are configured` -- which is the normal layout in a harness
 whose cwd merely *holds* repos as subdirectories.
 Don't read that as isolation being unavailable and fall back to a shared
 checkout; create each worktree explicitly instead
-(`git -C <repo> worktree add <path> main`, then realign it onto
-`origin/main`) and hand the subagent its path.
+(`git -C <repo> fetch origin main`, then
+`git -C <repo> worktree add --detach <path> origin/main`) and hand the
+subagent its path.
+Base every one of them on `origin/main`, never on the bare branch name `main`:
+`add <path> main` succeeds for the first agent in a wave and refuses for every
+one after it, and when the wave is genuinely concurrent its guard can race and
+put several agents on `main` at once, silently costing the isolation this step
+exists to buy.
+Leave the branch to the subagent, which cuts its own inside the worktree.
 See [`memories/preferences.md`](../../memories/preferences.md) for the full
-precondition and the stale-local-`main` trap in that fallback.
+precondition, the measured concurrency numbers, and the stale-local-`main` trap
+this form also avoids.
 
 A subagent starts **fresh** — it sees only the prompt you hand it, not this
 skill file — so **inline the entire per-issue procedure**. Don't point it at

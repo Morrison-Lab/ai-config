@@ -326,23 +326,40 @@
   The rule is not wrong, it is stated without its precondition, in both places
   a reader meets it: the bullet directly above, and
   [`gip`](../skills/gip/SKILL.md)'s "give **every** subagent
-  `isolation: \"worktree\"`".
+  `isolation: "worktree"`".
   Read as written, each prescribes a parameter that errors here, which invites
   the reader to conclude isolation is unavailable and share the checkout after
   all -- the exact outcome the bullet above exists to prevent.
   The explicit fallback gives identical isolation for two commands, so reach
   for it rather than standing down:
   `git -C <repo> fetch origin main`, then
-  `git -C <repo> worktree add <path> main`.
-  Two details decide whether that fallback is actually clean.
-  Use `git -C` rather than `cd`, per the persisting-cwd bullet further down.
-  And `worktree add <path> main` checks out the **local** `main`, which in a
-  container is routinely behind `origin/main`, so verify with
-  `git log --oneline -1` and realign before branching.
-  - **Do:** create the worktree explicitly with `git -C <repo> worktree add`
-    when `isolation: "worktree"` errors, and brief the agent with that path.
-  - **Do:** check what commit the new worktree actually landed on, since a
-    stale local `main` silently bases the branch several commits back.
+  `git -C <repo> worktree add --detach <path> origin/main`.
+  Each part of that pair is load-bearing, and the naive spelling
+  `worktree add <path> main` is wrong in more than one way at once.
+  Use `git -C` rather than `cd`, because Bash's cwd persists across separate
+  calls in a session, so a `cd` here silently carries into later ones.
+  Name `origin/main` rather than `main`, because a branch is meant to live in
+  one worktree: `add <path> main` refuses whenever `main` is checked out
+  anywhere, which is this corpus's own session-start state, and which after the
+  first subagent is every later one in a fan-out.
+  Worse, that guard is not atomic, so a genuinely concurrent fan-out can slip
+  several worktrees onto `main` at once and lose the isolation with no error at
+  all -- the loud refusal is the good outcome here.
+  That same substitution fixes the stale-base trap in one stroke, since
+  `fetch origin main` advances `origin/main` while leaving the local `main` ref
+  where it was.
+  And prefer `--detach` over a plain `-b <slug>`, because creating a branch
+  *that tracks* a remote ref writes upstream config under a `.git/config` lock
+  that concurrent subagents lose races on; the agent cuts its own branch inside
+  the worktree afterward, which is what its brief already tells it to do.
+  - **Do:** create the worktree explicitly with
+    `git -C <repo> worktree add --detach <path> origin/main` when
+    `isolation: "worktree"` errors, and brief the agent with that path.
+  - **Do:** base it on `origin/main`, which sidesteps the already-checked-out
+    refusal and the stale-local-`main` base at the same time.
+  - **Don't:** name the bare branch `main` -- sequentially that refuses from the
+    second agent onward, and concurrently it can silently share one branch
+    across several worktrees instead.
   - **Don't:** read the isolation error as "isolation is unavailable here" and
     let the agent share the parent's checkout.
   - **Don't:** infer that the session's cwd is a repository from the fact that
@@ -356,7 +373,27 @@
   has no Agent tool and did not re-run it.
   The stale-`main` half was hit directly: `git worktree add /tmp/wt-ums main`
   checked out `a30a2e1` while `origin/main` was five commits ahead at
-  `d0994c2`.)
+  `d0994c2`.
+  The command shape was then measured on git 2.43.0, five worktrees per run
+  against a throwaway repo whose local `main` sat five commits behind
+  `origin/main`.
+  `add <path> main` scored 0/5 with `main` checked out and 1/5 with it free,
+  the rest refusing with
+  `fatal: 'main' is already used by worktree at ...`.
+  Run **concurrently**, as a fan-out actually launches, that guard races: three
+  or four worktrees landed on `main` at once in every one of six rounds, a state
+  the sequential path refuses outright.
+  Nothing errors, and the isolation is gone -- one worktree committed, the next
+  immediately read `main` at that new commit and stacked on top of it, which is
+  the collision the parameter exists to prevent.
+  `add -b <slug> <path> origin/main`, the form review suggested, scored 5/5
+  sequentially but failed in four of five concurrent rounds with
+  `error: could not lock config file .git/config: File exists` beside
+  `unable to write upstream branch configuration`.
+  `--detach` and `-b <slug> --no-track` each scored 5/5 in all five concurrent
+  rounds, and the full flow -- detach, `checkout -b`, commit, five at once --
+  scored 5/5 in three more, every worktree based on `origin/main` rather than
+  the stale local ref.)
 - Bash's cwd PERSISTS across separate calls within a session (it does not silently reset between calls) — so a `cd` in one call carries forward into the next unless a later call `cd`s elsewhere. This one mechanism causes two mirror-image mistakes depending on the session's layout:
   - **Session runs INSIDE a worktree:** do NOT prefix git commands with `cd <main-checkout>`. Because cwd persists, that `cd` doesn't just affect the current call — any *later* call that omits its own `cd` stays in the main checkout too, silently working against a different branch (often another session's) instead of your worktree. Run git in the worktree with no `cd` at all; if you must touch another checkout, use `git -C <path>` instead of `cd`-ing into it. `gh` commands keyed by PR or issue number are cwd-agnostic, so only `git` breaks. Run `git branch --show-current` before committing or pushing to confirm. Learned on PR #62: a `cd`-prefixed push hit `main` and made my own worktree commits look missing.
   - **Session juggles several full (non-worktree) repo checkouts side by side:** a call with no `cd` silently runs against whichever repo an earlier call last `cd`'d into, not the repo you mean this time. Never omit an explicit `cd <repo>` in any Bash call when more than one repo checkout is in play, and re-verify with `pwd` or `git remote -v` after any call whose target repo matters. This bites hardest in back-to-back "same shape, different repo" calls (e.g. an identical empty claim-commit pushed to two sibling PRs one after another) — the second call looks correct in isolation but silently repeats the first call's repo. Caught it by checking `mergeable_state` output afterward; recovery was a `git reset --hard` to the last-good local commit plus `git push --force-with-lease` to undo the wrong-repo push before redoing it with an explicit `cd`. (Learned on ai-config#454/gha#215: an empty commit meant for `gha` landed on `ai-config`'s branch instead.)

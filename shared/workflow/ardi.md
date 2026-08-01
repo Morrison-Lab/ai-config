@@ -608,7 +608,9 @@ observed under that spelling was the node-versus-declared-string comparison.
 
 **A blocker that was true when you published it can stop being true while
 the PR is open, and withdrawing it is your job, not the reviewer's.**
-The bullet above covers a blocker that was never true.
+The verify-a-blocker bullet above covers a blocker that was never true, and
+the gate-naming bullet between it and this one covers a real blocker whose
+mechanism was misnamed.
 This is the harder case, because the caveat was correct and diligent when
 written, so nothing about it reads as a defect later --- and a sentence
 saying "this could not be checked" is one nobody re-checks, least of all
@@ -857,8 +859,8 @@ where it would have argued against porting the fix that actually worked.)
 **Verify a command, path, or flag *you* write into a doc, with the same rigor
 [`address-every-comment`](address-every-comment.md) demands for one a reviewer
 suggests.**
-That rule and the blocker rule above both point outward, at a claim someone
-else made or at a limit you hit.
+That rule and the verify-a-blocker rule above both point outward, at a claim
+someone else made or at a limit you hit.
 This is the one you author from scratch, and it is easier to miss than either,
 because inventing a plausible command does not feel like making a claim at
 all --- it feels like remembering one.

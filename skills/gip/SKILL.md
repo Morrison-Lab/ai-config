@@ -37,7 +37,8 @@ issues are interdependent / stacked (use [`gii`](../gii/SKILL.md), which stacks)
 `gii` runs one issue at a time on purpose, for three reasons:
 
 1. **Base-branch stacking** — a later issue's branch may depend on a prior MR
-   that hasn't merged yet, so it must branch from that MR's tip, not `main`.
+   that hasn't merged yet, so it must branch from that MR's tip, not
+   `<default-branch>`.
 2. **Same-file conflicts** — two issues that edit the same files produce
    guaranteed merge conflicts if worked in parallel.
 3. **Shared working tree** — a single checkout can't hold two in-progress
@@ -68,8 +69,9 @@ Partition the in-scope issues into an **independent set** (safe to parallelize)
 and a **dependent remainder** (must stay serial). An issue belongs in the
 independent set only if **all** hold:
 
-- **No stacking dependency** — it can branch straight from `origin/main`; it
-  doesn't need another in-flight issue's unmerged branch as its base.
+- **No stacking dependency** -- it can branch straight from
+  `origin/<default-branch>`; it doesn't need another in-flight issue's unmerged
+  branch as its base.
 - **No file overlap** — its likely touched files don't intersect any other
   in-batch issue's likely files. When in doubt, read the issues and sketch each
   one's probable file footprint; if two plausibly collide, treat them as

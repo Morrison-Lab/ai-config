@@ -133,8 +133,19 @@
 - When implementing a user instruction that edits a tracked file in the repo (e.g. CLAUDE.md, README, a config file), the task is not done at "made the local edit."
   Go all the way: file an issue, commit on a branch, and open a PR — without waiting to be asked.
   Stopping at a local edit leaves the change uncommitted and invisible to reviewers.
-- `dem-extra1/ai-config` is a FORK of the upstream `d-morrison/ai-config`.
-  When working in that fork, open PRs against the upstream original (`d-morrison/ai-config`, base `main`) as a cross-fork PR with head `dem-extra1:<branch>` — NOT against the fork's own `main`. (If a remote/web session is scoped only to `dem-extra1/ai-config` with no `add_repo` tool, the cross-fork PR can't be created from that session; push the branch and surface that the upstream PR must be opened where `d-morrison/ai-config` is in scope.)
+- `dem-extra1/ai-config` is a FORK of the canonical ai-config repo, which now lives at `Morrison-Lab/ai-config` (see the transfer note below; it was `d-morrison/ai-config` before the move, and that path still redirects).
+  When working in that fork, open PRs against the canonical repo (base `main`) as a cross-fork PR with head `dem-extra1:<branch>`, NOT against the fork's own `main`. (If a remote/web session is scoped only to `dem-extra1/ai-config` with no `add_repo` tool, the cross-fork PR can't be created from that session; push the branch and surface that the upstream PR must be opened from a session where the canonical repo is in scope.)
+  **The repo has MOVED: it was transferred from `d-morrison/ai-config` to `Morrison-Lab/ai-config`, which is now its canonical home.** This is a transfer, not a fork; there is no upstream/downstream pair, just one repo whose old path still resolves.
+  GitHub keeps the pre-transfer path working, so `d-morrison/ai-config` remotes, clones, and API calls all silently redirect to `Morrison-Lab`; a push to a `d-morrison` remote lands on `Morrison-Lab`, and `create_pull_request` with `owner: "d-morrison"` opens a PR that comes back with a `Morrison-Lab` URL and number.
+  **In a scoped remote session, pass the PRE-MOVE owner to every GitHub MCP call.** A session whose scope lists `d-morrison/ai-config` gets "Access denied" for `owner: "Morrison-Lab"`, since scope is matched against the literal owner string and the redirect does not extend it.
+  The same call with `owner: "d-morrison"` redirects server-side and **works**, for reads as well as writes: `create_pull_request`, `update_pull_request`, and `issue_write` all land on `Morrison-Lab`, and so do `pull_request_read`, `get_job_logs`, and `actions_run_trigger`.
+  So the repo is fully reachable for most calls; only the spelling of the owner matters for them.
+  Two exceptions, for unrelated reasons. `add_repo` refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `d-morrison`/`ucd-serg`/`ucdavis` repos; that is a session-composition limit, not a scope or redirect one, and it does not block anything above.
+  `mcp__github__resolve_review_thread` is unreachable under **either** owner spelling for this repo (see `memories/github-mcp-tools.md`), which is a genuine gap rather than a spelling issue.
+  **Do not conclude a repo is unreachable from one denied call.** Trying `owner: "Morrison-Lab"`, getting "Access denied", and stopping there produced a published claim that a PR's state "cannot be polled on demand", repeated in a memory entry and a PR body, and used to justify polling the branch over git instead.
+  It was false the whole time; the writes going through the pre-move owner were sitting right there as the counter-example.
+  When one owner spelling is denied, try the other before recording a limitation. (2026-07-31.)
+  Because it is one repo rather than two, do **not** reason about a "fork lagging behind upstream": `git show origin/main:<path>` through a `d-morrison` remote is reading `Morrison-Lab`'s own `main`, so content that landed upstream is visible immediately. (2026-07-31: an earlier draft of this entry called it a fork and was corrected by the owner, who performed the move.)
 - Always include `Closes #N` in MR/PR descriptions to auto-close the linked issue on merge.
 - On GitLab, assign MRs to `demorrison`.
 - Before committing code changes, run the repo checks that CI enforces
@@ -809,3 +820,9 @@ safer/preferred choice merely because the repo has external consumers.
 - Never leave durable memories or skills as local-only files (e.g., directly under `~/.codex/`).
 - Commit cross-project memories/skills to `d-morrison/ai-config`; commit project-specific guidance to that project's own repo.
 - If ai-config is temporarily out of scope in the current session, treat local storage as short-lived staging and hand off the required upstream PR.
+- **Never hesitate to run UMS, just run it.** Don't ask whether a pass is worth it, don't offer it as an option, and don't weigh a small increment against the cost of a PR.
+  The owner has said this directly: "never hesitate to run ums, just do it."
+  The `ums` skill already lists the triggers; this rule removes the judgment call about whether a given trigger is big enough to bother with.
+- **Never present losing a lesson as an available option.** Offering "capture these first, or archive now and they're lost with the context" frames data loss as a legitimate branch and invites the user to pick it.
+  It is not a choice to put in front of them; capture first, then report.
+  The same applies to any wrap-up point where context is about to end: `/clear`, archiving a session, handing off, or a container being reclaimed. (2026-07-31: offered exactly that framing at the end of a session; the owner's reply was "never risk letting work or lessons get lost.")

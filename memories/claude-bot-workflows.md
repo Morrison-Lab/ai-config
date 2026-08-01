@@ -978,10 +978,26 @@ The message is what separates them:
   not a collaborator, e.g. the Copilot coding agent
   (`UCD-SERG/ucd-serg.github.io#84`).
 - `Workflow validation failed ... identical content to the version on the
-  repository's default branch` --- not a failure at all.
-  The action **skips** and exits 0, so a green check on a PR that edits the review
-  workflow is not a review.
-  See the self-mod skip bullet above for gha's own guard against this.
+  repository's default branch` --- usually the self-mod skip when the action exits
+  0, but it can also be a red stale-branch block.
+  The green form means a PR edited the review workflow and the action deliberately
+  skipped itself.
+  The red form can appear on a PR that edits no workflows at all, when the branch
+  is behind a `main` commit that changed `.github/workflows/`.
+  **Do:** compare `.github/workflows/` against `origin/main` and merge `main`
+  before rerunning when this message appears on a non-workflow PR.
+  **Don't:** treat the message's "new repository" / "workflow changes" text as
+  exhaustive, or spend `rerun_failed_jobs` before bringing the branch current.
+  See the self-mod skip bullet above for gha's own guard against the green form,
+  and `fully-clean.md` for the stale-branch red form.
+
+(Morrison-Lab/ai-config#981, 2026-07-31/2026-08-01: a non-workflow PR
+was 30 commits behind `main` after #998 changed `claude-review.yml`.
+Its `claude-review` attempt 2 failed in 16 seconds with this validation text and
+`Error is not retryable, giving up immediately`; merging `origin/main` was the
+whole fix.
+Morrison-Lab/ai-config#994's earlier 5m26s stub looked similar in the queue, but
+it ran before #998 merged and was a different bug.)
 
 This is a fourth distinct cause in the short-duration band that
 [`fully-clean`](../shared/workflow/fully-clean.md) already records three for,

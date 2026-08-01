@@ -956,3 +956,57 @@ before any retry can happen.
 The two attempt artifacts and the differing guard wording were both visible
 at the time.
 The claim was retracted on the same issue.)
+
+**A stale branch can make workflow validation fail red before the reviewer starts,
+even when the PR edits no workflow file.**
+The workflow-validation case above is a green skip on a PR that edits the review
+workflow itself.
+This one is different.
+The action refuses to run because the branch's workflow file no longer matches
+`main`, but the message still names only two familiar causes: adding a Claude
+Code workflow to a new repository, or changing workflow files in the PR.
+A PR that changed neither looks unrelated, so the natural check clears the PR
+and leaves the actual cause hidden.
+
+Nothing else necessarily points at staleness.
+`mergeable` can read `UNKNOWN` rather than `CONFLICTING`, and the check can die in
+the same short-duration band this file already warns not to read as a credential
+signal.
+The standing retry-once remedy does not clear it either: the action itself says
+`Error is not retryable, giving up immediately`, so attempt 2 only proves the
+branch is still stale.
+
+So compare workflow files against current `origin/main` before classifying the
+failure.
+If any `.github/workflows/` file differs and the PR branch is behind, merge
+`origin/main` first and let that push carry the retry.
+That ordering matters when another real failure is present on the same PR queue:
+a stale branch can turn a genuine stub into a workflow-validation failure on the
+next rerun, making two different bugs look like one symptom.
+
+- **Do:** when `claude-review` fails with workflow-validation text on a PR that
+  does not edit workflows, check the branch's behind count and compare
+  `.github/workflows/` against `origin/main`.
+- **Do:** merge `origin/main` before rerunning or grouping the failure, and let
+  the push trigger the next review.
+- **Don't:** treat the message's two named causes as exhaustive, or stop at
+  "this PR did not change workflows".
+- **Don't:** spend another `rerun_failed_jobs` call before merging `main`, or
+  group the red check with stubs or credential failures on duration alone.
+
+(Morrison-Lab/ai-config#981, 2026-07-31/2026-08-01: run `30647227071` reached
+`run_attempt: 2` and failed in 16 seconds at
+`Fail the check if the review did not complete`, with
+`Workflow validation failed`, `Action skipped due to workflow validation error`,
+and `Error is not retryable, giving up immediately`.
+The PR touched only `CLAUDE.md`, two hook files, one hook test, and one
+`shared/workflow/` fragment.
+It was 30 commits behind `main`; #998 had merged at `2026-07-31T22:43:13Z` and
+changed `.github/workflows/claude-review.yml`; comparing every workflow file
+showed `claude-review.yml` and `validate.yml` differed before the merge and
+matched after.
+`git merge origin/main` was the whole fix, after about 27 hours stalled.
+#994 was 24 commits behind and would have hit the same block if rerun then, but
+its existing 5m26s `is_error: true`, `subtype: "success"`,
+`permission_denials_count: null` stub ran an hour before #998 merged, so it was
+a different bug; merge first, then retry.)

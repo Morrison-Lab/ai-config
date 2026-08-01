@@ -450,8 +450,8 @@ escape only because a non-UTF-8 locale cannot print it.
 The real bad input is element `5` of `add_words`, an accented author name in
 `inst/WORDLIST`.
 Reading the escape as flagged data sends you hunting a smart quote the file
-does not contain, and `grep -c $'’' <file>` returning `0` then reads as a
-puzzle rather than as the answer.
+does not contain, and searching for the literal apostrophe glyph itself
+returning zero hits then reads as a puzzle rather than as the answer.
 
 The tell is a literal in the error that you cannot find in your own input.
 Before concluding your data contains it, check whether it is a *parameter of
@@ -503,64 +503,6 @@ hand. They passed — but CI's `R CMD check` failed with
   files whose snapshot test was skipped or went unrun this pass** (e.g. snapr
   tests skipped because `NOT_CRAN` is unset) — see the snapr section below before
   running it with `git add -A` in scope.
-
-## R test/lint gotchas that only surface in CI
-Also from ettbc#13/#14:
-- **`lintr::object_usage_linter` flags package datasets used inside a *named*
-  helper function in a test file** (`no visible binding for global variable
-  'cohort'`). The same dataset used directly inside a `test_that()` block is
-  fine. So reference lazy-loaded data at file scope or inside the test blocks,
-  not inside a top-level helper. The repo's `lint-changed-files` job runs
-  `R CMD INSTALL .` before `lint_package`, so cross-file *internal* functions
-  (e.g. a helper defined in another `R/` file) resolve — a single-file
-  `lintr::lint()` can't see them and will false-flag them.
-- **`lintr::object_usage_linter` can't see a variable used only inside a
-  formula** — including every `~` in `dplyr::case_when()` / `case_match()`.
-  `codetools` doesn't walk formula bodies, so
-  `x <- f(y); dplyr::case_when(x %in% c(...) ~ "1", ...)` reports
-  `local variable 'x' assigned but may not be used` even though `x` is plainly
-  used. Don't suppress it: rewrite so the variable is referenced outside a
-  formula — a named lookup vector indexed by the variable (`bins[x]`) replaces
-  a `case_when` chain cleanly, and usually reads better anyway.
-  This is **not** a CI-only lint (verified: a plain single-file
-  `lintr::lint(f, linters = lintr::object_usage_linter())` reproduces it) — but
-  it is easy to *believe* it is, because an intervening local run can come back
-  clean off a stale loaded namespace and then CI flags it again. If a lint
-  disappears without you changing the thing it flagged, distrust the clean run.
-  (ucdavis/bcs#351.)
-- **`spelling::spell_check_package()` locally over-reports vs CI** on accented
-  hyphenated names: line-wrapped `García-Albéniz`/`Hernán` in `.Rd` files
-  tokenize as `Garc`/`niz`/`Hern`, which the CI spellcheck action does not flag
-  (main passes with them). Trust CI's misspelled count; add only the genuinely
-  new words to `inst/WORDLIST`.
-- **The ettbc `review / claude-review` check fails/skips org-wide when the
-  Anthropic org spend limit is hit** (`github-actions[bot]` posts "monthly spend
-  limit"). It's environmental, non-blocking, and unfixable from a content PR
-  (the bot can't edit `.github/workflows`). Stand in with a manual self-review
-  rather than chasing it.
-- **Adding a new hidden top-level dotfile/dir to an R package (a `.claude`
-  config dir, a `.ai-config` git submodule, any new `.<name>`) fails
-  `R CMD check` with `checking for hidden files and directories ... NOTE`
-  unless it's listed in `.Rbuildignore`.** A repo whose `R-CMD-check` job sets
-  `error_on = "note"` (common per this corpus's own review-guideline citations)
-  turns that NOTE into a hard CI failure on every platform the check runs —
-  it isn't Linux/macOS/Windows-specific, since the check runs identically on
-  all of them. Add an anchored entry (`^\.claude$`) matching the existing
-  `.Rbuildignore` style (e.g. the `^\.github$` line most repos already have)
-  proactively, in the same commit that adds the new dotfile/dir, rather than
-  waiting for CI to name it. A submodule whose content isn't checked out in CI
-  (the common case — `actions/checkout` doesn't init submodules by default)
-  can dodge the NOTE by luck — the CI build log's own `R CMD build` step
-  ("checking for empty or unneeded directories") reported
-  `Removed empty directory '<pkg>/.ai-config'`, so the uninitialized submodule
-  never reached `R CMD check` at all — but exclude it in `.Rbuildignore`
-  anyway rather than relying on that accident of checkout config.
-  (`UCD-SERG/serodynamics#265`: adding `.claude/settings.json` failed
-  `ubuntu-latest`/`macos-latest`/`windows-latest` (all `release`) plus
-  `ubuntu-latest (oldrel-1)` R-CMD-check
-  simultaneously with this exact NOTE; the sibling `.ai-config` submodule
-  added in the same PR happened not to trigger it, for the empty-dir reason
-  above.)
 
 ## R snapshot tests (snapr / testthat) — regenerating without collateral damage
 Hit across ucdavis/bcs#264 (the snapr-based `expect_snapshot_data` suite):

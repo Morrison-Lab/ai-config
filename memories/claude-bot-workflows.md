@@ -256,7 +256,7 @@ generic Actions-authoring and reusable-workflow material.
   work.)
   **Once fired, a remote/web session cannot call it back -- so prevention is
   the only control.** `cancel_workflow_run` 403s exactly like
-  `rerun_failed_jobs` does (see `memories/github.md`), and no MCP tool edits
+  `rerun_failed_jobs` does (see `memories/github-mcp-tools.md`), and no MCP tool edits
   an existing comment, so the mention can't be defused after the fact either.
   Editing would not help regardless: the caller stubs trigger on
   `issue_comment: [created]`, so an already-fired comment cannot re-fire, and

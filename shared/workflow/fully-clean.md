@@ -553,7 +553,7 @@ Read past the first page before concluding an entry is absent, since a busy PR c
 On #1005 `copilot-pull-request-reviewer[bot]` posted its quota refusal as a `COMMENTED` review at `23:59:46Z`, which is the refusal above exactly.
 Under five hours later on #1008 its check run completed with conclusion `success` at `04:50:41Z`, having posted nothing.
 `get_reviews` returned eight reviews there, four from the repo's own review bot and four from the maintainer, none from Copilot, with page 2 confirmed empty.
-Every other check on that head was green too, so nothing anywhere on the PR distinguished a reviewer that had approved from one that never spoke.)
+Every other check on that head was green too, so no signal short of the login-filtered review-list query distinguished a reviewer that had approved from one that never spoke.)
 
 **A sixth case runs the other way from all five above: the review is genuine and complete, but the workflow posts the reviewer's own tool invocation instead of the review body.**
 The comment opens with a literal `gh pr comment <N> --repo <owner>/<repo> --body "$(cat <<'EOF'` and closes with `EOF\n)"`, wrapping a real, correct verdict as unrendered text --- the model emitted a shell command as its final response and the workflow posted that string verbatim.

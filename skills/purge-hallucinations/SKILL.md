@@ -38,7 +38,7 @@ Pick the narrowest target the user named, in this precedence order:
 1. **Explicit target** — a file, a directory, a PR diff, or pasted AI output
    the user pointed at. For a PR: `gh pr diff <n>` (local) or
    `mcp__github__pull_request_read` `method: get_diff` (remote/web — see
-   `memories/github.md`); audit only the references the diff *introduces*.
+   `memories/github-mcp-tools.md`); audit only the references the diff *introduces*.
 2. **The memory/instruction corpus** — the ai-config repo's `memories/`,
    `skills/`, and `CLAUDE.md`. Find the repo root with
    `git -C ~/.claude/skills/purge-hallucinations rev-parse --show-toplevel`.

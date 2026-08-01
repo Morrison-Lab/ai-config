@@ -1,0 +1,659 @@
+# GitHub MCP tools (Claude Code remote/web sessions)
+
+The GitHub MCP tool surface used in remote/web sessions where the `gh`
+CLI is unavailable --- tool selection, scope and owner-string quirks,
+review/comment/thread mechanics, and the specific failure modes each
+tool has shown in practice. Split out of `github.md` when that file
+crossed the 1200-line gate (`scripts/check-memory-file-size.py`); see
+ai-config#694 for the precedent.
+
+- In remote/web sessions the authenticated GitHub identity is the repo owner
+  (`d-morrison`), so requesting `d-morrison` as a PR reviewer fails with
+  `422 Review cannot be requested from pull request author`. Harmless — the PR
+  is still created; the reviewer just isn't added. Don't treat the 422 as a
+  failure to retry (it's expected per the standing request-pr-review rule when
+  the author == the requested reviewer).
+- `gh` is NOT available in these sessions — use the `mcp__github__*` tools for
+  all GitHub interactions (PRs, issues, comments, reviews). CI status is always
+  available via `mcp__github__pull_request_read` (`get_check_runs` / `get_status`)
+  and the `mcp__github__actions_*` tools. Some environments may *also* expose a
+  separate `github_ci` MCP server (`mcp__github_ci__*`, e.g. `get_ci_status`),
+  which can connect asynchronously after session start. Don't conclude a tool is
+  absent from one check — `ToolSearch` for what you need before deciding it's
+  missing (and don't assume the `github_ci` server is present either).
+- **An angle-bracket placeholder can vanish from a PR or issue body posted
+  through these tools, and no markdown construct protects it.**
+  A PR body written with `` `git ls-remote https://github.com/<owner>/<repo>` ``
+  came back from the API as `git ls-remote https://github.com//`, with both
+  placeholders gone.
+  **No markdown construct protects them.**
+  A controlled test posted the same string four ways in one body --- plain
+  prose, an inline code span, an indented code block, and a fenced code block
+  --- and all four came back stripped, so the removal happens to the raw body
+  text and never reaches markdown parsing.
+  The instinct that backticks make text literal is therefore wrong twice over
+  here: neither the span nor the fence helps.
+  What is lost is the *stored* body, not one rendering of it, so re-reading or
+  re-rendering will not bring it back.
+  The blast radius is narrower than it first looks, and worth knowing precisely:
+  only text sent as a body through the API is affected.
+  A `<placeholder>` inside a file committed in the same PR is untouched, so a
+  memory entry documenting a command survives while the PR description quoting
+  that same command does not.
+  Write placeholders in a body without brackets --- `OWNER/REPO`, `PATH`, `N`
+  --- and re-read the body after posting whenever the exact text matters.
+  This is the "Postcondition gate" bullet at the top of this file made concrete:
+  nothing errors, the object is created exactly as asked, and only reading the
+  stored result back shows the content is not what was sent.
+  (ai-config#734, 2026-07-26: caught only because the mangled URL happened to be
+  re-read during an unrelated check.)
+  **A later observation narrows what "angle-bracket" means here, and its
+  mechanism is unconfirmed.**
+  A PR body posted through `create_pull_request` on 2026-07-31 came back
+  missing `<branch>`, `<gha-checkout>`, and `<base>`, leaving a documented
+  command with no path and a `git reset --hard origin/` with no branch --- so
+  the stored body carried instructions a reader would run and get wrong.
+  Two contrasts stop that from reducing to "angle brackets are stripped".
+  In the same body `<=` survived, stored as the escaped entity `&lt;=`, so
+  only tag-shaped tokens went.
+  And `<branch>` survived intact in a PR comment posted through
+  `add_issue_comment` in the same session (ai-config#965), inside backticks in
+  a blockquote, so the two write surfaces did not behave alike.
+  Which layer strips --- the MCP tool, GitHub's sanitizer, or the two
+  composed --- was not established, so read this as an observed effect rather
+  than as a mechanism, and do not generalize either surface's behaviour to the
+  other.
+  The mitigation is unchanged and cheap: spell a placeholder in caps
+  (`BRANCH`, `GHA-CHECKOUT`, `BASE`) in any body, where nothing can read it as
+  a tag.
+  Files in the diff were unaffected, as above --- the angle-bracket form
+  inside a fenced code block is correct there and should stay.
+- **`mcp__github__actions_run_trigger` can't re-run CI jobs in these sessions —
+  it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`, and
+  `cancel_workflow_run` -- the whole `actions: write` family, so you can neither
+  restart a run nor stop one) returns
+  `403 Resource not accessible by integration`: the integration token lacks the
+  `actions: write` the re-run API needs. So a flaky CI failure can't be re-kicked
+  via MCP — **push a commit to re-trigger the whole workflow** (the normal path
+  during an iterate loop anyway), or ask the user to click Re-run. (Hit
+  re-running a flaky `link-checker` timeout on a lab-manual PR.) **`method:
+  run_workflow` (a fresh `workflow_dispatch`, not a rerun) 403s the same way** —
+  the token lacks `actions: write` for dispatch too, not just for reruns, so
+  don't expect a direct-dispatch workaround to succeed where rerun failed
+  (confirmed on UCD-SERG/serodynamics#193, and again on `d-morrison/rme#1017`
+  trying to dispatch `publish.yml` — same `403 Resource not accessible by
+  integration`). Prefer folding
+  the retry into a real, already-pending fix (e.g. a reviewer's requested
+  wording tweak) over pushing a bare `--allow-empty` commit — same retrigger,
+  no throwaway commit in history. Only use an empty commit when no real fix is
+  pending. (ai-config#403.) **When the failing workflow only triggers on
+  `push: main` / `workflow_dispatch` (no `pull_request` trigger), there's no
+  "push a commit to re-trigger" fallback either** — nothing exercises the
+  actual failing job pre-merge. Ask the user to dispatch it manually from the
+  Actions UI (share the exact workflow filename + branch), and get their
+  explicit go-ahead first if the workflow has a real side effect (e.g. a
+  gh-pages deploy step not gated to `main`) — dispatching isn't just a status
+  check in that case, it's a live action.
+- **`issue_write`'s `labels` REPLACES the issue's whole label set, and a name
+  that does not exist yet is silently CREATED rather than rejected.** Two
+  independent surprises in one parameter, pulling in opposite directions.
+  The replace semantics come from the underlying REST "update an issue"
+  endpoint, so passing `["needs-data"]` to an issue already carrying
+  `["bug","tech-debt"]` drops both, with no warning and nothing in the
+  response to notice --- always pass the **union** of existing plus new.
+  Read the current labels first; `list_issues` already returns them, so a
+  bulk pass needs no extra call per issue.
+  The auto-creation runs the other way: it means a typo becomes a real label
+  rather than an error, so a misspelling silently splits a set in two.
+  Confirmed on `ucdavis/bcs`, 2026-07-29: applying `needs-data` to an issue
+  in a repo that had no such label created it, and `get_label` then returned
+  it with the default grey `#ededed` and an empty description.
+  **Nothing in the MCP tool set can set a label's color or description** ---
+  there is only `get_label` (`GET_LABEL` in
+  [`tool-mappings.md`](../tool-mappings.md)), no create/update --- so a label
+  born this way stays grey and undescribed until a human with **write**
+  access fixes it, or a workflow with `issues: write` does it via `gh api`.
+  Write, not admin: the Labels REST API's create/update endpoints need push
+  access, while admin governs repository settings, branch protection, and
+  webhooks.
+  Note that the Triage role can *apply* an existing label but cannot create
+  or edit one, so it is not sufficient here.
+  Say so when handing off, rather than leaving someone to wonder why the new
+  labels look unstyled.
+- **Comments/replies you post via the GitHub MCP tools echo back into the
+  session's `<github-webhook-activity>` events under the human account's
+  identity, not a bot identity.** `add_reply_to_pull_request_comment` and
+  `add_issue_comment` authenticate as the human who owns the session (e.g.
+  `d-morrison`), so a webhook event for your own just-posted reply shows
+  `Author: d-morrison` (or whichever human), never a recognizable bot name
+  like `claude[bot]`. Don't use the author field to decide "is this my own
+  echo, skip it." This is easy to get wrong at a glance since a same-author
+  event looks exactly like a genuine human reply demanding a response.
+  **Check for the Claude Code attribution footer instead of fuzzy-matching
+  body text/timing** --- every comment posted from these sessions ends with
+  `_Generated by [Claude Code](https://claude.ai/code)_` per the system
+  prompt's attribution-footer requirement, so a webhook event whose body
+  ends with that footer is mechanically, unambiguously your own post
+  (a genuine human reply won't carry it) --- a much sharper signal than
+  eyeballing whether the wording looks familiar. (Hit repeatedly on
+  `UCD-SERG/serocalculator#503`, 2026-07-24: several
+  `add_reply_to_pull_request_comment` calls immediately produced a webhook
+  event attributed to `d-morrison` quoting the reply verbatim --- each one
+  a self-echo, not a new human comment, confirmed each time by re-reading
+  the body rather than checking for the footer directly.)
+- **A sustained run of `503` responses across every endpoint (not just PR
+  reads) is a GitHub-side outage, not a per-call glitch — confirm with the
+  cheapest possible probe, then stop retrying and back off.** When
+  `pull_request_read`/`list_pull_requests` both 503, don't keep hammering the
+  same call — call `mcp__github__get_me` (no arguments, smallest possible
+  request) once: if that 503s too, it's a broad outage rather than something
+  scoped to one repo, PR, or endpoint, and no amount of retrying the original
+  call will help. Report the outage plainly, use whatever was last confirmed
+  before it started, and re-check later rather than looping. (ai-config#583/
+  #585 session, 2026-07-16: `pull_request_read`, `list_pull_requests`, and
+  `get_me` all 503'd for roughly an hour across several separate check-ins;
+  confirmed via `get_me` that it wasn't scoped to the two PRs being watched.)
+- `mcp__github__pull_request_read` `method:` enum: `get` · `get_diff` (PR
+  unified diff — equivalent to `gh pr diff`) · `get_status` · `get_files` ·
+  `get_commits` · `get_review_comments` · `get_reviews` · `get_comments` ·
+  `get_check_runs`.
+- **`mcp__github__request_copilot_review` is a real, separate tool** (not a
+  `pull_request_read` method) -- requests a Copilot code review on a PR,
+  equivalent to `gh api .../requested_reviewers -X POST -f
+  "reviewers[]=copilot-pull-request-reviewer[bot]"`. Verified directly
+  against `github/github-mcp-server`'s own source
+  (`pkg/github/copilot.go`'s `RequestCopilotReview`), registered in the
+  **default** toolset (`pkg/github/tools.go`), not behind an opt-in flag --
+  don't assume a tool is a hallucination just because it's absent from this
+  file, which is a running collection of quirks encountered, not an
+  exhaustive registry.
+- **`request_copilot_review` returns success even when Copilot's quota is
+  exhausted -- the refusal arrives later, as a posted review.**
+  The tool reports no error and no output whether or not Copilot will
+  actually review; what comes back minutes later is a `COMMENTED` review
+  whose entire body is *"Copilot was unable to review this pull request
+  because the user who requested the review has reached their quota
+  limit"*.
+  So a clean return is **not** evidence the quota is back, and neither is
+  the absence of an error --- only the posted review body settles it.
+  Two further specifics:
+  - The quota is **per requesting user**, not per repo or per PR, so every
+    request from the same account keeps refusing until it resets, however
+    many different PRs it's spread across.
+  - **Latency is a weak tell, and an untested one.**
+    Every refusal came back within roughly a minute of the request.
+    A later request was still pending when last checked about ten minutes
+    in, which is the only reason to suspect a long-pending request may be
+    a real review rather than a slow refusal -- but its outcome was never
+    observed, because the PR merged first.
+    So treat a long wait as weak grounds for holding off on re-requesting,
+    not as evidence a review is coming, and read the posted review either
+    way.
+  Copilot and the `@claude` reviewer fail **independently**: Copilot can be
+  quota-dead while `claude-review` posts genuine verdicts at the same head,
+  so a Copilot refusal is never a reason to stop checking the other one.
+  (`ucdavis/rampp#111`, 2026-07-24/25: three refusals across two heads while
+  `claude-review` reviewed both normally, and Copilot itself had worked on
+  the same PR two days earlier.)
+- **A branch ruleset can block Copilot from pushing a fix while leaving my
+  own push to the same branch unaffected.**
+  When Copilot reports it prepared a change but could not apply it ---
+  e.g. *"Cannot update this protected ref"* --- don't infer the branch is
+  write-protected for this session too: try the push.
+  The corollary matters more for review triage: a Copilot-identified issue
+  still sitting unfixed may be unfixed because its push was rejected,
+  **not** because the fix was wrong, disputed, or deliberately dropped.
+  Re-check such a finding on its own merits rather than reading "Copilot
+  left it alone" as a signal it was already settled.
+  (`ucdavis/rampp#111`: Copilot had prepared the `DESCRIPTION` version bump
+  that `version-check` was failing on and was rejected with that error; the
+  identical fix pushed fine from this session as `0c72d81`.)
+- **`get_status` can return "pending / 0 checks" even after CI has finished.**
+  Use `get_check_runs` for the real job conclusions (`success`, `failure`,
+  `skipped`) --- but see the bullet below: it is the more reliable of the two,
+  not an authoritative source.
+  `get_status` aggregates
+  across check suites and can lag or show a stale "pending" when all runs have
+  actually completed; `get_status` is unreliable for CI state.
+  (Hit during the ai-config #275 GII session — `get_status` showed
+  `total_count: 0` / `pending` while `get_check_runs` correctly showed all 5
+  checks `success`.)
+  **Given this, don't call `get_status` at all when checking CI state** —
+  go straight to `get_check_runs`; calling both in parallel "to be safe"
+  just spends a call on a field you already know not to trust. (Repeated
+  on `Lacaedemon/sparta` PR #780, 2026-07-12: called both in parallel to
+  confirm a canceled-review race, when `get_check_runs` alone — or, when
+  the incoming webhook event already names the failing commit's SHA, a
+  single `pull_request_read` `get` compared against that SHA — would have
+  settled it in one call. See
+  [`efficient-pr-babysitting`](../shared/workflow/efficient-pr-babysitting.md).)
+- **`get_check_runs` is the better of the two, but it is not authoritative:
+  it can report a job as `in_progress` minutes after that job finished.**
+  The entry above says to prefer it over `get_status`, which still holds ---
+  but read that as "less stale", not "correct".
+  `actions_get` `get_workflow_job` on the same job id returns the true
+  `status`/`conclusion`, and the two disagree often enough to matter.
+  The cross-check is cheap and decides it exactly, so run it rather than
+  reasoning about how long the job "should" have taken.
+  It is worth running in **both** directions.
+  Concluding "still running" from a stale `in_progress` only wastes a wait;
+  the dangerous inverse is a
+  rollup that has not yet caught up with a job that has since failed, which
+  is why the cross-check belongs in the declare-clean sweep
+  ([`fully-clean`](../shared/workflow/fully-clean.md) criterion 1) and not
+  only when something looks slow.
+  Do not over-correct, either: on the same PR minutes later, an
+  `in_progress` R-CMD-check was genuinely still running, and the runs
+  endpoint confirmed it.
+  The endpoint is unreliable, not wrong.
+  (`d-morrison/altdoc#61`, 2026-07-25: three instances in one afternoon ---
+  `test-coverage`, `docs-check` (completed `21:12:56`, still reported
+  `in_progress` after), and one true negative.)
+- **`list_pull_requests` reports `merged: false` for every PR, merged ones
+  included; `merged_at` is the field that discriminates.**
+  The two bullets above are about *staleness*, where a field is sometimes
+  wrong; here it is **constant**, so it is wrong for every merged PR while
+  looking correct on any unmerged one you spot-check it against.
+  A constant carries no information, the argument
+  [`fully-clean`](../shared/workflow/fully-clean.md) also makes for `.state`.
+  Measured on `d-morrison/ai-config`, 2026-08-01, over 101 rows all `false`:
+
+  | field | open (#1006) | merged (#1005) | closed unmerged (#505) |
+  |---|---|---|---|
+  | `list` `merged` | `false` | `false` | `false` |
+  | `list` `merged_at` | absent | present | absent |
+  | `get` `merged` | `false` | `true` | `false` |
+
+  **It is not the `fields` projection**, the first thing to suspect and a
+  different remedy: passing no `fields` argument at all returns the same value.
+  `merged_by` is no fallback either, never served in a list response even when
+  named in `fields` -- consistent with the list endpoint returning GitHub's
+  smaller representation, though that is inferred rather than read from source.
+  - **Do:** decide merged-versus-closed from `merged_at`, and call
+    `pull_request_read` `get` when you need `merged` itself.
+  - **Don't:** report a PR as closed-unmerged on a list response's `merged`
+    field -- it says that about every PR in the repo.
+- **`mcp__github__actions_list` (`list_workflow_runs`) returns a full repository
+  object per run -- budget accordingly, and prefer a cheaper call.** Each run in
+  the response carries `repository`, `head_repository`, `actor`, and
+  `triggering_actor` in full, so even `per_page: 1` runs ~30-60KB and a
+  `per_page: 3` call costs several thousand tokens; a large enough response
+  blows the tool-output cap and gets spilled to a file instead of returned.
+  When the question is "did CI/the review run, and how did it end",
+  `pull_request_read` `get_check_runs` answers it for a fraction of that, and
+  `actions_get` `get_workflow_run` (a single run by ID) is the right call when
+  you need one run's event/trigger/conclusion. Reserve `list_workflow_runs` for
+  when you genuinely need to enumerate runs the check-runs view can't see -- the
+  `action_required`/zero-job case in
+  [`fully-clean`](../shared/workflow/fully-clean.md) -- and when a call has
+  already spilled to a file, parse that file
+  (`python3 -c "json.load(...)"`) rather than re-listing.
+  (ai-config#687, 2026-07-24:
+  a two-run `list_workflow_runs` call to check whether a draft PR's review had
+  fired cost ~6k tokens; `get_check_runs` gave the same answer.)
+- **`gh pr view --json checks` is not a valid field.** When you need the
+  combined status/check rollup from `gh pr view`, ask for `statusCheckRollup`
+  instead; when you need the actual CI conclusions, use `gh pr checks` or the
+  REST check-runs endpoint.
+- **`mcp__github__push_files` strips executable bits** — files pushed via this
+  tool always land with mode `100644`, regardless of their original mode. Scripts
+  that were `100755` become non-executable. This is harmless when the workflow
+  invokes them via `bash <script>` (not directly), but creates cosmetic
+  inconsistency with sibling scripts. Workaround: fix the bit locally after
+  merge with `chmod +x <script> && git add <script> && git commit -m "Restore executable bit"`. Track the deferred fix as a
+  follow-up issue; don't block the PR on it. (Hit on `ucdavis/rampp#130` —
+  both `reassign-reviewers.sh` and `stash-reviewers.sh` lost `100755`; tracked
+  as `ucdavis/rampp#131`.)
+- **When rewriting a file's full content via `push_files`, read the current
+  file first and diff mentally.** Constructing the content from memory risks
+  introducing typos or omitting lines — e.g. accidentally re-adding a
+  previously-removed entry (`estiamnd` was re-introduced into `inst/WORDLIST`
+  after being removed, requiring a correction commit). Always use
+  `get_file_contents` to get the exact current content, then make the minimal
+  targeted change before pushing.
+- `mcp__github__pull_request_read` parameter names are **camelCase** — use
+  `pullNumber`, NOT `pull_number`. Snake_case fails silently or errors.
+- `mcp__github__add_issue_comment` parameter is **`issue_number`** (snake_case),
+  NOT `issueNumber`. This is the opposite of `pull_request_read`. Reload the
+  tool schema when unsure rather than guessing.
+- **`mcp__github__issue_write` with `method: "update"` and a `body` param
+  REPLACES the entire issue body -- it is not a way to post a comment.**
+  Passing a short claim string like "Working on this" as `body` silently
+  overwrites the full issue description with that one line; the call
+  succeeds with no warning, since `update` genuinely means "set these
+  fields," not "append." To post a comment, use
+  `mcp__github__add_issue_comment` instead -- never pass `body` to
+  `issue_write update` unless the actual intent is to edit/replace the
+  issue's description. The tool's own result echoes back the (now-wrong)
+  body, so the mistake is visible immediately if you check the response;
+  fix it with a follow-up `issue_write update` call restoring the original
+  text (keep a copy of the issue's existing body before editing it, since
+  the tool's response only echoes the new state, not the prior one --
+  or re-fetch it with `issue_read` `get` if you didn't), then post the
+  actual comment via `add_issue_comment`. (Hit claiming
+  `UCD-SERG/serocalculator#571` per the `claim-pr` convention: intended
+  `add_issue_comment` but called `issue_write update` with just the claim
+  text as `body`, clobbering the freshly-filed issue description --- caught
+  immediately from the echoed response and fixed with a restore-then-comment
+  pair of calls.)
+- **`mcp__github__create_or_update_file`'s `content` param is raw plain text,
+  not base64** — despite the GitHub REST API's own `PUT /repos/.../contents/`
+  endpoint taking base64, this MCP tool does the encoding for you. Passing an
+  already-encoded (or garbled-looking) string writes that literal string as the
+  file body — it does not decode it first, and the call still reports success,
+  so there's no error to catch the mistake. **Verify the write**: the response's
+  `content.size` should roughly match the source text's byte length; a
+  suspiciously small `size` (e.g. 113 bytes for a file that should be ~2700)
+  means the wrong content shipped. Fix immediately with a follow-up
+  `create_or_update_file` call using the new `sha` from the bad commit — don't
+  leave a broken file on the branch waiting for the next review round to catch
+  it. (Hit on lab-manual#376: an editing slip sent a truncated placeholder
+  instead of the real fragment text; caught by checking the returned `size`.)
+- **Issue *writes* 404 while *reads* succeed → the issue was transferred to
+  another repo, not a permissions gap.** If `mcp__github__add_issue_comment` /
+  `issue_write` to `owner/repo#<N>` fail (`404 Not Found`, or `Could not resolve
+  to an Issue with the number of <N>`) but `issue_read` (`get`) on the *same*
+  number succeeds and PR-comment writes work, suspect a **GitHub issue
+  transfer**. A transfer redirects the old number for *reads* — `issue_read`
+  silently follows the redirect and returns the issue at its NEW home, so check
+  the returned `html_url`/`number` (they show a different repo/number). Writes to
+  the old `owner/repo/issues/<N>` 404 because the issue no longer lives there.
+  Fix: re-read to get the new repo + number, then comment/close *there*. Don't
+  misdiagnose it as a missing `Issues:write` token scope. (Caught closing
+  `gha#75`, transferred to `rme#941`.)
+- **A pinned upstream commit SHA that 404s on the GitHub API can mean the
+  whole repo moved orgs, not just a stale/rewritten pin.** `renv::restore()`
+  (or any tool resolving a `Remotes:`-style GitHub pin) failing with a plain
+  network-looking error (curl "error code 22" wrapping an HTTP error) on a
+  commit-metadata fetch is easy to read as "transient" or "just re-pin to
+  latest `main`." Before assuming that, check whether the source repo itself
+  still exists at that path: fetch its `github.com` root page (not
+  `api.github.com`, which a sandbox proxy may block for out-of-scope repos —
+  use `WebFetch` on the plain `github.com/<owner>/<repo>` URL instead) and
+  look for a "this repo has moved to `<new-owner>/<repo>`" redirect notice —
+  some orgs (e.g. `insightsengineering`) replace a migrated repo's content
+  entirely with a redirect stub and drop its git history, which orphans every
+  previously-pinned commit SHA outright (a real 404, not a rate limit or
+  blip). Fix by repointing the `Remotes:`/lockfile entry at the NEW org and a
+  current commit there, not by re-snapshotting blindly (see the
+  `renv::snapshot()` destructive-mistake entry below for why not) or assuming
+  a simple re-pin to the old repo's `main` will work.
+  (`d-morrison/rme#1017`: `insightsengineering/cards` had moved to
+  `pharmaverse/cards`; the old repo was reduced to a redirect-only stub with
+  history removed, orphaning the pinned SHA.)
+- **WebFetch summarizes rendered page text through a small model, which can
+  garble a long hex string (e.g. a 40-char git SHA) even when the source page
+  is fetched correctly.** Don't trust a SHA read back from prose/rendered
+  text alone — cross-check by asking WebFetch specifically for an anchor
+  `href` containing the SHA as a URL path segment (e.g.
+  `/owner/repo/commit/<sha>`), which is far less prone to transcription
+  errors than reading digits out of rendered commit-page text, and repeat the
+  fetch 2-3× to confirm the same value comes back consistently before using
+  it in a commit/config change. (`d-morrison/rme#1017`: eyeballing a
+  WebFetch-rendered SHA left doubt about its exact length at a glance; an
+  href-based cross-check against the commit permalink URL, repeated across
+  three independent fetches, confirmed the same 40-char value each time
+  before it was used in the fix.)
+- **Read a commit SHA back from git before citing it in a comment; never
+  write one from memory.** The bullet above covers a SHA *garbled in
+  transit* by WebFetch; this is the adjacent failure of never having looked
+  it up at all. A PR reply that names "the commit that fixed this" is a
+  checkable reference, and an invented one sends every later reader to
+  nothing. `git rev-parse --short HEAD` immediately after the push costs one
+  call. Correct a wrong one on the thread promptly rather than at leisure:
+  an automated reviewer gathers comments when its run starts, so a
+  fabricated SHA left standing gets copied into the reviewer's own verdict
+  and becomes a second durable artifact to chase. (ai-config#696: a reply
+  cited `0d2ec06`, which existed nowhere on the branch -- the real commit
+  was `30ac111` -- and the `@claude` reviewer quoted `0d2ec06` back in its
+  next review before the correction landed.)
+- **In a fresh web/remote container, local `origin/*` refs can be stale or
+  phantom — verify true remote state via MCP, not local refs.** The clone's
+  `remotes/origin/main` may lag the real default branch by already-merged
+  commits, and the harness-assigned `claude/<id>` branch can appear under
+  `git branch -a` as `remotes/origin/claude/<id>` while not existing on the real
+  remote (`get_file_contents` with `ref: refs/heads/claude/<id>` returns 404).
+  `git fetch origin` (all refs) can also exceed the 2-min Bash limit on large
+  repos with submodules (rme). To read the real default-branch HEAD cheaply,
+  `get_file_contents` any file with no `ref` (= default branch) — the returned
+  resource path embeds the live commit SHA. Fetch the single branch you need
+  (`git fetch origin main`) and branch off that, so you don't build on a
+  stale/polluted base.
+- `mcp__github__pull_request_review_write` with `method: resolve_thread`
+  requires **only `threadId`** (node ID, e.g. `PRRT_kwDO...`); `owner`,
+  `repo`, and `pullNumber` are ignored for that method. Thread node IDs come
+  from `get_review_comments` --- **fetch them, never reconstruct one.** They
+  are opaque base64, so a plausible-looking id assembled from a remembered
+  prefix plus the suffix of a *different* thread fails with "Could not
+  resolve to a node with the global id"; that error means the id was
+  invented, not that the thread is gone.
+  On a PR with many threads, the
+  temptation is to skip a re-fetch because the list was read a few calls
+  ago --- but a new review round appends threads, so the ones you need are
+  exactly the ones not in that earlier read.
+  When only the newest threads
+  are wanted, `get_review_comments` takes an `after` cursor: pass the
+  `endCursor` from the previous listing and get just what has appeared
+  since, rather than re-fetching every thread.
+  **`page` does not do this for this method**, so `page: 2` returns the
+  first page again.
+  The tool's own schema is the authority, not the REST
+  endpoint [`tool-mappings.md`](../tool-mappings.md) lists as the `gh`
+  equivalent: `after` is documented as "used only by the
+  `get_review_comments` method", and that method's own description says
+  "use cursor-based pagination (`perPage`, `after`)", while `page` is a
+  generic parameter shared with the REST-backed methods on the same tool.
+  The `PRRT_`-prefixed thread ids corroborate it --- those are GraphQL
+  global node ids, which the REST comments endpoint does not return.
+  So one `pull_request_read` tool spans both pagination models depending
+  on `method`; don't generalize either one across it.
+  (Guessed twice in one `d-morrison/altdoc#78` session, 2026-07-27,
+  costing two failed calls before fetching properly.)
+- **A repository transfer breaks `mcp__github__resolve_review_thread`
+  specifically, and neither owner spelling works.**
+  The standing advice for a transferred repo --- keep using whichever owner
+  the session was scoped with, since the API follows the transfer redirect
+  server-side --- holds for every call that names the repo by `owner`/`repo`
+  **strings**.
+  It does not hold for this tool, whose `threadId` is a GraphQL node ID
+  rather than a name, so the declared owner and the node have to agree.
+  Read that as an observed gate rather than as a mechanism.
+  This entry first explained it as the node "already encoding the
+  post-transfer repo", which decoding one shows is the wrong story:
+  `PRRT_kwDOShagnM6VdO1_` is MessagePack for
+  `[0, 1242996892, 2507468159]`, whose middle element is the repository's
+  database ID --- the same value carried by the repo's own node ID
+  (`R_kgDOShagnA`) and returned as `id` by the REST API.
+  A transfer leaves that number alone, so the node names an identity with no
+  pre- or post-transfer form to disagree about.
+  What the first error below establishes is only that the server compares the
+  node's repository against the declared `owner`/`repo` string and rejects
+  the pair.
+  The second establishes a separate gate, the session's own repository scope
+  list, which never examines the node at all.
+  It is not the first comparison in different words: `Morrison-Lab/ai-config`
+  is the node's own repository, so that comparison would have matched.
+  Why that first comparison fails where string-addressed calls follow the
+  redirect was not established.
+  Measured on `Morrison-Lab/ai-config` (transferred from `d-morrison`),
+  2026-07-31, against PR #975 --- two different gates, one per spelling:
+  - `owner: d-morrison` --- `Access denied: review thread
+    PRRT_kwDOShagnM6VdO1_ does not belong to the declared repo
+    "d-morrison/ai-config".`
+  - `owner: Morrison-Lab` --- `Access denied: repository
+    "morrison-lab/ai-config" is not configured for this session.
+    Allowed repositories: d-morrison/gha, d-morrison/workflows,
+    d-morrison/ai-config, d-morrison/rpt, d-morrison/qwt, d-morrison/qbt`
+
+  The second is the session's own repo-scope list, which is fixed at session
+  start, and `add_repo` refuses a cross-owner add --- so this is **not
+  transient**, and re-testing it each polling round buys nothing.
+  Every other tool used in that session worked normally under
+  `owner: d-morrison`: `pull_request_read` (every method),
+  `add_issue_comment`, `add_reply_to_pull_request_comment`,
+  `update_pull_request`, `request_copilot_review`, and
+  `subscribe_pr_activity`.
+  So the split is between string-addressed and node-addressed calls, not
+  between read and write.
+
+  The consequence is worth stating plainly, because it is easy to mistake for
+  work left undone.
+  [`fully-clean`](../shared/workflow/fully-clean.md) makes "every inline
+  review thread is resolved" a criterion for calling a PR clean, so in a
+  transferred-repo session that criterion is **structurally unreachable**:
+  every finding can be Addressed and replied to, and the PR still cannot be
+  reported fully clean from this session.
+  Resolve the threads from the GitHub UI, or from a session scoped to the new
+  owner.
+
+  One untested alternative, recorded so the next session tries it before the
+  UI.
+  `pull_request_review_write` with `method: resolve_thread` is a separate tool
+  whose own schema says the `owner`, `repo`, and `pullNumber` it still
+  requires "are not used for this method", so passing the session's own owner
+  should clear the scope gate and then be ignored.
+  That is an inference from the tool descriptions rather than a measurement,
+  so treat it as one call worth spending, not as a known route.
+
+  - **Do:** resolve the threads in the GitHub UI, or from a session scoped to
+    the new owner, once this failure appears.
+  - **Do:** say in the status report that the findings are addressed and
+    replied to but the fully-clean criterion cannot be met from this session,
+    naming the tool.
+  - **Don't:** re-test the call each polling round --- the scope list is fixed
+    at session start and `add_repo` cannot widen it.
+  - **Don't:** report the PR fully clean because every finding was addressed;
+    unresolved threads fail that criterion whatever the reason.
+- **`mergeable_state` glossary — `unstable` is NOT a merge conflict.** GitHub's
+  `pull_request_read` `get` returns `mergeable_state` alongside `mergeable`;
+  the common values: `clean` (mergeable, all checks passing), `unstable`
+  (mergeable, but some check is pending/failing — not blocking), `dirty` (real
+  merge conflicts — this is the one that needs `git merge origin/main` +
+  conflict resolution), `blocked` (a required check hasn't passed),
+  `behind` (branch protection requires an update first). Only `dirty` means
+  conflicts; `unstable` just means "wait for CI" and needs no merge action.
+  (ai-config#373: `mergeable_state: unstable` right after a push was CI still
+  running, not a conflict signal.)
+- **`gh pr merge` can return "Head branch is out of date" even after syncing; verify with SHAs before looping, and re-establish fully-clean before retrying.** When this error repeats, first read the PR's actual base branch (`gh pr view <N> --json baseRefName -q .baseRefName`) — do **not** assume `main`; stacked and release PRs target a different base — then fetch and merge that base into the branch. Merging the base creates a new head SHA, which invalidates the CI/review "fully clean" snapshot that authorized the original merge attempt (a repo that doesn't make every workflow/review a required branch-protection check can otherwise merge an unreviewed/untested new head) — re-run the `fully-clean.md` check against the new SHA before retrying the merge, not just the merge command itself. If it still fails, don't compare against `origin` blindly: for a cross-fork PR, `origin` is the *base* repo, not necessarily where the head branch lives, so `git ls-remote origin refs/heads/<branch>` can silently read a missing ref or an unrelated same-named branch in the base repo. Get the actual head repo and ref from the PR API first (`gh pr view <N> --json headRepositoryOwner,headRepository,headRefName`), query *that* repo's ref (`gh api repos/<head-owner>/<head-repo>/git/refs/heads/<head-ref> --jq .object.sha` — verified this endpoint works), and compare it against the PR API's own `.head.sha` (`gh api repos/<o>/<r>/pulls/<N> --jq .head.sha`); the PR object can lag the branch ref briefly, so **wait** until the two SHAs agree rather than retrying. If branch protection still blocks the merge, only use `gh pr merge --admin` when the user has **separately and explicitly** authorized the bypass itself — ordinary merge authorization does **not** cover it (see `preferences.md`) — otherwise stop and surface it as a blocker.
+- Webhook PR-activity events cover comments/reviews/CI *failures* but NOT CI
+  *success*, new pushes, or merge-conflict transitions — don't rely on events
+  alone to know a PR went green or merged; re-check explicitly.
+- **A CI-failure webhook event's `HeadSHA` can be stale — compare it against
+  the PR's actual current head before investigating.** Pushing a fix-up commit
+  right after a bad one (e.g. correcting an encoding mistake seconds later)
+  produces a cascade of failure events for every check on the now-superseded
+  commit, arriving over the next several minutes as each job finishes. Check
+  the event's `HeadSHA` field against the PR's live head (`pull_request_read`
+  `get`, `.head.sha`) — if it doesn't match, the event is about a commit no
+  one will ever see the result of; skip it with a one-line "stale, superseded"
+  note instead of re-diagnosing content you've already fixed. (Hit on
+  UCD-SERG/serodynamics#193: an accidental double-base64-encoded push
+  triggered ~10 failure events across the whole CI matrix, all for the
+  immediately-superseded commit.)
+- **Self-wake to re-check CI in remote/web sessions.** Webhooks don't deliver CI
+  *success*, new pushes, or merge transitions, so re-check on a timer. Prefer
+  `CronCreate` (a harness scheduling tool, not an MCP tool): schedule a one-shot
+  (`recurring: false`) or recurring (`recurring: true`) job whose prompt re-polls
+  `mcp__github__pull_request_read` (`get_check_runs`) and acts on the result; it
+  fires at wall-clock time without holding a background process. (Used to watch
+  both PRs' merge transitions while migrating rme's preview workflows to the gha
+  reusable family.) Fallback when `CronCreate` isn't available: arm a one-shot
+  `Monitor` with `sleep <N>; echo recheck` and re-poll when it fires — the
+  `Monitor` can't reach the GitHub API itself (no `gh`; the only git remote is a
+  git-only proxy), so it's purely a timer, and foreground Bash `sleep` is
+  blocked, which is why the background `Monitor` is the workable one. There is no
+  `send_later` tool. Re-arm until the build goes green. Learned driving rme#929.
+- **`mcp__Claude_Code_Remote__send_later` can become unavailable mid-session,
+  not just absent from the start** (contrast the rme case above, where it was
+  never present). Observed failure sequence: first a few transient "Tool
+  permission stream closed before response received" errors (retrying the
+  identical call sometimes still worked), then a hard "Error: No such tool
+  available: mcp__Claude_Code_Remote__send_later" that no retry cleared.
+  Fallback to `CronCreate` with `recurring: false`, pinned to a specific
+  near-future cron time (compute it with `date`, since `CronCreate` takes an
+  absolute cron expression, not a relative "N minutes from now" delay).
+  **`CronCreate` jobs are session-only** — they die with the session, unlike
+  `send_later`'s durable server-side triggers — so this is a degraded
+  substitute, not an equivalent; say so rather than treating it as a full
+  replacement. (gha#193 PR-babysitting session, 2026-07-03.)
+  **It is degraded in a sharper way than "dies with the session" suggests:**
+  a `CronCreate` job can vanish from the store *before its fire time*, with
+  no error and nothing to surface the loss.
+  See the `CronCreate`-silent-loss entry in
+  [`claude-code.md`](claude-code.md) for the observations and the
+  `CronList` re-verification habit that catches it.
+- **`add_repo` refuses a cross-owner add once the session already has a repo from a
+  different owner** ("cross-tier adds are not supported in v1: requested `<owner>/<repo>`
+  but session already has repos from owner(s) `[...]`") — it does NOT fall back to a
+  read-only or degraded mode, so a session scoped to e.g. `d-morrison/*` repos cannot add
+  a `UCD-SERG/*` repo (or vice versa) no matter how the request is phrased. When a task
+  needs to read a PR/issue in such an out-of-scope repo, don't stop at the `add_repo`
+  failure or a raw `api.github.com` 403 (a plain `WebFetch` GET to
+  `api.github.com/repos/.../issues/comments/<id>` for a public repo 403'd with no body —
+  exact cause unconfirmed; `WebFetch` isn't threaded through the GitHub MCP session's own
+  auth, so this isn't necessarily the same failure mode as a scoped/cross-owner API call,
+  and GitHub's REST API does generally allow unauthenticated reads of public repos at a
+  lower rate limit, so don't over-generalize from this one data point) — try `WebFetch`
+  on the **rendered** `https://github.com/<owner>/<repo>/pull/<N>`
+  (or `/issues/<N>`) page instead. For a public repo this reliably returns the PR/issue
+  title, state, and recent comment/review content (works even for reading a *specific*
+  comment by its anchor), succeeding where both the MCP tool and the JSON API failed.
+  (Used to read UCD-SERG/serodynamics#193's `@claude`-bot comment from a
+  `d-morrison/gha`-scoped session, which surfaced the root cause fixed in gha#191.)
+- **`add_repo` (and likely other approval-gated MCP tools) can fail repeatedly
+  and silently under auto-mode, with no useful error.** In auto mode, a call
+  that needs an interactive permission-dialog approval has no human present to
+  click it, so it errors `Streamable HTTP error: Error POSTing to endpoint:
+  MCP tool call requires approval` — identical on every retry, giving no
+  signal that the real blocker is "no one is watching to approve this."
+  Retrying the same call in auto mode doesn't help. The fix is to have the
+  user switch to a non-auto permission mode (e.g. accept-edits) so there's
+  someone to grant it, then retry once — it then either succeeds outright or
+  fails with a real, actionable error (e.g. `add_repo`'s cross-tier-owner
+  refusal, above). Don't burn more than one or two identical retries in auto
+  mode before flagging this to the user. (gha#204 session, 2026-07-03: `rme`
+  succeeded immediately after the user switched modes; `epi204`/`epi202` then
+  failed with the real cross-tier error instead.)
+- **The MCP write tools silently drop `<https://...>` angle-bracket autolinks
+  from PR and issue bodies.** A body posted through `create_pull_request`,
+  `update_pull_request`, or `issue_write` comes back with the whole
+  `<...>` span gone, leaving a double space where the URL was --
+  "pointed readers at&nbsp;&nbsp;for the in-development documentation."
+  Presumably the angle brackets are treated as an HTML tag and stripped
+  somewhere in the write path; whatever the mechanism, the URL never reaches
+  GitHub. It is silent (the call succeeds) and easy to miss, because nothing
+  in the tool result flags it and the sentence still reads as a sentence.
+  Especially costly when the URL *is* the subject -- a PR about a broken link
+  losing exactly that link.
+  **Backticks do NOT protect it.** The sanitizer runs over the raw body
+  string with no regard for Markdown context, so an angle-bracket span inside
+  a code span is stripped exactly like a bare one, leaving an empty pair of
+  backticks. This is the same formatting-blind-substring failure mode as the
+  bot-mention gate in `memories/claude-bot-workflows.md` -- a pass that inspects
+  raw text while the author reasons in rendered Markdown.
+  **Write the URL with no angle brackets at all**: a `[text](url)` link, or
+  the bare `https://...` (GitHub auto-links it in a PR body anyway). Then
+  re-read the stored body after posting when a URL matters -- the call
+  succeeds either way, so the tool result never tells you.
+  Note this is a quirk of the MCP write path, not of GitHub or of Markdown
+  files: angle-bracket autolinks in a committed `README.md` render fine and
+  should be left alone.
+  (`UCD-SERG/serocalculator#605` and its issue #604, 2026-07-25: both bodies
+  lost the same URL this way. The backticked-is-safe assumption was then
+  disproved by this very bullet's own PR, `ai-config#724`, whose description
+  lost an angle-bracket span from inside a code span in the heading that
+  introduced this entry.)
+- `d-morrison/gha`'s `CLAUDE.md` carries its own `gh`->MCP substitution table
+  (the "GitHub access in remote / web sessions" section), scoped to that repo.
+  `d-morrison/ai-config` has its own cross-model registry at
+  [`tool-mappings.md`](../tool-mappings.md) (generated from `tool-mappings.yml`),
+  which ai-config skills can point to directly — see `CLAUDE.md`'s "Skills that
+  call gh/glab" section. When a skill or doc in a **different** repo (one with
+  neither table) tells a reader to "use the GitHub MCP tools," name the tools by
+  example (`mcp__github__add_issue_comment`, `mcp__github__create_pull_request`,
+  `mcp__github__search_pull_requests`) rather than pointing at a `CLAUDE.md`
+  mapping table that repo doesn't have — that cross-reference resolves only
+  where the table actually lives. (Caught in ai-config#137 review: the gip
+  skill referenced a table ai-config didn't have at the time; ai-config#327
+  later added `tool-mappings.md` to close that gap.)
+

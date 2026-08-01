@@ -672,6 +672,29 @@ withdraw the caveat where it was published, saying explicitly that it is
 withdrawn rather than quietly deleting the sentence.
 A reader who saw the original needs to know it was retested, not be left
 wondering whether it was ever true.
+
+
+A `main` merge is one moment that must fire this check, because it can falsify
+one of your own hedges without producing a conflict in the file that carries it.
+After merging `main`, grep the PR's touched files for hedge forms such as
+`still open`, `not yet merged`, `once that merges`, `as of`, `will live at`, and
+`proposed in`.
+Re-check each hit against the new base before pushing the merge.
+The conflict marker is not the scope of the review: a cleanly merged file can be
+where the stale caveat lives.
+
+- **Do:** after every `main` merge, scan the PR's touched files for merge-status
+  hedges and re-read each against the new base.
+- **Don't:** assume a hedge survived because the file that contained it merged
+  without conflicts.
+
+(Morrison-Lab/ai-config#981: its fragment said ai-config#959 was still open as
+of 2026-07-31 and that, once merged, the fragment would live at
+`shared/workflow/flag-practice-slippage.md`.
+#959 merged at 2026-07-31T16:24:34Z, and commit `df243ee9` merged `main` into
+#981 on 2026-08-01, pulling in that very file.
+The merge conflict was in `CLAUDE.md`, so the cleanly merged fragment was not
+re-read, and a reviewer caught the stale hedge afterward.)
 (ai-config#774, 2026-07-28: the PR body said four `adv-r.hadley.nz` anchors
 could not be verified because the host was egress-blocked, which was
 accurate when written.

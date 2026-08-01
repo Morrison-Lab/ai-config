@@ -1006,7 +1006,7 @@ changed `.github/workflows/claude-review.yml`; comparing every workflow file
 showed `claude-review.yml` and `validate.yml` differed before the merge and
 matched after.
 `git merge origin/main` was the whole fix, after about 27 hours stalled.
-#994 was 24 commits behind and would have hit the same block if rerun then, but
+PR #994 was 24 commits behind and would have hit the same block if rerun then, but
 its existing 5m26s `is_error: true`, `subtype: "success"`,
 `permission_denials_count: null` stub ran an hour before #998 merged, so it was
 a different bug; merge first, then retry.)

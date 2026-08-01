@@ -92,10 +92,10 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   The list is ordered by PR list order, effectively number/creation, before your `--jq` filter runs.
   That means an old, low-numbered PR that merged recently can sit below a page of higher-numbered PRs and never reach the filter.
   The result looks scoped by time while silently excluding the very merge checkpoint you were polling for.
-  Use a query whose ordering matches the question, such as `gh search prs --merged=">=<date>"`, or query each PR of interest directly.
+  Use a query whose filter matches the question, such as `gh search prs --repo <owner>/<repo> --merged-at ">=<date>"`, or query each PR of interest directly.
   If you use `gh pr list --state merged`, set `--limit` far beyond the expected count and report how many merged PRs the command examined, not only how many passed the `mergedAt` filter.
-  - **Do:** use `gh search prs --merged=">=<date>"`, direct `gh pr view <N>`, or an intentionally over-wide list with an examined count when answering "what merged since T".
-  - **Don't:** trust `gh pr list --state merged --limit N --json mergedAt --jq 'select(.mergedAt > T)'` as a time-window query.
+  - **Do:** use `gh search prs --repo <owner>/<repo> --merged-at ">=<date>"`, direct `gh pr view <N>`, or an intentionally over-wide list with an examined count when answering "what merged since T".
+  - **Don't:** trust `gh pr list --state merged --limit N --json mergedAt --jq '.[] | select(.mergedAt > T)'` as a time-window query.
   (Morrison-Lab/ai-config#969, 2026-08-01: `gh pr list --state merged --limit 15 --json number,mergedAt` plus a `mergedAt > 2026-08-01T08:00:00Z` filter returned only #1019, merged at `09:03:13Z`, and missed #969, merged at `09:14:38Z`.
   Raw `--limit 6` output showed #1013 at `05:36Z` before #1012 at `05:45Z`, proving the page was not sorted by merge time.
   Raising the limit to 30 returned both #1019 and #969.)

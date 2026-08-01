@@ -49,22 +49,29 @@ A redundancy finding is exactly where phrase grep is most tempting, and where
 it is least trustworthy.
 This corpus uses semantic line breaks and inline markup, so a copied claim can
 span a newline or differ only by backticks while still being the same prose.
-Use the existing n-gram shingle instrument first:
+Use the existing overlap instrument for the broad sweep:
 `scripts/find-near-duplicates.py` ranks corpus pairs by normalized word
 shingles and reports the number of units and pairs it examined.
-Its score is only a reading list, not a verdict, so still apply the litmus test
-above by reading the candidate bodies.
-When the question is a narrower single-file audit, use the same shape:
+Its default target set and top-pair threshold are tuned for near-duplicate
+files, not for proving that a short copied run between long `shared/` files is
+absent.
+So treat it as the reusable starting point and corpus-wide reading list, not as
+a clean-result certificate for a narrow review finding.
+When the question is a narrower single-file audit, use the same algorithmic
+shape with a run-reporting matcher:
 normalize whitespace and markup on both sides, lower-case, compare word
-n-grams, and report the examined scope.
+n-grams, and report the examined scope and every overlapping run.
 
-- **Do:** run `scripts/find-near-duplicates.py` or an equivalent normalized
-  n-gram shingle comparison before claiming a redundancy search is clean.
-- **Do:** report the examined files or pairs alongside any overlap found, then
-  read the overlapping bodies before deciding whether consolidation loses
+- **Do:** run `scripts/find-near-duplicates.py` for the broad candidate list,
+  or run an equivalent normalized n-gram matcher that reports overlapping runs
+  for the files under review.
+- **Do:** report the examined files, pairs, or runs alongside any overlap found,
+  then read the overlapping bodies before deciding whether consolidation loses
   nothing.
 - **Don't:** use literal grep as evidence that no matching prose exists in a
   semantic-line-break corpus.
+- **Don't:** treat `scripts/find-near-duplicates.py`'s default no-finding result
+  as proof a short copied passage is absent from long shared files.
 - **Don't:** treat a high shingle score as the disposition; it is a pointer to
   read, not a duplicate verdict.
 

@@ -691,8 +691,8 @@ where the stale caveat lives.
 (Morrison-Lab/ai-config#981: its fragment said ai-config#959 was still open as
 of 2026-07-31 and that, once merged, the fragment would live at
 `shared/workflow/flag-practice-slippage.md`.
-#959 merged at 2026-07-31T16:24:34Z, and commit `df243ee9` merged `main` into
-#981 on 2026-08-01, pulling in that very file.
+PR #959 merged at 2026-07-31T16:24:34Z, and commit `df243ee9` merged `main` into
+PR #981 on 2026-08-01, pulling in that very file.
 The merge conflict was in `CLAUDE.md`, so the cleanly merged fragment was not
 re-read, and a reviewer caught the stale hedge afterward.)
 (ai-config#774, 2026-07-28: the PR body said four `adv-r.hadley.nz` anchors

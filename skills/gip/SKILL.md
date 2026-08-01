@@ -105,6 +105,29 @@ and commits never collide on one checkout. (This is the subagent form of the
 same isolation [`session-lock`](../session-lock/SKILL.md) sets up for
 independent top-level sessions.)
 
+**That parameter errors when the session's own cwd is not inside a git
+repository** -- `Cannot create agent worktree: not in a git repository and no
+WorktreeCreate hooks are configured` -- which is the normal layout in a harness
+whose cwd merely *holds* repos as subdirectories.
+Don't read that as isolation being unavailable and fall back to a shared
+checkout; create each worktree explicitly instead
+(`git -C <repo> fetch origin <default-branch>`, then
+`git -C <repo> worktree add --detach <path> origin/<default-branch>`) and hand
+the subagent its path.
+`<default-branch>` is the one step 0 above already had you note, not the
+literal string `main`: hard-coding it fails with
+`fatal: invalid reference: origin/main` on any repo whose default is named
+otherwise.
+Base every one of them on `origin/<default-branch>`, never on the bare branch
+name: `add <path> <default-branch>` succeeds for the first agent in a wave and
+refuses for every one after it, and when the wave is genuinely concurrent its
+guard can race and put several agents on that branch at once, silently costing
+the isolation this step exists to buy.
+Leave the branch to the subagent, which cuts its own inside the worktree.
+See [`memories/preferences.md`](../../memories/preferences.md) for the full
+precondition, the measured concurrency numbers, and the stale local base this
+form also avoids.
+
 A subagent starts **fresh** — it sees only the prompt you hand it, not this
 skill file — so **inline the entire per-issue procedure**. Don't point it at
 `gi`/`ardi`; restate the steps. Fill in `<N>`, `<title>`, `<owner>`, `<repo>`,

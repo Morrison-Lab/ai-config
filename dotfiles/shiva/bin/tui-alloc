@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Grab an interactive SLURM slice on shiva and launch a TUI coding agent.
+#
+# Usage: tui-alloc <command> [extra salloc args...]
+#   e.g. tui-alloc claude
+#        tui-alloc codex --exclude=c1,c2
+#
+# Resource overrides (env):
+#   ALLOC_CPUS       cores      (default 8 hwthreads = 4 physical)
+#   ALLOC_MEM        memory     (default 32G -- MUST be set on shiva, see below)
+#   ALLOC_TIME       walltime   (default 24:00:00; see the walltime note below)
+#   ALLOC_CONDA_ENV  conda env to activate inside the slice (default: none).
+#                    e.g. ALLOC_CONDA_ENV=bcs claude-alloc  (for bcs repo work)
+#
+# shiva notes:
+#   - Partition `normal` is OverSubscribe=NO (shared, not exclusive), so a
+#     slice leaves the rest of the node free for others.
+#   - SelectType=cons_tres/CR_CORE_MEMORY with DefMemPerNode=UNLIMITED: omit
+#     --mem and you grab the node's whole 772G, locking everyone out. Always
+#     set memory.
+#   - c1 is the GPU node; excluded by default for these CPU-only sessions.
+#   - Walltime: partition `normal` has MaxTime=UNLIMITED, so the default here
+#     is a courtesy limit, not a cluster constraint. It was 12h, which expired
+#     mid-session during a long working day and took the agent's background
+#     monitors down with it (the slice dies, so anything running inside it
+#     dies too). 24h covers a full day; raise it per invocation with
+#     ALLOC_TIME if you need longer. Do not treat a bigger number as free: the
+#     slice holds its cores and memory for its whole life even while idle, on
+#     a 4-node cluster, so exit the session when you are done rather than
+#     letting a long allocation sit.
+#   - Long compute belongs in a detached `sbatch` job, not in this slice. A
+#     batch job survives the slice expiring; work running inside the slice
+#     does not.
+set -euo pipefail
+
+CMD="${1:?usage: tui-alloc <command> [salloc args...]}"; shift
+
+RCDIR="$HOME/.config/tui-alloc"
+
+export TUI_ALLOC_CMD="$CMD"
+export TUI_ALLOC_PWD="$PWD"
+
+# Node-side guard. zsh lives at /usr/bin/zsh on the login node but isn't
+# provisioned on every compute node, so `zsh -i` there dies with a cryptic
+# `env: 'zsh': No such file or directory` (exit 127). A shared-filesystem zsh
+# on PATH (`conda install -n base -c conda-forge zsh`) makes it visible on all
+# nodes; if that's ever missing, drop to an interactive bash with a clear hint
+# instead. Runs inside the srun step, so it checks the node, not the login host.
+NODE_GUARD='command -v zsh >/dev/null && exec zsh -i
+echo "tui-alloc: no zsh on this node ($(hostname)); falling back to bash." >&2
+echo "  fix: conda install -n base -c conda-forge zsh  (shared /home makes it visible on all nodes)" >&2
+exec bash -i'
+
+exec salloc \
+  --job-name="$CMD" \
+  --nodes=1 --ntasks=1 \
+  --cpus-per-task="${ALLOC_CPUS:-8}" \
+  --mem="${ALLOC_MEM:-32G}" \
+  --time="${ALLOC_TIME:-24:00:00}" \
+  --exclude=c1 \
+  "$@" \
+  srun --pty env \
+    ZDOTDIR="$RCDIR" \
+    TUI_ALLOC_CMD="$CMD" \
+    TUI_ALLOC_PWD="$PWD" \
+    ALLOC_CONDA_ENV="${ALLOC_CONDA_ENV:-}" \
+    sh -c "$NODE_GUARD"

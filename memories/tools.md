@@ -137,14 +137,20 @@ these.
     a slot, launches the session (default `claude-alloc`), then restores the
     throttle on clean exit --- but NOT on a hard kill / walltime death, so undo
     manually with `scontrol update jobid=<id> ArrayTaskThrottle=<orig>`.
-  - **zsh must live on the shared filesystem, not just the login node.**
-    `tui-alloc` runs `zsh -i` inside the srun step; zsh is at `/usr/bin/zsh` on
-    the login node but is NOT provisioned on every compute node (confirmed
-    missing on c2), so a slice landing there died with exit 127
-    (`env: 'zsh': No such file or directory`). Fixed by installing a
+  - **zsh must live on the shared filesystem; there is no system zsh to fall
+    back on.**
+    `tui-alloc` runs `zsh -i` inside the srun step, and zsh is not provisioned
+    on the compute nodes (confirmed missing on c2), so a slice landing there
+    died with exit 127
+    (`env: 'zsh': No such file or directory`).
+    Fixed by installing a
     shared-`/home` zsh all nodes see via PATH (`conda install -n base -c
     conda-forge zsh` -> `~/miniconda3/bin/zsh`); `tui-alloc` also guards by
     dropping to `bash -i` if zsh isn't resolvable on the node.
+    There is no `/usr/bin/zsh` on the login node either, as of 2026-07-31 ---
+    `which zsh` resolves to the conda build from every node, so the shared
+    install is the only zsh on the cluster rather than merely the portable
+    one.
   - Full usage/exit doc: `~/.config/tui-alloc/README.md`.
 
 ## Fact-check code comments' factual claims — a false one can survive many review rounds

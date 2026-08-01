@@ -106,7 +106,11 @@ the bullets in this fragment record it failing at this exact boundary.
       rather than collateral from an edit's blast radius --- a reviewer reads
       every deletion as deliberate and will rationalize an accidental one.
 - [ ] **`main` was merged in** if it moved, with version parity re-checked
-      afterward, so the round costs one review run rather than two.
+      afterward, so the round costs one review run rather than two --- and any
+      whole-file count a merge can worsen (spliced changelog bullets) compared
+      before against after, since a defect caused by a *deleted* line is
+      invisible to every added-lines check
+      ([`sync-with-main`](sync-with-main.md)).
 - [ ] **Killer item: the push landed.** `git rev-parse HEAD origin/<branch>`
       agree before any reply asserting a fix.
       This one is marked because its failure is not an omission but a **false
@@ -343,6 +347,111 @@ the prior commit `4bf5063`.
 `pull_request_read` `get` returned `9a3e722` moments later, so the two
 surfaces disagreed and the git-native one was right.)
 
+**A brand-new branch can read back at the wrong commit, so the local two-ref
+comparison above is not sufficient there.**
+That bullet offers `git rev-parse HEAD origin/<branch>` as the pair that
+settles the question, on the grounds that local refs cannot lag.
+They cannot.
+What they can do is agree with a remote ref that reads back at the wrong
+commit, and then the pair reports the push as landed.
+
+The failure direction inverts, which is what makes this worth separating.
+A read-side lag is a false alarm, correctly called the safe one there.
+This is a false all-clear, arriving on the one instrument that rule offers
+for deciding the question.
+
+**The gap is in the trigger rather than in the remedy.**
+The original SHA comparison does catch this whenever it is run.
+Nobody runs it after a `git push -u` that printed `* [new branch]`, set the
+upstream, and exited 0, because that is the least suspicious moment in the
+round.
+
+`git ls-remote origin <branch>` reads the remote directly rather than through
+a tracking ref, so it is the instrument that catches it.
+The corrective push is an explicit refspec:
+`git push origin HEAD:refs/heads/<branch>`.
+
+**The likeliest explanation is a local one, and it reproduces offline.**
+`git push -u origin <branch>` pushes the **branch ref**, not `HEAD`.
+So a local branch left behind at `main`'s tip, while `HEAD` carries the new
+commit, produces this whole signature with nothing on the server going wrong.
+Reproduced in a local bare repo, where no replica and no race exists: the
+push printed `* [new branch]` and exited 0, `git ls-remote` and the tracking
+ref both read `main`'s tip, `main..<branch>` held zero commits, and
+`git push origin HEAD:refs/heads/<branch>` then reported a real range.
+That last command is a test as much as a fix, since it answers
+`Everything up-to-date` when the branch ref and `HEAD` already agree.
+
+Two things weigh against the read-side story, which an earlier draft of this
+entry weighted equally against the write-side one.
+A lagging replica cannot invent a value for a ref that never existed before,
+so its failure mode is the ref reading **absent** rather than reading one
+specific wrong commit.
+And a tracking ref is set from what the push sent, which makes its value a
+client-side fact rather than a later network read.
+
+What stays genuinely unsettled is narrower than either reading claimed: the
+branch ref's own value at push time was never recorded, so the local
+explanation is the best supported one rather than a proven one.
+Note the shape of that, since it is the failure this entry is about.
+The entry has now over-claimed twice, first asserting a write-side fault, then
+asserting a parity between two hypotheses that the record does not support
+either.
+The practical advice survives all three readings, because the checks below
+are cheap whichever is right.
+
+Two things about diagnosing one of these.
+The downstream error misdirects, because opening the PR fails with
+`No commits between main and <branch>`, which names a base-versus-head
+relationship and sends you to check the wrong argument.
+And `* [new branch]` here is the ordinary output for a branch that did not
+exist before, **not** the deleted-underneath-you signal `CLAUDE.md`'s
+"Use the existing PR branch" section describes.
+There the line is diagnostic precisely because the branch had already been
+pushed to; here it is expected, so the two cases must not be conflated.
+
+The wrong value is the informative part, and it reads at first like noise.
+A race or a server fault has no reason to land on `main`'s tip in particular,
+whereas a branch ref cut from `main` and never advanced sits there by
+construction.
+So read a wrong value that happens to equal `main`'s tip as pointing at the
+local ref rather than at the network.
+
+- **Do:** run `git ls-remote origin <branch>` after the first push to a new
+  branch, and compare its SHA against `git rev-parse HEAD`.
+- **Do:** run `git rev-parse HEAD <branch>` first when those two disagree,
+  since a branch ref left behind accounts for the whole signature (and note
+  that `--short` rejects a second revision, so pass neither).
+- **Do:** re-run plain `git ls-remote` as well, so a ref that self-corrects
+  stays distinguishable from one a re-push repaired.
+- **Do:** re-push with `git push origin HEAD:refs/heads/<branch>` when the
+  mismatch persists, and read the SHA range it prints as the confirmation.
+- **Don't:** treat a `git push` that exited 0 and printed `* [new branch]` as
+  evidence the commit reached the remote.
+- **Don't:** assume `git push -u origin <branch>` sent the commit you just
+  made -- it sends the branch ref, which `HEAD` may have moved past.
+- **Don't:** credit a corrective re-push with having repaired a remote-side
+  fault when neither of those two controls was run.
+- **Don't:** answer a `No commits between main and <branch>` error by
+  re-checking the base branch argument before checking where the head ref
+  actually points.
+
+(Morrison-Lab/ai-config#985, 2026-07-31:
+`git push -u origin ums/prose-count-adjacent-to-block`, carrying commit
+`1611ccc`, printed `* [new branch]`, set the upstream, and exited 0.
+`git ls-remote` showed that ref at `98102a2`, which was `main`'s tip.
+The local `origin/ums/prose-count-adjacent-to-block` agreed with the wrong
+value, so the two-ref comparison reported the push as landed.
+`create_pull_request` then returned a 422 reading
+`No commits between main and ums/prose-count-adjacent-to-block`.
+`git push origin HEAD:refs/heads/ums/prose-count-adjacent-to-block` reported
+`98102a2..1611ccc`.
+Neither `git rev-parse ums/prose-count-adjacent-to-block` nor a second plain
+`git ls-remote` was run, so the branch ref's own value at push time is the
+fact the record is missing.
+Describing that push as "carrying commit `1611ccc`" was an inference from the
+commit just made, not a reading of the ref that was pushed.)
+
 **The same false claim arrives as *incoming* state when you pick a PR up
 mid-flight, and there the SHA comparison usually has nothing to compare.**
 The bullet above governs a claim you are about to make.
@@ -389,6 +498,50 @@ submodule the fixes were about.
 This is the ownerless cousin of the parallel-session case in
 [`claim-pr`](claim-pr.md), which assumes a real commit exists to cross-check;
 here there was none.)
+
+**Run that same command before *any* readiness claim, not only against an
+inherited one --- a PR whose branch carries no implementation is green on
+every check.**
+The bullet above uses `gh pr diff <N> --name-only` **differentially**: it has
+a claim naming files, and it asks whether those files are in the list.
+That test needs a claim as input, so when nobody claimed anything it never
+runs, and the readiness path is exactly the case where nobody has.
+The **existential** question --- does the list have anything in it at all ---
+is the one no rule was asking.
+
+[`pr-on-claim`](pr-on-claim.md) manufactures the hazard by design, and is
+right to: it opens the PR from `git commit --allow-empty` so the branch has a
+diff before any code exists.
+Merge `main` in later and the branch carries two commits, a real history, and
+no implementation.
+Every instrument then works perfectly and certifies nothing, because a check
+that finds no fault in an empty diff and a reviewer that raises no finding
+against one are both answering a narrower question than the one being asked.
+
+Note which nearby checks *pass* on such a branch, since their passing is what
+makes the state feel verified.
+`git rev-parse HEAD origin/<branch>` agree, so the pre-push checklist's killer
+item is satisfied.
+The branch is not behind `main`.
+`get_commits` returns two, so a sweep keyed on zero commits does not flag it.
+[`fully-clean`](fully-clean.md)'s two criteria are each satisfied **maximally**
+by an empty diff, since neither has a term about content.
+
+- **Do:** run `gh pr diff <N> --name-only` before reporting a PR ready, and
+  read the returned paths against what the PR says it does.
+- **Do:** treat an empty return, or a return holding only a `main` merge's
+  incidental paths, as the PR carrying no implementation.
+- **Don't:** count the claim commit or a `main` merge as work --- neither is
+  implementation, and both give the branch a plausible history.
+- **Don't:** read all-green CI plus a finding-free review as evidence a PR
+  contains anything; on an empty diff that is the expected result.
+
+(2026-07-30/31, a `ucdavis/bcs` session: a PR was reported `CLEAN` with every
+check passing, on a branch holding the empty claim commit plus a `main` merge
+and nothing else.
+Nothing had gone wrong with any instrument.
+The implementation had never been pushed, and no check, no reviewer, and no
+rule in this file was asking whether there was one.)
 
 **When the change affects downstream consumers, validate it against a real
 consumer repo before reporting the PR ready --- a package's own test
@@ -457,9 +610,55 @@ version `DESCRIPTION` pins --- was unavailable, inferred from one failed
 `install.packages()` disproved it, and the regeneration landed in the same
 round the finding did.)
 
+**Name the specific gate when you report a blocker, not a category word that
+happens to be one of several.**
+The rule above governs *whether* something is blocked, and its remedy is to
+attempt the thing once.
+This governs *why*, and it fires after that remedy has already succeeded: the
+call was attempted, it genuinely failed, and the blocker is real.
+Only the attribution is wrong, which is why nothing about it feels like an
+unverified claim -- the part that usually goes unchecked has, this time, been
+checked.
+
+The hazard is a platform with two gates whose refusals read alike.
+`resolve_review_thread` on a transferred repo fails under either spelling of
+the owner, saying `Access denied` both times, for unrelated reasons: the old
+owner trips a comparison between the thread's node and the declared
+`owner`/`repo` string, and the new owner trips the session's own repository
+allowlist.
+Only the second of those is scope.
+So "blocked for scope reasons" is not a loose summary of the first.
+It names a mechanism that was not involved, and it names one that genuinely
+exists on that platform, which is what lets it survive re-reading.
+
+That last point is the whole cost.
+A category word that is also the proper name of one mechanism cannot double as
+the generic term for its family, because a reader cannot tell which you meant,
+and the wrong reading is actionable: someone told a call failed on scope will
+reach for the other owner, which fails too.
+Quote the error's distinguishing clause instead of classifying it.
+The quote is usually shorter than the paraphrase, it is checkable, and it
+stays correct even when your model of the platform is not.
+
+- **Do:** quote the clause that distinguishes the failure, and name the gate
+  it belongs to.
+- **Do:** re-read a blocker you have restated several times, since a
+  paraphrase repeated across status reports hardens into the record.
+- **Don't:** use one mechanism's own name as a generic word for its category.
+- **Don't:** treat having verified *that* something is blocked as having
+  verified *why*.
+
+(2026-08-01, `Morrison-Lab/ai-config` worked from a `d-morrison`-scoped
+session: an unresolvable review thread was reported as blocked "for scope
+reasons" across roughly six status updates, while the failure actually
+observed under that spelling was the node-versus-declared-string comparison.
+`memories/github-mcp-tools.md` records both gates and their verbatim errors.)
+
 **A blocker that was true when you published it can stop being true while
 the PR is open, and withdrawing it is your job, not the reviewer's.**
-The bullet above covers a blocker that was never true.
+The verify-a-blocker bullet above covers a blocker that was never true, and
+the gate-naming bullet between it and this one covers a real blocker whose
+mechanism was misnamed.
 This is the harder case, because the caveat was correct and diligent when
 written, so nothing about it reads as a defect later --- and a sentence
 saying "this could not be checked" is one nobody re-checks, least of all
@@ -482,6 +681,62 @@ The review had already absorbed the caveat --- it listed those anchors as
 "unverified per the PR body's own caveat ... not a new finding" --- so
 leaving it would have shipped a limitation that no longer existed, blessed
 by a reviewer who could not have known.)
+
+**Landing a fix falsifies whatever prose documented the defect, and that prose
+is never in your diff --- so grep for it rather than expecting to be reminded.**
+The bullet above covers a caveat **you** published on **this** PR, which the
+environment then moved out from under.
+This is the case where you moved it yourself, and where the stale text lives in
+the standing corpus rather than on the PR: a memory bullet describing the
+hazard, a README warning about it, a docstring asserting the behaviour you just
+changed.
+
+The sync rules in
+[`address-every-comment`](address-every-comment.md) all end at the PR's own
+artifacts --- the changelog, the PR body, a skill's inline restatement --- and
+each prescribes grepping the diff.
+Documentation of a defect cannot be found that way, because not being in the
+diff is the entire property that makes it survive.
+So the trigger has to be the fix itself, and the search has to leave the files
+you edited.
+
+Two shapes, and the second is worse because it was never true.
+
+- **Prose staled by the fix.**
+  It was accurate when written, so nothing about it reads as a defect, and a
+  workaround it prescribes becomes active misdirection the moment the thing it
+  worked around is gone.
+  Keep the entry where the old behaviour explains something --- most of a
+  corpus is written against it --- but mark plainly that it is history and name
+  the change that ended it.
+- **Prose asserting conformance to a reference.**
+  A docstring saying the code "follows" some reference implementation is a
+  claim about two artifacts, and your own divergence falsifies it.
+  This one is not staleness at all: it was false before you arrived, and it is
+  load-bearing, because a reader checking the code against the reference stops
+  at the sentence saying someone already did.
+
+- **Do:** grep the repository for the defect, the workaround, and the behaviour
+  you changed, before calling a fix complete.
+- **Do:** mark a superseded entry as history and name the change that ended it,
+  rather than deleting it, when the old behaviour still explains other text.
+- **Don't:** treat a clean grep over the diff as coverage --- the stale prose is
+  outside it by construction.
+- **Don't:** leave a doc asserting conformance to a reference standing when the
+  code diverges; correct the claim in the same change that establishes the
+  divergence.
+
+(`ucdavis/bcs#534`, 2026-07-30/31: standardizing a G-computation CIF over the
+observed age distribution falsified two documents at once.
+`compute_gcomp_cif_ab507bs()`'s roxygen had read "this function follows the SAS
+pipeline's plug-in-at-the-mean approach", which the SAS program does not do ---
+false before the fix, and quoted by the fix's own changelog entry as such.
+A row in `inst/docs/program_steps.qmd` described the retired behaviour and was
+refreshed in a separate commit.
+Concurrently, ai-config#951 diff-scoped `scripts/semantic-line-breaks.py`, which
+falsified `memories/tools.md`'s entry prescribing "format new prose by hand" as
+the workaround; that entry was kept and marked `**Fixed in ai-config#951.**`,
+which is the first shape handled correctly.)
 
 **An instruction's own suggested code is not exempt from the
 project-conventions self-review above.**
@@ -708,8 +963,8 @@ where it would have argued against porting the fix that actually worked.)
 **Verify a command, path, or flag *you* write into a doc, with the same rigor
 [`address-every-comment`](address-every-comment.md) demands for one a reviewer
 suggests.**
-That rule and the blocker rule above both point outward, at a claim someone
-else made or at a limit you hit.
+That rule and the verify-a-blocker rule above both point outward, at a claim
+someone else made or at a limit you hit.
 This is the one you author from scratch, and it is easier to miss than either,
 because inventing a plausible command does not feel like making a claim at
 all --- it feels like remembering one.

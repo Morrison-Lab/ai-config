@@ -155,6 +155,56 @@ having checked what it covered.
 this family; the general form is that an instrument's answer is only as wide
 as its input.
 
+## Search for the artifact instead of arguing about whether it would exist
+
+The section above concerns an instrument you ran whose scope you did not check.
+This concerns the case where you ran nothing, because the question presented
+itself as a matter of **mechanism** rather than of fact.
+
+The shape is a claim about whether some component *can* do something: does this
+token carry enough scope, does that path get reached, would this handler fire.
+Reasoning about it feels like the appropriate response, because a mechanism
+question invites a mechanism answer, and a good argument about mechanism is
+genuinely satisfying to produce.
+
+Underneath it there is almost always an **observable** the argument is trying to
+predict, and the observable is one query away.
+"Does the workflow token need write to post a review?" is an argument.
+"Has a review ever been posted here?" is a search.
+The second is cheaper, decides the first outright, and cannot be argued with.
+
+Two things make this failure durable.
+A mechanism argument is **falsifiable only by another argument**, so it invites
+review rather than measurement --- and a reviewer handed a plausible mechanism
+tends to check the reasoning rather than look for the artifact, which is how a
+wrong premise collects agreement.
+And the argument's conclusion is usually about the future ("this will work"),
+where the observable is about the past ("this has never worked"), so nothing
+about the framing points at the record that would settle it.
+
+So when you catch yourself explaining why something *would* behave a certain
+way, stop and ask what would already exist if it did.
+Then look for that.
+
+- **Do:** convert a mechanism question into a search for its artifact --- a
+  comment, a file, a row, a log line --- before reasoning about it.
+- **Do:** treat "nobody has ever observed X" as stronger than any argument that
+  X should occur.
+- **Don't:** accept reviewer agreement as evidence for a mechanism claim; a
+  reviewer checks the argument you gave, not the record you did not consult.
+- **Don't:** let the future tense of the claim hide that the answer is already
+  in the past.
+
+(2026-08-01, `UCD-SERG/ucd-serg.github.io#89`: a review workflow's
+`pull-requests` permission was narrowed to `read`, justified by the argument
+that "the action posts with its own app token, so the workflow token does not
+need write".
+The argument was wrong, and two Copilot reviews restated it without objection.
+One query --- whether a `claude`-authored comment existed on any earlier PR ---
+returned zero across the workflow's entire month of operation, which settled
+both the mechanism and the fact that reviews had never once posted.
+Nobody ran it until a fourth PR was opened to fix the consequence.)
+
 ## Writing is the instrument, when the claim can be wrong
 
 The article establishes that self-assessment is unreliable and that confidence

@@ -233,6 +233,119 @@ classifier denied minutes earlier.
 A later run of the fixed script reported 910 of 947, which is how the
 rate-limit truncation above was found.)
 
+#### A zero-shaped summary can be sound, and the scope line is what decides it
+
+The rule above has a false-positive direction, and it lands on exactly the
+tools that already comply with it.
+
+A well-behaved instrument prints its scope --- which is the remedy this
+section asks for --- but it prints it on a **different line** from its
+summary, and the summary can be phrased so that it reads as the vacuous-scan
+signature:
+
+```
+Linting: 439 files
+Summary: 0 issues in 0 files
+```
+
+That is `markdownlint-cli2`.
+`0 files` counts **files with issues**, not files scanned.
+So the line that looks like "this examined nothing" is the line reporting
+that nothing was wrong, and the evidence against that reading is sitting two
+lines up.
+
+The failure this produces is not a swallowed error but a needless
+retraction: you report your own check as having verified nothing, withdraw a
+true claim, and spend a round re-running an instrument that was fine.
+That is the same cost the fragment warns about elsewhere --- a check nobody
+trusts stops being run --- arriving from over-application rather than from
+under-application.
+
+So read for the scope line before concluding a zero is vacuous, and quote it
+alongside the result rather than quoting the summary alone.
+Where a tool prints no scope at all, the original rule stands unchanged: that
+zero is not yet evidence.
+
+- **Do:** look for a scanned/examined count on its own line before calling a
+  zero-hit result vacuous.
+- **Do:** report the scope and the finding together --- "439 files linted, 0
+  issues" cannot be misread in either direction.
+- **Don't:** read a summary's "0 files" as the number examined without
+  checking what that tool counts.
+- **Don't:** retract a check as vacuous on the strength of one line of its
+  output.
+
+(Morrison-Lab/ai-config#974, 2026-07-31: a `markdownlint-cli2` result already
+published in a PR body as `0 issues in 0 files` was about to be re-reported as
+a check that examined nothing.
+Re-running it printed `Linting: 439 files` above the same summary.)
+
+### A background watcher reports failure as silence by default
+
+The cases above are all checks you read the output of.
+A watcher is one you deliberately stop reading, which is its whole purpose ---
+so its output channel is a *notification*, and the absence of one is
+indistinguishable from the thing still running.
+
+That inverts the usual economics of this bug.
+A silent `|| echo "none"` at least sits in front of you.
+A watcher's silence is what you asked for: quiet means nothing to report,
+which is exactly what a healthy long-running job looks like.
+So the failure is not merely unnoticed, it is *reassuring*.
+
+The shape is a poll loop that emits only on the happy path:
+
+```sh
+for i in $(seq 1 25); do
+  pending=$(...)
+  if [ "$pending" = 0 ]; then echo "settled: ..."; break; fi
+  sleep 60
+done                       # <- falls out silently when it never settles
+```
+
+Every iteration finds work still pending, the loop exhausts its range, and the
+script exits 0 having printed nothing.
+Nothing failed, so nothing is reported, and the watcher's silence gets read as
+"not finished yet" indefinitely.
+
+Two fixes, and take both.
+Give the loop a **terminal else**, so exhausting the range says so out loud and
+names what it was waiting for.
+And emit on **every** state you would act on, not just the one you hope for ---
+a failed check, a blocking verdict, a job that vanished.
+
+Note the second is the same instruction the Monitor tool's own documentation
+gives ("if this process crashed right now, would my filter emit anything?"),
+which is worth saying because reading that guidance is evidently not sufficient
+to follow it.
+
+- **Do:** end a bounded poll loop with an explicit timeout message naming the
+  condition that never arrived.
+- **Do:** widen the filter to every terminal state, then confirm by asking what
+  the watcher would have printed had the job died at the start.
+- **Don't:** read a watcher's quiet as evidence the work is still in flight.
+- **Don't:** treat "I read the tool's guidance about coverage" as having applied
+  it.
+
+A second route to the same silence, with a different cause, is recorded in
+[`memories/claude-code.md`](../../memories/claude-code.md): a pipe stage that
+consumes the content a later stage was meant to read (`grep -q`, `-l`, or `-c`
+upstream of something that greps stdout) starves the loop of anything to emit.
+That one is about what reaches the filter and this one is about what the filter
+is written to match, so the fixes differ --- but the symptom is identical, and
+in both cases the discrepancy surfaced only by running the underlying query by
+hand.
+
+(2026-08-01, a `UCD-SERG/ucd-serg.github.io` session: two successive monitors
+watching a PR's checks exited silently after 25 minutes, both written to print
+only when zero checks were pending.
+The first hid a red `validate`; the second hid nothing but was equally
+uninformative.
+Both were caught by querying the PR directly rather than by anything the
+watchers did, and the second was armed *after* writing a status note about the
+first --- so knowing the failure mode did not prevent repeating it within the
+hour.)
+
 ### The pattern itself is the other half, and it fails without erroring
 
 Everything above is about a check that *cannot report* its own failure.
@@ -296,6 +409,61 @@ published in an issue and a merged PR body as *the* verification command
 for a security invariant, so the phantom it produced was reported as a
 regression before the pattern was re-read.)
 
+## In a guard you ship: partial is worse than absent
+
+Everything above concerns a check whose failure is invisible **at runtime**,
+because its failure path prints what its pass path prints.
+A guard applied to only some of the paths that need it fails one level earlier,
+and in the opposite medium: it is perfectly loud wherever it runs, and it
+simply does not run on the paths that were left out.
+What goes wrong is what a **reader** infers from the source.
+
+An absent guard is discoverable.
+Someone reading the file sees an unguarded write and asks about it.
+A guard present once answers that question before it is asked --- the reader
+finds the guard, recognizes the hazard as handled, and stops looking for the
+two places it is not.
+So the partial version does not merely leave the bug in place; it spends the
+one signal that would have surfaced it, which is the same trade
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md) prices for a
+vacuous assertion: "worse than no test, because it reads as coverage".
+
+The shape is a hazard handled at one site out of several, where the sites are
+siblings rather than a sequence: three emitters, four entry points, both
+directions of a conversion.
+It is the author-side, no-reviewer sibling of
+[`address-every-comment`](../workflow/address-every-comment.md)'s rule that a
+reviewer-flagged pattern must be fixed everywhere it recurs.
+That rule needs a finding to convert into N fixes; here nobody flagged
+anything, so nothing fires, and the cost is a shipped bug rather than an extra
+review round.
+
+Enumerate the sites before writing the guard, and make the enumeration
+mechanical where it can be --- grep for the operation being guarded, not for
+the guard, since grepping for the guard finds the site you already fixed.
+Where the sites genuinely differ, say in a comment why an unguarded one is
+safe, so the next reader inherits a decision instead of an apparent oversight.
+
+- **Do:** list every site that performs the guarded operation, then check the
+  guard against that list rather than against the site that prompted it.
+- **Do:** grep for the operation, not for the guard.
+- **Don't:** ship a guard on one of several sibling paths without a comment
+  saying why the others need none.
+- **Don't:** read a guard's presence in a file as evidence the file is guarded
+  --- that inference is precisely what a partial guard supplies for free.
+
+(ai-config#950/#951, 2026-07-30/31: `scripts/semantic-line-breaks.py` has three
+emitters --- its own docstring lists "prose paragraphs, bullet continuation
+text, and blockquote prose" --- and a draft of the scope fix guarded only the
+blockquote one, leaving the two that do the bulk of the reflowing unscoped.
+The script therefore still rewrote whole files while its source visibly
+contained the fix; the unguarded behaviour changed 342 of `CLAUDE.md`'s 1163
+lines.
+Caught before it was committed, so the landed fix at `39b98c7b` already calls
+`_in_scope` at all three sites --- which is why git history shows no trace of
+the partial state, and why the enumeration has to happen while the guard is
+being written rather than afterwards.)
+
 ## In review
 
 Flag error handling that hides failure — swallowed exceptions, silent
@@ -306,6 +474,12 @@ Flag a handler that identifies a condition by matching its message text,
 too, and ask for a class.
 Ask for the explicit form: an early validation, a loud error, or a
 documented, observable fallback.
+
+Flag a guard applied to one of several sibling paths as well, and ask either
+for the remaining ones or for a comment saying why they are safe.
+This is the finding most likely to be missed by reading, since the diff shows
+the guard being added rather than the sites it skipped --- so check it against
+a grep for the guarded operation, not against the diff.
 
 This serves the Reliable goal in the
 [principles catalog](README.md): a loud failure is easier to catch than

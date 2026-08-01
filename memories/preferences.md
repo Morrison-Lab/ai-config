@@ -119,6 +119,7 @@
   Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch and resolve conflicts — don't wait for a branch to show DIRTY or for the next review trigger.
   In R packages the recurring conflicts are DESCRIPTION `Version:` (bump above main) and NEWS.md (union-merge, keeping both sides' bullets and one subsection per heading); the `@claude` bot auto-syncs non-conflicting branches but does NOT resolve these real DESCRIPTION/NEWS conflicts.
   Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable; parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners. (Learned on ucdavis/bcs.)
+  **The DESCRIPTION half of this cascade is obsolete once a repo adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check` capabilities (gha#390, tracking gha#388)** --- PRs stop touching `Version:` at all, so there's no version-bump conflict left to cascade down the stack. The NEWS.md union-merge half is unaffected until a separate `news.d`-fragment capability ships (deferred, see gha#388). Check whether the repo you're stacking PRs in has migrated before applying the DESCRIPTION-bump advice above.
 - **Before grabbing any issue (GI/GII), check that no other session is already on it.** Two signals must BOTH be clear: (1) the issue's most recent comment does NOT contain "Working on this" or equivalent claim; (2) there is NO open PR referencing the issue — by branch name or title, or via a cross-reference event on the issue (which covers most `#N` / `Closes #N` body mentions).
   If either signal fires, skip that issue — don't open a competing PR or claim it. (Twice grabbed issues already in-flight: sparta#325 had PR #327 open; sparta#292 had PR #329 open.
   Both required closing a duplicate.)
@@ -132,8 +133,19 @@
 - When implementing a user instruction that edits a tracked file in the repo (e.g. CLAUDE.md, README, a config file), the task is not done at "made the local edit."
   Go all the way: file an issue, commit on a branch, and open a PR — without waiting to be asked.
   Stopping at a local edit leaves the change uncommitted and invisible to reviewers.
-- `dem-extra1/ai-config` is a FORK of the upstream `d-morrison/ai-config`.
-  When working in that fork, open PRs against the upstream original (`d-morrison/ai-config`, base `main`) as a cross-fork PR with head `dem-extra1:<branch>` — NOT against the fork's own `main`. (If a remote/web session is scoped only to `dem-extra1/ai-config` with no `add_repo` tool, the cross-fork PR can't be created from that session; push the branch and surface that the upstream PR must be opened where `d-morrison/ai-config` is in scope.)
+- `dem-extra1/ai-config` is a FORK of the canonical ai-config repo, which now lives at `Morrison-Lab/ai-config` (see the transfer note below; it was `d-morrison/ai-config` before the move, and that path still redirects).
+  When working in that fork, open PRs against the canonical repo (base `main`) as a cross-fork PR with head `dem-extra1:<branch>`, NOT against the fork's own `main`. (If a remote/web session is scoped only to `dem-extra1/ai-config` with no `add_repo` tool, the cross-fork PR can't be created from that session; push the branch and surface that the upstream PR must be opened from a session where the canonical repo is in scope.)
+  **The repo has MOVED: it was transferred from `d-morrison/ai-config` to `Morrison-Lab/ai-config`, which is now its canonical home.** This is a transfer, not a fork; there is no upstream/downstream pair, just one repo whose old path still resolves.
+  GitHub keeps the pre-transfer path working, so `d-morrison/ai-config` remotes, clones, and API calls all silently redirect to `Morrison-Lab`; a push to a `d-morrison` remote lands on `Morrison-Lab`, and `create_pull_request` with `owner: "d-morrison"` opens a PR that comes back with a `Morrison-Lab` URL and number.
+  **In a scoped remote session, pass the PRE-MOVE owner to every GitHub MCP call.** A session whose scope lists `d-morrison/ai-config` gets "Access denied" for `owner: "Morrison-Lab"`, since scope is matched against the literal owner string and the redirect does not extend it.
+  The same call with `owner: "d-morrison"` redirects server-side and **works**, for reads as well as writes: `create_pull_request`, `update_pull_request`, and `issue_write` all land on `Morrison-Lab`, and so do `pull_request_read`, `get_job_logs`, and `actions_run_trigger`.
+  So the repo is fully reachable for most calls; only the spelling of the owner matters for them.
+  Two exceptions, for unrelated reasons. `add_repo` refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `d-morrison`/`ucd-serg`/`ucdavis` repos; that is a session-composition limit, not a scope or redirect one, and it does not block anything above.
+  `mcp__github__resolve_review_thread` is unreachable under **either** owner spelling for this repo (see `memories/github-mcp-tools.md`), which is a genuine gap rather than a spelling issue.
+  **Do not conclude a repo is unreachable from one denied call.** Trying `owner: "Morrison-Lab"`, getting "Access denied", and stopping there produced a published claim that a PR's state "cannot be polled on demand", repeated in a memory entry and a PR body, and used to justify polling the branch over git instead.
+  It was false the whole time; the writes going through the pre-move owner were sitting right there as the counter-example.
+  When one owner spelling is denied, try the other before recording a limitation. (2026-07-31.)
+  Because it is one repo rather than two, do **not** reason about a "fork lagging behind upstream": `git show origin/main:<path>` through a `d-morrison` remote is reading `Morrison-Lab`'s own `main`, so content that landed upstream is visible immediately. (2026-07-31: an earlier draft of this entry called it a fork and was corrected by the owner, who performed the move.)
 - Always include `Closes #N` in MR/PR descriptions to auto-close the linked issue on merge.
 - On GitLab, assign MRs to `demorrison`.
 - Before committing code changes, run the repo checks that CI enforces
@@ -269,6 +281,145 @@
   The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
   This applies to EVERY repo, not just ai-config — bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs — that silently changes the branch out from under any other session or task pointed at that path. Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task — both risk clobbering a concurrent agent.)
+- **A delegated subagent runs in the parent session's working tree, so the
+  branch-switching rule directly above governs your own agents, not only other
+  sessions.**
+  The remedy is already written down: [`gip`](../skills/gip/SKILL.md) says to
+  give every subagent `isolation: "worktree"`, and
+  [`ultracode-merge-conflicts`](../shared/workflow/ultracode-merge-conflicts.md)
+  assumes the same parameter.
+  Both frame the hazard as agents colliding with **each other** across a
+  fan-out, though, so the rule reads as inapplicable when you launch exactly
+  one agent and it has no siblings to collide with.
+  It is not.
+  The parent is a colliding party too, and a lone agent is fully exposed to the
+  parent's own `git checkout` or cherry-pick in the shared checkout.
+  An agent you launched also reads as part of your session rather than as a
+  separate consumer of that checkout, which is why switching branches
+  underneath it does not feel like switching branches out from under anybody.
+  Nothing errors when you do.
+  Every read the agent resolves through `HEAD` --- the working tree, the index,
+  and `git show HEAD:<file>` alike --- silently becomes an answer about your
+  branch instead of its own.
+  The symptom is the expensive part: `git show HEAD:<file>` returns the
+  pre-edit text, which is indistinguishable from the agent's own commit having
+  been reverted, so it may redo finished work or report the work as lost, and
+  both readings are wrong.
+  Note what that command is **not**, because the obvious remedy does not fix
+  it: `git show HEAD:<file>` already reads a committed blob and never touches
+  the working tree, so switching from the tree to a commit changes nothing.
+  What moved is the **ref**.
+  `HEAD` follows the parent's `git checkout` or cherry-pick; a branch name does
+  not.
+  So name the branch --- `git show <its-branch>:<file>` and
+  `git ls-remote origin <its-branch>` are unaffected by whatever `HEAD` now
+  points at.
+  - **Do:** pass `isolation: "worktree"` for a single delegated agent that will
+    commit or change branches, not only for a fan-out of several.
+  - **Do:** answer a suspected revert from the branch ref and the remote.
+  - **Don't:** change branches in a checkout one of your own subagents is
+    using, on the grounds that it is your session.
+  - **Don't:** read a working tree that disagrees with a commit you just made
+    as evidence the commit did not happen.
+  (2026-07-31, ai-config: a subagent committing in `/home/user/ai-config` had
+  the parent cherry-pick onto a new branch in the same checkout mid-run.
+  The agent then read `git show HEAD:<file>` as its edits reverted, while its
+  commit `8cc7ae3` in fact carried both files it had touched and its branch ref
+  and `origin` both pointed at it.
+  No `isolation` argument had been passed, which is the whole cause.)
+- **That remedy has a precondition nobody states: `isolation: "worktree"`
+  needs the *session's own cwd* to be inside a git repository, so it errors in
+  a session whose cwd merely holds repos as subdirectories.**
+  The Agent tool refuses with `Cannot create agent worktree: not in a git
+  repository and no WorktreeCreate hooks are configured.`
+  Both clauses of that message are separate preconditions, and a harness can
+  fail the first while providing nothing to satisfy the second.
+  The rule is not wrong, it is stated without its precondition, in both places
+  a reader meets it: the bullet directly above, and
+  [`gip`](../skills/gip/SKILL.md)'s "give **every** subagent
+  `isolation: "worktree"`".
+  Read as written, each prescribes a parameter that errors here, which invites
+  the reader to conclude isolation is unavailable and share the checkout after
+  all -- the exact outcome the bullet above exists to prevent.
+  The explicit fallback gives identical isolation for two commands, so reach
+  for it rather than standing down:
+  `git -C <repo> fetch origin <default-branch>`, then
+  `git -C <repo> worktree add --detach <path> origin/<default-branch>`.
+  Resolve `<default-branch>` from the repo rather than assuming `main`, the way
+  [`gip`](../skills/gip/SKILL.md)'s step 0 and [`ums`](../skills/ums/SKILL.md)
+  both already do: hard-coding it dies with
+  `fatal: invalid reference: origin/main` wherever the default is `master` or
+  `develop`, which is precisely where a fallback is worth having.
+  Each part of that pair is load-bearing, and the naive spelling
+  `worktree add <path> <default-branch>` is wrong in more than one way at once.
+  Use `git -C` rather than `cd`, because Bash's cwd persists across separate
+  calls in a session, so a `cd` here silently carries into later ones.
+  Name `origin/<default-branch>` rather than the bare branch, because a branch
+  is meant to live in one worktree: `add <path> <default-branch>` refuses
+  whenever that branch is checked out anywhere, which is this corpus's own
+  session-start state, and which after the first subagent is every later one in
+  a fan-out.
+  Worse, that guard is not atomic, so a genuinely concurrent fan-out can slip
+  several worktrees onto that one branch at once and lose the isolation with no
+  error at all -- the loud refusal is the good outcome here.
+  That same substitution fixes the stale-base trap in one stroke, since
+  `fetch origin <default-branch>` advances the remote-tracking ref while
+  leaving the local branch where it was.
+  And prefer `--detach` over a plain `-b <slug>`, because creating a branch
+  *that tracks* a remote ref writes upstream config under a `.git/config` lock
+  that concurrent subagents lose races on; the agent cuts its own branch inside
+  the worktree afterward, which is what its brief already tells it to do.
+  - **Do:** create the worktree explicitly with
+    `git -C <repo> worktree add --detach <path> origin/<default-branch>` when
+    `isolation: "worktree"` errors, and brief the agent with that path.
+  - **Do:** base it on `origin/<default-branch>`, which sidesteps the
+    already-checked-out refusal and the stale local base at the same time.
+  - **Don't:** name the bare branch -- sequentially that refuses from the
+    second agent onward, and concurrently it can silently share one branch
+    across several worktrees instead.
+  - **Don't:** hard-code `main` in either command, which dies outright on a
+    repo whose default branch is named anything else.
+  - **Don't:** read the isolation error as "isolation is unavailable here" and
+    let the agent share the parent's checkout.
+  - **Don't:** infer that the session's cwd is a repository from the fact that
+    the work is in one -- a cwd holding several repos satisfies neither clause.
+  (2026-08-01, this session: `git rev-parse --show-toplevel` in the default cwd
+  `/home/user` returns `fatal: not a git repository`, with `ai-config`, `gha`,
+  `qbt`, `qwt`, `rpt`, and `workflows` one level below it, and no
+  `settings.json` exists at `~/.claude/` or `/root/.claude/` -- so both named
+  preconditions are independently false here.
+  The error text is quoted from the parent session's own attempt; this agent
+  has no Agent tool and did not re-run it.
+  The stale-`main` half was hit directly: `git worktree add /tmp/wt-ums main`
+  checked out `a30a2e1` while `origin/main` was five commits ahead at
+  `d0994c2`.
+  The command shape was then measured on git 2.43.0, five worktrees per run
+  against a throwaway repo whose local `main` sat five commits behind
+  `origin/main`.
+  `add <path> main` scored 0/5 with `main` checked out and 1/5 with it free,
+  the rest refusing with
+  `fatal: 'main' is already used by worktree at ...`.
+  Run **concurrently**, as a fan-out actually launches, that guard races: three
+  or four worktrees landed on `main` at once in every one of six rounds, a state
+  the sequential path refuses outright.
+  Nothing errors, and the isolation is gone -- one worktree committed, the next
+  immediately read `main` at that new commit and stacked on top of it, which is
+  the collision the parameter exists to prevent.
+  `add -b <slug> <path> origin/main`, the form review suggested, scored 5/5
+  sequentially but failed in four of five concurrent rounds with
+  `error: could not lock config file .git/config: File exists` beside
+  `unable to write upstream branch configuration`.
+  `--detach` and `-b <slug> --no-track` each scored 5/5 in all five concurrent
+  rounds, and the full flow -- detach, `checkout -b`, commit, five at once --
+  scored 5/5 in three more, every worktree based on `origin/main` rather than
+  the stale local ref.
+  Those runs all used a repo whose default branch is literally `main`, which is
+  why they are written that way here and why they did not surface the
+  hard-coding: measured separately against one whose default is `develop`,
+  `fetch origin main` returns `fatal: couldn't find remote ref main` and
+  `worktree add --detach <path> origin/main` returns
+  `fatal: invalid reference: origin/main`, while both succeed against
+  `origin/develop`.)
 - Bash's cwd PERSISTS across separate calls within a session (it does not silently reset between calls) — so a `cd` in one call carries forward into the next unless a later call `cd`s elsewhere. This one mechanism causes two mirror-image mistakes depending on the session's layout:
   - **Session runs INSIDE a worktree:** do NOT prefix git commands with `cd <main-checkout>`. Because cwd persists, that `cd` doesn't just affect the current call — any *later* call that omits its own `cd` stays in the main checkout too, silently working against a different branch (often another session's) instead of your worktree. Run git in the worktree with no `cd` at all; if you must touch another checkout, use `git -C <path>` instead of `cd`-ing into it. `gh` commands keyed by PR or issue number are cwd-agnostic, so only `git` breaks. Run `git branch --show-current` before committing or pushing to confirm. Learned on PR #62: a `cd`-prefixed push hit `main` and made my own worktree commits look missing.
   - **Session juggles several full (non-worktree) repo checkouts side by side:** a call with no `cd` silently runs against whichever repo an earlier call last `cd`'d into, not the repo you mean this time. Never omit an explicit `cd <repo>` in any Bash call when more than one repo checkout is in play, and re-verify with `pwd` or `git remote -v` after any call whose target repo matters. This bites hardest in back-to-back "same shape, different repo" calls (e.g. an identical empty claim-commit pushed to two sibling PRs one after another) — the second call looks correct in isolation but silently repeats the first call's repo. Caught it by checking `mergeable_state` output afterward; recovery was a `git reset --hard` to the last-good local commit plus `git push --force-with-lease` to undo the wrong-repo push before redoing it with an explicit `cd`. (Learned on ai-config#454/gha#215: an empty commit meant for `gha` landed on `ai-config`'s branch instead.)
@@ -669,3 +820,9 @@ safer/preferred choice merely because the repo has external consumers.
 - Never leave durable memories or skills as local-only files (e.g., directly under `~/.codex/`).
 - Commit cross-project memories/skills to `d-morrison/ai-config`; commit project-specific guidance to that project's own repo.
 - If ai-config is temporarily out of scope in the current session, treat local storage as short-lived staging and hand off the required upstream PR.
+- **Never hesitate to run UMS, just run it.** Don't ask whether a pass is worth it, don't offer it as an option, and don't weigh a small increment against the cost of a PR.
+  The owner has said this directly: "never hesitate to run ums, just do it."
+  The `ums` skill already lists the triggers; this rule removes the judgment call about whether a given trigger is big enough to bother with.
+- **Never present losing a lesson as an available option.** Offering "capture these first, or archive now and they're lost with the context" frames data loss as a legitimate branch and invites the user to pick it.
+  It is not a choice to put in front of them; capture first, then report.
+  The same applies to any wrap-up point where context is about to end: `/clear`, archiving a session, handing off, or a container being reclaimed. (2026-07-31: offered exactly that framing at the end of a session; the owner's reply was "never risk letting work or lessons get lost.")

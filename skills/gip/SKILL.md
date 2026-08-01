@@ -37,7 +37,8 @@ issues are interdependent / stacked (use [`gii`](../gii/SKILL.md), which stacks)
 `gii` runs one issue at a time on purpose, for three reasons:
 
 1. **Base-branch stacking** — a later issue's branch may depend on a prior MR
-   that hasn't merged yet, so it must branch from that MR's tip, not `main`.
+   that hasn't merged yet, so it must branch from that MR's tip, not
+   `<default-branch>`.
 2. **Same-file conflicts** — two issues that edit the same files produce
    guaranteed merge conflicts if worked in parallel.
 3. **Shared working tree** — a single checkout can't hold two in-progress
@@ -68,8 +69,9 @@ Partition the in-scope issues into an **independent set** (safe to parallelize)
 and a **dependent remainder** (must stay serial). An issue belongs in the
 independent set only if **all** hold:
 
-- **No stacking dependency** — it can branch straight from `origin/main`; it
-  doesn't need another in-flight issue's unmerged branch as its base.
+- **No stacking dependency** -- it can branch straight from
+  `origin/<default-branch>`; it doesn't need another in-flight issue's unmerged
+  branch as its base.
 - **No file overlap** — its likely touched files don't intersect any other
   in-batch issue's likely files. When in doubt, read the issues and sketch each
   one's probable file footprint; if two plausibly collide, treat them as
@@ -104,6 +106,29 @@ its own working directory over the shared `.git`, so concurrent edits, branches,
 and commits never collide on one checkout. (This is the subagent form of the
 same isolation [`session-lock`](../session-lock/SKILL.md) sets up for
 independent top-level sessions.)
+
+**That parameter errors when the session's own cwd is not inside a git
+repository** -- `Cannot create agent worktree: not in a git repository and no
+WorktreeCreate hooks are configured` -- which is the normal layout in a harness
+whose cwd merely *holds* repos as subdirectories.
+Don't read that as isolation being unavailable and fall back to a shared
+checkout; create each worktree explicitly instead
+(`git -C <repo> fetch origin <default-branch>`, then
+`git -C <repo> worktree add --detach <path> origin/<default-branch>`) and hand
+the subagent its path.
+`<default-branch>` is the one step 0 above already had you note, not the
+literal string `main`: hard-coding it fails with
+`fatal: invalid reference: origin/main` on any repo whose default is named
+otherwise.
+Base every one of them on `origin/<default-branch>`, never on the bare branch
+name: `add <path> <default-branch>` succeeds for the first agent in a wave and
+refuses for every one after it, and when the wave is genuinely concurrent its
+guard can race and put several agents on that branch at once, silently costing
+the isolation this step exists to buy.
+Leave the branch to the subagent, which cuts its own inside the worktree.
+See [`memories/preferences.md`](../../memories/preferences.md) for the full
+precondition, the measured concurrency numbers, and the stale local base this
+form also avoids.
 
 A subagent starts **fresh** — it sees only the prompt you hand it, not this
 skill file — so **inline the entire per-issue procedure**. Don't point it at

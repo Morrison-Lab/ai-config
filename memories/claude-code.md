@@ -228,6 +228,102 @@ the split pays) while ai-config#700 attacked the description budget by
 removing duplication rather than by splitting anything (always-loaded, so
 splitting would not have paid).
 
+**That "splitting saves nothing" claim is Claude Code's documented behaviour,
+not an inference, and the docs name a lever this section omits.**
+Verified against <https://code.claude.com/docs/en/memory> on 2026-07-31.
+Imported files "are expanded and loaded into context at launch alongside the
+CLAUDE.md that references them"; "Splitting into `@path` imports helps
+organization but doesn't reduce context, since imported files load at launch";
+imports recurse to "a maximum depth of four hops"; and "CLAUDE.md files are
+loaded in full regardless of length, though shorter files produce better
+adherence".
+Two details worth adding to the pools above.
+Import parsing skips Markdown code spans and fenced code blocks, so a
+backticked `@README` stays literal text rather than becoming an import.
+And the docs' own recommended lever for a large instruction set is
+**path-scoped rules**, which load only when Claude works with matching files
+--- effectively a fourth pool, and one this corpus does not currently use.
+
+**Re-measure before arguing from a number: the always-loaded closure has
+roughly tripled since the 2026-07-24 figure above.**
+The instrument is a recursive walk summing `os.path.getsize` over
+whole-line `@path` matches, seeded at `CLAUDE.md`:
+
+```python
+import os, re
+IMPORT = re.compile(r"^@([\w./-]+)$", re.M)
+def closure(root, start="CLAUDE.md"):
+    seen, stack = {}, [os.path.join(root, start)]
+    while stack:
+        p = os.path.normpath(stack.pop())
+        if p in seen or not os.path.isfile(p):
+            continue
+        seen[p] = os.path.getsize(p)
+        text = open(p, encoding="utf-8", errors="replace").read()
+        stack += [os.path.join(root, m) for m in IMPORT.findall(text)]
+    return len(seen), sum(seen.values())
+```
+
+Measured 2026-07-31: ai-config's closure is **66 files, 661,750 bytes** ---
+roughly 165k tokens at a 4-bytes-per-token rule of thumb --- with all 65
+imports at depth 1, so the corpus uses one of the four available hops.
+`Morrison-Lab/gha`'s closure is 1 file, 104,462 bytes, which is the
+comparison worth holding onto: a repo with no imports at all pays about a
+sixth as much.
+
+**A CI review bot pays that closure too, so it is not only an interactive-
+session cost.**
+`claude-code-action` defaults `settingSources` to
+`["user", "project", "local"]` in `base-action/src/parse-sdk-options.ts`, and
+`"project"` is what loads the repo's own `CLAUDE.md`.
+The default is overridden only by passing `--setting-sources` in
+`claude_args`, which `Morrison-Lab/gha` does at none of `main`, `v1`, or `v2`
+(`git grep -c setting-sources <ref> -- '*.yml' '*.yaml'` returns no hits at
+any of the three).
+So every `@claude` run in a gha-consuming repo loads that repo's whole
+always-loaded set before it reads a line of the diff.
+
+**That closure has now overflowed the context limit for at least one workflow
+in this repo, so the cost is a measured failure rather than a projected one.**
+`Morrison-Lab/ai-config#986` carries a comment posted at 2026-07-31T20:47:04Z
+whose body is the API's context-length error verbatim, `Prompt is too long`,
+emitted by `claude.yml@v1`'s post-step from workflow run 30664135897.
+The agent had loaded the always-loaded set and done no work of its own: its
+`Run Claude Code` step ran 36 seconds, and the job concluded `success` with no
+step failing.
+So the figure above is not merely large; it exceeds what at least one consumer
+of it can accept.
+
+The second-order effect is the part to plan around.
+An agent that cannot run in this repo cannot be asked to help shrink it, so
+the corpus's size now blocks the tool that would reduce the corpus's size.
+That argues for treating the levers above as urgent rather than tidy, and for
+preferring the ones a human or a plain script can apply without an agent.
+
+**The reviewer half of the same afternoon is inference, and is labelled that
+way deliberately.**
+`claude-review` failed at two heads with `is_error: true` alongside
+`subtype: "success"`, and has **not** been shown to hit the same limit.
+The shapes do fit: the agent died before its first call, while the reviewer
+ran 43 seconds and spent $0.97 across 2 turns, which is what a prompt sitting
+just under the line and then pushed over by tool results would look like.
+A fitting shape is not evidence, so treat the reviewer failure as an open
+question rather than as a second instance, until something reads its own error
+string.
+
+- **Do:** re-run the closure walk before making a context-budget argument ---
+  the figure moves fast, and a stale one argues for the wrong lever.
+- **Do:** reach for pruning, consolidating, demoting to on-demand, or
+  path-scoped rules, which are the levers that change the number.
+- **Do:** treat the closure as a ceiling already reached rather than a budget
+  still being spent, since one workflow here has now failed on it outright.
+- **Don't:** propose splitting a large `CLAUDE.md` into `@path` imports as a
+  context saving; it buys organization and nothing else.
+- **Don't:** assume the always-loaded cost is paid only by interactive
+  sessions.
+- **Don't:** report the `claude-review` failures as the same overflow --- that
+  is a shape match, and no error string has been read for them.
+
 ## Custom subagents (`.claude/agents/*.md`) — Bash is a write-access loophole
 
 The `tools:` frontmatter field (comma-separated, e.g. `tools: Bash, Read,
@@ -295,9 +391,8 @@ best-effort. (Sparta gii-ffdb93 session, 2026-07-14.)
 ## `CronCreate`'s job store can silently lose a scheduled job mid-session, so it is a weak fallback for a check-in you have promised a time for
 
 The `send_later`-can-become-unavailable-mid-session bullet in
-[`memories/github.md`](github.md), under its "GitHub MCP tools (Claude Code
-remote/web sessions)" heading, recommends `CronCreate` as the fallback when
-`send_later` disappears.
+[`memories/github-mcp-tools.md`](github-mcp-tools.md) recommends
+`CronCreate` as the fallback when `send_later` disappears.
 It works, but its jobs are in-memory and session-only by design, and they can
 vanish **before their fire time** with no error and no notification.
 

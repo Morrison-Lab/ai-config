@@ -826,17 +826,49 @@ documents for the human case.)
 **gha#342's stripper does not close the human case, because a mention can be
 quoted with no markup around it at all.**
 That fix strips blockquote lines, fenced code blocks, indented code blocks,
-and inline code spans before matching, so it catches a mention someone wrapped
-in backticks or quoted as a block.
+and inline code spans before matching, so *upstream* it catches a mention
+someone wrapped in backticks or quoted as a block.
 It cannot catch one sitting in ordinary prose, and a rule cited by its own
 title is exactly that, since quotation marks are not markup.
 
-This corpus makes that the common case rather than a rare one, because four of
-its headings carry the mention bare:
+**Two things stop that from being the whole story here, and the first is the
+pin.**
+The stripper ships in `@v2`, and this repo's `claude-bot.yml` still calls
+`claude.yml@v1`.
+Check it by content rather than by tag date, since `v1` is frozen on a
+diverged line and is not an ancestor of the fix:
+
+```bash
+git show v1:.github/workflows/claude.yml | grep -c detect-bot-mention   # 0
+git show v2:.github/workflows/claude.yml | grep -c detect-bot-mention   # 1
+```
+
+So a backticked mention in a comment on *this* repo fires exactly like a bare
+one, and none of the markup reasoning above applies until the pin moves.
+Note that #998 moved `claude-review.yml` to `@v2` and left `claude-bot.yml`
+alone, so the two callers disagree and reading either one settles nothing
+about the other.
+
+The second reason holds even after the pin moves.
+`claude.yml@v2`'s own job-level `if:` still tests the raw body with
+`contains()`, because a GitHub expression cannot strip Markdown, so the job
+starts and the runner spins up regardless.
+What the stripper buys is the billed agent run and the review re-dispatch, not
+silence.
+So a code span is the wrong thing to trust under either pin, which is what the
+Do bullet below is about.
+
+This corpus makes the bare case the common one rather than a rare one, because
+four of its headings carry the mention with no markup at all:
 
 ```bash
 grep -rn '^#\{1,6\} .*@claude' --include=*.md . | grep -v '`@claude'
 ```
+
+Read that `grep -v` as isolating the bare subset, not as clearing what it
+drops.
+It filters out three further headings whose mention is backticked, and at
+`@v1` those are no safer than the four it keeps.
 
 One of the four is `CLAUDE.md`'s "Do the review yourself when the @claude
 workflow doesn't produce a verdict", which is self-defeating in a specific
@@ -849,8 +881,11 @@ Neither backticks nor gha#342 will do it for you.
 
 - **Do:** reword a quoted rule title that carries the mention, rather than
   trusting a code span to neutralize it.
-- **Don't:** read gha#342 as closing the quoting hole in general --- it closes
-  the markup-quoted half only.
+- **Do:** read the caller's own pin before reasoning about the stripper at
+  all, since `@v1` does not carry it.
+- **Don't:** read gha#342 as closing the quoting hole in general --- upstream
+  it closes the markup-quoted half only, and at `@v1` it is not in play at
+  all.
 
 (`Morrison-Lab/ai-config#986`, 2026-07-31: a self-review comment named that
 rule in a parenthetical, mention bare, and workflow run 30664135897 was

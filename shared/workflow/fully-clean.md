@@ -665,6 +665,47 @@ So the service was fine and the `d-morrison` credential was not, which no
 number of re-runs would have shown.
 Tracked in d-morrison/altdoc#99.)
 
+**A check-run reading `failure` is a fact about one *attempt*, not about the
+whole `run_id` -- a later attempt of that same run can still resolve on its
+own, with nobody having triggered it.**
+The section above is right that repeated *identical* failures at the same
+short duration point to a durable cause, and that retrying blindly is
+wasted motion once that pattern is established.
+It does not say the reverse: that a run which has failed once, or even
+twice, is done.
+GitHub records each `rerun_failed_jobs`/`rerun_workflow_run` as a new
+**attempt** of the same `run_id`, and `actions_get`'s `get_workflow_run`
+exposes that directly via `run_attempt`, `run_started_at`, and
+`previous_attempt_url`.
+A check-run's `failure` conclusion describes the attempt it belongs to; it
+says nothing about whether attempt 3 of the same `run_id` might still post a
+genuine verdict, from anyone -- a scheduled retry, a maintainer's manual
+re-run, or a mechanism this session never identified.
+
+So don't infer "this run_id is exhausted" from a failed attempt, however
+many rounds have already failed.
+Read `run_attempt` before writing that off, and treat a later successful
+attempt as the real, final verdict -- not as an anomaly to explain away.
+
+- **Do:** check `run_attempt`/`run_started_at`/`previous_attempt_url` on the
+  actual `run_id` before declaring a review permanently stuck, even after
+  more than one failed attempt.
+- **Do:** accept a later attempt's genuine verdict as authoritative, without
+  needing to know who or what triggered it.
+- **Don't:** assume a `run_id` is done because its most recent check-run you
+  read was `failure` -- fetch the run fresh rather than trusting a cached
+  conclusion.
+- **Don't:** claim a specific cause (a scheduled retry, an org-level rerun)
+  for an attempt you did not trigger yourself, without evidence naming it.
+
+(Morrison-Lab/gha#390, 2026-07-31: run `30646364412` failed twice -- attempt
+1 a stub, attempt 2 `is_error: true` -- and was treated as reproducibly
+stuck, with self-review relied on instead of a further retry.
+Attempt 3, `run_started_at: 2026-07-31T23:34:41Z`, `previous_attempt_url`
+pointing at attempt 2, resolved with `conclusion: success` and posted a
+genuine, itemized "Needs more work" verdict -- without this session
+triggering it.)
+
 **That duration signature does not run backwards, and reading it in reverse
 is how several unrelated bugs get filed as one.**
 The paragraph above offers a short run as **corroboration**, once a credential

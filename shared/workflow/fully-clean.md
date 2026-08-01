@@ -697,14 +697,24 @@ attempt as the real, final verdict -- not as an anomaly to explain away.
   conclusion.
 - **Don't:** claim a specific cause (a scheduled retry, an org-level rerun)
   for an attempt you did not trigger yourself, without evidence naming it.
+- **Don't:** trust a contemporaneous explanation for why a prior attempt
+  failed -- your own included -- without checking it against that attempt's
+  actual job logs.
 
-(Morrison-Lab/gha#390, 2026-07-31: run `30646364412` failed twice -- attempt
-1 a stub, attempt 2 `is_error: true` -- and was treated as reproducibly
-stuck, with self-review relied on instead of a further retry.
+(Morrison-Lab/gha#390, 2026-07-31: run `30646364412` failed twice --
+attempts 1 and 2 both stubs (no verdict, low denial count, on both the
+initial call and its own built-in gha#185 in-job retry), confirmed against
+attempt 2's own job logs rather than recalled -- and was treated as
+reproducibly stuck, with self-review relied on instead of a further retry.
 Attempt 3, `run_started_at: 2026-07-31T23:34:41Z`, `previous_attempt_url`
 pointing at attempt 2, resolved with `conclusion: success` and posted a
 genuine, itemized "Needs more work" verdict -- without this session
-triggering it.)
+triggering it, and with nothing on the PR explaining who or what did.
+A same-thread comment offered a different, already-documented explanation
+for the earlier failures (a downstream guard misreporting failure after a
+real verdict had posted) -- checked against attempt 2's actual job logs and
+found not to match: both prior attempts genuinely produced no verdict at
+all, so that explanation was itself an unverified guess, not a checked one.)
 
 **That duration signature does not run backwards, and reading it in reverse
 is how several unrelated bugs get filed as one.**

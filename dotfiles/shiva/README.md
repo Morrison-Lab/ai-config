@@ -18,6 +18,8 @@ of truth for what they *are*.
 | `config/tui-alloc/.zshrc` | `~/.config/tui-alloc/.zshrc` | the session rc `tui-alloc` points `ZDOTDIR` at; sources `~/.zshrc`, activates the env, launches the agent |
 | `config/tui-alloc/README.md` | `~/.config/tui-alloc/README.md` | the user-facing usage and exit doc |
 | `zshrc-fragment.zsh` | sourced from `~/.zshrc` | puts `~/bin` on PATH, installs the `ALLOC_CONDA_ENV` chpwd hook |
+| `lib/slurm-guard.sh` | not installed | `refuse_if_nested`, shared by `tui-alloc` and `cnode`; sourced through the install symlink |
+| `lib/test-slurm-guard.sh` | not installed | tests for `refuse_if_nested`; stubs `sinfo`/`uname` to cover all four node/job states |
 
 ## Install
 
@@ -60,6 +62,31 @@ A session launched by `claude-alloc` or `cnode` runs on a compute node, so
 `uname -n` reports `c2`, `c3`, or `c4` rather than the login node, while
 `scontrol show config` reads the same from either.
 Set `AI_CONFIG_DOTFILES_FORCE=1` to install on a machine that fails the gate.
+
+## Both launchers refuse to nest
+
+`refuse_if_nested` exits rather than grabbing a second allocation from inside
+an existing one, because a nested `srun`/`salloc` contends with its parent
+allocation's own step instead of getting new resources.
+
+It distinguishes two states that are easy to conflate, because on shiva they
+come apart.
+Holding an allocation is not the same as being on a compute node: with
+`LaunchParameters = (null)`, a bare `salloc` sets `$SLURM_JOB_ID` and leaves
+the shell on the login node, and only `srun --pty` moves you.
+Both states refuse, and the **advice differs**.
+On a compute node it tells you to run the command directly, which is the goal.
+On the login node it must not, since that would execute the command there ---
+the one outcome these launchers exist to prevent --- so it points at
+`srun --jobid=<id> --pty <cmd>` instead.
+`sinfo`'s node list decides which state you are in, and also catches a compute
+node reached without a job id, such as by `ssh`.
+
+`lib/test-slurm-guard.sh` covers all four combinations with a stubbed `sinfo`
+and `uname`.
+The salloc case is the regression it exists for: run against the previous
+guard, it reports `already inside SLURM job 4242 on shiva` --- the login
+hostname, beside a claim it contradicts --- and advises the bare command.
 
 ## Slices hold resources until you release them
 

@@ -195,6 +195,40 @@ Dropped before implementation, with the reasoning recorded in both the issue
 and the PR body, and the neighbouring fragments cross-linked to the skill
 instead.)
 
+**A routine merge from `main` can create the duplicate inside your own diff.**
+The collision above lands before you write, so the duplicate is redundant on
+arrival.
+A later `main` merge is quieter: both branches were non-duplicative when they
+were written, and the duplicate appears only when you bring the other branch's
+text into yours.
+Git reports a clean merge because the two copies sit in different files.
+Diff-scoped added-line checks do not help either, because the duplicated lines
+already existed on one side or the other.
+So after merging `main` into a prose branch, run the duplicate check against
+the branch's full current diff and the neighbouring corpus, not only against
+lines added by the merge commit.
+
+- **Do:** after a `main` merge, re-run a cross-file duplication check over the
+  merged branch's whole prose diff.
+- **Do:** treat a reviewer finding on such duplication as correct even when
+  each copy was independently right before the merge.
+- **Don't:** assume a conflict-free `main` merge preserved DRY, or that the
+  duplicate would have appeared in an added-lines-only scan.
+- **Don't:** answer by asking which branch "introduced" the duplication;
+  the merge introduced the state that made both copies coexist.
+
+(Morrison-Lab/ai-config#969, 2026-08-01: #969 added
+`shared/workflow/batch-merge-and-resolve.md` with a blockquote generalizing
+that an added-lines-only instrument is unsound when a defect can be introduced
+by deleting a line.
+PR #966 independently added the same generalization to
+`shared/workflow/sync-with-main.md` and merged after #969's branch was written.
+`git show 50afe818:shared/workflow/sync-with-main.md`, normalized for
+whitespace and markup, did not contain the phrase, so the duplication did not
+exist at #969's pre-merge head.
+The round-2 merge from `main` brought #966's copy in, and the round-3 review
+correctly flagged the two uncited copies.)
+
 **Two PRs that each append a new terminal numbered subsection to the same
 file (e.g. `### 5. ...` in a `CLAUDE.md` review-guidelines list) will
 conflict on merge even when neither side's content actually disagrees.**
@@ -285,6 +319,51 @@ it into `CLAUDE.md`; `#501` added a second copy of the same fragment plus the
 missing `CLAUDE.md` wiring. Resolved by keeping `main`'s published fragment
 and `#501`'s wiring, turning a `dirty` merge into a clean `+8/-0` diff.)
 
+**The same parallel resolution can be a whole-file split, and then files can
+vanish from your diff with no deletion hunk to read.**
+The add/add and duplicate-issue cases above both say to keep `main` when a
+sibling PR already published the same new file.
+The split case adds a second check, because resolving the one conflict can also
+make other files disappear from your PR's diff entirely.
+Those files look harmlessly gone, and there is no deleted line for
+[`ardi`](ardi.md)'s pre-push deletion sweep to inspect.
+Two causes are indistinguishable from the final diff alone:
+`main` absorbed your cross-reference edit, or the merge dropped your work.
+So verify each vanished file against the pre-merge head before calling the
+collapse correct.
+For each file that left the diff, compare the original head against the
+merge-base to recover what your branch intended, then confirm current `main`
+now carries that same change.
+Only after that per-file check is it safe to treat the smaller diff as a
+successful conflict resolution rather than as lost work.
+
+- **Do:** save or read the original pre-merge head, list the files that left
+  the PR diff after the merge, and verify each one's intended change is already
+  on `main`.
+- **Do:** keep `main`'s version for the overlapping split file when the sibling
+  PR has already published the same refactor, then carry forward only this
+  PR's distinct remainder.
+- **Don't:** infer that a vanished file was safely absorbed merely because the
+  final diff got smaller.
+- **Don't:** rely on the deleted-lines sweep for this case; content that left
+  the diff has no deletion hunk for that sweep to show.
+
+(Morrison-Lab/ai-config#966, merging `origin/main` after #973 landed as
+`ea11bc9a`, hit `CONFLICT (add/add)` on `memories/github-mcp-tools.md`.
+Both branches had split that file out of `memories/github.md`; the two split
+versions were byte-identical apart from #966's own 49-line addition, so keeping
+`origin/main:memories/github-mcp-tools.md` was correct.
+The final PR diff collapsed from 13 files, 1093 insertions, and 661 deletions
+to 8 files, 429 insertions, and 6 deletions.
+Five files disappeared entirely:
+`memories/claude-bot-workflows.md`, `memories/claude-code.md`,
+`shared/workflow/efficient-pr-babysitting.md`,
+`shared/workflow/fully-clean.md`, and
+`skills/purge-hallucinations/SKILL.md`.
+Each had contained only a cross-reference repointing from `memories/github.md`
+to `memories/github-mcp-tools.md`, and
+`git show origin/main:<file> | grep -c github-mcp-tools` returned `1` for each.)
+
 **A merge into a growing numbered list (e.g. `gha`'s `CLAUDE.md` "Code
 review guidelines" section) can produce zero blank lines between two
 adjacent headings
@@ -345,6 +424,75 @@ wired into CI before enabling one, not after.
 `## Bug fixes` bullet against another's; the check above then found **four**
 pre-existing instances in the same `NEWS.md`, in a repo that had no Markdown
 linting at all.)
+
+**Run that check as a whole-file count, and compare it before and after ---
+scoping it to the lines you added cannot see this defect at all.**
+The check above is the right instrument; the natural way to apply it is the
+wrong one.
+Having found the file's spliced bullets, the obvious next question is which of
+them are yours, and the obvious way to answer is to intersect them with the
+lines the branch added.
+That question is unanswerable, because the defect is a **deleted blank line**
+before a bullet that was already there.
+The bullet is *context* in the diff, never an addition, so the intersection is
+empty by construction and the check reports a confident zero.
+
+Note how this differs from the scope failures elsewhere in this corpus, where
+a check's **inputs** were too narrow --- a glob, a missing flag, a two-dot
+range.
+Here the inputs were right and the **question** was wrong, which no widening
+fixes.
+And it fails in the direction that reads as an all-clear, on the one file a
+reviewer will not re-derive.
+
+The sound form is a count delta over the whole file, which needs no judgment
+about ownership and no diff at all:
+
+```bash
+git show origin/main:NEWS.md   | awk '...' | wc -l   # before
+awk '...' NEWS.md              | wc -l               # after
+```
+
+A merge must not increase the count.
+That is an [`algorithmatize-checks`](algorithmatize-checks.md) instrument in
+the strict sense --- two integers decide it --- and it holds whoever authored
+the surrounding lines.
+
+Generalize past changelogs, because the property is about the defect rather
+than the file: **when a defect can be introduced by deleting a line, any
+instrument keyed on added lines is unsound.**
+Ask instead whether a whole-file measurement got worse.
+The version-parity rule above is the same shape --- a conflict-free merge
+leaves the branch at parity with `main`, `version-check` goes red, and there is
+nothing in the diff to point at --- which is why that rule is a direct
+comparison of two `DESCRIPTION` versions rather than a diff inspection.
+
+The shared trigger is the practical part: **a conflict-free merge is exactly
+when nothing prompts anyone to look.** Both defects arrive through one, both
+are invisible to diff-scoped checking, and the merge reports success.
+
+- **Do:** measure the whole file before and after a merge, and treat any
+  increase as the merge's fault regardless of who wrote the lines.
+- **Do:** ask, of every diff-scoped check, whether the defect it targets could
+  be caused by a deletion --- and replace it with a count if so.
+- **Don't:** intersect a whole-file finding with the branch's added lines to
+  decide ownership; for a deletion-caused defect that always returns zero.
+- **Don't:** read a conflict-free merge as a merge that changed nothing beyond
+  what the diff shows.
+
+(`ucdavis/bcs#534`, 2026-07-31: merging `main` spliced its `NEWS.md` bullet
+directly beneath the branch's own with no blank line between.
+markdownlint stayed green, since `blanks-around-lists` governs a list's
+boundaries rather than the gaps between its items.
+A pre-push check asking which flagged bullets were among the branch's added
+lines returned 0 --- `git diff -U0 origin/main...1b74899d -- NEWS.md |
+grep -c '^+\* Say that the'` --- and that zero was reported to the user as
+"none of these are mine", which was false.
+The count delta settles it: 14 spliced bullets on `origin/main`, 15 at
+`1b74899d` after the merge, 14 again at `9f5dab34` after the fix.
+Evidence filed on ucdavis/bcs#437; the `merge=union` driver proposed in
+ucdavis/bcs#438 would raise this defect's rate, so it is explicitly blocked on
+the detector landing first.)
 
 **A commit claiming "I've pulled main and resolved the merge conflicts" can be
 lying --- verify it actually merged before trusting the claim.** A genuine

@@ -42,3 +42,46 @@ the same procedure copied into several unrelated places), say so and route it
 to `find-overlap` (or `consolidate-skills`/`consolidate-memory` for
 skills/memories), rather than trying to fix everything found along the way in
 the current review.
+
+## Use the overlap instrument, not literal grep
+
+A redundancy finding is exactly where phrase grep is most tempting, and where
+it is least trustworthy.
+This corpus uses semantic line breaks and inline markup, so a copied claim can
+span a newline or differ only by backticks while still being the same prose.
+Use the existing overlap instrument for the broad sweep:
+`scripts/find-near-duplicates.py` ranks corpus pairs by normalized word
+shingles and reports the number of units and pairs it examined.
+Its default target set and top-pair threshold are tuned for near-duplicate
+files, not for proving that a short copied run between long `shared/` files is
+absent.
+So treat it as the reusable starting point and corpus-wide reading list, not as
+a clean-result certificate for a narrow review finding.
+When the question is a narrower single-file audit, use the same algorithmic
+shape with a run-reporting matcher:
+normalize whitespace and markup on both sides, lower-case, compare word
+n-grams, and report the examined scope and every overlapping run.
+
+- **Do:** run `scripts/find-near-duplicates.py` for the broad candidate list,
+  or run an equivalent normalized n-gram matcher that reports overlapping runs
+  for the files under review.
+- **Do:** report the examined files, pairs, or runs alongside any overlap found,
+  then read the overlapping bodies before deciding whether consolidation loses
+  nothing.
+- **Don't:** use literal grep as evidence that no matching prose exists in a
+  semantic-line-break corpus.
+- **Don't:** treat `scripts/find-near-duplicates.py`'s default no-finding result
+  as proof a short copied passage is absent from long shared files.
+- **Don't:** treat a high shingle score as the disposition; it is a pointer to
+  read, not a duplicate verdict.
+
+(Morrison-Lab/ai-config#969, 2026-08-01: after review flagged one uncited
+copy between `batch-merge-and-resolve.md` and `sync-with-main.md`, a
+10-gram shingle sweep normalized backticks, asterisks, underscores, whitespace,
+and case across `shared/workflow/`, `shared/writing/`, and
+`shared/principles/`.
+It found four overlapping runs: the flagged generalization, a second uncited
+copy about `markdownlint`'s `blanks-around-lists` explanation that review had
+missed, and two already-cited overlaps.
+A literal grep for the `blanks-around-lists` wording in `sync-with-main.md`
+returned nothing because the phrase crossed a semantic line break.)

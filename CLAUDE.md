@@ -1176,6 +1176,25 @@ and reject.
 
 @shared/workflow/metacognitive-monitoring.md
 
+## Question the assignment, not only the claims
+
+The rule above governs **claims** --- the ones you generate as much as the ones
+you are handed.
+This one governs what you are asked to **do** --- a brief, an issue body, a
+plan, a convention document, or the option set in a posed question.
+None of those assert anything, so no claim-checking rule fires on them, and
+adopting one feels like compliance rather than like skipping a step.
+A wrong claim spoils a sentence; a wrong assignment spoils the whole task,
+while every step inside it stays correct and checks green.
+
+Two written lines bound the check: before starting, name the premise the work
+rests on and what would show it false; in the report, name one thing in the
+assignment you actually checked.
+For a posed choice, state what its options presuppose before answering within
+them.
+
+@shared/workflow/challenge-the-assignment.md
+
 ## Check for merge conflicts on every merge in an ultracode session
 
 @shared/workflow/ultracode-merge-conflicts.md

@@ -175,9 +175,13 @@ finding → push → post summary → re-request review → repeat until clean.
    git log --oneline ..origin/main | head   # any commits? merge them in
    git merge origin/main
    ```
-   Resolve conflicts, run the repo's pre-commit checks, then push. Don't
-   rebase/squash a published branch — a merge commit matches GitHub's "Update
-   branch" button. (The `sync-pr-branch` skill does exactly this.)
+   Resolve conflicts, run the repo's pre-commit checks, then re-scan the
+   PR's touched files for merge-status hedges that `main` may have falsified
+   (`still open`, `not yet merged`, `once that merges`, `as of`, `will live at`,
+   `proposed in`) before pushing.
+   Don't rebase/squash a published branch -- a
+   merge commit matches GitHub's "Update branch" button. (The
+   `sync-pr-branch` skill does exactly this.)
 
    **Resolve inline threads as you go — including outdated ones.** After
    pushing fixes for a round, resolve the corresponding inline review threads

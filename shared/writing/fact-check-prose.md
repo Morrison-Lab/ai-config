@@ -172,7 +172,8 @@ An itemized breakdown and its total are an internal-consistency test: when the
 rows sum to one value and the total prints another, the total is wrong even if
 nobody can reconstruct the original sample.
 Then bound the downstream effect rather than leaving the correction open-ended:
-if derived percentages or labels stay unchanged under either total, say so.
+check whether derived percentages or labels still hold, and say when they do
+not.
 This composes with
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s enumeration
 rule and
@@ -197,7 +198,8 @@ A recount over local `~/.claude/projects/**/*.jsonl` transcripts before
 records spread over the six rows, so the original sample had rotated or lived
 on another machine.
 The fix therefore used the internally checkable total, 121, and stated that the
-60-row share still rounds to 49% under both 60/121 and 60/122.)
+60-row share changes under whole-percent rounding: 60/122 is 49%, while 60/121
+is 50%.)
 
 
 ## Check that a stated trigger actually fired

@@ -15,15 +15,18 @@ covers before deciding whether one subsumes the other.
 
 **The inverse failure: consolidation can gain a trigger even while removing
 duplication.**
-The litmus test above asks whether consolidating two copies would lose a case.
+The litmus test above asks whether consolidating copies would lose a case.
 The mirror image is whether it would add one.
-Two guards can agree on the common states and still be different predicates, so
-an extracted helper is not automatically either original's behavior.
-A state where exactly one original fired is the state where a shared helper can
-silently widen or narrow the system.
+A shared helper can be called from places whose old predicates differed, or from
+a place that had no guard at all, so the helper is not automatically any one
+call site's old behavior.
+A state where exactly one call site used to fire, or where a newly guarded call
+site did not fire before, is where a shared helper can silently widen or narrow
+the system.
 
-Before extracting, enumerate the states each copy fired in and decide whether
-the union is intended.
+Before extracting, enumerate the states each old predicate fired in, including
+"no guard" for newly covered call sites, and decide whether the union is
+intended.
 If the predicates differ, DRY may still be right, but the helper's name and
 call sites need to state the chosen predicate rather than smuggling it in as a
 cleanup.
@@ -34,20 +37,21 @@ That is the same move
 [`address-every-comment`](address-every-comment.md) requires for hedged
 findings whose evidence is outside the reviewer-visible diff.
 
-- **Do:** write the original predicates down before extracting a shared helper,
-  including the states where only one fired.
+- **Do:** write each call site's old predicate down before extracting a shared
+  helper, including newly guarded sites whose old predicate was "no guard".
 - **Do:** make the shared predicate an explicit design choice, then test the
-  uncommon state that distinguishes the originals.
+  uncommon state that distinguishes the call sites.
 - **Don't:** infer that two checks are redundant because they agree in the case
   you usually see.
 - **Don't:** treat a medium-confidence environment-dependent finding as
   speculative when the PR's unchanged context gives you the missing
   environment fact.
 
-(Morrison-Lab/ai-config#994, merged 2026-08-01T20:29:11Z: two SLURM launchers
-had similar refuse-to-nest guards, but `cnode` tested whether the hostname was
-in `sinfo`'s node list while the new shared `refuse_if_nested` tested only
-`[ -n "$SLURM_JOB_ID" ]`.
+(Morrison-Lab/ai-config#994, merged 2026-08-01T20:29:11Z: `cnode` had a
+refuse-to-nest guard and `tui-alloc` gained the shared guard during the
+cleanup.
+`cnode`'s old guard tested whether the hostname was in `sinfo`'s node list,
+while the new shared `refuse_if_nested` tested only `[ -n "$SLURM_JOB_ID" ]`.
 On shiva those differ because `LaunchParameters = (null)` leaves a bare
 `salloc` shell on the login node while setting `SLURM_JOB_ID`; only
 `srun --pty` moves the session to a compute node.

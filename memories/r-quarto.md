@@ -261,6 +261,22 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `version-check.yaml` before assuming which regime it's under. The
   `news.yaml`/changelog-entry half above is unaffected until a separate
   `news.d`-fragment capability ships (deferred; see gha#388).
+- **`read.dcf()` does not error on a DCF file with a duplicate top-level
+  field; it silently keeps whichever occurrence comes LAST.** Confirmed with
+  a live call, not assumed: a two-line `Version: 1.2.3` / `Version: 1.2.4`
+  stanza parses cleanly and returns `1.2.4`.
+  This is the general fact behind `configure-gitattributes`'s
+  never-`merge=union`-on-`DESCRIPTION` row
+  (`skills/configure-gitattributes/SKILL.md`) --- a union-merged
+  `DESCRIPTION` with two `Version:` lines is not a loud parse failure, it's
+  a silent pick of one side, which is worse.
+  Watch for the same trap anywhere else a merged or hand-edited DCF file
+  (`DESCRIPTION`, a `Packages` index) gets read back: a check that assumes
+  malformed DCF would be caught by the parser is assuming the wrong
+  failure mode.
+  (ai-config#979, 2026-07-31: an earlier draft of that SKILL.md row claimed
+  a duplicate `Version:` field "breaks every DCF parser (`read.dcf()`,
+  ...)", which a live `Rscript` call showed to be backwards.)
 - The **Spellcheck** job (`spelling::spell_check_package()`) fails on any word
   not in `inst/WORDLIST`. For one-off non-dictionary words in NEWS/prose, prefer
   rewording (e.g. "uncaptioned" → "without captions") over polluting WORDLIST;
@@ -323,6 +339,65 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `\usage{}` section shows `.helper_default()` verbatim — which is confusing to users
   copy-pasting the signature. Inline the literal value directly in the function
   signature instead. (d-morrison/altdoc#30.)
+
+## R test/lint gotchas that only surface in CI
+Also from ettbc#13/#14:
+- **`lintr::object_usage_linter` flags package datasets used inside a *named*
+  helper function in a test file** (`no visible binding for global variable
+  'cohort'`). The same dataset used directly inside a `test_that()` block is
+  fine. So reference lazy-loaded data at file scope or inside the test blocks,
+  not inside a top-level helper. The repo's `lint-changed-files` job runs
+  `R CMD INSTALL .` before `lint_package`, so cross-file *internal* functions
+  (e.g. a helper defined in another `R/` file) resolve — a single-file
+  `lintr::lint()` can't see them and will false-flag them.
+- **`lintr::object_usage_linter` can't see a variable used only inside a
+  formula** — including every `~` in `dplyr::case_when()` / `case_match()`.
+  `codetools` doesn't walk formula bodies, so
+  `x <- f(y); dplyr::case_when(x %in% c(...) ~ "1", ...)` reports
+  `local variable 'x' assigned but may not be used` even though `x` is plainly
+  used. Don't suppress it: rewrite so the variable is referenced outside a
+  formula — a named lookup vector indexed by the variable (`bins[x]`) replaces
+  a `case_when` chain cleanly, and usually reads better anyway.
+  This is **not** a CI-only lint (verified: a plain single-file
+  `lintr::lint(f, linters = lintr::object_usage_linter())` reproduces it) — but
+  it is easy to *believe* it is, because an intervening local run can come back
+  clean off a stale loaded namespace and then CI flags it again. If a lint
+  disappears without you changing the thing it flagged, distrust the clean run.
+  (ucdavis/bcs#351.)
+- **`spelling::spell_check_package()` locally over-reports vs CI** on accented
+  hyphenated names: line-wrapped `García-Albéniz`/`Hernán` in `.Rd` files
+  tokenize as `Garc`/`niz`/`Hern`, which the CI spellcheck action does not flag
+  (main passes with them). Trust CI's misspelled count; add only the genuinely
+  new words to `inst/WORDLIST`.
+- **The ettbc `review / claude-review` check fails/skips org-wide when the
+  Anthropic org spend limit is hit** (`github-actions[bot]` posts "monthly spend
+  limit"). It's environmental, non-blocking, and unfixable from a content PR
+  (the bot can't edit `.github/workflows`). Stand in with a manual self-review
+  rather than chasing it.
+- **Adding a new hidden top-level dotfile/dir to an R package (a `.claude`
+  config dir, a `.ai-config` git submodule, any new `.<name>`) fails
+  `R CMD check` with `checking for hidden files and directories ... NOTE`
+  unless it's listed in `.Rbuildignore`.** A repo whose `R-CMD-check` job sets
+  `error_on = "note"` (common per this corpus's own review-guideline citations)
+  turns that NOTE into a hard CI failure on every platform the check runs —
+  it isn't Linux/macOS/Windows-specific, since the check runs identically on
+  all of them. Add an anchored entry (`^\.claude$`) matching the existing
+  `.Rbuildignore` style (e.g. the `^\.github$` line most repos already have)
+  proactively, in the same commit that adds the new dotfile/dir, rather than
+  waiting for CI to name it. A submodule whose content isn't checked out in CI
+  (the common case — `actions/checkout` doesn't init submodules by default)
+  can dodge the NOTE by luck — the CI build log's own `R CMD build` step
+  ("checking for empty or unneeded directories") reported
+  `Removed empty directory '<pkg>/.ai-config'`, so the uninitialized submodule
+  never reached `R CMD check` at all — but exclude it in `.Rbuildignore`
+  anyway rather than relying on that accident of checkout config.
+  (`UCD-SERG/serodynamics#265`: adding `.claude/settings.json` failed
+  `ubuntu-latest`/`macos-latest`/`windows-latest` (all `release`) plus
+  `ubuntu-latest (oldrel-1)` R-CMD-check
+  simultaneously with this exact NOTE; the sibling `.ai-config` submodule
+  added in the same PR happened not to trigger it, for the empty-dir reason
+  above.)
+
 
 ## altdoc keeps its reference topics in two independent hand-maintained lists
 

@@ -99,6 +99,45 @@ Two options, in order of preference:
    Use this only when reordering is genuinely worse, not as a default
    shortcut.
 
+
+## Moving prose makes self-references stale
+
+The same check fires after a file split or prose migration, even when the
+reference was correct before the move.
+Phrases like "this file", "the section below", "as noted above", and
+"earlier in this" are relative to a source location, not to the concept being
+moved.
+A link checker cannot see them, because they are plain prose rather than
+links.
+A semantic-line-break or punctuation check cannot see them either, because the
+sentence can be well formed and still point at content that stayed behind.
+
+When moving a block between files or splitting a large memory file, grep the
+moved block itself for locative self-references before committing.
+For every hit, verify that the referenced content moved with it.
+If it did not, replace the phrase with an explicit link or filename that stays
+true after the split.
+This is the prose-reference counterpart to
+[`migrate-referenced-assets.md`](../workflow/migrate-referenced-assets.md):
+there the thing that must move is an asset, while here it is the referent of a
+self-reference.
+
+- **Do:** scan moved prose for locative phrases such as `this file`, `above`,
+  `below`, and `earlier in this`, then re-point each one after the move.
+- **Do:** prefer an explicit file or section link over a relative phrase when
+  the referenced content stayed in the source file.
+- **Don't:** assume a self-reference survived because it was true before the
+  split.
+- **Don't:** rely on link checks for this class; the broken pointer is prose,
+  not a link.
+
+(Morrison-Lab/ai-config#966 split `memories/github-mcp-tools.md` out of
+`memories/github.md`.
+A moved entry at `memories/github-mcp-tools.md:45` still said
+`This is the "Postcondition gate" bullet at the top of this file made concrete:`.
+After the split, that bullet remained in `memories/github.md:10`, so the
+sentence pointed to the wrong file until the reference was rewritten.)
+
 ## The roadmap exception
 
 A deliberate scene-setting overview near the start of a document or

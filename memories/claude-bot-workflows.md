@@ -256,7 +256,7 @@ generic Actions-authoring and reusable-workflow material.
   work.)
   **Once fired, a remote/web session cannot call it back -- so prevention is
   the only control.** `cancel_workflow_run` 403s exactly like
-  `rerun_failed_jobs` does (see `memories/github.md`), and no MCP tool edits
+  `rerun_failed_jobs` does (see `memories/github-mcp-tools.md`), and no MCP tool edits
   an existing comment, so the mention can't be defused after the fact either.
   Editing would not help regardless: the caller stubs trigger on
   `issue_comment: [created]`, so an already-fired comment cannot re-fire, and
@@ -664,6 +664,37 @@ not block `claude-review`.)
   on "waiting for background agents" — a mechanism the summary object alone
   can't show (`d-morrison/gha#185`, `Lacaedemon/sparta` PR #615, 2026-07-03).
 - **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.** `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments. If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading. This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review. Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text. Filed with full evidence as `d-morrison/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
+- **Both bullets above presuppose `@v2`: at `@v1` the execution artifact is
+  never produced at all, so its absence is not an access problem.**
+  `claude-code-review.yml@v1` has no `Resolve and upload execution file path`
+  step, while `@v2` has two of them (one per attempt), so a run pinned at
+  `@v1` uploads nothing and every route to the artifact fails identically ---
+  which reads as a credentials or proxy problem and is not.
+  Confirm the producing step ran before diagnosing the fetch; see
+  [`debugging.md`](debugging.md)'s "An artifact you cannot retrieve may never
+  have been produced" for the general form and the one-call check. (2026-07-31.)
+- **`is_error` is the field that says whether the run failed.
+  `subtype` is not, and the two can look contradictory in the same object.**
+  A stub review reports `is_error: false` alongside real turns and cost: it
+  ran, and never stated a verdict.
+  A genuine failure reports `is_error: true`, and can carry
+  `subtype: "success"` beside it.
+  That is not a contradiction --- `subtype` describes how the SDK turn
+  terminated, not whether the job did its job.
+  So read `is_error` for the verdict and treat `subtype` as narration.
+  (2026-07-31.)
+- **The *agent* workflow reports an API-level error by posting it as a plain
+  PR comment, and its job still concludes `success`.**
+  When `claude.yml`'s `Run Claude Code` step ends without committing anything,
+  the later `Post Claude's response if no code was committed` step publishes
+  whatever the run produced --- including a bare API error such as
+  `Prompt is too long`, under a footer naming the step and linking the run.
+  Every step conclusion stays `success` or `skipped`, so the run is green and
+  no check, artifact, or log records a failure anywhere.
+  Read the thread rather than the run when an agent invocation appears to have
+  done nothing; see [`debugging.md`](debugging.md)'s
+  "Read the failure's own output" for the general form.
+  (`Morrison-Lab/ai-config#986`, run 30664135897, 2026-07-31.)
 - **`gh pr checks <N>` can return a momentarily-stale check entry right after a
   state-changing trigger (close/reopen, a push, `gh run rerun`).** Querying
   immediately after triggering can show the check that was current a few
@@ -792,6 +823,77 @@ Caught in self-review before the first push; every fork skip would have
 dispatched an agent run, on the exact substring gate this file already
 documents for the human case.)
 
+**gha#342's stripper does not close the human case, because a mention can be
+quoted with no markup around it at all.**
+That fix strips blockquote lines, fenced code blocks, indented code blocks,
+and inline code spans before matching, so *upstream* it catches a mention
+someone wrapped in backticks or quoted as a block.
+It cannot catch one sitting in ordinary prose, and a rule cited by its own
+title is exactly that, since quotation marks are not markup.
+
+**Two things stop that from being the whole story here, and the first is the
+pin.**
+The stripper ships in `@v2`, and this repo's `claude-bot.yml` still calls
+`claude.yml@v1`.
+Check it by content rather than by tag date, since `v1` is frozen on a
+diverged line and is not an ancestor of the fix:
+
+```bash
+git show v1:.github/workflows/claude.yml | grep -c detect-bot-mention   # 0
+git show v2:.github/workflows/claude.yml | grep -c detect-bot-mention   # 1
+```
+
+So a backticked mention in a comment on *this* repo fires exactly like a bare
+one, and none of the markup reasoning above applies until the pin moves.
+Note that #998 moved `claude-review.yml` to `@v2` and left `claude-bot.yml`
+alone, so the two callers disagree and reading either one settles nothing
+about the other.
+
+The second reason holds even after the pin moves.
+`claude.yml@v2`'s own job-level `if:` still tests the raw body with
+`contains()`, because a GitHub expression cannot strip Markdown, so the job
+starts and the runner spins up regardless.
+What the stripper buys is the billed agent run and the review re-dispatch, not
+silence.
+So a code span is the wrong thing to trust under either pin, which is what the
+Do bullet below is about.
+
+This corpus makes the bare case the common one rather than a rare one, because
+four of its headings carry the mention with no markup at all:
+
+```bash
+grep -rn '^#\{1,6\} .*@claude' --include=*.md . | grep -v '`@claude'
+```
+
+Read that `grep -v` as isolating the bare subset, not as clearing what it
+drops.
+It filters out three further headings whose mention is backticked, and at
+`@v1` those are no safer than the four it keeps.
+
+One of the four is `CLAUDE.md`'s "Do the review yourself when the @claude
+workflow doesn't produce a verdict", which is self-defeating in a specific
+way: the rule you reach for *because* the reviewer failed cannot be named in a
+comment without spending a real agent run.
+
+So cite such a rule by section without reproducing its title verbatim, or
+defang the mention when the title has to be quoted.
+Neither backticks nor gha#342 will do it for you.
+
+- **Do:** reword a quoted rule title that carries the mention, rather than
+  trusting a code span to neutralize it.
+- **Do:** read the caller's own pin before reasoning about the stripper at
+  all, since `@v1` does not carry it.
+- **Don't:** read gha#342 as closing the quoting hole in general --- upstream
+  it closes the markup-quoted half only, and at `@v1` it is not in play at
+  all.
+
+(`Morrison-Lab/ai-config#986`, 2026-07-31: a self-review comment named that
+rule in a parenthetical, mention bare, and workflow run 30664135897 was
+created five seconds later.
+That run is the one whose `Prompt is too long` comment finally explained the
+afternoon's failures, so an accidental dispatch is the only reason the answer
+existed at all --- which is luck, and not a reason to leave the hole open.)
+
 ## `CLAUDE_CODE_OAUTH_TOKEN` carries no recoverable account identity
 
 Which Claude account minted a repo's `CLAUDE_CODE_OAUTH_TOKEN` is not
@@ -837,3 +939,121 @@ mattering.
 org-level Claude secrets, provisioned in three batches between 2026-05-09 and
 2026-07-14.
 Attribution proved unrecoverable by any of the three surfaces above.)
+
+## `pull_request_target` is rejected by the App-token exchange
+
+Anthropic's `github-app-token-exchange` endpoint rejects OIDC tokens minted for
+`pull_request_target` events, with
+`App token exchange failed: 401 Unauthorized - Invalid OIDC token`.
+The job dies in about 25 seconds, before the model is reached.
+
+The trap is that the action's **own** side supports the event.
+claude-code-action#347, "Can't use action in workflow triggered by
+`pull_request_target`", is closed as completed, and `docs/security.md` carries a
+section on using the action with that trigger --- so the workflow reads as both
+correct and documented.
+Only the server side refuses it.
+(Issue #713's body credits the support to "PR #759".
+That number is an unrelated open bug report in the same repo, so cite #347
+instead of repeating it.)
+Tracked as
+[anthropics/claude-code-action#713](https://github.com/anthropics/claude-code-action/issues/713),
+open since 2025-12-02, whose stated workaround is to use `pull_request`.
+
+So `pull_request_target` is not an available fix for fork PRs, whatever else
+recommends it.
+Nor would it be sufficient if the exchange worked: the action still refuses to run
+for a contributor without write access unless `allowed_non_write_users` is set,
+which `docs/security.md` documents as a significant security risk.
+Read a proposal to switch a review workflow to this trigger as a regression, and
+leave a comment in the workflow naming the upstream issue so it does not get
+re-applied.
+
+Three messages arrive at that same exchange step, and only the first two are
+401s.
+The message is what separates them:
+
+- `Invalid OIDC token` --- the trigger event, this entry.
+- `User does not have write access on this repository` --- the triggering actor is
+  not a collaborator, e.g. the Copilot coding agent
+  (`UCD-SERG/ucd-serg.github.io#84`).
+- `Workflow validation failed ... identical content to the version on the
+  repository's default branch` --- not a failure at all.
+  The action **skips** and exits 0, so a green check on a PR that edits the review
+  workflow is not a review.
+  See the self-mod skip bullet above for gha's own guard against this.
+
+This is a fourth distinct cause in the short-duration band that
+[`fully-clean`](../shared/workflow/fully-clean.md) already records three for,
+under "That duration signature does not run backwards".
+Three of the four run 25 seconds or less, and none of them is about credentials,
+which is that section's point: a short run corroborates a credential hypothesis
+you already hold on other grounds, and never produces one.
+
+Three of the four are on `UCD-SERG/ucd-serg.github.io` and one is on
+`d-morrison/qwt`, so the band is the thing they share rather than the repo.
+Saying otherwise would be the grouping-by-symptom overreach that same section
+warns about, in the entry invoking its authority.
+
+(`UCD-SERG/ucd-serg.github.io`, 2026-07-31: PR #83 switched the review workflow to
+`pull_request_target`, and all five subsequent runs failed this way while the two
+`pull_request` runs immediately before it succeeded.
+Reverted in #89, tracked as #88.
+The revert PR's own two runs are the cleanest demonstration available, because the
+trigger is the only variable between them.
+Run 30680266779 (`pull_request_target`) was rejected at the token with
+`401 Invalid OIDC token`.
+Run 30680266785 (`pull_request`) had its token *accepted* and got as far as
+workflow validation, where it skipped and exited 0 --- so its check reads
+`success` while the action never reviewed anything.
+Same repo, same secret, 15 seconds apart.
+
+That second run is also a worked example of the skip bullet above, and of how it
+misleads a careful reader.
+Round 2 of this PR's own review read that `success` conclusion and reported the
+sentence describing it as a fabricated claim, on the reasoning that a run which
+succeeded cannot have stopped early.
+It can, and this one did: the log carries
+`Skipping action due to workflow validation` and `Exiting due to workflow
+validation skip`.
+Read the log rather than the conclusion, on any job whose action can exit 0
+without doing its work.)
+
+A further failure state, and the only one that leaves no message at that step at
+all: the run reaches the model, produces a review, and is **denied when it tries to
+post it**.
+
+`pull-requests: read` in the workflow's `permissions:` block is enough to cause
+this.
+The action's app token covers its own bookkeeping, but the review is posted by
+Claude's tool calls running under `GITHUB_TOKEN`, so a read-only token loses the
+review after paying for it.
+The tell sits in the execution output rather than in any error:
+`"permission_denials_count": 8` alongside `is_error: false`.
+
+That makes **two** green-but-no-review states on this workflow: denied at posting,
+and skipped at workflow validation.
+The two 401s above are red, so they announce themselves; these two do not, which is
+what makes them worth enumerating separately from the messages.
+Only the log tells them apart.
+
+But the question that settles both at once is not about any mechanism.
+**Ask whether a `claude`-authored comment exists on the PR**, which is one query,
+rather than reasoning about which token ought to be able to post.
+
+- **Do:** grant `pull-requests: write` to a review workflow on the `pull_request`
+  trigger.
+  GitHub forces a read-only `GITHUB_TOKEN` on fork PRs regardless, so this widens
+  nothing for untrusted contributors.
+- **Don't:** infer from a green check, or from an argument about token scopes, that
+  a review was posted.
+
+(`UCD-SERG/ucd-serg.github.io`, 2026-08-01: `pull-requests: read` had been in that
+workflow since its first commit, and `claude` had **never** posted a review comment
+on the repository --- PRs #78, #79, #80, and #86 all ran green with zero.
+It surfaced only because #89 restored `read` while asserting it was safe on the
+grounds that "the action posts with its own app token".
+Two Copilot reviews on that PR restated the premise without objection.
+Fixed in #91.
+A single query for a `claude` comment on any earlier PR would have caught it at any
+point in the preceding month.)

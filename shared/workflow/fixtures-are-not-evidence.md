@@ -189,3 +189,76 @@ unchanged" held only because a `slice_max` had collapsed the accumulation to
 one row per participant, and it now asserts the opposite.
 Run against `main`'s implementation, the new tests produced 9 failures across
 all six blocks that touch the behavior.)
+
+## A third direction: a fixture that cannot tell the two apart
+
+The two sections above concern a fixture that **disagrees** with reality, and
+one that **agrees** with the bug.
+Both are claims about the world that happen to be wrong.
+The third case makes no claim at all: the fixture is faithful, the assertion is
+correct, and the data simply carries no information about the question, so the
+test passes identically whichever implementation it runs against.
+
+[`ardi`](ardi.md) already covers the version of this you can see --- "a fixture
+missing the input variety that makes the two paths differ" --- and its remedy,
+building the fixture so both sides are present and asserting them together, is
+the right one.
+What it does not cover is the case where the variety is **present but
+degenerate**.
+The column exists, the model fits it, the fixture looks exactly like one built
+to discriminate.
+Only its magnitude is wrong, and no reading of the fixture shows that, because
+the number is produced by the fit rather than written in the file.
+
+That defeats the usual review question.
+"Does the fixture vary the thing under test?" answers yes.
+The question that decides it is quantitative: **would the two implementations
+actually produce different output on this data?**
+
+### Assert the discriminating property, in the test
+
+The remedy is to make the fixture's fitness for purpose a **checked
+precondition** rather than an assumption --- the same move
+[`fail-fast`](../principles/fail-fast.md) asks for anywhere a pass and a
+non-answer are indistinguishable.
+Two assertions, and they are not redundant:
+
+1. **The discriminating parameter is non-negligible.**
+   A bound on the coefficient, the spread, the count --- whatever the two paths
+   diverge on.
+   This is what fails loudly when a fixture degenerates, including later, when
+   someone changes the generator for an unrelated reason.
+2. **The two implementations differ on this fixture.**
+   Keep the retired computation as a helper and assert a floor on the gap.
+   Without it, assertion 1 shows the input varies while leaving open whether
+   the output does.
+
+Both are cheap, and together they turn "this fixture discriminates" from a
+belief into a check.
+This is [`algorithmatize-checks`](algorithmatize-checks.md) applied to the test
+suite's own inputs: a threshold decides it exactly, so it should not be
+eyeballed once at authoring time and then trusted forever.
+
+- **Do:** assert a floor on the parameter the two paths diverge on, so a
+  degenerate fixture fails rather than passes.
+- **Do:** keep the superseded computation as a test helper and assert the two
+  differ, rather than asserting the new one against a constant.
+- **Don't:** accept "the fixture has that variable" as evidence it
+  discriminates --- presence and magnitude are different questions.
+- **Don't:** write a regression test whose passing is compatible with both
+  implementations; per `ardi`, one that was never observed to fail is a guess
+  about what it covers.
+
+(`ucdavis/bcs#534`, 2026-07-30/31: `compute_gcomp_cif_ab507bs()` evaluated the
+CIF for one synthetic participant at the mean baseline age instead of averaging
+each participant's hazard over the observed age distribution.
+The existing `fit_ab507bs_gee()` fixture fixes event timing by profile and
+repeat rather than by age, so the fit returns age coefficients of order
+`1e-17`; with no age effect the two estimators coincide exactly, and a
+regression test built on it would have passed against the buggy code.
+The new fixture draws deaths from a logit hazard with real linear and quadratic
+age terms, and the test asserts
+`expect_gt(abs(betas[["age_monthly"]]), 0.01)` and
+`expect_gt(abs(betas[["age_monthly2"]]), 0.001)` before asserting
+`expect_gt(max(abs(cif$cum_incidence - at_mean$cum_incidence)), 0.05)` against
+`ab507bs_gcomp_cif_at_mean_age()`, the retired computation kept as a helper.)

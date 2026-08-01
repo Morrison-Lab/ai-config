@@ -527,6 +527,34 @@ Three consequences for driving a PR to fully clean:
 The mechanics of detecting a refusal (it arrives as a posted review, not an API error, so the request call's success proves nothing) are in [`memories/github.md`](../../memories/github.md)'s GitHub MCP tools section.
 (`ucdavis/rampp#111`, 2026-07-24/25: Copilot refused three times across two heads for quota while `claude-review` posted genuine verdicts at both; the PR was reported clean --- and merged --- on `claude-review`'s verdict, with Copilot's absence stated in the ready-for-merge comment rather than papered over.)
 
+**The same reviewer has a third state, and it is worse for a reader than the refusal: the check goes green and no review is posted at all.**
+A refusal at least leaves a record.
+It costs a review and says so, in a comment anyone scanning the thread will see.
+The silent state costs the same review and says nothing: the reviewer's check run completes `success`, so a reader scanning checks sees an external reviewer that ran and was content, and the review list carries no entry from it to contradict that impression.
+Nothing on the PR reports that a configured reviewer did not weigh in.
+
+Note which remedy already in this file the silent state defeats.
+The "no verdict is its own state" bullet in criterion 2's four-surfaces list covers a job that posts nothing, and the instrument it prescribes is to read the job's own outcome rather than infer from the absence of comments.
+That works there because the job **failed**.
+Here it succeeded, so the outcome reads `success` and points away from the gap the bullet exists to expose.
+
+What decides it is the review list filtered by the reviewer's own login, never the check run: `pull_request_read` with `method: get_reviews`, asking whether any entry carries that bot as its `user.login`.
+A green check answers whether the app ran.
+Only the review list answers whether it reviewed.
+Read past the first page before concluding an entry is absent, since a busy PR can carry more reviews than one page returns.
+
+- **Do:** confirm each external reviewer by an entry in `get_reviews`, not by the conclusion of its check run.
+- **Do:** name a silent reviewer in the ready-for-merge report, exactly as the bullets above ask for a refusing one.
+- **Don't:** read a green reviewer check as a verdict --- it survives a refusal, and it survives silence.
+- **Don't:** reach for the job-outcome remedy above here.
+  It is scoped to a job that failed, and this one succeeded.
+
+(`Morrison-Lab/ai-config`#1005 and #1008, 2026-07-31/08-01, both merged.
+On #1005 `copilot-pull-request-reviewer[bot]` posted its quota refusal as a `COMMENTED` review at `23:59:46Z`, which is the refusal above exactly.
+Under five hours later on #1008 its check run completed with conclusion `success` at `04:50:41Z`, having posted nothing.
+`get_reviews` returned eight reviews there, four from the repo's own review bot and four from the maintainer, none from Copilot, with page 2 confirmed empty.
+Every other check on that head was green too, so nothing anywhere on the PR distinguished a reviewer that had approved from one that never spoke.)
+
 **A sixth case runs the other way from all five above: the review is genuine and complete, but the workflow posts the reviewer's own tool invocation instead of the review body.**
 The comment opens with a literal `gh pr comment <N> --repo <owner>/<repo> --body "$(cat <<'EOF'` and closes with `EOF\n)"`, wrapping a real, correct verdict as unrendered text --- the model emitted a shell command as its final response and the workflow posted that string verbatim.
 Nothing is lost, and the same body usually also lands as a properly-rendered sibling comment, so the PR carries the review twice.

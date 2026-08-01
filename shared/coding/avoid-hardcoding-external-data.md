@@ -138,3 +138,66 @@ Review round 1 correctly found the block needed a fourth command, and that
 fix is what made the preamble false.
 Round 2 flagged the stale count, fixed in `42214b0` as "Four reads settle it
 before you touch anything:".)
+
+## Where the rule stops: text that records what was observed
+
+Everything above pushes toward replacing a literal with whatever owns it.
+There is one boundary it must not cross, and a consistency sweep is precisely
+the operation that crosses it without noticing.
+
+Text that **asserts what was observed** is not configuration.
+A command someone actually ran, the output it actually produced, and the
+conditions a measurement was actually taken under are claims about the past,
+and their literals are the evidence for those claims.
+Parameterizing them does not generalize the record.
+It falsifies it, in the name of consistency, and leaves no trace that anything
+was changed.
+
+Three forms, each of which looks exactly like the hard-coding this fragment
+bans:
+
+- **A command that was executed.**
+  `git worktree add /tmp/wt-ums main` reports a run.
+  Rewriting it to `<default-branch>` asserts a run that never happened.
+- **A verbatim error string.**
+  `fatal: invalid reference: origin/main` is what the tool printed.
+  A reader matches it against their own terminal, so a parameterized version
+  matches nothing and stops being findable.
+- **The conditions of a measurement.**
+  A sentence saying the runs used a repo whose default branch is literally
+  `main` states the scope of the result.
+  It is usually the sentence that explains why the measurement did not surface
+  the bug.
+
+The tell is tense and mood rather than syntax.
+Prescriptive text tells a reader what to do next, and should name the
+parameter.
+Evidentiary text says what happened, and should keep the literal.
+One file routinely carries both, so decide occurrence by occurrence.
+
+[`ascii-punctuation-in-source`](ascii-punctuation-in-source.md) records the
+same over-application for punctuation, where a whole-file replace turned a
+one-line finding into a 104-line diff.
+The failure there is scope, and the diff is still true.
+Here the rewritten text becomes false, which no diff size reveals.
+
+- **Do:** parameterize the occurrences that instruct, and leave the ones that
+  record.
+- **Do:** decide per occurrence in a file that carries both, reading each one's
+  surrounding sentence.
+- **Don't:** run a whole-file replace over a literal that also appears inside
+  quoted commands, quoted output, or a statement of measurement conditions.
+- **Don't:** treat an unparameterized literal inside a case record as a defect
+  left behind -- there it is the evidence.
+
+(Morrison-Lab/ai-config#1008, merged 2026-08-01 as `3eb15a4`: it parameterized
+the base branch to `<default-branch>` across `skills/gip/SKILL.md` and
+`memories/preferences.md`, and stopped at three places on purpose.
+`memories/preferences.md` keeps `git worktree add /tmp/wt-ums main` and the
+scores measured with it, and closes that block by saying those runs "used a
+repo whose default branch is literally `main`, which is why they are written
+that way here and why they did not surface the hard-coding".
+`skills/gip/SKILL.md` keeps `fatal: invalid reference: origin/main` as the
+error a reader will actually see.
+The judgment was made correctly in both files and never written down, so the
+next sweep over the same files had nothing to consult.)

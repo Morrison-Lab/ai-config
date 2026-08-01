@@ -156,6 +156,56 @@ The review caught it by citing the entry's own number back at it; a direct
 test then showed `du` = `0B` against `ls -l` = 276 MB on one placeholder.)
 
 
+**When a disputed figure cannot be recounted, say so and fall back to internal
+consistency.**
+The section above trusts the measured number over the remembered rule because
+the measurement is available.
+This is the case where the source measurement is not available anymore, or not
+available from the machine making the fix.
+A recount that cannot reach the original population is not a stronger
+replacement for the disputed number.
+It is a new unverifiable number, and publishing it upgrades the claim beyond
+what the evidence supports.
+
+Use the part the reader can check without trusting your local data, but do not
+pretend the mismatch identifies its own source.
+An itemized breakdown and its total are an internal-consistency test: when the
+rows sum to one value and the total prints another, one side is wrong.
+Prefer the rows only when their completeness is itself inspectable or stated as
+a remaining premise; otherwise report the discrepancy without selecting a side.
+Then bound the downstream effect rather than leaving the correction open-ended:
+check whether derived percentages or labels still hold, and say when they do
+not.
+This composes with
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s enumeration
+rule and
+[`fail-fast`](../principles/fail-fast.md)'s count-what-you-examined rule, but it
+adds the escape hatch those rules need when the enumeration's scope does not
+match the cited source.
+
+- **Do:** report the attempted recount's scope and result, including why it does
+  not reproduce the cited source.
+- **Do:** use the itemized breakdown over a disagreeing total only when the
+  rows' completeness is checkable, and state which derived claims survive the
+  correction.
+- **Don't:** assert a fresh recounted number when the source population rotated,
+  lived on another machine, or otherwise cannot be reached.
+- **Don't:** replace one unverifiable figure with another merely because the new
+  one came from a command you just ran.
+
+(Morrison-Lab/ai-config#981, 2026-08-01: docstrings claimed a fixture came from
+122 real `Agent` launches, while their own rows summed
+`48 + 33 + 27 + 9 + 3 + 1 = 121`.
+A recount over local `~/.claude/projects/**/*.jsonl` transcripts before
+2026-08-01 returned 8 `Agent` `tool_use` records in one key shape, not 121
+records spread over the six rows, so the original sample had rotated or lived
+on another machine.
+The fix therefore used the internally checkable row sum, 121, while naming the
+remaining assumption that the rows were complete.
+It also corrected the derived label: under whole-percent rounding, 60/122 is
+49%, while 60/121 is 50%.)
+
+
 ## Check that a stated trigger actually fired
 
 A justification for why a file was split, a check was added, or a workflow was

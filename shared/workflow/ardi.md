@@ -672,6 +672,7 @@ withdraw the caveat where it was published, saying explicitly that it is
 withdrawn rather than quietly deleting the sentence.
 A reader who saw the original needs to know it was retested, not be left
 wondering whether it was ever true.
+
 (ai-config#774, 2026-07-28: the PR body said four `adv-r.hadley.nz` anchors
 could not be verified because the host was egress-blocked, which was
 accurate when written.
@@ -682,10 +683,38 @@ The review had already absorbed the caveat --- it listed those anchors as
 leaving it would have shipped a limitation that no longer existed, blessed
 by a reviewer who could not have known.)
 
+
+A `main` merge is one moment that must fire this check, because it can falsify
+one of your own hedges without producing a conflict in the file that carries it.
+After merging `main`, run a whitespace-normalizing search over the PR's touched
+files for hedge forms such as `still open`, `not yet merged`,
+`once that merges`, `as of`, `will live at`, and `proposed in`.
+Do not use line-oriented literal grep in this semantic-line-break corpus: a
+phrase split across lines is exactly the case this check must still find.
+Re-check each hit against the new base before pushing the merge.
+The conflict marker is not the scope of the review: a cleanly merged file can be
+where the stale caveat lives.
+
+- **Do:** after every `main` merge, scan the PR's touched files for merge-status
+  hedges with whitespace-normalizing search, then re-read each hit against the
+  new base.
+- **Don't:** assume a hedge survived because the file that contained it merged
+  without conflicts, or because literal grep missed a phrase split across
+  semantic lines.
+
+(Morrison-Lab/ai-config#981: its fragment said ai-config#959 was still open as
+of 2026-07-31 and that, once merged, the fragment would live at
+`shared/workflow/flag-practice-slippage.md`.
+PR #959 merged at 2026-07-31T16:24:34Z, and commit `df243ee9` merged `main` into
+PR #981 on 2026-08-01, pulling in that very file.
+The merge conflict was in `CLAUDE.md`, so the cleanly merged fragment was not
+re-read, and a reviewer caught the stale hedge afterward.)
+
 **Landing a fix falsifies whatever prose documented the defect, and that prose
 is never in your diff --- so grep for it rather than expecting to be reminded.**
-The bullet above covers a caveat **you** published on **this** PR, which the
-environment then moved out from under.
+The blocker-withdrawal rule above, illustrated by ai-config#774, covers a
+caveat **you** published on **this** PR, which the environment then moved out
+from under.
 This is the case where you moved it yourself, and where the stale text lives in
 the standing corpus rather than on the PR: a memory bullet describing the
 hazard, a README warning about it, a docstring asserting the behaviour you just

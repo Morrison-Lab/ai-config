@@ -72,6 +72,56 @@ one file over. Grep the diff for the flagged phrase before considering the
 finding closed. (ai-config#373: fixed "routing/dispatch site" in the skill
 per review, but the CHANGELOG entry still said it until a follow-up commit.)
 
+**When syncing copies, search the diff for the claim, not the files or symptom
+already in front of you.**
+The paragraph above says to grep the diff, and both words matter.
+A path-scoped grep over the files already open is not a diff search, however
+real the hits it returns are.
+The scope is the silent variable: the command succeeded, but it searched the
+author's working memory rather than the change.
+Pipe the diff itself, so the search space is the whole PR diff:
+
+```bash
+git diff origin/main...HEAD | grep -n "<figure-or-phrase>"
+```
+
+Run that after committing, not before.
+Like `check-new-line-breaks`, any `origin/main...HEAD` scan reports on `HEAD`,
+so a pre-commit run describes the old committed text and can make a fixed
+working tree look unfixed.
+
+The same failure can hide in the search term instead of the path.
+When a review retires a rationale, search for statements of the retired
+criterion, not only for the word or contradiction that exposed it.
+The exposing detail usually appears once; the criterion is what got copied
+around.
+
+- **Do:** run whole-diff searches for synchronized figures and phrases, after
+  committing the fix, and report the before/after counts.
+- **Do:** when a rationale is retired, search for every wording that states that
+  rationale or criterion, not only for the symptom word that made it fail.
+- **Don't:** substitute `grep -rn <term> <files-you-had-open>` for grepping the
+  diff.
+- **Don't:** accept a search for the visible contradiction as proof that the
+  retired claim itself is gone.
+
+(Morrison-Lab/ai-config#981, round 2 commit `f616dc5a`, did both.
+A count fix followed this section's rule in name, but ran
+`grep -rn "122" hooks/*.py`, scoped to the two files already open.
+That missed `hooks/hooks.json:56` and
+`shared/workflow/incidents-dont-repeal-decisions.md:94`, so round 3 found the
+PR still disagreeing with itself: 121 in two places and 122 in two others for
+one unrecountable measurement.
+The round 3 fix `05486216` used the diff as the scope; after committing, the
+counts were `122: 0` and `121: 5`.
+The same round retired a rationale that `Explore` and `Plan` were exempt
+because they lacked `Edit`, `Write`, and `NotebookEdit`, while `Bash` was the
+hole in that role contract.
+Searching only for `Bash` missed a nearby code comment and two test labels that
+still said the agents were read-only "by definition".
+Those were corrected to the harness's declared read-only role, and both review
+threads were resolved.)
+
 **The PR description is on that list and is the one copy grepping the diff
 cannot find, so check it separately.**
 A PR body is not a file, so it appears in no diff and no reviewer reads it as

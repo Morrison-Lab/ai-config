@@ -12,6 +12,54 @@ loses something; that's a worse outcome than leaving the duplication alone.
 Question the content, don't assume either way: check what each copy actually
 covers before deciding whether one subsumes the other.
 
+
+**The inverse failure: consolidation can gain a trigger even while removing
+duplication.**
+The litmus test above asks whether consolidating copies would lose a case.
+The mirror image is whether it would add one.
+A shared helper can be called from places whose old predicates differed, or from
+a place that had no guard at all, so the helper is not automatically any one
+call site's old behavior.
+A state where exactly one call site used to fire, or where a newly guarded call
+site did not fire before, is where a shared helper can silently widen or narrow
+the system.
+
+Before extracting, enumerate the states each old predicate fired in, including
+"no guard" for newly covered call sites, and decide whether the union is
+intended.
+If the predicates differ, DRY may still be right, but the helper's name and
+call sites need to state the chosen predicate rather than smuggling it in as a
+cleanup.
+When the triggering state depends on an environment fact, check the unchanged
+context in front of you for that fact before treating the finding as speculative.
+That is the same move
+[`address-every-comment`](address-every-comment.md) requires for findings whose
+evidence is outside the reviewer-visible diff.
+
+- **Do:** write each call site's old predicate down before extracting a shared
+  helper, including newly guarded sites whose old predicate was "no guard".
+- **Do:** make the shared predicate an explicit design choice, then test the
+  uncommon state that distinguishes the call sites.
+- **Don't:** infer that two checks are redundant because they agree in the case
+  you usually see.
+- **Don't:** treat an environment-dependent finding as speculative when the PR's
+  unchanged context gives you the missing environment fact.
+
+(Morrison-Lab/ai-config#994, merged 2026-08-01T20:29:11Z: at head `11b5a3d`,
+`cnode` had a refuse-to-nest guard and `tui-alloc` gained the shared guard
+during the cleanup.
+`cnode`'s old guard tested whether the hostname was in `sinfo`'s node list,
+while the extracted `refuse_if_nested` draft tested only `[ -n "$SLURM_JOB_ID" ]`.
+On shiva those differ because `LaunchParameters = (null)` leaves a bare
+`salloc` shell on the login node while setting `SLURM_JOB_ID`; only
+`srun --pty` moves the session to a compute node.
+That draft therefore fired after a bare `salloc`, printed
+`already inside SLURM job 4242 on shiva` while naming the login host, and
+advised the bare command that would have run on the login node.
+Review caught the widened trigger before merge, and commit `bd1bf356` restored
+the missing branch by checking `on_compute_node()` inside the `SLURM_JOB_ID`
+case.)
+
 ## What this looks like in each domain
 
 - **Prose.** The same claim or explanation restated in two places --- a README

@@ -611,11 +611,15 @@
   (`R_kgDOShagnA`) and returned as `id` by the REST API.
   A transfer leaves that number alone, so the node names an identity with no
   pre- or post-transfer form to disagree about.
-  What the two errors below establish is only that the server compares the
+  What the first error below establishes is only that the server compares the
   node's repository against the declared `owner`/`repo` string and rejects
   the pair.
-  Why that comparison fails where string-addressed calls follow the redirect
-  was not established.
+  The second establishes a separate gate, the session's own repository scope
+  list, which never examines the node at all.
+  It is not the first comparison in different words: `Morrison-Lab/ai-config`
+  is the node's own repository, so that comparison would have matched.
+  Why that first comparison fails where string-addressed calls follow the
+  redirect was not established.
   Measured on `Morrison-Lab/ai-config` (transferred from `d-morrison`),
   2026-07-31, against PR #975 --- two different gates, one per spelling:
   - `owner: d-morrison` --- `Access denied: review thread

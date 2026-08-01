@@ -41,6 +41,56 @@ to look.
   them mechanically.
 - A defect was caught by eye that a threshold over dumped state would have
   caught earlier and every time thereafter.
+- You are about to write "the only X this could affect is Y" --- see the next
+  section, which is that tell in its most reportable form.
+
+## Never predict which case will fail; enumerate the class
+
+The rule so far concerns checks you *perform*.
+It has a second form that reaches further, because it survives into what you
+*say*: predicting which member of a class will fail, in place of running the
+enumeration.
+
+The shape is a sentence like "the only new word this could flag is
+`monotonicity`", or "the one file this could break is the parser".
+It reads as the output of an analysis.
+It is the output of an intuition, and the giveaway is that no command was run.
+
+**A guess in a report is worse than reporting nothing**, which is why this is
+worth a section of its own rather than a bullet.
+Naming a single member implies the others were examined and cleared, so a gap
+that is total gets recorded as narrow and understood.
+The next reader --- often you, later --- then spends attention on the named
+case and none on the rest.
+
+So ask whether the class is enumerable by a command.
+Usually it is, and usually the command needs less than the guess did: no
+dictionary, no installed package, no network, just a pattern over the diff.
+When it genuinely is not enumerable, say the class is unbounded and the check
+did not run.
+An honest "unverified" is worth more than a confident member, because it
+leaves the gap the size it actually is.
+
+Watch for the specific slip where sound reasoning about a **category** is
+cashed in as a prediction about a **member**.
+"CI's dictionary is more permissive than the local one" can be well evidenced
+and still license nothing about which word will fail --- those are different
+claims, and only the first had support.
+
+- **Do:** enumerate with a command, and report what it examined.
+- **Do:** say a check could not run, and name the class it would have covered.
+- **Don't:** substitute "the only one that could fail is X" for running the
+  check.
+- **Don't:** let a supported claim about a category carry an unsupported one
+  about a member.
+
+(2026-07-31, `ucdavis/bcs#503`: a spelling check could not run locally, and the
+status report named `monotonicity` as the only newly-reachable word.
+`monotonicity` passed; `unlabelled` failed --- a British spelling in prose
+written minutes earlier.
+A three-line pattern scan over the diff, needing nothing installed, then found
+`unlabelled` **and** `neighbours` in one pass.
+The user's correction was "no guessing".)
 
 ## Test the instrument against the incident that prompted it, verbatim
 

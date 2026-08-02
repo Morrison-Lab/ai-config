@@ -43,7 +43,8 @@ If Copilot is a configured reviewer, request it immediately after `gh pr create`
 ```bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
   -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
-gh pr view <N> --json reviewRequests
+gh pr view <N> --json reviewRequests,reviews
+gh pr checks <N>
 ```
 
 Verify the request landed before writing a status report: the POST response should include the reviewer, then a fresh read should show either a pending request or a new review/check from that reviewer on the current head.

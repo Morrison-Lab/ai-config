@@ -43,7 +43,8 @@ In this repo, Copilot reviews only when explicitly requested with the requested-
 ```bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
   -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
-gh pr view <N> --json reviewRequests
+gh pr view <N> --json reviewRequests,reviews
+gh pr checks <N>
 ```
 
 Run that request immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR, before writing any status report.

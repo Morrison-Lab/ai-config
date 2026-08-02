@@ -149,15 +149,23 @@ _UNCLOSED_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})[^\n]*$", re.MULTILINE)
 # double-backtick span pairs with a single-backtick closer -- stripping
 # content that is not code and hiding the imports inside it.
 _FENCE_RE = re.compile(
-    r"^ {0,3}(?:(`{3,})(?!`)[^\n]*$[\s\S]*?^ {0,3}\1`*[ \t]*$"
-    r"|(~{3,})(?!~)[^\n]*$[\s\S]*?^ {0,3}\2~*[ \t]*$)",
+    r"^ {0,3}(?:(`{3,})(?!`)[^\n]*$[\s\S]*?^ {0,3}\1`*[ \t]*\r?$"
+    r"|(~{3,})(?!~)[^\n]*$[\s\S]*?^ {0,3}\2~*[ \t]*\r?$)",
     re.MULTILINE,
 )
 # A code span's delimiters must also be maximal runs, and its opener must
 # not be preceded by a backtick -- otherwise ``@a.md` pairs its SECOND
 # backtick with the closer and strips an import that is not in a span.
+#
+# Every line-ending construct here accepts CRLF, and the omission bit twice.
+# A fence closer whose `[ \t]*$` cannot consume the `\r` leaves a BALANCED
+# block looking like two orphan markers, so `strip_code` drops the marker
+# lines and keeps the body -- counting the `@path` examples inside a
+# documented code block as real imports. And a blank-line bound written
+# `\n(?![ \t]*\n)` never fires on CRLF, which reopens the swallow bug this
+# module already fixed once for LF.
 _CODE_SPAN_RE = re.compile(
-    r"(?<!`)(`+)(?!`)(?:[^\n]|\n(?![ \t]*\n))*?(?<!`)\1(?!`)"
+    r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
 )
 
 

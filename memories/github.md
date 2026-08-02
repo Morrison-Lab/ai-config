@@ -385,7 +385,9 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
   comment, gives the "ready to merge" verdict) and `claude.yml` agent post-step
   (separate findings). They can DISAGREE — one says clean while the other finds
   nits. Reconcile BOTH before calling a PR clean; the agent post-step tends to
-  drip 1–2 pre-existing cosmetic nits per round (asymptotic).
+  drip 1-2 pre-existing cosmetic nits per round. That drip is a reason to keep
+  iterating, never a reason to stop or to ask whether to stop --- see
+  `skills/ardi/SKILL.md`, "Stopping conditions".
 
 ## Stacked-PR series: a closed base PR strands the whole downstream stack silently
 

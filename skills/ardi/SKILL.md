@@ -393,7 +393,20 @@ Do-Confirm; per
       reviewer's all-clear comment and your reply — normally a top-level PR
       comment, not an inline thread).
 
-## Asymptotic-noise guard and deadlocks
+## Stopping conditions
+
+**There is no round limit. Always request another review.** The loop ends on
+exactly three things:
+
+1. **A totally clean review** --- no nits, no non-blocking comments, everything
+   Addressed or agreed Deferred. See
+   [*The bar: "fully clean"*](#the-bar-fully-clean).
+2. **A genuine deadlock on a specific item** --- you and the reviewer have argued
+   back and forth and cannot reach an understanding.
+3. **The user says stop.**
+
+Nothing else. Not a round count, not a sense that findings are getting smaller,
+not a judgment that the reviewer is nitpicking.
 
 - **Deadlock on an item:** if you and the reviewer can't reach consensus (your
   rebuttal didn't convince them, and their re-raise didn't convince you),
@@ -401,9 +414,44 @@ Do-Confirm; per
   unilaterally overriding. Request `d-morrison` via the `request-pr-review`
   skill (or `gh pr edit <N> --add-reviewer d-morrison`), `@`-mention them in a
   comment summarizing the impasse, and surface the open item to the user.
-- **Asymptotic noise:** if after 3–4 rounds the reviewer keeps generating new
-  nits (not converging), surface that to the user and ask whether to continue
-  or accept.
+  This is per-item: escalating one deadlocked finding does not stop the loop,
+  which keeps running on everything else.
+
+### "Asymptotic noise" is an anti-pattern, not a signal
+
+This skill used to carry a guard saying that after 3-4 rounds of new nits you
+should surface the pattern and ask whether to continue. **That guard is
+removed, and reasoning of that shape must not be reintroduced.** It fails
+three ways:
+
+- **It fires on round count, not on finding quality.** A round producing
+  genuine, reproducible correctness bugs is indistinguishable from a round
+  producing style churn if all you count is rounds.
+- **It reads as diligence**, which is exactly why it goes unexamined. Stopping
+  to ask feels like respecting the user's time.
+- **It hands triage back to the user** --- the precise move
+  [`address-every-comment`](../../shared/workflow/address-every-comment.md)
+  already forbids for individual findings. The guard reintroduced at loop
+  scale the thing that fragment bans at item scale.
+
+The tell is any sentence of the form "the reviewer keeps finding things, so
+maybe we should stop." Replace it with another review request.
+
+Two things that are **not** this anti-pattern and stay:
+
+- **The per-item hold.** When a reviewer re-raises one already-deferred item
+  verbatim each round, reply once pointing at the tracked issue and hold on
+  *that item*, while continuing to fix every new finding. That is about not
+  re-litigating one item; it never stops the loop.
+- **Reporting the round count.** Saying "round 7, 23 findings, all Addressed"
+  is useful information. Attaching "shall I stop?" to it is the anti-pattern.
+
+(ai-config#1029 is the case record: six rounds, 23 findings, all Addressed,
+with rounds 2-6 each finding real bugs in *earlier rounds' own fixes* ---
+including CRLF silently disabling a failure path repo-wide, a `--compare`
+reporting a zero delta, and a traversal-order-dependent measurement. The loop
+stopped to ask twice under the old guard; both times the answer was to keep
+going, and the next round found four more real bugs.)
 
 ## On clean
 

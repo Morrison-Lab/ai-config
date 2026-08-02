@@ -38,7 +38,7 @@ Apply the ARDI loop (ARD + iterate) to every open PR/MR in the repo, driving eac
     Drive each to a terminal state:
 
     - **Clean** — zero flagged items under any heading; post the unclaim comment, record the round count.
-    - **Asymptotic noise** — per ARDI’s guard, if after 3–4 rounds the reviewer keeps emitting *new* nits, stop that PR, record it “stalled (noise)”, move on.
+    - **Deadlocked** — a specific item where you and the reviewer have argued and cannot reach an understanding. Escalate that item to a human, record it, move on. A round count is never a terminal state on its own: see [`ardi`](../../skills/ardi/SKILL.llms.md)’s “Stopping conditions”.
     - **Blocked** — needs a human decision, has unresolvable conflicts, or fails preflight in a way your change didn’t cause. Record what’s blocking, move on.
 
     **Process PRs one at a time, not concurrently.** Each ARDI run pushes commits, triggers review workflows, and polls for the result; running them in parallel would interleave pushes, collide on shared review runners, and make per-PR status illegible. One PR stalling or blocking must not abort the batch — keep going to the next.

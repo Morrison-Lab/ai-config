@@ -452,6 +452,92 @@ with tempfile.TemporaryDirectory() as tmp:
                             "--compare", old_sha])
     check("a file lost at the target invalidates the comparison", lost_rc == 2)
 
+# --- round-3 review findings ------------------------------------------------
+
+# A diamond: `deep.md` is reachable at depth 4 down a chain and at depth 1
+# directly. Reached via the chain first, its own imports sit at depth 5 and
+# are skipped for exceeding the limit; a plain `loaded` SET then suppressed
+# the shallower revisit, so `child.md` was never counted although it is well
+# inside four hops. The result depended on which citation came first.
+_diamond = {
+    "root.md": "@a1.md\n@deep.md\n",
+    "a1.md": "@a2.md\n",
+    "a2.md": "@a3.md\n",
+    "a3.md": "@deep.md\n",
+    "deep.md": "@child.md\n",
+    "child.md": "CHILD BYTES",
+}
+chain_first, _, _ = ccc.walk_closure("root.md", reader_for(_diamond))
+_reversed = dict(_diamond, **{"root.md": "@deep.md\n@a1.md\n"})
+direct_first, _, _ = ccc.walk_closure("root.md", reader_for(_reversed))
+names_chain = [p for p, _, _ in chain_first]
+names_direct = [p for p, _, _ in direct_first]
+check(
+    "a file reached first at depth 4 is re-walked via a shallower route",
+    "child.md" in names_chain,
+)
+check(
+    "  ... so the closure is traversal-order independent",
+    sorted(names_chain) == sorted(names_direct),
+)
+check(
+    "  ... and byte totals agree across orders",
+    sum(b for _, b, _ in chain_first) == sum(b for _, b, _ in direct_first),
+)
+check(
+    "  ... with each file still counted exactly once",
+    names_chain.count("deep.md") == 1 and names_chain.count("child.md") == 1,
+)
+# The four-hop limit must still bind on a chain with no shallower route.
+_chain = {"f0.md": "@f1.md\n"}
+for i in range(1, 9):
+    _chain[f"f{i}.md"] = f"@f{i + 1}.md\n"
+files, _, _ = ccc.walk_closure("f0.md", reader_for(_chain))
+check("re-walking does not defeat the depth limit",
+      max(d for _, _, d in files) == 4)
+
+# --- compare mode validates BOTH closures independently ---------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
+    sub = base / ".ai-config"
+    sub.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=sub, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=sub, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=sub, check=True)
+    # Baseline is BROKEN: it cites gone.md, which does not exist at the pin.
+    (sub / "sub.md").write_text("@.ai-config/gone.md\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=sub, check=True)
+    subprocess.run(["git", "commit", "-qm", "broken pin"], cwd=sub, check=True)
+    broken_pin = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=sub, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    # The TARGET fixes it, which is exactly the state the old condition
+    # (`after_missing and not before_missing`) accepted silently.
+    (sub / "sub.md").write_text("all good now\n", encoding="utf-8")
+    (sub / "gone.md").write_text("now present", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=sub, check=True)
+    subprocess.run(["git", "commit", "-qm", "fixed"], cwd=sub, check=True)
+
+    (base / "CLAUDE.md").write_text("@.ai-config/sub.md\n", encoding="utf-8")
+    subprocess.run(["git", "add", "CLAUDE.md"], cwd=base, check=True)
+    subprocess.run(
+        ["git", "update-index", "--add", "--cacheinfo",
+         f"160000,{broken_pin},.ai-config"], cwd=base, check=True,
+    )
+    subprocess.run(["git", "commit", "-qm", "record broken pin"], cwd=base, check=True)
+
+    buf = StringIO()
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+        rc = ccc.main(["--base", str(base), "--budget", "100000000",
+                       "--compare", "HEAD"])
+    check("a dangling import at the BASELINE fails, even when the target fixes it",
+          rc == 2)
+    check("  ... and the error names the pin side", "recorded pin" in buf.getvalue())
+
 # --- corpus facts -----------------------------------------------------------
 
 # These pin facts about the real corpus rather than fixture behaviour, so a

@@ -186,13 +186,24 @@ def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
     # downgraded to a non-fatal inline warning, purely by traversal order.
     # Only successful reads are cached unconditionally; a failed inline
     # attempt is recorded but must not block a stronger anchored one.
-    loaded: set[str] = set()
+    #
+    # `loaded` maps a path to the SHALLOWEST depth it has been processed
+    # at, not merely to the fact that it was seen. A plain set makes the
+    # result depend on traversal order: reach a file first down a depth-4
+    # chain and its own imports are skipped for exceeding the limit, then
+    # reach it again directly at depth 1 and the set suppresses the revisit,
+    # so those imports are never counted although they are well inside the
+    # four-hop limit. Re-walking on a strictly shallower route fixes that;
+    # bytes are still counted once, on first load.
+    loaded: dict[str, int] = {}
     failed: dict[str, bool] = {}  # path -> was it attempted as anchored?
 
     def visit(path: str, depth: int, cited_by: str, anchored: bool) -> None:
-        if path in loaded or depth > max_depth:
+        if depth > max_depth:
             return
-        if path in failed and (failed[path] or not anchored):
+        if path in loaded and loaded[path] <= depth:
+            return
+        if path not in loaded and path in failed and (failed[path] or not anchored):
             # Already failed at this strength or stronger; nothing to gain.
             return
         blob = read(path)
@@ -206,8 +217,9 @@ def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
                 unresolved_inline.append((path, cited_by))
             failed[path] = anchored or failed.get(path, False)
             return
-        loaded.add(path)
-        files.append((path, len(blob), depth))
+        if path not in loaded:
+            files.append((path, len(blob), depth))
+        loaded[path] = depth
         text = blob.decode("utf-8", errors="replace")
         child_anchored, child_inline = import_paths(text)
         for child in child_anchored:
@@ -458,13 +470,33 @@ def main(argv=None) -> int:
             args.root, submodule_reader(base, args.submodule, args.compare)
         )
         after_total = sum(size for _, size, _ in after_files)
-        if not after_files or (after_missing and not before_missing):
+        if not after_files:
             print(
                 f"error: could not resolve the closure with {args.submodule} "
                 f"at {args.compare}; is the submodule populated and fetched?",
                 file=sys.stderr,
             )
             return 2
+        # Validate the two closures INDEPENDENTLY. The previous condition,
+        # `after_missing and not before_missing`, silently accepted three
+        # wrong states: a baseline whose own dangling import the target
+        # happens to fix, a new target-side miss whenever the baseline also
+        # had one, and any baseline defect at all -- since in compare mode
+        # the working-tree `missing` list is measured at whatever the
+        # submodule is checked out to, which during a pin bump is the
+        # target. So neither side was actually being checked.
+        for label, misses in (
+            (f"the recorded pin ({pin[:8]})", before_missing),
+            (f"the target ({args.compare})", after_missing),
+        ):
+            if misses:
+                print(
+                    f"error: {len(misses)} dangling anchored import(s) at "
+                    f"{label}:\n"
+                    + "\n".join(f"    {p}  (cited by {c})" for p, c in misses),
+                    file=sys.stderr,
+                )
+                return 2
         # An inline import that resolves at the pin but not at the target
         # makes `after_total` shrink for the wrong reason, so the delta would
         # read as a favourable bump rather than an incomplete comparison.

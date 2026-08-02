@@ -99,17 +99,19 @@ finding → push → post summary → re-request review → repeat until clean.
      affirmative zero-findings overview doesn't rule out a non-verdict
      formal review.
      **A "no new comments" overview can still carry real findings in a
-     collapsed `<details><summary>Suppressed comments (N)</summary>` block**
-     -- these are genuine flagged items under the fully-clean rule (address
-     every finding regardless of confidence label), even though they never
-     become formal inline comment objects the `/comments` endpoint returns
+     collapsed suppression block** -- these are genuine flagged items under
+     the fully-clean rule (address every finding regardless of confidence
+     label), even though they never become formal inline comment objects the
+     `/comments` endpoint returns
      (verified: PR #660's review 4767752501 read "generated no new comments"
      in its overview while its full body carried 3 suppressed findings;
      PR #1029 repeated the shape from round 3 onward). A third
      condition is required: the raw review **body** must not contain
-     `Suppressed comments (` at all. Do not search for the old phrase
-     "Comments suppressed"; it returns a false zero against the current
-     Copilot body shape.
+     a suppression block at all.
+     Match case-insensitively on `suppressed`,
+     not on either exact phrase:
+     PR #660 emitted `Comments suppressed due to low confidence (3)`,
+     while PRs #1029 and #1031 emitted `Suppressed comments (4)`.
      And dispositioning a finding-bearing review's comments
      yourself does **not** make that same review the all-clear -- the
      fully-clean bar needs a *later* review, at the still-current head, that

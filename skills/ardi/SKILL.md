@@ -395,27 +395,39 @@ Do-Confirm; per
 
 ## Stopping conditions
 
-**There is no round limit. Always request another review.** The loop ends on
-exactly three things:
+**There is no round limit. Always request another review.** The loop on a
+single PR ends on exactly three things:
 
 1. **A totally clean review** --- no nits, no non-blocking comments, everything
    Addressed or agreed Deferred. See
    [*The bar: "fully clean"*](#the-bar-fully-clean).
-2. **A genuine deadlock on a specific item** --- you and the reviewer have argued
-   back and forth and cannot reach an understanding.
+2. **Nothing actionable remains** --- every open item has been escalated to a
+   human and is waiting on their decision, so there is no next action you can
+   take. Not "some items are deadlocked"; *all* of them.
 3. **The user says stop.**
 
 Nothing else. Not a round count, not a sense that findings are getting smaller,
 not a judgment that the reviewer is nitpicking.
 
-- **Deadlock on an item:** if you and the reviewer can't reach consensus (your
-  rebuttal didn't convince them, and their re-raise didn't convince you),
-  **escalate to a human reviewer** for the final decision rather than looping or
-  unilaterally overriding. Request `d-morrison` via the `request-pr-review`
-  skill (or `gh pr edit <N> --add-reviewer d-morrison`), `@`-mention them in a
-  comment summarizing the impasse, and surface the open item to the user.
-  This is per-item: escalating one deadlocked finding does not stop the loop,
-  which keeps running on everything else.
+**Deadlock is per-item, and it does not stop the loop.** If you and the
+reviewer can't reach consensus on one finding (your rebuttal didn't convince
+them, and their re-raise didn't convince you), **escalate that item to a human
+reviewer** rather than looping on it or unilaterally overriding. Request
+`d-morrison` via the `request-pr-review` skill (or `gh pr edit <N>
+--add-reviewer d-morrison`), `@`-mention them in a comment summarizing the
+impasse, and surface the open item to the user. Then **keep driving the PR**:
+address every other finding, push, and request the next review. Only when
+*every* remaining item is an escalated deadlock does condition 2 above fire,
+and even then the loop resumes the moment the human rules.
+
+### Sweep-level scheduling is a different question
+
+[`ardia`](../ardia/SKILL.md) and [`gia`](../gia/SKILL.md) drive *many* PRs.
+When one of those is waiting on a human --- a deadlocked item, a blocked
+dependency, an unresolvable conflict --- the sweep records it and moves to the
+next PR so the batch keeps moving. That is **scheduling**, not a stopping
+condition for the loop: the sweep returns when the human rules, and nothing
+about it licenses accepting unaddressed findings on the PR itself.
 
 ### "Asymptotic noise" is an anti-pattern, not a signal
 

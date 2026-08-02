@@ -83,8 +83,10 @@ Print one combined summary:
 
 ## Stopping conditions
 
-- Phase 1 drives each PR per ARDIA's own terminal states: clean, deadlocked on
-  a specific item, or blocked. A round count is not one of them --- see
+- Phase 1 drives each PR to clean, or parks it when every remaining item is
+  waiting on a human, then moves to the next PR. That is sweep **scheduling**,
+  not a licence to accept unaddressed findings: within a PR the loop runs until
+  a totally clean review. A round count is never a reason to stop --- see
   [`ardi`](../ardi/SKILL.md)'s "Stopping conditions".
 - If Phase 1 produced no durable lessons, Phase 2 records nothing — that's a
   valid outcome; don't manufacture edits.

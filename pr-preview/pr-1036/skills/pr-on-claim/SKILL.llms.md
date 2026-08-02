@@ -32,7 +32,7 @@ gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
 gh pr view <N> --json reviewRequests
 ```
 
-Verify the request landed before writing a status report. If the request is blocked, report that blocker and start the fallback; do not write “review owed” as a status item.
+Verify the request landed before writing a status report: the POST response should include the reviewer, then a fresh read should show either a pending request or a new review/check from that reviewer on the current head. If the request disappears with no current-head review, report that blocker and start the fallback; do not write “review owed” as a status item.
 
 ## Workflow order
 

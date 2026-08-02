@@ -397,7 +397,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="at">-X</span> POST <span class="st">"repos/&lt;owner&gt;/&lt;repo&gt;/pulls/&lt;N&gt;/requested_reviewers"</span> <span class="dt">\</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-f</span> <span class="st">'reviewers[]=copilot-pull-request-reviewer[bot]'</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr view <span class="op">&lt;</span>N<span class="op">&gt;</span> --json reviewRequests</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Verify the request landed before writing a status report. If the request is blocked, report that blocker and start the fallback; do not write “review owed” as a status item.</p>
+<p>Verify the request landed before writing a status report: the POST response should include the reviewer, then a fresh read should show either a pending request or a new review/check from that reviewer on the current head. If the request disappears with no current-head review, report that blocker and start the fallback; do not write “review owed” as a status item.</p>
 </section>
 <section id="workflow-order" class="level2">
 <h2 class="anchored" data-anchor-id="workflow-order">Workflow order</h2>

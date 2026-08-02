@@ -481,10 +481,11 @@
   Fix pattern once caught: convert back to draft, reword any forward-looking citation to something that stays accurate regardless of merge timing (e.g. "proposed in #N --- once merged, lives at `path`" rather than asserting the path already resolves), then flip back to ready and re-verify the citation resolves once the dependency actually merges. (Learned on ai-config#454/gha#215.)
 - During ARDI loops: only stop iterating (without consensus) if you're at a literal impasse --- going in circles, redoing and undoing the same changes.
   New nits each round is NOT an impasse; keep addressing them.
-  **There is no round limit, and "asymptotic noise" is an anti-pattern rather than a signal.** Always request another review.
-  Stop only on a totally clean review, a genuine per-item deadlock, or me saying stop --- never on a round count, and never by asking whether to accept the current state.
-  That question fires on how many rounds have passed rather than on what the findings are worth, and it reads as diligence, which is why it goes unexamined. (Purged from the corpus in ai-config#1030 after ai-config#1029 ran six rounds producing 23 real findings, with rounds 2-6 each finding bugs in earlier rounds' own fixes; the loop stopped to ask twice under the old guard, both times the answer was to keep going, and the next round found four more real bugs.
-  Rationale and case record in `skills/ardi/SKILL.md`, "Stopping conditions".)
+  **There is no round limit, and "asymptotic noise" is an anti-pattern rather than a signal.**
+  Always request another review. Stop only on a totally clean review, on every remaining item being escalated to a human (nothing actionable left), or on me saying stop --- never on a round count, and never by asking whether to accept the current state.
+  A deadlock on ONE item does not stop the loop: escalate that item and keep driving the rest.
+  That question fires on how many rounds have passed rather than on what the findings are worth, and it reads as diligence, which is why it goes unexamined.
+  (Purged from the corpus in ai-config#1030 after ai-config#1029 ran six rounds producing 23 real findings, with rounds 2-6 each finding bugs in earlier rounds' own fixes; the loop stopped to ask twice under the old guard, both times the answer was to keep going, and the next round found four more real bugs. Rationale and case record in `skills/ardi/SKILL.md`, "Stopping conditions".)
 - **Every mistake owes a HOOK, not just a recorded learning.** When I get something wrong, ask whether a condition decidable from the transcript would have caught it, and write the hook if so.
   A prose rule is consulted at read time and broken at composition time, so re-reading it never reaches the moment it breaks --- every mistake in the 2026-08-02 session already had a rule covering it, and the rule is what failed.
   Model a message that is wrong to send on `hooks/no-offer-to-file.py` (a `Stop` block); model an obligation that follows a message which is right to send on `hooks/remind-ums-after-error.py` (a `UserPromptSubmit` injection).

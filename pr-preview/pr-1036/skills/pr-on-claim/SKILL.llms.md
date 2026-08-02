@@ -24,7 +24,7 @@ A draft PR doesn’t trigger `@claude` review bot, so no review round is spent o
 
 ## Request reviewer before reporting status
 
-Opening a PR or marking a draft ready can trigger this repo’s own review workflow, but that does not summon Copilot. If Copilot is a configured reviewer, request it immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR:
+Opening a PR or marking a draft ready can trigger the repo’s own review workflow, but that does not summon Copilot. If Copilot is a configured reviewer, request it immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR:
 
 ``` bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \

@@ -393,7 +393,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="request-reviewer-before-reporting-status" class="level2">
 <h2 class="anchored" data-anchor-id="request-reviewer-before-reporting-status">Request reviewer before reporting status</h2>
-<p>Opening a PR or marking a draft ready can trigger this repo’s own review workflow, but that does not summon Copilot. If Copilot is a configured reviewer, request it immediately after <code>gh pr create</code> for a non-draft PR, or immediately after <code>gh pr ready</code> for a draft PR:</p>
+<p>Opening a PR or marking a draft ready can trigger the repo’s own review workflow, but that does not summon Copilot. If Copilot is a configured reviewer, request it immediately after <code>gh pr create</code> for a non-draft PR, or immediately after <code>gh pr ready</code> for a draft PR:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="at">-X</span> POST <span class="st">"repos/&lt;owner&gt;/&lt;repo&gt;/pulls/&lt;N&gt;/requested_reviewers"</span> <span class="dt">\</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-f</span> <span class="st">'reviewers[]=copilot-pull-request-reviewer[bot]'</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr view <span class="op">&lt;</span>N<span class="op">&gt;</span> --json reviewRequests,reviews</span>

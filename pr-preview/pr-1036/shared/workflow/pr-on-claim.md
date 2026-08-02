@@ -38,7 +38,7 @@ complete and the repo's checks pass, mark the PR **ready for review**
 Marking it ready is what kicks off ARDI.
 
 **Request the external reviewer in the same stride.** Opening a PR or marking a draft ready can trigger the repo's own review workflow, but that does not summon every reviewer.
-In this repo, Copilot reviews only when explicitly requested with the requested-reviewers API or the equivalent UI action:
+For repositories that use Copilot, Copilot reviews only when explicitly requested with the requested-reviewers API or the equivalent UI action:
 
 ```bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \

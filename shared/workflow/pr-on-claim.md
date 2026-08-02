@@ -38,14 +38,32 @@ complete and the repo's checks pass, mark the PR **ready for review**
 Marking it ready is what kicks off ARDI.
 
 **Request the external reviewer in the same stride.** Opening a PR or marking a draft ready can trigger the repo's own review workflow, but that does not summon every reviewer.
-For repositories that use Copilot, Copilot reviews only when explicitly requested with the requested-reviewers API or the equivalent UI action:
+For a repository whose Copilot review isn't already scheduled automatically (see the caveat below), Copilot only reviews when explicitly requested with the requested-reviewers API or the equivalent UI action --- the `REQUEST_COPILOT_REVIEW` operation token (`tool-mappings.md`):
 
 ```bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
-  -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+  -f 'reviewers[]=copilot-pull-request-reviewer[bot]'   # REQUEST_COPILOT_REVIEW
 gh pr view <N> --json reviewRequests,reviews
 gh pr checks <N>
 ```
+
+In a remote/web session without `gh`, use the equivalent tool
+(`mcp__github__request_copilot_review`) instead.
+
+**Some repos schedule Copilot automatically, and this step is redundant there.**
+A repository ruleset can carry a `copilot_code_review` rule with
+`review_on_push: true` (and optionally `review_draft_pull_requests: true`),
+which re-requests Copilot on every push with no explicit request from anyone
+--- see [`memories/github.md`](../../memories/github.md)'s "Required checks are
+not the only thing a ruleset carries" section for how to read that off a
+repo's rulesets.
+When that applies, an explicit request lands while Copilot is already a
+pending reviewer, which the API can (unreliably) answer with either `201` or
+`422` --- don't spend a call resolving which; either response is consistent
+with the ruleset already having asked.
+Where you can't tell whether the repo has such a ruleset, request explicitly
+anyway --- a redundant request costs nothing, while skipping it on a repo
+without automatic review leaves Copilot unrequested.
 
 Run that request immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR, before writing any status report.
 Verify the request landed: the POST response should include the requested reviewer, then a fresh read should show either a pending review request or a new review/check from that reviewer on the current head.

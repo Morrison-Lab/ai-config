@@ -43,30 +43,29 @@ standing **never assume; always verify** rule applied to closing out a PR.)
 
 ### 1.25. Check for reviews that landed just before the merge
 
-A review can post after your last processed round
-and moments before the human merges.
+A review can post after your last processed round and before the human merges.
 Those findings are real even though they are absent from the merge commit.
-After confirming `mergedAt`,
-re-read formal reviews and PR comments whose `submittedAt` or `createdAt`
-is near the merge time,
-and compare them with the last review this session explicitly dispositioned.
+After confirming `mergedAt`, identify the last review this session explicitly dispositioned, then read every formal review and PR comment after that timestamp and before `mergedAt`.
+Do not use an imprecise "near the merge time" window; the lower bound is the last dispositioned review, and `mergedAt` is only the upper bound.
 
 ```bash
 gh pr view <N> --json mergedAt,reviews,comments   # VIEW_PR
+gh api repos/<owner>/<repo>/pulls/<N>/comments    # VIEW_INLINE_COMMENTS
 ```
+
+A formal review's top-level body is not enough.
+For each late review, read the inline review comments tied to that review ID too, because an empty-body review can carry every finding inline.
 
 If a late review contains findings:
 
 1. Confirm the merge commit does not contain the fix.
-2. File or use a follow-up issue or PR,
-   and carry the findings there with a link back to the merged PR.
-3. Do not count the merged PR's review loop as clean for those findings;
-   the new PR owns them.
+2. File or use a follow-up issue or PR, and carry the findings there with a link back to the merged PR.
+3. Do not count the merged PR's review loop as clean for those findings; the new PR owns them.
 
-- **Do:** check for reviews submitted shortly before `mergedAt`,
-  especially any posted after your last processed review.
-- **Do:** carry late findings forward to a new tracked fix
-  when the merge beat the ARD round.
+- **Do:** check every review and PR comment posted after the last dispositioned review and before `mergedAt`.
+- **Do:** fetch late formal reviews' inline comments, not only their top-level bodies.
+- **Do:** carry late findings forward to a new tracked fix when the merge beat the ARD round.
+- **Don't:** use a vague "near merge time" window that can skip a late finding posted well before a delayed merge.
 - **Don't:** treat the merge as proof the final review round was clean.
 - **Don't:** drop a finding because it arrived too late for the merged branch.
 

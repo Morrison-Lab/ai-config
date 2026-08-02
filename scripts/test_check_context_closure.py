@@ -83,7 +83,7 @@ check(
 
 # --- walk_closure -----------------------------------------------------------
 
-files, missing, inline = ccc.walk_closure(
+files, missing, inline, _amb = ccc.walk_closure(
     "CLAUDE.md",
     reader_for(
         {
@@ -102,19 +102,19 @@ check("nothing missing when every import resolves", missing == [])
 
 # A file imported twice must be counted once: Claude Code loads it once, so
 # double-counting would overstate the budget and cry wolf.
-files, _, _ = ccc.walk_closure(
+files, _, _, _amb = ccc.walk_closure(
     "root.md",
     reader_for({"root.md": "@a.md\n@b.md\n", "a.md": "@b.md\n", "b.md": "xxxx"}),
 )
 check("a file imported twice is counted once", [p for p, _, _ in files].count("b.md") == 1)
 
 # An import cycle must terminate rather than recursing forever.
-files, _, _ = ccc.walk_closure(
+files, _, _, _amb = ccc.walk_closure(
     "root.md", reader_for({"root.md": "@a.md\n", "a.md": "@root.md\n"})
 )
 check("an import cycle terminates", len(files) == 2)
 
-files, missing, _ = ccc.walk_closure(
+files, missing, _, _amb = ccc.walk_closure(
     "root.md", reader_for({"root.md": "@gone.md\n@here.md\n", "here.md": "y"})
 )
 check("an unresolvable anchored import is reported as missing", missing == [("gone.md", "root.md")])
@@ -124,7 +124,7 @@ check("a missing import does not stop the walk", len(files) == 2)
 # address), so it must NOT be reported as a dangling import -- that would make
 # the check cry wolf on a corpus full of bot mentions. It is surfaced
 # separately instead, so a genuinely mistyped inline import is still visible.
-files, missing, inline = ccc.walk_closure(
+files, missing, inline, _amb = ccc.walk_closure(
     "root.md", reader_for({"root.md": "ask @claude to look\n@real.md\n", "real.md": "z"})
 )
 check("an unresolved inline @token is NOT a dangling import", missing == [])
@@ -143,7 +143,7 @@ check("  ... while an absolute path is left alone",
       ccc.resolve("/etc/x.md", "docs/a.md") == "/etc/x.md")
 check("  ... as is a ~ path", ccc.resolve("~/x.md", "docs/a.md") == "~/x.md")
 
-files, missing, _ = ccc.walk_closure(
+files, missing, _, _amb = ccc.walk_closure(
     "CLAUDE.md",
     reader_for({"CLAUDE.md": "@docs/a.md\n", "docs/a.md": "@b.md\n", "docs/b.md": "nested"}),
 )
@@ -160,10 +160,10 @@ check("the shipped depth limit matches the documented four hops",
 deep = {"f0.md": "@f1.md\n"}
 for i in range(1, 12):
     deep[f"f{i}.md"] = f"@f{i + 1}.md\n"
-files, _, _ = ccc.walk_closure("f0.md", reader_for(deep))
+files, _, _, _amb = ccc.walk_closure("f0.md", reader_for(deep))
 check("the walk stops at the documented depth by default",
       max(d for _, _, d in files) == 4)
-files, _, _ = ccc.walk_closure("f0.md", reader_for(deep), max_depth=3)
+files, _, _, _amb = ccc.walk_closure("f0.md", reader_for(deep), max_depth=3)
 check("the walk stops at an explicit max_depth", max(d for _, _, d in files) <= 3)
 
 # --- readers ----------------------------------------------------------------
@@ -184,15 +184,15 @@ with tempfile.TemporaryDirectory() as tmp:
     subprocess.run(["git", "add", "-A"], cwd=sub, check=True)
     subprocess.run(["git", "commit", "-qm", "newer"], cwd=sub, check=True)
 
-    files, _, _ = ccc.walk_closure("CLAUDE.md", ccc.local_reader(base))
+    files, _, _, _amb = ccc.walk_closure("CLAUDE.md", ccc.local_reader(base))
     check("local_reader reads the working tree", len(files) == 3)
 
     # The pin-bump report's core claim: the import list is fixed, and only
     # what the submodule contributes changes.
-    at_head, _, _ = ccc.walk_closure(
+    at_head, _, _, _amb = ccc.walk_closure(
         "CLAUDE.md", ccc.submodule_reader(base, ".ai-config", "HEAD")
     )
-    at_pin, _, _ = ccc.walk_closure(
+    at_pin, _, _, _amb = ccc.walk_closure(
         "CLAUDE.md", ccc.submodule_reader(base, ".ai-config", "HEAD~1")
     )
     check(
@@ -270,7 +270,7 @@ check("positive_int itself rejects zero", ccc.positive_int("4") == 4)
 # An unresolved inline token must not claim a path and downgrade a later
 # ANCHORED import of the same path from a hard failure to a warning. The bug
 # was purely traversal-order dependent, so it needs both citations present.
-files, missing, inline = ccc.walk_closure(
+files, missing, inline, _amb = ccc.walk_closure(
     "root.md",
     reader_for(
         {
@@ -354,7 +354,7 @@ with tempfile.TemporaryDirectory() as tmp:
             ccc.local_reader(Path(tmp))("~/personal.md") == b"probe",
         )
         (Path(tmp) / "CLAUDE.md").write_text("@~/personal.md\n", encoding="utf-8")
-        files, missing, _ = ccc.walk_closure(
+        files, missing, _, _amb = ccc.walk_closure(
             "CLAUDE.md", ccc.local_reader(Path(tmp))
         )
         check(
@@ -502,9 +502,9 @@ _diamond = {
     "deep.md": "@child.md\n",
     "child.md": "CHILD BYTES",
 }
-chain_first, _, _ = ccc.walk_closure("root.md", reader_for(_diamond))
+chain_first, _, _, _amb = ccc.walk_closure("root.md", reader_for(_diamond))
 _reversed = dict(_diamond, **{"root.md": "@deep.md\n@a1.md\n"})
-direct_first, _, _ = ccc.walk_closure("root.md", reader_for(_reversed))
+direct_first, _, _, _amb = ccc.walk_closure("root.md", reader_for(_reversed))
 names_chain = [p for p, _, _ in chain_first]
 names_direct = [p for p, _, _ in direct_first]
 check(
@@ -527,7 +527,7 @@ check(
 _chain = {"f0.md": "@f1.md\n"}
 for i in range(1, 9):
     _chain[f"f{i}.md"] = f"@f{i + 1}.md\n"
-files, _, _ = ccc.walk_closure("f0.md", reader_for(_chain))
+files, _, _, _amb = ccc.walk_closure("f0.md", reader_for(_chain))
 check("re-walking does not defeat the depth limit",
       max(d for _, _, d in files) == 4)
 
@@ -573,12 +573,65 @@ with tempfile.TemporaryDirectory() as tmp:
           rc == 2)
     check("  ... and the error names the pin side", "recorded pin" in buf.getvalue())
 
+# --- round-5 review findings ------------------------------------------------
+
+# A CRLF checkout, or a trailing space, silently downgraded EVERY anchored
+# import: `$` will not match before a `\r` and `[^\s`]+` cannot consume it,
+# so the anchored matcher found nothing while the inline matcher still found
+# the token -- turning a hard dangling-import failure into a non-fatal
+# warning, repo-wide, on Windows.
+check(
+    "CRLF line endings still yield ANCHORED imports",
+    ccc.import_paths("@a.md\r\n@b.md\r\n") == (["a.md", "b.md"], []),
+)
+check(
+    "trailing horizontal whitespace does not downgrade an anchored import",
+    ccc.import_paths("@a.md  \n")[0] == ["a.md"],
+)
+check(
+    "a CRLF dangling import is fatal, not a warning",
+    ccc.walk_closure("root.md", reader_for({"root.md": "@gone.md\r\n"}))[1]
+    == [("gone.md", "root.md")],
+)
+
+# An unclosed fence is REPORTED rather than swallowed to EOF. Implementing
+# CommonMark's rule verbatim is catastrophic on real content: this repo's own
+# CLAUDE.md has same-length nested fences, so its outer closer reads as a
+# fresh unclosed opener and everything after becomes code -- measured, 19
+# genuine imports lost and the closure down from 70 files to 51.
+check(
+    "an unclosed fence does not swallow the rest of the document",
+    ccc.import_paths("```\n@inside.md\n\n@after.md\n")[0]
+    == ["inside.md", "after.md"],
+)
+check(
+    "an unclosed fence is counted as unbalanced",
+    ccc.unbalanced_fences("```\n@inside.md\n") == 1,
+)
+check(
+    "a balanced document reports no unbalanced fences",
+    ccc.unbalanced_fences("```\n@x.md\n```\n") == 0,
+)
+_f, _m, _i, _amb = ccc.walk_closure(
+    "root.md", reader_for({"root.md": "```\n@x.md\n", "x.md": "y"})
+)
+check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
+
+# This repo's own CLAUDE.md is the real instance, so pin it: the count must
+# stay at 69 anchored imports whatever the fence handling does.
+check(
+    "this repo's CLAUDE.md still yields 69 anchored imports",
+    len(ccc.import_paths(
+        (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    )[0]) == 69,
+)
+
 # --- corpus facts -----------------------------------------------------------
 
 # These pin facts about the real corpus rather than fixture behaviour, so a
 # future change that breaks them fails here instead of silently shrinking the
 # measured closure.
-files, missing, inline = ccc.walk_closure("CLAUDE.md", ccc.local_reader(ccc.REPO_ROOT))
+files, missing, inline, _amb = ccc.walk_closure("CLAUDE.md", ccc.local_reader(ccc.REPO_ROOT))
 check("this repo's own closure has no dangling imports", not missing)
 check("this repo's own closure resolves more than just the root", len(files) > 1)
 

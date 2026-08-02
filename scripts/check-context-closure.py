@@ -101,7 +101,13 @@ DEFAULT_BYTES_PER_TOKEN = 4
 # the failure `shared/principles/fail-fast.md` warns about. Counting both
 # when they resolve, and failing only on the anchored ones, is what
 # avoids each.
-_ANCHORED_IMPORT_RE = re.compile(r"^@([^\s`]+)$", re.MULTILINE)
+# The anchored form tolerates trailing horizontal whitespace and a CR.
+# Without that, a CRLF checkout downgrades EVERY anchored import: `$` will
+# not match before the `\r` and `[^\s`]+` cannot consume it, so the
+# anchored matcher finds nothing while the inline matcher still finds the
+# token -- turning a hard dangling-import failure into a non-fatal warning
+# on Windows checkouts, silently and repo-wide.
+_ANCHORED_IMPORT_RE = re.compile(r"^@([^\s`]+)[ \t]*\r?$", re.MULTILINE)
 _INLINE_IMPORT_RE = re.compile(r"(?<![\w`])@([^\s`]+?)(?=[.,;:!?)\]]*(?:\s|$))")
 
 # Both delimiters must match a RUN of markers, not a fixed one. A fenced
@@ -117,6 +123,17 @@ _INLINE_IMPORT_RE = re.compile(r"(?<![\w`])@([^\s`]+?)(?=[.,;:!?)\]]*(?:\s|$))")
 #     indented independently. An unindented pattern leaves the block's
 #     contents in the text, so an `@path` inside a documented example is
 #     counted as a real import.
+#   * An UNCLOSED fence is REPORTED but not swallowed to EOF, which is a
+#     deliberate departure from CommonMark and the only one here. The spec
+#     says an unclosed fence runs to the end of the document, and
+#     implementing that verbatim is catastrophic on real content: this
+#     repo's own CLAUDE.md contains same-length nested fences (an outer
+#     ``` wrapping an inner ```{r}), so the outer closer reads as a fresh
+#     unclosed opener and everything after it becomes code. Measured, that
+#     dropped 19 genuine imports, taking the closure from 70 files to 51.
+#     Under-reporting the closure by a quarter to be spec-correct about a
+#     malformed fence is the wrong trade for a measuring instrument, so
+#     unbalanced fences surface as a warning and the operator decides.
 #   * A code span may contain line endings but NOT a blank line. That bound
 #     is load-bearing rather than pedantic: an unbounded `[\s\S]*?` pairs a
 #     stray backtick with another far later in the file and strips
@@ -124,6 +141,7 @@ _INLINE_IMPORT_RE = re.compile(r"(?<![\w`])@([^\s`]+?)(?=[.,;:!?)\]]*(?:\s|$))")
 #     the anchored-import count from 69 to 50 and the closure from 70 files
 #     to 51. Stopping at a blank line keeps multi-line spans working while
 #     confining any mismatch to a single paragraph.
+_UNCLOSED_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})[^\n]*$", re.MULTILINE)
 _FENCE_RE = re.compile(
     r"^ {0,3}(`{3,}|~{3,})[^\n]*$[\s\S]*?^ {0,3}\1[`~]*[ \t]*$", re.MULTILINE
 )
@@ -134,6 +152,17 @@ _CODE_SPAN_RE = re.compile(r"(`+)(?:[^\n]|\n(?![ \t]*\n))*?\1(?!`)")
 # of four hops". A deeper file is not loaded, so counting it would inflate
 # both the closure total and the pin-bump delta.
 MAX_IMPORT_DEPTH = 4
+
+
+def unbalanced_fences(text: str) -> int:
+    """How many fence markers are left over after pairing closed blocks.
+
+    An unclosed fence makes this parser's answer ambiguous: CommonMark says
+    the rest of the document is code, while this module deliberately does
+    not swallow it (see `_UNCLOSED_FENCE_RE`'s comment). Rather than pick
+    silently, count the leftovers so the report can say so.
+    """
+    return len(_UNCLOSED_FENCE_RE.findall(_FENCE_RE.sub("", text)))
 
 
 def import_paths(text: str) -> tuple[list[str], list[str]]:
@@ -188,6 +217,7 @@ def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
     files: list[tuple[str, int, int]] = []
     missing: list[tuple[str, str]] = []
     unresolved_inline: list[tuple[str, str]] = []
+    ambiguous: list[tuple[str, int]] = []
     # Two caches, not one. Caching every ATTEMPTED path meant an unresolved
     # inline token could claim a path and suppress a later anchored import
     # of the same path -- so a genuinely dangling anchored import was
@@ -229,6 +259,9 @@ def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
             files.append((path, len(blob), depth))
         loaded[path] = depth
         text = blob.decode("utf-8", errors="replace")
+        stray = unbalanced_fences(text)
+        if stray and all(a[0] != path for a in ambiguous):
+            ambiguous.append((path, stray))
         child_anchored, child_inline = import_paths(text)
         for child in child_anchored:
             visit(resolve(child, path), depth + 1, path, True)
@@ -236,7 +269,7 @@ def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
             visit(resolve(child, path), depth + 1, path, False)
 
     visit(root, 0, "(root)", True)
-    return files, missing, unresolved_inline
+    return files, missing, unresolved_inline, ambiguous
 
 
 def local_reader(base: Path):
@@ -317,7 +350,8 @@ def submodule_reader(base: Path, submodule: str, rev: str):
 
 
 def render(
-    files, missing, unresolved_inline, budget, bytes_per_token, label, top_n=10
+    files, missing, unresolved_inline, ambiguous, budget, bytes_per_token, label,
+    top_n=10,
 ) -> str:
     """Human-readable report for one closure measurement."""
     total = sum(size for _, size, _ in files)
@@ -350,6 +384,17 @@ def render(
             lines.append(f"    @{path}  (in {cited_by})")
         if len(unresolved_inline) > top_n:
             lines.append(f"    ... and {len(unresolved_inline) - top_n} more")
+    if ambiguous:
+        # An unclosed fence makes this file's parse ambiguous: CommonMark
+        # would treat the remainder as code, this parser does not. Say so
+        # rather than resolving it silently in either direction.
+        lines.append("")
+        lines.append(
+            f"  {len(ambiguous)} file(s) have unbalanced code fences, so their "
+            f"import parse is ambiguous:"
+        )
+        for path, n in ambiguous[:top_n]:
+            lines.append(f"    {path}  ({n} unclosed fence marker(s))")
     lines.append("")
     if total > budget:
         over = total - budget
@@ -440,7 +485,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
 
     base = Path(args.base).resolve()
-    files, missing, inline = walk_closure(args.root, local_reader(base))
+    files, missing, inline, ambiguous = walk_closure(args.root, local_reader(base))
 
     if not files:
         # A closure that resolved nothing is not a small closure. Fail loudly
@@ -453,7 +498,10 @@ def main(argv=None) -> int:
         return 2
 
     print(
-        render(files, missing, inline, args.budget, args.bytes_per_token, str(base))
+        render(
+            files, missing, inline, ambiguous, args.budget,
+            args.bytes_per_token, str(base),
+        )
     )
 
     total = sum(size for _, size, _ in files)
@@ -470,11 +518,11 @@ def main(argv=None) -> int:
                 file=sys.stderr,
             )
             return 2
-        before_files, before_missing, before_inline = walk_closure(
+        before_files, before_missing, before_inline, _ = walk_closure(
             args.root, submodule_reader(base, args.submodule, pin)
         )
         before_total = sum(size for _, size, _ in before_files)
-        after_files, after_missing, after_inline = walk_closure(
+        after_files, after_missing, after_inline, _ = walk_closure(
             args.root, submodule_reader(base, args.submodule, args.compare)
         )
         after_total = sum(size for _, size, _ in after_files)

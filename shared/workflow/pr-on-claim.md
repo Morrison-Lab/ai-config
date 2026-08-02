@@ -47,15 +47,16 @@ gh pr view <N> --json reviewRequests
 ```
 
 Run that request immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR, before writing any status report.
-Verify the request landed: the API response should include the requested reviewer, and `gh pr view <N> --json reviewRequests` should show the pending request.
-If a reviewer cannot be requested in this session, say so and start the documented fallback; do not leave it as "review owed".
+Verify the request landed: the POST response should include the requested reviewer, then a fresh read should show either a pending review request or a new review/check from that reviewer on the current head.
+A POST response alone is not enough; if the pending request disappears and no current-head review appears after a short poll, treat the reviewer request as blocked and start the documented fallback.
+Do not leave it as "review owed".
 
 This is part of opening the PR, not a follow-up task.
 A status sentence like "review owed on #N" is the anti-pattern: it names a debt that should already have been discharged, the same way an offer to file an issue names work instead of doing it.
 The sentence is the trigger to request the review now.
 
 - **Do:** request the reviewer explicitly in the same step that opens the PR or marks it ready.
-- **Do:** verify the request landed from the API response and `reviewRequests`.
+- **Do:** verify the request landed from the API response plus a fresh pending-request or current-head-review read.
 - **Don't:** treat a PR's auto-triggered checks as evidence that every reviewer is engaged.
 - **Don't:** write "review owed" or "still need to request review" into a status report; go request it instead.
 

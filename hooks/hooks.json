@@ -94,6 +94,13 @@
       "event": "UserPromptSubmit",
       "timeout": 10,
       "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring'. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
+    },
+    {
+      "script": "no-whole-file-punct-replace.py",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 10,
+      "why": "shared/coding/ascii-punctuation-in-source.md's over-application warning. A whole-file glyph replace converts pre-existing glyphs on untouched lines, and the resulting mechanical diff HIDES real changes -- on 2026-08-02 it concealed two dropped paragraphs. Blocks only when a glyph replace, a write-back, and no scoping token all co-occur under an interpreter."
     }
   ]
 }

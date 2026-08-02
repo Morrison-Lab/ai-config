@@ -83,8 +83,9 @@ Print one combined summary:
 
 ## Stopping conditions
 
-- Honor ARDIA's asymptotic-noise guard in Phase 1: if a single PR won't
-  converge after 3–4 rounds, surface it and move on rather than spinning.
+- Phase 1 drives each PR per ARDIA's own terminal states: clean, deadlocked on
+  a specific item, or blocked. A round count is not one of them --- see
+  [`ardi`](../ardi/SKILL.md)'s "Stopping conditions".
 - If Phase 1 produced no durable lessons, Phase 2 records nothing — that's a
   valid outcome; don't manufacture edits.
 

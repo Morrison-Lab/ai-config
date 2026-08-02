@@ -15,8 +15,10 @@ over-length line in the touched section in one pass** — not just the
 specifically-flagged ones. Review bots (`@claude` / Copilot) re-scan on
 each push and flag the next batch of adjacent borderline lines the prior
 round left alone, so fixing only what was named drags the PR through round
-after round of the same finding (asymptotic noise; UCD-SERG/lab-manual#297
-took five review rounds this way).
+after round of the same finding (UCD-SERG/lab-manual#297 took five review
+rounds this way). Doing the whole section in one pass is how you spend
+fewer rounds --- not a reason to stop iterating, which is never on the
+table (see [`ardi`](../../skills/ardi/SKILL.md)'s "Stopping conditions").
 
 **URL-inflation exception:** a line that runs long *only* because of an
 embedded `[text](long-url)` link — where the visible prose before the link

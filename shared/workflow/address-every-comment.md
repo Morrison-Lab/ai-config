@@ -34,9 +34,18 @@ backstop --- resolve-on-address is the default, not a cleanup step.
 
 Do **not** report "ready to merge with one minor nit noted" / "harmless as-is" /
 "can address if you want" --- that hedging just pushes triage back to the
-requester. If after 3--4 rounds the reviewer keeps generating new nits each
-cycle (asymptotic noise), surface that and ask whether to keep going or accept
-the current state.
+requester.
+
+**A round count is never a reason to stop, and "the reviewer keeps finding
+things" is not a finding about the reviewer.** There is no threshold after
+which unaddressed items become acceptable: keep requesting reviews and keep
+dispositioning findings until a review comes back with none. The only exits
+are a totally clean review, a genuine per-item deadlock, or the user calling
+it. Reasoning of the form "we have done N rounds, shall we accept the current
+state?" is the same hedging this paragraph bans, moved up from one finding to
+the whole loop --- see
+[`ardi`](../../skills/ardi/SKILL.md)'s "Stopping conditions" for why it fails
+and for the case record.
 
 **Noise is per-item, not per-round --- don't stop the whole loop over one
 recurring flag.** A long-running PR can have both real findings (worth fixing

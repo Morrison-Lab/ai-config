@@ -23,7 +23,7 @@ Confirm `state == MERGED` and `mergedAt` is set. If it isn’t actually merged, 
 
 ### 1.25. Check for reviews that landed just before the merge
 
-A review can post after your last processed round and before the human merges. Those findings are real even though they are absent from the merge commit. After confirming `mergedAt`, identify the last review this session explicitly dispositioned, then read every formal review and PR comment after that timestamp and before `mergedAt`. Do not use an imprecise “near the merge time” window; the lower bound is the last dispositioned review, and `mergedAt` is only the upper bound.
+A review can post after your last processed round and before the human merges. Those findings are real even though they are absent from the merge commit. After confirming `mergedAt`, identify the last review this session explicitly dispositioned, then read every formal review and PR comment after that timestamp and before `mergedAt`. Do not use an imprecise “near the merge time” window. The lower bound is the last dispositioned review, and `mergedAt` is only the upper bound.
 
 ``` bash
 gh pr view <N> --json mergedAt,reviews,comments   # VIEW_PR

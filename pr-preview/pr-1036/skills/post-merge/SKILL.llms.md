@@ -26,11 +26,11 @@ Confirm `state == MERGED` and `mergedAt` is set. If it isn’t actually merged, 
 A review can post after your last processed round and before the human merges. Those findings are real even though they are absent from the merge commit. After confirming `mergedAt`, identify the last review this session explicitly dispositioned, then read every formal review and PR comment after that timestamp and before `mergedAt`. Do not use an imprecise “near the merge time” window. The lower bound is the last dispositioned review, and `mergedAt` is only the upper bound.
 
 ``` bash
-gh pr view <N> --json mergedAt,reviews,comments   # VIEW_PR
-gh api repos/<owner>/<repo>/pulls/<N>/comments    # VIEW_INLINE_COMMENTS
+gh api repos/<owner>/<repo>/pulls/<N>/reviews --paginate   # review bodies
+gh api repos/<owner>/<repo>/pulls/<N>/comments --paginate  # inline comments
 ```
 
-A formal review’s top-level body is not enough. For each late review, read the inline review comments tied to that review ID too, because an empty-body review can carry every finding inline.
+A formal review’s top-level body is not enough. For each late review, filter the inline comments by `pull_request_review_id`, because an empty-body review can carry every finding inline. This is the same two-surface shape `ardi` already requires when reading formal reviews; do not reimplement it as a body-only scan here.
 
 If a late review contains findings:
 

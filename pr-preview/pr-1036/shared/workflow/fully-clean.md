@@ -260,11 +260,12 @@ inconsistent.
   Copilot can say it "generated no new comments"
   and create zero inline comments
   while placing substantive findings inside a collapsed
-  `<details><summary>Suppressed comments (N)</summary>` block in the review
-  body.
-  The heading matters:
-  `Suppressed comments (` is the current literal,
-  while `Comments suppressed` is an old string that returns a false zero.
+  `<details>` suppression block in the review body.
+  The heading moves,
+  so match case-insensitively on `suppressed` rather than on one exact phrase:
+  PR #660 emitted `Comments suppressed due to low confidence (3)`,
+  while PRs #1029 and #1031 emitted `Suppressed comments (4)`.
+  A literal grep for either phrase can return a false zero.
   A body read that stops at the overview is therefore not a body read.
 - **"No verdict" is its own state, distinct from "a verdict with no
   findings".**
@@ -294,7 +295,7 @@ rather than substituting the nearest available count.
 - **Don't:** treat an empty review body as an all-clear without checking the
   inline comments.
 - **Don't:** treat a "generated no new comments" overview as an all-clear
-  until the full body has been checked for `Suppressed comments (`.
+  until the full body has been checked case-insensitively for `suppressed`.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 

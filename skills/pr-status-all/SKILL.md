@@ -142,7 +142,7 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    low-confidence findings collapsed into a `<details>` block that never
 >    becomes a formal inline comment (verified: PR #660's review 4767752501
 >    read "generated no new comments" while carrying 3 suppressed findings;
->    PR #1029 repeated the shape across seven rounds). Do not search for the
+>    PR #1029 repeated the shape from round 3 onward). Do not search for the
 >    old phrase "Comments suppressed"; it returns zero against the current
 >    Copilot body shape. A stub-like non-answer ("ineligible",
 >    "reached their quota limit") is not a verdict either.

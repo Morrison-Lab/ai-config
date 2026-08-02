@@ -105,7 +105,7 @@ finding → push → post summary → re-request review → repeat until clean.
      become formal inline comment objects the `/comments` endpoint returns
      (verified: PR #660's review 4767752501 read "generated no new comments"
      in its overview while its full body carried 3 suppressed findings;
-     PR #1029 repeated the shape across seven review rounds). A third
+     PR #1029 repeated the shape from round 3 onward). A third
      condition is required: the raw review **body** must not contain
      `Suppressed comments (` at all. Do not search for the old phrase
      "Comments suppressed"; it returns a false zero against the current

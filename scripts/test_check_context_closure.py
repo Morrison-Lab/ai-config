@@ -688,6 +688,50 @@ check("a shallower revisit corrects the REPORTED depth", _depths["deep.md"] == 1
 check("  ... and its children get the shallower depth too",
       _depths["child.md"] == 2)
 
+# --- round-7 review findings ------------------------------------------------
+
+# Every line-ending construct must accept CRLF. Two separate omissions, both
+# of which turn a Windows checkout into a differently-wrong measurement:
+#
+#   * a fence closer whose `[ \\t]*$` cannot consume the `\\r` leaves a
+#     BALANCED block looking like two orphan markers, so strip_code drops the
+#     marker lines and KEEPS the body -- counting documented `@path` examples
+#     inside a code block as real imports;
+#   * a blank-line bound written `\\n(?![ \\t]*\\n)` never fires on CRLF, which
+#     reopens the swallow bug this module already fixed once for LF.
+check(
+    "a balanced CRLF fence is stripped, not read as two orphans",
+    ccc.import_paths("```\r\n@gone.md\r\n```\r\n@real.md\r\n")[0] == ["real.md"],
+)
+check(
+    "  ... and reports no unbalanced fences",
+    ccc.unbalanced_fences("```\r\n@x.md\r\n```\r\n") == 0,
+)
+check(
+    "a CRLF tilde fence is stripped",
+    ccc.import_paths("~~~\r\n@gone.md\r\n~~~\r\n@real.md\r\n")[0] == ["real.md"],
+)
+check(
+    "a CRLF indented fence with a blank body line is stripped",
+    ccc.import_paths(
+        "   ```\r\n@gone.md\r\n\r\nx\r\n   ```\r\n@real.md\r\n"
+    )[0] == ["real.md"],
+)
+check(
+    "the blank-line bound fires on CRLF, so a stray backtick cannot swallow",
+    ccc.import_paths("stray ` x\r\n\r\n@real.md\r\n\r\ny ` z\r\n")[0]
+    == ["real.md"],
+)
+check(
+    "a genuine CRLF multi-line span is still stripped",
+    ccc.import_paths("a `code\r\n@gone.md\r\nmore` b\r\n@real.md\r\n")[0]
+    == ["real.md"],
+)
+check(
+    "run-length rules still hold under CRLF",
+    ccc.import_paths("````\r\n@a.md\r\n```\r\n@b.md\r\n")[0] == ["a.md", "b.md"],
+)
+
 # --- corpus facts -----------------------------------------------------------
 
 # These pin facts about the real corpus rather than fixture behaviour, so a

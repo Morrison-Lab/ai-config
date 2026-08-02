@@ -119,8 +119,10 @@ stacks on it.
   on to the next item rather than halting the sweep. Stop only when every
   remaining item depends on that blocked one, so no independent work is left
   (see [`stack-dont-pause`](../../shared/workflow/stack-dont-pause.md)).
-- If Phase 1's reviewer keeps emitting new nits each round on the same PR
-  (asymptotic noise after 3–4 rounds), surface it and ask whether to continue.
+- If Phase 1's reviewer and you deadlock on a specific item --- argued back and
+  forth with no understanding reached --- escalate that item to a human and keep
+  driving the rest. A run of rounds is not itself a reason to stop or to ask:
+  see [`ardi`](../ardi/SKILL.md)'s "Stopping conditions".
 
 ## Orchestration
 

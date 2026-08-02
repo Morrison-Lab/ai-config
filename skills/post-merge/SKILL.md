@@ -41,6 +41,42 @@ Confirm `state == MERGED` and `mergedAt` is set. If it isn't actually merged,
 **stop and report** — don't tidy a branch whose work hasn't landed. (The
 standing **never assume; always verify** rule applied to closing out a PR.)
 
+### 1.25. Check for reviews that landed just before the merge
+
+A review can post after your last processed round
+and moments before the human merges.
+Those findings are real even though they are absent from the merge commit.
+After confirming `mergedAt`,
+re-read formal reviews and PR comments whose `submittedAt` or `createdAt`
+is near the merge time,
+and compare them with the last review this session explicitly dispositioned.
+
+```bash
+gh pr view <N> --json mergedAt,reviews,comments   # VIEW_PR
+```
+
+If a late review contains findings:
+
+1. Confirm the merge commit does not contain the fix.
+2. File or use a follow-up issue or PR,
+   and carry the findings there with a link back to the merged PR.
+3. Do not count the merged PR's review loop as clean for those findings;
+   the new PR owns them.
+
+- **Do:** check for reviews submitted shortly before `mergedAt`,
+  especially any posted after your last processed review.
+- **Do:** carry late findings forward to a new tracked fix
+  when the merge beat the ARD round.
+- **Don't:** treat the merge as proof the final review round was clean.
+- **Don't:** drop a finding because it arrived too late for the merged branch.
+
+(Morrison-Lab/ai-config#1029:
+Copilot round 7 posted at 2026-08-02T06:29:10Z,
+and the PR merged at 06:30:55Z as `1e0b5fdf`.
+The suppressed findings were real,
+absent from the merged code,
+and had to be carried forward to #1034.)
+
 ### 1.5. Cascade conflict scan
 
 **In an ultracode/coordinator session, delegate this whole step to a

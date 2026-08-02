@@ -137,12 +137,14 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    ```
 >    Clean requires **three** things: an affirmative zero-new-findings
 >    overview (e.g. "generated no new comments" -- never a literally empty
->    body), zero matched inline comments, **and no "Comments suppressed due
->    to low confidence" block in the body** -- a "no new comments" overview
->    can still carry real low-confidence findings collapsed into a
->    `<details>` block that never becomes a formal inline comment (verified:
->    PR #660's review 4767752501 read "generated no new comments" while
->    carrying 3 suppressed findings). A stub-like non-answer ("ineligible",
+>    body), zero matched inline comments, **and no `Suppressed comments (`
+>    block in the body** -- a "no new comments" overview can still carry real
+>    low-confidence findings collapsed into a `<details>` block that never
+>    becomes a formal inline comment (verified: PR #660's review 4767752501
+>    read "generated no new comments" while carrying 3 suppressed findings;
+>    PR #1029 repeated the shape across seven rounds). Do not search for the
+>    old phrase "Comments suppressed"; it returns zero against the current
+>    Copilot body shape. A stub-like non-answer ("ineligible",
 >    "reached their quota limit") is not a verdict either.
 >    **This step cannot determine *why* no Copilot verdict exists** -- it
 >    can't tell "Copilot was never asked" from "Copilot is unreachable" from

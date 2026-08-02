@@ -103,8 +103,23 @@ DEFAULT_BYTES_PER_TOKEN = 4
 # avoids each.
 _ANCHORED_IMPORT_RE = re.compile(r"^@([^\s`]+)$", re.MULTILINE)
 _INLINE_IMPORT_RE = re.compile(r"(?<![\w`])@([^\s`]+?)(?=[.,;:!?)\]]*(?:\s|$))")
-_FENCE_RE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
-_CODE_SPAN_RE = re.compile(r"`[^`]*`")
+
+# Both delimiters must match a RUN of markers, not a fixed one. A fenced
+# block may open with three or more backticks or tildes, and a code span
+# with any number of backticks -- so ``@a.md`` survived a single-backtick
+# pattern (it stripped the two empty pairs and left the token), and a `~~~`
+# block was not recognised at all. Either way a documented example became
+# a counted import.
+#
+# The code span is deliberately bounded to ONE LINE (`[^\n]*?`, not
+# `[\s\S]*?`). A newline-spanning version pairs a stray backtick with
+# another one much later in the file and strips everything between,
+# swallowing real imports: measured on this repo's own CLAUDE.md, it cut
+# the anchored-import count from 69 to 50 and the closure from 70 files to
+# 51. Bounding to a line also matches CommonMark, where a code span cannot
+# contain a blank line.
+_FENCE_RE = re.compile(r"^(`{3,}|~{3,})[^\n]*$[\s\S]*?^\1[`~]*[ \t]*$", re.MULTILINE)
+_CODE_SPAN_RE = re.compile(r"(`+)[^\n]*?\1(?!`)")
 
 # Claude Code stops following imports after this many hops: its docs say
 # "Imported files can recursively import other files, with a maximum depth
@@ -165,16 +180,33 @@ def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
     files: list[tuple[str, int, int]] = []
     missing: list[tuple[str, str]] = []
     unresolved_inline: list[tuple[str, str]] = []
-    seen: set[str] = set()
+    # Two caches, not one. Caching every ATTEMPTED path meant an unresolved
+    # inline token could claim a path and suppress a later anchored import
+    # of the same path -- so a genuinely dangling anchored import was
+    # downgraded to a non-fatal inline warning, purely by traversal order.
+    # Only successful reads are cached unconditionally; a failed inline
+    # attempt is recorded but must not block a stronger anchored one.
+    loaded: set[str] = set()
+    failed: dict[str, bool] = {}  # path -> was it attempted as anchored?
 
     def visit(path: str, depth: int, cited_by: str, anchored: bool) -> None:
-        if path in seen or depth > max_depth:
+        if path in loaded or depth > max_depth:
             return
-        seen.add(path)
+        if path in failed and (failed[path] or not anchored):
+            # Already failed at this strength or stronger; nothing to gain.
+            return
         blob = read(path)
         if blob is None:
-            (missing if anchored else unresolved_inline).append((path, cited_by))
+            if anchored:
+                # Upgrade: drop any earlier inline record of the same path,
+                # so it is reported once, at its true strength.
+                unresolved_inline[:] = [u for u in unresolved_inline if u[0] != path]
+                missing.append((path, cited_by))
+            else:
+                unresolved_inline.append((path, cited_by))
+            failed[path] = anchored or failed.get(path, False)
             return
+        loaded.add(path)
         files.append((path, len(blob), depth))
         text = blob.decode("utf-8", errors="replace")
         child_anchored, child_inline = import_paths(text)
@@ -188,10 +220,18 @@ def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
 
 
 def local_reader(base: Path):
-    """Read blobs from a working tree rooted at `base`."""
+    """Read blobs from a working tree rooted at `base`.
+
+    A `~`-prefixed import is expanded rather than joined to `base`. Claude
+    Code supports these -- its docs give
+    `@~/.claude/my-project-instructions.md` as the way to share personal
+    instructions across worktrees -- so joining would look under
+    `<base>/~/...`, find nothing, and report a genuinely loaded file as a
+    dangling import.
+    """
 
     def read(path: str) -> bytes | None:
-        candidate = base / path
+        candidate = Path(path).expanduser() if path.startswith("~") else base / path
         try:
             return candidate.read_bytes()
         except OSError:
@@ -211,6 +251,29 @@ def git_reader(base: Path, rev: str):
         return None if result.returncode else result.stdout
 
     return read
+
+
+def gitlink_rev(base: Path, submodule: str) -> str | None:
+    """The commit the parent repo RECORDS for `submodule`, or None.
+
+    Deliberately not the submodule's checked-out HEAD. During a normal
+    pin-bump workflow those differ: you check the submodule out at the
+    target revision first, and the parent still records the old pin until
+    you `git add` it. Measuring the baseline from the working tree then
+    compares the target against itself and reports a zero delta -- the one
+    number this tool exists to produce, silently wrong at exactly the
+    moment it is consulted.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(base), "ls-tree", "HEAD", submodule],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode or not result.stdout.strip():
+        return None
+    fields = result.stdout.split()
+    # `<mode> commit <sha>\t<path>` for a gitlink; anything else is not one.
+    return fields[2] if len(fields) >= 3 and fields[1] == "commit" else None
 
 
 def submodule_reader(base: Path, submodule: str, rev: str):
@@ -376,20 +439,53 @@ def main(argv=None) -> int:
     total = sum(size for _, size, _ in files)
     after_total = None
     if args.compare:
-        after_files, after_missing, _ = walk_closure(
+        # Baseline the CURRENT side on the parent's recorded gitlink, not on
+        # the submodule's checked-out tree -- see gitlink_rev's docstring for
+        # why the two differ exactly when this tool is being used.
+        pin = gitlink_rev(base, args.submodule)
+        if pin is None:
+            print(
+                f"error: {args.submodule} is not a recorded submodule of "
+                f"{base}; --compare needs a gitlink to baseline against.",
+                file=sys.stderr,
+            )
+            return 2
+        before_files, before_missing, before_inline = walk_closure(
+            args.root, submodule_reader(base, args.submodule, pin)
+        )
+        before_total = sum(size for _, size, _ in before_files)
+        after_files, after_missing, after_inline = walk_closure(
             args.root, submodule_reader(base, args.submodule, args.compare)
         )
         after_total = sum(size for _, size, _ in after_files)
-        if not after_files or (after_missing and not missing):
+        if not after_files or (after_missing and not before_missing):
             print(
                 f"error: could not resolve the closure with {args.submodule} "
                 f"at {args.compare}; is the submodule populated and fetched?",
                 file=sys.stderr,
             )
             return 2
-        print(render_delta(total, after_total, args.bytes_per_token, args.compare))
-        if after_total > args.budget >= total:
+        # An inline import that resolves at the pin but not at the target
+        # makes `after_total` shrink for the wrong reason, so the delta would
+        # read as a favourable bump rather than an incomplete comparison.
+        resolved_before = {p for p, _, _ in before_files}
+        lost = sorted(
+            p for p, _ in after_inline if p in resolved_before
+        ) + sorted(p for p, _ in after_missing if p in resolved_before)
+        if lost:
+            print(
+                "error: these imports resolve at the current pin but not at "
+                f"{args.compare}, so the delta would be incomplete:\n"
+                + "\n".join(f"    {p}" for p in lost),
+                file=sys.stderr,
+            )
+            return 2
+        print(
+            render_delta(before_total, after_total, args.bytes_per_token, args.compare)
+        )
+        if after_total > args.budget >= before_total:
             print(f"\n  This bump would cross the {args.budget:,}-byte budget.")
+        total = before_total
 
     if missing:
         # A dangling anchored import is a defect rather than a size finding,

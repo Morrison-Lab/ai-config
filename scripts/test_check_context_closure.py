@@ -240,39 +240,6 @@ with tempfile.TemporaryDirectory() as tmp:
         ccc.main(["--base", str(base), "--budget", "10000000"]) == 0,
     )
 
-    # --strict must cover the COMPARED total too. Gating only on the current
-    # total prints "this bump would cross the budget" and then exits 0, which
-    # contradicts what the flag says it does. The budget below sits between
-    # the two totals, so the current pin is under it and the bump is over.
-    (base / "CLAUDE.md").write_text("@own.md\n@.ai-config/sub.md\n", encoding="utf-8")
-    at_pin_total = sum(
-        n for _, n, _ in ccc.walk_closure(
-            "CLAUDE.md", ccc.submodule_reader(base, ".ai-config", "HEAD~1")
-        )[0]
-    )
-    at_head_total = sum(
-        n for _, n, _ in ccc.walk_closure(
-            "CLAUDE.md", ccc.submodule_reader(base, ".ai-config", "HEAD")
-        )[0]
-    )
-    between = (at_pin_total + at_head_total) // 2
-    check(
-        "the fixture straddles the budget (pin under, bump over)",
-        at_pin_total <= between < at_head_total,
-    )
-    args = ["--base", str(base), "--budget", str(between), "--compare", "HEAD"]
-    # The working tree holds the newer submodule content, so measure the
-    # "current" side at the older pin to make the bump the thing that crosses.
-    subprocess.run(["git", "checkout", "-q", "HEAD~1", "--", "sub.md"], cwd=sub, check=True)
-    check(
-        "a bump that crosses the budget exits 1 under --strict",
-        ccc.main(args + ["--strict"]) == 1,
-    )
-    check(
-        "  ... and is still advisory without --strict",
-        ccc.main(args) == 0,
-    )
-
 # --bytes-per-token 0 previously passed argparse and crashed in render() with
 # a ZeroDivisionError; a negative silently produced a nonsense estimate. Bad
 # operator input belongs at the boundary (shared/principles/fail-fast.md).
@@ -296,6 +263,194 @@ check(
     ccc.main(["--bytes-per-token", "4", "--budget", "100000000"]) == 0,
 )
 check("positive_int itself rejects zero", ccc.positive_int("4") == 4)
+
+# --- round-2 review findings ------------------------------------------------
+
+# An unresolved inline token must not claim a path and downgrade a later
+# ANCHORED import of the same path from a hard failure to a warning. The bug
+# was purely traversal-order dependent, so it needs both citations present.
+files, missing, inline = ccc.walk_closure(
+    "root.md",
+    reader_for(
+        {
+            "root.md": "@a.md\n@b.md\n",
+            "a.md": "mentions @gone.md inline\n",
+            "b.md": "@gone.md\n",
+        }
+    ),
+)
+check(
+    "an inline mention does not downgrade a later anchored dangling import",
+    missing == [("gone.md", "b.md")],
+)
+check("  ... and it is not double-reported as inline", inline == [])
+
+# Code spans and fences use RUNS of markers. A single-backtick pattern strips
+# the two empty pairs around ``@x`` and leaves the token; a `~~~` block was
+# not recognised at all. Either way a documented example becomes an import.
+check(
+    "a double-backtick code span is not an import",
+    ccc.import_paths("use ``@a.md`` and @real.md\n") == ([], ["real.md"]),
+)
+check(
+    "a ~~~ fenced block is not an import",
+    ccc.import_paths("~~~\n@a.md\n~~~\n@real.md\n") == (["real.md"], []),
+)
+# A code span must not span NEWLINES. A `[\\s\\S]*?` version pairs a stray
+# backtick with another much later in the file and strips everything between,
+# swallowing real imports -- measured on this repo, 69 anchored imports fell
+# to 50. This is a regression guard, not a hypothetical.
+check(
+    "a code span does not swallow imports across lines",
+    ccc.import_paths("a `span` here\n@real.md\nlater `another` span\n")[0]
+    == ["real.md"],
+)
+check(
+    "an unmatched backtick does not eat the rest of the file",
+    ccc.import_paths("stray ` backtick\n@real.md\nmore ` text\n")[0]
+    == ["real.md"],
+)
+
+check(
+    "a 4-backtick fence is not an import",
+    ccc.import_paths("````\n@a.md\n````\n@real.md\n") == (["real.md"], []),
+)
+
+# Claude Code documents `@~/.claude/my-project-instructions.md` as the way to
+# share personal instructions across worktrees, so a ~ import is real context.
+# Joining it to --base would look under <base>/~/... and report it dangling.
+with tempfile.TemporaryDirectory() as tmp:
+    home_file = Path.home() / ".ccc_test_probe.md"
+    wrote = not home_file.exists()
+    if wrote:
+        home_file.write_text("probe", encoding="utf-8")
+    try:
+        check(
+            "a ~ import is expanded, not joined to --base",
+            ccc.local_reader(Path(tmp))("~/.ccc_test_probe.md") == b"probe",
+        )
+    finally:
+        if wrote:
+            home_file.unlink()
+
+# --- gitlink baseline -------------------------------------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
+    sub = base / ".ai-config"
+    sub.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=sub, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=sub, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=sub, check=True)
+    (sub / "sub.md").write_text("old pinned content", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=sub, check=True)
+    subprocess.run(["git", "commit", "-qm", "pin"], cwd=sub, check=True)
+    old_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=sub, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    (base / "CLAUDE.md").write_text("@.ai-config/sub.md\n", encoding="utf-8")
+    subprocess.run(["git", "add", "CLAUDE.md"], cwd=base, check=True)
+    subprocess.run(
+        ["git", "update-index", "--add", "--cacheinfo",
+         f"160000,{old_sha},.ai-config"], cwd=base, check=True,
+    )
+    subprocess.run(["git", "commit", "-qm", "record pin"], cwd=base, check=True)
+
+    check("gitlink_rev reads the parent's recorded pin",
+          ccc.gitlink_rev(base, ".ai-config") == old_sha)
+    check("gitlink_rev returns None when the path is not a gitlink",
+          ccc.gitlink_rev(base, "CLAUDE.md") is None)
+
+    # The pin-bump workflow itself: the submodule is checked out at the TARGET
+    # while the parent still records the old pin. Baselining on the working
+    # tree would compare the target against itself and report a zero delta --
+    # the one number this tool exists to produce, wrong exactly when consulted.
+    (sub / "sub.md").write_text("much longer new content here", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=sub, check=True)
+    subprocess.run(["git", "commit", "-qm", "newer"], cwd=sub, check=True)
+
+    from io import StringIO
+    import contextlib
+
+    buf = StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = ccc.main(["--base", str(base), "--budget", "100000000",
+                       "--compare", "HEAD"])
+    out = buf.getvalue()
+    check("compare mode succeeds with a checked-out-ahead submodule", rc == 0)
+    check(
+        "  ... and does NOT report a zero delta (baselined on the gitlink)",
+        "+0 B" not in out and "(+0%)" not in out,
+    )
+
+    # --strict must cover the COMPARED total too. Gating only on the current
+    # total prints "this bump would cross the budget" and then exits 0, which
+    # contradicts what the flag says it does. The budget below sits between
+    # the two totals, so the pin is under it and the bump is over.
+    pin_total = sum(
+        n for _, n, _ in ccc.walk_closure(
+            "CLAUDE.md", ccc.submodule_reader(base, ".ai-config", old_sha)
+        )[0]
+    )
+    head_total = sum(
+        n for _, n, _ in ccc.walk_closure(
+            "CLAUDE.md", ccc.submodule_reader(base, ".ai-config", "HEAD")
+        )[0]
+    )
+    between = (pin_total + head_total) // 2
+    check(
+        "the fixture straddles the budget (pin under, bump over)",
+        pin_total <= between < head_total,
+    )
+    strict_args = ["--base", str(base), "--budget", str(between), "--compare", "HEAD"]
+    with contextlib.redirect_stdout(StringIO()):
+        strict_rc = ccc.main(strict_args + ["--strict"])
+        advisory_rc = ccc.main(strict_args)
+    check("a bump that crosses the budget exits 1 under --strict", strict_rc == 1)
+    check("  ... and is still advisory without --strict", advisory_rc == 0)
+
+    # An import that resolves at the pin but not at the target shrinks
+    # after_total for the wrong reason, so the delta would read as a
+    # favourable bump rather than an incomplete comparison. Built by
+    # recording a pin that HAS the file and comparing against an earlier
+    # revision that lacks it -- `old_sha` predates `only-old.md`.
+    subprocess.run(["git", "checkout", "-q", old_sha], cwd=sub, check=True)
+    (sub / "only-old.md").write_text("present at the pin only", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=sub, check=True)
+    subprocess.run(["git", "commit", "-qm", "add only-old"], cwd=sub, check=True)
+    pin2 = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=sub, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    # The second citation is INLINE on purpose. An anchored one that fails at
+    # the target is already caught by the after_missing guard above, so only
+    # an inline one exercises the `lost` check -- a distinction the first
+    # version of this test missed, passing for the wrong reason.
+    (base / "CLAUDE.md").write_text(
+        "@.ai-config/sub.md\nsee @.ai-config/only-old.md for detail\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "CLAUDE.md"], cwd=base, check=True)
+    subprocess.run(
+        ["git", "update-index", "--cacheinfo", f"160000,{pin2},.ai-config"],
+        cwd=base, check=True,
+    )
+    subprocess.run(["git", "commit", "-qm", "repin"], cwd=base, check=True)
+
+    check(
+        "fixture: the recorded pin resolves both files",
+        ccc.gitlink_rev(base, ".ai-config") == pin2
+        and len(ccc.walk_closure(
+            "CLAUDE.md", ccc.submodule_reader(base, ".ai-config", pin2)
+        )[0]) == 3,
+    )
+    with contextlib.redirect_stdout(StringIO()):
+        lost_rc = ccc.main(["--base", str(base), "--budget", "100000000",
+                            "--compare", old_sha])
+    check("a file lost at the target invalidates the comparison", lost_rc == 2)
 
 # --- corpus facts -----------------------------------------------------------
 

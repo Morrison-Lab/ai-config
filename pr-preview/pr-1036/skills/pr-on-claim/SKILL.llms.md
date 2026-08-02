@@ -29,7 +29,8 @@ Opening a PR or marking a draft ready can trigger this repo’s own review workf
 ``` bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
   -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
-gh pr view <N> --json reviewRequests
+gh pr view <N> --json reviewRequests,reviews
+gh pr checks <N>
 ```
 
 Verify the request landed before writing a status report: the POST response should include the reviewer, then a fresh read should show either a pending request or a new review/check from that reviewer on the current head. If the request disappears with no current-head review, report that blocker and start the fallback; do not write “review owed” as a status item.

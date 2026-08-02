@@ -53,6 +53,15 @@ Do not use an imprecise "near the merge time" window.
 The lower bound is the last dispositioned review,
 and `mergedAt` is only the upper bound.
 
+**When this session never dispositioned a review on this PR** --- entering
+through the "the PR merged -- now what?" route, or picking up a PR another
+session drove --- there is no last-dispositioned-review timestamp to anchor
+on.
+Don't skip the scan for lack of a lower bound.
+Scan the complete review and comment history through `mergedAt` instead,
+with no lower bound at all,
+since anything on the PR is late from this session's point of view.
+
 ```bash
 gh api repos/<owner>/<repo>/pulls/<N>/reviews --paginate   # review bodies
 gh api repos/<owner>/<repo>/pulls/<N>/comments --paginate  # inline comments
@@ -78,6 +87,7 @@ If a late review contains findings:
 - **Don't:** use a vague "near merge time" window that can skip a late finding posted well before a delayed merge.
 - **Don't:** treat the merge as proof the final review round was clean.
 - **Don't:** drop a finding because it arrived too late for the merged branch.
+- **Don't:** skip this scan because no last-dispositioned-review timestamp exists --- scan the whole history through `mergedAt` instead.
 
 (Morrison-Lab/ai-config#1029:
 Copilot round 7 posted at 2026-08-02T06:29:10Z,

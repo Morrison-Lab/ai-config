@@ -45,8 +45,13 @@ standing **never assume; always verify** rule applied to closing out a PR.)
 
 A review can post after your last processed round and before the human merges.
 Those findings are real even though they are absent from the merge commit.
-After confirming `mergedAt`, identify the last review this session explicitly dispositioned, then read every formal review and PR comment after that timestamp and before `mergedAt`.
-Do not use an imprecise "near the merge time" window; the lower bound is the last dispositioned review, and `mergedAt` is only the upper bound.
+After confirming `mergedAt`,
+identify the last review this session explicitly dispositioned,
+then read every formal review and PR comment after that timestamp
+and before `mergedAt`.
+Do not use an imprecise "near the merge time" window.
+The lower bound is the last dispositioned review,
+and `mergedAt` is only the upper bound.
 
 ```bash
 gh pr view <N> --json mergedAt,reviews,comments   # VIEW_PR
@@ -54,7 +59,9 @@ gh api repos/<owner>/<repo>/pulls/<N>/comments    # VIEW_INLINE_COMMENTS
 ```
 
 A formal review's top-level body is not enough.
-For each late review, read the inline review comments tied to that review ID too, because an empty-body review can carry every finding inline.
+For each late review,
+read the inline review comments tied to that review ID too,
+because an empty-body review can carry every finding inline.
 
 If a late review contains findings:
 

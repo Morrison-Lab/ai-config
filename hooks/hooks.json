@@ -99,7 +99,7 @@
       "script": "no-unreviewed-pr.py",
       "event": "Stop",
       "timeout": 10,
-      "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. With claude-review failing repo-wide on context size (ai-config#897), an unrequested PR gets no review at all."
+      "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down."
     }
   ]
 }

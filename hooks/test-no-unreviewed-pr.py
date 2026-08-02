@@ -1,10 +1,9 @@
 """Test the no-unreviewed-pr guard.
 
 The guard's value is concentrated in the negative cases: a draft PR
-legitimately defers review (a draft does not trigger the review bot), and a
-session that already requested a reviewer must not be nagged. A guard that
-fires on correct behaviour gets disabled, and then the case it exists for
-goes unprotected too.
+legitimately defers review, and a session that already requested a reviewer
+must not be nagged. A guard that fires on correct behaviour gets disabled,
+and then the case it exists for goes unprotected too.
 
 Run: python3 hooks/test-no-unreviewed-pr.py hooks/no-unreviewed-pr.py
 """
@@ -16,31 +15,20 @@ import tempfile
 
 HOOK = sys.argv[1]
 
-CREATE_CLI = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "input": {
-        "command": "gh pr create --base main --title 'x' --body 'y'"}}]}}
-# The harness tool names its verb only in `name`; the input carries title/body.
-# A scan reading the input alone would never see this as opening a PR.
-CREATE_TOOL = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "name": "create_pull_request",
-     "input": {"title": "x", "body": "y"}}]}}
-CREATE_DRAFT = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "input": {
-        "command": "gh pr create --draft --base main --title 'x'"}}]}}
-DRAFT_TOOL = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "name": "create_pull_request",
-     "input": {"title": "x", "draft": True}}]}}
-READY = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "input": {"command": "gh pr ready 1038"}}]}}
-REQUEST = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "input": {
-        "command": ("gh api repos/o/r/pulls/1038/requested_reviewers -X POST "
-                    "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'")}}]}}
-ADD_REVIEWER = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "input": {
-        "command": "gh pr edit 1038 --add-reviewer d-morrison"}}]}}
-UNRELATED = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "input": {"command": "git status --short"}}]}}
+
+def bash(cmd):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Bash", "input": {"command": cmd}}]}}
+
+
+def tool(name, **inp):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": name, "input": inp}]}}
+
+
+def result(body):
+    return {"type": "user", "message": {"content": [
+        {"type": "tool_result", "content": body}]}}
 
 
 def say(text):
@@ -48,53 +36,87 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
-# (events, should_block, label)
+OK = result("{\"requested_reviewers\":[{\"login\":\"Copilot\"}]}")
+FAILED = result("{\"status\":422,\"message\":\"Review cannot be requested\"}")
+
+CREATE = bash("gh pr create --base main --title x --body y  # pulls/1038")
+CREATE_DRAFT = bash("gh pr create --draft --base main --title x")
+READY = bash("gh pr ready 1038")
+UNDO = bash("gh pr ready 1038 --undo")
+REQUEST = bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST "
+               "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'")
+CREATE_WITH_REVIEWER = bash("gh pr create --base main --title x --reviewer "
+                            "copilot-pull-request-reviewer  # pulls/1038")
+# A file whose CONTENT mentions the CLI strings. Matching a non-shell tool's
+# serialized input is the heredoc false positive README.md:265-271 warns
+# about, and these very hook files contain both strings in their prose.
+WRITE_DOC = tool("create", path="hooks/no-unreviewed-pr.py",
+                 file_text="matches gh pr create and requested_reviewers")
+
 CASES = [
-    # The failure this exists for: PR opened, recap written, no request.
-    ([CREATE_CLI, say("Opened #1038. Review owed.")], True,
+    ([CREATE, say("Opened #1038. Review owed.")], True,
      "gh pr create with no reviewer request blocks"),
-    ([CREATE_TOOL, say("Opened the PR.")], True,
-     "harness create_pull_request with no request blocks"),
+    ([tool("create_pull_request", title="x", body="y"), say("Opened.")], True,
+     "the harness create tool with no request blocks"),
     ([READY, say("Marked it ready.")], True,
      "gh pr ready with no request blocks"),
 
-    # Discharged: a request after the open.
-    ([CREATE_CLI, REQUEST, say("Opened #1038 and requested review.")], False,
-     "a reviewer request after create does not block"),
-    ([CREATE_CLI, ADD_REVIEWER, say("Opened and assigned a human.")], False,
-     "--add-reviewer also discharges it"),
+    ([CREATE, REQUEST, OK, say("Opened and requested.")], False,
+     "a SUCCESSFUL request discharges it"),
+    ([CREATE, CREATE_WITH_REVIEWER, OK, say("Opened with a reviewer.")], False,
+     "gh pr create --reviewer discharges it"),
 
-    # A draft legitimately defers review, per pr-on-claim.
-    ([CREATE_DRAFT, say("Opened as a draft; implementing now.")], False,
+    # A 422 still produces a tool_use, so trusting the attempt alone would let
+    # the session stop with no reviewer attached.
+    ([CREATE, REQUEST, FAILED, say("Requested.")], True,
+     "a FAILED (422) request does not discharge it"),
+
+    ([CREATE_DRAFT, say("Opened as a draft.")], False,
      "a draft PR does not block"),
-    ([DRAFT_TOOL, say("Opened as a draft.")], False,
+    ([tool("create_pull_request", title="x", draft=True), say("Draft.")], False,
      "the harness draft flag does not block"),
-
-    # Order matters: drafting first, then readying, re-arms the guard.
-    ([CREATE_DRAFT, READY, say("Marked it ready.")], True,
+    ([CREATE_DRAFT, READY, say("Ready now.")], True,
      "readying a draft later re-arms the guard"),
-    # ... and requesting after that readying discharges it again.
-    ([CREATE_DRAFT, READY, REQUEST, say("Ready, review requested.")], False,
-     "requesting after readying discharges it"),
+    # `gh pr ready --undo` converts BACK to draft. Without the negative
+    # lookahead it matches RX_OPEN and behaves in exactly the wrong direction.
+    ([CREATE, UNDO, say("Held as a draft.")], False,
+     "gh pr ready --undo is a draft action, not an open one"),
+    # --undo also matches RX_OPEN's own `gh pr ready` alternative, so this
+    # only passes because RX_DRAFT is checked FIRST (if/elif). A version
+    # that checked RX_OPEN first, or as an independent `if`, would open the
+    # PR here instead of holding it -- covered by re-deriving the case
+    # directly against the hook rather than trusting the label above.
+    ([CREATE, UNDO], "ordering", "RX_DRAFT must be checked before RX_OPEN"),
+    ([tool("create_pull_request", title="x", body="y  pulls/1038"),
+      tool("update_pull_request", pull_number=1038, draft=True),
+      say("Converted back to draft.")], False,
+     "update_pull_request draft:true defers review again"),
 
-    # Nothing opened: the guard must stay silent in an ordinary session.
-    ([UNRELATED, say("All clean.")], False,
+    # Scalar timestamps lose obligations across PRs: opening A then B and
+    # requesting only B silently forgot A. That IS the two-PR failure this
+    # hook exists to catch, so it must be tracked per PR.
+    ([bash("gh pr create --title a  # pulls/1038"),
+      bash("gh pr create --title b  # pulls/1040"),
+      bash("gh api repos/o/r/pulls/1040/requested_reviewers -X POST"), OK,
+      say("Opened both, requested one.")], True,
+     "requesting for one PR does not clear another's obligation"),
+    ([bash("gh pr create --title a  # pulls/1038"),
+      bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST"), OK,
+      bash("gh pr create --draft --title b  # pulls/1040"),
+      say("One reviewed, one draft.")], False,
+     "a later draft does not silence an already-satisfied PR"),
+
+    # Non-shell tools must never be text-matched.
+    ([WRITE_DOC, say("Wrote the hook file.")], False,
+     "writing a file mentioning the CLI strings creates no obligation"),
+    ([CREATE, tool("create", path="doc.md",
+                   file_text="see requested_reviewers"), say("Documented.")],
+     True, "a file mentioning requested_reviewers does not discharge"),
+
+    ([bash("git status --short"), say("All clean.")], False,
      "a session that opened no PR does not block"),
-    ([REQUEST, say("Re-requested review on #1029.")], False,
+    ([REQUEST, OK, say("Re-requested on #1029.")], False,
      "a bare re-request with no open does not block"),
-
-    # Stale request: requested BEFORE opening a second PR.
-    ([REQUEST, CREATE_CLI, say("Opened another PR.")], True,
-     "a request preceding the open does not count"),
-
-    # Draft-gating: a ready PR converted BACK to draft to hold it behind a
-    # prerequisite (CLAUDE.md, "Surface merge-order constraints"). Review is
-    # legitimately deferred again, so the guard must go quiet. This is the
-    # only case that reaches the `last_draft > last_open` branch -- the
-    # create-a-draft cases exit earlier, at `last_open < 0`, so they pass
-    # with that branch deleted and do not test it.
-    ([CREATE_CLI, DRAFT_TOOL, say("Held as a draft behind #1029.")], False,
-     "converting a ready PR back to draft defers review again"),
 ]
 
 
@@ -104,8 +126,6 @@ def run(events):
         for e in events:
             fh.write(json.dumps(e) + "\n")
     try:
-        # A fresh sentinel dir per case, so the once-per-message guard does
-        # not make later cases silently pass.
         env = dict(os.environ, TMPDIR=tempfile.mkdtemp())
         out = subprocess.run(
             [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
@@ -119,6 +139,29 @@ def run(events):
 def main():
     passes = failures = 0
     for events, expected, label in CASES:
+        if expected == "ordering":
+            # Re-derive PR state directly: after --undo, the PR must be
+            # ABSENT from open_prs (drafted), not merely "not blocking" --
+            # a coincidentally-passing block check would not catch a wrong
+            # check order the way inspecting the actual state does.
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("_h", HOOK)
+            hookmod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(hookmod)
+            fd, path = tempfile.mkstemp(suffix=".jsonl")
+            with os.fdopen(fd, "w") as fh:
+                for e in events:
+                    fh.write(json.dumps(e) + "\n")
+            open_prs, _ = hookmod.scan(path)
+            os.unlink(path)
+            got_ordering = "1038" not in open_prs
+            if got_ordering:
+                print(f"PASS: {label}")
+                passes += 1
+            else:
+                print(f"FAIL: {label} (PR #1038 still marked open after --undo)")
+                failures += 1
+            continue
         got = run(events)
         if got == expected:
             print(f"PASS: {label}")
@@ -127,7 +170,31 @@ def main():
             print(f"FAIL: {label} (expected block={expected}, got {got})")
             failures += 1
 
-    # Fails open on unreadable input rather than wedging the session.
+    # The recovery commands must be copy-pasteable: an unquoted `<` is a shell
+    # redirect, so a placeholder-bearing argument has to be quoted.
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in [CREATE, say("Opened it.")]:
+            fh.write(json.dumps(e) + "\n")
+    out = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+        capture_output=True, text=True,
+        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+    ).stdout
+    os.unlink(path)
+    reason = json.loads(out).get("reason", "") if out.strip() else ""
+    bare = [ln for ln in reason.splitlines()
+            if "<" in ln and "gh " in ln and '"<' not in ln and "'<" not in ln
+            and "/<" not in ln.split("#")[0].replace('"', "")]
+    if not [ln for ln in reason.splitlines()
+            if ln.strip().startswith("gh ") and "<" in ln
+            and '"' not in ln and "'" not in ln]:
+        print("PASS: recovery commands quote their placeholders")
+        passes += 1
+    else:
+        print(f"FAIL: unquoted placeholder in recovery command: {bare[:1]}")
+        failures += 1
+
     out = subprocess.run(
         [sys.executable, HOOK], input='{"transcript_path": "/nonexistent"}',
         capture_output=True, text=True,

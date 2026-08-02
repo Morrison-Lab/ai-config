@@ -200,6 +200,30 @@ python3 scripts/validate-skills.py
 python3 scripts/check-links.py
 ```
 
+### Context budget (`scripts/check-context-closure.py`)
+
+`CLAUDE.md` and the transitive closure of its `@path` imports are loaded **in full at launch**, so their size is an unconditional per-session cost.
+A per-file line count cannot see it -- no single fragment is unreasonable, and the total is -- and splitting a fragment into more imports does not help, since [imports load at launch too](https://code.claude.com/docs/en/memory).
+Only moving content *out* of the closure reduces what is loaded.
+
+```sh
+python3 scripts/check-context-closure.py            # this repo's closure
+python3 scripts/check-context-closure.py --base ../consumer-repo
+```
+
+Advisory: it reports the total against `--budget` and exits 0 over it, so it serves as a trend line on every PR rather than a gate.
+A dangling **anchored** import (one written on its own line) does exit non-zero, being a defect rather than a size finding.
+An unresolved **inline** `@token` is reported but does *not* fail, since most are prose (`@claude` mentions, email addresses) rather than mistyped imports --- so don't rely on this command to gate those.
+
+For a repo that vendors ai-config as a `.ai-config` submodule, `--compare` answers what a pin bump would cost.
+The import list is fixed; what changes is what those files weigh:
+
+```sh
+python3 scripts/check-context-closure.py --base ../consumer-repo --compare origin/main
+```
+
+Measured on `ucdavis/bcs` at a three-day-old pin, the same 33 imports had grown **+62%**, arriving silently since a bump's gitlink diff is one line (ai-config#1028).
+
 Ideas borrowed from comparable projects (and their licenses) are recorded in
 [`CREDITS.md`](CREDITS.md); see the `scout-peers` skill for the survey behind
 them.

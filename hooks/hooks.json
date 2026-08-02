@@ -84,6 +84,18 @@
       "why": "CLAUDE.md 'Run UMS proactively' -- discovering you were wrong is a trigger with no artifact, so nothing else prompts the pass; this injects a reminder naming the admitted error when no memory/skill write followed it."
     },
     {
+      "script": "no-unfiled-finding.py",
+      "event": "Stop",
+      "timeout": 10,
+      "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER (needs a `?`); this catches the DECLARATIVE form, which asks nothing and so slips past it."
+    },
+    {
+      "script": "no-mistake-without-a-hook.py",
+      "event": "UserPromptSubmit",
+      "timeout": 10,
+      "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring'. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
+    },
+    {
       "script": "no-unreviewed-pr.py",
       "event": "Stop",
       "timeout": 10,

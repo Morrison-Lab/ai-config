@@ -550,6 +550,26 @@ This makes context visible to future @claude sessions, other reviewers, and cont
 
 When opening or taking over a PR in any repo, subscribe/watch that PR's activity immediately using the available GitHub notification/subscription mechanism. If the current session's tools cannot subscribe, say so explicitly and fall back to active polling for reviews, comments, and checks during the session.
 
+## Monitor every pushed PR head to completion
+
+After every push to a PR in every repository and every session, actively monitor that exact head commit for CI failures and new review comments.
+Keep polling and address actionable failures or findings until all workflows and check runs are complete and passing (success or skipped), the current-head review is clean, and no review threads remain unresolved.
+Once that commit is fully clean and green, stop the **intensive head poll** for it; don't restart that poll for the same commit unless something regresses.
+A later push creates a new head commit and starts a new monitoring cycle automatically.
+
+**Ending the head poll does not end the PR watch.**
+The two run at different frequencies and answer different questions, and only the first one is finished when a head goes green:
+
+- The **head poll** asks "is this commit done?" and terminates when it is.
+- The **PR watch** above ("Subscribe to PR updates automatically") asks "is this PR still mergeable and still clean?" and runs until the PR merges or closes.
+
+That distinction is load-bearing because a clean head can regress with **no push of yours at all**.
+The base branch advancing is enough: the PR goes `CONFLICTING`, or `main` catches up to an R package's `DESCRIPTION` version, or a sibling PR merges a colliding append --- each turning a green, review-clean head red while nothing about that commit changed.
+`shared/workflow/fully-clean.md` says the same thing about verdicts: a clean CI run and a clean review are a snapshot, not a standing guarantee.
+
+So keep checking mergeability and check state at the lower PR-watch frequency after the head poll ends, and **restart the intensive poll if state regresses** --- a new conflict, a check flipping red, a fresh review comment.
+Re-derive it from a live query rather than trusting the earlier verdict.
+
 ## Claim a GitHub PR/issue before working on it
 
 <!-- Shared with the lab manual; edit shared/workflow/claim-pr.md, not here. -->

@@ -17,7 +17,8 @@ finding → push → post summary → re-request review → repeat until clean.
 
 ## Procedure
 
-1. **Identify and claim the PR/MR.** Use the current branch's open MR, or
+1. **Identify and claim the PR/MR.**
+Use the current branch's open MR, or
    the one the user specified. Post a brief claim comment (`COMMENT_PR`) so a
    parallel `@claude` CI run or another person doesn't start a colliding
    session:
@@ -26,7 +27,8 @@ finding → push → post summary → re-request review → repeat until clean.
    other bracketed tokens below are abstract operation tokens — resolve to
    your model's tool via [`tool-mappings.md`](../../tool-mappings.md).)
 
-2. **Read the latest review.** Pull the most recent reviewer comment — the
+2. **Read the latest review.**
+Pull the most recent reviewer comment — the
    `@claude` bot's, or a human's. Don't trust earlier cached verdicts — actively
    poll until a review appears that references the commit you just pushed, then
    read **that** one.
@@ -91,45 +93,30 @@ finding → push → post summary → re-request review → repeat until clean.
        echo "no fresh review yet -- wait or re-request"
      fi
      ```
-     A genuine clean Copilot overview is **not** an empty string -- it reads
-     something like "Copilot reviewed N files and generated no new comments."
-     Don't require a literally empty body; parse the overview for a
-     zero-new-findings phrasing **and** confirm zero matched inline comments
-     -- both, not either alone, since zero inline comments with no
-     affirmative zero-findings overview doesn't rule out a non-verdict
-     formal review.
-     **A "no new comments" overview can still carry real findings in a
-     collapsed `<details><summary>Comments suppressed due to low
-     confidence (N)</summary>` block** -- these are genuine flagged items
-     under the fully-clean rule (address every finding regardless of
-     confidence label), even though they never become formal inline
-     comment objects the `/comments` endpoint returns (verified: PR #660's
-     review 4767752501 read "generated no new comments" in its overview
-     while its full body carried 3 suppressed findings). A third condition
-     is required: the raw review **body** must not contain a "Comments
-     suppressed" block at all -- checking only the overview's headline
-     phrasing and the `/comments` endpoint's inline-comment count both miss
-     this.
-     And dispositioning a finding-bearing review's comments
-     yourself does **not** make that same review the all-clear -- the
-     fully-clean bar needs a *later* review, at the still-current head, that
-     doesn't re-raise them. So the all-clear is either (a) a review with a
-     zero-new-findings overview, zero inline comments, and no suppressed-
-     findings block, or (b) a later review at the same head as a
-     finding-bearing one, confirming nothing
-     remains -- never the finding-bearing review itself, however thoroughly
-     you addressed its findings. A review object existing at the current
-     `commit_id` with unresolved findings inside it is not clean, it's just
-     current. A stub-like non-answer ("ineligible", "reached their quota
-     limit") is also not a verdict -- treat it the same as a skipped/stub
-     `@claude` run (see the "Do the review yourself" fallback in `CLAUDE.md`)
-     and retry later or fall back accordingly.
+     A genuine clean Copilot overview is **not** an empty string -- it reads something like "Copilot reviewed N files and generated no new comments."
+     Don't require a literally empty body; parse the overview for a zero-new-findings phrasing **and** confirm zero matched inline comments -- both, not either alone, since zero inline comments with no affirmative zero-findings overview doesn't rule out a non-verdict formal review.
+     **A "no new comments" overview can still carry real findings in a collapsed `<details>` suppression block** -- these are genuine flagged items under the fully-clean rule (address every finding regardless of confidence label), even though they never become formal inline comment objects the `/comments` endpoint returns (verified: PR #660's review 4767752501 read "generated no new comments" in its overview while its full body carried 3 suppressed findings).
+
+     **Match the block case-insensitively on `suppressed`, not on either exact phrase -- GitHub changed the wording and dropped the reason.**
+     Measured in this repo: PR #660 emits `<summary>Comments suppressed due to low confidence (3)</summary>`, while PRs #1029 and #1031 emit `<summary>Suppressed comments (4)</summary>`.
+     A literal grep for `Comments suppressed` therefore returns **zero** against a current body that plainly has the block, which produced a real false negative during the ai-config#1029 loop.
+     GitHub's own docs do not document suppression at all, so expect the label to keep moving and key on the stable token.
+
+     The stakes are why this matters: from round 3 of ai-config#1029 onward *every* substantive finding arrived suppressed, under a "generated no new comments" overview with zero inline comments -- including CRLF silently disabling a failure path repo-wide.
+     So a suppressed finding is not a lower-value one, on the evidence available here --- which is a run of valuable suppressed findings, not a measured correlation.
+
+     A third condition is required: the raw review **body** must not contain a suppression block at all -- checking only the overview's headline phrasing and the `/comments` endpoint's inline-comment count both miss this.
+     And dispositioning a finding-bearing review's comments yourself does **not** make that same review the all-clear -- the fully-clean bar needs a *later* review, at the still-current head, that doesn't re-raise them.
+     So the all-clear is either (a) a review with a zero-new-findings overview, zero inline comments, and no suppressed- findings block, or (b) a later review at the same head as a finding-bearing one, confirming nothing remains -- never the finding-bearing review itself, however thoroughly you addressed its findings.
+     A review object existing at the current `commit_id` with unresolved findings inside it is not clean, it's just current.
+     A stub-like non-answer ("ineligible", "reached their quota limit") is also not a verdict -- treat it the same as a skipped/stub `@claude` run (see the "Do the review yourself" fallback in `CLAUDE.md`) and retry later or fall back accordingly.
    - **GitLab:** poll the MR notes (`sort=desc`) for a review note that
      references your latest short SHA before proceeding; if none has appeared,
      wait and retry rather than reading a stale verdict.
 
    **If the latest review is a cancellation, the live verdict is stale —
-   don't re-do already-applied fixes.** A `cancel-in-progress` cancellation
+   don't re-do already-applied fixes.**
+   A `cancel-in-progress` cancellation
    (on setups that cancel superseded review runs) means the last
    *complete* review's findings may already have been fixed by a commit that
    landed after it, with the confirming re-review killed before it could post.
@@ -185,7 +172,8 @@ finding → push → post summary → re-request review → repeat until clean.
    merge commit matches GitHub's "Update branch" button. (The
    `sync-pr-branch` skill does exactly this.)
 
-   **Resolve inline threads as you go — including outdated ones.** After
+   **Resolve inline threads as you go — including outdated ones.**
+   After
    pushing fixes for a round, resolve the corresponding inline review threads
    immediately (`RESOLVE_REVIEW_THREAD`) via `mcp__github__pull_request_review_write` with
    `method: resolve_thread` and the `threadId` (returned by
@@ -196,7 +184,8 @@ finding → push → post summary → re-request review → repeat until clean.
    whose fixes are already in the tree but were never resolved still block the
    "fully clean" check — clear them as soon as you confirm the code is right.
 
-   **Opportunistic conflict sweep.** After pushing (or after any round where
+   **Opportunistic conflict sweep.**
+   After pushing (or after any round where
    all findings were Rebutted/Deferred with no push), scan other open PRs in
    the same repo for merge conflicts:
    ```bash
@@ -216,7 +205,8 @@ finding → push → post summary → re-request review → repeat until clean.
 5. **Post the ARD summary** as a comment on the MR/PR (table format per the
    ARD skill).
 
-6. **Re-request review — but don't double-trigger.** How depends on whether
+6. **Re-request review — but don't double-trigger.**
+How depends on whether
    this round pushed code:
    - **Code was pushed:** the push **already** triggers the review (e.g.
      `claude-code-review` on `pull_request` sync). Do **NOT** also post
@@ -252,7 +242,8 @@ finding → push → post summary → re-request review → repeat until clean.
      run on a **bot-pushed** commit may show as `action_required` (gated) and
      never run — the explicit `workflow_dispatch` bypasses that.
 
-   **Don't let the trigger phrase leak into prose.** The `issue_comment`
+   **Don't let the trigger phrase leak into prose.**
+   The `issue_comment`
    trigger fires on the bare bot `@`-mention **anywhere** in a comment body —
    even inside a sentence saying you're *not* triggering a review. In ARD
    summaries and status comments, refer to it obliquely ("re-request review",
@@ -265,7 +256,8 @@ finding → push → post summary → re-request review → repeat until clean.
 
    Then wait for the new verdict.
 
-   **While waiting, keep checking for merge conflicts.** Other PRs in this repo
+   **While waiting, keep checking for merge conflicts.**
+   Other PRs in this repo
    can become conflicting at any time (someone merges to `main` while the review
    runs). Poll every few minutes with `/loop` or a manual re-check:
    ```bash
@@ -395,36 +387,41 @@ Do-Confirm; per
 
 ## Stopping conditions
 
-**There is no round limit. Always request another review.** The loop ends on
-exactly three things:
+**There is no round limit.
+Always request another review.**
+The loop on a single PR ends on exactly three things:
 
-1. **A totally clean review** --- no nits, no non-blocking comments, everything
-   Addressed or agreed Deferred. See
-   [*The bar: "fully clean"*](#the-bar-fully-clean).
-2. **A genuine deadlock on a specific item** --- you and the reviewer have argued
-   back and forth and cannot reach an understanding.
+1. **A totally clean review** --- no nits, no non-blocking comments, everything Addressed or agreed Deferred.
+   See [*The bar: "fully clean"*](#the-bar-fully-clean).
+2. **Nothing actionable remains** --- every open item has been escalated to a human and is waiting on their decision, so there is no next action you can take.
+   Not "some items are deadlocked"; *all* of them.
 3. **The user says stop.**
 
 Nothing else. Not a round count, not a sense that findings are getting smaller,
 not a judgment that the reviewer is nitpicking.
 
-- **Deadlock on an item:** if you and the reviewer can't reach consensus (your
-  rebuttal didn't convince them, and their re-raise didn't convince you),
-  **escalate to a human reviewer** for the final decision rather than looping or
-  unilaterally overriding. Request `d-morrison` via the `request-pr-review`
-  skill (or `gh pr edit <N> --add-reviewer d-morrison`), `@`-mention them in a
-  comment summarizing the impasse, and surface the open item to the user.
-  This is per-item: escalating one deadlocked finding does not stop the loop,
-  which keeps running on everything else.
+**Deadlock is per-item, and it does not stop the loop.**
+If you and the reviewer can't reach consensus on one finding (your rebuttal didn't convince them, and their re-raise didn't convince you), **escalate that item to a human reviewer** rather than looping on it or unilaterally overriding.
+Request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`), `@`-mention them in a comment summarizing the impasse, and surface the open item to the user.
+Then **keep driving the PR**: address every other finding, push, and request the next review.
+Only when *every* remaining item is an escalated deadlock does condition 2 above fire, and even then the loop resumes the moment the human rules.
+
+### Sweep-level scheduling is a different question
+
+[`ardia`](../ardia/SKILL.md) and [`gia`](../gia/SKILL.md) drive *many* PRs.
+When one of those is waiting on a human --- a deadlocked item, a blocked dependency, an unresolvable conflict --- the sweep records it and moves to the next PR so the batch keeps moving.
+That is **scheduling**, not a stopping condition for the loop: the sweep returns when the human rules, and nothing about it licenses accepting unaddressed findings on the PR itself.
 
 ### "Asymptotic noise" is an anti-pattern, not a signal
 
 This skill used to carry a guard saying that after 3-4 rounds of new nits you
 should surface the pattern and ask whether to continue. **That guard is
-removed, and reasoning of that shape must not be reintroduced.** It fails
+removed, and reasoning of that shape must not be reintroduced.**
+It fails
 three ways:
 
-- **It fires on round count, not on finding quality.** A round producing
+- **It fires on round count, not on finding quality.**
+A round producing
   genuine, reproducible correctness bugs is indistinguishable from a round
   producing style churn if all you count is rounds.
 - **It reads as diligence**, which is exactly why it goes unexamined. Stopping
@@ -439,11 +436,13 @@ maybe we should stop." Replace it with another review request.
 
 Two things that are **not** this anti-pattern and stay:
 
-- **The per-item hold.** When a reviewer re-raises one already-deferred item
+- **The per-item hold.**
+When a reviewer re-raises one already-deferred item
   verbatim each round, reply once pointing at the tracked issue and hold on
   *that item*, while continuing to fix every new finding. That is about not
   re-litigating one item; it never stops the loop.
-- **Reporting the round count.** Saying "round 7, 23 findings, all Addressed"
+- **Reporting the round count.**
+Saying "round 7, 23 findings, all Addressed"
   is useful information. Attaching "shall I stop?" to it is the anti-pattern.
 
 (ai-config#1029 is the case record: six rounds, 23 findings, all Addressed,

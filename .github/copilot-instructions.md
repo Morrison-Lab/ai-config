@@ -14,7 +14,8 @@ Review prose with the rigor you would apply to code.
 Write `--` where a dash is wanted.
 This is enforced by convention rather than by CI, so review is the main line of defence.
 
-**Semantic line breaks.** Prose is written one clause per line, so a phrase routinely spans a newline.
+**Semantic line breaks.**
+Prose is written one clause per line, so a phrase routinely spans a newline.
 Two consequences for you.
 Do not flag a short line as needing to be joined.
 And before reporting that some text or reference is missing, remember that a literal single-line search gives false negatives here; a claim of absence needs a whitespace-normalized search behind it.
@@ -29,11 +30,14 @@ Correctness first, in this order:
 2. **Internal consistency.** This corpus cross-references itself heavily.
    A change to one rule frequently falsifies a restatement of it elsewhere, and the stale copy is usually in a *different* file from the one being edited.
 3. **Instructions that cannot be followed.** Two sections giving opposite guidance for the same situation is the highest-value finding class here, and the hardest for the author to see.
-4. Style, only where it breaks the conventions above.
+4. **Documented style rules**, which in this repo are substantive rather than cosmetic.
+   Ambiguous terminology, forward references to content the reader has not reached, unverified claims, and redundant restatement all have their own fragments under `shared/writing/` and `shared/workflow/`, and findings against them are welcome.
+   What is *not* wanted is generic style preference with no rule behind it.
 
 ## Tests
 
-Test files under `scripts/test_*.py` are plain Python scripts with a `check(name, condition)` helper, not pytest.
+Test files under `scripts/test_*.py` are plain Python scripts, not pytest.
+Each defines its own `check(...)` helper and prints a pass/fail tally; the signature varies by file, so read the one in front of you rather than assuming a shape.
 
 The single most valuable thing you can flag: **a test that would still pass if the fix it guards were reverted.** Common shapes seen in this repo:
 

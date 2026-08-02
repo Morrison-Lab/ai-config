@@ -32,7 +32,22 @@ Operationalizes the strong form of the claim workflow: branch â†’ empty commit â
 
 ## Why draft?
 
-A draft PR doesn't trigger `@claude` review bot, so no review round is spent on an empty or half-finished diff. When implementation is complete and checks pass, mark ready-for-review (`gh pr ready <N>`).
+A draft PR doesn't trigger `@claude` review bot, so no review round is spent on an empty or half-finished diff.
+When implementation is complete and checks pass, mark ready-for-review (`gh pr ready <N>`), then request the external reviewer in the same stride.
+
+## Request reviewer before reporting status
+
+Opening a PR or marking a draft ready can trigger this repo's own review workflow, but that does not summon Copilot.
+If Copilot is a configured reviewer, request it immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR:
+
+```bash
+gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
+  -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+gh pr view <N> --json reviewRequests
+```
+
+Verify the request landed before writing a status report.
+If the request is blocked, report that blocker and start the fallback; do not write "review owed" as a status item.
 
 ## Workflow order
 
@@ -40,8 +55,9 @@ A draft PR doesn't trigger `@claude` review bot, so no review round is spent on 
 2. _(This skill)_ Claim the issue and open the draft PR (branch + empty commit + PR + claim comment)
 3. _(Caller)_ Implement code on the branch
 4. _(Caller)_ Mark PR ready-for-review (`gh pr ready <N>`)
-5. _(Caller)_ Iterate ARDI until clean
-6. _(Caller)_ Merge
+5. _(Caller)_ Request and verify the external reviewer before reporting status
+6. _(Caller)_ Iterate ARDI until clean
+7. _(Caller)_ Merge
 
 ## Related
 

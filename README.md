@@ -212,7 +212,8 @@ python3 scripts/check-context-closure.py --base ../consumer-repo
 ```
 
 Advisory: it reports the total against `--budget` and exits 0 over it, so it serves as a trend line on every PR rather than a gate.
-A **dangling** import does exit non-zero, being a defect rather than a size finding.
+A dangling **anchored** import (one written on its own line) does exit non-zero, being a defect rather than a size finding.
+An unresolved **inline** `@token` is reported but does *not* fail, since most are prose (`@claude` mentions, email addresses) rather than mistyped imports --- so don't rely on this command to gate those.
 
 For a repo that vendors ai-config as a `.ai-config` submodule, `--compare` answers what a pin bump would cost.
 The import list is fixed; what changes is what those files weigh:

@@ -111,15 +111,23 @@ _INLINE_IMPORT_RE = re.compile(r"(?<![\w`])@([^\s`]+?)(?=[.,;:!?)\]]*(?:\s|$))")
 # block was not recognised at all. Either way a documented example became
 # a counted import.
 #
-# The code span is deliberately bounded to ONE LINE (`[^\n]*?`, not
-# `[\s\S]*?`). A newline-spanning version pairs a stray backtick with
-# another one much later in the file and strips everything between,
-# swallowing real imports: measured on this repo's own CLAUDE.md, it cut
-# the anchored-import count from 69 to 50 and the closure from 70 files to
-# 51. Bounding to a line also matches CommonMark, where a code span cannot
-# contain a blank line.
-_FENCE_RE = re.compile(r"^(`{3,}|~{3,})[^\n]*$[\s\S]*?^\1[`~]*[ \t]*$", re.MULTILINE)
-_CODE_SPAN_RE = re.compile(r"(`+)[^\n]*?\1(?!`)")
+# Both follow CommonMark's own bounds:
+#
+#   * A fence may be indented up to three spaces, and its closer may be
+#     indented independently. An unindented pattern leaves the block's
+#     contents in the text, so an `@path` inside a documented example is
+#     counted as a real import.
+#   * A code span may contain line endings but NOT a blank line. That bound
+#     is load-bearing rather than pedantic: an unbounded `[\s\S]*?` pairs a
+#     stray backtick with another far later in the file and strips
+#     everything between. Measured on this repo's own CLAUDE.md, that cut
+#     the anchored-import count from 69 to 50 and the closure from 70 files
+#     to 51. Stopping at a blank line keeps multi-line spans working while
+#     confining any mismatch to a single paragraph.
+_FENCE_RE = re.compile(
+    r"^ {0,3}(`{3,}|~{3,})[^\n]*$[\s\S]*?^ {0,3}\1[`~]*[ \t]*$", re.MULTILINE
+)
+_CODE_SPAN_RE = re.compile(r"(`+)(?:[^\n]|\n(?![ \t]*\n))*?\1(?!`)")
 
 # Claude Code stops following imports after this many hops: its docs say
 # "Imported files can recursively import other files, with a maximum depth

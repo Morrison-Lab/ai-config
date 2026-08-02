@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression tests for check-context-closure.py."""
 import importlib.util
+import os
 import subprocess
 import sys
 import tempfile
@@ -305,9 +306,26 @@ check(
     ccc.import_paths("a `span` here\n@real.md\nlater `another` span\n")[0]
     == ["real.md"],
 )
+# CommonMark allows a code span to contain line endings but NOT a blank
+# line. That bound is what stops a stray backtick pairing with another far
+# later in the file: the damage is confined to one paragraph.
 check(
-    "an unmatched backtick does not eat the rest of the file",
-    ccc.import_paths("stray ` backtick\n@real.md\nmore ` text\n")[0]
+    "a stray backtick cannot swallow across a blank line",
+    ccc.import_paths("stray ` backtick\n\n@real.md\n\nmore ` text\n")[0]
+    == ["real.md"],
+)
+check(
+    "a genuine multi-line code span IS stripped (CommonMark)",
+    ccc.import_paths("a `code\n@gone.md\nmore` b\n@real.md\n")[0] == ["real.md"],
+)
+# The body deliberately contains a BLANK LINE. Without one, the code-span
+# rule strips an indented fence incidentally, so a simpler fixture passes
+# even with the indentation allowance removed -- it tests nothing. A blank
+# line is exactly what a span may not contain, so only the fence rule can
+# handle this.
+check(
+    "a fence indented up to three spaces is still a fence",
+    ccc.import_paths("   ```\n@gone.md\n\nstill inside\n   ```\n@real.md\n")[0]
     == ["real.md"],
 )
 
@@ -319,19 +337,36 @@ check(
 # Claude Code documents `@~/.claude/my-project-instructions.md` as the way to
 # share personal instructions across worktrees, so a ~ import is real context.
 # Joining it to --base would look under <base>/~/... and report it dangling.
+#
+# HOME is redirected at the temp dir rather than probing the real home: a
+# fixed filename there collides with whatever the user happens to have, so
+# the earlier version could fail even with local_reader working correctly.
 with tempfile.TemporaryDirectory() as tmp:
-    home_file = Path.home() / ".ccc_test_probe.md"
-    wrote = not home_file.exists()
-    if wrote:
-        home_file.write_text("probe", encoding="utf-8")
+    fake_home = Path(tmp) / "home"
+    fake_home.mkdir()
+    (fake_home / "personal.md").write_text("probe", encoding="utf-8")
+    _saved = {k: os.environ.get(k) for k in ("HOME", "USERPROFILE")}
+    os.environ["HOME"] = str(fake_home)
+    os.environ["USERPROFILE"] = str(fake_home)
     try:
         check(
             "a ~ import is expanded, not joined to --base",
-            ccc.local_reader(Path(tmp))("~/.ccc_test_probe.md") == b"probe",
+            ccc.local_reader(Path(tmp))("~/personal.md") == b"probe",
+        )
+        (Path(tmp) / "CLAUDE.md").write_text("@~/personal.md\n", encoding="utf-8")
+        files, missing, _ = ccc.walk_closure(
+            "CLAUDE.md", ccc.local_reader(Path(tmp))
+        )
+        check(
+            "  ... so a ~ import is counted, not reported dangling",
+            missing == [] and len(files) == 2,
         )
     finally:
-        if wrote:
-            home_file.unlink()
+        for k, v in _saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 # --- gitlink baseline -------------------------------------------------------
 

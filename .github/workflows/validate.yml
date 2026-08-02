@@ -71,8 +71,10 @@ jobs:
         # line count cannot see a total and the gitlink diff of a pin bump is
         # one line. A trend line on every PR is what was missing.
         #
-        # It still exits non-zero on a DANGLING import, which is a defect
-        # rather than a size finding -- see the script's docstring.
+        # It still exits non-zero on a dangling ANCHORED import (one written
+        # on its own line), which is a defect rather than a size finding.
+        # An unresolved INLINE @token is reported but does not fail, since
+        # most are prose -- see the script's docstring.
         run: python3 scripts/check-context-closure.py
       - name: Check for oversized memory files (advisory)
         # Non-blocking (ai-config#695): memory files are read on demand, so

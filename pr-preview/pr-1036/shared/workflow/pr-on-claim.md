@@ -37,6 +37,32 @@ complete and the repo's checks pass, mark the PR **ready for review**
 (`gh pr ready <N>`, or `mcp__github__update_pull_request` with `draft: false`).
 Marking it ready is what kicks off ARDI.
 
+**Request the external reviewer in the same stride.** Opening a PR or marking a draft ready can trigger the repo's own review workflow, but that does not summon every reviewer.
+In this repo, Copilot reviews only when explicitly requested with the requested-reviewers API or the equivalent UI action:
+
+```bash
+gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
+  -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+gh pr view <N> --json reviewRequests
+```
+
+Run that request immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR, before writing any status report.
+Verify the request landed: the API response should include the requested reviewer, and `gh pr view <N> --json reviewRequests` should show the pending request.
+If a reviewer cannot be requested in this session, say so and start the documented fallback; do not leave it as "review owed".
+
+This is part of opening the PR, not a follow-up task.
+A status sentence like "review owed on #N" is the anti-pattern: it names a debt that should already have been discharged, the same way an offer to file an issue names work instead of doing it.
+The sentence is the trigger to request the review now.
+
+- **Do:** request the reviewer explicitly in the same step that opens the PR or marks it ready.
+- **Do:** verify the request landed from the API response and `reviewRequests`.
+- **Don't:** treat a PR's auto-triggered checks as evidence that every reviewer is engaged.
+- **Don't:** write "review owed" or "still need to request review" into a status report; go request it instead.
+
+(Morrison-Lab/ai-config #1038 and #1040, 2026-08-02: both PRs were opened around 07:00Z and then reported as still owing review requests.
+They had zero Copilot reviews until the user asked why no review had been requested about ten minutes later.
+The repo's `claude-review` workflow was failing for the same context-closure limit that made #1029's review fail on every attempt, so a PR without the explicit Copilot request had no working reviewer despite review-shaped checks.)
+
 **Don't mark ready within seconds of the final push — the two review runs race
 and the WRONG one can get cancelled.** On repos whose review workflow runs on
 `pull_request` (`synchronize`, `ready_for_review`) with `concurrency:

@@ -82,6 +82,12 @@
       "event": "UserPromptSubmit",
       "timeout": 10,
       "why": "CLAUDE.md 'Run UMS proactively' -- discovering you were wrong is a trigger with no artifact, so nothing else prompts the pass; this injects a reminder naming the admitted error when no memory/skill write followed it."
+    },
+    {
+      "script": "no-unreviewed-pr.py",
+      "event": "Stop",
+      "timeout": 10,
+      "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. With claude-review failing repo-wide on context size (ai-config#897), an unrequested PR gets no review at all."
     }
   ]
 }

@@ -63,63 +63,31 @@ so **inline the exact commands**; don't point it at a section it can't read.
 Fill in `<N>`, `<headRefName>`, `<owner>`, `<repo>` for each PR (resolve
 owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.name)"'`):
 
-> Gather the status of PR **#<N>** (branch `<headRefName>`) in this repo and
-> return a single structured row. Do not push, merge, or modify anything.
+> Gather the status of PR **#<N>** (branch `<headRefName>`) in this repo and return a single structured row.
+> Do not push, merge, or modify anything.
 >
 > 1. **Latest review verdict, checked for currency against the head.** Read
->    the *most recent* review comment **and** the timestamp of the latest
->    commit, in one call, so a "clean" verdict posted before the last push
->    can't be mistaken for current:
+>    the *most recent* review comment **and** the timestamp of the latest commit, in one call, so a "clean" verdict posted before the last push can't be mistaken for current:
 >    ```bash
 >    gh pr view "<N>" --json comments,commits,headRefOid \
 >      --jq '{review: ([.comments[] | select(.author.login | startswith("claude"))] | last), lastCommitDate: (.commits[-1].committedDate), headRefOid: .headRefOid}'
 >    ```
->    **This fetches more than `READ_PR_COMMENTS` maps to** --
->    [`tool-mappings.md`](../../tool-mappings.md)'s entry for that token is a
->    comments-only MCP call, which returns neither `commits` nor
->    `headRefOid`. In a remote/MCP session without `gh`, fetch those two
->    fields with a separate call rather than assuming the token mapping
->    covers this expanded query.
->    The reviewer login varies by setup: `gh pr view` reports `claude`; the
->    REST API reports `claude[bot]`. `startswith("claude")` matches both. If
->    `.review` is `null`, the reviewer may post as `github-actions[bot]` or
->    another login -- **never report "clean"**; broaden the filter or say no
->    review was found.
->    **If `.review.createdAt` is earlier than `.lastCommitDate`, the review
->    predates the latest push** -- report `in-flight`, not the review body's
->    verdict, regardless of what it says (both are ISO 8601 UTC timestamps, so
->    a plain string comparison works).
->    **This timing comparison is best-effort, not proof** -- a review run
->    *started* against an older commit can finish and post *after* a newer
->    push lands, making `createdAt` look current even though the reviewed
->    content is stale (issue comments carry no structured `commit_id` to
->    check directly, unlike formal reviews). When the review body names the
->    commit it reviewed (the `@claude` bot commonly writes "commit `<sha>`"),
->    cross-check that mentioned SHA's prefix against `.headRefOid` (now part
->    of the same call above) as a
->    corroborating signal; treat a mismatch as `in-flight` even if the
->    timing check alone would have said `clean`.
->    **When no SHA can be extracted from the body, don't fall back to trusting
->    the timing check alone as proof of currency** -- report `unverified`
->    (not `clean`) instead, since `committedDate` is the commit's local
->    committer timestamp, not when GitHub received the push, and a commit
->    authored earlier but pushed later can pass the timing check while still
->    being newer than the review.
->    Only once the review postdates the last commit **and** a named SHA
->    matches -- unconditionally; no SHA named means `unverified`, not
->    `clean`, full stop -- apply the bar for
->    `clean`: "Looks good" / "no findings" / "approved" with zero follow-on
->    bullets under any heading. A rebuttal the reviewer still disputes is
->    **open**, not clean.
+>    **This fetches more than `READ_PR_COMMENTS` maps to** -- [`tool-mappings.md`](../../tool-mappings.md)'s entry for that token is a comments-only MCP call, which returns neither `commits` nor `headRefOid`.
+>    In a remote/MCP session without `gh`, fetch those two fields with a separate call rather than assuming the token mapping covers this expanded query.
+>    The reviewer login varies by setup: `gh pr view` reports `claude`; the REST API reports `claude[bot]`.
+>    `startswith("claude")` matches both.
+>    If `.review` is `null`, the reviewer may post as `github-actions[bot]` or another login -- **never report "clean"**; broaden the filter or say no review was found.
+>    **If `.review.createdAt` is earlier than `.lastCommitDate`, the review predates the latest push** -- report `in-flight`, not the review body's verdict, regardless of what it says (both are ISO 8601 UTC timestamps, so a plain string comparison works).
+>    **This timing comparison is best-effort, not proof** -- a review run *started* against an older commit can finish and post *after* a newer push lands, making `createdAt` look current even though the reviewed content is stale (issue comments carry no structured `commit_id` to check directly, unlike formal reviews).
+>    When the review body names the commit it reviewed (the `@claude` bot commonly writes "commit `<sha>`"), cross-check that mentioned SHA's prefix against `.headRefOid` (now part of the same call above) as a corroborating signal; treat a mismatch as `in-flight` even if the timing check alone would have said `clean`.
+>    **When no SHA can be extracted from the body, don't fall back to trusting the timing check alone as proof of currency** -- report `unverified` (not `clean`) instead, since `committedDate` is the commit's local committer timestamp, not when GitHub received the push, and a commit authored earlier but pushed later can pass the timing check while still being newer than the review.
+>    Only once the review postdates the last commit **and** a named SHA matches -- unconditionally; no SHA named means `unverified`, not `clean`, full stop -- apply the bar for `clean`: "Looks good" / "no findings" / "approved" with zero follow-on bullets under any heading.
+>    A rebuttal the reviewer still disputes is **open**, not clean.
 > 2. **External (Copilot) reviewer verdict -- read-only, don't request one.**
->    The comment above is the `@claude` bot only; a formal Copilot review is a
->    separate object it won't show. This step **only inspects an existing
->    Copilot review** -- it never POSTs a review request. Requesting a review
->    is a mutation (triggers a review job, consumes quota, can collide with a
->    concurrent `ardi` loop), which breaks this skill's whole justification for
->    fanning out subagents concurrently (*read-only, side-effect-free*). If no
->    genuine verdict already exists at the current head, report that fact --
->    don't try to produce one; that's `ardi`'s job.
+>    The comment above is the `@claude` bot only; a formal Copilot review is a separate object it won't show.
+>    This step **only inspects an existing Copilot review** -- it never POSTs a review request.
+>    Requesting a review is a mutation (triggers a review job, consumes quota, can collide with a concurrent `ardi` loop), which breaks this skill's whole justification for fanning out subagents concurrently (*read-only, side-effect-free*).
+>    If no genuine verdict already exists at the current head, report that fact -- don't try to produce one; that's `ardi`'s job.
 >    ```bash
 >    set -o pipefail
 >    head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"
@@ -135,25 +103,16 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >      echo "no Copilot review exists at the current head"
 >    fi
 >    ```
->    Clean requires **three** things: an affirmative zero-new-findings
->    overview (e.g. "generated no new comments" -- never a literally empty
->    body), zero matched inline comments, **and no "Comments suppressed due
->    to low confidence" block in the body** -- a "no new comments" overview
->    can still carry real low-confidence findings collapsed into a
->    `<details>` block that never becomes a formal inline comment (verified:
->    PR #660's review 4767752501 read "generated no new comments" while
->    carrying 3 suppressed findings). A stub-like non-answer ("ineligible",
->    "reached their quota limit") is not a verdict either.
->    **This step cannot determine *why* no Copilot verdict exists** -- it
->    can't tell "Copilot was never asked" from "Copilot is unreachable" from
->    "a self-review was posted instead." Don't guess; report the plain
->    evidence-based fact (`no verdict at head`), and leave the
->    availability/self-review judgment call to `ardi`, which actually drives
->    the PR and can request reviews.
+>    Clean requires **three** things: an affirmative zero-new-findings overview (e.g. "generated no new comments" -- never a literally empty body), zero matched inline comments, **and no suppression block in the body** -- match case-insensitively on `suppressed`, never on either exact phrase: PR #660 emitted `Comments suppressed due to low confidence (3)` while PRs #1029 and #1031 emit `Suppressed comments (4)`, so a literal grep for the older wording returns zero against a current body that has the block.
+>    A "no new comments" overview can still carry real low-confidence findings collapsed into a `<details>` block that never becomes a formal inline comment (verified: PR #660's review 4767752501 read "generated no new comments" while carrying 3 suppressed findings).
+>    A stub-like non-answer ("ineligible", "reached their quota limit") is not a verdict either.
+>    **This step cannot determine *why* no Copilot verdict exists** -- it can't tell "Copilot was never asked" from "Copilot is unreachable" from "a self-review was posted instead."
+>    Don't guess; report the plain evidence-based fact (`no verdict at head`), and leave the availability/self-review judgment call to `ardi`, which actually drives the PR and can request reviews.
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); name any failing/pending
 >    check, don't just say "red".
 > 4. **Unresolved threads** -- count open inline review threads
->    (`READ_PR_REVIEW_COMMENTS`). Run exactly:
+>    (`READ_PR_REVIEW_COMMENTS`).
+>    Run exactly:
 >    ```bash
 >    gh api graphql -f query='query {
 >      repository(owner:"<owner>", name:"<repo>") {
@@ -171,52 +130,24 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >      else if $open == 0 then "resolved" else "\($open) open" end
 >      end'
 >    ```
->    The command emits one of three normalized values: `resolved` (all threads
->    resolved), `N open` (e.g. `3 open`) — that many unresolved threads, or
->    `N+ open (cap)` — the 100-thread cap was hit, **cannot confirm clean** —
->    treat as unresolved.
+>    The command emits one of three normalized values: `resolved` (all threads resolved), `N open` (e.g. `3 open`) — that many unresolved threads, or `N+ open (cap)` — the 100-thread cap was hit, **cannot confirm clean** — treat as unresolved.
 > 5. **Behind main?** -- fetch the head ref too (a fresh subagent has no local
->    branch), then compare remote-tracking refs: `git fetch origin main
->    <headRefName> -q && git rev-list --count origin/<headRefName>..origin/main`.
->    >0 means main has moved ahead.
+>    branch), then compare remote-tracking refs: `git fetch origin main <headRefName> -q && git rev-list --count origin/<headRefName>..origin/main`. >0 means main has moved ahead.
 > 6. **Blocking human `CHANGES_REQUESTED`** (`READ_PR_REVIEWS` -- abstract
->    operation token; resolve to your model's tool via
->    [`tool-mappings.md`](../../tool-mappings.md)). A bot's clean verdict does
->    **not** clear a human's formal review state -- it's a separate object,
->    invisible to the Signal 1 comments query, and its top-level body is
->    often empty (the finding lives in an inline comment):
+>    operation token; resolve to your model's tool via [`tool-mappings.md`](../../tool-mappings.md)).
+>    A bot's clean verdict does **not** clear a human's formal review state -- it's a separate object, invisible to the Signal 1 comments query, and its top-level body is often empty (the finding lives in an inline comment):
 >    ```bash
 >    gh pr view "<N>" --json reviews \
 >      --jq '[.reviews[] | select(.author.login != null and (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED"))] | group_by(.author.login) | map(sort_by(.submittedAt) | last) | [.[] | select(.state == "CHANGES_REQUESTED") | .author.login]'
 >    ```
->    **`--json reviews` returns the full review history, not one entry per
->    reviewer, and a reviewer's *decisive* state persists across neutral
->    comments** -- GitHub only clears `CHANGES_REQUESTED` when that same
->    reviewer later `APPROVED`s, or via an explicit dismissal; a neutral
->    `COMMENTED` review in between does **not** clear it. Filter to only
->    `APPROVED`/`CHANGES_REQUESTED`/`DISMISSED` states *before* reducing to
->    each author's latest review -- reducing over all states first lets a
->    later `COMMENTED` round hide an earlier `CHANGES_REQUESTED` (verified
->    with a synthetic fixture: naive reduction incorrectly cleared it,
->    state-filtered reduction correctly kept it blocking). **Keep
->    `DISMISSED` in the filter** -- dropping it would let an older
->    `CHANGES_REQUESTED` outlive its own later dismissal, since the
->    dismissal itself would never survive the reduction to compete as
->    "latest" (verified with a second synthetic fixture:
->    `CHANGES_REQUESTED` then `DISMISSED` incorrectly stayed blocking under
->    an `APPROVED`/`CHANGES_REQUESTED`-only filter, correctly cleared once
->    `DISMISSED` was included). The trailing `select(.state ==
->    "CHANGES_REQUESTED")` still keeps `DISMISSED` reviews themselves out of
->    the final blocking list. Any
->    non-empty result **blocks** regardless of what any bot says -- only the
->    human (or an explicit dismissal) resolves it. Return the reviewer login(s)
->    from the array, not just a count.
+>    **`--json reviews` returns the full review history, not one entry per reviewer, and a reviewer's *decisive* state persists across neutral comments** -- GitHub only clears `CHANGES_REQUESTED` when that same reviewer later `APPROVED`s, or via an explicit dismissal; a neutral `COMMENTED` review in between does **not** clear it.
+>    Filter to only `APPROVED`/`CHANGES_REQUESTED`/`DISMISSED` states *before* reducing to each author's latest review -- reducing over all states first lets a later `COMMENTED` round hide an earlier `CHANGES_REQUESTED` (verified with a synthetic fixture: naive reduction incorrectly cleared it, state-filtered reduction correctly kept it blocking).
+>    **Keep `DISMISSED` in the filter** -- dropping it would let an older `CHANGES_REQUESTED` outlive its own later dismissal, since the dismissal itself would never survive the reduction to compete as "latest" (verified with a second synthetic fixture: `CHANGES_REQUESTED` then `DISMISSED` incorrectly stayed blocking under an `APPROVED`/`CHANGES_REQUESTED`-only filter, correctly cleared once `DISMISSED` was included).
+>    The trailing `select(.state == "CHANGES_REQUESTED")` still keeps `DISMISSED` reviews themselves out of the final blocking list.
+>    Any non-empty result **blocks** regardless of what any bot says -- only the human (or an explicit dismissal) resolves it.
+>    Return the reviewer login(s) from the array, not just a count.
 >
-> Return: PR number, CI (✅/❌-with-name/⏳), review (`clean` / `unverified`
-> / `N open` with the headline finding / `none found` / `in-flight`),
-> external (`clean` / `N open` / `no verdict at head`), human-blocked
-> (`none` / `N pending` -- name the reviewer if `N` > 0), threads (`resolved`
-> / `N open` / `N+ open (cap)`), behind-main (`up to date` / `N commits`).
+> Return: PR number, CI (✅/❌-with-name/⏳), review (`clean` / `unverified` / `N open` with the headline finding / `none found` / `in-flight`), external (`clean` / `N open` / `no verdict at head`), human-blocked (`none` / `N pending` -- name the reviewer if `N` > 0), threads (`resolved` / `N open` / `N+ open (cap)`), behind-main (`up to date` / `N commits`).
 
 ### 3. Assemble (orchestrator)
 

@@ -70,7 +70,7 @@ List the merge order across **both** phases — Phase 1 PRs can be stacked on ea
 - If the trigger was ambiguous about whether to also burn down issues (e.g. a bare “clean up the PRs”), stop after Phase 1 and check in before starting Phase 2.
 - Honor GII’s 5-issue checkpoint in Phase 2 (ask before continuing).
 - If a PR or issue is blocked or ambiguous, **bypass** it — surface it and move on to the next item rather than halting the sweep. Stop only when every remaining item depends on that blocked one, so no independent work is left (see [`stack-dont-pause`](../../shared/workflow/stack-dont-pause.md)).
-- If Phase 1’s reviewer keeps emitting new nits each round on the same PR (asymptotic noise after 3–4 rounds), surface it and ask whether to continue.
+- If Phase 1’s reviewer and you deadlock on a specific item — argued back and forth with no understanding reached — escalate that item to a human and keep driving the rest. A run of rounds is not itself a reason to stop or to ask: see [`ardi`](../../skills/ardi/SKILL.llms.md)’s “Stopping conditions”.
 
 ## Orchestration
 

@@ -439,8 +439,11 @@
   Caught by the `@claude` reviewer (twice, once inline and once in the full verdict) after a companion PR was opened ready-for-review while its own body said "blocked, should stay draft" — the citation it made to a sibling-repo file genuinely 404'd on that repo's `main` because the dependency hadn't merged yet.
   Fix pattern once caught: convert back to draft, reword any forward-looking citation to something that stays accurate regardless of merge timing (e.g. "proposed in #N — once merged, lives at `path`" rather than asserting the path already resolves), then flip back to ready and re-verify the citation resolves once the dependency actually merges. (Learned on ai-config#454/gha#215.)
 - During ARDI loops: only stop iterating (without consensus) if you're at a literal impasse — going in circles, redoing and undoing the same changes.
-  Asymptotic new nits each round is NOT an impasse; keep addressing them.
-  After 3–4 rounds of asymptotic noise (new nits appearing each round with no sign of convergence), surface that to the user and ask whether to keep going or accept the current state.
+  New nits each round is NOT an impasse; keep addressing them.
+  **There is no round limit, and "asymptotic noise" is an anti-pattern rather than a signal.**
+  Always request another review. Stop only on a totally clean review, a genuine per-item deadlock, or me saying stop --- never on a round count, and never by asking whether to accept the current state.
+  That question fires on how many rounds have passed rather than on what the findings are worth, and it reads as diligence, which is why it goes unexamined.
+  (Purged from the corpus in ai-config#1030 after ai-config#1029 ran six rounds producing 23 real findings, with rounds 2-6 each finding bugs in earlier rounds' own fixes; the loop stopped to ask twice under the old guard, both times the answer was to keep going, and the next round found four more real bugs. Rationale and case record in `skills/ardi/SKILL.md`, "Stopping conditions".)
 - Keep the bot's `@`-mention trigger phrase OUT of PR/issue comment prose unless you actually intend to dispatch.
   The `issue_comment` trigger fires on the bare mention ANYWHERE in a comment — even in a sentence saying you're NOT triggering a review (e.g. an ARD summary noting "not posting [the mention]").
   A stray mention spawns a run that cancels the push-triggered review on `cancel-in-progress` setups.

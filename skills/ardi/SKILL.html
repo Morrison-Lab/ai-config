@@ -358,7 +358,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul class="collapse">
   <li><a href="#fully-clean-exit-checklist" id="toc-fully-clean-exit-checklist" class="nav-link" data-scroll-target="#fully-clean-exit-checklist">Fully-clean exit checklist</a></li>
   </ul></li>
-  <li><a href="#asymptotic-noise-guard-and-deadlocks" id="toc-asymptotic-noise-guard-and-deadlocks" class="nav-link" data-scroll-target="#asymptotic-noise-guard-and-deadlocks">Asymptotic-noise guard and deadlocks</a></li>
+  <li><a href="#stopping-conditions" id="toc-stopping-conditions" class="nav-link" data-scroll-target="#stopping-conditions">Stopping conditions</a>
+  <ul class="collapse">
+  <li><a href="#asymptotic-noise-is-an-anti-pattern-not-a-signal" id="toc-asymptotic-noise-is-an-anti-pattern-not-a-signal" class="nav-link" data-scroll-target="#asymptotic-noise-is-an-anti-pattern-not-a-signal">“Asymptotic noise” is an anti-pattern, not a signal</a></li>
+  </ul></li>
   <li><a href="#on-clean" id="toc-on-clean" class="nav-link" data-scroll-target="#on-clean">On clean</a></li>
   </ul></li>
   </ul>
@@ -488,12 +491,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 </section>
 </section>
-<section id="asymptotic-noise-guard-and-deadlocks" class="level2">
-<h2 class="anchored" data-anchor-id="asymptotic-noise-guard-and-deadlocks">Asymptotic-noise guard and deadlocks</h2>
+<section id="stopping-conditions" class="level2">
+<h2 class="anchored" data-anchor-id="stopping-conditions">Stopping conditions</h2>
+<p><strong>There is no round limit. Always request another review.</strong> The loop ends on exactly three things:</p>
+<ol type="1">
+<li><strong>A totally clean review</strong> — no nits, no non-blocking comments, everything Addressed or agreed Deferred. See <a href="#the-bar-fully-clean"><em>The bar: “fully clean”</em></a>.</li>
+<li><strong>A genuine deadlock on a specific item</strong> — you and the reviewer have argued back and forth and cannot reach an understanding.</li>
+<li><strong>The user says stop.</strong></li>
+</ol>
+<p>Nothing else. Not a round count, not a sense that findings are getting smaller, not a judgment that the reviewer is nitpicking.</p>
 <ul>
-<li><strong>Deadlock on an item:</strong> if you and the reviewer can’t reach consensus (your rebuttal didn’t convince them, and their re-raise didn’t convince you), <strong>escalate to a human reviewer</strong> for the final decision rather than looping or unilaterally overriding. Request <code>d-morrison</code> via the <code>request-pr-review</code> skill (or <code>gh pr edit &lt;N&gt; --add-reviewer d-morrison</code>), <code>@</code>-mention them in a comment summarizing the impasse, and surface the open item to the user.</li>
-<li><strong>Asymptotic noise:</strong> if after 3–4 rounds the reviewer keeps generating new nits (not converging), surface that to the user and ask whether to continue or accept.</li>
+<li><strong>Deadlock on an item:</strong> if you and the reviewer can’t reach consensus (your rebuttal didn’t convince them, and their re-raise didn’t convince you), <strong>escalate to a human reviewer</strong> for the final decision rather than looping or unilaterally overriding. Request <code>d-morrison</code> via the <code>request-pr-review</code> skill (or <code>gh pr edit &lt;N&gt; --add-reviewer d-morrison</code>), <code>@</code>-mention them in a comment summarizing the impasse, and surface the open item to the user. This is per-item: escalating one deadlocked finding does not stop the loop, which keeps running on everything else.</li>
 </ul>
+<section id="asymptotic-noise-is-an-anti-pattern-not-a-signal" class="level3">
+<h3 class="anchored" data-anchor-id="asymptotic-noise-is-an-anti-pattern-not-a-signal">“Asymptotic noise” is an anti-pattern, not a signal</h3>
+<p>This skill used to carry a guard saying that after 3-4 rounds of new nits you should surface the pattern and ask whether to continue. <strong>That guard is removed, and reasoning of that shape must not be reintroduced.</strong> It fails three ways:</p>
+<ul>
+<li><strong>It fires on round count, not on finding quality.</strong> A round producing genuine, reproducible correctness bugs is indistinguishable from a round producing style churn if all you count is rounds.</li>
+<li><strong>It reads as diligence</strong>, which is exactly why it goes unexamined. Stopping to ask feels like respecting the user’s time.</li>
+<li><strong>It hands triage back to the user</strong> — the precise move <a href="../../shared/workflow/address-every-comment.md"><code>address-every-comment</code></a> already forbids for individual findings. The guard reintroduced at loop scale the thing that fragment bans at item scale.</li>
+</ul>
+<p>The tell is any sentence of the form “the reviewer keeps finding things, so maybe we should stop.” Replace it with another review request.</p>
+<p>Two things that are <strong>not</strong> this anti-pattern and stay:</p>
+<ul>
+<li><strong>The per-item hold.</strong> When a reviewer re-raises one already-deferred item verbatim each round, reply once pointing at the tracked issue and hold on <em>that item</em>, while continuing to fix every new finding. That is about not re-litigating one item; it never stops the loop.</li>
+<li><strong>Reporting the round count.</strong> Saying “round 7, 23 findings, all Addressed” is useful information. Attaching “shall I stop?” to it is the anti-pattern.</li>
+</ul>
+<p>(ai-config#1029 is the case record: six rounds, 23 findings, all Addressed, with rounds 2-6 each finding real bugs in <em>earlier rounds’ own fixes</em> — including CRLF silently disabling a failure path repo-wide, a <code>--compare</code> reporting a zero delta, and a traversal-order-dependent measurement. The loop stopped to ask twice under the old guard; both times the answer was to keep going, and the next round found four more real bugs.)</p>
+</section>
 </section>
 <section id="on-clean" class="level2">
 <h2 class="anchored" data-anchor-id="on-clean">On clean</h2>

@@ -419,7 +419,7 @@ ul.task-list li input[type="checkbox"] {
 <li>If the trigger was ambiguous about whether to also burn down issues (e.g.&nbsp;a bare “clean up the PRs”), stop after Phase 1 and check in before starting Phase 2.</li>
 <li>Honor GII’s 5-issue checkpoint in Phase 2 (ask before continuing).</li>
 <li>If a PR or issue is blocked or ambiguous, <strong>bypass</strong> it — surface it and move on to the next item rather than halting the sweep. Stop only when every remaining item depends on that blocked one, so no independent work is left (see <a href="../../shared/workflow/stack-dont-pause.md"><code>stack-dont-pause</code></a>).</li>
-<li>If Phase 1’s reviewer keeps emitting new nits each round on the same PR (asymptotic noise after 3–4 rounds), surface it and ask whether to continue.</li>
+<li>If Phase 1’s reviewer and you deadlock on a specific item — argued back and forth with no understanding reached — escalate that item to a human and keep driving the rest. A run of rounds is not itself a reason to stop or to ask: see <a href="../../skills/ardi/SKILL.html"><code>ardi</code></a>’s “Stopping conditions”.</li>
 </ul>
 </section>
 <section id="orchestration" class="level2">

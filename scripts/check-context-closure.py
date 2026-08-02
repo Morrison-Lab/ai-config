@@ -142,10 +142,37 @@ _INLINE_IMPORT_RE = re.compile(r"(?<![\w`])@([^\s`]+?)(?=[.,;:!?)\]]*(?:\s|$))")
 #     to 51. Stopping at a blank line keeps multi-line spans working while
 #     confining any mismatch to a single paragraph.
 _UNCLOSED_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})[^\n]*$", re.MULTILINE)
+# Backtick and tilde fences are separate alternatives so a closer must use
+# the SAME character as its opener, and each opening run carries `(?!x)` so
+# it cannot BACKTRACK to a shorter capture. Without that, `+`/`{3,}` shrinks
+# on demand and a four-backtick fence is "closed" by three, or a
+# double-backtick span pairs with a single-backtick closer -- stripping
+# content that is not code and hiding the imports inside it.
 _FENCE_RE = re.compile(
-    r"^ {0,3}(`{3,}|~{3,})[^\n]*$[\s\S]*?^ {0,3}\1[`~]*[ \t]*$", re.MULTILINE
+    r"^ {0,3}(?:(`{3,})(?!`)[^\n]*$[\s\S]*?^ {0,3}\1`*[ \t]*$"
+    r"|(~{3,})(?!~)[^\n]*$[\s\S]*?^ {0,3}\2~*[ \t]*$)",
+    re.MULTILINE,
 )
-_CODE_SPAN_RE = re.compile(r"(`+)(?:[^\n]|\n(?![ \t]*\n))*?\1(?!`)")
+# A code span's delimiters must also be maximal runs, and its opener must
+# not be preceded by a backtick -- otherwise ``@a.md` pairs its SECOND
+# backtick with the closer and strips an import that is not in a span.
+_CODE_SPAN_RE = re.compile(
+    r"(?<!`)(`+)(?!`)(?:[^\n]|\n(?![ \t]*\n))*?(?<!`)\1(?!`)"
+)
+
+
+def strip_code(text: str) -> str:
+    """Remove fenced blocks, orphan fence markers, and code spans.
+
+    Orphan markers are dropped between the two passes. A leftover opener
+    from an unclosed fence is a block-level marker, not a span delimiter,
+    so leaving it in lets the code-span pass pair it with a later marker
+    and swallow real content. Only the marker line goes -- its body stays,
+    per the deliberate no-swallow decision above.
+    """
+    return _CODE_SPAN_RE.sub(
+        " ", _UNCLOSED_FENCE_RE.sub("", _FENCE_RE.sub("", text))
+    )
 
 # Claude Code stops following imports after this many hops: its docs say
 # "Imported files can recursively import other files, with a maximum depth
@@ -173,7 +200,7 @@ def import_paths(text: str) -> tuple[list[str], list[str]]:
     reported only as anchored, so callers can union the two without
     double-counting.
     """
-    stripped = _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub("", text))
+    stripped = strip_code(text)
     anchored = _ANCHORED_IMPORT_RE.findall(stripped)
     seen = set(anchored)
     inline = []
@@ -257,6 +284,14 @@ def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
             return
         if path not in loaded:
             files.append((path, len(blob), depth))
+        elif depth < loaded[path]:
+            # Correct the RECORDED depth too, not just the cache. Otherwise
+            # the report shows the deeper route a file happened to be found
+            # by first, which is not its effective depth.
+            for i, (p_, n_, d_) in enumerate(files):
+                if p_ == path:
+                    files[i] = (p_, n_, depth)
+                    break
         loaded[path] = depth
         text = blob.decode("utf-8", errors="replace")
         stray = unbalanced_fences(text)
@@ -518,11 +553,11 @@ def main(argv=None) -> int:
                 file=sys.stderr,
             )
             return 2
-        before_files, before_missing, before_inline, _ = walk_closure(
+        before_files, before_missing, before_inline, before_amb = walk_closure(
             args.root, submodule_reader(base, args.submodule, pin)
         )
         before_total = sum(size for _, size, _ in before_files)
-        after_files, after_missing, after_inline, _ = walk_closure(
+        after_files, after_missing, after_inline, after_amb = walk_closure(
             args.root, submodule_reader(base, args.submodule, args.compare)
         )
         after_total = sum(size for _, size, _ in after_files)
@@ -568,6 +603,20 @@ def main(argv=None) -> int:
                 file=sys.stderr,
             )
             return 2
+        # Local mode reports unresolved inline tokens and ambiguous parses;
+        # compare mode measures two DIFFERENT closures, neither of which is
+        # the one local mode just reported, so its diagnostics have to be
+        # emitted too or the delta is the only thing a reader sees.
+        for label, inl, amb in (
+            (f"recorded pin ({pin[:8]})", before_inline, before_amb),
+            (f"target ({args.compare})", after_inline, after_amb),
+        ):
+            for path, cited_by in inl:
+                print(f"  note [{label}]: inline @{path} did not resolve "
+                      f"(in {cited_by}; not counted)")
+            for path, n in amb:
+                print(f"  note [{label}]: {path} has {n} unclosed fence "
+                      f"marker(s), so its import parse is ambiguous")
         print(
             render_delta(before_total, after_total, args.bytes_per_token, args.compare)
         )

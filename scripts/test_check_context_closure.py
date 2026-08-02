@@ -263,7 +263,7 @@ check(
     "a positive --bytes-per-token is accepted",
     ccc.main(["--bytes-per-token", "4", "--budget", "100000000"]) == 0,
 )
-check("positive_int itself rejects zero", ccc.positive_int("4") == 4)
+check("positive_int accepts a positive value", ccc.positive_int("4") == 4)
 
 # --- round-2 review findings ------------------------------------------------
 
@@ -625,6 +625,68 @@ check(
         (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     )[0]) == 69,
 )
+
+# --- round-6 review findings ------------------------------------------------
+
+# Run lengths must be PRESERVED, not backtracked. Python shrinks `+`/`{3,}`
+# on demand, so a four-backtick fence was "closed" by three and a
+# double-backtick span paired with a single-backtick closer -- stripping
+# content that is not code and hiding the imports inside it.
+check(
+    "a 4-backtick fence is NOT closed by 3 backticks",
+    ccc.import_paths("````\n@a.md\n```\n@b.md\n")[0] == ["a.md", "b.md"],
+)
+check(
+    "a 4-backtick fence IS closed by 4",
+    ccc.import_paths("````\n@a.md\n````\n@b.md\n")[0] == ["b.md"],
+)
+check(
+    "a longer closer still closes",
+    ccc.import_paths("```\n@a.md\n`````\n@b.md\n")[0] == ["b.md"],
+)
+check(
+    "a tilde fence does not close a backtick fence",
+    ccc.import_paths("```\n@a.md\n~~~\n@b.md\n")[0] == ["a.md", "b.md"],
+)
+check(
+    "a closer with a mixed marker suffix is rejected",
+    ccc.import_paths("```\n@a.md\n```~~\n@b.md\n")[0] == ["a.md", "b.md"],
+)
+check(
+    "an orphan fence marker is not reused as a code-span delimiter",
+    ccc.strip_code("```\n@a.md\n```~~\n@b.md\n").count("@") == 2,
+)
+# A code span's delimiters must be MAXIMAL runs, and its opener must not be
+# preceded by a backtick. Without both guards the engine backtracks: ``@x`
+# pairs its second backtick with the single closer, and ```@x`` pairs a
+# shrunken opener with the double closer -- stripping text that is not a
+# code span at all. Asserted through strip_code rather than import_paths,
+# because an @ immediately preceded by a backtick is not an inline import
+# either, so import_paths cannot distinguish these.
+# Mid-line on purpose: a LINE-INITIAL run of three or more backticks is a
+# fence opener, whose info string is legitimately dropped, so a line-initial
+# fixture would pass for the wrong reason.
+check(
+    "an unmatched double-backtick opener does not strip following text",
+    "@a.md" in ccc.strip_code("x ``@a.md` y\n"),
+)
+check(
+    "a triple opener does not pair with a double closer",
+    "@a.md" in ccc.strip_code("x ```@a.md`` y\n"),
+)
+check(
+    "a properly matched span IS still stripped",
+    "@a.md" not in ccc.strip_code("x `@a.md` y\n"),
+)
+
+# A file first reached deeply and then via a shallower route had `loaded`
+# corrected but kept the ORIGINAL depth in the reported tuple, so the report
+# showed the route it happened to be found by first, not its real depth.
+_dia, _, _, _ = ccc.walk_closure("root.md", reader_for(_diamond))
+_depths = {p: d for p, _, d in _dia}
+check("a shallower revisit corrects the REPORTED depth", _depths["deep.md"] == 1)
+check("  ... and its children get the shallower depth too",
+      _depths["child.md"] == 2)
 
 # --- corpus facts -----------------------------------------------------------
 

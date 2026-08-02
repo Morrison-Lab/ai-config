@@ -557,7 +557,8 @@ Keep polling and address actionable failures or findings until all workflows and
 Once that commit is fully clean and green, stop the **intensive head poll** for it; don't restart that poll for the same commit unless something regresses.
 A later push creates a new head commit and starts a new monitoring cycle automatically.
 
-**Ending the head poll does not end the PR watch.** The two run at different frequencies and answer different questions, and only the first one is finished when a head goes green:
+**Ending the head poll does not end the PR watch.**
+The two run at different frequencies and answer different questions, and only the first one is finished when a head goes green:
 
 - The **head poll** asks "is this commit done?" and terminates when it is.
 - The **PR watch** above ("Subscribe to PR updates automatically") asks "is this PR still mergeable and still clean?" and runs until the PR merges or closes.

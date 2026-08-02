@@ -46,20 +46,24 @@ Threshold rationale (`--budget`, default below):
 
 Reports what it examined, not only what it found: a closure that resolved
 zero files must be distinguishable from one that is comfortably under
-budget, since both would otherwise print a small number and exit 0. Missing
-imports are reported and, being dangling references rather than style
-findings, are the one condition that fails even without `--strict` -- see
+budget, since both would otherwise print a small number and exit 0. A
+dangling **anchored** import is reported and fails even without `--strict`,
+being a broken reference rather than a size finding -- see
 `shared/principles/fail-fast.md` on checks whose failure path and pass path
-look alike.
+look alike. An unresolved **inline** `@token` is reported but does not fail,
+since most are prose (`@claude` mentions, email addresses) rather than
+mistyped imports.
 
 Advisory otherwise: exits 0 over budget unless `--strict` is passed. The
 same stance ai-config#695 settled for the memory-file check -- crossing the
 line is a prompt to decide what comes out, not a defect that should block an
-unrelated PR.
+unrelated PR. Under `--strict` in `--compare` mode, a bump that would cross
+the budget fails too, even while the current pin is under it.
 """
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import subprocess
 import sys
@@ -77,54 +81,110 @@ DEFAULT_ROOT = "CLAUDE.md"
 DEFAULT_BYTES_PER_TOKEN = 4
 
 # Claude Code evaluates an import written as `@path` but NOT one inside a
-# code span or fenced code block. Fences are stripped before matching for
-# that reason; a corpus that documents its own `@`-import syntax in examples
-# would otherwise import whatever those examples name.
+# code span or fenced code block -- its docs say "Import parsing skips
+# Markdown code spans and fenced code blocks". Both are stripped before
+# matching for that reason; a corpus that documents its own `@`-import
+# syntax in examples would otherwise import whatever those examples name.
 #
-# Matching is anchored to a whole line. Claude Code also honours an inline
-# `@path`, but an unanchored pattern would sweep up `@claude` mentions,
-# email addresses, and R roxygen tags, all of which this corpus contains in
-# quantity -- so the anchored form under-reports by design rather than
-# over-reporting. Every import in this repo is written on its own line, and
-# `test_check_context_closure.py` pins that as a corpus fact.
-_IMPORT_RE = re.compile(r"^@([^\s`]+)$", re.MULTILINE)
+# Imports are NOT line-anchored. The docs say to "reference them with `@`
+# syntax anywhere in your CLAUDE.md", and their own example is inline
+# prose: "See @README for project overview". So both forms are matched.
+#
+# The two are tracked separately, because they warrant different failure
+# behaviour rather than different counting. An unresolved ANCHORED import
+# is almost certainly a broken reference. An unresolved INLINE token is
+# usually prose -- `@claude` mentions, email addresses, and roxygen tags,
+# all of which this corpus contains in quantity. Failing on those would
+# make the check cry wolf, which is the failure mode
+# `shared/workflow/algorithmatize-checks.md` warns about; silently
+# dropping them would under-report a consumer's real closure, which is
+# the failure `shared/principles/fail-fast.md` warns about. Counting both
+# when they resolve, and failing only on the anchored ones, is what
+# avoids each.
+_ANCHORED_IMPORT_RE = re.compile(r"^@([^\s`]+)$", re.MULTILINE)
+_INLINE_IMPORT_RE = re.compile(r"(?<![\w`])@([^\s`]+?)(?=[.,;:!?)\]]*(?:\s|$))")
 _FENCE_RE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
+_CODE_SPAN_RE = re.compile(r"`[^`]*`")
 
-# Claude Code stops following imports after this many hops.
-MAX_IMPORT_DEPTH = 5
+# Claude Code stops following imports after this many hops: its docs say
+# "Imported files can recursively import other files, with a maximum depth
+# of four hops". A deeper file is not loaded, so counting it would inflate
+# both the closure total and the pin-bump delta.
+MAX_IMPORT_DEPTH = 4
 
 
-def import_paths(text: str) -> list[str]:
-    """The `@path` imports a CLAUDE.md-style file declares, in order."""
-    return _IMPORT_RE.findall(_FENCE_RE.sub("", text))
+def import_paths(text: str) -> tuple[list[str], list[str]]:
+    """The `@path` imports a CLAUDE.md-style file declares.
+
+    Returns (anchored, inline). Code spans and fenced blocks are stripped
+    first, per Claude Code's own parsing. A path appearing both ways is
+    reported only as anchored, so callers can union the two without
+    double-counting.
+    """
+    stripped = _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub("", text))
+    anchored = _ANCHORED_IMPORT_RE.findall(stripped)
+    seen = set(anchored)
+    inline = []
+    for path in _INLINE_IMPORT_RE.findall(stripped):
+        if path not in seen:
+            seen.add(path)
+            inline.append(path)
+    return anchored, inline
+
+
+def resolve(child: str, parent: str) -> str:
+    """Resolve `child` as Claude Code does: relative to the citing file.
+
+    Its docs say "Relative paths resolve relative to the file containing
+    the import, not the working directory". For a root-level `CLAUDE.md`
+    the two coincide, which is why a working walk over this repo says
+    nothing about a consumer whose imports nest.
+
+    `..` segments are normalised textually, so two spellings of one path
+    collapse to a single cache key and the file is counted once. Purely
+    lexical, deliberately: this resolves paths that may live in a git
+    revision rather than on disk, so it must not touch the filesystem or
+    follow symlinks the way `Path.resolve()` would.
+    """
+    if child.startswith(("/", "~")):
+        return child
+    return posixpath.normpath(posixpath.join(posixpath.dirname(parent), child))
 
 
 def walk_closure(root: str, read, max_depth: int = MAX_IMPORT_DEPTH):
     """Walk `root`'s import closure using `read(path) -> bytes | None`.
 
-    Returns (files, missing), where `files` is a list of (path, n_bytes,
-    depth) in discovery order and `missing` is a list of (path, cited_by)
-    for imports that did not resolve. `read` is injected so the same walk
-    serves a working tree, a git revision, and a test fixture.
+    Returns (files, missing, unresolved_inline). `files` is a list of
+    (path, n_bytes, depth) in discovery order; `missing` is a list of
+    (path, cited_by) for anchored imports that did not resolve; and
+    `unresolved_inline` is the same for inline ones, kept separate because
+    an unresolved inline token is usually prose rather than a broken
+    reference. `read` is injected so the same walk serves a working tree, a
+    git revision, and a test fixture.
     """
     files: list[tuple[str, int, int]] = []
     missing: list[tuple[str, str]] = []
+    unresolved_inline: list[tuple[str, str]] = []
     seen: set[str] = set()
 
-    def visit(path: str, depth: int, cited_by: str) -> None:
+    def visit(path: str, depth: int, cited_by: str, anchored: bool) -> None:
         if path in seen or depth > max_depth:
             return
         seen.add(path)
         blob = read(path)
         if blob is None:
-            missing.append((path, cited_by))
+            (missing if anchored else unresolved_inline).append((path, cited_by))
             return
         files.append((path, len(blob), depth))
-        for child in import_paths(blob.decode("utf-8", errors="replace")):
-            visit(child, depth + 1, path)
+        text = blob.decode("utf-8", errors="replace")
+        child_anchored, child_inline = import_paths(text)
+        for child in child_anchored:
+            visit(resolve(child, path), depth + 1, path, True)
+        for child in child_inline:
+            visit(resolve(child, path), depth + 1, path, False)
 
-    visit(root, 0, "(root)")
-    return files, missing
+    visit(root, 0, "(root)", True)
+    return files, missing, unresolved_inline
 
 
 def local_reader(base: Path):
@@ -173,7 +233,9 @@ def submodule_reader(base: Path, submodule: str, rev: str):
     return read
 
 
-def render(files, missing, budget, bytes_per_token, label, top_n=10) -> str:
+def render(
+    files, missing, unresolved_inline, budget, bytes_per_token, label, top_n=10
+) -> str:
     """Human-readable report for one closure measurement."""
     total = sum(size for _, size, _ in files)
     lines = [
@@ -191,6 +253,20 @@ def render(files, missing, budget, bytes_per_token, label, top_n=10) -> str:
         lines.append(f"  {len(missing)} import(s) did not resolve:")
         for path, cited_by in missing:
             lines.append(f"    {path}  (cited by {cited_by})")
+    if unresolved_inline:
+        # Reported rather than counted or failed on: most are prose
+        # (`@claude`, an email address), but a genuine inline import that
+        # was mistyped would look the same, so the operator gets to see
+        # them instead of the check silently under-reporting.
+        lines.append("")
+        lines.append(
+            f"  {len(unresolved_inline)} inline @token(s) did not resolve "
+            f"(probably prose, not imports; not counted):"
+        )
+        for path, cited_by in unresolved_inline[:top_n]:
+            lines.append(f"    @{path}  (in {cited_by})")
+        if len(unresolved_inline) > top_n:
+            lines.append(f"    ... and {len(unresolved_inline) - top_n} more")
     lines.append("")
     if total > budget:
         over = total - budget
@@ -219,6 +295,23 @@ def render_delta(before_total, after_total, bytes_per_token, rev) -> str:
     )
 
 
+def positive_int(value: str) -> int:
+    """An argparse type that rejects zero and negatives.
+
+    `--bytes-per-token 0` would otherwise pass parsing and reach `render`
+    as a ZeroDivisionError traceback, and a negative would silently produce
+    a nonsense estimate. Per `shared/principles/fail-fast.md`, bad input
+    should stop at the boundary with a clear message.
+    """
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not an integer")
+    if parsed < 1:
+        raise argparse.ArgumentTypeError(f"must be a positive integer, got {parsed}")
+    return parsed
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -244,25 +337,27 @@ def main(argv=None) -> int:
     )
     parser.add_argument(
         "--budget",
-        type=int,
+        type=positive_int,
         default=DEFAULT_BUDGET_BYTES,
         help=f"closure bytes above which to flag (default: {DEFAULT_BUDGET_BYTES:,})",
     )
     parser.add_argument(
         "--bytes-per-token",
-        type=int,
+        type=positive_int,
         default=DEFAULT_BYTES_PER_TOKEN,
         help=f"divisor for the token estimate (default: {DEFAULT_BYTES_PER_TOKEN})",
     )
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="exit 1 if over budget (default: advisory, exits 0)",
+        help="exit 1 if over budget (default: advisory, exits 0). In --compare "
+        "mode this covers the compared total too, so a bump that would cross "
+        "the budget fails even while the current pin is under it.",
     )
     args = parser.parse_args(argv)
 
     base = Path(args.base).resolve()
-    files, missing = walk_closure(args.root, local_reader(base))
+    files, missing, inline = walk_closure(args.root, local_reader(base))
 
     if not files:
         # A closure that resolved nothing is not a small closure. Fail loudly
@@ -274,11 +369,14 @@ def main(argv=None) -> int:
         )
         return 2
 
-    print(render(files, missing, args.budget, args.bytes_per_token, str(base)))
+    print(
+        render(files, missing, inline, args.budget, args.bytes_per_token, str(base))
+    )
 
     total = sum(size for _, size, _ in files)
+    after_total = None
     if args.compare:
-        after_files, after_missing = walk_closure(
+        after_files, after_missing, _ = walk_closure(
             args.root, submodule_reader(base, args.submodule, args.compare)
         )
         after_total = sum(size for _, size, _ in after_files)
@@ -291,15 +389,17 @@ def main(argv=None) -> int:
             return 2
         print(render_delta(total, after_total, args.bytes_per_token, args.compare))
         if after_total > args.budget >= total:
-            print(
-                f"\n  This bump would cross the {args.budget:,}-byte budget.",
-            )
+            print(f"\n  This bump would cross the {args.budget:,}-byte budget.")
 
     if missing:
-        # A dangling import is a defect rather than a size finding, so it
-        # fails regardless of --strict.
+        # A dangling anchored import is a defect rather than a size finding,
+        # so it fails regardless of --strict. Unresolved INLINE tokens do not
+        # fail: they are reported above, being usually prose.
         return 1
-    if total > args.budget and args.strict:
+    # --strict covers the compared total too. Gating only on the current
+    # total would print "this bump would cross the budget" and then exit 0,
+    # which contradicts what the flag says it does.
+    if args.strict and max(total, after_total or 0) > args.budget:
         return 1
     return 0
 

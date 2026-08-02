@@ -235,9 +235,12 @@ guidance".
 All three threads were unresolved at that point, so the PR failed both halves of
 criterion 2 while carrying a verdict line that read like a pass.)
 
-**Findings hide on four different surfaces, and no single check sees all
-four --- so read the verdict body, the inline comments, the thread list, and
-the verdict's own conclusion every round.**
+**Findings hide on several surfaces,
+and no single check sees all of them --- so read the verdict body,
+any suppressed-comments block,
+the inline comments,
+the thread list,
+and the verdict's own conclusion every round.**
 The entry above is about a reviewer contradicting itself inside one comment.
 This is about the *detection method* returning an answer that is technically
 true and substantively wrong, which is harder to notice because nothing looks
@@ -253,6 +256,23 @@ inconsistent.
   A review can post a completely empty top-level body and carry its entire
   finding in one inline comment, so a body-only read finds nothing to act on
   and concludes there is nothing.
+- **A clean overview can hide a collapsed findings block.**
+  Copilot can say it "generated no new comments"
+  and create zero inline comments
+  while placing substantive findings inside a collapsed
+  `<details>` suppression block in the review body.
+  The heading moves,
+  so match case-insensitively on `suppressed` **inside the `<summary>`
+  heading**, not anywhere in the body:
+  PR #660 emitted `Comments suppressed due to low confidence (3)`,
+  while PRs #1029 and #1031 emitted `Suppressed comments (4)`.
+  A literal grep for either exact phrase can return a false zero.
+  A body-wide match over-corrects the other way and can permanently reject a
+  genuinely clean review, since ordinary overview prose can also contain the
+  word --- review 4837572117's summary table read "suppressed Copilot
+  findings" outside any collapsed block.
+  A body read that stops at the overview is therefore not a body read, and a
+  match against the whole body is not the right instrument either.
 - **"No verdict" is its own state, distinct from "a verdict with no
   findings".**
   A review job can fail having posted *nothing* --- not a stub, not an empty
@@ -271,19 +291,26 @@ Per [`algorithmatize-checks`](algorithmatize-checks.md), prefer the instrument
 that decides the question exactly --- and where none does, as here, say so
 rather than substituting the nearest available count.
 
-- **Do:** read all four surfaces before calling a PR clean, every round.
+- **Do:** read all review surfaces before calling a PR clean,
+  every round,
+  including collapsed suppressed-comments blocks.
 - **Do:** distinguish "no findings" from "no verdict" explicitly, and treat
   the latter as unreviewed.
 - **Don't:** report clean on a zero thread count, however many checks are
   green.
 - **Don't:** treat an empty review body as an all-clear without checking the
   inline comments.
+- **Don't:** treat a "generated no new comments" overview as an all-clear
+  until every `<summary>` heading has been checked case-insensitively for
+  `suppressed` --- not until the whole body has, which flags ordinary
+  overview prose that merely mentions suppressed findings.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 
-**A fourth surface, and the one that defeats the gate itself: the review
-check can pass on a blocking verdict.**
-The three above are cases where a *reader* looks at the wrong place.
+**Another surface,
+and the one that defeats the gate itself:
+the review check can pass on a blocking verdict.**
+The cases above are ones where a *reader* looks at the wrong place.
 This is the case where the repo's own gate looks at the right place and still
 reports green, because `require-review` tests whether a review **ran**, not
 what it **concluded**.
@@ -324,7 +351,7 @@ On #473 `claude-review` failed after its built-in retry, posting nothing at
 all, so there was no body to read past and zero threads because zero
 comments.)
 
-(The fourth surface, ucdavis/bcs#468, same night.
+(The review-gate case, ucdavis/bcs#468, same night.
 `require-review` passed, `claude-review` passed, all 18 checks were green,
 and there were zero inline comments and zero threads --- while the verdict
 read "Needs more work" over a blocking finding that the new section's own
@@ -332,6 +359,17 @@ safety rule was false on one code path.
 The review's own closing line said as much, noting that because no
 `--comment` argument was passed, it had not posted the findings to the PR.
 Every count-based check called that PR ready.)
+
+(The collapsed-block case,
+Morrison-Lab/ai-config#1029,
+2026-08-02.
+From review round 3 onward,
+Copilot's overview repeatedly read "generated no new comments"
+and produced zero inline comment objects,
+while the full review body carried severe findings under `Suppressed comments (N)`.
+Round 7 posted at 2026-08-02T06:29:10Z,
+about two minutes before the PR merged at 06:30:55Z,
+and those real findings had to be carried forward to #1034.)
 
 **A review comment's header SHA can be stale, so take the reviewed commit from
 the run's own `head_sha`.**

@@ -44,6 +44,62 @@ to look.
 - You are about to write "the only X this could affect is Y" --- see the next
   section, which is that tell in its most reportable form.
 
+## A holding-constant measurement is a regression test
+
+When the instrument's purpose is to measure a real corpus property,
+re-run it on that real corpus every round
+and treat an unexpected movement as a defect until explained.
+A unit test can cover the local branch
+and still miss that the instrument's headline number moved,
+because the number is an end-to-end invariant over the real input
+rather than a property of one fixture.
+
+The useful signal is not only a threshold failure.
+A measurement meant to hold constant is itself a regression test:
+same input, same code path, same count.
+If the count changes,
+either the corpus changed in a way you can name
+or the instrument regressed.
+Report both the before and after numbers,
+and require the PR to explain the change before calling it clean.
+
+The same rule decides what to do
+when a spec-correct fix makes the real measurement worse.
+A specification can define behaviour that is hostile to the corpus's actual
+syntax mix,
+especially when one construct nests inside another
+in ways the spec does not model for this use.
+Do not silently pick the spec or the corpus.
+Report the ambiguity,
+keep a regression test for the harmful interpretation,
+and make the maintainer choose the policy.
+
+- **Do:** re-run a measuring instrument on real input after every change,
+  and treat movement in a supposed constant as a regression until explained.
+- **Do:** when spec-correct behaviour worsens the real measurement,
+  surface the ambiguity
+  and protect against reintroducing the harmful interpretation.
+- **Don't:** rely on fixture tests alone
+  for an instrument whose output is a corpus-level count.
+- **Don't:** apply a spec verbatim
+  after the instrument shows it dropped real content.
+
+(Morrison-Lab/ai-config#1029:
+`scripts/check-context-closure.py` reported the auto-loaded context closure
+as 70 files and 803,950 bytes across review rounds.
+A code-span regex regression that crossed newlines dropped the closure to 51 files
+by swallowing 19 real imports;
+no test failed,
+and only the moved number caught it.
+The same PR tried CommonMark's rule
+that an unclosed fence runs to end of document.
+On this corpus that dropped `CLAUDE.md` from 69 anchored imports to 50,
+because same-length nested fences,
+such as an outer triple-backtick fence wrapping an inner triple-backtick R fence,
+made the outer closer look like a fresh unclosed opener.
+The fix was to report the ambiguous fence
+rather than silently consume the rest of the document.)
+
 ## Never predict which case will fail; enumerate the class
 
 The rule so far concerns checks you *perform*.

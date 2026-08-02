@@ -202,6 +202,34 @@ reminder that the empirical one-liner outranks any quoted documentation,
 including a reviewer's. (ucdavis/rampp #138/#111, 2026-07-17;
 re-verified on ai-config#611, 2026-07-18.)
 
+## Python regex features must fit the oldest runtime that will run the script
+
+Do not choose a regex construct only because CI accepts it.
+A repository can run validation under Python 3.12
+while local sessions and users run the same script under Python 3.10,
+so a syntax added in 3.11 fails before the code under review even starts.
+Atomic groups, `(?>...)`, are the concrete trap:
+they compile under Python 3.11+ and fail under Python 3.10.
+Use a portable form,
+such as a negative lookahead on a quantified run,
+when the same backtracking guard is needed across those runtimes.
+
+- **Do:** check the oldest Python runtime that will execute a script
+  before using recently added `re` syntax.
+- **Do:** prefer a portable negative-lookahead pattern
+  when it expresses the same guard.
+- **Don't:** treat `actions/setup-python`'s CI version
+  as the only supported interpreter for a repo script.
+- **Don't:** use an atomic group in ai-config scripts
+  until local and CI Python floors both support it.
+
+(Morrison-Lab/ai-config#1029/#1034:
+the local session's `python3 --version` reported Python 3.10.18,
+while `.github/workflows/validate.yml` pins `actions/setup-python` to Python 3.12.
+The context-closure parser therefore could not use Python 3.11 atomic groups
+to stop fence-regex backtracking;
+the portable fix was a negative lookahead.)
+
 ## Windows Git Bash: `python`/`python3` may resolve to the Store stub; use `py`
 
 On at least one Windows setup, `python` and `python3` both resolve on

@@ -27,6 +27,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -316,6 +351,7 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#usage" id="toc-usage" class="nav-link" data-scroll-target="#usage">Usage</a></li>
   <li><a href="#what-it-does" id="toc-what-it-does" class="nav-link" data-scroll-target="#what-it-does">What it does</a></li>
   <li><a href="#why-draft" id="toc-why-draft" class="nav-link" data-scroll-target="#why-draft">Why draft?</a></li>
+  <li><a href="#request-reviewer-before-reporting-status" id="toc-request-reviewer-before-reporting-status" class="nav-link" data-scroll-target="#request-reviewer-before-reporting-status">Request reviewer before reporting status</a></li>
   <li><a href="#workflow-order" id="toc-workflow-order" class="nav-link" data-scroll-target="#workflow-order">Workflow order</a></li>
   <li><a href="#related" id="toc-related" class="nav-link" data-scroll-target="#related">Related</a></li>
   </ul></li>
@@ -353,7 +389,16 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="why-draft" class="level2">
 <h2 class="anchored" data-anchor-id="why-draft">Why draft?</h2>
-<p>A draft PR doesn’t trigger <code>@claude</code> review bot, so no review round is spent on an empty or half-finished diff. When implementation is complete and checks pass, mark ready-for-review (<code>gh pr ready &lt;N&gt;</code>).</p>
+<p>A draft PR doesn’t trigger <code>@claude</code> review bot, so no review round is spent on an empty or half-finished diff. When implementation is complete and checks pass, mark ready-for-review (<code>gh pr ready &lt;N&gt;</code>), then request the external reviewer in the same stride.</p>
+</section>
+<section id="request-reviewer-before-reporting-status" class="level2">
+<h2 class="anchored" data-anchor-id="request-reviewer-before-reporting-status">Request reviewer before reporting status</h2>
+<p>Opening a PR or marking a draft ready can trigger the repo’s own review workflow, but that does not summon Copilot. If Copilot is a configured reviewer, request it immediately after <code>gh pr create</code> for a non-draft PR, or immediately after <code>gh pr ready</code> for a draft PR:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="at">-X</span> POST <span class="st">"repos/&lt;owner&gt;/&lt;repo&gt;/pulls/&lt;N&gt;/requested_reviewers"</span> <span class="dt">\</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-f</span> <span class="st">'reviewers[]=copilot-pull-request-reviewer[bot]'</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr view <span class="op">&lt;</span>N<span class="op">&gt;</span> --json reviewRequests,reviews</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr checks <span class="op">&lt;</span>N<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Verify the request landed before writing a status report: the POST response should include the reviewer, then a fresh read should show either a pending request or a new review/check from that reviewer on the current head. If the request disappears with no current-head review, report that blocker and start the fallback; do not write “review owed” as a status item.</p>
 </section>
 <section id="workflow-order" class="level2">
 <h2 class="anchored" data-anchor-id="workflow-order">Workflow order</h2>
@@ -362,6 +407,7 @@ ul.task-list li input[type="checkbox"] {
 <li><em>(This skill)</em> Claim the issue and open the draft PR (branch + empty commit + PR + claim comment)</li>
 <li><em>(Caller)</em> Implement code on the branch</li>
 <li><em>(Caller)</em> Mark PR ready-for-review (<code>gh pr ready &lt;N&gt;</code>)</li>
+<li><em>(Caller)</em> Request and verify the external reviewer before reporting status</li>
 <li><em>(Caller)</em> Iterate ARDI until clean</li>
 <li><em>(Caller)</em> Merge</li>
 </ol>

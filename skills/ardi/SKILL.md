@@ -99,17 +99,34 @@ finding → push → post summary → re-request review → repeat until clean.
      affirmative zero-findings overview doesn't rule out a non-verdict
      formal review.
      **A "no new comments" overview can still carry real findings in a
-     collapsed `<details><summary>Comments suppressed due to low
-     confidence (N)</summary>` block** -- these are genuine flagged items
-     under the fully-clean rule (address every finding regardless of
+     collapsed `<details>` suppression block** -- these are genuine flagged
+     items under the fully-clean rule (address every finding regardless of
      confidence label), even though they never become formal inline
      comment objects the `/comments` endpoint returns (verified: PR #660's
      review 4767752501 read "generated no new comments" in its overview
-     while its full body carried 3 suppressed findings). A third condition
-     is required: the raw review **body** must not contain a "Comments
-     suppressed" block at all -- checking only the overview's headline
-     phrasing and the `/comments` endpoint's inline-comment count both miss
-     this.
+     while its full body carried 3 suppressed findings).
+
+     **Match the block case-insensitively on `suppressed`, not on either
+     exact phrase -- GitHub changed the wording and dropped the reason.**
+     Measured in this repo: PR #660 emits
+     `<summary>Comments suppressed due to low confidence (3)</summary>`,
+     while PRs #1029 and #1031 emit `<summary>Suppressed comments (4)</summary>`.
+     A literal grep for `Comments suppressed` therefore returns **zero**
+     against a current body that plainly has the block, which produced a
+     real false negative during the ai-config#1029 loop. GitHub's own docs
+     do not document suppression at all, so expect the label to keep moving
+     and key on the stable token.
+
+     The stakes are why this matters: from round 3 of ai-config#1029 onward
+     *every* substantive finding arrived suppressed, under a "generated no
+     new comments" overview with zero inline comments -- including CRLF
+     silently disabling a failure path repo-wide. Confidence is uncorrelated
+     with worth.
+
+     A third condition is required: the raw review **body** must not
+     contain a suppression block at all -- checking only the overview's
+     headline phrasing and the `/comments` endpoint's inline-comment count
+     both miss this.
      And dispositioning a finding-bearing review's comments
      yourself does **not** make that same review the all-clear -- the
      fully-clean bar needs a *later* review, at the still-current head, that

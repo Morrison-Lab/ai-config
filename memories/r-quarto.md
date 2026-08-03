@@ -341,6 +341,29 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   `.Rd` by hand. (Corrected 2026-07-20: on serocalculator#562 I hand-edited two
   `.Rd` files instead of installing roxygen2 and running `document()`; the
   user's rule is to run the generator.)
+  - **An UNTRACKED file in `R/` silently poisons the generated `NAMESPACE`,
+    and the damage lands in a tracked file.**
+    `document()` reads the working tree, not the index,
+    so a `.R` file that git does not track still gets roxygenized:
+    its `@export` becomes an `export()` line in `NAMESPACE`,
+    and its `.Rd` appears in `man/`.
+    Only the `NAMESPACE` edit is to a tracked file,
+    so `git status` shows one innocuous-looking modification
+    while the source backing it is invisible to every other checkout.
+    Local `R CMD check` passes, since the file is on disk.
+    CI fails instead, or --- worse --- the export merges
+    and `main` names a function nobody else has.
+    The tell is an `export()` line in a `document()` diff
+    for a function this change never touched.
+    Before committing a regenerated `NAMESPACE`,
+    run `git status --short R/` and account for every `??`.
+    This is the R case of the general hazard
+    that a generator's input set is the working tree rather than the commit.
+    (`ucdavis/bcs`, 2026-08-02: an untracked `R/prep_adherence_by_month.R`,
+    sitting in the tree since Jul 21,
+    put `export(prep_adherence_by_month)` into a `document()` commit
+    on a PR branch.
+    It never reached `main` only because that commit was never pushed.)
   - **Match the package's pinned roxygen2 version before trusting generated output.**
     Different roxygen2 versions can rewrite the same `.Rd` differently,
     so a local version that differs from the one CI uses can produce a misleading diff.

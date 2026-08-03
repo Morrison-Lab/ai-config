@@ -294,7 +294,56 @@ git -C "$REPO" worktree remove "$(git rev-parse --show-toplevel)"   # worktree r
 git -C "$REPO" branch -d <merged-branch>
 ```
 
-**Diverged main checkout:** `git pull --ff-only` fails when the main checkout
+**Stale is not diverged, and the two need opposite responses --- check which
+one you have before applying the bullet below.**
+A blocked `git checkout main` reads as the diverged case, since the symptom is
+the same and diverged is the case this skill warns about.
+Stale is far commoner: local `main` is merely behind `origin/main` and **0
+ahead**, carrying nobody's work.
+Two counts separate them exactly:
+
+```bash
+git fetch origin main
+echo "behind: $(git rev-list --count main..origin/main)  ahead: $(git rev-list --count origin/main..main)"
+```
+
+`ahead: 0` means stale, and then the bullet below is the wrong remedy --- it
+would leave `main` behind for no reason.
+
+What blocks the switch in that case is usually an **unrelated dirty file**
+(a `renv.lock` an `renv::snapshot()` rewrote, a lockfile, a local config)
+whose content differs between the *stale* `main` and your branch's HEAD, so
+git refuses to carry the local edit across.
+That file is frequently identical between HEAD and `origin/main`, so
+fast-forwarding first dissolves the conflict --- and a branch that is not
+checked out can be fast-forwarded by refspec, touching no working tree:
+
+```bash
+git fetch origin main:main    # fast-forwards the ref; refuses if not a fast-forward
+git checkout main             # now carries the dirty file across untouched
+```
+
+The refspec form is safe by construction, refusing a non-fast-forward rather
+than clobbering, so it cannot destroy a genuinely diverged local `main`.
+Preserve the dirty file rather than stashing or discarding it --- it is
+unrelated to this PR, and may be another session's or the user's.
+
+- **Do:** read `behind`/`ahead` before deciding, and fast-forward by refspec
+  when `ahead` is 0.
+- **Don't:** treat a blocked checkout as evidence of divergence, or leave
+  `main` stale because the bullet below said to skip the pull.
+
+(`ucdavis/bcs#536`, 2026-08-02: `git checkout main` aborted on a modified
+`renv.lock`, which looked like the diverged case.
+Local `main` was 54 behind and 0 ahead, and the file was byte-identical
+between HEAD and `origin/main` --- it differed only from the 54-commit-stale
+`main`.
+`git fetch origin main:main` fast-forwarded the ref and the switch then
+succeeded with the local edit intact; skipping the pull as the bullet below
+prescribes would have left `main` 54 commits behind.)
+
+**Diverged main checkout** (`ahead` is non-zero)**:** `git pull --ff-only`
+fails when the main checkout
 has local commits from a concurrent session that hasn't been pushed. Don't
 force-merge or reset their work — skip the pull and delete the branch only.
 The branch deletion is what matters; another session will pull main when it's

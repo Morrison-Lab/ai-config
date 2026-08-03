@@ -17,7 +17,8 @@ rides along with.
 
 THE CHECK
 ---------
-Three conditions, ALL required:
+For each MUTATING segment of the command (a segment whose leading command is
+an interpreter), all three conditions must hold on THAT SAME segment:
 
   1. a punctuation-glyph replacement (mapping or .replace chain)
   2. a write-back (write_text / writelines / `>` / sed -i)
@@ -25,6 +26,14 @@ Three conditions, ALL required:
 
 Requiring all three keeps the two legitimate shapes silent: a read-only scan
 fails (2), and a correctly scoped replace fails (3).
+
+Evaluating per segment rather than over the whole command matters: a scope
+token or write-back in an UNRELATED segment must not decide the mutating one.
+`python3 <unscoped replace> && git diff` is still blocked (the `git diff` is a
+different segment), and a read-only preview followed by `echo ok > report.md`
+stays silent (the redirect is a different segment). Segmentation respects
+quotes and heredoc bodies, so an interpreter's own `;`/`|` inside its body
+does not split it.
 
 Fails OPEN, like every guard here. A hook that breaks Bash when a regex
 misbehaves costs more than the mistake it prevents.
@@ -67,8 +76,9 @@ SCOPED = re.compile(
 
 # An explicit, deliberate corpus-wide cleanup. #685 and #720 track exactly
 # that work, so it must remain possible -- name the override rather than
-# pretend the case does not exist.
-OVERRIDE = re.compile(r"ALLOW_WHOLE_FILE_PUNCT|#685\b|#720\b", re.I)
+# pretend the case does not exist. Require an actual `=1` assignment: a bare
+# mention of the variable (or of an issue number) must NOT exempt the command.
+OVERRIDE = re.compile(r"ALLOW_WHOLE_FILE_PUNCT=1\b")
 
 
 # Only an interpreter can actually rewrite a file here. Anchoring on the
@@ -77,21 +87,96 @@ OVERRIDE = re.compile(r"ALLOW_WHOLE_FILE_PUNCT|#685\b|#720\b", re.I)
 # matches all three conditions in its TEXT while mutating nothing.
 # `require-gh-repo-flag.py` solves the same false positive the same way.
 MUTATORS = {"python", "python3", "sed", "perl", "ruby", "awk"}
-_ENV = re.compile(r"^\s*(?:\w+=\S*\s+)*")
+_ENV = re.compile(r"^\w+=\S*$")
+_SKIP = {
+    "cd", "then", "do", "done", "fi", "else", "elif",
+    "if", "while", "until", "for", "!", "(", "{",
+}
 
 
-def leading_command(cmd):
-    """First real command word of the last `&&`/`;`/`|` segment, or ''."""
-    seg = re.split(r"&&|\|\||;|\|", cmd)
-    for part in reversed(seg):
-        part = _ENV.sub("", part).strip()
-        if not part:
+def leading_command(segment):
+    """First real command word of a segment, or '' -- skipping leading env
+    assignments and shell control words. The segment is one pipeline stage
+    already (split_segments splits on `|` too), so no pipe-splitting here."""
+    for word in segment.split():
+        if _ENV.match(word) or word in _SKIP:
             continue
-        word = part.split()[0].split("/")[-1]
-        if word in {"cd", "then", "do", "fi"}:
-            continue
-        return word
+        return word.split("/")[-1]
     return ""
+
+
+def _mask(cmd):
+    """`cmd` with single/double-quoted strings and heredoc bodies blanked to
+    spaces, same length as `cmd`. Used only to locate top-level shell
+    operators without matching inside an interpreter's own body (a heredoc or
+    a `-c` argument), which routinely contains `;`, `|`, and `&&`."""
+    out = []
+    i, n = 0, len(cmd)
+    pending = []  # heredoc delimiters whose bodies are not yet consumed
+    while i < n:
+        c = cmd[i]
+        if c == "'":
+            j = cmd.find("'", i + 1)
+            if j == -1:
+                out.append(" " * (n - i))
+                break
+            out.append("'" + " " * (j - i - 1) + "'")
+            i = j + 1
+            continue
+        if c == '"':
+            j = i + 1
+            buf = ['"']
+            while j < n and cmd[j] != '"':
+                if cmd[j] == "\\" and j + 1 < n:
+                    buf.append("  ")
+                    j += 2
+                    continue
+                buf.append(" ")
+                j += 1
+            if j < n:  # closing quote
+                buf.append('"')
+                j += 1
+            out.append("".join(buf))
+            i = j
+            continue
+        if cmd[i:i + 2] == "<<":
+            m = re.match(r"<<-?\s*([\"']?)(\w+)\1", cmd[i:])
+            if m:
+                pending.append(m.group(2))
+                out.append(" " * m.end())
+                i += m.end()
+                continue
+        if c == "\n":
+            out.append("\n")
+            i += 1
+            while pending and i < n:  # consume heredoc body line by line
+                nl = cmd.find("\n", i)
+                end = n if nl == -1 else nl
+                line = cmd[i:end]
+                if line.strip() == pending[0]:
+                    pending.pop(0)
+                out.append(" " * len(line))
+                if nl == -1:
+                    i = end
+                else:
+                    out.append("\n")
+                    i = end + 1
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def split_segments(cmd):
+    """Top-level shell segments, split on `&&`/`||`/`;`/`|` but not inside a
+    quoted string or a heredoc body. Returns slices of the original `cmd`."""
+    mask = _mask(cmd)
+    parts, last = [], 0
+    for m in re.finditer(r"&&|\|\||;|\|", mask):
+        parts.append(cmd[last:m.start()])
+        last = m.end()
+    parts.append(cmd[last:])
+    return parts
 
 
 def main() -> int:
@@ -104,16 +189,23 @@ def main() -> int:
 
     if tool != "Bash" or not cmd:
         return 0
-    # Any segment run by an interpreter can mutate; a `gh`/`echo` command
-    # merely quoting the pattern cannot.
-    segments = re.split(r"&&|\|\||;", cmd)
-    if not any(leading_command(s) in MUTATORS for s in segments):
-        return 0
     if OVERRIDE.search(cmd):
         return 0
-    if not (GLYPH.search(cmd) and REPLACING.search(cmd) and WRITING.search(cmd)):
-        return 0
-    if SCOPED.search(cmd):
+
+    # Block only when a SINGLE mutating segment satisfies all conditions on
+    # its own: an interpreter is its leading command, it replaces a glyph and
+    # writes back, and nothing in that segment scopes it to added lines. A
+    # `gh`/`echo` segment merely quoting the pattern is not a mutator; a scope
+    # token or write in a different segment does not decide this one.
+    blocked = any(
+        leading_command(seg) in MUTATORS
+        and GLYPH.search(seg)
+        and REPLACING.search(seg)
+        and WRITING.search(seg)
+        and not SCOPED.search(seg)
+        for seg in split_segments(cmd)
+    )
+    if not blocked:
         return 0
 
     print(json.dumps({

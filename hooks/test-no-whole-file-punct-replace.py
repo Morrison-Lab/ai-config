@@ -47,6 +47,40 @@ t=pathlib.Path('CLAUDE.md').read_text()
 print(t.replace('\\u2014','---')[:200])"
 """
 
+# A one-line `-c` form of the unscoped replace, for the segment-scoping cases
+# below. Same four ingredients (glyph, replace, write, no scope) on one line.
+INLINE_UNSCOPED = (
+    "python3 -c \"import pathlib; "
+    "p=pathlib.Path('a.md'); "
+    "t=p.read_text().replace('\\u2014','---'); "
+    "p.write_text(t)\""
+)
+# A mutator whose whole-file write is fed onward through a pipe. No top-level
+# `;`/`&&` surfaces the interpreter, so selecting only the LAST pipeline stage
+# (`tee`) would miss the mutation entirely -- every stage must be inspected.
+# Deliberately statement-per-line (no `;`) so the whole thing is one segment.
+PIPED = (
+    "python3 -c \"\n"
+    "import pathlib\n"
+    "pathlib.Path('a.md').write_text("
+    "pathlib.Path('a.md').read_text().replace('\\u2014','---'))\n"
+    "\" | tee /tmp/x"
+)
+# An unscoped replace with an UNRELATED `git diff` in a second segment. The
+# scope token belongs to `git diff`, not to the mutating command, so it must
+# not exempt the replace.
+COMPOUND_DIFF = INLINE_UNSCOPED + " && git diff --check"
+# A read-only PREVIEW (no write) followed by an unrelated redirect. The `>`
+# write belongs to `echo`, not to the interpreter, so the preview stays silent.
+PREVIEW_THEN_WRITE = (
+    "python3 -c \"import pathlib; "
+    "print(pathlib.Path('a.md').read_text().replace('\\u2014','---')[:80])\""
+    " && echo ok > report.md"
+)
+# A bare mention of the override token, and of an issue number, must NOT
+# exempt an otherwise-blocked replace: only a real `=1` assignment does.
+LOOSE_685 = INLINE_UNSCOPED + " # cleanup for #685"
+BARE_VAR = INLINE_UNSCOPED + " # ALLOW_WHOLE_FILE_PUNCT (not set)"
 SED_UNSCOPED = r"""sed -i '' 's/\u2014/---/g' skills/ardi/SKILL.md"""
 OVERRIDE = "ALLOW_WHOLE_FILE_PUNCT=1 " + UNSCOPED
 # Prose about the rule, e.g. this issue's own body being posted.
@@ -63,9 +97,18 @@ p=pathlib.Path('x.md'); t=p.read_text().replace('foo','bar'); p.write_text(t)"
 
 CASES = [
     (UNSCOPED, True, "the unscoped python replace is blocked"),
+    (INLINE_UNSCOPED, True, "the inline unscoped replace is blocked"),
     (SED_UNSCOPED, True, "an unscoped sed -i on a glyph is blocked"),
+    (PIPED, True, "an unscoped replace piped onward is blocked"),
+    (COMPOUND_DIFF, True,
+     "an unrelated git-diff segment does not exempt the replace"),
+    (LOOSE_685, True, "a bare #685 mention does not exempt the replace"),
+    (BARE_VAR, True,
+     "a bare override-var mention (no =1) does not exempt the replace"),
     (SCOPED, False, "a base-branch-scoped replace is allowed"),
     (SCAN, False, "a read-only glyph scan is allowed"),
+    (PREVIEW_THEN_WRITE, False,
+     "a read-only preview with an unrelated redirect is allowed"),
     (OVERRIDE, False, "an explicit override is allowed"),
     (OTHER_REPLACE, False, "a non-glyph replace is allowed"),
     (UNRELATED, False, "an unrelated command is allowed"),
@@ -74,10 +117,19 @@ CASES = [
 
 def run(cmd, tool="Bash"):
     payload = {"tool_name": tool, "tool_input": {"command": cmd}}
-    out = subprocess.run(
+    proc = subprocess.run(
         [sys.executable, HOOK], input=json.dumps(payload),
         capture_output=True, text=True,
-    ).stdout
+    )
+    # A crashed hook must never read as "allow": the guard fails open only on
+    # malformed INPUT (json errors), never on its own bug. Make a nonzero exit
+    # fatal, as the neighboring hook harnesses do.
+    if proc.returncode != 0:
+        raise SystemExit(
+            f"hook exited {proc.returncode} (a crash must not count as allow)\n"
+            f"  cmd: {cmd!r}\n  stderr: {proc.stderr.strip()}"
+        )
+    out = proc.stdout
     return '"permissionDecision": "deny"' in out or '"permissionDecision":"deny"' in out
 
 

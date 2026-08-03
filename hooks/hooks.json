@@ -96,6 +96,12 @@
       "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring'. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
     },
     {
+      "script": "no-unreviewed-pr.py",
+      "event": "Stop",
+      "timeout": 10,
+      "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down."
+    },
+    {
       "script": "no-whole-file-punct-replace.py",
       "event": "PreToolUse",
       "matcher": "Bash",

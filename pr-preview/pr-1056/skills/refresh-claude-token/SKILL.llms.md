@@ -1,0 +1,139 @@
+# refresh-claude-token
+
+Replace `CLAUDE_CODE_OAUTH_TOKEN` on the repos that already carry it, and confirm the replacement actually works.
+
+`/install-github-app` is the only built-in that writes this secret, and it bundles that write with installing the GitHub App and committing workflow files. When the token is the only thing that needs replacing, that command does far more than the job requires, and re-running it against a repo whose workflows are already customized risks scaffolding over them.
+
+This skill is a thin wrapper. The work is done by `scripts/rotate-claude-token.py`, which already discovers its targets, previews by default, keeps the token out of `argv`, and confirms each write landed. Read that script’s docstring before changing anything here.
+
+## When this fires
+
+- “refresh the claude token”, “rotate the claude token”, “rct”
+- “update CLAUDE_CODE_OAUTH_TOKEN”, “the claude token expired”
+- “the review bot stopped working”, “reviews are failing at auth”
+- “set the token on a new repo”
+- A `claude-review` job failing in well under a minute with `is_error: true` and `total_cost_usd: 0`, which is the signature of a credential rejected before the model is reached.
+
+## What this is not
+
+Installing the GitHub App, committing or editing anything under `.github/workflows/`, or provisioning the secret into a repo that has never had it.
+
+That last one is deliberate. The script touches only repos that **already** carry the secret, because adding it to a new repo is a per-repo decision about which account’s quota that repo should spend. Pass `--repos <owner>/<name>` explicitly to do that, and say so out loud rather than letting a sweep decide it.
+
+For authoring or changing the workflows themselves, use `claude-agent-workflow` or `claude-review-workflow`.
+
+## Procedure
+
+### 1. Preview, and read the target list
+
+``` bash
+python3 scripts/rotate-claude-token.py            # preview; changes nothing
+```
+
+This prints the owners swept, the number of repos inspected, and every repo carrying the secret with its current `updated_at`.
+
+Read the count before going further. A number far below the last known sweep means the discovery step failed rather than that the estate shrank, and rotating against a truncated list leaves the untouched repos on the old token with nothing reporting it. The script prints unreadable repos to stderr for exactly this reason, so a run reporting errors has understated its own target list.
+
+### 2. Mint the token – the human runs this step
+
+`claude setup-token` is interactive and needs a TTY, so an agent session cannot run it. Ask the user to run it in the session with the `!` prefix:
+
+    ! claude setup-token
+
+It prints a long-lived token and touches no repo. It requires a Claude subscription.
+
+**Mind which account is logged in.** The command mints from whichever account the local CLI is currently authenticated as, with no account picker and no confirmation naming it, and nothing afterwards records which account a given token came from. Check first if it matters:
+
+``` bash
+claude auth status
+```
+
+### 3. Rotate
+
+Pipe the token straight in. Never paste it as an argument: `argv` is visible to anyone who can run `ps`, and it lands in shell history.
+
+``` bash
+claude setup-token | python3 scripts/rotate-claude-token.py --apply
+```
+
+The user runs that pipeline themselves, for the reason in step 2. When the token is already in the environment, the agent can run:
+
+``` bash
+python3 scripts/rotate-claude-token.py --apply     # reads $CLAUDE_CODE_OAUTH_TOKEN
+```
+
+The script re-reads each repo’s `updated_at` after writing and fails the repo if the timestamp did not move, so a silent no-op cannot pass for a rotation.
+
+### 4. Verify the new token authenticates
+
+**This is the step the script cannot do, and the reason this skill exists.**
+
+`gh secret set` succeeds against any value. A garbage token bumps `updated_at` exactly like a good one, so step 3 finishing clean proves the secret **changed** and says nothing about whether it **works**.
+
+Settle it on the artifact rather than on the write. Pick one repo with an open PR, dispatch a review, and look for a posted verdict:
+
+``` bash
+gh run list --workflow claude-review.yml --repo <owner>/<repo> \
+  --limit 1 --json databaseId --jq '.[0].databaseId'          # note this, to spot the new run
+gh workflow run claude-review.yml --repo <owner>/<repo> \
+  --field pr_number=<N>                                       # RUN_WORKFLOW
+```
+
+Then read the run that appears, and the PR:
+
+``` bash
+gh run list --workflow claude-review.yml --repo <owner>/<repo> --limit 3 \
+  --json databaseId,conclusion,createdAt,updatedAt \
+  --jq '.[] | "\(.databaseId) \(.conclusion) \(.createdAt) -> \(.updatedAt)"'
+gh pr view <N> --repo <owner>/<repo> --json comments \
+  --jq '[.comments[] | select(.author.login == "claude")] | last | .createdAt'
+```
+
+- **Working.** A review comment appears at the current head, and the run spans minutes.
+- **Still broken.** The run finishes in tens of seconds and posts nothing.
+
+Take the run’s length from its own `createdAt` and `updatedAt` once it has completed, never from a `status` field read mid-flight. `status` lags, so a finished job can still read `in_progress`, and inferring elapsed time from that measures the API’s freshness rather than the job’s runtime.
+
+Two cautions on reading a short run.
+
+A short run means the job stopped before reaching the model. It does not by itself mean the credential is why. Checkout failures, App-token exchange failures, and workflow-validation refusals all die in the same few-tens-of-seconds band. Open the log and quote the line the job actually died on before blaming the token.
+
+And a draft PR is not a test. This repo’s `claude-review` skips on drafts, so dispatching against one produces a fast, green, review-free run that looks exactly like the failure you are checking for. Use a non-draft PR.
+
+### 5. Report
+
+Say how many repos rotated, which failed, and which repo the verification ran on. Name the account if step 2 established it. A rotation reported without a verification repo is a write that nobody confirmed authenticates.
+
+## Why write-verified is not auth-verified
+
+Worth stating plainly, because the script’s own verification is good and that is exactly what makes it easy to over-read.
+
+`rotate()` compares `updated_at` before and after, which answers “did GitHub store something different”. The question a user actually cares about is “will the reviewer be able to authenticate”, and no property of the secrets API can answer that: the endpoint returns only name, `created_at`, and `updated_at`, and the action’s logs mask the value as `***`.
+
+So the only instrument is behavioural, and the only positive evidence is a run that reached the model. This is the failure recorded in [`fully-clean`](../../shared/workflow/fully-clean.md)’s eighth case and its cross-repo variant: seven `claude-review` runs on `d-morrison/altdoc` \#95 and \#96 failing in the 26-to-35-second band with `is_error: true`, `total_cost_usd: 0`, and no permission denials, while the same reviewer returned a full verdict on another owner’s repo minutes later. No number of re-runs would have shown that; only a working control on a different credential did.
+
+## Edge cases
+
+- **A repo that has never had the secret.** Discovery skips it by design. Pass `--repos <owner>/<name>` to provision it deliberately.
+- **Re-running with an unchanged token.** If GitHub does not bump `updated_at` when the value is identical, the script reports the write as unverified. That is a false alarm rather than a false pass, which is the safe direction.
+- **`gh` not on `PATH`.** The script exits with that message rather than proceeding.
+- **Org-level secrets.** `gh secret set <name> --org <org> --visibility selected --repos <owner>/<name>` sets one secret for several repos. Note that a sweep of 324 admin repos in 2026-07 found zero org-level Claude secrets and 35 repo-level ones, so the estate is repo-level today and moving it is a change of shape, not a rotation.
+
+## Anti-patterns
+
+- Running `/install-github-app` to fix an expired token, which reinstalls the App and rescaffolds workflows to change one secret.
+- Passing the token as a command-line argument or via `--body`, putting it in `ps` output and shell history.
+- Reporting a rotation as done on the strength of step 3 alone, which verifies the write and not the credential.
+- Reading a short, green, review-free run on a **draft** PR as evidence the token is broken.
+- Diagnosing a short run as a credential failure without opening the log, when checkout, App-token exchange, and workflow validation fail in the same duration band.
+- Rotating against a preview whose error count was not read, leaving unreadable repos silently on the old token.
+- Hardcoding a repo list into a rotation instead of letting the script discover it, per [`avoid-hardcoding-external-data`](../../shared/coding/avoid-hardcoding-external-data.md).
+
+## Relationship to other skills
+
+- **`claude-agent-workflow` / `claude-review-workflow`** author and modify the workflows that consume this secret. This skill only replaces the secret and never edits a workflow file.
+- **`permission-check`** covers what a workflow token is allowed to do; this covers whether the Claude credential authenticates at all. A job can fail for either reason with a similar-looking short run.
+- **`ardi`** is what resumes once reviews work again. A reviewer that never posts is not a clean verdict, per [`fully-clean`](../../shared/workflow/fully-clean.md)’s “no findings” versus “no verdict” distinction.
+- **`cdu`** audits stale pinned dependencies. A stale credential is a different kind of staleness and is not in its sweep.
+
+Back to top

@@ -56,7 +56,31 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   summary, and clean-state verification all went through GraphQL, and
   `core` reset 11 minutes later.)
 - **The @claude review bot's author name differs by API:** its comment author is `claude[bot]` in REST (`.user.login`) but `claude` in GraphQL (`.author.login`). A watcher filtering REST comments for `.user.login == "claude"` silently finds nothing — use `"claude[bot]"`.
-- **A third variant: on `d-morrison/gha` itself, the review comment posts as `github-actions[bot]`, not `claude`/`claude[bot]`.** Filtering `.user.login == "claude"` (or `"claude[bot]"`) there returns nothing even though a real, complete review was posted — the workflow's own `gather-context` job comment even says "REST author login is `claude[bot]`", which doesn't match what the bot actually posts under in that repo. Don't conclude "no review yet" from an empty filter on one login string: if it comes back empty, list all comment authors (`gh api repos/<o>/<r>/issues/<N>/comments --jq '.[] | .user.login'`) and check the body for the `**Claude finished` marker regardless of which login posted it. (gha#278, 2026-07-21: `select(.author.login == "claude")` and `select(.user.login | test("claude"))` both came up empty; the actual review comments were under `github-actions[bot]`.)
+- **A third variant, and it is not one repo's quirk: the review comment can
+  post as `github-actions[bot]` rather than `claude`/`claude[bot]`, and the
+  same repo can do it on one round and not the next.**
+  First recorded on `d-morrison/gha`; observed again on
+  `Morrison-Lab/ai-config#1054` (2026-08-03), where round 2's verdict posted as
+  `claude[bot]` at `02:12:52Z` and round 3's as `github-actions[bot]` at
+  `03:04:19Z` --- so the login varied **between consecutive rounds of one PR**,
+  and a login filter that had worked all session began silently returning the
+  older comment.
+  Note the failure differs by repo in a way that matters: where the login never
+  matches, the filter returns **empty**, which at least looks wrong; where it
+  matched earlier rounds, it returns a **stale but plausible** verdict, which
+  does not.
+  Filtering `.user.login == "claude"` (or `"claude[bot]"`) returns nothing on
+  such a repo even though a real, complete review was posted --- the workflow's
+  own `gather-context` job comment even says "REST author login is
+  `claude[bot]`", which does not match what the bot actually posts under there.
+  Don't conclude "no review yet" from an empty filter on one login string: if it
+  comes back empty, list all comment authors
+  (`gh api repos/<o>/<r>/issues/<N>/comments --jq '.[] | .user.login'`) and check
+  the body for the `**Claude finished` marker regardless of which login posted
+  it.
+  (gha#278, 2026-07-21: `select(.author.login == "claude")` and
+  `select(.user.login | test("claude"))` both came up empty; the actual review
+  comments were under `github-actions[bot]`.)
 - **Polling for the bot's verdict: match `Claude finished`, don't exclude a placeholder.** While a run is underway, the bot's comment holds an in-progress placeholder whose wording *varies between runs* ("### Review in progress …", "Claude Code is working…"), so a watcher that exits when comments exist, or when one known placeholder phrase disappears, fires early on the next differently-worded placeholder. Completed runs (review and agent alike) start the body with `**Claude finished`. **Filter on that body marker, not on an author login** --- the login itself varies by repo (see the `github-actions[bot]` variant in the bullet above), so a login-only filter can come up empty even once a review has posted.
   - **When re-triggering a run on a thread that already has a completed `**Claude finished` comment from an earlier run, also scope the filter to comments newer than a baseline ID captured before the trigger** --- otherwise the poll matches the *prior* run's already-finished comment immediately and never actually waits for the new one. **`gh api`'s own `--jq` flag has no way to inject a variable (no `--argjson`) and only fetches the first REST page (30 comments) unless told to paginate, and `--paginate`'s `--slurp` companion flag is rejected outright when combined with `--jq`** --- pipe the raw paginated output into standalone `jq -s` instead, which supports both. **Enable `pipefail` in each shell process that runs one of these pipelines** so an upstream `gh api` failure does not get masked by a successful downstream `jq`:
     ```bash

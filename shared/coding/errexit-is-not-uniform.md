@@ -205,11 +205,64 @@ never given a chance to print anything.
 under `set -eu` reported every branch deleted, including the ones `git` had
 refused.)
 
+### An ad-hoc `&&` chain is the same defect with nowhere to put the remedy
+
+The section above assumes a script, so both its examples end in `|| fallback`
+and its preferred fix is a `set` line to amend.
+A batch of checks run as a single shell invocation has neither.
+There is no `set -e`, no `set -o pipefail`, and no file to add either one to,
+so the `&&` between the stages is the entire error handling.
+Piping any stage then removes that stage from the chain's verdict, and every
+later check runs as though it had passed.
+
+The symptom differs from the `||` case in a way worth seeing.
+There the fallback is unreachable, so nothing happens that should have.
+Here the chain runs to completion and reports success, which is a stronger and
+more misleading claim than silence.
+Measured on bash 3.2.57:
+
+```bash
+$ bash -c 'false | tail -1 && echo "CHAIN CONTINUED"; echo "rc=$?"'
+CHAIN CONTINUED
+rc=0
+$ bash -c 'set -o pipefail; false | tail -1 && echo "CHAIN CONTINUED"; echo "rc=$?"'
+rc=1
+```
+
+The trigger is worth naming, because nobody arrives at it by reasoning about
+error handling.
+A check prints more output than you want to read, so you pipe it through
+`tail` to shorten it.
+At that moment the pipe is a formatting decision about the output, and the
+exit status is not in view at all, which for a verification check is the one
+thing that mattered.
+So the anti-pattern the bullets above name, tidying output when the status is
+the point, is reached precisely when the status is least visible.
+
+- **Do:** open an ad-hoc chain with `set -o pipefail;` whenever any stage in
+  it is piped.
+- **Do:** run a check whose output needs trimming as its own command, and read
+  its status, rather than folding it into a chain.
+- **Don't:** read "set `pipefail` in any script" as inapplicable because there
+  is no script; the same word works at the front of a one-off command line.
+- **Don't:** pipe a verification check into `tail` or `head` for readability
+  while its exit status is still gating what runs next.
+
+(2026-08-03, preparing a push in `Morrison-Lab/ai-config`: a pre-push check
+set was run as one `&&` chain, with `npx markdownlint-cli2 ... | tail -N`
+among the stages and no `set` line anywhere.
+markdownlint reported a real MD018 failure, `tail` exited 0, and the chain
+continued through the remaining checks and reported them all passing.
+The failure surfaced only on a later run that did not pipe.)
+
 ## In review
 
 Flag a pipeline or command under `set -e` whose left-hand side routinely
 exits non-zero on a legitimate input, where the tolerance is not stated.
 Flag `|| fallback` attached to a pipeline in a script without `pipefail`, and
 a piped command whose status the script goes on to rely on.
+Flag a piped stage inside an `&&` chain that carries no `pipefail`, including
+in a one-off command line rather than a committed script, since there the
+`&&` is the only thing sequencing failure at all.
 Flag it even when every current call site masks it: the finding is that the
 behaviour is call-site dependent, not that it misbehaves today.

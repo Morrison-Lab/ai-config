@@ -529,6 +529,13 @@ Hit across ucdavis/bcs#264 (the snapr-based `expect_snapshot_data` suite):
   (`future::plan("sequential")` / set workers to 1), then copy the result into
   the parallel snapshot path — verify seq==par output on `main` first so the
   copy is sound.
+- **A failed CI snapshot run may still upload the authoritative `.new` files.**
+  When a reusable snapshot updater cannot commit because unrelated tests fail,
+  download its or the coverage job's failure artifact and copy only the
+  generated `*_*.new.*` files over their matching committed snapshots; do not
+  regenerate a partial suite locally and assume skipped parallel tests are
+  covered. Confirm the artifact head SHA matches the PR head before accepting
+  it.
 - **`require-review` failure caused by dispatch winning the concurrency race.**
   `cancel-in-progress: true` on a concurrency group means a newly-dispatched
   review cancels the still-running push-triggered review. The push-triggered

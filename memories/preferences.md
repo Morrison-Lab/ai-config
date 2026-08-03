@@ -614,6 +614,7 @@
 
 - **Always show the draft before posting to any external system.** Before running `gh issue create`, `gh pr create`, `gh pr comment`, or any equivalent that sends content somewhere public, output the draft in the conversation and wait for explicit "ok" / approval.
   This applies even when the user explicitly asked to file/post --- they still want to see the text first. (Learned 2026-06-26: posted a quarto-cli GitHub issue without showing the draft.)
+  The user's internal ai-config maintenance PRs are an exception: they are trusted workflow-infrastructure changes, so create them directly when the task calls for the UMS follow-up.
 
 - Before adding a new content section to a Quarto book chapter, search the repo for existing content on the same topic (`mcp__github__search_code` or grep) to catch overlap before committing.
   Duplicate content costs a review round when the reviewer spots it and asks for consolidation. (Learned on UCD-SERG/lab-manual#360: a new "PR Roles" section was added to `github.qmd` before discovering that `ai-tools/reviewing-copilot-prs.qmd` already covered several of the same roles.)

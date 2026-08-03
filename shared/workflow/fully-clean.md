@@ -773,6 +773,27 @@ The record's other figure moved too:
 the #1008 rollup count was written as 10 and re-measures at 9,
 and why was not determined.)
 
+**A clean verdict from the counting reviewer does not mean every reviewer's backlog is addressed --- sweep the other reviewer's earlier findings before declaring clean.**
+The cases above are about a reviewer that refuses, goes silent, or last reviewed an earlier commit.
+This is the inverse blind spot: a *second* reviewer that reviewed real, current code several rounds ago, raised findings, and has been silent since --- so its findings sit at a stale head, and the counting reviewer (the one whose verdict gates the merge) never inherited them.
+When that counting reviewer returns a clean verdict, the natural reading is "the PR is clean", and the other reviewer's earlier, still-open findings evaporate unexamined.
+
+They are easy to under-weight for two compounding reasons.
+They are attached to a superseded commit, so they read as history.
+And they often arrive as *suppressed* / low-confidence inline comments (Copilot's `<details>` block, per criterion 2's four-surfaces list), which reads as "the reviewer itself wasn't sure".
+Neither makes a finding false.
+A finding about a line the later commits never touched is still live at the current head, whatever commit it was filed against.
+
+So before declaring clean on one reviewer's verdict, re-read the *other* reviewer's most substantive prior review and check each of its findings against the current code, exactly as you would a fresh one --- verify, then Address, Rebut, or Defer.
+A clean verdict answers "did the reviewer who spoke find anything"; it does not answer "did the reviewer who went quiet leave anything real behind".
+
+- **Do:** sweep a silent-since-earlier reviewer's prior findings against the current head before reporting clean, treating a stale-head or suppressed finding as live until checked.
+- **Don't:** read one reviewer's clean verdict as evidence that a different reviewer's earlier backlog is empty.
+
+(Morrison-Lab/ai-config#1042, 2026-08-03: at head `8ac62ce` the counting reviewer (`claude-review`) returned "Ready for merge" with no findings, and `require-review` was green --- the PR read done.
+A sweep of Copilot's earlier reviews (its last was several commits back, its findings in a suppressed block) surfaced two still-live in-scope items: a dangerous draft-clear silent-discharge and a README hook-catalog omission.
+Both were fixed in `8b6eaf1`; neither had ever been flagged by the counting reviewer.)
+
 **A sixth case runs the other way from all five above: the review is genuine and complete, but the workflow posts the reviewer's own tool invocation instead of the review body.**
 The comment opens with a literal `gh pr comment <N> --repo <owner>/<repo> --body "$(cat <<'EOF'` and closes with `EOF\n)"`, wrapping a real, correct verdict as unrendered text --- the model emitted a shell command as its final response and the workflow posted that string verbatim.
 Nothing is lost, and the same body usually also lands as a properly-rendered sibling comment, so the PR carries the review twice.

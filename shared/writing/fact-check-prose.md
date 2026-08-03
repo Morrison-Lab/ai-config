@@ -118,6 +118,40 @@ gap: the code didn't implement what the prose claimed. Re-reading the claim
 against the actual `if` conditions before posting would have caught it
 without needing a review round.)
 
+## Prose that distills code is a code claim, checked like code
+
+When prose restates a code formula, invariant, or gate condition -- a UMS pass
+distilling a hook into English, a doc summarizing a function's logic -- that
+prose is a claim about what the code computes, and it earns the logic
+fact-check in [`fact-check-code-logic`](../coding/fact-check-code-logic.md), not
+the lighter reading prose usually gets.
+A dropped negation or a renamed variable is invisible in the restated form the
+way it never is in the code: the right-hand side matches term for term while
+only the gate's sense inverts, so the formula computes the exact opposite of
+the invariant the surrounding prose defines, with every word around it arguing
+for the original.
+The restatement gets less scrutiny than the code it came from, not more,
+because restating something already verified feels like transcription rather
+than a fresh claim.
+
+So evaluate a distilled formula the way you would the code: name what each
+variable means, run the gate against a case whose answer you know, and confirm
+every negation kept its sense across the rewrite.
+
+- **Do:** fact-check a prose formula, invariant, or gate against the code it
+  distills, checking that each negation and comparison kept its sense.
+- **Don't:** treat a restatement of already-verified code as transcription
+  exempt from the logic check -- the inverted copy reads as authoritative.
+
+(Morrison-Lab/ai-config#1096, 2026-08-03: a UMS pass distilled a hook's
+`req_failed = (not last) or err or failure_pattern(body)`, gated by
+`if not req_failed:`, into prose that renamed the variable to `released`, kept
+the right-hand side, and dropped the negation on the gate -- so the prose
+computed the exact inverse of the invariant the section defined, and a reader
+copying it would have built the very bug the section warns against.
+The reviewer caught it; the fix restored `req_failed`/`if not req_failed` and
+turned the mistake into an in-text warning.)
+
 ## Check a general claim against the concrete numbers in the same document
 
 The checks above compare prose against an external referent --- the code,
@@ -204,6 +238,67 @@ The fix therefore used the internally checkable row sum, 121, while naming the
 remaining assumption that the rows were complete.
 It also corrected the derived label: under whole-percent rounding, 60/122 is
 49%, while 60/121 is 50%.)
+
+
+**An entry's case record is its own test case, and the numbers check above does
+not fire on one, because the record reads as the reason the claim is true.**
+That check governs a passage that happens to report a figure.
+An entry written to this corpus's conventions always reports one, in the
+parenthetical case record that closes it, and that record is attached to
+*support* the generalization above it.
+So it is read as corroboration rather than as evidence the claim is measured
+against, and the check goes unrun on the one document guaranteed to hold the
+material for it.
+
+Run the rule against its own record before shipping the entry, and again on any
+round that edits the rule.
+A round addressing a finding about the claim is a likely place for the
+contradiction to enter, since attention is on the reviewer's wording rather than
+on the evidence below it.
+A mismatch means one of the two is wrong, and the numbers check above already
+says which is usually which, and that the rule still needs verifying directly
+afterwards.
+Both halves hold here, with one addition: a case record is authored prose too,
+so its own figures are recalled until checked.
+A record that contradicts a rule is therefore a counterexample to verify, not a
+source to copy from.
+Check each side against its referent before re-deriving, and expect the
+correction to sharpen the rule rather than only delete a clause: the record is
+the concrete thing the generalization was abstracted from, so what it refutes
+is usually the step where the abstraction went wrong.
+
+- **Do:** read a case record back against the rule it supports, before shipping
+  and after every edit to the rule.
+- **Do:** verify both sides against their referents when they disagree, then
+  re-derive the rule rather than striking the contradicted clause and leaving
+  the rest.
+- **Don't:** read a case record as corroboration, which is the stance its
+  placement invites and the reason nothing tests the rule against it.
+- **Don't:** exempt a bullet you have just rewritten to satisfy a review
+  finding, since that rewrite is an edit to the rule like any other.
+
+(Morrison-Lab/ai-config#1073, 2026-08-02: an entry added to
+[`address-every-comment`](../workflow/address-every-comment.md) asserted that an
+escalation's claimed scope is "by construction wider than the finding, and so
+wider than whatever instrument produced the finding".
+Its own case record, fifteen lines below that bullet in the same block, reports
+that the reviewer's instrument showed five fields while the escalation named
+three, which is the reverse.
+The five-field figure was present from the entry's first commit, `6b066ec1`.
+The clause it refutes was not: that entered at `6bdd4148`, a commit addressing a
+Copilot finding about this very bullet, whose message reasons explicitly about
+the record's other figures, a two-field probe behind a one-field finding widened
+to three.
+Round 2 dropped it at `8b0291ae`, and the retraction produced a sharper rule:
+the defect was truncating a full-scope instrument, not choosing a narrow one.
+The numbers check above had been on the books since 2026-07-29, via
+[#816](https://github.com/Morrison-Lab/ai-config/pull/816), and did not fire.
+The escalation itself concerned
+[#1056](https://github.com/Morrison-Lab/ai-config/pull/1056), merged as
+`e1875ff7`.
+This entry's own first draft put that distance at eight lines, and measuring it
+against the branch gave fifteen, which is why the rule above checks the record
+against its referent rather than preferring it outright.)
 
 
 ## Check that a stated trigger actually fired

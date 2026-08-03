@@ -250,6 +250,68 @@ The filtering step was sound --- against green `main` it separated the four
 possessives exactly, `arm's` 4 files, `manuscript's` 2, `simulation's` 6, and
 `SAS's` 0 --- which is what makes the extraction the whole of the defect.)
 
+## A review flagging an overclaimed check is a prompt to build it, not to soften the claim
+
+The sections above are about an instrument you already decided to build.
+This is about the moment a reviewer tells you one is missing --- and the
+softer, wrong way out of it.
+
+The shape is a description, a docstring, or a PR body asserting a property was
+verified ("the parser is fuzzed", "inputs are validated", "the migration is
+idempotent") when the verification was ad hoc manual work during development
+and nothing repeatable shipped.
+A reviewer flags the mismatch: the prose reads as if a committed test covers
+it, and none does.
+
+The tempting disposition is to delete the claim, since that makes the prose
+accurate in one edit.
+It is the wrong one whenever the property is **real and cheap to guard**,
+because deleting the sentence throws away exactly the check this whole
+principle says to build.
+The manual verification you did once is the ad hoc check; the reviewer has
+just handed you the recurrence signal that turns it into an instrument.
+So make the claim true instead --- ship the committed, repeatable guard the
+prose already describes --- and the finding resolves by addition rather than
+by retraction.
+
+Prefer deletion only when the property is not worth a standing check: a
+one-off characteristic of this diff, or an invariant no future change could
+plausibly break.
+Say which it is, rather than defaulting to whichever edit is smaller.
+
+**Then prove the new guard is non-vacuous by isolating the injected fault to a
+shape only it reaches.**
+This is [`ardi`](ardi.md)'s "seen to fail" rule with a suite-level trap: when
+the guard ships into a shared test file, an injected fault that an *existing*
+deterministic case also reaches makes that earlier case abort the suite first,
+so you have demonstrated the old test catches it, not the new one.
+Target the fault at an input the deterministic cases never build, or run the
+new guard in isolation, before believing it catches what it claims.
+
+- **Do:** ship the committed guard the prose describes when the property is
+  real, so the finding resolves by addition.
+- **Do:** state plainly when a property is a genuine one-off, and delete the
+  claim then.
+- **Do:** isolate a non-vacuity fault to a shape only the new guard reaches,
+  or run it alone, so the failure is attributed to the right test.
+- **Don't:** default to deleting an overclaiming sentence because it is the
+  smaller edit --- that discards the instrument the finding asked for.
+- **Don't:** read a suite that aborts on an injected fault as proof the *new*
+  guard caught it; an earlier case may have.
+
+(Morrison-Lab/ai-config#1047 round 5, 2026-08-03: `claude-review` returned
+"Ready for merge" with one non-blocking note --- the PR body said "the parser
+is fuzzed for the no-throw invariant", but no fuzzing shipped.
+The invariant is real: a parser crash prints a traceback into Bash.
+Rather than delete the claim, `fuzz()` was shipped --- a `random.Random`-seeded
+adversarial corpus driven through `split_segments` and the full predicate,
+plus a subprocess smoke through `main()`.
+The first non-vacuity probe injected a bug the `BACKSLASH_CONT` case also hit,
+so the suite aborted on that case before `fuzz()` ran; a second probe targeting
+an unterminated-quote-with-trailing-backslash shape the deterministic cases
+never build was caught by `fuzz()` in isolation, while the real parser passed
+4000 rounds.)
+
 ## A reminder guard's discharge condition is a second matcher, and its failure is silence
 
 The two sections above test a guard's *fire* condition: does the matcher catch

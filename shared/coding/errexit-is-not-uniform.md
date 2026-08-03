@@ -153,11 +153,20 @@ than continue: it **chooses a branch** on it.
 
 A command's exit status is a single integer doing two jobs at once, and a
 boolean test collapses them.
-`grep` answers "no match" with 1 and "I am not installed" with 127, and
+`grep` answers "no match" with 1, and a command that is not installed never
+answers at all --- the shell reports 127 on its behalf.
 `if ! cmd` maps both to true.
 So a missing dependency does not report a missing dependency.
 It reports a negative result, confidently, in the vocabulary the script was
 expecting.
+
+Keep those two sources straight when reading a status, because only one of
+them is documented anywhere you would think to look.
+`man grep` lists 0, 1, and 2 and stops, so a reader who goes looking for 127
+there finds nothing and concludes the claim is wrong.
+127 is the shell's, for a command it could not find, and it is therefore
+available from *any* command --- which is exactly why a predicate cannot
+distinguish it from that command's own answer.
 
 The shape, from a git pre-commit hook:
 
@@ -217,6 +226,34 @@ pipeline under `set -e` aborts on the no-match case before `case` ever runs,
 so capturing the status is the only way to reach the branch that handles it.
 Measured on bash 5.1.16: no match gives `rc=1`, and substituting a
 nonexistent command gives `rc=127`.
+
+One residual that `-q` introduces, worth knowing precisely because `-q` is
+what a guard reaches for --- and which turns out to prove this section's own
+point a second time.
+
+GNU grep's manual says the status is 0 "if the `-q` or `--quiet` or
+`--silent` is used and a line is selected, even if an error occurred", so the
+flag that makes a check quiet also lets a match **outrank** a genuine error.
+Measured on GNU grep 3.7, matching one readable file and one missing file:
+`-q` gives `rc=0` and the same command without `-q` gives `rc=2`.
+
+The reason to measure rather than quote is that the same command on the same
+machine disagreed.
+`grep` there resolved to **ugrep 7.5.0**, on `PATH` ahead of
+`/usr/bin/grep`, and ugrep reports `rc=2` for those identical inputs --- it
+does not mask.
+So the manual is right about GNU grep and wrong about what `grep` runs, which
+is the machine-dependence this section already warns about arriving through
+the tool you were told to prefer as the portable one.
+A `command -v rg` guard would not have helped, because `grep` was present the
+whole time; it was a different `grep`.
+
+Neither implementation reaches the missing-command case above, since a command
+that never ran cannot select a line, so 127 arrives intact either way.
+What `-q` costs you on GNU grep is the "broken" versus "matched" distinction,
+not "broken" versus "no match".
+Drop `-q` and redirect to `/dev/null` where that difference matters, and read
+`grep --version` before trusting any of these codes.
 
 - **Do:** verify a tool exists before branching on its exit status, in
   anything that runs on a machine you do not control.

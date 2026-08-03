@@ -83,7 +83,7 @@ mutates a PR stays serial.
    Prefer a narrow wave, and re-run preparation rather than stretching one
    across many PRs.
 
-3. **For each PR/MR, in series, run ARDI** (the full single-PR loop — see the
+3. **For each PR/MR, in series, run ARDI** (the full single-PR loop --- see the
    `ardi` skill): claim → sync main → read latest review → ARD every finding →
    push → post summary → re-request review → repeat until fully clean. Don't
    reimplement that loop here; follow it per PR.

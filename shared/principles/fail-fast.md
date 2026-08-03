@@ -557,6 +557,12 @@ request with this reasoning) over trading the fail-safe away.
 Reducing a safe-direction over-block is exactly how a fail-safe guard grows a
 dangerous hole.
 
+(Distinct from
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A reminder
+guard's discharge condition is a second matcher": that governs a discharge
+*condition* too broad to begin with, this governs a correct condition *firing*
+on evidence it cannot attribute.)
+
 ### A combined result cannot attribute a per-step outcome
 
 The commonest way a discharge fires on false evidence: the guard reads a
@@ -564,37 +570,48 @@ The commonest way a discharge fires on false evidence: the guard reads a
 commands, a batched response, any blob spanning more than one action --- and
 attributes success to the specific step it cares about.
 It cannot.
-A whole-call exit status (`is_error`, `$?`) belongs to the **last** command in
-a pipeline or `&&`-chain, not to an earlier one, so a failed request followed
-by a trailing `echo` reads as success, and a successful request followed by a
-failing command reads as failure.
+A whole-call exit status (`is_error`, `$?`) belongs to the **last** command in a
+`;`-sequence or a `pipefail`-less pipeline, not to an earlier one.
+So a failed request followed by a trailing `echo` reads as success, and --- in
+any chaining form, `&&` included --- a successful request followed by a failing
+command reads as failure.
+(An `&&`-chain short-circuits, so it alone surfaces a failed *leading* request;
+the trailing-failure ambiguity holds regardless.)
 Attributing a per-step outcome from an opaque combined blob is fundamentally
 ambiguous; no amount of body-scanning recovers it.
 
 The invariant that survives this: **defer every releasing state change to a
 result you can attribute, and fail toward keeping the guard armed when you
-cannot.** Concretely:
+cannot.**
+Concretely:
 
 - A releasing change (discharge / clear) fires only on positive success of a
   step whose result is unambiguously its own --- the **last** simple command
-  in a call, or a single **atomic** structured tool. Key it by the action's
-  own `tool_use_id`, not by position.
+  in a call, or a single **atomic** structured tool.
+  Key it by the action's own `tool_use_id`, not by position.
 - A step chained **ahead** of anything else is ambiguous, so it **never**
   releases the guard --- a deliberate over-warn, per the safe/dangerous
   asymmetry above.
 - Any state change made at the *tool_use* moment, before its result is known,
   can be wrong if that result fails --- so route it through a pending map and
-  apply it only on the non-failed result. This holds for **every** releasing
-  path, not just the obvious one: an obligation-drop, a draft-clear, and a
-  discharge are all the same class, and fixing one while leaving its siblings
-  is the "partial guard" failure of the section above.
+  apply it only on the non-failed result.
+  This holds for **every** releasing path, not just the obvious one: an
+  obligation-drop, a draft-clear, and a discharge are all the same class, and
+  fixing one while leaving its siblings is the "partial guard" failure of the
+  section above.
 
 The discipline that makes each such fix trustworthy is **mutation-testing the
-invariant term by term**: revert each clause of the release condition
-independently and confirm exactly its own regression case fails. A release
-condition of the form `released = (not last) or err or failure_pattern(body)`
-has three terms, and a test suite that does not fail when any one is dropped is
-not yet testing the invariant.
+invariant term by term**: revert each clause of the condition independently and
+confirm exactly its own regression case fails.
+Name the condition for what it computes --- *failure*, not release --- so the
+guard reads `if not req_failed: discharge`, with
+`req_failed = (not last) or err or failure_pattern(body)`.
+Its three terms say the request is unattributable, errored, or matched a failure
+pattern; a test suite that does not fail when any one is dropped is not yet
+testing the invariant.
+Labelling that same right-hand side `released` inverts it --- the guard would
+then discharge in exactly the three cases it must not, which is the
+silent-discharge bug this section exists to prevent.
 
 - **Do:** release a guard only on positive, attributable success; treat every
   releasing path as one class and gate them all on a confirmed result.
@@ -608,12 +625,14 @@ not yet testing the invariant.
 (Morrison-Lab/ai-config#1042, 2026-08-02/03: the `no-unreviewed-pr.py` Stop
 hook took ~12 review rounds, six of them closing the same dangerous class ---
 a discharge, an obligation-drop, and a draft-clear each fired on unattributable
-or premature evidence. Rounds 8-10 churned because each patch *reduced* a
-safe-direction over-warn and opened a silent discharge next door; round 9's
-nag-reduction directly caused round 10's non-4xx-failure silent discharge. They
-converged only when the three ad-hoc patches were replaced by the single
-`released = (not last) or err or RX_REQ_FAILED(body)` invariant plus
-result-gated `pending`/`pending_clear` maps, every term mutation-checked.)
+or premature evidence.
+Its discharge path churned across rounds 8-10, and round 9 is the clean instance
+of the trap this section warns about: a fix that *reduced* a safe-direction nag
+introduced a non-4xx-failure silent discharge, which round 10 caught and fixed.
+They converged only when the ad-hoc patches were replaced by the single
+`req_failed = (not last) or err or RX_REQ_FAILED(body)` invariant (discharge iff
+`not req_failed`) plus result-gated `pending`/`pending_clear` maps, every term
+mutation-checked.)
 
 ## In review
 
@@ -634,8 +653,8 @@ a grep for the guarded operation, not against the diff.
 
 Flag a guard that **releases** (discharges, clears, marks handled) on the
 absence of a failure rather than on positive, attributable success --- and one
-that infers a per-step outcome from a combined result's whole-call status. Ask
-whether every releasing path is gated on a confirmed result, and whether a
+that infers a per-step outcome from a combined result's whole-call status.
+Ask whether every releasing path is gated on a confirmed result, and whether a
 change that reduces an over-warn is quietly opening a silent-discharge hole in
 the dangerous direction.
 

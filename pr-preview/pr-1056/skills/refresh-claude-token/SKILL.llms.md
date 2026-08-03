@@ -105,16 +105,22 @@ Then record the current state and dispatch:
 ``` bash
 BOT=claude                                        # from the query above
 BEFORE=$(gh pr view <N> --repo <owner>/<repo> --json comments \
-  --jq --arg bot "$BOT" '[.comments[] | select(.author.login == $bot)] | last | .id // "none"')
+  | jq -r --arg bot "$BOT" '[.comments[] | select(.author.login == $bot)] | last | .id // "none"')
 gh workflow run claude-review.yml --repo <owner>/<repo> \
-  --field pr_number=<N>                           # RUN_WORKFLOW
+  --ref <branch> --field pr_number=<N>            # RUN_WORKFLOW
 ```
+
+**Pipe into standalone `jq`; do not pass `--arg` to `gh`’s own `--jq`.** `gh`’s `--jq` takes exactly one argument, the filter, and has no `--arg`/`--argjson` passthrough ([cli/cli#10263](https://github.com/cli/cli/issues/10263) is the open request). Passing them makes `gh` read each as a positional argument and refuse:
+
+    accepts at most 1 arg(s), received 4
+
+This corpus already records that, in [`skills/ardi/SKILL.md`](../../skills/ardi/SKILL.llms.md) and [`memories/github.md`](../../memories/github.md).
 
 Once the run completes, evaluate it in **one** filter that names every outcome:
 
 ``` bash
 gh pr view <N> --repo <owner>/<repo> --json comments \
-  --jq --arg bot "$BOT" --arg before "$BEFORE" '
+  | jq -r --arg bot "$BOT" --arg before "$BEFORE" '
     [.comments[] | select(.author.login == $bot)] | last
     | if   . == null      then "BROKEN: no comment from \($bot) at all"
       elif .id == $before then "BROKEN: newest comment unchanged; this run posted nothing"
@@ -152,7 +158,7 @@ So the only instrument is behavioural, and the only positive evidence is a run t
 - **A repo that has never had the secret.** The script cannot reach it at all, with or without `--repos`, for the reason in “What this is not” above. Use `gh secret set` directly.
 - **Re-running with an unchanged token.** If GitHub does not bump `updated_at` when the value is identical, the script reports the write as unverified. That is a false alarm rather than a false pass, which is the safe direction.
 - **`gh` not on `PATH`.** The script exits with that message rather than proceeding.
-- **Org-level secrets.** `gh secret set <name> --org <org> --visibility selected --repos <owner>/<name>` sets one secret for several repos. Note that a sweep of 324 admin repos in 2026-07 found zero org-level Claude secrets and 35 repo-level ones, so the estate is repo-level today and moving it is a change of shape, not a rotation.
+- **Org-level secrets.** `gh secret set <name> --org <org> --visibility selected --repos <repo1>,<repo2>` sets one secret for several repos. `--repos` takes **bare** repo names, comma-separated, not `owner/name`: the owner is already fixed by `--org`. Note that a sweep of 324 admin repos in 2026-07 found zero org-level Claude secrets and 35 repo-level ones, so the estate is repo-level today and moving it is a change of shape, not a rotation.
 
 ## Anti-patterns
 

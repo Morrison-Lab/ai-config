@@ -179,6 +179,58 @@ whole line yours to split.
 - **Don't:** read such a flag as the check misfiring --- it is reporting the
   diff correctly, and the diff genuinely contains that character.
 
+**Relocating prose is the strongest form of touching it, not an exception to
+this rule.**
+The section above is about a line you *edit*.
+Moving a section to another file edits none of its lines, and every one of them
+still lands in the diff as an added line --- so a file split, an extraction, or
+a move between fragments makes the whole moved body yours at once.
+
+The reasoning that talks you out of this is the scope-creep rule in this same
+fragment ("Fixing one flagged glyph is a one-line edit; fixing it with a
+whole-file replace is a different, much larger change"), which correctly says
+not to answer a one-line finding with a whole-file replace.
+It does not apply here, and the difference is worth stating because the two look
+identical from the inside.
+That rule protects a diff from growing *beyond* what the change was for.
+A relocation's diff is already the whole file, so fixing the moved prose adds no
+scope at all --- it just makes the lines you are already publishing conform.
+
+The corpus-wide sweep tracked in
+[#731](https://github.com/Morrison-Lab/ai-config/issues/731) is not a reason to
+defer either.
+That issue exists for the lines nobody is touching; a line you are moving is by
+definition not one of them, and leaving it puts a known-bad line into a diff a
+reviewer is about to read.
+
+This applies equally to
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md), which is
+diff-scoped for the same reason: a relocated multi-sentence line is a
+multi-sentence line you just added.
+Verify the result with the real check rather than a hand-rolled one, and confirm
+the reflow changed nothing but whitespace --- a whitespace- and
+markup-normalized word-level comparison against the pre-move version should come
+back identical.
+
+- **Do:** fix banned glyphs and multi-sentence lines throughout any prose you
+  relocate, in the same change that moves it.
+- **Do:** prove a mechanical reflow preserved content, by word-level comparison
+  against the original.
+- **Don't:** treat "I only moved it" as grandfathering --- the diff cannot tell
+  a move from an authoring pass, and neither can a reviewer.
+- **Don't:** defer to the corpus-wide sweep for lines your own diff is
+  republishing.
+
+(Morrison-Lab/ai-config#1067 -> #1069, 2026-08-02: #1067 split six worktree
+sections out of `memories/git.md` and left 26 em-dashes and 16 multi-sentence
+lines in the relocated file, reasoning that relocation is not authoring
+and that #731 covers the sweep.
+The user's correction was "fix em-dashes and semantic line breaks on any prose
+you touch", pointing at the 10 warnings the `check-new-line-breaks` job had
+already posted as annotations on that PR.
+Fixed in #1069, with the word-level comparison confirming 1910 words on both
+sides.)
+
 (Twice on 2026-07-29/30.
 `Morrison-Lab/gha#374`: retargeting an owner name inside
 `sync-upstream.yml`'s generated PR-body string re-added that line's

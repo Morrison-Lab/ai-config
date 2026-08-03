@@ -527,6 +527,113 @@ Caught before it was committed, so the landed fix at `39b98c7b` already calls
 the partial state, and why the enumeration has to happen while the guard is
 being written rather than afterwards.)
 
+## A guard's discharge fires on positive success, not the absence of failure
+
+The section above is about a guard that runs on too few sites.
+This is about a guard that runs everywhere and **stops guarding too early** ---
+it clears its own obligation on evidence that only *looks* like the hazard was
+resolved.
+A guard exists to catch a condition, so every state change that *releases* the
+guard --- a discharge, a clear, a "this one is handled now" --- is an assertion
+that the condition is gone.
+An assertion of absence must rest on **positive evidence the thing succeeded**,
+never on the mere non-appearance of a failure.
+
+The failure mode is a **silent discharge**: the guard forgets a live obligation
+and reports clean, which is strictly worse than an over-warn, because an
+over-warn is visible and annoying while a silent discharge is invisible and
+defeats the guard's whole purpose.
+The two directions are not symmetric, and treating them as symmetric is the
+root error:
+
+- **Over-warn** (guard fires when it needn't) is the **safe** direction.
+- **Silent discharge** (guard clears when it shouldn't) is the **dangerous**
+  one.
+
+So when a reviewer or your own instinct pushes to *reduce* an over-warn ---
+"stop nagging on this case" --- weigh it as a request to move toward the
+dangerous direction, and prefer keeping the over-warn (and rebutting the
+request with this reasoning) over trading the fail-safe away.
+Reducing a safe-direction over-block is exactly how a fail-safe guard grows a
+dangerous hole.
+
+(Distinct from
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A reminder
+guard's discharge condition is a second matcher": that governs a discharge
+*condition* too broad to begin with, this governs a correct condition *firing*
+on evidence it cannot attribute.)
+
+### A combined result cannot attribute a per-step outcome
+
+The commonest way a discharge fires on false evidence: the guard reads a
+**combined result** --- a shell `tool_result` covering several chained
+commands, a batched response, any blob spanning more than one action --- and
+attributes success to the specific step it cares about.
+It cannot.
+A whole-call exit status (`is_error`, `$?`) belongs to the **last** command in a
+`;`-sequence or a `pipefail`-less pipeline, not to an earlier one.
+So a failed request followed by a trailing `echo` reads as success, and --- in
+any chaining form, `&&` included --- a successful request followed by a failing
+command reads as failure.
+(An `&&`-chain short-circuits, so it alone surfaces a failed *leading* request;
+the trailing-failure ambiguity holds regardless.)
+Attributing a per-step outcome from an opaque combined blob is fundamentally
+ambiguous; no amount of body-scanning recovers it.
+
+The invariant that survives this: **defer every releasing state change to a
+result you can attribute, and fail toward keeping the guard armed when you
+cannot.**
+Concretely:
+
+- A releasing change (discharge / clear) fires only on positive success of a
+  step whose result is unambiguously its own --- the **last** simple command
+  in a call, or a single **atomic** structured tool.
+  Key it by the action's own `tool_use_id`, not by position.
+- A step chained **ahead** of anything else is ambiguous, so it **never**
+  releases the guard --- a deliberate over-warn, per the safe/dangerous
+  asymmetry above.
+- Any state change made at the *tool_use* moment, before its result is known,
+  can be wrong if that result fails --- so route it through a pending map and
+  apply it only on the non-failed result.
+  This holds for **every** releasing path, not just the obvious one: an
+  obligation-drop, a draft-clear, and a discharge are all the same class, and
+  fixing one while leaving its siblings is the "partial guard" failure of the
+  section above.
+
+The discipline that makes each such fix trustworthy is **mutation-testing the
+invariant term by term**: revert each clause of the condition independently and
+confirm exactly its own regression case fails.
+Name the condition for what it computes --- *failure*, not release --- so the
+guard reads `if not req_failed: discharge`, with
+`req_failed = (not last) or err or failure_pattern(body)`.
+Its three terms say the request is unattributable, errored, or matched a failure
+pattern; a test suite that does not fail when any one is dropped is not yet
+testing the invariant.
+Labelling that same right-hand side `released` inverts it --- the guard would
+then discharge in exactly the three cases it must not, which is the
+silent-discharge bug this section exists to prevent.
+
+- **Do:** release a guard only on positive, attributable success; treat every
+  releasing path as one class and gate them all on a confirmed result.
+- **Do:** mutation-test each term of a release condition, and keep the
+  over-warn on any genuinely ambiguous input.
+- **Don't:** infer a per-step outcome from a combined result's whole-call
+  status.
+- **Don't:** trade a safe-direction over-warn for fewer nags --- that is the
+  move that grows a silent-discharge hole.
+
+(Morrison-Lab/ai-config#1042, 2026-08-02/03: the `no-unreviewed-pr.py` Stop
+hook took ~12 review rounds, six of them closing the same dangerous class ---
+a discharge, an obligation-drop, and a draft-clear each fired on unattributable
+or premature evidence.
+Its discharge path churned across rounds 8-10, and round 9 is the clean instance
+of the trap this section warns about: a fix that *reduced* a safe-direction nag
+introduced a non-4xx-failure silent discharge, which round 10 caught and fixed.
+They converged only when the ad-hoc patches were replaced by the single
+`req_failed = (not last) or err or RX_REQ_FAILED(body)` invariant (discharge iff
+`not req_failed`) plus result-gated `pending`/`pending_clear` maps, every term
+mutation-checked.)
+
 ## In review
 
 Flag error handling that hides failure — swallowed exceptions, silent
@@ -543,6 +650,13 @@ for the remaining ones or for a comment saying why they are safe.
 This is the finding most likely to be missed by reading, since the diff shows
 the guard being added rather than the sites it skipped --- so check it against
 a grep for the guarded operation, not against the diff.
+
+Flag a guard that **releases** (discharges, clears, marks handled) on the
+absence of a failure rather than on positive, attributable success --- and one
+that infers a per-step outcome from a combined result's whole-call status.
+Ask whether every releasing path is gated on a confirmed result, and whether a
+change that reduces an over-warn is quietly opening a silent-discharge hole in
+the dangerous direction.
 
 This serves the Reliable goal in the
 [principles catalog](README.md): a loud failure is easier to catch than

@@ -113,6 +113,8 @@ Every finding from that review has an ARD disposition.
 
 If code changed, main was synced in first when needed, merge-status hedges in touched files were re-scanned with whitespace normalization, then fixes were pushed.
 
+If source comments or generated inputs changed, the repository’s generator was run after the final edit and its generated paths are clean against the index; stage any resulting artifacts before pushing.
+
 ARD summary was posted and corresponding inline-thread replies/resolutions were handled.
 
 Re-review trigger was chosen correctly: push-trigger only when code was pushed; explicit mention/dispatch only when no code was pushed.

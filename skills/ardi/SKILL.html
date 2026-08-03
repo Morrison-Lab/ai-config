@@ -450,6 +450,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><label><input type="checkbox"><strong>Killer item:</strong> the latest review analyzed is for the current head commit, not a stale prior run. Marked because getting this wrong invalidates the whole round rather than leaving a gap in it: a reviewer’s snapshot predating your rebuttal re-raises an item you already answered, and a verdict from an older head says nothing about the code you just pushed. Compare the review run’s <code>started_at</code> against your last reply and the head SHA.</label></li>
 <li><label><input type="checkbox">Every finding from that review has an ARD disposition.</label></li>
 <li><label><input type="checkbox">If code changed, main was synced in first when needed, merge-status hedges in touched files were re-scanned with whitespace normalization, then fixes were pushed.</label></li>
+<li><label><input type="checkbox">If source comments or generated inputs changed, the repository’s generator was run after the final edit and its generated paths are clean against the index; stage any resulting artifacts before pushing.</label></li>
 <li><label><input type="checkbox">ARD summary was posted and corresponding inline-thread replies/resolutions were handled.</label></li>
 <li><label><input type="checkbox">Re-review trigger was chosen correctly: push-trigger only when code was pushed; explicit mention/dispatch only when no code was pushed.</label></li>
 </ul>

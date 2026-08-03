@@ -404,7 +404,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="mint-the-token-the-human-runs-this-step" class="level3">
 <h3 class="anchored" data-anchor-id="mint-the-token-the-human-runs-this-step">2. Mint the token – the human runs this step</h3>
-<p><code>claude setup-token</code> is interactive and needs a TTY, so an agent session cannot run it. Ask the user to run it in the session with the <code>!</code> prefix:</p>
+<p><code>claude setup-token</code> is interactive, and an agent session cannot complete it. Run non-interactively it does not fail fast: with stdin closed it printed nothing and was still running when killed at 8 seconds, so an agent that calls it hangs rather than getting an error to report.</p>
+<p>State that as the observed behaviour rather than as a TTY check. The gate was never identified, and naming a mechanism you did not observe is how a blocker gets misattributed (see <a href="../../shared/workflow/ardi.md"><code>ardi</code></a>, “Name the specific gate when you report a blocker”).</p>
+<p>Ask the user to run it in the session with the <code>!</code> prefix:</p>
 <pre><code>! claude setup-token</code></pre>
 <p>It prints a long-lived token and touches no repo. It requires a Claude subscription.</p>
 <p><strong>Mind which account is logged in.</strong> The command mints from whichever account the local CLI is currently authenticated as, with no account picker and no confirmation naming it, and nothing afterwards records which account a given token came from. Check first if it matters:</p>

@@ -36,7 +36,11 @@ Read the count before going further. A number far below the last known sweep mea
 
 ### 2. Mint the token – the human runs this step
 
-`claude setup-token` is interactive and needs a TTY, so an agent session cannot run it. Ask the user to run it in the session with the `!` prefix:
+`claude setup-token` is interactive, and an agent session cannot complete it. Run non-interactively it does not fail fast: with stdin closed it printed nothing and was still running when killed at 8 seconds, so an agent that calls it hangs rather than getting an error to report.
+
+State that as the observed behaviour rather than as a TTY check. The gate was never identified, and naming a mechanism you did not observe is how a blocker gets misattributed (see [`ardi`](../../shared/workflow/ardi.md), “Name the specific gate when you report a blocker”).
+
+Ask the user to run it in the session with the `!` prefix:
 
     ! claude setup-token
 

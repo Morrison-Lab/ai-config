@@ -654,10 +654,70 @@ reasons" across roughly six status updates, while the failure actually
 observed under that spelling was the node-versus-declared-string comparison.
 `memories/github-mcp-tools.md` records both gates and their verbatim errors.)
 
+**When the blocker is a hang, inspect the process rather than re-guessing
+what it is waiting on.**
+The bullet above governs a real failure whose gate was misnamed from an error
+message, so there is at least a message to re-read.
+A hang gives you nothing to quote and nothing to classify, and that vacuum
+gets filled by a guess about mechanism.
+The guess then arrives feeling like a measurement, because something really
+was run and something really did block.
+
+"It needs a TTY" and "it hangs when run non-interactively" are both category
+words in the sense the bullet above means.
+Each names a plausible mechanism, neither was observed, and a reader cannot
+tell which one you checked.
+Replacing the first with the second after a probe returns nothing feels like
+progress, and moves you no closer to a gate you can name.
+
+A blocked process answers the question directly, and the reads are cheap:
+
+```bash
+ps -o pid=,stat= -p <pid>        # S: alive and blocked, rather than spinning or gone
+lsof -p <pid> -a -d 0            # what fd 0 actually is: tty, pipe, or socket
+ps -o ppid=,command= -p <pid>    # what launched it, and with what arguments
+```
+
+Those turn "it hangs" into a specific, checkable fact about *what* it is
+waiting on, which is the gate the bullet above asks you to name.
+They also separate two states that no amount of re-running distinguishes: a
+capability check refusing at startup, and a read reached only late in the
+flow after the interactive step succeeded.
+Those call for opposite responses, so guessing between them is not a
+harmless imprecision.
+
+- **Do:** read `ps -o stat=`, `lsof -d 0`, and the process tree before
+  describing what a hung command is waiting for.
+- **Do:** say which read produced the answer, so the gate is checkable rather
+  than asserted.
+- **Don't:** substitute one guessed mechanism for another because a probe
+  produced no output.
+- **Don't:** report a timeout signal as evidence about *why* something
+  blocked; it is evidence only that it had not finished.
+
+Do not reach for the probe first, either.
+The probe that produces the hang is itself a live command with its own first
+instant, and running an interactive one to see what it does is the failure
+[`growth-mindset`](growth-mindset.md)'s "A timeout bounds how long you wait"
+section covers.
+
+(2026-08-02, `Morrison-Lab/ai-config#1056`: a claim that `claude setup-token`
+"needs a TTY" was written into a skill without measurement, then replaced
+with "it hangs when non-interactive" on the strength of a probe that returned
+exit 142 and no output.
+Both were guesses, and the second read as the correction of the first.
+`ps -o pid=,stat= -p <pid>` then reported `S` -- alive and blocked -- *after*
+the browser authorization had completed, and `lsof -p <pid> -a -d 0` showed
+fd 0 as a unix socket rather than a terminal.
+So the gate is a post-authorize read on stdin, not a startup capability
+check, and the same claim was wrong three times in one session before anyone
+measured it.
+Recorded in [`memories/claude-code.md`](../../memories/claude-code.md).)
+
 **A blocker that was true when you published it can stop being true while
 the PR is open, and withdrawing it is your job, not the reviewer's.**
 The verify-a-blocker bullet above covers a blocker that was never true, and
-the gate-naming bullet between it and this one covers a real blocker whose
+the "Name the specific gate" bullet covers a real blocker whose
 mechanism was misnamed.
 This is the harder case, because the caveat was correct and diligent when
 written, so nothing about it reads as a defect later --- and a sentence
@@ -1147,6 +1207,47 @@ a *different* configuration, and its failures and passes both mislead.
 - **Don't:** scope a local run to the files you edited --- the test asserting
   the old behaviour is usually somewhere else.
 - **Don't:** read a green subset as a green suite, or a skip as a pass.
+
+**Running a script is not running its tests, and an "advisory" check can have a
+hard-gating twin.**
+The bullets above assume you reached for the test suite and took too little of
+it.
+The nearer miss is reaching for the **production script** instead: you touch
+something a checker measures, run that checker, read its exit code, and treat
+that as having verified the property.
+It feels like stronger evidence than a test, since it is the real instrument on
+the real data.
+
+It answers a different question.
+A script **reports**; a job **gates**, and the gate is frequently a separate
+step asserting the same property about the repo itself.
+The two can disagree by design --- one deliberately advisory, its twin
+deliberately blocking --- so a script's exit 0 says nothing about whether the
+job is green.
+
+What makes this worth its own entry is that the conclusion is easy to
+**publish**, and a claim about what CI enforces is the kind other people act
+on.
+Per [`metacognitive-monitoring`](metacognitive-monitoring.md) that is a scope
+claim, and its remedy applies: check the population --- every step of the job
+--- rather than the sample that came to mind.
+
+- **Do:** run every check the CI job runs, its test files included, before
+  pushing.
+- **Do:** grep the job definition for other steps touching the same property
+  before saying anything about whether it gates.
+- **Don't:** substitute a production script's exit code for its test file.
+- **Don't:** infer a job's behaviour from one step's label --- "(advisory)"
+  describes that step, not the job.
+
+(Morrison-Lab/ai-config#1067, 2026-08-02: a UMS pass took `memories/git.md`
+from 1172 to 1315 lines.
+`scripts/check-memory-file-size.py` exits 0 and its `validate.yml` step is
+labelled advisory, both genuinely so, and the threshold was therefore reported
+as non-blocking on #1007.
+`scripts/test_check_memory_file_size.py` asserts this repo's own `memories/`
+are under the default and hard-fails, turning `validate` red on the next push.
+The claim had to be retracted on #1007 as well as fixed in the PR.)
 
 (d-morrison/altdoc#95 and #96, 2026-07-29: twice in one session.
 On #95 a test asserting "aborts when no venv is configured" read that

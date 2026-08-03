@@ -41,6 +41,12 @@ Only repos that ALREADY carry the secret are touched. Provisioning it into a
 repo that lacks it is a separate per-repo decision and stays deliberate; pass
 `--repos` explicitly to do that.
 
+`claude setup-token` is the USER's to run, in their own terminal. It opens a
+browser as its first act and then blocks reading an authorization code from
+stdin, which an agent-spawned process (fd 0 is a socket, not a terminal) can
+never satisfy -- and no timeout or closed stdin prevents the browser. See
+memories/claude-code.md, "`claude setup-token` opens a browser first".
+
 Usage:
 
     python3 scripts/rotate-claude-token.py                  # preview

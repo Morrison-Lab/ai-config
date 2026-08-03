@@ -92,6 +92,62 @@ accept it as broken".
 The render then worked on the first try and settled the question, which the
 manuscript would otherwise have asserted unchecked.)
 
+## A timeout bounds how long you wait, not what the command already did
+
+The section above tells you to attempt the thing before reporting it broken,
+and that is right.
+It does not say *how*, and the natural how is to run the command behind a
+guard: a `timeout`, an `alarm`, a closed stdin, a short deadline.
+That guard reads as making the probe non-destructive.
+It is not.
+It bounds how long the command runs, and it bounds nothing at all about what
+the command does in its first instant.
+
+An interactive or authentication command is the sharp case, because its first
+act is an out-of-band side effect on the user's own machine.
+Opening a browser window, starting an OAuth flow, sending a network request,
+writing a credential file: each lands immediately, long before any deadline
+can fire.
+So a probe that returns nothing but a timeout signal has still done all of
+that, and the empty output is what makes it look like nothing happened.
+
+Two things make this worse than an ordinary careless command.
+The cost lands on the **user** rather than on the session, whose browser opens
+on whatever profile it happens to be on, in the middle of something else, with
+nothing saying an agent caused it.
+And the session cannot see it, because an out-of-band side effect leaves no
+trace in the command's own output, so the probe reports success at being
+harmless.
+
+Ask what the command does in its first instant, not how long it runs.
+`--help`, a dry-run flag, the documentation, or the source usually answer the
+question the probe was going to answer, and none of them touch anything.
+Treat any command whose name contains `login`, `auth`, `setup`, or `init` as
+presumed interactive until one of those says otherwise.
+When only running it will do, say so before you run it, since the user is the
+one whose browser opens.
+
+- **Do:** read `--help`, a dry-run flag, the docs, or the source before
+  running an unfamiliar command to see what it does.
+- **Do:** announce an interactive or auth-shaped command before running it,
+  and prefer handing it to the user when it touches their own session.
+- **Don't:** treat `timeout`, `alarm`, or a closed stdin as making a probe
+  non-destructive; they bound the wait, not the first instant.
+- **Don't:** read an empty result from a bounded probe as evidence that the
+  command did nothing.
+
+(2026-08-02, verifying a claim written into
+[ai-config#1056](https://github.com/Morrison-Lab/ai-config/pull/1056) that
+`claude setup-token` "needs a TTY, so an agent session cannot run it":
+`perl -e 'alarm 8; exec "claude","setup-token"' < /dev/null` was run as a
+supposedly non-destructive check, and returned exit 142 with no output.
+It had already opened a real browser window on the user's machine, on the
+wrong browser profile, which the session learned only because the user said
+so.
+The command's behaviour is recorded in
+[`memories/claude-code.md`](../../memories/claude-code.md); reading its
+`--help` would have answered the question the probe was asked to answer.)
+
 ## A refusal can name its own remedy, and that sentence is the one skipped
 
 The section above assumes the error needs diagnosing.

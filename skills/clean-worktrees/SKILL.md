@@ -321,6 +321,14 @@ misclassification signal.
 If `git branch -d` refuses (squash/rebase merge can hide the merge), confirm the
 PR merged (`gh pr list --head <branch> --state merged`) before `git branch -D`.
 
+**A branch that was ever pushed as a PR head is recoverable after deletion**,
+so a `-D` here is far less consequential than it looks: GitHub retains
+`refs/pull/N/head` permanently, and it still resolves once the branch is gone
+(`git fetch origin refs/pull/<N>/head`).
+See `memories/git.md`, "GitHub keeps `refs/pull/N/head` forever".
+The exception is the one that matters --- a branch **never pushed** has no such
+ref, which is why an unpushed worktree branch still needs confirmation.
+
 **A squash merge does not reliably force that refusal, so expect both outcomes
 in one sweep.**
 `git-branch(1)` checks the branch against its **upstream** --- "fully merged in

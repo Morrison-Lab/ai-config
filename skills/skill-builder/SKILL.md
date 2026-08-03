@@ -1,6 +1,6 @@
 ---
 name: skill-builder
-description: "Build a new skill for the ai-config repo the right way — FIRST check whether an existing skill should be extended instead (search skills/, scan every branch for in-flight similar work, AND check open PRs for in-progress drafts to redirect to instead of duplicating), and only then scaffold skills/<name>/SKILL.md with proper frontmatter, a discoverable trigger-rich description, a spelled-out/short alias as appropriate, cross-links, and (if it encodes a standing rule) matching preferences.md / CLAUDE.md updates — shipped via branch + PR, reviewer requested, ARDI'd to clean. Use when asked to 'build a skill', 'create a skill', 'make a new skill', 'add a skill', 'add an alias for X', 'make X an alias for Y', 'should this be an alias for Y', or 'skill-builder' — creating an alias stub routes here too, so the codex wrapper gets regenerated and the stub is self-reviewed."
+description: "Build a new skill for the ai-config repo the right way -- FIRST check whether an existing skill should be extended instead (search skills/, scripts/, and hooks/, scan every branch for in-flight similar work, AND check open PRs for in-progress drafts to redirect to instead of duplicating), and only then scaffold skills/<name>/SKILL.md with proper frontmatter, a discoverable trigger-rich description, a spelled-out/short alias as appropriate, cross-links, and (if it encodes a standing rule) matching preferences.md / CLAUDE.md updates -- shipped via branch + PR, reviewer requested, ARDI'd to clean. Use when asked to 'build a skill', 'create a skill', 'make a new skill', 'add a skill', 'add an alias for X', 'make X an alias for Y', 'should this be an alias for Y', or 'skill-builder' -- creating an alias stub routes here too, so the codex wrapper gets regenerated and the stub is self-reviewed."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -35,15 +35,63 @@ branch is already building it.
 
 Rule out extending an existing skill *before* scaffolding anything:
 
-1. **Search the live skills** for something that already owns (or is adjacent
-   to) this concern:
+1. **Search the whole corpus, not only `skills/`**, for something that already
+   owns (or is adjacent to) this concern:
    ```bash
    cd "$(git -C ~/.claude/skills/skill-builder rev-parse --show-toplevel)"   # the ai-config repo
-   ls skills/
-   grep -ril "<keywords>" skills/*/SKILL.md
+   ls skills/ scripts/ hooks/
+   grep -ril "<keywords>" skills/ scripts/ hooks/ shared/ memories/ CLAUDE.md
    ```
    If a skill already covers it, **extend that skill** (a new alias, a new
    section, an extra trigger phrase) rather than adding a near-duplicate.
+   If a **script or hook** already performs it, the skill you were about to
+   author is a wrapper around that instrument, so document the instrument
+   instead of restating its procedure as prose.
+
+   **`scripts/` and `hooks/` are the paths most often left out of this search,
+   and they are where prior art for a procedural skill is likeliest to sit.**
+   A skill describing a procedure is frequently a wrapper around an instrument
+   that already exists, because
+   [`deterministic-tools`](../../shared/principles/deterministic-tools.md)
+   pushes every recurring judgment task toward a script.
+   So an instrument in `scripts/` is prior art for a skill exactly as another
+   skill is.
+   A search confined to `skills/*/SKILL.md` answers the narrower question
+   "does a skill exist", rather than the one actually being asked, "does this
+   capability exist".
+
+   Omitting them produces the failure shape
+   [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)
+   describes: a real command, a real null result, and a conclusion wider than
+   the paths that were searched.
+   So report the paths you covered alongside the step 4 decision below, rather
+   than reporting the decision alone.
+
+   - **Do:** search `scripts/` and `hooks/` alongside `skills/` before
+     concluding that a capability does not already exist.
+   - **Do:** name the paths the search covered when stating the
+     extend-or-create decision.
+   - **Don't:** read a clean grep over `skills/*/SKILL.md` as evidence that
+     the capability is absent; it answers a narrower question.
+   - **Don't:** author a skill describing a procedure without first checking
+     whether an instrument already performs it.
+
+   (Morrison-Lab/ai-config#1055 and #1056, 2026-08-02: a Step 0 pass ran
+   `ls skills/`, the `skills/*/SKILL.md` grep, and the branch, worktree, and
+   open-PR scans below, plus a wider grep over `skills/`, `shared/`,
+   `memories/`, and `CLAUDE.md`.
+   Every one came back clean, so the session filed #1055 and opened #1056 to
+   author a new `refresh-claude-token` skill.
+   `scripts/rotate-claude-token.py` had been on `main` since commit
+   `18173c88`, merged as #953 under issue #952, at 312 lines with a 329-line
+   test file beside it.
+   It already discovers its target repos rather than hardcoding them, previews
+   by default, reads the token from stdin or the environment so it never
+   reaches `argv`, and re-reads each secret's `updated_at` to verify the write.
+   It surfaced only incidentally, from a
+   `gh search code 'CLAUDE_CODE_OAUTH_TOKEN'` run made for an unrelated
+   reason.
+   `scripts/` was in none of the searched paths.)
 
 2. **Scan EVERY branch AND every local worktree for in-flight work** — you,
    another CLI session, or the `@claude` bot may already be adding it. A
@@ -359,6 +407,10 @@ Then, as their own explicit steps (don't leave them buried in a comment):
 ## Anti-patterns
 
 - ❌ Creating a new skill when an existing one should be extended (skipping step 0).
+- ❌ Searching only `skills/` in step 0 -- `scripts/` and `hooks/` hold the
+  instruments a procedural skill is likeliest to duplicate, so a clean grep
+  over `skills/*/SKILL.md` alone is not evidence the capability is missing
+  (#1055/#1056).
 - ❌ Not scanning other branches → colliding parallel work / duplicate skills.
 - ❌ Not checking open PRs → building a second draft of a skill someone already
   pushed and opened a PR for, instead of redirecting to it.

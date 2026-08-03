@@ -819,14 +819,19 @@ Hold an escalation to the standard a rebuttal gets.
 Measure with an instrument covering the whole scope your escalation claims,
 not merely the narrower scope the finding covered, and say which instrument
 that was.
+Do not read the finding's narrowness as a bound on the reviewer's instrument.
+A reviewer can inspect a whole field set and report only the member that is
+broken, so a one-field finding can rest on a five-field probe.
+The instrument you need may therefore be the reviewer's own, run without
+whatever narrowed your view of it, rather than a new and wider one.
 When the escalation turns out to be wrong, correct it on the thread that
 carried it, not only in a later round's summary.
 A reader who saw "it is worse than you reported" has no other way to learn
 that it was not.
 
-- **Do:** verify an escalation against the full scope it claims, which is by
-  construction wider than the finding, and so wider than whatever instrument
-  produced the finding.
+- **Do:** verify an escalation against the full scope it claims, which is
+  wider than the scope the finding reported, and which the finding's own
+  instrument may already cover.
 - **Do:** post the correction to the thread that carried the escalation.
 - **Don't:** treat agreeing-and-extending as exempt from the checks a rebuttal
   gets, since agreement suppresses the reflex that disagreement triggers.
@@ -845,7 +850,15 @@ On gh 2.96.0 that usage message lists five fields: `name`,
 A usage line plus the first two of those is exactly what `head -3` returns, so
 `updatedAt` was reachable all along and only `created_at` was not.
 A later round caught it, and the correction had to be posted to the original
-thread.)
+thread.
+
+Note which instrument was the wider one, because it is the reverse of what
+escalating assumes.
+The reviewer's report named one field and its instrument showed all five,
+while the escalation named three fields on a view of two.
+The defect was truncating a full-scope instrument rather than choosing a
+narrow one, which is why the remedy is coverage of your own claim rather than
+a probe wider than the reviewer's.)
 
 **When a finding cites a source, read the cited source before reproducing
 anything -- it is the cheaper instrument, and it is the one that can show the

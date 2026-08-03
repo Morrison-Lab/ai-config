@@ -249,8 +249,8 @@ operations:
       PR-scoped dispatch wants. The MCP tool's `ref` is required for the same
       reason.
     cli: gh workflow run <workflow>.yml --repo <owner>/<repo> --ref <branch> --field <key>=<value>
-    github_mcp: mcp__github__actions_run_trigger (method run_workflow)
+    github_mcp: mcp__github__actions_run_trigger (method=run_workflow)
   - id: LIST_WORKFLOW_RUNS
     description: List a workflow's recent runs, with conclusion and timestamps.
     cli: gh run list --workflow <workflow>.yml --repo <owner>/<repo>
-    github_mcp: mcp__github__actions_list (method list_workflow_runs)
+    github_mcp: mcp__github__actions_list (method=list_workflow_runs)

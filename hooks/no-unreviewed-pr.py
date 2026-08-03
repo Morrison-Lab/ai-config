@@ -486,13 +486,14 @@ def scan(path):
                         # 422s, or `update_pull_request(draft=False,
                         # reviewers=[...])` whose reviewer-add fails). A failure
                         # there must not be read as the PR never existing:
-                        #   * failed AND the PR's identity is STILL unknown (never
-                        #     in the input, not in this result) -> the open itself
-                        #     is what failed, no PR exists to track, so drop it.
-                        #     This is the `create_pull_request`/`gh pr create`
-                        #     case, whose number is only ever learned from the
-                        #     result -- a create that failed without yielding a
-                        #     number yielded no PR.
+                        #   * failed, NOT a self create+reviewers obligation, AND
+                        #     the PR's identity is STILL unknown (never in the
+                        #     input, not in this result) -> the open itself is what
+                        #     failed, no PR exists to track, so drop it. This is a
+                        #     plain `create_pull_request`/`gh pr create`, whose
+                        #     number is only ever learned from the result -- a
+                        #     create that failed without yielding a number yielded
+                        #     no PR.
                         #   * failed BUT the PR's identity is known -- resolved
                         #     here (a URL/number in the result) OR already known
                         #     from the input (`update_pull_request`'s
@@ -503,7 +504,21 @@ def scan(path):
                         #     on a bare `{"status":422}` body (no number echoed --
                         #     the ordinary error shape) would silently clear a PR
                         #     that was genuinely marked ready with no reviewer.
-                        if failed and rnum is None and ob["num"] is None:
+                        #   * failed AND self (a create+reviewers: `gh pr create
+                        #     --reviewer`, `create_pull_request(reviewers=[...])`)
+                        #     -> its number is NEVER known at append time, so a
+                        #     numberless failure body cannot distinguish "the
+                        #     create failed, no PR" from "the PR was created and
+                        #     only the reviewer step failed". Dropping would
+                        #     silently discharge a genuinely-created, unreviewed
+                        #     PR (the dangerous direction), so it is NOT dropped
+                        #     here: it falls through to the `self` check below and
+                        #     stays outstanding. The cost is a rare unclearable
+                        #     (num-None) obligation when the create truly failed --
+                        #     a safe over-warn, per shared/principles/fail-fast.md,
+                        #     chosen over a silent discharge.
+                        if failed and rnum is None and ob["num"] is None \
+                                and not ob["self"]:
                             continue
                         if ob["num"] is None and rnum:
                             ob["num"] = rnum

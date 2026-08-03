@@ -138,6 +138,25 @@ case([use("create_pull_request", tid="c", owner="o", repo="r", title="x",
           err=True),
       say("Opened with a reviewer; the reviewer step failed.")], True,
      "a create+reviewers whose reviewer step fails but echoes the number tracks")
+# And when the failure body does NOT echo the number (the ordinary error shape),
+# a create+reviewers (`self`) obligation must STILL stay tracked: its number is
+# never known at append time, so a numberless failure cannot tell "the create
+# failed, no PR" from "the PR was created and only the reviewer step failed".
+# Dropping it would silently discharge a genuinely-created, unreviewed PR -- the
+# dangerous direction. It stays tracked (unclearable, a safe over-warn), for both
+# the structured tool and the `gh pr create --reviewer` shell form.
+case([use("create_pull_request", tid="c", owner="o", repo="r", title="x",
+          reviewers=["copilot-pull-request-reviewer"]),
+      res("c", '{"status":422,"message":"Reviewers could not be requested"}',
+          err=True),
+      say("Opened with a reviewer; the reviewer step failed.")], True,
+     "a create+reviewers reviewer-fail with NO number in the body still tracks")
+case([bash("gh pr create --reviewer copilot-pull-request-reviewer[bot] "
+           "--base main --title x", tid="c"),
+      res("c", '{"status":422,"message":"Reviewers could not be requested"}',
+          err=True),
+      say("Opened via gh with a reviewer; the reviewer step failed.")], True,
+     "a `gh pr create --reviewer` numberless reviewer-fail still tracks")
 case(create("c") + [bash(REQ_CMD, tid="q"), res("q", FAIL, err=True),
                     say("Requested.")], True,
      "a FAILED (422) request does not discharge it")

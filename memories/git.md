@@ -346,6 +346,29 @@ between an earlier partial `git add` and the commit. (`ai-config` `gia`
 session, 2026-07-06: this exact ordering, done on two sibling PR branches
 right after merging `main` in, produced a `validate` failure on one of them
 that had to be fixed with a follow-up commit.)
+
+## `git commit -m "..."` runs backtick spans as shell commands
+
+A commit message passed through a double-quoted `-m` goes through the shell
+first, so any backtick span inside it is command substitution: the shell
+*runs* the backticked text and drops it from the message.
+`git commit -m "fix the \`slast\` guard"` commits `fix the  guard` --- the
+`slast` span is gone, and whatever running `slast` printed (usually nothing,
+often an error to stderr) is spliced in where it stood.
+Nothing errors on the commit itself, and the corrupted message is what lands in
+history.
+
+This is the bash counterpart of `CLAUDE.md`'s "PowerShell CLI Command Safety"
+backtick warning, by a different mechanism: PowerShell treats the backtick as
+an escape character, bash treats it as command substitution.
+The remedy is the same either way.
+Use `git commit -F <file>` with a body file, or a single-quoted `-m '...'`,
+whenever the message carries backticks --- Markdown code spans, identifiers,
+paths.
+(Morrison-Lab/ai-config#1042, 2026-08-03: a `-m` commit message lost its
+backtick spans this way; the message landed at `97bf7d4` with the spans
+executed and deleted.)
+
 ## Stacked PRs across a squash-merge: rebuild via cherry-pick, and verify force-pushes actually landed
 
 Two git/GitHub behaviors that compose on stacked PRs (learned on

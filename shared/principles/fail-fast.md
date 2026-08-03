@@ -583,6 +583,23 @@ Caught before it was committed, so the landed fix at `39b98c7b` already calls
 the partial state, and why the enumeration has to happen while the guard is
 being written rather than afterwards.)
 
+**A review lifecycle can play this failure out one path at a time, which is
+the same defect stretched across rounds rather than shipped at once.**
+When the sibling paths are parallel *discharge* conditions rather than
+emitters, a guard added to one and not the others does not read as a bug ---
+it reads as a fix --- so each review round finds the one path still unguarded,
+the next round adds it, and the loop repeats until every sibling is covered.
+The remedy is unchanged: enumerate the sibling paths and guard them together in
+the change that guards the first, rather than letting review drive the
+enumeration one round at a time.
+(Morrison-Lab/ai-config#1042, 2026-08-03: `hooks/no-unreviewed-pr.py` has four
+parallel open/draft/request/self discharge-and-identity paths, and the
+fail-safe guard --- structural identity, "last simple command", same-PR
+scoping --- was applied to them one at a time across a nine-round review, each
+round surfacing the one path not yet guarded: round 7 shell parsing, round 8
+the `open` path, round 9 the `self` path.
+The per-path *discharge* mechanics of that same PR are in the section below.)
+
 ## A guard's discharge fires on positive success, not the absence of failure
 
 The section above is about a guard that runs on too few sites.

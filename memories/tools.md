@@ -584,3 +584,40 @@ was shell *quoting*, this one is stdin *contention*.
 diff for semantic-line-breaks, and it read nothing --- a real multi-sentence-line
 violation was reported as "0 found" and the vacuous all-clear was stated to the
 user before the method was caught.)
+
+## Splitting a shell command into simple commands in Python: two `shlex` gotchas
+
+When a Python guard splits a shell command string into its component simple
+commands (to attribute an exit status, to find a trailing `echo`, to scope a
+matcher), `shlex` gets two things wrong that both fail silently by merging
+commands that should stay separate.
+
+**`shlex` treats a newline as ordinary whitespace and drops it.**
+An unquoted newline is not emitted as a token, so two commands written on two
+lines merge into one:
+
+```python
+list(shlex.shlex("a\nb", punctuation_chars=True))   # ['a', 'b'] --- the \n is gone
+```
+
+There is no separator token to split on, so convert unquoted newlines to `;`
+before tokenizing if a newline should end a command.
+
+**`shlex.shlex(punctuation_chars=True)` conflates redirection with control
+operators.**
+Its default punctuation set is `();<>|&`, which lumps the *redirection*
+operators `<` and `>` in with the command separators.
+A redirect belongs to its command rather than terminating it, so `a > f; b`
+must not split at `>`.
+Pass only the genuine separators as the punctuation set:
+
+```python
+shlex.shlex(cmd, punctuation_chars=";&|()")   # not the default ();<>|&
+```
+
+Both produce a guard that reads a per-step outcome off the wrong boundary,
+which for a discharge/attribution guard is exactly the "combined result cannot
+attribute a per-step outcome" failure in
+[`fail-fast`](../shared/principles/fail-fast.md).
+(Morrison-Lab/ai-config#1042, 2026-08-03: both surfaced while building
+`hooks/no-unreviewed-pr.py`'s shell-command parser, round 7 of its review.)

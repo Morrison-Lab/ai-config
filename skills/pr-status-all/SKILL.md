@@ -103,7 +103,8 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >      echo "no Copilot review exists at the current head"
 >    fi
 >    ```
->    Clean requires **three** things: an affirmative zero-new-findings overview (e.g. "generated no new comments" -- never a literally empty body), zero matched inline comments, **and no suppression block in the body** -- a "no new comments" overview can still carry real low-confidence findings collapsed into a `<details>` block that never becomes a formal inline comment (verified: PR #660's review 4767752501 read "generated no new comments" while carrying 3 suppressed findings; PR #1029 repeated the shape from round 3 onward).
+>    Clean requires **three** things: an affirmative zero-new-findings overview (e.g. "generated no new comments" -- never a literally empty body), zero matched inline comments, **and no suppression block in the body**.
+>    A "no new comments" overview can still carry real low-confidence findings collapsed into a `<details>` block that never becomes a formal inline comment (verified: PR #660's review 4767752501 read "generated no new comments" while carrying 3 suppressed findings; PR #1029 repeated the shape from round 3 onward).
 >    Match inside the `<summary>` heading, case-insensitively on `suppressed` -- not on either exact phrase, and not anywhere in the body.
 >    PR #660 emitted `Comments suppressed due to low confidence (3)` while PRs #1029 and #1031 emit `Suppressed comments (4)`, so a literal grep for the older wording returns zero against a current body that has the block.
 >    A body-wide match over-corrects and would keep a clean PR permanently non-clean: ordinary overview prose contains the word, verified on review 4837572117, whose summary table reads "suppressed Copilot findings" outside any collapsed block.

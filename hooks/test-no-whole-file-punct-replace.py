@@ -95,6 +95,51 @@ import pathlib
 p=pathlib.Path('x.md'); t=p.read_text().replace('foo','bar'); p.write_text(t)"
 """
 
+# A heredoc with a trailing shell operator on the OPENER line -- the exact
+# incident shape. The body (glyph/replace/write) must stay attached to the
+# interpreter segment, not orphaned into the `git add`/`tee` segment.
+HEREDOC_TRAIL = (
+    "python3 - <<'PY' && git add -A\n"
+    "import pathlib\n"
+    "p=pathlib.Path('skills/ardi/SKILL.md')\n"
+    "p.write_text(p.read_text().replace('\\u2014','---'))\n"
+    "PY"
+)
+HEREDOC_PIPE = HEREDOC_TRAIL.replace(" && git add -A", " | tee /tmp/log")
+# The same heredoc-plus-trailing-operator shape, but correctly scoped inside
+# the body -- must stay allowed even though it has a trailing `| tee`.
+HEREDOC_TRAIL_SCOPED = (
+    "python3 - <<'PY' | tee /tmp/log\n"
+    "import subprocess,pathlib\n"
+    "orig=subprocess.run(['git','show',f'origin/main:{f}'],"
+    "capture_output=True,text=True).stdout\n"
+    "origset=set(orig.splitlines())\n"
+    "for line in cur.splitlines(keepends=True):\n"
+    "    if line.rstrip('\\n') not in origset:\n"
+    "        line=line.replace('\\u2014','---')\n"
+    "    out.append(line)\n"
+    "p.write_text(''.join(out))\n"
+    "PY"
+)
+# A genuine `ALLOW_WHOLE_FILE_PUNCT=1` mentioned in text (a comment) is NOT an
+# assignment prefix, and an assignment on an UNRELATED segment must not exempt
+# the mutating one -- the override is checked per segment.
+OVERRIDE_MENTION = INLINE_UNSCOPED + " # cleanup, see ALLOW_WHOLE_FILE_PUNCT=1 in docs"
+OVERRIDE_CROSS = "ALLOW_WHOLE_FILE_PUNCT=1 echo starting && " + INLINE_UNSCOPED
+# The ESCAPE form of a curly double quote (U+201C) -- a cleanup written the
+# way the incident's own replace table is written. `[4-9]` can't reach hex
+# `c`, so the escape branch must spell `201[cd]` out.
+ESC_CURLY = (
+    "python3 -c \"import pathlib; p=pathlib.Path('a.md'); "
+    "p.write_text(p.read_text().replace('\\u201c','_'))\""
+)
+# A read-only preview that writes to a STREAM, not a file. `.write(` on its
+# own must not count as a file write, or a genuine preview is blocked.
+STDOUT_WRITE = (
+    "python3 -c \"import pathlib,sys; "
+    "sys.stdout.write(pathlib.Path('a.md').read_text().replace('\\u2014','---'))\""
+)
+
 CASES = [
     (UNSCOPED, True, "the unscoped python replace is blocked"),
     (INLINE_UNSCOPED, True, "the inline unscoped replace is blocked"),
@@ -105,8 +150,22 @@ CASES = [
     (LOOSE_685, True, "a bare #685 mention does not exempt the replace"),
     (BARE_VAR, True,
      "a bare override-var mention (no =1) does not exempt the replace"),
+    (HEREDOC_TRAIL, True,
+     "a heredoc with a trailing && operator is blocked"),
+    (HEREDOC_PIPE, True,
+     "a heredoc with a trailing | pipe is blocked"),
+    (OVERRIDE_MENTION, True,
+     "a text mention of ALLOW_WHOLE_FILE_PUNCT=1 does not exempt"),
+    (OVERRIDE_CROSS, True,
+     "an override assignment on an unrelated segment does not exempt"),
+    (ESC_CURLY, True,
+     "the escape form of a curly double quote is blocked"),
     (SCOPED, False, "a base-branch-scoped replace is allowed"),
+    (HEREDOC_TRAIL_SCOPED, False,
+     "a scoped heredoc with a trailing pipe is allowed"),
     (SCAN, False, "a read-only glyph scan is allowed"),
+    (STDOUT_WRITE, False,
+     "a read-only preview writing to a stream is allowed"),
     (PREVIEW_THEN_WRITE, False,
      "a read-only preview with an unrelated redirect is allowed"),
     (OVERRIDE, False, "an explicit override is allowed"),

@@ -56,8 +56,9 @@ The canonical skills name concrete tools — mostly `gh`/`git` commands. So a
 non-Claude model knows what to run, [`tool-mappings.yml`](tool-mappings.yml)
 maps each canonical operation (e.g. `VIEW_PR`, `CREATE_ISSUE`, `PUSH`) to its
 GitHub MCP equivalent, with a per-model resolution rule (Codex, Copilot, and a
-generic CLI fallback). The sync script above embeds this table into every Codex
-wrapper and renders the full reference at [`tool-mappings.md`](tool-mappings.md).
+generic CLI fallback). The sync script above renders the full reference at
+[`tool-mappings.md`](tool-mappings.md); wrappers link to that single reference
+instead of duplicating its table.
 Edit the `.yml`, then rerun the script — CI fails if either output is stale.
 
 A handful of the highest-traffic skills (`ard`, `ardi`, `claim-pr`,

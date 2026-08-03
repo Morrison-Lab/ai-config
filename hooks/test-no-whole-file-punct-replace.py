@@ -7,7 +7,9 @@ that blocks either gets switched off -- taking the real case with it.
 Run: python3 hooks/test-no-whole-file-punct-replace.py \\
          hooks/no-whole-file-punct-replace.py
 """
+import importlib.util
 import json
+import random
 import subprocess
 import sys
 
@@ -218,6 +220,52 @@ def run(cmd, tool="Bash"):
     return '"permissionDecision": "deny"' in out or '"permissionDecision":"deny"' in out
 
 
+def _load_hook():
+    """Import the hook as a module so the parser can be driven in-process."""
+    spec = importlib.util.spec_from_file_location("_hook_under_test", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# Tokens biased toward the parser's tricky surfaces: quotes, heredoc openers
+# and delimiters, operators, backslash-newline continuations, and interpreter
+# payloads. A random walk over these produces unterminated quotes, dangling
+# heredocs, odd backslash runs, and operators inside/outside strings.
+_FUZZ_TOKENS = [
+    "&&", "||", ";", "|", "'", '"', "\\", "\n", " ", "=", "#", "(", ")",
+    "<<", "<<-", "<<'", "PY", "EOF", "python3", "sed", "-c", "-i", "a",
+    ".replace(", ".write_text(", "\\u2014", "\\u201c", "origin/main",
+    "git show", "ALLOW_WHOLE_FILE_PUNCT=1",
+]
+
+
+def fuzz(rounds=4000, subprocess_smoke=12):
+    """The parser must NEVER raise: a crash prints a traceback into Bash. Feed
+    a seeded corpus of adversarial command strings through split_segments and
+    the full block predicate in-process, plus a small end-to-end subprocess
+    smoke through main(). Seeded, so the corpus is reproducible in CI."""
+    mod = _load_hook()
+    rng = random.Random(0xC0FFEE)
+    smoke = []
+    for r in range(rounds):
+        s = "".join(rng.choice(_FUZZ_TOKENS) for _ in range(rng.randint(0, 40)))
+        segs = mod.split_segments(s)          # invariant: must not raise
+        assert isinstance(segs, list), f"split_segments returned {segs!r}"
+        for seg in segs:                      # the full predicate, per segment
+            mod.leading_command(seg)
+            mod.has_override(seg)
+            mod.GLYPH.search(seg)
+            mod.REPLACING.search(seg)
+            mod.WRITING.search(seg)
+            mod.SCOPED.search(seg)
+        if r < subprocess_smoke:
+            smoke.append(s)
+    for s in smoke:                           # end-to-end: main() must not crash
+        run(s)                                # run() raises on any nonzero exit
+    return rounds
+
+
 def main():
     passes = failures = 0
     for cmd, expected, label in CASES:
@@ -257,6 +305,15 @@ def main():
         passes += 1
     else:
         print("FAIL: should fail open on malformed input")
+        failures += 1
+
+    # The parser's no-throw invariant, on a seeded adversarial corpus.
+    try:
+        n = fuzz()
+        print(f"PASS: fuzz -- parser never threw over {n} random commands")
+        passes += 1
+    except Exception as e:  # noqa: BLE001 -- a throw here IS the failure
+        print(f"FAIL: fuzz -- parser raised on a random command: {e!r}")
         failures += 1
 
     print(f"\n{passes} passed, {failures} failed")

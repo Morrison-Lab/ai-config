@@ -164,6 +164,35 @@ check(
     "```\n",
 )
 
+# Bug 7: a sentence ending in bold (`**...**.`) must split from the next
+# sentence. The closing `**` sits between the period and the whitespace, so a
+# boundary regex keyed on `[.!?]\s+` misses it -- and this is the corpus's
+# most common paragraph opener, so the tool was silently re-merging it.
+check(
+    "bold-close sentence boundary splits (**...**. Next)",
+    "**Ending the head poll does not end the PR watch.** "
+    "The two run at different frequencies.\n",
+    "**Ending the head poll does not end the PR watch.**\n"
+    "The two run at different frequencies.\n",
+)
+
+# Bug 7b: a single-asterisk (italic) close before the whitespace splits too.
+check(
+    "italic-close sentence boundary splits (.* Next)",
+    "See the note.* Then continue with the next point.\n",
+    "See the note.*\n"
+    "Then continue with the next point.\n",
+)
+
+# Bug 7c: adding `*` to the closing-char class must NOT over-split. A
+# bold-close period followed by a lowercase word is a continuing clause, not a
+# sentence boundary -- the uppercase-or-markup lookahead keeps it on one line.
+check(
+    "bold-close then lowercase is left joined (no false split)",
+    "It is **critical.** yet often skipped on the first pass.\n",
+    "It is **critical.** yet often skipped on the first pass.\n",
+)
+
 # ---------------------------------------------------------------------------
 # Write-guard and diff-scoping tests.
 #

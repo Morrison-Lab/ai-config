@@ -38,7 +38,13 @@ _ABBREV_RE = re.compile(
 )
 
 # Sentence boundary: [.!?] + optional closing chars + whitespace + uppercase/quote.
-_SENT_BREAK_RE = re.compile(r'([.!?][`"\')\]]*)\s+(?=[A-Z"\'`\*\[])')
+# The closing-char class includes `*` so a sentence ending in bold or italic
+# (`**Some claim.** Explanation...`, the corpus's most common paragraph opener)
+# splits: the `**` sits between the period and the whitespace and would
+# otherwise defeat the boundary. A lowercase word after the close still blocks
+# the split via the uppercase-or-markup lookahead, so mid-sentence emphasis is
+# left intact.
+_SENT_BREAK_RE = re.compile(r'([.!?][`"\')\]*]*)\s+(?=[A-Z"\'`\*\[])')
 
 
 _PLACEHOLDER = '\x00'

@@ -1148,6 +1148,47 @@ a *different* configuration, and its failures and passes both mislead.
   the old behaviour is usually somewhere else.
 - **Don't:** read a green subset as a green suite, or a skip as a pass.
 
+**Running a script is not running its tests, and an "advisory" check can have a
+hard-gating twin.**
+The bullets above assume you reached for the test suite and took too little of
+it.
+The nearer miss is reaching for the **production script** instead: you touch
+something a checker measures, run that checker, read its exit code, and treat
+that as having verified the property.
+It feels like stronger evidence than a test, since it is the real instrument on
+the real data.
+
+It answers a different question.
+A script **reports**; a job **gates**, and the gate is frequently a separate
+step asserting the same property about the repo itself.
+The two can disagree by design --- one deliberately advisory, its twin
+deliberately blocking --- so a script's exit 0 says nothing about whether the
+job is green.
+
+What makes this worth its own entry is that the conclusion is easy to
+**publish**, and a claim about what CI enforces is the kind other people act
+on.
+Per [`metacognitive-monitoring`](metacognitive-monitoring.md) that is a scope
+claim, and its remedy applies: check the population --- every step of the job
+--- rather than the sample that came to mind.
+
+- **Do:** run every check the CI job runs, its test files included, before
+  pushing.
+- **Do:** grep the job definition for other steps touching the same property
+  before saying anything about whether it gates.
+- **Don't:** substitute a production script's exit code for its test file.
+- **Don't:** infer a job's behaviour from one step's label --- "(advisory)"
+  describes that step, not the job.
+
+(Morrison-Lab/ai-config#1067, 2026-08-02: a UMS pass took `memories/git.md`
+from 1172 to 1315 lines.
+`scripts/check-memory-file-size.py` exits 0 and its `validate.yml` step is
+labelled advisory, both genuinely so, and the threshold was therefore reported
+as non-blocking on #1007.
+`scripts/test_check_memory_file_size.py` asserts this repo's own `memories/`
+are under the default and hard-fails, turning `validate` red on the next push.
+The claim had to be retracted on #1007 as well as fixed in the PR.)
+
 (d-morrison/altdoc#95 and #96, 2026-07-29: twice in one session.
 On #95 a test asserting "aborts when no venv is configured" read that
 precondition from the ambient environment; the local run missed it because

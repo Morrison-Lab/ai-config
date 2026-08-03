@@ -192,142 +192,6 @@ branch, say "Supersedes #N", and comment on the closed PR pointing forward.
 name that no longer asserted a refuted diagnosis closed PR #326, replaced
 by #328.)
 
-## Git — `worktree add` does not cd into the new worktree
-- `git worktree add <path> <ref>` creates the worktree at `<path>` but leaves the
-  shell in the **original** checkout. Subsequent bare git commands (`git checkout`,
-  `git merge`, etc.) run against the original checkout, not the new worktree.
-- Always follow `git worktree add <path> …` with `cd <path>` before any further
-  git work inside that worktree.
-- When creating a worktree to fix a **conflict caused by a squash-merge on main**,
-  `git fetch origin main <branch>` (both refs) **before** `git worktree add` so
-  the squash commit is present when you merge. Fetching only the PR branch leaves
-  origin/main stale and the merge won't pick up the commit that caused the conflict.
-
-## Git — removing a worktree that contains a submodule
-- `git worktree remove <path>` **fails** on a worktree that has an initialized
-  submodule: `fatal: working trees containing submodules cannot be moved or
-  removed`. Many repos with a vendored `.ai-config` submodule hit this after a
-  feature branch merges.
-- Fix: `git worktree remove --force <path>` removes it cleanly. (Plain `--force`
-  is enough; the submodule warning is the only blocker.) If the dir somehow
-  lingers, `rm -rf <path> && git worktree prune` finishes the cleanup.
-- The branch can't be deleted while the worktree still references it
-  (`error: cannot delete branch '…' used by worktree at '…'`), so remove the
-  worktree **first**, then `git branch -D <branch>`.
-
-## Git (Windows) — `worktree remove` on your own cwd partially fails, leaving an orphaned unregistered directory that silently falls through to the parent repo
-- `git worktree remove <path>` on a `<path>` that is the **current process's cwd**
-  fails on Windows with `error: failed to delete '<path>': Permission denied` —
-  Windows won't let you delete a directory a running process has open as its
-  working directory. That failure is not clean/atomic: git had already
-  unregistered the worktree (removed it from `git worktree list` and deleted
-  the checked-out files) before the final `rmdir` step failed, so the
-  directory is left **empty and unregistered** rather than restored to its
-  prior working state.
-- **The dangerous part:** an empty, unregistered directory nested under the
-  main repo (e.g. `.claude/worktrees/<name>/`) is not an error state as far as
-  git commands are concerned — `git status`/`git log`/`git pull` etc. run from
-  inside it just walk up to the parent directory, find `../../.git` there, and
-  silently operate on the **main repo's checkout and branch** instead of
-  erroring. Nothing points out that you're no longer in an isolated worktree;
-  a `git pull --ff-only` there quietly fast-forwards the main checkout instead
-  of failing.
-- **Detect it** with `git rev-parse --show-toplevel` (or `--git-dir`) — if the
-  path it prints is the **parent** repo rather than the worktree path itself,
-  you've hit this. `git worktree list` run from the parent repo also won't
-  list the directory. (Same failure signature as a worktree that was simply
-  never registered in the first place, e.g. because a harness only prepared
-  the directory but never actually ran `git worktree add` — check this first
-  before assuming any work was corrupted.)
-- **Fix** by re-registering in place: `git -C <parent-repo> worktree add
-  <same-path> [-b <branch>] <base-ref>` — safe to run even though the
-  directory already exists, as long as it's empty (which it will be, since
-  the failed removal already deleted its contents).
-- Avoid triggering this at all: don't call `git worktree remove` on a path
-  that's your own cwd. `cd` out to the parent repo (or a sibling worktree)
-  first, *then* remove.
-
-## Git — `checkout -B` in a linked worktree silently bypasses the already-checked-out guard
-- Plain `git checkout main` in a linked worktree correctly refuses when `main`
-  is checked out in the primary (or any other) worktree: `fatal: 'main' is
-  already used by worktree at …`. `git checkout -B main origin/main` does
-  **not** refuse — the reset-and-checkout form re-points the shared branch ref
-  and checks it out in the current worktree anyway, leaving **two** worktrees
-  both claiming `[main]` in `git worktree list`.
-- The damage lands one command later: a `git pull` in the second worktree moves
-  the shared ref out from under the first worktree's working tree — HEAD
-  advances while that worktree's index and files stay at the old commit, so
-  `git status` there shows index-vs-HEAD as phantom **staged** diffs, with no
-  error anywhere. In the primary worktree this reads as the just-merged PR's
-  changes staged in reverse, as if about to commit a full revert of it.
-- The scripted fallback is how it happens in practice:
-  `git checkout -q main 2>/dev/null || git checkout -qB main origin/main` —
-  the plain form refuses (silenced by `-q`/`2>/dev/null`), the fallback
-  "succeeds".
-- **Recovery:** move the offending worktree onto a new branch
-  (`git switch -c <next-branch>` — frees the ref), then in the other worktree
-  restore **only** the phantom-diff files
-  (`git restore --staged --worktree <files>`) — not a blanket `reset --hard`,
-  which clobbers unrelated local state (e.g. a dirty submodule pointer).
-- **The same suppression bites outside worktrees, on ref manipulation
-  generally: never `2>/dev/null` a git command that moves a branch ref.**
-  `git branch -f main origin/main` is the right way to realign `main` when
-  it is *not* checked out (per `CLAUDE.md`'s "Keep ai-config and repo
-  checkouts fresh"), but git refuses it outright when `main` **is** the
-  current branch ("cannot force update the branch checked out at ...").
-  That refusal is the signal; a `2>/dev/null` on it, or burying it mid-chain
-  in a `;`-separated compound whose later commands still succeed, throws the
-  signal away and leaves you on a stale base with everything reporting
-  success.
-  The staleness then surfaces somewhere unrelated and much later:
-  a diff-scoped CI check reporting a phantom hit in a file you never
-  touched, because the base ref, not the file, was wrong.
-  Run ref-moving commands unsuppressed and read their output;
-  when `main` is checked out,
-  use `git pull --ff-only` (or `git checkout --detach` first) instead of
-  `git branch -f`. (ai-config#691: `git branch -f main origin/main` was
-  refused this way while `main` was checked out -- the error suppressed, the
-  ref left untouched -- leaving the branch two commits
-  behind; caught only when `scripts/check-new-line-breaks.py` flagged a line
-  in `memories/tools.md` that the working tree did not contain.)
-- **Prevention:** in a session/linked worktree, never "return to main" after a
-  merge — branch the next task directly off the remote
-  (`git switch -c <branch> origin/main`) and leave `main` itself to the
-  primary checkout. To advance the local `main` ref without checking it out
-  (CLAUDE.md § "Keep ai-config and repo checkouts fresh" recommends this when
-  a single checkout sits on a feature branch), `git branch -f main
-  origin/main` is the safe form to *attempt* — not because the guard never
-  fires, but because it **fails closed**: when any worktree holds `main` it
-  hard-refuses (`fatal: cannot force update the branch 'main' checked out
-  at …`, verified empirically) instead of silently double-checking-out the
-  way `checkout -B` does; in that multi-worktree case, leave updating `main`
-  to the worktree that holds it. (Hit on `Lacaedemon/sparta`, 2026-07-16: a
-  post-merge tidy ran the fallback form inside a session worktree; the
-  primary showed nine phantom staged reversals of the just-merged PR until
-  restored.)
-
-## Git — if a target branch is already checked out in another worktree, push by refspec instead of switching
-- Attempting to `checkout` a branch already active elsewhere fails with
-  `fatal: '<branch>' is already used by worktree at ...`.
-- When you need to land your current commit on that branch (for example, to
-  update an existing PR branch), avoid switching branches: push your current
-  HEAD directly to the target remote branch with
-  `git push "<remote>" HEAD:"<target-branch>"`. Note that this pushes **all commits
-  reachable from HEAD**, not just your latest one; before pushing, verify the
-  outgoing range is safe — the target branch should be an ancestor of HEAD
-  (`git merge-base --is-ancestor "<target-branch-tip>" HEAD`), and there should be
-  no unrelated commits between them — to avoid advancing the PR branch beyond
-  what you intended. Don't hard-code `origin` without
-  checking: in a fork/multi-remote setup, `origin` may be your own fork while
-  the existing PR's head branch lives on a different remote (e.g.
-  `upstream`), so pushing to `origin` silently creates/advances a same-named
-  branch there instead of updating the intended PR. Confirm which remote
-  actually owns the PR's head (`git remote -v`, or match the PR's
-  `head.repo` from `gh pr view "<N>" --json headRepositoryOwner,headRepository`)
-  before picking the refspec's remote.
-- This avoids clobber-prone workarounds (`checkout -B`) and avoids opening a
-  new sibling PR by mistake.
-
 ## Git — `merge --continue` takes no arguments
 - `git merge --continue --no-edit` fails with `fatal: --continue expects no arguments`.
 - After resolving conflicts and staging (`git add <files>`), use `git merge --continue` alone.
@@ -418,34 +282,6 @@ executable script (a `tools/ci/*.sh` invoked directly, not sourced), verify
 its committed mode explicitly (`git ls-tree HEAD -- <path>`, compare against
 an existing sibling script) rather than trusting the code review alone to
 catch it.
-
-## Two worktrees on the same branch name silently move a shared ref, not a conflict error
-
-Git *should* refuse `git checkout -B <branch>` (or checking that branch out)
-when another worktree already has it checked out — but in practice, creating
-a second worktree for a branch name a leftover worktree from earlier in the
-same session still holds (e.g. via `git worktree add <path> origin/<branch>`
-then `git checkout -B <branch>` inside it) can succeed without error and
-silently repoint the shared branch ref out from under the first worktree.
-That worktree's `git status` then shows a wall of spurious modified/deleted
-files — not real data loss, just its checked-out files diffing against the
-ref's new (moved) tip while its own index/working tree still reflect the old
-one. Confirm via that worktree's own reflog (`git -C <path> reflog show
-HEAD`) that its real last commit is still there and reachable — check with
-`git merge-base --is-ancestor <that-commit> <new-ref-tip>` — before concluding
-anything, but treat any push made under this collision as suspect until
-verified, since it may have been built from a different, wrong base than
-intended. **Prevention:** always `git worktree list | grep <branch>` before
-creating a new worktree for a PR branch, especially one worked earlier in the
-same session (a `wave-N-*`-style dispatch worktree is exactly the kind that
-lingers). If one already exists, reuse it (`git fetch` +
-`git reset --hard origin/<branch>`) instead of adding a second one on the same
-name — or use a distinct local branch name if reuse isn't feasible.
-(`Lacaedemon/sparta` PR #626, 2026-07-03 — recovered with no data loss, but
-required a `--force-with-lease` push to fix and explicit user sign-off given
-the ref-mutation risk.)
-
-**On Windows, `~/.claude`'s real-copy consumer directories can drift far more than a quick glance suggests — check the whole corpus, not just `CLAUDE.md`.** CLAUDE.md's own "Keep ai-config and repo checkouts fresh" step 2 already says a `git pull` on the ai-config checkout doesn't propagate to `~/.claude/{skills,shared,commands,memories}` on Windows (real copies, not symlinks). In practice the drift found there can be large even in an actively-used setup: one check found `CLAUDE.md` itself missing ~10 sections, `skills/` with 56 of ~90 files differing (plus 6 new skills never copied over), `shared/` with 5 differing/missing fragments, and `memories/` with 3 of 4 files differing — accumulated silently because the per-session refresh habit checks `CLAUDE.md` (loaded every turn, so staleness there is visible) but not the other three directories (loaded on-demand, so staleness there is invisible until a skill/memory is actually needed and reads wrong). Before trusting a sync is complete, `diff -rq` (or `cp -r` unconditionally, after checking for genuine un-upstreamed local edits per the existing before-overwriting caution) all four directories, not just the one that happens to render in every prompt. (`Lacaedemon/sparta`, 2026-07-04.)
 
 ## Windows Git Bash: MSYS path conversion mangles a colon-refspec that contains a slash
 
@@ -1170,3 +1006,146 @@ The flagged commits were in the **ai-config** checkout, pulled in minutes
 earlier by a routine `git pull --ff-only`, authored by the repo owner.
 `git merge-base --is-ancestor HEAD origin/main` returned true, settling it
 in one command.)
+
+## A ref pattern is not a pathspec: `*` does NOT cross a slash in `for-each-ref`, but DOES in `ls-files`
+
+The section above establishes that a **pathspec** `*` matches `/` too.
+Git's other pattern matcher does the opposite, with identical syntax, so the
+intuition you just built is wrong one command over.
+
+`git for-each-ref <pattern>` (and `git branch --list`, and a refspec's left
+side) matches with `fnmatch` under `FNM_PATHNAME`, where `*` stops at a slash.
+So `refs/remotes/origin/*` matches `origin/main` and misses
+`origin/feat/anything`.
+
+Measured together on git 2.34.1, in one repo, same syntax:
+
+```bash
+git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/*'    # 8
+git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/**'   # 18
+git ls-files -- 'skills/*'                                              # 180
+git ls-files -- 'skills/**'                                             # 180
+```
+
+The ref matcher halves the result; the pathspec matcher cannot tell the two
+patterns apart.
+
+**The failure direction is a silent false all-clear, and it is biased toward
+the refs that matter.**
+Slash-named branches are exactly the conventional ones -- `feat/`, `fix/`,
+`docs/`, `claude/` -- so a sweep keyed on the single star quietly omits every
+branch anyone named properly, including the ones carrying open PRs, while
+reporting a clean run over whatever is left.
+Nothing errors and the count looks plausible.
+
+Use `**` for ref patterns, or `git branch -r` / `git branch --list`, which
+enumerate without a pattern.
+And per [[algorithmatize-checks]], give any ref sweep a control: check that a
+known slash-named branch appears in its output before trusting a total.
+
+- **Do:** use `refs/remotes/origin/**` when you mean every remote branch.
+- **Do:** confirm a known nested ref is in the result before quoting a count.
+- **Don't:** carry pathspec intuition into `for-each-ref` -- the two matchers
+  disagree on the one character that decides it.
+- **Don't:** read a smaller-than-expected ref count as "this repo is tidy".
+
+(2026-08-02, a `clean-branches` sweep on `Morrison-Lab/ai-config`: the single
+star reported 17 of 34 `origin/**` refs and hid all five open PRs' branches.
+Caught only because the open-PR column came back empty against a known count of
+five.)
+
+## GitHub keeps `refs/pull/N/head` forever, so deleting a closed PR's branch loses nothing
+
+Deleting the head branch of a **closed, unmerged** PR feels lossy, since the
+commits are on no branch afterwards and `main` never absorbed them.
+It is not.
+GitHub retains the PR's own head ref permanently, and it still resolves after
+the branch is gone.
+
+Check before deleting, and recover afterwards:
+
+```bash
+git ls-remote origin 'refs/pull/669/head'          # still resolves post-deletion
+git fetch origin refs/pull/669/head
+git checkout -b recover/669 FETCH_HEAD
+```
+
+Verify rather than assume, since it is one call: `git ls-remote`'s SHA should
+equal the branch tip you are about to delete.
+Measured across six closed PRs on `Morrison-Lab/ai-config`
+(#305, #306, #430, #553, #610, #669):
+every `refs/pull/N/head` resolved and matched its branch tip exactly.
+
+Two consequences worth carrying:
+
+- A closed PR's branch is safe to delete, so the real deliverable is a tracking
+  issue recording *what* was unlanded and the recovery command -- not keeping
+  the ref.
+- These refs are **not** fetched by the default refspec
+  (`+refs/heads/*:refs/remotes/origin/*`), so they cost nothing until asked for.
+
+- **Do:** cite the `refs/pull/N/head` recovery command in the issue that
+  records the unlanded work.
+- **Don't:** hold a dead branch open as the backup copy -- GitHub already is
+  one.
+
+## An orphaned `refs/remotes/<ns>/*` namespace inflates every branch count
+
+A one-off `git fetch origin '+refs/pull/*/head:refs/remotes/pr/*'` writes refs
+that **no configured refspec matches**.
+Nothing updates them, `--prune` never touches them (it prunes only what a
+refspec covers), and they persist indefinitely.
+
+They are counted by `git branch -r`, so a repo can report hundreds of "remote
+branches" that are neither remote nor branches.
+
+```bash
+git config --get-all remote.origin.fetch      # what is actually tracked
+git for-each-ref --format='%(refname)' | grep -v '^refs/remotes/origin/'   # what is not
+git for-each-ref --format='delete %(refname)' refs/remotes/pr/ | git update-ref --stdin
+```
+
+Before sweeping branches, separate the tracked namespace from stray ones ---
+otherwise the sweep's scope is wrong from the first command.
+
+(2026-08-02: `git branch -r` reported 741 on `Morrison-Lab/ai-config`, of which
+709 were orphaned `refs/remotes/pr/*` from an earlier PR-head fetch and only 31
+were real branches.
+Deleting them took the repo from ~800 refs to 49.)
+
+## Uncommitted leftovers on a merged branch can be a REJECTED direction, not unfinished work
+
+Finding staged or unstaged edits on a branch whose PR already merged reads as
+"work someone did not finish", and the reflex is to complete and land it.
+Check the opposite hypothesis first, because the working tree records only that
+an edit was *made*, never that it was *kept*.
+
+Two shapes seen together on one branch:
+
+- **A stale base.** The edits were written against an older `main`, so applying
+  them now silently reverts whatever landed in between.
+- **A rejected direction.** The edits contradict what the merged PR concluded,
+  because they predate its final review round.
+
+The second is the dangerous one: it looks like unfinished work and is actually
+a bug someone already fixed correctly.
+
+So before completing leftover work, check the branch's PR state, then verify
+the edit's own claim independently rather than inferring intent from its
+presence.
+
+- **Do:** run the leftover edit's central claim as an experiment before landing
+  it.
+- **Do:** diff each leftover file against current `main`, not against the
+  branch tip, to separate genuinely new content from stale-base reverts.
+- **Don't:** treat an uncommitted edit as an unfinished intention -- it may be
+  a draft the review already overruled.
+
+(2026-08-02, after `Morrison-Lab/ai-config#900` merged: three staged files
+proposed *unquoting* git's `branch -d` warning literal.
+Reproducing the command showed git prints the quoted form with a trailing
+period, which is what `main` already had -- so the leftovers would have
+reintroduced the exact defect that PR's final round fixed.
+A fourth, unstaged file held genuinely new content plus a stale-base reversion
+of a taxonomy that had landed meanwhile; only the new half was carried forward,
+as #1054.)

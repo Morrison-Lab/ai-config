@@ -108,27 +108,40 @@ with stdin closed it printed nothing and was still running when killed at 8
 seconds,
 so an agent that calls it hangs rather than getting an error to report.
 
-State that as the observed behaviour rather than as a TTY check.
-The gate was never identified,
-and naming a mechanism you did not observe is how a blocker gets misattributed
-(see [`ardi`](../../shared/workflow/ardi.md),
-"Name the specific gate when you report a blocker").
+The gate is a post-authorize read, established by inspecting the blocked
+process rather than inferred:
 
-Ask the user to run it in the session with the `!` prefix:
-
-```
-! claude setup-token
+```bash
+ps -o pid=,stat= -p <pid>        # S, still alive after the browser authorize
+lsof -p <pid> -a -d 0            # fd 0 is a unix socket, not a TTY
 ```
 
-It prints a long-lived token and touches no repo.
-It requires a Claude subscription.
+It opens a browser, and after you authorize it blocks reading an
+authorization code from stdin.
+An agent-spawned process has a socket on fd 0, so that read can never be
+satisfied.
+The full record is in
+[`memories/claude-code.md`](../../memories/claude-code.md).
 
-**Mind which account is logged in.**
+**Never have the user run it bare.**
+It prints a live, long-lived OAuth token to stdout,
+so a bare `! claude setup-token` puts that credential into the agent's
+context and into the persisted session transcript.
+Pipe it into the consumer instead, so the value is never displayed --
+which is the same reason the script itself refuses the token on `argv`:
+
+```
+! cd <ai-config-checkout> && claude setup-token | python3 scripts/rotate-claude-token.py --apply
+```
+
+**Mind which account is logged in, without minting anything to find out.**
 The command mints from whichever account the local CLI is currently
 authenticated as,
 with no account picker and no confirmation naming it,
 and nothing afterwards records which account a given token came from.
-Check first if it matters:
+`claude auth status` answers that on its own,
+so run it *before* deciding to rotate rather than minting a token to
+discover the answer:
 
 ```bash
 claude auth status
@@ -168,35 +181,58 @@ and says nothing about whether it **works**.
 Settle it on the artifact rather than on the write.
 Pick one **non-draft** PR, record what already exists, then dispatch:
 
-```bash
-BEFORE=$(gh pr view <N> --repo <owner>/<repo> --json comments \
-  --jq '[.comments[] | select(.author.login == "claude")] | last | .id // "none"')
-echo "newest existing claude comment: $BEFORE"
-gh workflow run claude-review.yml --repo <owner>/<repo> \
-  --field pr_number=<N>                                       # RUN_WORKFLOW
-```
-
-**Capturing `BEFORE` is the whole point of this step, so do not skip it.**
-Asking only for the latest Claude comment *after* the run
-returns whatever was already there,
-so any PR with an older review satisfies the check
-and a rejected token reads as working.
-The test is a comment **newer than `BEFORE`**, not a comment.
-
-Once the run completes:
+First find the reviewer's login **in this repo**, rather than assuming it.
+It differs by repo:
+`Morrison-Lab/ai-config` posts as `claude`,
+while `d-morrison/gha` posts as `github-actions[bot]`.
+A hardcoded login matches nothing, which reads as "posted nothing":
 
 ```bash
-gh run list --workflow claude-review.yml --repo <owner>/<repo> --limit 3 \
-  --json databaseId,conclusion,createdAt,updatedAt \
-  --jq '.[] | "\(.databaseId) \(.conclusion) \(.createdAt) -> \(.updatedAt)"'   # LIST_WORKFLOW_RUNS
 gh pr view <N> --repo <owner>/<repo> --json comments \
-  --jq '[.comments[] | select(.author.login == "claude")] | last | "\(.id) \(.createdAt)"'
+  --jq '[.comments[].author.login] | unique'      # pick the reviewer's login
 ```
 
-- **Working.** The trailing comment's id differs from `BEFORE`,
-  it carries a `### Verdict`, and the run spans minutes.
-- **Still broken.** The id equals `BEFORE`, so this run posted nothing,
-  however the run's own conclusion reads.
+Then record the current state and dispatch:
+
+```bash
+BOT=claude                                        # from the query above
+BEFORE=$(gh pr view <N> --repo <owner>/<repo> --json comments \
+  --jq --arg bot "$BOT" '[.comments[] | select(.author.login == $bot)] | last | .id // "none"')
+gh workflow run claude-review.yml --repo <owner>/<repo> \
+  --field pr_number=<N>                           # RUN_WORKFLOW
+```
+
+Once the run completes, evaluate it in **one** filter that names every
+outcome:
+
+```bash
+gh pr view <N> --repo <owner>/<repo> --json comments \
+  --jq --arg bot "$BOT" --arg before "$BEFORE" '
+    [.comments[] | select(.author.login == $bot)] | last
+    | if   . == null      then "BROKEN: no comment from \($bot) at all"
+      elif .id == $before then "BROKEN: newest comment unchanged; this run posted nothing"
+      elif (.body | test("(?i)###\\s*verdict")) then "WORKING: new verdict \(.id)"
+      else "INCONCLUSIVE: new comment \(.id), no verdict heading"
+      end'
+```
+
+**Use one filter, never a `BEFORE` capture compared against a
+differently-shaped read.**
+That two-command form is the trap, and it is subtle enough to have shipped
+here once already.
+`.id // "none"` yields `none` on an empty result,
+while `"\(.id) \(.createdAt)"` on the same empty result yields the string
+`null null`.
+Those two differ, so a PR with **no** prior review reports the token
+**working** whatever the run did --
+a false pass in the one step that exists to prevent false passes.
+Measured on this repo, against a PR with no reviews:
+`none` versus `null null`.
+
+Note what the `.body` test buys as well.
+Without it the check accepts any new comment,
+including a cost tally or a quota-exhausted notice,
+neither of which is a review.
 
 Take the run's length from its own `createdAt` and `updatedAt` once it has
 completed, never from a `status` field read mid-flight.

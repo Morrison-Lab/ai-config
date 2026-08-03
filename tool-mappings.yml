@@ -226,9 +226,10 @@ operations:
     description: >-
       List a repo's Actions secrets. The value is never readable, so this can
       confirm a secret exists and when it last changed, never what it is or
-      whether it works. Use the REST endpoint rather than `gh secret list`:
-      the plain CLI prints only name and updated_at, and its --json accepts
-      only name and numSelectedRepos, so created_at is unreachable there.
+      whether it works. Use the REST endpoint when created_at is needed:
+      `gh secret list --json` offers name, numSelectedRepos, selectedReposURL,
+      updatedAt, and visibility (gh 2.96.0), so updatedAt is available from the
+      CLI but created_at is not.
     cli: gh api repos/<owner>/<repo>/actions/secrets
     github_mcp: (no GitHub MCP tool; use gh api)
   - id: SET_SECRET

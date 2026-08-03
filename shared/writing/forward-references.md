@@ -149,22 +149,22 @@ Nothing about your insertion looks like it touched that later sentence, and it
 did not; it changed the sentence's *referent* by displacing the sections it
 counts.
 
-This is the trigger `sync-with-main.md` names for numbered subsections
-colliding at merge time --- "grep the file for any other place that names the
+This is the trigger [`sync-with-main.md`](../workflow/sync-with-main.md) names
+for numbered subsections colliding at merge time --- "grep the file for any other place that names the
 old numbering" --- but it fires during ordinary authoring, not just on a
 merge, so an author inserting a section mid-file never thinks to consult a
 merge-conflict rule.
 It is also invisible to every mechanical check: a link checker sees no link, a
 punctuation or line-break check sees a well-formed sentence, and the
-directional-word grep above passes because "above" is still the correct
-*direction* --- only the *count* is now off.
+directional-word grep above never fires --- its word list is exclusively
+forward-pointing (`below`, `later`, `following`, ...), so a backward reference
+like "above" is outside its alphabet regardless of whether the count is right.
 
 So before landing an insertion, grep the file **below** the insertion point
 for positional and count references, and re-verify each still resolves to what
 it names.
-The durable fix is the one `definition-crossrefs.md` prefers: name the target
-sections rather than counting to them, so the next insertion cannot silently
-invalidate the reference.
+The durable fix is to name the target sections rather than counting to them,
+so the next insertion cannot silently invalidate the reference.
 
 - **Do:** after inserting a section, grep the rest of the file for
   positional/count phrases (`sections above`, `the previous section`, `N
@@ -173,8 +173,9 @@ invalidate the reference.
   sections") over counting to it, so an insertion cannot break the count.
 - **Don't:** assume a back-reference survived your insertion because it was
   correct before and you did not touch its sentence.
-- **Don't:** rely on the directional-word grep above to catch this --- the
-  direction stays right while the count goes wrong.
+- **Don't:** rely on the directional-word grep above to catch this --- its word
+  list is exclusively forward-pointing and never sees a backward reference
+  like "above" in the first place.
 
 (Morrison-Lab/ai-config#1091, 2026-08-03: a new section was inserted between
 "A negative control must enter at the real input" and "A reminder guard's

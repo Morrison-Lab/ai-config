@@ -211,31 +211,24 @@ def _verb_ident(argv):
 
 
 def _argv_request(argv):
-    """(is_request, num, repo, api) for one simple command's argv.
+    """(is_request, num, repo) for one simple command's argv.
 
     Identity comes from the request command ITSELF -- the `gh api` URL, or the
     `gh pr edit` number/`-R` -- so a different PR path echoed earlier in the
     line cannot misdirect the discharge. `-r` (reviewer) differs from `-R`
     (repo) only by case, and argv tokens are matched case-sensitively, so the
     two never collide.
-
-    `api` is True only for the `gh api`/`curl`/`wget` POST form, whose failure
-    is a clean 4xx-shaped body (RX_REQ_FAILED) readable regardless of where the
-    command sits in a chain. The CLI forms (`--add-reviewer`, `--reviewer`) go
-    through GraphQL, whose errors need not carry a 4xx status, so their failure
-    is caught by the harness `is_error` exit status instead -- see the discharge
-    in scan() for why that distinction decides which signal to trust.
     """
     if not argv:
-        return False, None, None, False
+        return False, None, None
     a0 = argv[0]
     if a0 == "gh" and len(argv) >= 3 and argv[1] == "pr":
         sub, rest = argv[2], argv[3:]
         if sub == "create" and _has_flag(rest, "--reviewer", "-r"):
-            return True, None, None, False  # a create's number is in its result
+            return True, None, None       # a create's number is in its result
         if sub == "edit" and _has_flag(rest, "--add-reviewer"):
             num, repo = _verb_ident(argv)
-            return True, num, repo, False
+            return True, num, repo
     # `gh api`/`curl`/`wget` hitting the requested_reviewers endpoint with a
     # POST. The same endpoint is read via GET (to CHECK who is requested), and
     # a GET must NOT discharge, which is why the method is required.
@@ -245,19 +238,27 @@ def _argv_request(argv):
         url = next((t for t in argv if "requested_reviewers" in t), None)
         if url and _post_method(argv):
             num, repo = _url_ident(url)
-            return True, num, repo, True
-    return False, None, None, False
+            return True, num, repo
+    return False, None, None
 
 
 def request_ident(cmd):
-    """(is_request, num, repo, api): does `cmd` genuinely request a reviewer?"""
+    """(is_request, num, repo, last): does `cmd` genuinely request a reviewer?
+
+    `last` is True when the matched request is the LAST simple command in the
+    chain. That is exactly when the harness `is_error` exit status (which
+    reflects the WHOLE call, i.e. its last command) is authoritative for the
+    request's own outcome -- so the discharge can trust `err` only then. A
+    request chained AHEAD of other commands has an is_error that belongs to a
+    later command, so the discharge treats it as ambiguous and does not fire.
+    """
     cmds = _simple_commands(cmd)
     if cmds is None:
         return False, None, None, False
-    for argv in cmds:
-        ok, num, repo, api = _argv_request(argv)
+    for i, argv in enumerate(cmds):
+        ok, num, repo = _argv_request(argv)
         if ok:
-            return True, num, repo, api
+            return True, num, repo, (i == len(cmds) - 1)
     return False, None, None, False
 
 
@@ -439,27 +440,33 @@ def scan(path):
                             continue
                         keep.append(ob)
                     obligations[:] = keep
-                    # Discharge the reviewer request that produced this result,
-                    # gated on the REQUEST's own outcome -- never the broad
-                    # `failed` flag, which an unrelated chained command's
-                    # `error`/`not found` shell noise would trip.
+                    # Discharge the reviewer request that produced this result.
+                    # A discharge is the DANGEROUS action -- it asserts the PR
+                    # got its reviewer -- so it fires only on POSITIVE evidence
+                    # the request itself succeeded, never merely on the absence
+                    # of failure text.
                     #
-                    # `err` (is_error) is the exit status of the WHOLE Bash call,
-                    # i.e. the LAST simple command, so it is trustworthy for the
-                    # request ONLY when nothing runs after it. For the `gh api`
-                    # POST form (api=True) that is not safe to assume -- the hook
-                    # even suggests chaining a verify step after the POST -- but
-                    # that form fails with a clean 4xx-shaped body, so
-                    # RX_REQ_FAILED alone decides it, ordering-independent, and
-                    # `err` is dropped. The CLI/structured forms (api=False) can
-                    # fail without a 4xx body (a GraphQL error, an MCP failure),
-                    # so `err` is kept -- reliable for the atomic structured
-                    # tools, and only over-blocking (the safe direction) in the
-                    # rare case a CLI request is chained ahead of another command.
+                    # The one reliable success signal is the harness `is_error`
+                    # exit status, but it is the exit status of the WHOLE Bash
+                    # call -- its LAST simple command -- so it is authoritative
+                    # for the request ONLY when the request is that last command
+                    # (`last`), or when the call is a single structured tool
+                    # (atomic, recorded with last=True). A request chained AHEAD
+                    # of anything else has an is_error belonging to a later
+                    # command, and no other signal recovers the request's own
+                    # outcome from the one combined result blob -- RX_REQ_FAILED
+                    # catches a 4xx body but not a network error, a timeout, a
+                    # 5xx, or a GraphQL/auth failure. Such a call is therefore
+                    # AMBIGUOUS, and the guard fails toward NOT discharging (it
+                    # keeps blocking -- the safe over-warn direction) rather than
+                    # risk silently clearing a genuinely-failed request.
+                    #
+                    # So discharge only a last/atomic request whose own result
+                    # neither errored nor carries a 4xx failure body.
                     if rid in pending:
-                        rnum2, rrepo2, api2 = pending.pop(rid)
-                        req_failed = bool(RX_REQ_FAILED.search(body)) \
-                            or (err and not api2)
+                        rnum2, rrepo2, last2 = pending.pop(rid)
+                        req_failed = (not last2) or err \
+                            or bool(RX_REQ_FAILED.search(body))
                         if not req_failed:
                             _clear(obligations, rnum2 or rnum, rrepo2 or rrepo)
                     continue
@@ -494,12 +501,12 @@ def scan(path):
                     if inp.get("reviewers"):
                         # A structured tool call is atomic -- one tool_use, one
                         # result -- so is_error reflects THIS request, with no
-                        # chained command to poison it. api=False -> trust err.
-                        pending[tid] = (num, repo, False)
+                        # chained command to poison it: last=True -> trust err.
+                        pending[tid] = (num, repo, True)
                     continue
                 if name in REQ_TOOLS:
                     rn, rr = input_ident(inp)
-                    pending[tid] = (rn, rr, False)  # atomic; trust err
+                    pending[tid] = (rn, rr, True)  # atomic; is_error is trusted
                     continue
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
@@ -517,7 +524,7 @@ def scan(path):
                 # example request quoted in a body/echo/heredoc/herestring
                 # never forges or discharges an obligation. Its identity comes
                 # from the request command itself.
-                requested, rnum, rrepo, rapi = request_ident(cmd_raw)
+                requested, rnum, rrepo, rlast = request_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
                 # too, and it is the draft action that decides.
                 if draft:
@@ -529,7 +536,7 @@ def scan(path):
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.
                 if requested and not opened:
-                    pending[tid] = (rnum or num, rrepo or repo, rapi)
+                    pending[tid] = (rnum or num, rrepo or repo, rlast)
     return obligations, text
 
 

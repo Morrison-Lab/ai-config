@@ -178,22 +178,56 @@ case(create("c") + [
     say("Ran a check, then a request that 422'd.")], True,
      "a chained request that itself 422s does not discharge")
 
-# --- err is the WHOLE call's exit status (the LAST command), so an API POST
-# request followed by an unrelated FAILING command must still discharge ---
-# The `gh api` POST fails with a clean 4xx body, so the discharge reads that
-# body shape (ordering-independent) rather than `err`, which reflects the
-# trailing command. A trailing `--jq` field error sets is_error=True for the
-# whole result but leaves no 4xx shape, so the successful request discharges.
+# --- the discharge fires only on POSITIVE success of the request's OWN result,
+# which is reliable only when the request is the last/sole simple command ---
+# A genuinely-FAILED request whose failure is NOT 4xx-shaped -- a network error,
+# a 5xx, a timeout, a bare auth message -- must still block. `is_error` is the
+# only signal that catches these, and it is authoritative because the request
+# is the sole command in the call. (Dropping is_error for the api form, as an
+# earlier revision did, silently discharged exactly this case -- the dangerous
+# direction, since no reviewer was ever actually requested.)
+case(create("c") + [
+    bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST", tid="q"),
+    res("q", "gh: Could not resolve host: api.github.com\n"
+             "curl: (6) Could not resolve host", err=True),
+    say("Opened and tried to request; the request failed to connect.")], True,
+     "a sole api request that fails without a 4xx body does not discharge")
+# A sole successful api request MUST still discharge (guards against the
+# fail-safe rule over-blocking everything).
+case(create("c") + [
+    bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST", tid="q"),
+    res("q", '{"requested_reviewers":[{"login":"Copilot"}]}'),
+    say("Requested a reviewer, successfully.")], False,
+     "a sole successful api request discharges")
+# A request chained AHEAD of another command is AMBIGUOUS: is_error belongs to
+# the trailing command, and no other signal recovers the request's own outcome
+# from the single combined result blob. The guard fails toward NOT discharging
+# (it keeps blocking -- the safe over-warn direction) rather than risk clearing
+# a request that may have failed. Here the request actually succeeded, so the
+# block is a deliberate over-warn, not a false positive about failure.
 case(create("c") + [
     bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST "
          "-f reviewers=x; gh pr view 1038 --jq .nonexistent", tid="q"),
     res("q", '{"requested_reviewers":[{"login":"Copilot"}]}\n'
              "jq: error: nonexistent field", err=True),
-    say("Requested a reviewer, then a verify step that errored.")], False,
-     "an api request followed by an unrelated failing command discharges")
+    say("Requested a reviewer, then a verify step that errored.")], True,
+     "an api request chained ahead of a failing command does not discharge")
+# The DANGEROUS variant, and why the chained-ahead case must block regardless
+# of `is_error`: a request that itself FAILED non-4xx, chained ahead of a
+# command that SUCCEEDED, leaves is_error=False (the trailing success) with no
+# 4xx body -- so `err`/RX_REQ_FAILED alone would silently discharge a genuinely
+# failed request. The ambiguity guard (a chained-ahead request never
+# discharges) is the only thing that blocks it.
+case(create("c") + [
+    bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST "
+         "|| echo continuing", tid="q"),
+    res("q", "curl: (6) Could not resolve host\ncontinuing"),
+    say("The request failed to connect, but a trailing echo succeeded.")],
+     True,
+     "a failed request whose trailing command succeeds does not discharge")
 # A CLI `--add-reviewer` request can fail through GraphQL with NO 4xx body, so
-# for the CLI form `err` is kept -- a genuinely failed CLI request (is_error)
-# must still block, since RX_REQ_FAILED alone would not catch it.
+# `is_error` is what catches it -- a genuinely failed sole CLI request must
+# still block, since RX_REQ_FAILED alone would not.
 case(create("c") + [
     bash("gh pr edit 1038 -R o/r --add-reviewer baduser", tid="q"),
     res("q", "GraphQL: Could not resolve to a User with the login of "

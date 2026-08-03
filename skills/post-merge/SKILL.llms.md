@@ -55,6 +55,32 @@ If a late review contains findings:
 
 (Morrison-Lab/ai-config#1029: Copilot round 7 posted at 2026-08-02T06:29:10Z, and the PR merged at 06:30:55Z as `1e0b5fdf`. The suppressed findings were real, absent from the merged code, and had to be carried forward to \#1034.)
 
+**A review can also arrive *after* `mergedAt`, which the bound above excludes by construction.** Everything above treats the merge as the scan’s upper bound, and for a review already sitting on the PR that is right. It also encodes an assumption that nothing further can land, and a reviewer dispatched before the merge does not stop working when the merge happens. `post-merge` runs promptly after the merge, which is what makes this a gap rather than a curiosity: the scan fires while a late review has not posted yet, so a single run returns a clean result that expires.
+
+So re-read the three surfaces once more before closing the PR out, with no upper bound at all, and treat a `submitted_at` later than `mergedAt` as an ordinary finding rather than as an anomaly.
+
+That re-read catches a review already sitting on the PR; it cannot catch one still in flight. A single synchronous read narrows the window but does not close it — the review that posted ten minutes after the merge in the case below would still be unposted at the moment `post-merge` runs. The durable catch is staying subscribed to the merged PR’s review activity, so the review notification wakes the session when the late verdict actually posts, or re-arming a delayed check with a defined completion condition.
+
+Two things change when the review lands after the merge rather than before it.
+
+The merged PR is **no longer a place to land code fixes**. That is a third reason for moving work elsewhere, distinct from the two the corpus already carries: ARD’s Defer moves a finding because fixing it would widen the PR’s scope, and [`address-every-comment`](../../shared/workflow/address-every-comment.md)’s `main`-sync case moves one because the line is not yours. Here the finding is in scope and is yours, and only the branch it belonged to is gone.
+
+And the vehicle is a **follow-up PR against `main`**, narrower than the “issue or PR” item 2 above leaves open. The findings usually still apply to `main`, since `main` now holds the merged code they were written about — but confirm that against current `main` first, since an overlapping merge can have changed or removed that code before the follow-up runs. Where they do still apply, the fixes are already known, so an issue would record work that could simply be done.
+
+**Post the back-pointer on the merged PR, not only the forward link.** Item 2 asks the follow-up to link back to the merged PR, which serves a reader who already knows the follow-up exists. That is the reader who needs it least. The follow-up is reachable only by someone who has already found it, whereas the merged PR is what a changelog entry, a `git blame`, or the review notification itself points at. That reader finds a review with unaddressed findings sitting under a merged banner, and has no way to tell whether anyone handled them. Comment on the merged PR naming the follow-up and each finding’s disposition, so the record reads correctly from whichever end it is entered.
+
+`CLAUDE.md`’s push-races-the-merge case already asks for a comment of this shape, saying which of a merged PR’s findings did not ship in it. Its trigger is a `* [new branch]` push tell rather than a review posting, so neither case fires on the other.
+
+- **Do:** re-read the three surfaces with no upper bound before closing out, and treat a review submitted after `mergedAt` as ordinary.
+- **Do:** stay subscribed to the merged PR, or re-arm a delayed check with a completion condition, to catch a review that posts after `post-merge` runs — a single synchronous re-read cannot close that window.
+- **Do:** open a follow-up PR against `main` when the findings are in scope and the fixes are known, rather than filing an issue.
+- **Do:** comment on the merged PR naming the follow-up and each finding’s disposition.
+- **Don’t:** read the scan’s clean result as durable when it ran promptly after the merge, before a late review could post.
+- **Don’t:** treat a post-merge finding as a Defer, since nothing about its scope changed, only the branch’s availability.
+- **Don’t:** rely on the follow-up’s link back as the whole record, since a reader who lands on the merged PR never sees it.
+
+(Morrison-Lab/ai-config#1079 merged at 2026-08-03T03:36:11Z, and Copilot’s review posted at 03:46:25Z, ten minutes after the merge rather than two minutes before it as in \#1029 above. It carried three inline findings plus two more inside a `Suppressed comments (2)` block, and all five were correct. They were addressed against `main` in \#1082, opened for that purpose and merged at 04:15:05Z, and a comment on \#1079 at 03:52:47Z names \#1082 and each finding’s disposition.)
+
 ### 1.5. Cascade conflict scan
 
 **In an ultracode/coordinator session, delegate this whole step to a subagent** rather than running the scan-and-resolve loop in the main thread — it’s exactly the kind of investigation-plus-fix work the coordinator should hand off (see `memories/preferences.md`’s coordinator-mode bullet). Brief the subagent with the merged PR’s number/branch and the steps below; have it report back which PRs it found conflicting, what it did about each, and any it skipped (already claimed, conflict it couldn’t understand). Do the scan inline only for a solo (non-orchestrated) session.

@@ -97,6 +97,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`r-pkg-cran-checklist`](skills/r-pkg-cran-checklist/SKILL.llms.md) |  | Walk through the standard CRAN submission checklist |
 | [`reproducibility-audit`](skills/reproducibility-audit/SKILL.llms.md) |  | Audit a project for reproducibility gaps: hidden deps, hardcoded paths, undocumented prerequisites, output traceability |
 | [`measure-performance`](skills/measure-performance/SKILL.llms.md) | `perf`, `benchmark` | Profile R code to find the real bottleneck, microbenchmark only that, then confirm the win survives end to end |
+| [`refresh-claude-token`](skills/refresh-claude-token/SKILL.llms.md) | `rct` | Rotate `CLAUDE_CODE_OAUTH_TOKEN` across the repos that carry it, without `/install-github-app`’s workflow scaffolding, then verify the new token authenticates |
 
 ### Session management
 
@@ -118,6 +119,6 @@ Most skills also respond to plain-English triggers listed in their `description`
 
 ## Full skill list
 
-All 175+ canonical skills are in [`skills/`](https://github.com/d-morrison/ai-config/tree/main/skills) on GitHub. Generated Codex wrappers live in [`codex-skills/`](https://github.com/d-morrison/ai-config/tree/main/codex-skills). Each canonical `SKILL.md` has a `description` field that lists the trigger phrases and a full procedure.
+All 177+ canonical skills are in [`skills/`](https://github.com/d-morrison/ai-config/tree/main/skills) on GitHub. Generated Codex wrappers live in [`codex-skills/`](https://github.com/d-morrison/ai-config/tree/main/codex-skills). Each canonical `SKILL.md` has a `description` field that lists the trigger phrases and a full procedure.
 
 Back to top

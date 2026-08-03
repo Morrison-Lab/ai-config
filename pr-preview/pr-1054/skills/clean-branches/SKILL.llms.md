@@ -46,6 +46,23 @@ git branch -r --merged origin/main | grep -v 'origin/main\|origin/HEAD'
 git branch -r --no-merged origin/main
 ```
 
+**First separate real remote branches from stray ref namespaces, or the sweep’s scope is wrong from its first command.** A one-off `git fetch origin '+refs/pull/*/head:refs/remotes/pr/*'` writes refs that no configured refspec matches, so nothing updates them and `--prune` never touches them — but `git branch -r` counts them anyway.
+
+``` bash
+git config --get-all remote.origin.fetch                                  # what is tracked
+git for-each-ref --format='%(refname)' | grep -v '^refs/remotes/origin/'  # what is not
+```
+
+Anything outside the tracked namespace is local cruft rather than a branch: `git push origin --delete` cannot touch it, and it belongs in a separate `git update-ref --stdin` sweep, not in the plan below.
+
+**Write ref patterns with `**`, because a single `*` does not cross a slash.** `git for-each-ref 'refs/remotes/origin/*'` silently omits every slash-named branch — `feat/`, `fix/`, `claude/` — which is every branch anyone named conventionally, including the ones carrying open PRs. Nothing errors; the count merely comes back smaller and entirely plausible. Note this is the **opposite** of pathspec matching, where `*` does cross a slash; see `memories/git.md`, “A ref pattern is not a pathspec”.
+
+``` bash
+git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/**'
+```
+
+Give the enumeration a control before trusting a total: confirm a known slash-named branch appears in the output. A shortfall here is indistinguishable from a tidy repo.
+
 ### 3. Classify each branch
 
 For each remote branch (excluding `main`, `HEAD`, protected branches):
@@ -79,6 +96,15 @@ gh pr list --head=<branch> --json number,title,state | cat   # LIST_PRS
 
 If an open MR exists → **Active**, skip.
 
+**Fetch every PR once and match locally, rather than querying per branch.** A sweep of N branches costs N API round-trips this way, which is slow and rate-limit-prone at repo scale; one call answers for all of them, and it also supplies the *merged* and *closed-unmerged* states that b and f need.
+
+``` bash
+gh pr list --state all --limit 2000 \
+  --json number,headRefName,state,mergedAt,url,title > /tmp/all-prs.json   # LIST_PRS
+```
+
+Then index by `headRefName` and look each branch up in memory. Raise `--limit` above the repo’s total PR count and check the returned length against it — a silently truncated list marks live branches as having no PR, which is the one error in this sweep that deletes something.
+
 #### d. Check for linked issues
 
 Look for branch naming patterns that reference issues: - `fix/123-*`, `feat/123-*`, `issue-123-*` → check if issue \#123 is open - If the linked issue is open → **Active**, skip
@@ -111,6 +137,18 @@ git diff --stat origin/main...origin/<branch>                # what is still unl
 Weight the check by how far the branch’s contents stray from its title: a branch carrying commits unrelated to the PR that named it is the shape this catches. `rescue-closed` is the deliberate, whole-tracker version of the same sweep; this is the minimum owed before a deletion.
 
 (2026-07-29: a bcs branch closed as superseded still carried an orthogonal out-of-memory fix — `geepack::geeglm` replaced by `glm` + `sandwich::vcovCL` — that the superseding privacy redesign never touched. Deleting on the closure rationale would have discarded it silently; filed instead as `ucdavis/bcs#466`.)
+
+**Once you have found unlanded work, the deliverable is a tracking issue — not keeping the branch.** On GitHub the branch is not the only copy: `refs/pull/N/head` is retained permanently and still resolves after the head branch is deleted. So the choice is not “delete or preserve”, it is “record or lose track of”, which is a much easier call and lets the sweep finish.
+
+Verify rather than assume, since it is one call per PR, then put the recovery command in the issue:
+
+``` bash
+git ls-remote origin 'refs/pull/<N>/head'    # should equal the branch tip
+git fetch origin refs/pull/<N>/head
+git checkout -b recover/<N> FETCH_HEAD
+```
+
+An issue naming what was unlanded, how much of it, and that command is strictly more useful than a stale branch nobody will revisit — and unlike the branch, it appears in the tracker. (2026-08-02, `Morrison-Lab/ai-config`: six closed-unmerged branches carried work absent from `main`; every `refs/pull/N/head` resolved and matched its branch tip exactly, so all six were deleted after the two substantial ones were filed as \#1062 and \#1063.)
 
 ### 4. Present the plan (dry run)
 
@@ -281,6 +319,8 @@ Print a summary covering **both** local and remote:
 
 ## Safety rules
 
+- **A merged PR settles that the work landed — stop measuring there.** The content checks above exist for branches whose fate is *unknown*. Once `gh pr list --state merged` names a PR for the branch, residual differences against `main` are the branch’s pre-review draft versus the post-review text that actually merged, and mean nothing about safety. Measuring anyway invents doubt about the one case that is already certain: in a 2026-08-02 sweep, 47 of 50 local branches had merged PRs and several scored under 90% on a line-presence check purely because review had reworded them.
+- **A GitHub branch is never the only copy of a PR’s work.** `refs/pull/N/head` is retained permanently and resolves after the head branch is deleted, so “delete the branch” and “lose the work” are different events on GitHub. This does not weaken the local-only rule below — a branch that was **never pushed** has no PR ref behind it, and that is exactly the case that needs confirmation.
 - **Never delete `main`, `master`, `develop`, or any protected branch.**
 - **Never force-push to a branch with an open MR** without rebasing cleanly.
 - **Always present the plan first** — no silent deletions.

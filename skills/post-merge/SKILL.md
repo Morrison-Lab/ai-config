@@ -356,9 +356,8 @@ between HEAD and `origin/main` --- it differed only from the 54-commit-stale
 succeeded with the local edit intact; skipping the pull as the bullet below
 prescribes would have left `main` 54 commits behind.)
 
-**Diverged main checkout** (`ahead` and `behind` both non-zero)**:**
-`git pull --ff-only`
-fails when the main checkout
+**Diverged main checkout (`ahead` and `behind` both non-zero):**
+`git pull --ff-only` fails when the main checkout
 has local commits from a concurrent session that hasn't been pushed. Don't
 force-merge or reset their work — skip the pull and delete the branch only.
 The branch deletion is what matters; another session will pull main when it's

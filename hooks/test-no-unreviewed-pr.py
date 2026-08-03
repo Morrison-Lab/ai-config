@@ -557,6 +557,72 @@ case(create("c") + [
          tid="q"), res("q", OK), say("Ran the multi-line recovery command.")],
      False, "the multi-line (\\-continued) recovery command still discharges")
 
+# --- separator set: newline separates, redirects attach ---
+# A NEWLINE separates two commands exactly as `;` does. shlex drops `\n` as
+# whitespace, so without converting it to a separator the two commands merge
+# into one, the request registers as `last`, and its own genuine failure is
+# masked by the trailing command's success -- a SILENT DISCHARGE. Mirrors the
+# `;` case at "a failed request whose trailing command succeeds" above.
+case(create("c") + [
+    bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST\necho done",
+         tid="q"),
+    res("q", "curl: (6) Could not resolve host\ndone", err=False),
+    say("Requested (failed) then echoed, on two lines.")], True,
+     "a newline-joined failed request whose trailing command succeeds tracks")
+# The mirror: a newline-joined SUCCESSFUL request followed by a command is still
+# ambiguous (the request is not the last simple command), so it over-warns
+# rather than risk a silent discharge -- the same rule the `;`-joined case uses.
+case(create("c") + [
+    bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST\necho done",
+         tid="q"),
+    res("q", '{"requested_reviewers":[{"login":"Copilot"}]}\ndone', err=False),
+    say("Requested (ok) then echoed, on two lines.")], True,
+     "a newline-joined request ahead of another command does not discharge")
+# A trailing REDIRECT (`> /dev/null`, `2>&1`) attaches to the command, it does
+# not start a new one. Treating `<`/`>` as separators split a genuinely sole,
+# successful request into two "commands", so it never registered as `last` and
+# never discharged -- a permanent nag. A redirect must leave the request as the
+# sole/last command so it discharges normally.
+case(create("c") + [
+    bash('gh api "repos/o/r/pulls/1038/requested_reviewers" -X POST '
+         "-f 'reviewers[]=copilot' > /dev/null", tid="q"),
+    res("q", "", err=False),
+    say("Requested with output redirected to /dev/null.")], False,
+     "a sole successful request with a trailing > redirect still discharges")
+case(create("c") + [
+    bash("gh pr edit 1038 --add-reviewer copilot 2>&1", tid="q"),
+    res("q", "{}", err=False),
+    say("Added a reviewer with 2>&1.")], False,
+     "a sole add-reviewer with a 2>&1 redirect still discharges")
+
+# --- a bare `gh pr ready` (no number) must be dischargeable ---
+# `gh pr ready` with no argument readies the current branch's PR -- ordinary
+# usage. RX_CMD_VERB needs a digit, so the command yields no number and the
+# obligation is appended with num=None. gh's success line is `Pull request
+# owner/repo#N is marked as "ready for review"` -- an owner/repo#N shape
+# result_ident must recognize, or the number never backfills and _clear() (which
+# will not touch a num=None obligation) can NEVER discharge it: the guard would
+# then block every message for the rest of the session (a wedge).
+READY_OUT = 'Pull request o/r#1038 is marked as "ready for review"'
+case([bash("gh pr ready", tid="r"), res("r", READY_OUT),
+      bash(REQ_CMD, tid="q"), res("q", OK),
+      say("Readied the current branch's PR, then requested.")], False,
+     "a bare `gh pr ready` is discharged by a later request (num backfilled)")
+case([bash("gh pr ready", tid="r"), res("r", READY_OUT),
+      say("Readied the current branch's PR; no reviewer yet.")], True,
+     "a bare `gh pr ready` with no request still blocks (num resolved)")
+
+# --- a 4xx failure body survives json.dumps' escaping ---
+# A string tool-result body is `json.dumps()`-wrapped in scan(), so a `{"status":
+# 422}` body arrives as `\"status\":422`. The failure regexes must match that
+# escaped shape, not only a bare `"status":422` -- otherwise a sole request that
+# failed with a 4xx body but is_error UNSET (no `HTTP 4xx` text) would discharge.
+case(create("c") + [
+    bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST", tid="q"),
+    res("q", '{"status":422,"message":"nope"}', err=False),
+    say("Requested; it 422'd with is_error unset.")], True,
+     "a sole request 422ing with is_error unset (escaped body) does not discharge")
+
 # --- non-shell tools must never be text-matched ---
 case([use("create", tid="w", path="hooks/no-unreviewed-pr.py",
           file_text="matches gh pr create and requested_reviewers"),

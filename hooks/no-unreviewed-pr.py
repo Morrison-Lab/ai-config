@@ -135,8 +135,15 @@ def _scrub_all(cmd):
 # --add-reviewer` exist; `gh pr review --request` does NOT (review has only
 # --approve/--comment/--request-changes), so it is deliberately absent.
 
-# Shell control operators that separate one simple command from the next.
-_SHELL_OPS = set("();<>|&")
+# Shell CONTROL operators that separate one simple command from the next:
+# `;`, `&`/`&&`, `|`/`||`, `(`, `)` -- and a newline, handled below. Redirection
+# operators (`<`, `>`, `>>`, `2>&1`) are deliberately EXCLUDED: a redirect
+# attaches to the command it decorates rather than terminating it, so treating
+# `>` as a separator split a genuinely-sole request with a trailing `> /dev/null`
+# into two "commands", flipped its `last` flag to False, and left it permanently
+# undischargeable (a severe over-warn). A `>`/`<` token now falls through into
+# the current command's argv, where the request/draft detectors ignore it.
+_SHELL_OPS = set("();|&")
 
 
 def _simple_commands(cmd):
@@ -145,9 +152,20 @@ def _simple_commands(cmd):
     Line-continuations are joined and heredoc bodies blanked first, so shlex
     neither chokes on a heredoc body nor mis-splits a `\\`-continued request
     (like the hook's own recovery command) into two commands.
+
+    An unescaped newline is a genuine command separator, but shlex treats it as
+    whitespace and silently drops it -- which merged two commands on two lines
+    into one, making a trailing command's exit status masquerade as the
+    request's own `last` outcome and SILENTLY DISCHARGE a failed request (the
+    dangerous direction). Multi-line Bash is the ordinary shape agents emit, so
+    remaining newlines are converted to `;`. A newline INSIDE a quoted string
+    becomes a `;` inside that quote -- a literal character in one token, not a
+    separator -- so a multi-line `--body` is not split (and its contents are
+    never argv the detectors read anyway).
     """
     cmd = re.sub(r"\\\r?\n", " ", cmd)   # join `\`-continued lines
     cmd = RX_HEREDOC.sub("<<", cmd)       # drop heredoc bodies
+    cmd = cmd.replace("\n", ";")          # unquoted newline -> separator
     try:
         lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
         lex.whitespace_split = True
@@ -156,7 +174,7 @@ def _simple_commands(cmd):
         return None                       # unbalanced quotes, etc.
     cmds, cur = [], []
     for t in toks:
-        if t and set(t) <= _SHELL_OPS:    # an operator token (||, |, ;, <<<)
+        if t and set(t) <= _SHELL_OPS:    # a control-operator token (||, |, ;, &)
             if cur:
                 cmds.append(cur)
                 cur = []
@@ -348,10 +366,19 @@ RX_CMD_VERB = re.compile(
 )
 RX_CMD_REPO = re.compile(r"(?:-R|--repo)[=\s]+([\w.-]+/[\w.-]+)", re.I)
 
-# A PR identity carried by a tool RESULT: the PR URL (owner/repo/number) or a
-# bare `"number"` field.
+# A PR identity carried by a tool RESULT: the PR URL (owner/repo/number), gh's
+# `Pull request owner/repo#N` success line, or a bare `"number"` field.
 RX_RES_URL = re.compile(r"github\.com/([\w.-]+)/([\w.-]+)/pull/(\d+)", re.I)
 RX_RES_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
+# `gh pr ready`/`gh pr create` print `... Pull request owner/repo#N ...` (e.g.
+# `Pull request o/r#42 is marked as "ready for review"`). A BARE `gh pr ready`
+# (no number -- the ordinary way to ready the current branch's PR) carries no
+# number in the command, so RX_CMD_VERB yields None and the obligation is
+# appended with num=None. Without recognizing this result shape the number never
+# backfills, and _clear() (which refuses to touch a num=None obligation) can
+# never discharge it -- a bare `gh pr ready` would then block every message for
+# the rest of the session, contradicting the "cannot wedge a session" invariant.
+RX_RES_HASH = re.compile(r"[Pp]ull [Rr]equest\s+([\w.-]+)/([\w.-]+)#(\d+)")
 RX_RES_NUM = re.compile(r"\\?\"number\\?\"\s*:\s*(\d+)")
 
 # A tool result that reports failure. Kept specific: a bare 4xx substring
@@ -359,7 +386,7 @@ RX_RES_NUM = re.compile(r"\\?\"number\\?\"\s*:\s*(\d+)")
 # HTTP-status shape or an explicit error word, plus the harness `is_error`
 # flag when present.
 RX_FAILED = re.compile(
-    r"\"status\"\s*:\s*4\d\d|HTTP\s+4\d\d|\berror\b|\bfailed\b"
+    r"\\?\"status\\?\"\s*:\s*4\d\d|HTTP\s+4\d\d|\berror\b|\bfailed\b"
     r"|cannot be requested|not found",
     re.I,
 )
@@ -374,8 +401,13 @@ RX_FAILED = re.compile(
 # genuinely failed `gh api`/`gh pr edit` request exits non-zero (is_error) or
 # returns a 4xx, so this still catches every real failure without firing on a
 # neighbouring command's stderr.
+# The `\\?\"` before/after `status` tolerates the escaped-quote shape a string
+# tool-result body takes once `json.dumps()` wraps it (`\"status\":422`), as
+# well as an unescaped `"status":422`; without it this 4xx alternative was dead
+# for the ordinary string-content case and only `HTTP 4\d\d`/`is_error` caught a
+# failure. Mirrors RX_RES_NUM's `\\?\"` handling.
 RX_REQ_FAILED = re.compile(
-    r"\"status\"\s*:\s*4\d\d|HTTP\s+4\d\d|cannot be requested",
+    r"\\?\"status\\?\"\s*:\s*4\d\d|HTTP\s+4\d\d|cannot be requested",
     re.I,
 )
 
@@ -406,7 +438,8 @@ def input_ident(inp):
 
 def result_ident(body):
     """(num, repo) parsed from a tool_result body string."""
-    m = RX_RES_URL.search(body) or RX_RES_API.search(body)
+    m = RX_RES_URL.search(body) or RX_RES_API.search(body) \
+        or RX_RES_HASH.search(body)
     if m:
         return m.group(3), f"{m.group(1)}/{m.group(2)}"
     m = RX_RES_NUM.search(body)

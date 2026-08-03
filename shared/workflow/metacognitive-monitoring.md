@@ -185,6 +185,58 @@ A verification inherits the scope of whatever instrument it reaches for, so
 "I checked and it is not there" stays a claim about the instrument until the
 instrument's own coverage has been established.)
 
+## An action you recommend is a claim about state
+
+The four types above fire on an assertion, and the section above extends them
+to a premise you were handed.
+Both are things somebody states.
+A recommendation states nothing about the world.
+It is a judgment about what the user should do, which is exactly how
+`CLAUDE.md`'s chat-output tagging defines the RECOMMENDATION marker,
+distinguishing it from an ANSWER that "reports what is true".
+That definition is what carries a recommendation past every rule on this page.
+
+Underneath the judgment sits a claim nobody wrote.
+Advising an action presupposes that the action is still available, so
+"merge these two whenever you like" asserts that both are open, in a form no
+check keyed on status vocabulary can see.
+The presupposition is the claim, and it is load-bearing: when it fails, the
+advice is not merely imprecise but impossible to follow.
+
+The cost also lands differently from an ordinary stale reading.
+A stale assertion misinforms.
+A stale recommendation asks the user to *act*, so they spend a turn
+discovering the action is gone, and the failure surfaces on their side rather
+than on yours.
+
+The tell is positional.
+A recommendation is usually the last line of a long recap, and its inputs come
+from that recap's own table, which was correct when built minutes earlier.
+That is why reciting it does not feel like recalling.
+
+- **Do:** re-query an artifact's state immediately before recommending an
+  action on it, exactly as you would before asserting that state.
+- **Do:** name the query and when it ran, so a reader can tell a fresh read
+  from a recited one.
+- **Don't:** treat a recommendation as exempt because it contains no status
+  word.
+- **Don't:** build one from the recap's own status table, however recently
+  that table was assembled.
+
+(2026-08-02, this repo: a boxed RECOMMENDATION advised merging `#1058` and
+`#1064` "whenever you like", calling them independent and both carrying clean
+verdicts.
+Both had already merged, `#1064` at `2026-08-03T02:34:40Z` and `#1058` at
+`2026-08-03T02:34:49Z`, roughly four minutes earlier, by a second account
+rather than by that session.
+`gh pr view 1058 --json state` returns `MERGED` and settles it in one call.
+Because the recommendation carried no status word,
+`hooks/no-stale-pr-status.py` could not fire on it either: its `ASSERT` list
+is entirely state vocabulary and holds no imperative form, and its staleness
+condition is anchored to a push of *ours*, which a third party's merge does
+not produce.
+Both halves are tracked in ai-config#1072.)
+
 ## Question the answer that arrives without deliberation
 
 This is distinct from the confidence point above, and harder to catch.

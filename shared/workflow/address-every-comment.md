@@ -785,6 +785,81 @@ error is dangerous.
 The reviewer's actual worry -- that a reader might not reproduce it -- was
 right, and sharper than stated.)
 
+**A third direction, which evades the verification reflex rather than lacking
+a rule: agreeing with a finding and then escalating it.**
+The bullets above check the reviewer's *fix*, and the one above checks their
+*premise*.
+Both assume you are deciding whether the finding is right.
+This is the case where it is right, and correctly scoped, and you tell the
+reviewer it understated the problem.
+
+The **obligation** is not new, and claiming otherwise would overstate this
+entry.
+[`metacognitive-monitoring`](metacognitive-monitoring.md) already requires
+verifying a finding's particulars before restating them as fact, and its
+**scope** claim type already governs an assertion of your own about how wide a
+defect is, telling you to check the population rather than the sample that
+came to mind.
+An escalation is nothing but a new particular of exactly that kind: a wider
+scope, a bigger count, one more failing case.
+So it lands squarely in the class that fragment names as least dependable, and
+it does so where the reviewer's credibility will carry it.
+
+What is new is the **trigger**.
+Both of those rules fire on an act you recognize as asserting something, and
+agreeing does not present as one.
+Rebutting is adversarial and prompts you to verify.
+Extending is agreement wearing extra diligence, and agreement is not a thing
+anyone verifies.
+So the rule is already there and nothing calls it, which is how the escalation
+ships under the reviewer's authority with less scrutiny than a rebuttal would
+have got.
+
+Hold an escalation to the standard a rebuttal gets.
+Measure with an instrument covering the whole scope your escalation claims,
+not merely the narrower scope the finding covered, and say which instrument
+that was.
+Do not read the finding's narrowness as a bound on the reviewer's instrument.
+A reviewer can inspect a whole field set and report only the member that is
+broken, so a one-field finding can rest on a five-field probe.
+The instrument you need may therefore be the reviewer's own, run without
+whatever narrowed your view of it, rather than a new and wider one.
+When the escalation turns out to be wrong, correct it on the thread that
+carried it, not only in a later round's summary.
+A reader who saw "it is worse than you reported" has no other way to learn
+that it was not.
+
+- **Do:** verify an escalation against the full scope it claims, which is
+  wider than the scope the finding reported, and which the finding's own
+  instrument may already cover.
+- **Do:** post the correction to the thread that carried the escalation.
+- **Don't:** treat agreeing-and-extending as exempt from the checks a rebuttal
+  gets, since agreement suppresses the reflex that disagreement triggers.
+- **Don't:** report a finding as understated on a measurement you have not
+  shown covers the whole field set.
+
+(Morrison-Lab/ai-config#1056, 2026-08-02: Copilot found that the
+`LIST_SECRETS` row promised `created_at`, which `gh secret list` does not
+expose, and that finding was correct and correctly scoped to one field.
+The session ran `gh secret list --repo <owner>/<repo> --json 2>&1 | head -3`,
+read the two field names that survived its own truncation, and replied that
+the CLI failed on two of three fields rather than one, writing that into
+`tool-mappings.yml` as measured fact.
+On gh 2.96.0 that usage message lists five fields: `name`,
+`numSelectedRepos`, `selectedReposURL`, `updatedAt`, and `visibility`.
+A usage line plus the first two of those is exactly what `head -3` returns, so
+`updatedAt` was reachable all along and only `created_at` was not.
+A later round caught it, and the correction had to be posted to the original
+thread.
+
+Note which instrument was the wider one, because it is the reverse of what
+escalating assumes.
+The reviewer's report named one field and its instrument showed all five,
+while the escalation named three fields on a view of two.
+The defect was truncating a full-scope instrument rather than choosing a
+narrow one, which is why the remedy is coverage of your own claim rather than
+a probe wider than the reviewer's.)
+
 **When a finding cites a source, read the cited source before reproducing
 anything -- it is the cheaper instrument, and it is the one that can show the
 finding backwards rather than merely unsupported.**

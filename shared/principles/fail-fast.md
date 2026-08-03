@@ -409,6 +409,69 @@ published in an issue and a merged PR body as *the* verification command
 for a security invariant, so the phantom it produced was reported as a
 regression before the pattern was re-read.)
 
+### The third one arrives in the repair, and only on the empty input
+
+The two cases above are checks written wrong the first time.
+This is the one written wrong the second time, inside the fix for the first,
+which is the version that ships.
+
+The standard repair for a check that read the wrong thing is to split its one
+question across two commands: record a baseline, do the work, read again, and
+compare the two.
+That is sound while both reads encode their answers the same way.
+It stops being sound when one read supplies a chosen sentinel and the other
+supplies a default, because the two then agree on every input carrying data
+and differ on the input carrying none.
+Emptiness is usually the case such a check exists to catch, so it reports
+success on the one input it was built for.
+
+Two things keep this out of view.
+A repair carries credibility the original had just lost, since it is visibly a
+response to a real finding, so it reads as the hardened version rather than as
+new and untested code.
+And a check exercised against real data never meets the empty case at all, so
+re-running it on more real data cannot surface the gap.
+
+The control is therefore a question of **which input**, not of which stage.
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md) already
+requires a negative control to enter at the instrument's real input.
+For a comparison check whose inputs can be empty, that control is an input
+holding nothing, and it costs one run.
+
+That qualifier is doing real work, so decide it rather than assuming it.
+One question settles it: can any input this check will actually meet make
+either side's read return nothing?
+A PR that has never been reviewed is such an input, so the check below owes
+the control.
+A comparison over two fields a schema guarantees to be present is not, and
+demanding an empty run there asks for a case nobody can construct.
+Answer the question explicitly, because "absence cannot happen here" is itself
+a claim about the input domain, and it is the claim that excuses the control.
+
+- **Do:** produce both sides of a comparison with the same command and the
+  same filter, or show that they encode absence identically.
+- **Do:** run a repaired comparison check once against an empty input before
+  trusting the repair, whenever absence is reachable in its input domain.
+- **Don't:** compare a chosen sentinel against a default emptiness shape.
+- **Don't:** let a fix inherit the scrutiny that produced it, since the repair
+  is the least-reviewed code in the round.
+
+(Morrison-Lab/ai-config#1056, 2026-08-02: review round 1 found that a
+verification step read the newest bot comment *after* dispatching a run, so a
+pre-existing comment satisfied it and a broken credential read as working.
+The repair split that read in two, taking a baseline with
+`... | last | .id // "none"` and the later read with
+`... | last | "\(.id) \(.createdAt)"`.
+On jq 1.7.1 an empty selection yields `none` from the first and `null null`
+from the second, so on any PR carrying no prior bot comment the two differ and
+the check again reported success whatever the run did.
+Round 2 caught it, and the landed fix is a single filter naming all four
+outcomes rather than a patched sentinel.
+The worked commands live in
+[`refresh-claude-token`](../../skills/refresh-claude-token/SKILL.md), which
+that PR merged on 2026-08-03.
+This entry is the general rule.)
+
 ## In a guard you ship: partial is worse than absent
 
 Everything above concerns a check whose failure is invisible **at runtime**,

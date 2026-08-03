@@ -80,8 +80,11 @@ mutates a PR stays serial.
    That staleness is what bounds the fan-out rather than runner contention:
    nothing here pushes, so the cost of going wider is that the last patch
    applied has waited longest and is likeliest to be stale.
-   Prefer a narrow wave, and re-run preparation rather than stretching one
-   across many PRs.
+   Default to a wave of about **3**, and shrink it when the queue is moving
+   fast --- frequent merges to `main` invalidate preparation sooner, so a
+   busy repo wants a narrower wave than a quiet one.
+   Re-run preparation for a later wave rather than stretching one across
+   every PR at once.
 
 3. **For each PR/MR, in series, run ARDI** (the full single-PR loop --- see the
    `ardi` skill): claim → sync main → read latest review → ARD every finding →

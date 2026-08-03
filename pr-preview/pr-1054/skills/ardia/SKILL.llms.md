@@ -31,7 +31,7 @@ Apply the ARDI loop (ARD + iterate) to every open PR/MR in the repo, driving eac
 
     Skip the fan-out for stacked PRs, for PRs whose likely file footprints overlap, and whenever independence is uncertain. Consolidate the prepared findings and patches before step 3 begins.
 
-    **A prepared patch is a snapshot, not a decision.** Re-read the latest review and CI state when the serial loop reaches that PR, and re-derive the patch if either has moved. `main` advancing or a new review round landing invalidates a prepared patch silently, and applying a stale one costs a review round rather than saving one. That staleness is what bounds the fan-out rather than runner contention: nothing here pushes, so the cost of going wider is that the last patch applied has waited longest and is likeliest to be stale. Prefer a narrow wave, and re-run preparation rather than stretching one across many PRs.
+    **A prepared patch is a snapshot, not a decision.** Re-read the latest review and CI state when the serial loop reaches that PR, and re-derive the patch if either has moved. `main` advancing or a new review round landing invalidates a prepared patch silently, and applying a stale one costs a review round rather than saving one. That staleness is what bounds the fan-out rather than runner contention: nothing here pushes, so the cost of going wider is that the last patch applied has waited longest and is likeliest to be stale. Default to a wave of about **3**, and shrink it when the queue is moving fast — frequent merges to `main` invalidate preparation sooner, so a busy repo wants a narrower wave than a quiet one. Re-run preparation for a later wave rather than stretching one across every PR at once.
 
 3.  **For each PR/MR, in series, run ARDI** (the full single-PR loop — see the `ardi` skill): claim → sync main → read latest review → ARD every finding → push → post summary → re-request review → repeat until fully clean. Don’t reimplement that loop here; follow it per PR.
 
@@ -65,7 +65,7 @@ Apply the ARDI loop (ARD + iterate) to every open PR/MR in the repo, driving eac
 
 ARDIA serializes every action that **mutates** a PR (see *Process PRs one at a time* above): each round claims, pushes, triggers shared review runners, and polls for the result, so parallel pushes collide and make per-PR status illegible. A Workflow does not change that external limit — do **not** fan out the claim — push — re-review — merge loop.
 
-What you *can* orchestrate is step 2: the read-only survey, and the isolated local preparation that feeds it. Use one worktree per independent PR, and say in the worker’s prompt that its patch stays uncommitted and that no forge state may change — a worker told only to “fix the findings” will reach for `gh` and `git push` on its own. Consult `shared/workflow/when-to-orchestrate.md` (the shared-runner exception); default to the serial loop, and propose the fan-out only when there are many PRs to survey.
+What you *can* orchestrate is step 2: the read-only survey, and the isolated local preparation that feeds it. Step 2 states the worker’s limits, and a Workflow relaxes none of them — spell them out in the worker’s prompt, because a worker told only to “fix the findings” will reach for `gh` and `git push` on its own. Consult `shared/workflow/when-to-orchestrate.md` (the shared-runner exception); default to the serial loop, and propose the fan-out only when there are many PRs to survey.
 
 ### Lightweight sidecar delegation
 

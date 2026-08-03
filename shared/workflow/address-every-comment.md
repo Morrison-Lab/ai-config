@@ -72,6 +72,90 @@ breaks it in the same pass, rather than waiting for the reviewer to flag each
 occurrence in a separate round. Re-scan the whole changed file for the same
 pattern before pushing the fix.
 
+**That rule's scope is "the same file", and a reviewer who enumerates the sites
+is the reason the scope goes unquestioned.**
+A pattern finding usually arrives with a list attached: three spots, named,
+each with a file and a line.
+That list is a snapshot of where the reviewer happened to look, never the
+extent of the pattern.
+A reviewer reports the instances it noticed while reading a diff, which is not
+the same operation as sweeping for them.
+
+Inheriting the list rather than deriving it reads as responsive rather than as
+under-scoped, which is what lets it survive a round.
+The reviewer found the problem, so its account of the problem carries the
+authority of the finding itself, and fixing exactly what was named is
+indistinguishable --- from the inside and from the thread --- from fixing the
+pattern.
+The failure then reproduces one round later in a file the enumeration did not
+name, which is the round the rule above exists to save.
+
+The tell is lexical, and it sits in your own reply: **"fixed all three spots
+you named"**.
+Quoting the reviewer's count is the signal that the set was inherited, since a
+derived set has no reason to agree with a number someone else supplied.
+
+So derive the site list with a command: pipe the whole diff through a grep for
+the flagged phrase, and widen the search past the diff when that phrase was
+copied in from somewhere else.
+
+Pick the pattern shorter than the phrase, though.
+This corpus mandates semantic line breaks, so a multi-word phrase routinely
+straddles a newline, and a line-oriented grep for the whole thing then matches
+nothing --- a derived set can come back empty for a formatting reason rather
+than a factual one, which is the same false-negative this file treats at length
+under its own semantic-line-break corollary.
+A short distinctive fragment is the reliable choice.
+
+Then report what was **swept** rather than what was fixed.
+"Grepped the whole diff for `X|Y|Z`, four hits, all four fixed" is checkable,
+while "fixed all three" asserts a scope nobody measured.
+
+This is [`derive-dont-enumerate`](derive-dont-enumerate.md)'s principle applied
+to a review finding's site list rather than to work items, and that is the
+transferable part.
+Every fix is individually correct while the coverage claim over them is false,
+so the gap is a property of the **set** rather than of any member --- nothing
+in the diff, the tests, or the thread reports it.
+
+Distinct from
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "never predict which case
+will fail; enumerate the class", which shares this remedy and has a different
+trigger.
+There the list is one **you** produced from intuition, so the rule fires on
+your own naming of a member.
+Here the list arrived from someone with more standing to write it than you had,
+which is why nothing about accepting it feels like guessing.
+
+- **Do:** derive the site list by grepping the whole diff for the flagged
+  phrase, and fix what the grep returns.
+- **Do:** report the sweep --- the pattern searched and the hit count ---
+  rather than the number of sites you fixed.
+- **Don't:** treat a reviewer's enumeration as the extent of the pattern; it is
+  the extent of that reviewer's read.
+- **Don't:** write "all N spots you named" into a reply, since quoting the
+  reviewer's count is the tell that no sweep ran.
+- **Don't:** read a null result as "no further sites"; it means no further hit
+  for that pattern, and a differently-worded instance would not have matched.
+
+(`Morrison-Lab/gha#398`, 2026-08-03: round 1 flagged an unquantified
+superlative, "the corpus's most common paragraph opener", and named three sites
+--- `CLAUDE.md`, a `changelog.d/` fragment, and a code comment in
+`check-new-line-breaks/check-new-line-breaks.py`.
+Commit `698d0af` touched exactly those three files, and the reply read "in all
+three spots you named".
+Round 4 then found a fourth site, a comment block in
+`check-new-line-breaks/tests/test_check_new_line_breaks.py`.
+Its finding opened "Fourth site with the same unquantified-superlative issue,
+missed by the two rounds that fixed the other three" --- the reviewer's words,
+not the code comment's, which says nothing about review rounds.
+The sweep was available in round 1 and would have closed it there:
+`git diff origin/main...e0e08e2 | grep -E 'most common|single most|house style'`,
+run against round 1's own head, returns five hits across all four files.
+The same grep at the fixed head returns no further hit for that pattern, which
+is the other half of the check --- though only for that pattern, since a
+superlative worded differently would not match it.)
+
 **When a prose fix changes wording that's also paraphrased elsewhere in the
 same PR (a CHANGELOG entry, a PR description, a cross-reference), sync that
 copy too.** A CHANGELOG entry written before the review lands often quotes or

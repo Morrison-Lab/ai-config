@@ -884,6 +884,22 @@ confirm a genuine all-clear review is posted at the current head from an externa
 a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
 doesn't satisfy this once an external verdict is obtainable.
 
+**A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for.**
+A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.
+The gap is specific and predictable: a shallow self-review checks *structure* --- a dogfood back-reference, ASCII punctuation, semantic line breaks --- and skips the prose *fact-check*, so a false mechanism claim or a misattributed citation sails straight through, since a structural pass has nothing to say about either.
+Run the applicable prose-review skills against the diff's own factual claims, not just its shape: [`fact-check-prose`](shared/writing/fact-check-prose.md), plus the **cause** and **citation** claim-type checks in [`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md) --- a claim about *why* some mechanism behaves as it does gets asked what else would explain it, and a citation gets read against what the cited source actually says.
+This is the fallback-specific sharpening of "Apply the same review standards the bot would" above: the standard does not relax because the reviewer it replaces happened to be absent.
+
+- **Do:** run `fact-check-prose` and the mechanism/citation checks on a fallback self-review, exactly as on any pre-push self-review.
+- **Do:** treat the fallback's stopgap feel as the cue to slow down, not as license to skip the semantic checks.
+- **Don't:** let a fallback self-review stop at structural checks (dogfood, ASCII, line breaks) and report "no findings".
+- **Don't:** read "the bot was down" as permission for a lighter review than the bot itself would have given.
+
+(Morrison-Lab/ai-config#1092, 2026-08-03: a FALLBACK self-review was posted while `claude-review` was erroring on infra failures, and it reported "no findings / ready" while missing two content bugs the recovered bot then caught.
+One was a false mechanism claim --- the prose said a directional-word grep "passes because the direction ('above') stays right", when that grep's word list is exclusively forward-pointing and never evaluates "above" at all.
+The other was a misattributed citation --- prose credited a "name the target, don't count to it" preference to `shared/writing/definition-crossrefs.md`, which is about formal Quarto crossref-div ordering and says no such thing.
+Both are semantic errors that escape mechanical checks, which is the very subject the reviewed section was about; the self-review had run the structural checks and not `fact-check-prose`.)
+
 ## Watch and ARDI every PR you touch — don't ask first
 
 When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.

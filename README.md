@@ -247,9 +247,14 @@ the rule is consulted when it is *read* and broken when a message is
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 
-Each hook ships a `test-<name>.py` beside it; `scripts/test_hooks.py` runs them
-all (pairing each with its subject) and gates `validate` and pre-commit, so a
-guard cannot regress unnoticed.
+A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
+every such suite (pairing each with its subject) and also checks the reverse
+direction --- it enumerates the hooks and flags any that lack a test --- so a
+*tested* guard cannot regress unnoticed and an *untested* one cannot hide. It
+gates `validate` and pre-commit. Two hooks are untested today
+(`no-offer-to-file.py`, `inject-local-time.sh`), carried in an explicit
+`KNOWN_UNTESTED` allowlist and tracked in
+[#1080](https://github.com/Morrison-Lab/ai-config/issues/1080).
 
 `bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
 directory, so the scripts arrive with no extra step.

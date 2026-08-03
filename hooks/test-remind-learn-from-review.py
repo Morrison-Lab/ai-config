@@ -3,8 +3,21 @@
 The value is concentrated in the negative cases. This hook fires on accepting a
 reviewer's finding, and the phrases that signal acceptance ("good catch",
 "you're right") are also said to the USER and in non-review contexts. A guard
-that nags on those, or on a Rebut, or when the learning was already recorded,
-gets switched off -- and then the case it exists for goes unprotected too.
+that nags on those, or on a Rebut, or that goes SILENT because the ordinary fix
+looks like a recorded learning, gets switched off -- and then the case it
+exists for goes unprotected too.
+
+Several cases below are regression tests for the ai-config#1075 review, pasted
+close to the reviewer's own examples per algorithmatize-checks' "test against
+the incident verbatim":
+  * the fix itself (an edit to shared/CLAUDE.md/memories) is NOT a discharge;
+  * a Read/Grep of a hook/CI path is NOT a mechanism;
+  * routine prose ("no check is failing", "already tracked in #N") is NOT a
+    one-off judgment;
+  * review context must be NEAR the acceptance, not merely earlier in the
+    session;
+  * "good pointer" must not match "good point";
+  * a non-dict JSON payload must fail open and silent.
 
 Run: python3 hooks/test-remind-learn-from-review.py hooks/remind-learn-from-review.py
 """
@@ -30,56 +43,96 @@ def tool(name, inp):
 # A review-surface action, establishing PR-review context.
 REVIEW = tool("resolve_review_thread", {"threadId": "x"})
 # Accepting a finding; the sentence also names the reviewer, so it carries its
-# own context as well.
+# own context.
 ACCEPT = say("Good catch -- the reviewer is right, the regex misses the "
              "anchored form.")
-# Discharges: the learning half, the mechanism half, and the one-off judgment.
-MEM_WRITE = tool("Write", {"file_path": "memories/git.md", "content": "..."})
+
+# Discharges.
+UMS_BASH = tool("Bash", {"command": "echo running the ums pass now"})
+UMS_TASK = tool("Task", {"description": "record learnings",
+                         "prompt": "run ums to record what the review taught"})
 HOOK_WRITE = tool("Write", {"file_path": "hooks/no-x.py", "content": "..."})
-UMS_BASH = tool("Bash", {"command": "echo running ums pass"})
+
+# NON-discharges (the fix, or a read, or routine prose).
+FIX_SHARED = tool("Edit", {"file_path": "shared/workflow/fully-clean.md",
+                           "old_string": "a", "new_string": "b"})
+FIX_MEMORY = tool("Write", {"file_path": "memories/git.md", "content": "..."})
+READ_HOOK = tool("Read", {"file_path": "hooks/no-offer-to-file.py"})
+GREP_CI = tool("Grep", {"pattern": "x", "path": ".github/workflows/"})
+
+# Neutral filler carrying no review word and no acceptance, to push an
+# acceptance out of REVIEW_WINDOW of the last review signal.
+FILLER = [say(f"Working on the next file, step {n}.") for n in range(8)]
 
 
 # (events, should_remind, label)
 CASES = [
-    # The exact case this exists for: a reviewer finding accepted, nothing
-    # recorded after it.
+    # The case this exists for: a reviewer finding accepted, nothing recorded.
     ([REVIEW, ACCEPT], True,
      "accepted finding with no follow-up reminds"),
-    # The acceptance sentence names the reviewer, so context needs no tool.
     ([ACCEPT], True,
      "acceptance naming the reviewer carries its own context"),
 
-    # Discharged, by any of the three routes.
-    ([REVIEW, ACCEPT, MEM_WRITE], False,
-     "a memory write after the acceptance discharges it"),
-    ([REVIEW, ACCEPT, HOOK_WRITE], False,
-     "building a hook after the acceptance discharges it"),
+    # Discharged only by an EXPLICIT learning / mechanism / one-off.
     ([REVIEW, ACCEPT, UMS_BASH], False,
-     "a ums pass after the acceptance discharges it"),
+     "an explicit ums pass discharges it"),
+    ([REVIEW, ACCEPT, UMS_TASK], False,
+     "a subagent dispatched to run ums discharges it"),
+    ([REVIEW, ACCEPT, HOOK_WRITE], False,
+     "writing a hook file discharges it (mechanism)"),
     ([REVIEW, say("Good catch from the reviewer -- but this is a one-off "
-                  "typo, no rule would catch it.")], False,
+                  "typo, no rule would have caught it.")], False,
      "an explicit one-off judgment discharges it"),
+
+    # Regression (finding 2): the FIX is not the lesson. Editing the flagged
+    # corpus file, or any memory file, must NOT discharge.
+    ([REVIEW, ACCEPT, FIX_SHARED], True,
+     "editing the flagged shared/ file (the fix) does not discharge"),
+    ([REVIEW, ACCEPT, FIX_MEMORY], True,
+     "a bare memory write is not an explicit learning pass"),
+
+    # Regression (finding 3): a read builds nothing.
+    ([REVIEW, ACCEPT, READ_HOOK], True,
+     "reading a hook file does not discharge"),
+    ([REVIEW, ACCEPT, GREP_CI], True,
+     "grepping .github/workflows/ does not discharge"),
+
+    # Regression (finding 5): routine prose is not a one-off judgment.
+    ([REVIEW, ACCEPT, say("All green: no check is failing on this head.")],
+     True, "'no check is failing' does not discharge"),
+    ([REVIEW, ACCEPT, say("The finding is already tracked in #1065.")], True,
+     "'already tracked in #N' does not discharge"),
+    ([REVIEW, ACCEPT, say("There is no rule about this yet, so I added one.")],
+     True, "'no rule about this' does not discharge"),
 
     # A Rebut is the opposite disposition and must never fire.
     ([REVIEW, say("The reviewer is wrong here; the pattern is valid. "
                   "Rebutting with the repro.")], False,
      "a rebuttal does not remind"),
 
-    # Acceptance vocabulary with NO review context must not fire -- this is the
-    # 'good catch' said to the user.
+    # Regression (finding 4): review context must be NEAR. An earlier review
+    # action followed by unrelated agreement with the user is not an accept.
+    ([REVIEW] + FILLER + [say("You're right, let's use tabs instead.")], False,
+     "agreement far from any review signal does not remind (staleness)"),
+    ([REVIEW, say("You're right, let's use tabs instead.")], True,
+     "agreement immediately after a review signal still counts"),
+
+    # Regression (finding 6): word boundary. "good pointer" is not "good point".
+    ([REVIEW, say("That is a good pointer to the reviewer's docs.")], False,
+     "'good pointer' does not match 'good point'"),
+
+    # Acceptance with no review context anywhere must not fire.
     ([say("Good catch, thanks! I'll add that to the plan.")], False,
      "acceptance with no review context does not remind"),
 
-    # Quoting the rule (inline code) is stripped by visible_prose, so it must
-    # not fire even though 'reviewer' is present.
+    # Quoting the rule (inline code) is stripped by visible_prose.
     ([REVIEW, say("The `good catch` convention for a reviewer is discussed "
                   "in the fragment.")], False,
      "an inline-code mention of the phrase does not remind"),
 
-    # Ordering: a recording BEFORE the acceptance does not discharge a later
-    # one.
-    ([MEM_WRITE, REVIEW, ACCEPT], True,
-     "a memory write preceding the acceptance does not count"),
+    # Ordering: a discharge BEFORE the acceptance does not count.
+    ([UMS_BASH, REVIEW, ACCEPT], True,
+     "a ums pass preceding the acceptance does not count"),
 ]
 
 
@@ -89,14 +142,11 @@ def run(events):
         for e in events:
             fh.write(json.dumps(e) + "\n")
     try:
-        # Fresh sentinel dir per case, so the once-per-acceptance guard does
-        # not make later cases silently pass.
         env = dict(os.environ, TMPDIR=tempfile.mkdtemp())
         out = subprocess.run(
             [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True, env=env,
         )
-        # It must NEVER block: no Stop-hook decision, ever, and always exit 0.
         assert out.returncode == 0, f"non-zero exit: {out.returncode}"
         assert '"decision"' not in out.stdout, "must never emit a block decision"
         return "[hook: remind-learn-from-review]" in out.stdout
@@ -131,6 +181,18 @@ def main():
     else:
         print("FAIL: should fail open on an unreadable transcript")
         failures += 1
+
+    # Regression (finding 7): a non-dict JSON payload must fail open and silent.
+    for bad in ('"just-a-string"', "null", "[1,2]", "42"):
+        out = subprocess.run(
+            [sys.executable, HOOK], input=bad, capture_output=True, text=True)
+        if out.returncode == 0 and not out.stdout and not out.stderr:
+            print(f"PASS: non-dict payload {bad!r} fails open and silent")
+            passes += 1
+        else:
+            print(f"FAIL: non-dict payload {bad!r} did not fail silent "
+                  f"(rc={out.returncode}, out={out.stdout!r}, err={out.stderr[:60]!r})")
+            failures += 1
 
     # The complement it was built to cover: the first-person sibling must NOT
     # fire on an accepted reviewer finding, which is exactly why this hook is

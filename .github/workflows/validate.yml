@@ -61,9 +61,10 @@ jobs:
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
       - name: Run enforcement-hook tests
-        # Each hook in hooks/ ships a test-<name>.py that ran nowhere until now
-        # (ai-config#1065): the guards that enforce the corpus's rules were
-        # themselves unverified. This runner pairs each test with its subject.
+        # The hooks/ guards enforce corpus rules but their test-<name>.py files
+        # ran nowhere until now (ai-config#1065). This runner pairs each test
+        # with its subject AND flags any hook missing a test (ai-config#1080),
+        # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
       - name: Measure the auto-loaded context closure (advisory)
         # Reports rather than gates, and deliberately so: this repo is

@@ -202,6 +202,8 @@ If `git worktree remove` reports the tree is dirty, that worktree was misclassif
 
 If `git branch -d` refuses (squash/rebase merge can hide the merge), confirm the PR merged (`gh pr list --head <branch> --state merged`) before `git branch -D`.
 
+**A branch that was ever pushed as a PR head is recoverable after deletion**, so a `-D` here is far less consequential than it looks: GitHub retains `refs/pull/N/head` permanently, and it still resolves once the branch is gone (`git fetch origin refs/pull/<N>/head`). See `memories/git.md`, “GitHub keeps `refs/pull/N/head` forever”. The exception is the one that matters — a branch **never pushed** has no such ref, which is why an unpushed worktree branch still needs confirmation.
+
 **A squash merge does not reliably force that refusal, so expect both outcomes in one sweep.** `git-branch(1)` checks the branch against its **upstream** — “fully merged in its upstream branch, or in HEAD if no upstream was set”. So a branch still tracking a live `origin/<name>` passes `-d` regardless of what `main` contains, printing `warning: deleting branch 'X' that has been merged to 'refs/remotes/origin/X', but not yet merged to HEAD.` Only once the remote ref is gone (auto-delete on merge, or `gh pr merge --delete-branch`) does the check fall back to HEAD and refuse. A sweep of 29 branches split 18 `-d` / 11 `-D` on that basis alone. So don’t read a needed `-D` as a red flag, and don’t read a successful `-d` as proof the work reached `main` — step 3’s classification is what establishes that, not the deletion flag.
 
 ### 6. Final prune + report

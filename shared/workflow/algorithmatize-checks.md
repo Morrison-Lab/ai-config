@@ -378,6 +378,25 @@ an unterminated-quote-with-trailing-backslash shape the deterministic cases
 never build was caught by `fuzz()` in isolation, while the real parser passed
 4000 rounds.)
 
+**A guard whose condition ANDs several clauses masks its own mutation test the
+same way, one level in.**
+The suite-level trap above is a *sibling test case* aborting first; this is a
+*sibling clause* in the very condition you are mutating.
+When a guard reads `if a and b and c`, reverting clause `b` alone still passes
+any regression case that clause `a` or `c` also keeps correct --- so the
+mutation looks covered when it is not, a false negative that hides an untested
+clause.
+Construct a test that isolates each clause: an input where *only* that clause
+keeps the result correct, so reverting it is the one change that flips the
+outcome.
+Then mutation-check each clause separately, per [`ardi`](ardi.md)'s "seen to
+fail" rule applied clause by clause rather than once for the whole condition.
+(Morrison-Lab/ai-config#1042, 2026-08-03: `hooks/no-unreviewed-pr.py`'s
+discharge fired only when structural-identity, "last simple command", and
+same-PR-scoping clauses all held, and a single regression case that two of the
+three clauses each kept correct made reverting any one of them still pass; each
+clause needed its own isolating case before the mutation test meant anything.)
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

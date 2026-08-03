@@ -595,9 +595,10 @@ enumeration one round at a time.
 (Morrison-Lab/ai-config#1042, 2026-08-03: `hooks/no-unreviewed-pr.py` has four
 parallel open/draft/request/self discharge-and-identity paths, and the
 fail-safe guard --- structural identity, "last simple command", same-PR
-scoping --- was applied to them one at a time across a nine-round review, each
-round surfacing the one path not yet guarded: round 7 shell parsing, round 8
-the `open` path, round 9 the `self` path.
+scoping --- was applied to them one at a time across the review rather than all
+at once, and each subsequent round surfaced the one path still unguarded: the
+shell-command parser underlying them, then the `open` path (`open_ident`), then
+the `self` discharge.
 The per-path *discharge* mechanics of that same PR are in the section below.)
 
 ## A guard's discharge fires on positive success, not the absence of failure

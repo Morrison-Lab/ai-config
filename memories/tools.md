@@ -620,4 +620,4 @@ which for a discharge/attribution guard is exactly the "combined result cannot
 attribute a per-step outcome" failure in
 [`fail-fast`](../shared/principles/fail-fast.md).
 (Morrison-Lab/ai-config#1042, 2026-08-03: both surfaced while building
-`hooks/no-unreviewed-pr.py`'s shell-command parser, round 7 of its review.)
+`hooks/no-unreviewed-pr.py`'s shell-command parser during its review.)

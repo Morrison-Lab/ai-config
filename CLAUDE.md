@@ -291,6 +291,15 @@ The first `git branch -D` failed with the worktree message, and `git worktree li
 
 **When flagging a good moment to `/clear`, offer archiving as the default alternative.** Whenever there's a meaningful chance I'd want to come back to this conversation later, recommend leaving the session alone and starting a fresh one for the next task, instead of `/clear`ing it -- the old session stays fully retrievable (nothing to lose), at the cost of a small navigation step to reopen it. Reserve a bare `/clear` recommendation for when nothing in the session is worth revisiting; when in doubt, default to the archive-and-start-new option since it's strictly safer.
 
+**`/compact` is a third alternative, for weak continuity rather than a clean break.**
+When the next move is to keep working on *loosely related* things in the same window -- no concrete open item, so not the live state that triggers the `compress-session` flag, but enough of a thread that a clean slate would lose something worth keeping -- recommend `/compact` instead of archive-and-start-new.
+It carries a lossy summary forward in place, keeping the gist and skipping the reopen step, at the cost of a session that keeps growing and detail that is lost.
+Pick among the options by what the *next* work needs from this session.
+Nothing and unrelated is archive-and-start-new, or a bare `/clear` when nothing is worth keeping;
+the gist in the same window is `/compact`;
+the full live task state is the `compress-session` flag, not this one.
+Archive still beats compact for pure *reference*, since a retrievable full thread dominates a lossy summary, so reserve the compact recommendation for continuation rather than preservation.
+
 ## Flag good moments to run `compress-session`, too
 
 The mid-task counterpart to the section above: don't wait for the automatic compaction to guess what matters, and don't wait to be asked.

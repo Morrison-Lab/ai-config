@@ -290,6 +290,29 @@ case(create("c") + [bash("gh pr ready 1038 -R o/r --undo", tid="d"),
                     res("d", "failed to convert PR to draft", err=True),
                     say("Tried to undo ready; it failed.")], True,
      "a failed gh pr ready --undo keeps the ready PR tracked")
+# A draft transition chained AHEAD of a succeeding command has an is_error that
+# belongs to the LATER command, so the clear cannot trust it -- exactly the
+# ordering hazard the reviewer-request discharge already guards against. Here
+# the `--undo` genuinely fails ("cannot revert to draft state") but `echo done`
+# succeeds (is_error=False) and the failure text carries no error-word/4xx, so
+# the broad whole-body flag alone would wrongly read success. The clear must
+# NOT fire: silently dropping this leaves a ready, unreviewed PR unguarded.
+case(create("c") + [bash("gh pr ready 1038 --undo; echo done", tid="u"),
+                    res("u", "pull request cannot revert to draft state\ndone",
+                        err=False),
+                    say("Tried to undo ready; unclear if it worked.")], True,
+     "a failed --undo chained ahead of a success keeps the PR tracked")
+case(create("c") + [bash("gh pr ready 1038 --undo || echo done", tid="u"),
+                    res("u", "could not convert\ndone", err=False),
+                    say("Tried to undo ready with a fallback.")], True,
+     "a failed --undo with a `|| echo` fallback keeps the PR tracked")
+# The ordering guard is about POSITION, not about forbidding chaining: a draft
+# action that IS the last simple command (even preceded by another command)
+# still has an authoritative is_error, so a genuine success still clears.
+case(create("c") + [bash("echo start; gh pr ready 1038 --undo", tid="u"),
+                    res("u", "start\n{}", err=False),
+                    say("Held as a draft after a preamble.")], False,
+     "a successful --undo as the last command still clears")
 
 # --- per-PR identity: one request does not clear another PR ---
 case([bash("gh pr create --title a", tid="a"), res("a", URL),

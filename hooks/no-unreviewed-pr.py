@@ -262,6 +262,53 @@ def request_ident(cmd):
     return False, None, None, False
 
 
+def _argv_draft(argv):
+    """True if one simple command's argv is a draft transition.
+
+    Structural, exactly like _argv_request: a `--draft`/`gh pr ready --undo`
+    quoted inside a DIFFERENT command's `--body` tokenizes as a single argument
+    and so does not match, preserving the anti-forgery property RX_DRAFT gets
+    from _scrub_all. Identity is not needed here (the caller already has it from
+    cmd_ident); this only decides ordering.
+    """
+    if not argv:
+        return False
+    # `gh pr ready [<N>] --undo` converts a ready PR BACK to draft.
+    if len(argv) >= 3 and argv[0] == "gh" and argv[1] == "pr" \
+            and argv[2] == "ready" and _has_flag(argv[3:], "--undo"):
+        return True
+    # A real `--draft` flag, or a `draft=true`/`draft:true` key/value token
+    # (`gh pr create --draft`, `gh api ... -f draft=true`) -- a bare argv token,
+    # never the interior of a quoted string.
+    for a in argv:
+        if a == "--draft":
+            return True
+        if a.replace('"', "").replace("'", "").replace(" ", "").lower() \
+                in ("draft=true", "draft:true"):
+            return True
+    return False
+
+
+def _draft_last(cmd):
+    """True if the draft transition is the LAST simple command in the chain.
+
+    That is exactly when the harness `is_error` (the WHOLE call's exit status,
+    i.e. its last command) is authoritative for the transition's own outcome --
+    the same reasoning `request_ident`'s `last` encodes for a reviewer request.
+    A draft action chained AHEAD of another command has an is_error belonging to
+    a later command, so the discharge must treat it as AMBIGUOUS.
+
+    Conservative on every uncertainty (unparseable command, or a last simple
+    command that is not itself a draft action): returns False, the safe
+    over-warn direction, which keeps the PR tracked rather than risk silently
+    clearing a genuinely-failed transition.
+    """
+    cmds = _simple_commands(cmd)
+    if not cmds:
+        return False
+    return _argv_draft(cmds[-1])
+
+
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
 # other tool's serialized input is the documentation/heredoc false positive
 # README.md:265-271 warns about -- self-demonstrating here, since these very
@@ -482,13 +529,33 @@ def scan(path):
                             or bool(RX_REQ_FAILED.search(body))
                         if not req_failed:
                             _clear(obligations, rnum2 or rnum, rrepo2 or rrepo)
-                    # A deferred draft transition clears its PR only if the
-                    # transition's own result did not fail. `failed` here is the
-                    # broad whole-body flag, so any hint of failure keeps the PR
-                    # tracked -- the safe over-warn direction for a clear.
+                    # A deferred draft transition clears its PR only on POSITIVE
+                    # evidence the transition itself succeeded -- a clear is the
+                    # DANGEROUS action (it asserts the PR is now a draft and
+                    # needs no reviewer), so it obeys the same fail-safe rule the
+                    # reviewer-request discharge above does.
+                    #
+                    # `is_error`/`failed` is the WHOLE call's exit status, so it
+                    # is authoritative for the transition ONLY when the draft
+                    # action is the last simple command (`clast`) or an atomic
+                    # structured tool. A `gh pr ready --undo` that genuinely
+                    # fails but is chained AHEAD of a succeeding command (e.g.
+                    # `... --undo; echo done`, or `... --undo || true`) has an
+                    # is_error belonging to that later command -- so such a call
+                    # is AMBIGUOUS and must NOT discharge (keep the PR tracked --
+                    # the safe over-warn direction), never silently clear a
+                    # still-ready, unreviewed PR.
+                    #
+                    # For the last/atomic case the BROAD `failed` (not the
+                    # narrower RX_REQ_FAILED the request side uses) is
+                    # deliberate: for a clear, over-warning is the SAFE direction,
+                    # so a broader failure signal is strictly safer here -- per
+                    # shared/principles/fail-fast.md, prefer keeping the over-warn
+                    # rather than narrowing it to cut nags.
                     if rid in pending_clear:
-                        cnum, crepo = pending_clear.pop(rid)
-                        if not failed:
+                        cnum, crepo, clast = pending_clear.pop(rid)
+                        clear_failed = (not clast) or failed
+                        if not clear_failed:
                             _clear(obligations, cnum, crepo)
                     continue
 
@@ -518,7 +585,9 @@ def scan(path):
                         # only if it SUCCEEDS. Clearing at tool_use time would
                         # forget a still-ready PR when the transition fails, so
                         # defer the clear to this call's own non-failed result.
-                        pending_clear[tid] = (num, repo)
+                        # A structured tool is atomic -- one tool_use, one result
+                        # -- so is_error reflects THIS transition: last=True.
+                        pending_clear[tid] = (num, repo, True)
                     elif inp.get("draft") is False:
                         obligations.append({"num": num, "repo": repo,
                                             "tid": tid,
@@ -556,7 +625,10 @@ def scan(path):
                 # ready --undo` that fails leaves the PR ready, so clearing at
                 # tool_use time would silently forget it.
                 if draft:
-                    pending_clear[tid] = (num, repo)
+                    # last=whether the draft action is the last simple command,
+                    # so the discharge can trust is_error only then (mirrors the
+                    # `rlast` guard a chained-ahead reviewer request needs).
+                    pending_clear[tid] = (num, repo, _draft_last(cmd_raw))
                 elif opened:
                     obligations.append({"num": num, "repo": repo, "tid": tid,
                                         "self": requested})

@@ -116,6 +116,28 @@ case([use("create_pull_request", tid="c", title="x",
           reviewers=["copilot-pull-request-reviewer"]),
       res("c", '{"number":1038}'), say("Opened with a reviewer.")], False,
      "the harness create tool with a reviewers field self-discharges")
+# `update_pull_request` marking a PR ready AND requesting reviewers, whose
+# reviewer-add fails with a bare `{"status":422}` (no PR number echoed -- the
+# ordinary error shape). The PR number is known from the INPUT (`pull_number`),
+# so the "failed + no identity in the result" drop must NOT fire: the PR was
+# genuinely marked ready with no reviewer, and dropping it would silently
+# discharge exactly the dangerous false-negative every round has blocked on.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False,
+          reviewers=["copilot-pull-request-reviewer"]),
+      res("u", '{"status":422,"message":"Reviewers could not be requested"}',
+          err=True),
+      say("Marked ready and tried to add a reviewer; it 422'd.")], True,
+     "a ready+reviewers edit whose reviewer-add fails keeps the PR tracked")
+# The create counterpart: a create whose reviewer step fails but whose result
+# DOES echo the PR number is real and must stay tracked (identity known from
+# the result rather than the input).
+case([use("create_pull_request", tid="c", owner="o", repo="r", title="x",
+          reviewers=["copilot-pull-request-reviewer"]),
+      res("c", '{"number":1038,"errors":[{"message":"cannot be requested"}]}',
+          err=True),
+      say("Opened with a reviewer; the reviewer step failed.")], True,
+     "a create+reviewers whose reviewer step fails but echoes the number tracks")
 case(create("c") + [bash(REQ_CMD, tid="q"), res("q", FAIL, err=True),
                     say("Requested.")], True,
      "a FAILED (422) request does not discharge it")

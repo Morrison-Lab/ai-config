@@ -416,17 +416,29 @@ def scan(path):
                             keep.append(ob)
                             continue
                         # `failed` is one flag over the WHOLE result body, but a
-                        # single Bash call can chain a create with a trailing
-                        # request (`gh pr create ... && gh api ...
-                        # requested_reviewers -X POST`, or `gh pr create
-                        # --reviewer` whose reviewer step 422s). A failure there
-                        # must not be read as the create failing:
-                        #   * failed AND no PR identity resolved -> the open
-                        #     itself failed, no PR exists, so drop it.
-                        #   * failed BUT a PR URL/number is present -> the create
-                        #     SUCCEEDED and the trailing request is what failed;
-                        #     the PR is real and unreviewed, so keep tracking it.
-                        if failed and rnum is None:
+                        # single call can pair opening a PR with requesting a
+                        # reviewer (`gh pr create --reviewer` whose reviewer step
+                        # 422s, or `update_pull_request(draft=False,
+                        # reviewers=[...])` whose reviewer-add fails). A failure
+                        # there must not be read as the PR never existing:
+                        #   * failed AND the PR's identity is STILL unknown (never
+                        #     in the input, not in this result) -> the open itself
+                        #     is what failed, no PR exists to track, so drop it.
+                        #     This is the `create_pull_request`/`gh pr create`
+                        #     case, whose number is only ever learned from the
+                        #     result -- a create that failed without yielding a
+                        #     number yielded no PR.
+                        #   * failed BUT the PR's identity is known -- resolved
+                        #     here (a URL/number in the result) OR already known
+                        #     from the input (`update_pull_request`'s
+                        #     `pull_number`, populated at append time) -> the PR
+                        #     is real and its reviewer step is what failed, so
+                        #     keep tracking it and let the `self` check below hold
+                        #     it outstanding. Dropping a known-identity obligation
+                        #     on a bare `{"status":422}` body (no number echoed --
+                        #     the ordinary error shape) would silently clear a PR
+                        #     that was genuinely marked ready with no reviewer.
+                        if failed and rnum is None and ob["num"] is None:
                             continue
                         if ob["num"] is None and rnum:
                             ob["num"] = rnum

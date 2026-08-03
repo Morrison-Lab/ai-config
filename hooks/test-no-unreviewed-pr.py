@@ -225,6 +225,51 @@ case([bash("gh pr create --title x --body y && "
                '{"requested_reviewers":[{"login":"Copilot"}]}'),
       say("Opened and requested in one call; both succeeded.")], False,
      "a chained create + successful request in one call discharges")
+# --- the `self` (create+reviewer) discharge is guarded like pending[tid] ---
+# `self` comes from request_ident over the WHOLE command, so the matched request
+# may be a NON-LAST command whose own failure is masked by a trailing success.
+# Here `gh pr edit --add-reviewer` (index 1 of 3) genuinely fails with GraphQL
+# text matching none of RX_FAILED's alternatives, but the trailing `gh pr view`
+# succeeds (is_error=False) -- so the coarse whole-body `failed` is False. The
+# request is not the last simple command, so the discharge must be withheld
+# (the same last-command guard the pending[tid] path uses); otherwise the PR is
+# silently discharged with its reviewer-add having failed.
+case([bash("gh pr create --title x --body y && "
+           "gh pr edit --add-reviewer copilot-pull-request-reviewer[bot]; "
+           "gh pr view --json url", tid="c"),
+      res("c", "https://github.com/o/r/pull/1038\n"
+               "GraphQL: Could not resolve to a User with the login of "
+               "'copilot-pull-request-reviewer[bot]'\n"
+               '{"url":"https://github.com/o/r/pull/1038"}', err=False),
+      say("Opened, add-reviewer failed (non-last), then viewed.")], True,
+     "a failed add-reviewer chained non-last in a create combo stays tracked")
+# The sharper variant, needing no failure text: a request for an UNRELATED PR
+# (#999) chained ahead of the create satisfies `requested=True` for the NEW PR's
+# obligation. Without same-PR scoping, the new PR (#1040) self-discharges on
+# ordinary success though no reviewer was ever requested FOR IT.
+case([bash("gh pr edit 999 --add-reviewer someone && "
+           "gh pr create --title x --body y", tid="c"),
+      res("c", "https://github.com/o/r/pull/1040\n", err=False),
+      say("Requested review on #999, then opened a new PR.")], True,
+     "an unrelated-PR request chained with a create does not self-discharge it")
+# The same-PR guard in isolation: the unrelated request for #999 is the LAST
+# simple command (so the ordering guard alone would let it through), but it
+# targets #999, not the created #1040 -- same-PR scoping is what keeps #1040
+# tracked. This is the case the ordering guard cannot catch on its own.
+case([bash("gh pr create --title x --body y && "
+           "gh pr edit 999 --add-reviewer someone", tid="c"),
+      res("c", "https://github.com/o/r/pull/1040\n", err=False),
+      say("Opened a new PR, then requested review on unrelated #999.")], True,
+     "a last request for a DIFFERENT PR does not self-discharge the created one")
+# The control: the SAME shape but the request is the LAST simple command AND
+# targets the created PR -- it must still discharge, so the guard does not
+# over-block a genuine chained create+request.
+case([bash("gh pr create --title x --body y && "
+           "gh api repos/o/r/pulls/1038/requested_reviewers -X POST", tid="c"),
+      res("c", "https://github.com/o/r/pull/1038\n"
+               '{"requested_reviewers":[{"login":"Copilot"}]}'),
+      say("Opened then requested (last) for the same PR.")], False,
+     "a last, same-PR request in a create combo still discharges")
 # A create that itself fails carries NO PR URL/number, so no PR was opened.
 case([bash("gh pr create --title x --body y", tid="c"),
       res("c", '{"status":422,"message":"validation failed"}', err=True),

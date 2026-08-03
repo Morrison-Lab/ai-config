@@ -460,6 +460,19 @@ def result_ident(body):
     return None, None
 
 
+def _new_obl(num, repo, tid, self_, slast, srnum, srrepo):
+    """One outstanding-open record.
+
+    `self_` marks an open whose SAME action also requested a reviewer, so the
+    request's outcome is read from the open's own result. `slast`/`srnum`/`srrepo`
+    carry that request's ordering and target so the `self` discharge can apply the
+    same fail-safe guard as pending[tid] (discharge only on a last/atomic,
+    same-PR, non-failed request). They are unread when `self_` is False.
+    """
+    return {"num": num, "repo": repo, "tid": tid, "self": self_,
+            "slast": slast, "srnum": srnum, "srrepo": srrepo}
+
+
 def _repo_ok(a, b):
     return a is None or b is None or a == b
 
@@ -569,11 +582,30 @@ def scan(path):
                             ob["num"] = rnum
                         if ob["repo"] is None and rrepo:
                             ob["repo"] = rrepo
-                        # A create --reviewer (self) discharges only when its
-                        # result did NOT fail: a reviewer request that 422'd on
-                        # an otherwise-created PR leaves the PR unreviewed, so
-                        # the obligation must stay outstanding.
-                        if ob["self"] and not failed:
+                        # A `self` obligation (an open whose SAME action also
+                        # requested a reviewer -- `gh pr create --reviewer`,
+                        # `create_pull_request(reviewers=[...])`, or a create
+                        # chained with a request in one Bash call) discharges only
+                        # on POSITIVE evidence the reviewer request itself
+                        # succeeded, the same fail-safe rule the pending[tid] path
+                        # below uses. For the shell path `self` comes from
+                        # request_ident scanning the WHOLE command, so the matched
+                        # request may be a NON-LAST simple command (its own failure
+                        # masked by a trailing success) or target a DIFFERENT PR
+                        # than the one opened. So discharge only when that request
+                        # was the LAST/atomic simple command (`slast`, so the
+                        # coarse `failed` reflects IT rather than a trailing
+                        # command) AND names THIS PR (`srnum` None -- the create's
+                        # own reviewer or a current-branch edit -- or equal to the
+                        # resolved number). Otherwise keep it tracked (the safe
+                        # over-warn direction). A structured create/edit is atomic
+                        # (slast=True) and targets its own PR, so it is unaffected.
+                        if ob["self"]:
+                            same_pr = (ob["srnum"] is None
+                                       or ob["srnum"] == ob["num"])
+                            if ob["slast"] and not failed and same_pr:
+                                continue
+                            keep.append(ob)
                             continue
                         keep.append(ob)
                     obligations[:] = keep
@@ -651,9 +683,11 @@ def scan(path):
                 if name in OPEN_TOOLS:
                     if not inp.get("draft"):
                         num, repo = input_ident(inp)
-                        obligations.append({"num": num, "repo": repo,
-                                            "tid": tid,
-                                            "self": bool(inp.get("reviewers"))})
+                        # Structured tool: atomic (slast=True), and its reviewers
+                        # field targets this PR's own number.
+                        obligations.append(_new_obl(
+                            num, repo, tid, bool(inp.get("reviewers")),
+                            True, num, repo))
                     continue
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
@@ -666,9 +700,10 @@ def scan(path):
                         # -- so is_error reflects THIS transition: last=True.
                         pending_clear[tid] = (num, repo, True)
                     elif inp.get("draft") is False:
-                        obligations.append({"num": num, "repo": repo,
-                                            "tid": tid,
-                                            "self": bool(inp.get("reviewers"))})
+                        # Structured, atomic: slast=True, reviewers target num.
+                        obligations.append(_new_obl(
+                            num, repo, tid, bool(inp.get("reviewers")),
+                            True, num, repo))
                     if inp.get("reviewers") and inp.get("draft") is not False:
                         # A structured tool call is atomic -- one tool_use, one
                         # result -- so is_error reflects THIS request, with no
@@ -728,8 +763,13 @@ def scan(path):
                     # which never clears -- the safe over-warn direction.
                     pending_clear[tid] = (dnum, drepo, dlast)
                 elif opened:
-                    obligations.append({"num": onum, "repo": orepo, "tid": tid,
-                                        "self": requested})
+                    # `self` carries the matched request's ordering (rlast) and
+                    # target PR (rnum/rrepo) so the discharge can require the
+                    # request to be last/atomic and same-PR -- a request from a
+                    # non-last or different-PR command in a chained create combo
+                    # must not silently discharge this open.
+                    obligations.append(_new_obl(
+                        onum, orepo, tid, requested, rlast, rnum, rrepo))
                 # A create --reviewer both opens and requests; its `self` flag
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.

@@ -248,6 +248,42 @@ case([bash('echo "gh pr create"', tid="e"), res("e", ""),
       say("Just echoed an example.")], False,
      "a quoted create outside any payload flag forges no obligation")
 
+# --- request detection is STRUCTURAL: an embedded example never discharges ---
+# Round 5's payload-flag scrub blanked quoted text only next to six named
+# flags, but is_request/cmd_ident scanned the whole string -- so ANY other
+# embedding mechanism (a bare echo, a herestring, `gh pr edit` quoted, ...)
+# still discharged a real obligation. Request detection now parses argv per
+# simple command, so the request tokens count only as the argv of an actual
+# gh api / gh pr edit invocation.
+case(create("c") + [
+    bash('echo "run gh api repos/o/r/pulls/1038/requested_reviewers -X POST"',
+         tid="e"), res("e", ""), say("Just echoed the recovery snippet.")],
+     True, "a bare echo of the recovery snippet does not discharge")
+case(create("c") + [
+    bash("gh pr comment 42 --body-file - <<< "
+         '"see repos/o/r/pulls/1038/requested_reviewers -X POST"', tid="m"),
+    res("m", "{}"), say("Opened 1038, herestring comment on 42.")], True,
+     "a herestring quoting the recovery snippet does not discharge")
+case(create("c") + [
+    bash('echo "gh pr edit 1038 --add-reviewer bob"', tid="e"), res("e", ""),
+    say("Echoed an add-reviewer example.")], True,
+     "a quoted 'gh pr edit --add-reviewer' does not discharge")
+# The mirror: a GENUINE `gh pr edit --add-reviewer` (an inherently mutating
+# request form, no separate POST) must still discharge.
+case(create("c") + [
+    bash("gh pr edit 1038 --add-reviewer copilot-pull-request-reviewer",
+         tid="q"), res("q", "{}"), say("Requested via edit.")], False,
+     "a real gh pr edit --add-reviewer discharges")
+# The hook's own recovery command spans two lines with a `\` continuation. The
+# structural parser must join it, not split it into a URL-only command and a
+# POST-only command (which would leave the obligation standing forever after
+# the user runs exactly what the hook printed).
+case(create("c") + [
+    bash('gh api "repos/o/r/pulls/1038/requested_reviewers" \\\n'
+         "  -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'",
+         tid="q"), res("q", OK), say("Ran the multi-line recovery command.")],
+     False, "the multi-line (\\-continued) recovery command still discharges")
+
 # --- non-shell tools must never be text-matched ---
 case([use("create", tid="w", path="hooks/no-unreviewed-pr.py",
           file_text="matches gh pr create and requested_reviewers"),

@@ -45,6 +45,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 import tempfile
 
@@ -64,34 +65,6 @@ RX_DRAFT = re.compile(
     re.I,
 )
 
-# Reviewer-request CLI/MCP forms that are inherently mutating: no separate
-# POST check is needed for these. Verified against `gh --help`:
-# `gh pr create --reviewer` and `gh pr edit --add-reviewer` exist;
-# `gh pr review --request` does NOT (`gh pr review` has only
-# --approve/--comment/--request-changes), so it is deliberately absent.
-RX_REQ_CLI = re.compile(
-    r"request_copilot_review"
-    r"|gh\s+pr\s+edit[^|;&]*--add-reviewer"
-    r"|gh\s+pr\s+create[^|;&]*--reviewer\b",
-    re.I,
-)
-# The short reviewer flag is `-r`; the repo flag is `-R`. They differ only by
-# case, so this one alternative must be case-SENSITIVE -- matching it under
-# re.I would read `gh pr create -R owner/repo` as a reviewer request.
-RX_REQ_SHORT = re.compile(r"gh\s+pr\s+create[^|;&]*\s-r\s")
-# A mutating HTTP method. The bare `requested_reviewers` endpoint is also read
-# via GET (to CHECK who is requested -- the hook's own recovery text suggests a
-# verification call), and a GET must NOT discharge the obligation.
-RX_POST = re.compile(r"-X\s*['\"]?POST|--method\s+['\"]?POST", re.I)
-
-
-def is_request(cmd):
-    """True when a shell command actually REQUESTS a reviewer (not a read)."""
-    if RX_REQ_CLI.search(cmd) or RX_REQ_SHORT.search(cmd):
-        return True
-    return "requested_reviewers" in cmd and bool(RX_POST.search(cmd))
-
-
 # A gh action must be an actual command word, not a string quoted inside a
 # DIFFERENT command's argument. This repo's own docs and this hook's own
 # recovery text are full of literal `gh pr create` / `requested_reviewers -X
@@ -99,31 +72,40 @@ def is_request(cmd):
 # otherwise forge an obligation, and a `--body "... requested_reviewers -X
 # POST ..."` would silently DISCHARGE a real one -- the exact false negative
 # this hook exists to catch (the README.md:265-271 heredoc trap, one layer in
-# from the non-shell-tool case). So blank quoted example text before matching.
+# from the non-shell-tool case).
 #
-# But WHICH quotes to blank depends on the check, because RX_OPEN and
-# is_request have opposite quoting properties -- and a single blanket blank of
-# every quote (which is what a naive fix reaches for) breaks is_request:
+# Open/draft detection and request detection defend against that differently,
+# because they key on structurally different things:
 #
-#   * RX_OPEN keys on `gh pr create`/`ready`, always a LEADING command word,
-#     never legitimately inside quotes. So for open-detection every quoted span
-#     can be blanked (`_scrub_all`) -- that catches an example create quoted in
-#     a `--body` AND a bare `echo "gh pr create"`, with no risk to a real open.
-#   * is_request keys on `requested_reviewers`, which is a STRUCTURAL URL-path
-#     ARGUMENT (`gh api "repos/o/r/pulls/N/requested_reviewers" -X POST`) --
-#     and double-quoting a `gh api` URL is standard shell. Blanking every quote
-#     there erases the hook's OWN recovery command, so a genuine request never
-#     discharges the obligation and the hook nags forever after the user does
-#     exactly what it asked. So for request-detection only FREE-TEXT payload
-#     arguments (a `--body`/`--title`/`--notes` value) and heredoc bodies are
-#     blanked (`_scrub_payload`), leaving the structural URL intact.
+#   * RX_OPEN/RX_DRAFT key on `gh pr create`/`ready`, always a LEADING command
+#     word, never legitimately inside quotes. So for them every quoted span is
+#     blanked (`_scrub_all`) before matching -- that neutralises an example
+#     create quoted in a `--body` AND a bare `echo "gh pr create"`, with no
+#     risk to a real open, whose command word is never quoted.
+#   * Request detection keys on `requested_reviewers`/`-X POST`, which are the
+#     STRUCTURAL argv of the hook's OWN recovery command
+#     (`gh api "repos/o/r/pulls/N/requested_reviewers" -X POST`) -- double-
+#     quoting a `gh api` URL is standard shell, so blanking every quote there
+#     erases a genuine request and the hook nags forever after the user does
+#     exactly what it asked (round 4's regression). But those same tokens also
+#     appear inside ordinary string arguments -- `echo "... -X POST"`, a
+#     `gh pr comment` body, a heredoc/herestring -- where they are NOT a
+#     request. Blanking only known payload flags (round 5) missed every other
+#     embedding mechanism. So request detection instead PARSES the command into
+#     simple commands and inspects each one's argv (`request_ident`), matching
+#     the request tokens only when they are the argv of an actual `gh api`/
+#     `gh pr edit`/`gh pr create` invocation -- never the value of a string
+#     argument. That closes the class rather than the next instance of it.
 #
-# Over-blanking only ever DROPS a match (a missed obligation -- the fail-open
-# direction), never forges or discharges one.
+# Over-blanking (open/draft) only ever DROPS a match -- a missed obligation,
+# the fail-open direction -- never forges or discharges one. Request parsing
+# fails toward NOT-a-request (a shlex error or unrecognised form leaves the
+# obligation outstanding and the hook warns), so it never silently discharges.
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
-# The quoted value of a free-text payload flag, where an example command can
-# hide. A `gh api` URL argument is NOT a payload flag value, so it survives.
+# The quoted value of a free-text payload flag. Used only for cmd_ident's
+# identity on a REAL open/draft command (`gh pr ready N`, `-R o/r`), so a
+# `--body` mentioning a `pulls/N` path cannot forge a draft-clear target.
 RX_PAYLOAD = re.compile(
     r"((?:--body|--title|--notes|--message|-b|-t|-m)[=\s]+)"
     r"(\"(?:[^\"\\]|\\.)*\"|'[^']*')"
@@ -142,6 +124,134 @@ def _scrub_all(cmd):
     cmd = re.sub(r'"(?:[^"\\]|\\.)*"', '""', cmd)
     cmd = re.sub(r"'[^']*'", "''", cmd)
     return cmd
+
+
+# --- Structural reviewer-request detection --------------------------------
+# `requested_reviewers`/`-X POST`/`--add-reviewer` are matched against the
+# argv of parsed simple commands, never as substrings of the raw string, so an
+# example request embedded in any string argument (echo, a comment body, a
+# heredoc or herestring) is never mistaken for a real request. Verified
+# against `gh --help`: `gh pr create --reviewer` and `gh pr edit
+# --add-reviewer` exist; `gh pr review --request` does NOT (review has only
+# --approve/--comment/--request-changes), so it is deliberately absent.
+
+# Shell control operators that separate one simple command from the next.
+_SHELL_OPS = set("();<>|&")
+
+
+def _simple_commands(cmd):
+    """Split a shell command into simple-command argv lists; None on error.
+
+    Line-continuations are joined and heredoc bodies blanked first, so shlex
+    neither chokes on a heredoc body nor mis-splits a `\\`-continued request
+    (like the hook's own recovery command) into two commands.
+    """
+    cmd = re.sub(r"\\\r?\n", " ", cmd)   # join `\`-continued lines
+    cmd = RX_HEREDOC.sub("<<", cmd)       # drop heredoc bodies
+    try:
+        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return None                       # unbalanced quotes, etc.
+    cmds, cur = [], []
+    for t in toks:
+        if t and set(t) <= _SHELL_OPS:    # an operator token (||, |, ;, <<<)
+            if cur:
+                cmds.append(cur)
+                cur = []
+        else:
+            cur.append(t)
+    if cur:
+        cmds.append(cur)
+    return cmds
+
+
+def _has_flag(argv, *flags):
+    """True if argv contains any of `flags`, as a bare token or `flag=value`."""
+    for a in argv:
+        if a in flags or any(a.startswith(f + "=") for f in flags):
+            return True
+    return False
+
+
+def _post_method(argv):
+    """True if argv sets the HTTP method to POST (a mutating request)."""
+    for i, a in enumerate(argv):
+        au = a.upper()
+        if au in ("-X", "--METHOD") and i + 1 < len(argv) \
+                and argv[i + 1].upper() == "POST":
+            return True
+        if au == "-XPOST":
+            return True
+        if au.startswith("--METHOD=") and au.split("=", 1)[1] == "POST":
+            return True
+    return False
+
+
+def _url_ident(url):
+    """(num, repo) from a `repos/o/r/pulls/N/...` token; RX_CMD_API is below."""
+    m = RX_CMD_API.search(url)
+    if m:
+        return m.group(3), f"{m.group(1)}/{m.group(2)}"
+    return None, None
+
+
+def _verb_ident(argv):
+    """(num, repo) from a `gh pr edit <N> ... -R o/r` argv."""
+    num = argv[3].lstrip("#") if len(argv) >= 4 \
+        and argv[3].lstrip("#").isdigit() else None
+    repo = None
+    for i, a in enumerate(argv):
+        if a in ("-R", "--repo") and i + 1 < len(argv):
+            repo = argv[i + 1]
+        elif a.startswith("--repo="):
+            repo = a.split("=", 1)[1]
+    return num, repo
+
+
+def _argv_request(argv):
+    """(is_request, num, repo) for one simple command's argv.
+
+    Identity comes from the request command ITSELF -- the `gh api` URL, or the
+    `gh pr edit` number/`-R` -- so a different PR path echoed earlier in the
+    line cannot misdirect the discharge. `-r` (reviewer) differs from `-R`
+    (repo) only by case, and argv tokens are matched case-sensitively, so the
+    two never collide.
+    """
+    if not argv:
+        return False, None, None
+    a0 = argv[0]
+    if a0 == "gh" and len(argv) >= 3 and argv[1] == "pr":
+        sub, rest = argv[2], argv[3:]
+        if sub == "create" and _has_flag(rest, "--reviewer", "-r"):
+            return True, None, None       # a create's number is in its result
+        if sub == "edit" and _has_flag(rest, "--add-reviewer"):
+            num, repo = _verb_ident(argv)
+            return True, num, repo
+    # `gh api`/`curl`/`wget` hitting the requested_reviewers endpoint with a
+    # POST. The same endpoint is read via GET (to CHECK who is requested), and
+    # a GET must NOT discharge, which is why the method is required.
+    api = (a0 == "gh" and len(argv) >= 2 and argv[1] == "api") \
+        or a0 in ("curl", "wget")
+    if api:
+        url = next((t for t in argv if "requested_reviewers" in t), None)
+        if url and _post_method(argv):
+            num, repo = _url_ident(url)
+            return True, num, repo
+    return False, None, None
+
+
+def request_ident(cmd):
+    """(is_request, num, repo): does `cmd` genuinely request a reviewer?"""
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False, None, None
+    for argv in cmds:
+        ok, num, repo = _argv_request(argv)
+        if ok:
+            return True, num, repo
+    return False, None, None
 
 
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
@@ -337,14 +447,18 @@ def scan(path):
 
                 cmd_raw = inp.get("command") or ""
                 # Open/draft detection blanks EVERY quote (leading-word checks,
-                # never quoted); request/identity detection blanks only payload
-                # values so a genuine quoted `gh api` URL still reads.
+                # never quoted); open/draft IDENTITY reads the payload-scrubbed
+                # string, so a `--body` mentioning a `pulls/N` path cannot forge
+                # a draft-clear target on a real open/draft command.
                 cmd_open = _scrub_all(cmd_raw)
-                cmd_req = _scrub_payload(cmd_raw)
-                num, repo = cmd_ident(cmd_req)
-                requested = is_request(cmd_req)
+                num, repo = cmd_ident(_scrub_payload(cmd_raw))
                 draft = bool(RX_DRAFT.search(cmd_open))
                 opened = bool(RX_OPEN.search(cmd_open)) and not draft
+                # Request detection is STRUCTURAL (per simple command), so an
+                # example request quoted in a body/echo/heredoc/herestring
+                # never forges or discharges an obligation. Its identity comes
+                # from the request command itself.
+                requested, rnum, rrepo = request_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
                 # too, and it is the draft action that decides.
                 if draft:
@@ -356,7 +470,7 @@ def scan(path):
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.
                 if requested and not opened:
-                    pending[tid] = (num, repo)
+                    pending[tid] = (rnum or num, rrepo or repo)
     return obligations, text
 
 

@@ -95,9 +95,18 @@ you named"**.
 Quoting the reviewer's count is the signal that the set was inherited, since a
 derived set has no reason to agree with a number someone else supplied.
 
-So derive the site list with a command, using the whole-diff grep the section
-below already prescribes, and widen the search past the diff when the flagged
-phrase was copied in from somewhere else.
+So derive the site list with a command: pipe the whole diff through a grep for
+the flagged phrase, and widen the search past the diff when that phrase was
+copied in from somewhere else.
+
+Pick the pattern shorter than the phrase, though.
+This corpus mandates semantic line breaks, so a multi-word phrase routinely
+straddles a newline, and a line-oriented grep for the whole thing then matches
+nothing --- a derived set can come back empty for a formatting reason rather
+than a factual one, which is the same false-negative this file treats at length
+under its own semantic-line-break corollary.
+A short distinctive fragment is the reliable choice.
+
 Then report what was **swept** rather than what was fixed.
 "Grepped the whole diff for `X|Y|Z`, four hits, all four fixed" is checkable,
 while "fixed all three" asserts a scope nobody measured.
@@ -126,6 +135,8 @@ which is why nothing about accepting it feels like guessing.
   the extent of that reviewer's read.
 - **Don't:** write "all N spots you named" into a reply, since quoting the
   reviewer's count is the tell that no sweep ran.
+- **Don't:** read a null result as "no further sites"; it means no further hit
+  for that pattern, and a differently-worded instance would not have matched.
 
 (`Morrison-Lab/gha#398`, 2026-08-03: round 1 flagged an unquantified
 superlative, "the corpus's most common paragraph opener", and named three sites
@@ -133,15 +144,17 @@ superlative, "the corpus's most common paragraph opener", and named three sites
 `check-new-line-breaks/check-new-line-breaks.py`.
 Commit `698d0af` touched exactly those three files, and the reply read "in all
 three spots you named".
-Round 4 then found a fourth, a comment block in
-`check-new-line-breaks/tests/test_check_new_line_breaks.py`, opening "Fourth
-site with the same unquantified-superlative issue, missed by the two rounds
-that fixed the other three".
+Round 4 then found a fourth site, a comment block in
+`check-new-line-breaks/tests/test_check_new_line_breaks.py`.
+Its finding opened "Fourth site with the same unquantified-superlative issue,
+missed by the two rounds that fixed the other three" --- the reviewer's words,
+not the code comment's, which says nothing about review rounds.
 The sweep was available in round 1 and would have closed it there:
 `git diff origin/main...e0e08e2 | grep -E 'most common|single most|house style'`,
 run against round 1's own head, returns five hits across all four files.
-The same grep at the fixed head returns zero, which is the other half of the
-check --- no fifth site existed.)
+The same grep at the fixed head returns no further hit for that pattern, which
+is the other half of the check --- though only for that pattern, since a
+superlative worded differently would not match it.)
 
 **When a prose fix changes wording that's also paraphrased elsewhere in the
 same PR (a CHANGELOG entry, a PR description, a cross-reference), sync that

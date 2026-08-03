@@ -186,9 +186,10 @@ Moving a section to another file edits none of its lines, and every one of them
 still lands in the diff as an added line --- so a file split, an extraction, or
 a move between fragments makes the whole moved body yours at once.
 
-The reasoning that talks you out of this is the scope-creep rule two sections
-above, which correctly says not to answer a one-line finding with a whole-file
-replace.
+The reasoning that talks you out of this is the scope-creep rule in this same
+fragment ("Fixing one flagged glyph is a one-line edit; fixing it with a
+whole-file replace is a different, much larger change"), which correctly says
+not to answer a one-line finding with a whole-file replace.
 It does not apply here, and the difference is worth stating because the two look
 identical from the inside.
 That rule protects a diff from growing *beyond* what the change was for.

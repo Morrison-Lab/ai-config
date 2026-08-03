@@ -240,7 +240,21 @@ the rule is consulted when it is *read* and broken when a message is
 | `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
 | `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
+| `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
+| `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
+| `no-mistake-without-a-hook.py` | `UserPromptSubmit` | reminds, never blocks, that an admitted mistake owes a *mechanism*, not just a note |
+| `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
+| `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
+
+A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
+every such suite (pairing each with its subject) and also checks the reverse
+direction --- it enumerates the hooks and flags any that lack a test --- so a
+*tested* guard cannot regress unnoticed and an *untested* one cannot hide. It
+gates `validate` and pre-commit. Two hooks are untested today
+(`no-offer-to-file.py`, `inject-local-time.sh`), carried in an explicit
+`KNOWN_UNTESTED` allowlist and tracked in
+[#1080](https://github.com/Morrison-Lab/ai-config/issues/1080).
 
 `bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
 directory, so the scripts arrive with no extra step.

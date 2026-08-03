@@ -94,6 +94,26 @@
       "event": "UserPromptSubmit",
       "timeout": 10,
       "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring'. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
+    },
+    {
+      "_note_covers_external_correction": [
+        "UserPromptSubmit, inject-only, for the same reason as the two",
+        "reminders above: accepting a reviewer's finding and fixing it is",
+        "RIGHT, so this can only ADD context and never blocks. It fills the",
+        "hole those two leave -- both key on a FIRST-PERSON admission and",
+        "remind-ums-after-error.py explicitly excludes correcting someone",
+        "else, so agreeing with a reviewer triggers neither. That is the",
+        "commonest way a mistake surfaces and the class ai-config#1065 is",
+        "about.",
+        "",
+        "NOT REGISTERED on any machine yet. Activation is a separate decision",
+        "after this PR merges (README's activation gate) -- run",
+        "scripts/install-hooks.py --fix to opt in then, not before."
+      ],
+      "script": "remind-learn-from-review.py",
+      "event": "UserPromptSubmit",
+      "timeout": 10,
+      "why": "ai-config#1065 'any time a reviewer brings up valid concerns, learn from that'. Injects, never blocks, when an accepted reviewer finding has no recorded learning or mechanism after it -- the external-correction sibling of remind-ums-after-error.py, which fires only on first-person admissions."
     }
   ]
 }

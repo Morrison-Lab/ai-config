@@ -61,22 +61,56 @@ mutates a PR stays serial.
    Independent PRs may be inspected concurrently, one worker per PR, each in its
    own worktree.
    A worker may read the latest review and CI logs, trace a finding to its
-   cause, run the repo's local checks, and leave a focused **uncommitted** patch
-   in its worktree.
+   cause, run the repo's local checks, and prepare a focused patch.
    It must not claim a PR, post a comment, commit, push, request review, or
    otherwise mutate shared forge state --- every one of those belongs to the
    serial loop below.
+
+   **The patch has to leave the worktree as an artifact, not sit in it as a
+   dirty tree.**
+   A worker's worktree is not durable: `isolation: 'worktree'` has reclaimed one
+   mid-run before, which is the incident
+   [`incidents-dont-repeal-decisions`](../../shared/workflow/incidents-dont-repeal-decisions.md)
+   is written about.
+   A dirty tree is also the one form the orchestrator cannot inspect, diff, or
+   apply without re-entering that worktree, so it fails whether or not the
+   worktree survives.
+   Have each worker end by emitting a patch to an orchestrator-owned path, and
+   return that path plus the SHAs below:
+
+   ```bash
+   git diff > "$ARTIFACT_DIR/pr-<N>.patch"    # no commit, no push, no forge state touched
+   ```
+
+   That keeps the no-mutation rule exactly as stated --- a patch file is not a
+   commit --- while making the preparation survive the worker.
 
    Skip the fan-out for stacked PRs, for PRs whose likely file footprints
    overlap, and whenever independence is uncertain.
    Consolidate the prepared findings and patches before step 3 begins.
 
    **A prepared patch is a snapshot, not a decision.**
-   Re-read the latest review and CI state when the serial loop reaches that PR,
-   and re-derive the patch if either has moved.
-   `main` advancing or a new review round landing invalidates a prepared patch
-   silently, and applying a stale one costs a review round rather than saving
-   one.
+   Record the base and head SHAs the patch was prepared against, and re-check
+   **all four** signals when the serial loop reaches that PR: those two refs,
+   the latest review, and CI state.
+   Re-derive the patch if any has moved.
+
+   The two refs are the half that is easy to omit and the half that actually
+   goes stale.
+   A `main` advance or a new PR-head commit need not produce a new review or a
+   new CI run, so a review-and-CI check alone returns "unchanged" for exactly
+   the case that invalidates a patch --- which is the shape
+   [`fail-fast`](../../shared/principles/fail-fast.md) warns about, where the
+   pass path and the stale path print the same thing.
+
+   ```bash
+   base=$(git rev-parse origin/main); head=$(git rev-parse "origin/$branch")   # at prepare time
+   git fetch origin -q                                                        # at apply time
+   [ "$base" = "$(git rev-parse origin/main)" ] &&
+   [ "$head" = "$(git rev-parse "origin/$branch")" ] || echo "stale -- re-derive"
+   ```
+
+   Applying a stale patch costs a review round rather than saving one.
    That staleness is what bounds the fan-out rather than runner contention:
    nothing here pushes, so the cost of going wider is that the last patch
    applied has waited longest and is likeliest to be stale.
@@ -163,7 +197,8 @@ A Workflow does not change that external limit ---
 do **not** fan out the claim --- push --- re-review --- merge loop.
 
 What you *can* orchestrate is step 2:
-the read-only survey, and the isolated local preparation that feeds it.
+the read-only survey, and the isolated local preparation that follows it and
+feeds step 3's serial loop.
 Step 2 states the worker's limits, and a Workflow relaxes none of them ---
 spell them out in the worker's prompt, because a worker told only to "fix the
 findings" will reach for `gh` and `git push` on its own.

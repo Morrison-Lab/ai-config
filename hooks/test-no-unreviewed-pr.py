@@ -200,6 +200,28 @@ case(create("c") + [
     res("g", OK), say("Checked who is requested.")], True,
      "a read-only GET of requested_reviewers does not discharge")
 
+# --- a gh action QUOTED inside another command's argument is not an action ---
+# This repo's docs and this hook's own recovery text quote these strings, so a
+# comment/body containing them must neither forge nor discharge an obligation.
+case([bash('gh pr comment 1038 --body "next time run gh pr create first"',
+           tid="m"), res("m", "{}"), say("Reminded someone.")], False,
+     "a quoted 'gh pr create' in a --body forges no obligation")
+case(create("c") + [
+    bash('gh pr comment 42 --body "fix: run gh api '
+         'repos/o/r/pulls/1038/requested_reviewers -X POST"', tid="m"),
+    res("m", "{}"), say("Opened 1038, commented on 42.")], True,
+     "a quoted requested_reviewers -X POST does not discharge a real PR")
+case(create("c") + [
+    bash("gh pr comment 42 --body-file - <<'EOF'\n"
+         "run gh api repos/o/r/pulls/1038/requested_reviewers -X POST\nEOF",
+         tid="m"), res("m", "{}"), say("Opened 1038, heredoc comment on 42.")],
+     True, "a heredoc body quoting the recovery snippet does not discharge")
+# A REAL create whose --body is a heredoc must still be detected as an open.
+case([bash("gh pr create --title x --body \"$(cat <<'EOF'\n"
+           "the body\nEOF\n)\"", tid="c"), res("c", URL),
+      say("Opened with a heredoc body.")], True,
+     "a real create with a heredoc body still blocks")
+
 # --- non-shell tools must never be text-matched ---
 case([use("create", tid="w", path="hooks/no-unreviewed-pr.py",
           file_text="matches gh pr create and requested_reviewers"),

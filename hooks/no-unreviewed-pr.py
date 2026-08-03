@@ -92,6 +92,28 @@ def is_request(cmd):
     return "requested_reviewers" in cmd and bool(RX_POST.search(cmd))
 
 
+# A gh action must be an actual command word, not a string quoted inside a
+# DIFFERENT command's argument. This repo's own docs and this hook's own
+# recovery text are full of literal `gh pr create` / `requested_reviewers -X
+# POST` examples, so a `gh pr comment --body "... gh pr create ..."` would
+# otherwise forge an obligation, and a `--body "... requested_reviewers -X
+# POST ..."` would silently DISCHARGE a real one -- the exact false negative
+# this hook exists to catch (the README.md:265-271 heredoc trap, one layer in
+# from the non-shell-tool case). So blank the CONTENTS of heredoc bodies and
+# quoted arguments before matching. A gh invocation is normally the leading
+# word of its command, before any quote, so real opens/requests survive;
+# over-blanking only ever drops a real match (a missed obligation -- the
+# fail-open direction), never forges or discharges one.
+RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
+
+
+def _scrub(cmd):
+    cmd = RX_HEREDOC.sub("<<", cmd)              # drop heredoc bodies
+    cmd = re.sub(r'"(?:[^"\\]|\\.)*"', '""', cmd)  # blank "..." contents
+    cmd = re.sub(r"'[^']*'", "''", cmd)          # blank '...' contents
+    return cmd
+
+
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
 # other tool's serialized input is the documentation/heredoc false positive
 # README.md:265-271 warns about -- self-demonstrating here, since these very
@@ -283,7 +305,7 @@ def scan(path):
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
 
-                cmd = inp.get("command") or ""
+                cmd = _scrub(inp.get("command") or "")
                 num, repo = cmd_ident(cmd)
                 requested = is_request(cmd)
                 opened = bool(RX_OPEN.search(cmd)) and not RX_DRAFT.search(cmd)

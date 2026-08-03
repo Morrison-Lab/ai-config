@@ -158,14 +158,16 @@ polls for the result, so parallel pushes collide and make per-PR status
 illegible. A Workflow does not change that external limit --- do **not** fan out
 the claim --- push --- re-review --- merge loop.
 
-What you *can* orchestrate is step 2: the read-only survey, and the isolated
-local preparation that feeds it. Use one worktree per independent PR, and say in
-the worker's prompt that its patch stays uncommitted and that no forge state may
-change --- a worker told only to "fix the findings" will reach for `gh` and
-`git push` on its own. Consult
-`shared/workflow/when-to-orchestrate.md` (the shared-runner exception); default
-to the serial loop, and propose the fan-out only when there are many PRs to
-survey.
+What you *can* orchestrate is step 2:
+the read-only survey, and the isolated local preparation that feeds it.
+Use one worktree per independent PR,
+and say in the worker's prompt that its patch stays uncommitted and that no
+forge state may change ---
+a worker told only to "fix the findings" will reach for `gh` and `git push` on
+its own.
+Consult `shared/workflow/when-to-orchestrate.md` (the shared-runner exception);
+default to the serial loop,
+and propose the fan-out only when there are many PRs to survey.
 
 ### Lightweight sidecar delegation
 

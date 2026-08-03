@@ -129,6 +129,42 @@ case([use("update_pull_request", tid="u", owner="o", repo="r",
           err=True),
       say("Marked ready and tried to add a reviewer; it 422'd.")], True,
      "a ready+reviewers edit whose reviewer-add fails keeps the PR tracked")
+# The SAME `update_pull_request(draft=False, reviewers=[...])` shape, but the
+# reviewer-add fails with PLAIN-LANGUAGE text ("failed"/"error"/"not found") and
+# NO 4xx/HTTP shape, with is_error UNSET. The `draft:false` branch appends a
+# `self` obligation, kept correctly by the BROAD RX_FAILED. Registering
+# `pending[tid]` too (the old code did, unconditionally on `reviewers`) added a
+# second, NARROWER (RX_REQ_FAILED) discharge path that runs AFTER the obligations
+# loop and `_clear()`s the very obligation the broad check just kept -- silently
+# discharging a genuinely-unreviewed PR. The pending path is now withheld when
+# draft is False, so only the self path (broad, fail-safe) tracks it.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False,
+          reviewers=["copilot-pull-request-reviewer"]),
+      res("u", '{"message":"Adding reviewer failed"}', err=False),
+      say("Marked ready; the reviewer-add failed in plain language.")], True,
+     "a ready+reviewers edit whose reviewer-add fails in plain language tracks")
+# The success mirror: the SAME shape whose reviewer-add SUCCEEDS must still
+# discharge -- via the self-obligation path (`self and not failed`), now that the
+# redundant pending path is gone -- so the fix does not over-block a real success.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False,
+          reviewers=["copilot-pull-request-reviewer"]),
+      res("u", '{"number":1038,"requested_reviewers":[{"login":"Copilot"}]}'),
+      say("Marked ready and added the reviewer.")], False,
+     "a ready+reviewers edit whose reviewer-add succeeds discharges")
+# The RESERVED case: a pure reviewer-add via update_pull_request with NO draft
+# transition is a genuine request that discharges an ALREADY-tracked PR. The
+# pending path must still fire here (it is withheld ONLY for draft:false), so a
+# prior open is cleared by a later reviewers-only edit.
+case([use("create_pull_request", tid="c", owner="o", repo="r", title="x",
+          body="y"),
+      res("c", '{"number":1038,"html_url":"https://github.com/o/r/pull/1038"}'),
+      use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, reviewers=["copilot-pull-request-reviewer"]),
+      res("u", '{"requested_reviewers":[{"login":"Copilot"}]}'),
+      say("Opened, then added a reviewer.")], False,
+     "a reviewers-only update_pull_request discharges an already-open PR")
 # The create counterpart: a create whose reviewer step fails but whose result
 # DOES echo the PR number is real and must stay tracked (identity known from
 # the result rather than the input).

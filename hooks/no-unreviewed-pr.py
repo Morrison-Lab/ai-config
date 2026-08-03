@@ -624,10 +624,27 @@ def scan(path):
                         obligations.append({"num": num, "repo": repo,
                                             "tid": tid,
                                             "self": bool(inp.get("reviewers"))})
-                    if inp.get("reviewers"):
+                    if inp.get("reviewers") and inp.get("draft") is not False:
                         # A structured tool call is atomic -- one tool_use, one
                         # result -- so is_error reflects THIS request, with no
                         # chained command to poison it: last=True -> trust err.
+                        #
+                        # But NOT when draft is False: that branch already
+                        # appended a `self` obligation, whose discharge/keep is
+                        # decided in the obligations loop by the BROAD `failed`
+                        # (success -> discharge via the `self and not failed`
+                        # drop; failure -> keep). Also registering `pending[tid]`
+                        # here would add a SECOND discharge path for the same
+                        # tid, keyed on the NARROWER RX_REQ_FAILED, that runs
+                        # AFTER the obligations loop and `_clear()`s the very
+                        # obligation the broad check just kept -- so a
+                        # reviewer-add failing with plain-language text
+                        # ("failed"/"error"/"not found") and no 4xx/HTTP shape,
+                        # with is_error unset, would silently discharge a
+                        # genuinely-unreviewed PR. The self-obligation path is
+                        # sufficient and fail-safe on its own; the pending path
+                        # is reserved for a reviewer-add with NO draft:false
+                        # transition (a request against an already-ready PR).
                         pending[tid] = (num, repo, True)
                     continue
                 if name in REQ_TOOLS:

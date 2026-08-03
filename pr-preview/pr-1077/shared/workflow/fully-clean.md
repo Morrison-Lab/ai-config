@@ -80,6 +80,70 @@ A PR/MR is **fully clean** when **both** of these hold:
    The log showed that job starting at `04:05:25` and cleaning up at
    `04:05:51`: 26 seconds, identical to the other six.)
 
+   **`gh pr checks` is not a complete enumeration of a head's check runs, so
+   settle "has everything finished" from the commit check-runs endpoint
+   instead.**
+   This is a different gap from the workflow-run one above, and the remedy
+   there does not close it.
+   That paragraph warns that a workflow run may produce **no check run**, so a
+   check-runs query cannot see it, and sends you to the raw workflow runs.
+   Here the check run **exists** and the check-runs endpoint returns it.
+   It is `gh pr checks` that does not list it, so a raw workflow-run
+   cross-check finds nothing missing and confirms the wrong surface.
+
+   The failure direction is the expensive one, because the omitted check run
+   can be `in_progress` while `gh pr checks` reports zero pending.
+   Anything keyed on that count --- a watcher, a readiness gate, an ARDI
+   round-close --- then calls a PR terminal while a reviewer is still running,
+   which is precisely the state this criterion exists to catch.
+
+   ```bash
+   gh api "repos/<owner>/<repo>/commits/<head-sha>/check-runs" \
+     --jq '.check_runs[] | select(.status != "completed") | "\(.name) \(.status)"'
+   ```
+
+   **Why the two surfaces disagree is unexplained, so do not assert a
+   mechanism for it.**
+   Three candidates were named and none of them was tested: whether
+   `gh pr checks` filters by check-suite app, whether it reflects only the
+   required or branch-protection set, and whether an `in_progress` app check
+   is omitted until it completes.
+   The counts in the case record below happen to embarrass all three, which is
+   a reason not to adopt any of them rather than a reason to keep looking:
+   naming a mechanism that has survived one round of disconfirmation is still
+   guessing, and it is the exact failure several later sections of this file
+   are about.
+   What is measured is the disagreement, and that alone decides which surface
+   to read.
+
+   - **Do:** decide criterion 1 from the commit check-runs endpoint, and treat
+     `gh pr checks` as a convenience view of it.
+   - **Do:** report both counts when they disagree, so the gap stays visible
+     to whoever reads the status next.
+   - **Don't:** read `0 pending` from `gh pr checks` as evidence that nothing
+     is still running.
+   - **Don't:** offer a reason for the omission --- none was established.
+
+   (`Morrison-Lab/ai-config#1056`, merged as `e1875ff7`, at head
+   `cbf39b6452e33188524f3f8a233ba1a9190906ad`.
+   On 2026-08-02 `gh pr checks 1056` returned 10 contexts and reported 0
+   pending, while `commits/<sha>/check-runs` returned 11 --- the extra one
+   being `copilot-pull-request-reviewer` at `status: in_progress`.
+   Re-measured 2026-08-03, once every run had settled: `gh pr checks` still
+   returns 10 and the endpoint returns 13, so the disagreement outlives the
+   in-flight run that first exposed it.
+   The three the rollup drops are `copilot-pull-request-reviewer`, plus one of
+   the two check runs named `build / build` and one of the two named
+   `claude / claude`.
+   It keeps both copies of `validate` and both of
+   `new-line-breaks / check-new-line-breaks` on the same head, so it is not
+   collapsing duplicate names either.
+   All 13 report `app.slug: github-actions`, so no app-level filter selects
+   that subset, and every run had `status: completed` at the second
+   measurement, so no in-progress filter does either.
+   That is what disqualifies the candidate mechanisms above without supplying
+   a replacement for them.)
+
 2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
    A rebuttal the reviewer still disputes does **not** count as clean.
    That review must be a genuine posted verdict at the current head commit,
@@ -569,20 +633,41 @@ The mechanics of detecting a refusal (it arrives as a posted review, not an API 
 A refusal at least leaves a record.
 It costs a review and says so, in a comment anyone scanning the thread will see.
 The silent state costs the same review and says nothing.
-Nothing on the check surface reports it either way: on the PRs below this
-reviewer contributed **no check run at all** --- not when it refused, and not
-when it stayed silent --- so a reader scanning checks sees every context green
-and has no Copilot-attributable signal to read in either direction.
-The review list then carries no entry from it, and nothing anywhere reports
-that a configured reviewer did not weigh in.
+The check surface reports it in neither direction, and it fails two different
+ways rather than one.
+An earlier revision of this section said something stronger: that on the PRs
+below the reviewer contributed **no check run at all**, and that the check
+surface is therefore silent about it *by construction*.
+That is too strong, and both observations are worth keeping with their dates
+rather than replacing one with the other.
 
-Do not soften that into "its check run went green".
-The distinction decides which surface can answer the question: a green *Copilot*
-check would at least be a signal read wrongly, whereas an absent one means the
-check surface is silent about that reviewer by construction, and no amount of
-care reading checks recovers the fact.
-Whether other repos or configurations emit such a check was not established
-here; what was measured is that these did not.
+- **2026-07-31/08-01, on #1005 and #1008.**
+  The check rollup carried no Copilot-attributable context.
+  Re-measured 2026-08-03, `gh pr checks` still returns 0 such contexts for
+  either PR, while `commits/<sha>/check-runs` returns exactly one for each ---
+  a `copilot-pull-request-reviewer` run with `conclusion: success`.
+  So the original measurement reproduces on the surface it was taken from, and
+  is false on the other one.
+- **2026-08-02, on #1056.**
+  The reviewer contributed a check run that `gh pr checks` again did not list,
+  caught this time while it was still `in_progress`.
+
+Do not read that pair as the behaviour having changed.
+Two dates cannot establish a change, and no change is needed to explain the
+original record: the two surfaces disagreed with each other on the *same* PRs
+on the *same* day, so reading the rollup accounts for it entirely.
+Treat the check surface as unreliable about this reviewer in both directions:
+it can omit a check run that exists, and the check run it does report can be
+green with nothing behind it.
+
+That second mode is the sharper one, and it is the newly evidenced one.
+On #1008 `copilot-pull-request-reviewer` completed `success` while Copilot
+posted no review on that PR at all.
+On #1056 it completed `success` at head `cbf39b64`, while both of its actual
+reviews sit at earlier commits, `252d8fb5` and `1e17d166`.
+A green Copilot check therefore attests that the app ran, never that it
+reviewed the current head --- which is exactly the inference a reader scanning
+checks will draw from it.
 
 Note which remedy already in this file the silent state defeats.
 The "no verdict is its own state" bullet in criterion 2's four-surfaces list covers a job that posts nothing, and the instrument it prescribes is to read the job's own outcome rather than infer from the absence of comments.
@@ -603,9 +688,19 @@ A green check answers whether the app ran.
 Only the review list answers whether it reviewed.
 Read past the first page before concluding an entry is absent, since a busy PR can carry more reviews than one page returns.
 
+The two failure modes above strengthen that instruction rather than
+complicating it, because they land on the same remedy from opposite sides.
+An absent check run leaves nothing to read, and a present one answers a
+narrower question than the one being asked, so no amount of care reading
+checks recovers the fact either way.
+Read the reviews.
+
 - **Do:** confirm each external reviewer by an entry in `get_reviews`, not by the conclusion of its check run.
+- **Do:** read the `commit_id` on the review you find, since a green check at the current head is compatible with every review sitting at an earlier commit.
 - **Do:** name a silent reviewer in the ready-for-merge report, exactly as the bullets above ask for a refusing one.
-- **Don't:** read a green reviewer check as a verdict --- it survives a refusal, and it survives silence.
+- **Don't:** read a green reviewer check as a verdict --- it survives a refusal, it survives silence, and it survives having last reviewed three commits ago.
+- **Don't:** read an absent Copilot context in `gh pr checks` as evidence that no such check run exists.
+  That rollup omits it, per criterion 1 above.
 - **Don't:** reach for the job-outcome remedy above here.
   It is scoped to a job that failed, and this one succeeded.
 
@@ -613,11 +708,13 @@ Read past the first page before concluding an entry is absent, since a busy PR c
 On #1005 `copilot-pull-request-reviewer[bot]` posted its quota refusal as a `COMMENTED` review at `23:59:46Z`, which is the refusal above exactly.
 Under five hours later on #1008 it posted nothing at all.
 `get_reviews` returned eight reviews there, four from the repo's own review bot and four from the maintainer, none from Copilot, with page 2 confirmed empty.
-Neither PR's check rollup carries a single Copilot-attributable context: `#1005` has 8 checks and `#1008` has 10, and filtering either for a name matching `opilot` returns **0**.
+Neither PR's check **rollup** carries a Copilot-attributable context: re-measured 2026-08-03, `gh pr checks` returns 8 contexts for #1005 and 9 for #1008, and filtering either for a name matching `opilot` returns **0**.
 Every other check on both heads was green, so no signal short of the login-filtered review-list query distinguished a reviewer that had approved from one that never spoke.
-An earlier revision of this record claimed Copilot's own check run completed `success` at `04:50:41Z` on #1008.
-That was wrong and is worth leaving visible rather than quietly deleting: there is no such check run, the timestamp belongs to nothing Copilot-attributable, and the claim reached this file from a self-check recorded in
-[`metacognitive-monitoring`](metacognitive-monitoring.md) --- which is to say a verification step propagated the invented particular it was run to catch.)
+The commit check-runs endpoint disagrees with that rollup on both PRs, returning 9 and 11 respectively, the extra entries including one `copilot-pull-request-reviewer` run apiece.
+Two figures in the paragraph above have since been corrected, and the correction runs opposite to the one this record previously carried.
+An earlier revision claimed Copilot's own check run completed `success` at `04:50:41Z` on #1008, a later revision retracted that as an invented particular, and the retraction was the wrong one: check run `91327863807` on `7abfed6b` is named `copilot-pull-request-reviewer` and reads `completed_at: 2026-08-01T04:50:41Z`, `conclusion: success`.
+It is worth leaving the whole chain visible rather than quietly deleting it, because the retraction was produced by exactly the gap criterion 1 now documents --- a query against a surface that omits the check run, read as establishing that the check run does not exist.
+The record's other figure moved too: #1008's rollup count was written as 10 and re-measures at 9, and why was not determined.)
 
 **A sixth case runs the other way from all five above: the review is genuine and complete, but the workflow posts the reviewer's own tool invocation instead of the review body.**
 The comment opens with a literal `gh pr comment <N> --repo <owner>/<repo> --body "$(cat <<'EOF'` and closes with `EOF\n)"`, wrapping a real, correct verdict as unrendered text --- the model emitted a shell command as its final response and the workflow posted that string verbatim.

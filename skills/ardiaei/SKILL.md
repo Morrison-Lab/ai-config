@@ -93,9 +93,11 @@ Print one combined summary:
 
 ## Orchestration
 
-The ARDIA phase is serial by design --- shared review runners, see `ardia` --- so
-don't fan out the push --- re-review loop; at most orchestrate the read-only
-review survey across PRs. The UMS phase reasons over the whole session's learnings
+The ARDIA phase serializes every action that **mutates** a PR --- shared review
+runners, see `ardia` --- so don't fan out the claim --- push --- re-review loop.
+You may orchestrate `ardia`'s step 2: the read-only survey across PRs, plus
+worktree-isolated local patch preparation, which touches no forge state.
+The UMS phase reasons over the whole session's learnings
 at once and is not decomposable, so it stays inline. Consult
 `shared/workflow/when-to-orchestrate.md` (the shared-runner exception).
 

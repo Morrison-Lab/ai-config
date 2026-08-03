@@ -37,8 +37,19 @@ Fanning out work that **pushes commits and triggers CI / a review bot per target
 this bar, even at ~4+ targets: the targets are decomposable but they collide on
 shared review runners and make per-PR status illegible. That is why `ardia`
 drives PRs one at a time and `gip` caps concurrency. For those, orchestrate only
-the **read-only** part (survey every PR's latest review in parallel) and keep the
-push --- re-review --- merge actions serial or capped.
+the part that touches no shared forge state, and keep the push --- re-review ---
+merge actions serial or capped.
+
+That part is wider than a survey.
+It covers reading each PR's latest review and
+CI logs, tracing findings, running local checks, and **preparing an uncommitted
+patch** in an isolated worktree --- none of which claims, comments, commits,
+pushes, or requests review, so none of it contends for a review runner.
+[`ardia`](../../skills/ardia/SKILL.md)'s step 2 is the worked form, including
+the artifact handoff and the staleness re-check a prepared patch needs.
+The line is **mutation of shared state**, not read-only-ness in the literal
+sense: a worker writing a patch file to its own worktree is on the safe side of
+it.
 
 ## Stay inline when
 

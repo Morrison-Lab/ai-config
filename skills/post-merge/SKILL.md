@@ -116,9 +116,9 @@ Everything above treats the merge as the scan's upper bound, and for a review
 already sitting on the PR that is right.
 It also encodes an assumption that nothing further can land, and a reviewer
 dispatched before the merge does not stop working when the merge happens.
-`post-merge` normally runs within a minute or two of the merge, so the scan
-fires at exactly the moment a late review has not posted yet, and a single run
-returns a clean result that expires.
+`post-merge` runs promptly after the merge, which is what makes this a gap
+rather than a curiosity: the scan fires while a late review has not posted
+yet, so a single run returns a clean result that expires.
 
 So re-read the three surfaces once more before closing the PR out, with no
 upper bound at all, and treat a `submitted_at` later than `mergedAt` as an
@@ -143,14 +143,20 @@ an issue would record work that could simply be done.
 
 **Post the back-pointer on the merged PR, not only the forward link.**
 Item 2 asks the follow-up to link back to the merged PR, which serves a reader
-who starts at the follow-up.
-Few do.
-A later reader arrives at the merged PR instead, from a changelog entry, a
-`git blame`, or the review itself, finds a review with unaddressed findings
-sitting under a merged banner, and has no way to tell whether anyone handled
-them.
+who already knows the follow-up exists.
+That is the reader who needs it least.
+The follow-up is reachable only by someone who has already found it, whereas
+the merged PR is what a changelog entry, a `git blame`, or the review
+notification itself points at.
+That reader finds a review with unaddressed findings sitting under a merged
+banner, and has no way to tell whether anyone handled them.
 Comment on the merged PR naming the follow-up and each finding's disposition,
 so the record reads correctly from whichever end it is entered.
+
+`CLAUDE.md`'s push-races-the-merge case already asks for a comment of this
+shape, saying which of a merged PR's findings did not ship in it.
+Its trigger is a `* [new branch]` push tell rather than a review posting, so
+neither case fires on the other.
 
 - **Do:** re-read the three surfaces with no upper bound before closing out,
   and treat a review submitted after `mergedAt` as ordinary.
@@ -158,8 +164,8 @@ so the record reads correctly from whichever end it is entered.
   and the fixes are known, rather than filing an issue.
 - **Do:** comment on the merged PR naming the follow-up and each finding's
   disposition.
-- **Don't:** read the scan's clean result as durable when it ran seconds after
-  the merge.
+- **Don't:** read the scan's clean result as durable when it ran promptly
+  after the merge, before a late review could post.
 - **Don't:** treat a post-merge finding as a Defer, since nothing about its
   scope changed, only the branch's availability.
 - **Don't:** rely on the follow-up's link back as the whole record, since a

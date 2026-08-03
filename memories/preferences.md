@@ -82,6 +82,18 @@
   branch onto it before continuing.
 - When deferring work out of scope during a review iteration, always file a follow-up issue (via `gh issue create` or `glab issue create`) capturing the deferred item.
   Don't just mention it in a comment --- create the issue so it's tracked.
+- **When unsure whether the user wants an action taken, default to doing it (if reversible and in-scope) rather than asking --- the user names the exceptions.**
+  This is the general rule the "always yes" bullets below are specific cases of: opening the PR after pushing, ARDI-ing to clean, subscribing to PR activity, filing follow-up issues, running UMS.
+  It is also the general form of `shared/workflow/report-mistakes-proactively.md`'s "Filing is not gated on approval", `CLAUDE.md`'s "Offering to run UMS is not running it", and `shared/workflow/growth-mindset.md`'s bias toward removing a limitation rather than routing around it.
+  Each of those is this general rule applied to one artifact; this is the master rule they instantiate.
+  - **Do:** when unsure whether the user wants an action taken, take it (when the action is reversible and in-scope) and report it in the past tense, rather than ending the turn with an offer.
+  - **Do:** treat "do [issue]" as including opening the PR --- implementing and pushing a branch but stopping to ask "want me to open the PR?" leaves the issue half-done, because opening the PR is part of doing the issue, not a separate decision to gate on approval.
+  - **Don't:** end a turn with an offer or question ("want me to open a PR?", "should I do X?") for an action that is reversible and in-scope --- that pushes triage back onto the user, who then spends a round-trip giving the yes this standing rule already gave.
+  - **Exception (the class the user carved out):** an irreversible, outward-facing, or destructive action still gates on explicit approval --- the example given was merging a PR without an active `mwc` (merge-when-confident) grant.
+  Provenance of the Do/Don't pair: the standing directive and the "do [issue]" correction both came from the user, verbatim, on 2026-08-03.
+  The reversible-vs-irreversible framing and the report-in-past-tense phrasing I generalized from those two corrections, consistent with the irreversible-or-high-stakes carve-outs already on the bullets below.
+  (Standing directive from the user, verbatim, 2026-08-03: "if you are unsure whether I want you to do something or not, default to doing it; I will tell you the exceptions to that rule (like merging without mwc active)."
+  The `cai` that prompted it the same day: after being handed a GitHub issue and told to "do" it, I implemented and pushed a branch but stopped short of opening the PR and asked whether to open one --- "'do [issue]' means open a PR; you should have done it already.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
 - Always ARDI an open PR/MR to a clean review verdict --- don't ask "want me to ARDI it?" first, just drive it to clean. (Still don't merge unless asked; "always ardi" means always drive to clean, not always merge.)
 - "Fully clean" (the ARDI/iterate terminal state) means BOTH: (1) all CI workflows AND check runs have finished with a passing outcome (success or skipped) --- across every workflow and every individual check run, not just required checks, not just the review job; includes non-gating checks like Coverage/codecov; never merge while any workflow or check run is still queued or in progress, AND (2) the latest review is totally clean --- no nits, and every item not directly Addressed is either Deferred to a tracked issue or Rebutted with a rebuttal that actually CONVINCED the reviewer (they didn't re-raise it).

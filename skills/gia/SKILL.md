@@ -128,11 +128,12 @@ stacks on it.
 
 Both GIA phases push commits that trigger shared review runners, so neither fans
 out freely --- the same constraint that makes `ardia` serial and caps `gip`. You
-may orchestrate the read-only parts (survey all open PRs' reviews, or triage the
-issue backlog) in parallel, but route the actual implement --- push --- review
-work through the serial or capped paths: `ardia` for the PR phase, `gip` for
-provably-independent issues. Consult `shared/workflow/when-to-orchestrate.md` (the
-shared-runner exception).
+may orchestrate the parts that touch no shared forge state (survey all open PRs'
+reviews, prepare uncommitted patches per [`ardia`](../ardia/SKILL.md)'s step 2,
+or triage the issue backlog) in parallel, but route the actual implement ---
+push --- review work through the serial or capped paths: `ardia` for the PR
+phase, `gip` for provably-independent issues.
+Consult `shared/workflow/when-to-orchestrate.md` (the shared-runner exception).
 
 Within either phase, a single PR's own round can still delegate lightweight
 sidecar work via the `Agent` tool --- see `ardia`'s "Lightweight sidecar

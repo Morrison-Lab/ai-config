@@ -160,20 +160,30 @@ script that was not the one running, a cited line number with nothing at it, a
 hardcoded-value scope that named 2 of 6 sites, and
 a two-command failure whose first command failed with an error the finding
 never mentioned.
-The shape then recurred while this entry was being written, and the sixth
-instance breaks the pattern the sentence above states.
+The shape then recurred while this entry was being written, and took two
+further passes to settle.
 The observation recorded in
 [`fully-clean`](fully-clean.md)'s fifth case was handed over with a completion
-time of `04:08:13Z` and corrected here to `04:50:41Z`, which felt like the
-check working.
-Both are wrong: `#1008` carries no Copilot-attributable check run at all, so
-its conclusion -- a green reviewer check with no review behind it -- was **not**
-right, and this correction propagated an invented particular into
-`fully-clean.md` rather than catching one.
-So read "the conclusion held" as five of six, not as a rule.
-A verification that only ever adjusts a figure, never asks whether the thing
-being measured exists, can carry a fabrication forward while reading as
-diligence.)
+time of `04:08:13Z`, corrected here to `04:50:41Z`, and then retracted in that
+file as an invented particular, on the grounds that `#1008` carried no
+Copilot-attributable check run at all.
+Re-measured 2026-08-03, the retraction is the step that was wrong: check run
+`91327863807` on that head is named `copilot-pull-request-reviewer` and reads
+`completed_at: 2026-08-01T04:50:41Z`, `conclusion: success`.
+So the first correction held, and so did the conclusion drawn from it, a green
+reviewer check with no review behind it.
+It was the verification of the verification that carried a false particular
+forward.
+
+That does not rescue the pattern so much as relocate it.
+The retraction came from querying a surface that omits this check run ---
+[`fully-clean`](fully-clean.md)'s criterion 1 now names which surface, and
+records that the reason for the omission is still unestablished --- and
+nothing about the zero it returned announced that it was answering a narrower
+question than the one asked.
+A verification inherits the scope of whatever instrument it reaches for, so
+"I checked and it is not there" stays a claim about the instrument until the
+instrument's own coverage has been established.)
 
 ## Question the answer that arrives without deliberation
 

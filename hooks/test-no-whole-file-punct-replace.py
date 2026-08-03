@@ -139,6 +139,17 @@ STDOUT_WRITE = (
     "python3 -c \"import pathlib,sys; "
     "sys.stdout.write(pathlib.Path('a.md').read_text().replace('\\u2014','---'))\""
 )
+# A bare top-level NEWLINE separates statements just like `;`. An unrelated
+# preceding line (whose command isn't a mutator) must NOT merge with the
+# incident payload and disarm the leading-command check.
+NEWLINE_BYPASS = "echo starting\n" + INLINE_UNSCOPED
+# ...and two individually-safe lines must NOT jointly trip the guard: a
+# read-only preview on one line, an unrelated file write on the next.
+NEWLINE_FALSEPOS = (
+    "python3 -c \"import pathlib; "
+    "print(pathlib.Path('a.md').read_text().replace('\\u2014','---')[:80])\"\n"
+    "python3 -c \"import pathlib; pathlib.Path('report.md').write_text('done')\""
+)
 
 CASES = [
     (UNSCOPED, True, "the unscoped python replace is blocked"),
@@ -160,7 +171,11 @@ CASES = [
      "an override assignment on an unrelated segment does not exempt"),
     (ESC_CURLY, True,
      "the escape form of a curly double quote is blocked"),
+    (NEWLINE_BYPASS, True,
+     "an unrelated line before the payload (bare newline) does not disarm it"),
     (SCOPED, False, "a base-branch-scoped replace is allowed"),
+    (NEWLINE_FALSEPOS, False,
+     "two safe lines separated by a newline are not jointly blocked"),
     (HEREDOC_TRAIL_SCOPED, False,
      "a scoped heredoc with a trailing pipe is allowed"),
     (SCAN, False, "a read-only glyph scan is allowed"),

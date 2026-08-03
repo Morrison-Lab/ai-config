@@ -176,10 +176,13 @@ def split_segments(cmd):
                 pending.append([m.group(2), cur])
                 i += m.end()
                 continue
-        if c == "\n":                             # maybe start a heredoc body
-            cur.append("\n")
+        if c == "\n":
             i += 1
-            while pending and i < n:
+            if not pending:
+                flush()                           # bare newline = separator
+                continue
+            cur.append("\n")                      # opener line's own segment
+            while pending and i < n:              # consume heredoc body/bodies
                 delim, owner = pending[0]
                 nl = cmd.find("\n", i)
                 end = n if nl == -1 else nl

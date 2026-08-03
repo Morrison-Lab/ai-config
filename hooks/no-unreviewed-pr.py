@@ -292,6 +292,21 @@ RX_FAILED = re.compile(
     re.I,
 )
 
+# A request discharge must NOT be blocked by an UNRELATED command's failure
+# text chained into the same Bash call (`some_check; gh api ... POST`, or
+# `<request> || echo done`). RX_FAILED above matches generic `error`/`failed`/
+# `not found` -- ordinary shell noise -- so a successful request sharing a
+# result body with such text would nag forever. The discharge therefore keys
+# on this NARROWER signal: an actual API-failure SHAPE (a 4xx status or GitHub's
+# "cannot be requested"), plus the tool call's own is_error exit status. A
+# genuinely failed `gh api`/`gh pr edit` request exits non-zero (is_error) or
+# returns a 4xx, so this still catches every real failure without firing on a
+# neighbouring command's stderr.
+RX_REQ_FAILED = re.compile(
+    r"\"status\"\s*:\s*4\d\d|HTTP\s+4\d\d|cannot be requested",
+    re.I,
+)
+
 
 def cmd_ident(cmd):
     """(num, repo) from a shell command; each None when absent."""
@@ -383,8 +398,8 @@ def scan(path):
                 if kind == "tool_result":
                     rid = b.get("tool_use_id")
                     body = json.dumps(b.get("content") or "")
-                    failed = bool(b.get("is_error")) or bool(
-                        RX_FAILED.search(body))
+                    err = bool(b.get("is_error"))
+                    failed = err or bool(RX_FAILED.search(body))
                     rnum, rrepo = result_ident(body)
                     # Resolve the open that produced this result.
                     keep = []
@@ -418,9 +433,16 @@ def scan(path):
                         keep.append(ob)
                     obligations[:] = keep
                     # Discharge the reviewer request that produced this result.
+                    # Gate on the REQUEST's own outcome (`err` exit status, or an
+                    # API-failure shape), NOT the broad `failed` flag: an
+                    # unrelated command chained into the same call
+                    # (`some_check; gh api ... POST`) can put `error`/`not found`
+                    # shell noise in the shared body, and reusing `failed` here
+                    # would nag forever after a genuinely successful request.
                     if rid in pending:
                         rnum2, rrepo2 = pending.pop(rid)
-                        if not failed:
+                        req_failed = err or bool(RX_REQ_FAILED.search(body))
+                        if not req_failed:
                             _clear(obligations, rnum2 or rnum, rrepo2 or rrepo)
                     continue
 

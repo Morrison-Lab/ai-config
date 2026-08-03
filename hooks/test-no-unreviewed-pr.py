@@ -154,6 +154,30 @@ case([bash("gh pr create --title x --body y", tid="c"),
       say("The create itself failed.")], False,
      "a create that itself fails opens no PR")
 
+# --- request discharge is scoped to the REQUEST's own outcome ---
+# An UNRELATED failing command chained (via `;`) with a genuinely successful
+# request in one call must still discharge: the request exits 0 and the only
+# failure text (`command not found: error`) belongs to the other command, not
+# to an API failure. Gating the discharge on the whole-body `failed` flag would
+# nag forever after a real, successful request (the safe-but-real bug).
+case(create("c") + [
+    bash("some_check.sh; gh api repos/o/r/pulls/1038/requested_reviewers "
+         "-X POST", tid="q"),
+    res("q", "some_check.sh: command not found: error\n"
+             '{"requested_reviewers":[{"login":"Copilot"}]}'),
+    say("Ran an unrelated check, then requested, in one call.")], False,
+     "an unrelated failing command chained with a successful request discharges")
+# The mirror: a chained request that ITSELF 422s (a real API failure shape,
+# even with is_error unset) must NOT discharge -- the narrow request-failure
+# signal still catches a genuine 4xx.
+case(create("c") + [
+    bash("some_check.sh; gh api repos/o/r/pulls/1038/requested_reviewers "
+         "-X POST", tid="q"),
+    res("q", "some_check.sh: ok\n"
+             '{"status":422,"message":"cannot be requested"}'),
+    say("Ran a check, then a request that 422'd.")], True,
+     "a chained request that itself 422s does not discharge")
+
 # --- draft carve-out ---
 case([bash("gh pr create --draft --base main --title x", tid="c"),
       res("c", URL), say("Draft.")], False,

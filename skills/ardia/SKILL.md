@@ -152,11 +152,12 @@ mutates a PR stays serial.
 
 ## Orchestration
 
-ARDIA serializes every action that **mutates** a PR (see *Process PRs one at a
-time* above): each round claims, pushes, triggers shared review runners, and
-polls for the result, so parallel pushes collide and make per-PR status
-illegible. A Workflow does not change that external limit --- do **not** fan out
-the claim --- push --- re-review --- merge loop.
+ARDIA serializes every action that **mutates** a PR
+(see *Process PRs one at a time* above):
+each round claims, pushes, triggers shared review runners, and polls for the
+result, so parallel pushes collide and make per-PR status illegible.
+A Workflow does not change that external limit ---
+do **not** fan out the claim --- push --- re-review --- merge loop.
 
 What you *can* orchestrate is step 2:
 the read-only survey, and the isolated local preparation that feeds it.

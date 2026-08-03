@@ -1,6 +1,6 @@
 ---
 name: ardia
-description: "ARD + Iterate-All: apply ARDI (ARD + iterate) to every open PR/MR in the repo. Drive each one to a clean review verdict in turn. Use when asked to 'ardia', 'iterate all', 'iterate all PRs', 'iterate every open PR', 'carry every open PR to clean', 'review-loop all my PRs', 'drive all MRs to clean', or to run the ARD-iterate loop across the whole open-PR queue rather than a single PR."
+description: "ARD + Iterate-All: apply ARDI (ARD + iterate) to every open PR/MR in the repo. Optionally survey and prepare independent PRs in parallel, then drive each one to a clean review verdict in turn. Use when asked to 'ardia', 'iterate all', 'iterate all PRs', 'iterate every open PR', 'carry every open PR to clean', 'review-loop all my PRs', 'drive all MRs to clean', or to run the ARD-iterate loop across the whole open-PR queue rather than a single PR."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -14,6 +14,8 @@ allowed-tools:
 
 Apply the ARDI loop (ARD + iterate) to every open PR/MR in the repo, driving
 each to a clean review verdict in series.
+Triage and local patch preparation may run in parallel first; every action that
+mutates a PR stays serial.
 
 ## Procedure
 
@@ -55,7 +57,33 @@ each to a clean review verdict in series.
    Report the in-scope list (with bare PR URLs) **before** you start, so the
    user can veto any before the loop pushes commits.
 
-2. **For each PR/MR, in series, run ARDI** (the full single-PR loop — see the
+2. **Optionally fan out read-only triage and local preparation.**
+   Independent PRs may be inspected concurrently, one worker per PR, each in its
+   own worktree.
+   A worker may read the latest review and CI logs, trace a finding to its
+   cause, run the repo's local checks, and leave a focused **uncommitted** patch
+   in its worktree.
+   It must not claim a PR, post a comment, commit, push, request review, or
+   otherwise mutate shared forge state --- every one of those belongs to the
+   serial loop below.
+
+   Skip the fan-out for stacked PRs, for PRs whose likely file footprints
+   overlap, and whenever independence is uncertain.
+   Consolidate the prepared findings and patches before step 3 begins.
+
+   **A prepared patch is a snapshot, not a decision.**
+   Re-read the latest review and CI state when the serial loop reaches that PR,
+   and re-derive the patch if either has moved.
+   `main` advancing or a new review round landing invalidates a prepared patch
+   silently, and applying a stale one costs a review round rather than saving
+   one.
+   That staleness is what bounds the fan-out rather than runner contention:
+   nothing here pushes, so the cost of going wider is that the last patch
+   applied has waited longest and is likeliest to be stale.
+   Prefer a narrow wave, and re-run preparation rather than stretching one
+   across many PRs.
+
+3. **For each PR/MR, in series, run ARDI** (the full single-PR loop — see the
    `ardi` skill): claim → sync main → read latest review → ARD every finding →
    push → post summary → re-request review → repeat until fully clean. Don't
    reimplement that loop here; follow it per PR.
@@ -110,7 +138,7 @@ each to a clean review verdict in series.
    make per-PR status illegible. One PR stalling or blocking must not abort the
    batch — keep going to the next.
 
-3. **Report a summary table** at the end, with clickable links:
+4. **Report a summary table** at the end, with clickable links:
 
    | MR/PR | Rounds | Final status |
    |-------|--------|--------------|
@@ -124,15 +152,20 @@ each to a clean review verdict in series.
 
 ## Orchestration
 
-ARDIA drives PRs **one at a time on purpose** (see *Process PRs one at a time*
-above): each round pushes commits and triggers shared review runners, so parallel
-pushes collide and make per-PR status illegible. A Workflow does not change that
-external limit --- do **not** fan out the push --- re-review --- merge loop. What
-you *can* orchestrate is the read-only survey: pull every open PR's latest review
-and triage its findings in parallel, then feed that into the serial fix loop.
-Consult `shared/workflow/when-to-orchestrate.md` (the shared-runner exception);
-default to the serial loop, and propose the read-only fan-out only when there are
-many PRs to survey.
+ARDIA serializes every action that **mutates** a PR (see *Process PRs one at a
+time* above): each round claims, pushes, triggers shared review runners, and
+polls for the result, so parallel pushes collide and make per-PR status
+illegible. A Workflow does not change that external limit --- do **not** fan out
+the claim --- push --- re-review --- merge loop.
+
+What you *can* orchestrate is step 2: the read-only survey, and the isolated
+local preparation that feeds it. Use one worktree per independent PR, and say in
+the worker's prompt that its patch stays uncommitted and that no forge state may
+change --- a worker told only to "fix the findings" will reach for `gh` and
+`git push` on its own. Consult
+`shared/workflow/when-to-orchestrate.md` (the shared-runner exception); default
+to the serial loop, and propose the fan-out only when there are many PRs to
+survey.
 
 ### Lightweight sidecar delegation
 

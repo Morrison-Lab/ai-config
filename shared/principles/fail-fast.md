@@ -435,13 +435,23 @@ re-running it on more real data cannot surface the gap.
 The control is therefore a question of **which input**, not of which stage.
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) already
 requires a negative control to enter at the instrument's real input.
-For a comparison check that control is an input holding nothing, and it costs
-one run.
+For a comparison check whose inputs can be empty, that control is an input
+holding nothing, and it costs one run.
+
+That qualifier is doing real work, so decide it rather than assuming it.
+One question settles it: can any input this check will actually meet make
+either side's read return nothing?
+A PR that has never been reviewed is such an input, so the check below owes
+the control.
+A comparison over two fields a schema guarantees to be present is not, and
+demanding an empty run there asks for a case nobody can construct.
+Answer the question explicitly, because "absence cannot happen here" is itself
+a claim about the input domain, and it is the claim that excuses the control.
 
 - **Do:** produce both sides of a comparison with the same command and the
   same filter, or show that they encode absence identically.
-- **Do:** run a repaired check once against an empty input before trusting the
-  repair.
+- **Do:** run a repaired comparison check once against an empty input before
+  trusting the repair, whenever absence is reachable in its input domain.
 - **Don't:** compare a chosen sentinel against a default emptiness shape.
 - **Don't:** let a fix inherit the scrutiny that produced it, since the repair
   is the least-reviewed code in the round.

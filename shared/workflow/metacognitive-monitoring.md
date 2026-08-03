@@ -210,8 +210,8 @@ That is why reciting it does not feel like recalling.
   from a recited one.
 - **Don't:** treat a recommendation as exempt because it contains no status
   word.
-- **Don't:** build one from a status table assembled earlier in the same turn,
-  however recently.
+- **Don't:** build one from the recap's own status table, however recently
+  that table was assembled.
 
 (2026-08-02, this repo: a boxed RECOMMENDATION advised merging `#1058` and
 `#1064` "whenever you like", calling them independent and both carrying clean

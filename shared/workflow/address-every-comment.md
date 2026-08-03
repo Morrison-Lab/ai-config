@@ -785,40 +785,48 @@ error is dangerous.
 The reviewer's actual worry -- that a reader might not reproduce it -- was
 right, and sharper than stated.)
 
-**A third direction, which no verification reflex covers: agreeing with a
-finding and then escalating it.**
+**A third direction, which evades the verification reflex rather than lacking
+a rule: agreeing with a finding and then escalating it.**
 The bullets above check the reviewer's *fix*, and the one above checks their
 *premise*.
 Both assume you are deciding whether the finding is right.
 This is the case where it is right, and correctly scoped, and you tell the
 reviewer it understated the problem.
 
-Amplifying is the one response that feels like the opposite of disputing, so
-none of the checks above fire on it.
-Rebutting is adversarial and prompts you to verify.
-Extending is agreement wearing extra diligence, and agreement is not a thing
-anyone verifies.
-The escalation then ships under the reviewer's authority, with your own
-addition having had less scrutiny than a rebuttal would have got.
-
-[`metacognitive-monitoring`](metacognitive-monitoring.md) supplies the reason
-to expect an escalation to be wrong.
-A competent reviewer's conclusion is usually sound while its *particulars* are
-much less reliable, and an escalation is nothing but a new particular: a wider
+The **obligation** is not new, and claiming otherwise would overstate this
+entry.
+[`metacognitive-monitoring`](metacognitive-monitoring.md) already requires
+verifying a finding's particulars before restating them as fact, and its
+**scope** claim type already governs an assertion of your own about how wide a
+defect is, telling you to check the population rather than the sample that
+came to mind.
+An escalation is nothing but a new particular of exactly that kind: a wider
 scope, a bigger count, one more failing case.
 So it lands squarely in the class that fragment names as least dependable, and
 it does so where the reviewer's credibility will carry it.
 
+What is new is the **trigger**.
+Both of those rules fire on an act you recognize as asserting something, and
+agreeing does not present as one.
+Rebutting is adversarial and prompts you to verify.
+Extending is agreement wearing extra diligence, and agreement is not a thing
+anyone verifies.
+So the rule is already there and nothing calls it, which is how the escalation
+ships under the reviewer's authority with less scrutiny than a rebuttal would
+have got.
+
 Hold an escalation to the standard a rebuttal gets.
-Measure with an instrument at least as wide as the one that produced the
-finding, and say which instrument that was.
+Measure with an instrument covering the whole scope your escalation claims,
+not merely the narrower scope the finding covered, and say which instrument
+that was.
 When the escalation turns out to be wrong, correct it on the thread that
 carried it, not only in a later round's summary.
 A reader who saw "it is worse than you reported" has no other way to learn
 that it was not.
 
-- **Do:** verify an escalation with an instrument at least as wide as the one
-  behind the finding you are widening.
+- **Do:** verify an escalation against the full scope it claims, which is by
+  construction wider than the finding, and so wider than whatever instrument
+  produced the finding.
 - **Do:** post the correction to the thread that carried the escalation.
 - **Don't:** treat agreeing-and-extending as exempt from the checks a rebuttal
   gets, since agreement suppresses the reflex that disagreement triggers.

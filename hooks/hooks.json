@@ -102,6 +102,13 @@
       "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down."
     },
     {
+      "script": "no-whole-file-punct-replace.py",
+      "event": "PreToolUse",
+      "matcher": "Bash",
+      "timeout": 10,
+      "why": "shared/coding/ascii-punctuation-in-source.md's over-application warning. A whole-file glyph replace converts pre-existing glyphs on untouched lines, and the resulting mechanical diff HIDES real changes -- on 2026-08-02 it concealed two dropped paragraphs. Blocks only when a glyph replace, a write-back, and no scoping token all co-occur under an interpreter."
+    },
+    {
       "_note_covers_external_correction": [
         "UserPromptSubmit, inject-only, for the same reason as the two",
         "reminders above: accepting a reviewer's finding and fixing it is",

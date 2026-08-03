@@ -138,6 +138,54 @@ A moved entry at `memories/github-mcp-tools.md:45` still said
 After the split, that bullet remained in `memories/github.md:10`, so the
 sentence pointed to the wrong file until the reference was rewritten.)
 
+## Inserting prose makes a downstream back-reference stale
+
+The section above covers the referrer *moving*.
+The mirror case keeps the referrer still and changes what sits between it and
+its target: you insert a section, and a **count-based back-reference** further
+down --- "the two sections above", "the previous section", "as shown three
+paragraphs up" --- now counts wrong.
+Nothing about your insertion looks like it touched that later sentence, and it
+did not; it changed the sentence's *referent* by displacing the sections it
+counts.
+
+This is the trigger [`sync-with-main.md`](../workflow/sync-with-main.md) names
+for numbered subsections colliding at merge time --- "grep the file for any other place that names the
+old numbering" --- but it fires during ordinary authoring, not just on a
+merge, so an author inserting a section mid-file never thinks to consult a
+merge-conflict rule.
+It is also invisible to every mechanical check: a link checker sees no link, a
+punctuation or line-break check sees a well-formed sentence, and the
+directional-word grep above never fires --- its word list is exclusively
+forward-pointing (`below`, `later`, `following`, ...), so a backward reference
+like "above" is outside its alphabet regardless of whether the count is right.
+
+So before landing an insertion, grep the file **below** the insertion point
+for positional and count references, and re-verify each still resolves to what
+it names.
+The durable fix is to name the target sections rather than counting to them,
+so the next insertion cannot silently invalidate the reference.
+
+- **Do:** after inserting a section, grep the rest of the file for
+  positional/count phrases (`sections above`, `the previous section`, `N
+  paragraphs up`) and confirm each still counts correctly.
+- **Do:** prefer naming the target ("the negative-control and incident-test
+  sections") over counting to it, so an insertion cannot break the count.
+- **Don't:** assume a back-reference survived your insertion because it was
+  correct before and you did not touch its sentence.
+- **Don't:** rely on the directional-word grep above to catch this --- its word
+  list is exclusively forward-pointing and never sees a backward reference
+  like "above" in the first place.
+
+(Morrison-Lab/ai-config#1091, 2026-08-03: a new section was inserted between
+"A negative control must enter at the real input" and "A reminder guard's
+discharge condition...", whose opening "The two sections above test a guard's
+fire condition" then counted back to the new, unrelated section instead of the
+two fire-condition sections it described.
+Review caught it; the fix relocated the inserted section out of the arc so the
+count resolved again.
+CI was fully green throughout --- no mechanical check sees this.)
+
 ## The roadmap exception
 
 A deliberate scene-setting overview near the start of a document or

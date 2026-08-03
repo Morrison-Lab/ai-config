@@ -118,6 +118,40 @@ gap: the code didn't implement what the prose claimed. Re-reading the claim
 against the actual `if` conditions before posting would have caught it
 without needing a review round.)
 
+## Prose that distills code is a code claim, checked like code
+
+When prose restates a code formula, invariant, or gate condition -- a UMS pass
+distilling a hook into English, a doc summarizing a function's logic -- that
+prose is a claim about what the code computes, and it earns the logic
+fact-check in [`fact-check-code-logic`](../coding/fact-check-code-logic.md), not
+the lighter reading prose usually gets.
+A dropped negation or a renamed variable is invisible in the restated form the
+way it never is in the code: the right-hand side matches term for term while
+only the gate's sense inverts, so the formula computes the exact opposite of
+the invariant the surrounding prose defines, with every word around it arguing
+for the original.
+The restatement gets less scrutiny than the code it came from, not more,
+because restating something already verified feels like transcription rather
+than a fresh claim.
+
+So evaluate a distilled formula the way you would the code: name what each
+variable means, run the gate against a case whose answer you know, and confirm
+every negation kept its sense across the rewrite.
+
+- **Do:** fact-check a prose formula, invariant, or gate against the code it
+  distills, checking that each negation and comparison kept its sense.
+- **Don't:** treat a restatement of already-verified code as transcription
+  exempt from the logic check -- the inverted copy reads as authoritative.
+
+(Morrison-Lab/ai-config#1096, 2026-08-03: a UMS pass distilled a hook's
+`req_failed = (not last) or err or failure_pattern(body)`, gated by
+`if not req_failed:`, into prose that renamed the variable to `released`, kept
+the right-hand side, and dropped the negation on the gate -- so the prose
+computed the exact inverse of the invariant the section defined, and a reader
+copying it would have built the very bug the section warns against.
+The reviewer caught it; the fix restored `req_failed`/`if not req_failed` and
+turned the mistake into an in-text warning.)
+
 ## Check a general claim against the concrete numbers in the same document
 
 The checks above compare prose against an external referent --- the code,

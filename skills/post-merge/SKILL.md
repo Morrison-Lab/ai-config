@@ -110,6 +110,70 @@ The suppressed findings were real,
 absent from the merged code,
 and had to be carried forward to #1034.)
 
+**A review can also arrive *after* `mergedAt`, which the bound above excludes
+by construction.**
+Everything above treats the merge as the scan's upper bound, and for a review
+already sitting on the PR that is right.
+It also encodes an assumption that nothing further can land, and a reviewer
+dispatched before the merge does not stop working when the merge happens.
+`post-merge` normally runs within a minute or two of the merge, so the scan
+fires at exactly the moment a late review has not posted yet, and a single run
+returns a clean result that expires.
+
+So re-read the three surfaces once more before closing the PR out, with no
+upper bound at all, and treat a `submitted_at` later than `mergedAt` as an
+ordinary finding rather than as an anomaly.
+
+Two things change when the review lands after the merge rather than before it.
+
+The merged PR is **no longer a place to address anything**.
+That is a third reason for moving work elsewhere, distinct from the two the
+corpus already carries: ARD's Defer moves a finding because fixing it would
+widen the PR's scope, and
+[`address-every-comment`](../../shared/workflow/address-every-comment.md)'s
+`main`-sync case moves one because the line is not yours.
+Here the finding is in scope and is yours, and only the branch it belonged to
+is gone.
+
+And the vehicle is a **follow-up PR against `main`**, narrower than the
+"issue or PR" item 2 above leaves open.
+The findings are valid against `main` by construction, since `main` now holds
+the merged code they were written about, and the fixes are already known, so
+an issue would record work that could simply be done.
+
+**Post the back-pointer on the merged PR, not only the forward link.**
+Item 2 asks the follow-up to link back to the merged PR, which serves a reader
+who starts at the follow-up.
+Few do.
+A later reader arrives at the merged PR instead, from a changelog entry, a
+`git blame`, or the review itself, finds a review with unaddressed findings
+sitting under a merged banner, and has no way to tell whether anyone handled
+them.
+Comment on the merged PR naming the follow-up and each finding's disposition,
+so the record reads correctly from whichever end it is entered.
+
+- **Do:** re-read the three surfaces with no upper bound before closing out,
+  and treat a review submitted after `mergedAt` as ordinary.
+- **Do:** open a follow-up PR against `main` when the findings are in scope
+  and the fixes are known, rather than filing an issue.
+- **Do:** comment on the merged PR naming the follow-up and each finding's
+  disposition.
+- **Don't:** read the scan's clean result as durable when it ran seconds after
+  the merge.
+- **Don't:** treat a post-merge finding as a Defer, since nothing about its
+  scope changed, only the branch's availability.
+- **Don't:** rely on the follow-up's link back as the whole record, since a
+  reader who lands on the merged PR never sees it.
+
+(Morrison-Lab/ai-config#1079 merged at 2026-08-03T03:36:11Z, and Copilot's
+review posted at 03:46:25Z, ten minutes after the merge rather than two
+minutes before it as in #1029 above.
+It carried three inline findings plus two more inside a
+`Suppressed comments (2)` block, and all five were correct.
+They were addressed against `main` in #1082, opened for that purpose and
+merged at 04:15:05Z, and a comment on #1079 at 03:52:47Z names #1082 and each
+finding's disposition.)
+
 ### 1.5. Cascade conflict scan
 
 **In an ultracode/coordinator session, delegate this whole step to a

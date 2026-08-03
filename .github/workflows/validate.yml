@@ -60,6 +60,11 @@ jobs:
         run: python3 scripts/test_pr_sweep.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
+      - name: Run enforcement-hook tests
+        # Each hook in hooks/ ships a test-<name>.py that ran nowhere until now
+        # (ai-config#1065): the guards that enforce the corpus's rules were
+        # themselves unverified. This runner pairs each test with its subject.
+        run: python3 scripts/test_hooks.py
       - name: Measure the auto-loaded context closure (advisory)
         # Reports rather than gates, and deliberately so: this repo is
         # currently ~4x the shipped budget (ai-config#897), so a blocking

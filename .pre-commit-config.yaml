@@ -44,3 +44,9 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: enforcement-hook-tests
+        name: enforcement-hook tests (hooks/test-*.py)
+        entry: python scripts/test_hooks.py
+        language: python
+        pass_filenames: false
+        always_run: true

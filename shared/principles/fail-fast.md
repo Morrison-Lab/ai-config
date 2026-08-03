@@ -188,6 +188,62 @@ The fix adopted was rewriting the scan in Python, which also reports how many
 added lines it examined --- so a zero-hit result is distinguishable from a run
 that examined nothing, per the fan-out section below.)
 
+### The narration can be the unfalsifiable part, while the check is fine
+
+Everything above concerns a command whose *output* cannot distinguish pass
+from fail.
+The adjacent failure leaves the command correct and puts the ambiguity in the
+sentence printed next to it:
+
+```bash
+git log --oneline HEAD..origin/main -- <files>
+echo "(empty above = none of them touch my files)"
+```
+
+The `git log` is right, and the `echo` runs unconditionally.
+So when the range is non-empty, the output says one thing and the label
+beneath it asserts the opposite --- and the label is the part a reader
+believes, because it is phrased as a conclusion while the lines above it are
+raw data.
+
+It is worse than an ambiguous check for two reasons.
+It reads as *more* rigorous, since narrating what a command proves is what a
+careful person does.
+And it survives review of the command: someone checking your `git log`
+invocation finds nothing wrong with it, because nothing is.
+
+The fix is to compute the label or omit it.
+Anything that makes the sentence depend on the data will do:
+
+```bash
+out="$(git log --oneline HEAD..origin/main -- <files>)"
+[ -z "$out" ] && echo "none touch my files" || printf '%s\n' "$out"
+```
+
+This is the [`deterministic-tools`](deterministic-tools.md) rule applied to a
+status line, which that fragment names outright as a thing to stop composing
+by hand.
+
+- **Do:** derive any conclusion you print from the output you just captured.
+- **Do:** print the raw result alone when computing the label is not worth it
+  --- no label beats a wrong one.
+- **Don't:** write a parenthetical asserting what an upcoming command's output
+  will mean; you are describing the expected case, and the unexpected one is
+  why you ran it.
+- **Don't:** trust your own label on a re-read --- it carries the authority of
+  a conclusion and none of the evidence.
+
+(2026-08-03, one `ucdavis/bcs` session: three instances in about an hour, each
+printed beneath output that contradicted it.
+`(empty = my files are untouched by those commits)` beneath three filenames,
+which was briefly believed and produced a wrong statement before a corrected
+query caught it; `(no output above = no auto-review rule)` beneath the
+`copilot_code_review` rule it denied; and `(empty above means none)` beneath
+the commit it said was absent.
+The two later ones were caught immediately, which is the point --- the pattern
+recurred after being noticed twice, because nothing about writing the label
+feels like making a claim.)
+
 ### A fan-out makes this worse, because every worker fails identically
 
 The one-liner above swallows one command's failure.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression tests for the six bugs fixed in semantic-line-breaks.py."""
+"""Regression tests for the bugs fixed in semantic-line-breaks.py."""
 import tempfile
 from pathlib import Path
 import sys
@@ -191,6 +191,17 @@ check(
     "bold-close then lowercase is left joined (no false split)",
     "It is **critical.** yet often skipped on the first pass.\n",
     "It is **critical.** yet often skipped on the first pass.\n",
+)
+
+# Bug 7d: the underscore emphasis forms (`__claim.__`, `_claim._`) split too.
+# The corpus uses asterisk emphasis, not underscore, so this guards the class
+# for both Markdown syntaxes rather than fixing a live corpus bug.
+check(
+    "underscore bold-close sentence boundary splits (__...__. Next)",
+    "__Ending the head poll does not end the PR watch.__ "
+    "The two run at different rates.\n",
+    "__Ending the head poll does not end the PR watch.__\n"
+    "The two run at different rates.\n",
 )
 
 # ---------------------------------------------------------------------------

@@ -24,14 +24,18 @@ A draft PR doesn’t trigger `@claude` review bot, so no review round is spent o
 
 ## Request reviewer before reporting status
 
-Opening a PR or marking a draft ready can trigger the repo’s own review workflow, but that does not summon Copilot. If Copilot is a configured reviewer, request it immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR:
+Opening a PR or marking a draft ready can trigger the repo’s own review workflow, but that does not summon Copilot automatically — unless the repo’s own ruleset does (see below). If Copilot is a configured reviewer, request it immediately after `gh pr create` for a non-draft PR, or immediately after `gh pr ready` for a draft PR — the `REQUEST_COPILOT_REVIEW` operation token (`tool-mappings.md`):
 
 ``` bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
-  -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+  -f 'reviewers[]=copilot-pull-request-reviewer[bot]'   # REQUEST_COPILOT_REVIEW
 gh pr view <N> --json reviewRequests,reviews
 gh pr checks <N>
 ```
+
+In a remote/web session without `gh`, use `mcp__github__request_copilot_review` instead.
+
+**Some repos schedule Copilot automatically via a `copilot_code_review` ruleset rule** (`review_on_push: true`, optionally `review_draft_pull_requests: true`), which re-requests Copilot on every push — see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) for how to read that off a repo’s rulesets, and [`memories/github.md`](../../memories/github.md) for the case record. Request explicitly anyway when you can’t tell whether that applies; a redundant request costs nothing, and skipping it on a repo without the ruleset leaves Copilot unrequested.
 
 Verify the request landed before writing a status report: the POST response should include the reviewer, then a fresh read should show either a pending request or a new review/check from that reviewer on the current head. If the request disappears with no current-head review, report that blocker and start the fallback; do not write “review owed” as a status item.
 

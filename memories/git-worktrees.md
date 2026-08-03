@@ -186,7 +186,12 @@ name --- or use a distinct local branch name if reuse isn't feasible.
 required a `--force-with-lease` push to fix and explicit user sign-off given
 the ref-mutation risk.)
 
-**On Windows, `~/.claude`'s real-copy consumer directories can drift far more than a quick glance suggests --- check the whole corpus, not just `CLAUDE.md`.** CLAUDE.md's own "Keep ai-config and repo checkouts fresh" step 2 already says a `git pull` on the ai-config checkout doesn't propagate to `~/.claude/{skills,shared,commands,memories}` on Windows (real copies, not symlinks).
+**On Windows, `~/.claude`'s real-copy consumer directories can drift far more
+than a quick glance suggests --- check the whole corpus, not just `CLAUDE.md`.**
+CLAUDE.md's own "Keep ai-config and repo checkouts fresh" step 2 already says a
+`git pull` on the ai-config checkout doesn't propagate to
+`~/.claude/{skills,shared,commands,memories}` on Windows (real copies, not
+symlinks).
 In practice the drift found there can be large even in an actively-used setup: one check found `CLAUDE.md` itself missing ~10 sections, `skills/` with 56 of ~90 files differing (plus 6 new skills never copied over), `shared/` with 5 differing/missing fragments, and `memories/` with 3 of 4 files differing --- accumulated silently because the per-session refresh habit checks `CLAUDE.md` (loaded every turn, so staleness there is visible) but not the other three directories (loaded on-demand, so staleness there is invisible until a skill/memory is actually needed and reads wrong).
 Before trusting a sync is complete, `diff -rq` (or `cp -r` unconditionally, after checking for genuine un-upstreamed local edits per the existing before-overwriting caution) all four directories, not just the one that happens to render in every prompt.
 (`Lacaedemon/sparta`, 2026-07-04.)

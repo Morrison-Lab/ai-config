@@ -21,8 +21,25 @@ a hook rather than a rule to remember:
     a PR was created or marked ready this session
     AND no reviewer request came after it
 
-Fails OPEN on any parse trouble, and fires at most once per distinct message,
-so it cannot wedge a session.
+Correlation is by tool_use identity, not by position or by a scalar
+timestamp. Three facts make that necessary, each an independently-reproduced
+bug in the position/timestamp model this replaces:
+
+  * A `gh pr create` command cannot carry its own PR number -- the number
+    only appears in the command's RESULT. So the open is keyed from its
+    result (URL or `number` field), by tool_use id, not from the command.
+  * A reviewer request is discharged only by ITS OWN successful result,
+    matched by tool_use id -- not by the first result in a batch, which may
+    belong to an unrelated tool.
+  * A read of the `requested_reviewers` endpoint (a GET) is not a request;
+    only a mutating POST (or a `--reviewer`/`--add-reviewer`/
+    `request_copilot_review` form) discharges the obligation.
+
+Obligations carry owner/repo when the transcript provides it, so the same PR
+number in two repositories is two obligations, not one.
+
+Fails OPEN on any parse trouble, and fires at most once per distinct message
+per transcript, so it cannot wedge a session.
 """
 import hashlib
 import json
@@ -31,88 +48,164 @@ import re
 import sys
 import tempfile
 
-# Opening a PR, or taking a draft out of draft. `create_pull_request` is the
-# harness tool; `gh pr create` and `gh pr ready` are the CLI forms.
-RX_OPEN = re.compile(
-    r"gh\s+pr\s+ready|gh\s+pr\s+create|"
-    r"create_pull_request|update_pull_request",
-    re.I,
-)
-
-# Requesting a reviewer. Covers the REST endpoint, the CLI flag, and the MCP
-# tool. `requested_reviewers` is the stable token across all three.
-# Verified against `gh --help`: `gh pr create --reviewer` and
-# `gh pr edit --add-reviewer` exist; `gh pr review --request` does NOT
-# (`gh pr review` has only --approve/--comment/--request-changes, and
-# `--request` is rejected as an unknown flag). Matching it would let a
-# command that FAILS look like a successful request.
-RX_REQUEST = re.compile(
-    r"requested_reviewers|request_copilot_review|"
-    r"gh\s+pr\s+edit[^|;&]*--add-reviewer|"
-    r"gh\s+pr\s+create[^|;&]*(?:--reviewer|-r\s)",
-    re.I,
-)
+# Opening a PR, or taking a draft out of draft, via the CLI. The structured
+# harness/MCP tools are matched by NAME below, not by this pattern -- a
+# command string never contains `create_pull_request`, but a doc that quotes
+# it would, which is the heredoc false positive README.md:265-271 warns about.
+RX_OPEN = re.compile(r"gh\s+pr\s+(?:create|ready)\b", re.I)
 
 # Marking a PR draft is a deliberate reason NOT to request review yet: a draft
 # does not trigger the review bot, per shared/workflow/pr-on-claim.md. Only a
-# *later* ready/create should re-arm this guard, which the index compare below
-# handles naturally.
+# *later* ready/create re-arms the guard.  `gh pr ready --undo` converts a
+# ready PR BACK to draft, so it counts as a draft action even though it also
+# matches RX_OPEN -- the draft branch is checked first below.
 RX_DRAFT = re.compile(
     r"\"?draft\"?\s*[:=]\s*true|--draft\b|gh\s+pr\s+ready[^|;&]*--undo",
     re.I,
 )
 
+# Reviewer-request CLI/MCP forms that are inherently mutating: no separate
+# POST check is needed for these. Verified against `gh --help`:
+# `gh pr create --reviewer` and `gh pr edit --add-reviewer` exist;
+# `gh pr review --request` does NOT (`gh pr review` has only
+# --approve/--comment/--request-changes), so it is deliberately absent.
+RX_REQ_CLI = re.compile(
+    r"request_copilot_review"
+    r"|gh\s+pr\s+edit[^|;&]*--add-reviewer"
+    r"|gh\s+pr\s+create[^|;&]*--reviewer\b",
+    re.I,
+)
+# The short reviewer flag is `-r`; the repo flag is `-R`. They differ only by
+# case, so this one alternative must be case-SENSITIVE -- matching it under
+# re.I would read `gh pr create -R owner/repo` as a reviewer request.
+RX_REQ_SHORT = re.compile(r"gh\s+pr\s+create[^|;&]*\s-r\s")
+# A mutating HTTP method. The bare `requested_reviewers` endpoint is also read
+# via GET (to CHECK who is requested -- the hook's own recovery text suggests a
+# verification call), and a GET must NOT discharge the obligation.
+RX_POST = re.compile(r"-X\s*['\"]?POST|--method\s+['\"]?POST", re.I)
+
+
+def is_request(cmd):
+    """True when a shell command actually REQUESTS a reviewer (not a read)."""
+    if RX_REQ_CLI.search(cmd) or RX_REQ_SHORT.search(cmd):
+        return True
+    return "requested_reviewers" in cmd and bool(RX_POST.search(cmd))
+
 
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
 # other tool's serialized input is the documentation/heredoc false positive
-# README.md:265-271 warns about -- and it is self-demonstrating here, since
-# these very hook files contain the strings `gh pr create` and
-# `requested_reviewers` in their prose.
+# README.md:265-271 warns about -- self-demonstrating here, since these very
+# hook files contain the strings `gh pr create` and `requested_reviewers`.
 SHELL_TOOLS = {"Bash", "bash", "run_command"}
 
-# Structured PR tools. Matched on the tool NAME, with their arguments read as
-# fields rather than as text.
+# Structured PR tools, matched on the tool NAME with arguments read as fields.
 OPEN_TOOLS = {"create_pull_request", "mcp__github__create_pull_request"}
 EDIT_TOOLS = {"update_pull_request", "mcp__github__update_pull_request"}
 REQ_TOOLS = {"request_copilot_review", "mcp__github__request_copilot_review"}
 
-# Three shapes carry a PR number: an API path (`pulls/1038`), a CLI verb
-# (`gh pr ready 1038`), and a structured field (`pull_number: 1038`).
-# Missing the CLI-verb form made `gh pr ready <N> --undo` resolve to a
-# different key than the `create` that opened it, so the draft carve-out
-# silently failed to clear the obligation it was meant to.
-RX_PR_NUM = re.compile(
-    r"pulls?[/\s#]+(\d+)"
-    r"|\bpr\s+(?:ready|edit|view|comment|review|merge|close)\s+#?(\d+)"
-    r"|\bpull_?number\D{0,3}(\d+)",
+# A PR number plus owner/repo carried by a shell command: an API path
+# (`repos/o/r/pulls/1038`), a CLI verb (`gh pr ready 1038`), or a `-R o/r`
+# flag. `gh pr create` carries NEITHER -- its number is learned from the
+# result -- which is the whole reason opens are keyed from their result.
+RX_CMD_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
+RX_CMD_VERB = re.compile(
+    r"\bpr\s+(?:ready|edit|view|comment|review|merge|close|diff|checks)\s+#?(\d+)",
     re.I,
 )
-# A tool result that reports failure. A 422 -- documented when the PR author
-# is the requested reviewer -- must NOT discharge the obligation.
-RX_FAILED = re.compile(r"\b4\d\d\b|\berror\b|\bfail", re.I)
+RX_CMD_REPO = re.compile(r"(?:-R|--repo)[=\s]+([\w.-]+/[\w.-]+)", re.I)
+
+# A PR identity carried by a tool RESULT: the PR URL (owner/repo/number) or a
+# bare `"number"` field.
+RX_RES_URL = re.compile(r"github\.com/([\w.-]+)/([\w.-]+)/pull/(\d+)", re.I)
+RX_RES_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
+RX_RES_NUM = re.compile(r"\\?\"number\\?\"\s*:\s*(\d+)")
+
+# A tool result that reports failure. Kept specific: a bare 4xx substring
+# matches PR numbers like 422 or a `/pull/430` URL, so failure is keyed on an
+# HTTP-status shape or an explicit error word, plus the harness `is_error`
+# flag when present.
+RX_FAILED = re.compile(
+    r"\"status\"\s*:\s*4\d\d|HTTP\s+4\d\d|\berror\b|\bfailed\b"
+    r"|cannot be requested|not found",
+    re.I,
+)
 
 
-def pr_key(blob):
-    """PR number mentioned, or '*' when none is identifiable."""
-    m = RX_PR_NUM.search(blob)
+def cmd_ident(cmd):
+    """(num, repo) from a shell command; each None when absent."""
+    repo = None
+    m = RX_CMD_REPO.search(cmd)
     if m:
-        return next(g for g in m.groups() if g)
-    return "*"
+        repo = m.group(1)
+    m = RX_CMD_API.search(cmd)
+    if m:
+        return m.group(3), f"{m.group(1)}/{m.group(2)}"
+    m = RX_CMD_VERB.search(cmd)
+    if m:
+        return m.group(1), repo
+    return None, repo
+
+
+def input_ident(inp):
+    """(num, repo) from a structured tool's input fields."""
+    num = inp.get("pullNumber") or inp.get("pull_number")
+    num = str(num) if num is not None else None
+    owner, rp = inp.get("owner"), inp.get("repo")
+    repo = f"{owner}/{rp}" if owner and rp else None
+    return num, repo
+
+
+def result_ident(body):
+    """(num, repo) parsed from a tool_result body string."""
+    m = RX_RES_URL.search(body) or RX_RES_API.search(body)
+    if m:
+        return m.group(3), f"{m.group(1)}/{m.group(2)}"
+    m = RX_RES_NUM.search(body)
+    if m:
+        return m.group(1), None
+    return None, None
+
+
+def _repo_ok(a, b):
+    return a is None or b is None or a == b
+
+
+def _clear(obligations, num, repo):
+    """Remove the best obligation a (num, repo) discharges, if any.
+
+    Matches on PR number, preferring an exact owner/repo match over one where
+    a side's repo is unknown. It deliberately does NOT clear an obligation
+    whose own number is still unresolved: that would let a request for one PR
+    silently discharge a different, unidentified one. A create's number is read
+    from its result before any request could target it, so a resolved
+    obligation is the normal state, and an unresolved one means a genuinely
+    unparseable result -- which stays outstanding rather than being cleared by
+    an unrelated request.
+    """
+    best, best_rank = None, 99
+    for idx, ob in enumerate(obligations):
+        if ob["num"] is not None and num is not None and ob["num"] == num \
+                and _repo_ok(ob["repo"], repo):
+            rank = 0 if (ob["repo"] and repo) else 1
+            if rank < best_rank:
+                best, best_rank = idx, rank
+    if best is not None:
+        obligations.pop(best)
 
 
 def scan(path):
-    """Return (open_prs, text).
+    """Return (obligations, text).
 
-    `open_prs` maps PR key -> True when an obligation is outstanding. Tracked
-    PER PR rather than as scalar timestamps: with scalars, opening A then B
-    and requesting review only for B silently forgets A -- which is exactly
-    the two-PR failure this hook exists to catch.
+    `obligations` is a list of {"num", "repo", "tid", "self"} records, one per
+    non-draft PR opened whose reviewer request has not been discharged.
+    Tracked as a list (not a scalar timestamp or a number-keyed dict) so that
+    two PRs, or the same number in two repositories, are two obligations.
     """
-    open_prs = {}
+    obligations = []
+    pending = {}  # tool_use_id -> (num, repo) for reviewer requests
     text = ""
-    pending = []  # (index, key) request attempts awaiting their result
     with open(path, errors="ignore") as fh:
-        for i, line in enumerate(fh):
+        for line in fh:
             try:
                 m = json.loads(line)
             except Exception:
@@ -126,77 +219,107 @@ def scan(path):
                 kind = b.get("type")
 
                 if kind == "tool_result":
-                    # Only a SUCCESSFUL request discharges. A 422 still
-                    # produces a tool_use, so trusting the attempt alone lets
-                    # the session stop with no reviewer attached.
+                    rid = b.get("tool_use_id")
                     body = json.dumps(b.get("content") or "")
-                    for _, key in pending:
-                        if not RX_FAILED.search(body):
-                            open_prs.pop(key, None)
-                            if key == "*":
-                                open_prs.clear()
-                    pending = []
+                    failed = bool(b.get("is_error")) or bool(
+                        RX_FAILED.search(body))
+                    rnum, rrepo = result_ident(body)
+                    # Resolve the open that produced this result.
+                    keep = []
+                    for ob in obligations:
+                        if ob["tid"] != rid:
+                            keep.append(ob)
+                            continue
+                        if failed:
+                            continue  # a failed open opened no PR
+                        if ob["num"] is None and rnum:
+                            ob["num"] = rnum
+                        if ob["repo"] is None and rrepo:
+                            ob["repo"] = rrepo
+                        if ob["self"]:
+                            continue  # create --reviewer already requested
+                        keep.append(ob)
+                    obligations[:] = keep
+                    # Discharge the reviewer request that produced this result.
+                    if rid in pending:
+                        rnum2, rrepo2 = pending.pop(rid)
+                        if not failed:
+                            _clear(obligations, rnum2 or rnum, rrepo2 or rrepo)
                     continue
 
-                if kind == "tool_use":
-                    name = b.get("name") or ""
-                    inp = b.get("input") or {}
-                    blob = json.dumps(inp)
+                if kind != "tool_use":
+                    if kind == "text" and m.get("type") == "assistant":
+                        if b.get("text", "").strip():
+                            text = b["text"]
+                    continue
 
-                    if name in OPEN_TOOLS:
-                        if not inp.get("draft"):
-                            open_prs[pr_key(blob)] = True
-                        continue
-                    if name in EDIT_TOOLS:
-                        key = pr_key(blob)
-                        if inp.get("draft") is True:
-                            open_prs.pop(key, None)
-                        elif inp.get("draft") is False:
-                            open_prs[key] = True
-                        if inp.get("reviewers"):
-                            pending.append((i, key))
-                        continue
-                    if name in REQ_TOOLS:
-                        pending.append((i, pr_key(blob)))
-                        continue
-                    if name not in SHELL_TOOLS:
-                        continue  # never text-match a non-shell tool
+                name = b.get("name") or ""
+                tid = b.get("id")
+                inp = b.get("input")
+                if not isinstance(inp, dict):
+                    inp = {}
 
-                    cmd = inp.get("command") or ""
-                    key = pr_key(cmd)
-                    # RX_DRAFT is checked FIRST, via if/elif, and its own
-                    # pattern already matches `gh pr ready ... --undo` -- so
-                    # RX_OPEN needs no separate `--undo` exclusion. That
-                    # exclusion was tried and found dead: the mutation test
-                    # that removed it did not fail, because this ordering
-                    # already wins regardless of what RX_OPEN also matches.
-                    if RX_DRAFT.search(cmd):
-                        open_prs.pop(key, None)
-                    elif RX_OPEN.search(cmd):
-                        open_prs[key] = True
-                    if RX_REQUEST.search(cmd):
-                        pending.append((i, key))
+                if name in OPEN_TOOLS:
+                    if not inp.get("draft"):
+                        num, repo = input_ident(inp)
+                        obligations.append({"num": num, "repo": repo,
+                                            "tid": tid,
+                                            "self": bool(inp.get("reviewers"))})
+                    continue
+                if name in EDIT_TOOLS:
+                    num, repo = input_ident(inp)
+                    if inp.get("draft") is True:
+                        _clear(obligations, num, repo)
+                    elif inp.get("draft") is False:
+                        obligations.append({"num": num, "repo": repo,
+                                            "tid": tid,
+                                            "self": bool(inp.get("reviewers"))})
+                    if inp.get("reviewers"):
+                        pending[tid] = (num, repo)
+                    continue
+                if name in REQ_TOOLS:
+                    pending[tid] = input_ident(inp)
+                    continue
+                if name not in SHELL_TOOLS:
+                    continue  # never text-match a non-shell tool
 
-                elif kind == "text" and m.get("type") == "assistant":
-                    if b.get("text", "").strip():
-                        text = b["text"]
-    return open_prs, text
+                cmd = inp.get("command") or ""
+                num, repo = cmd_ident(cmd)
+                requested = is_request(cmd)
+                opened = bool(RX_OPEN.search(cmd)) and not RX_DRAFT.search(cmd)
+                # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
+                # too, and it is the draft action that decides.
+                if RX_DRAFT.search(cmd):
+                    _clear(obligations, num, repo)
+                elif opened:
+                    obligations.append({"num": num, "repo": repo, "tid": tid,
+                                        "self": requested})
+                # A create --reviewer both opens and requests; its `self` flag
+                # discharges it on the create's own result, so it is not also a
+                # separate pending request here.
+                if requested and not opened:
+                    pending[tid] = (num, repo)
+    return obligations, text
 
 
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-        open_prs, text = scan(payload.get("transcript_path") or "")
+        transcript = payload.get("transcript_path") or ""
+        obligations, text = scan(transcript)
     except Exception:
         return 0  # fail open
 
-    if not text or not open_prs:
+    if not text or not obligations:
         return 0
 
-    named = sorted(k for k in open_prs if k != "*")
-    which = ", ".join("#" + k for k in named) if named else "a PR"
+    named = sorted({o["num"] for o in obligations if o["num"]}, key=int)
+    which = ", ".join("#" + n for n in named) if named else "a PR"
 
-    key = hashlib.sha256((text + which).encode()).hexdigest()[:16]
+    # Sentinel scoped to this transcript AND this message, so a later session
+    # ending with the same recap text does not silently skip the guard.
+    key = hashlib.sha256(
+        (transcript + "\0" + text + "\0" + which).encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-unreviewed-pr-{key}")
     if os.path.exists(sentinel):
         return 0

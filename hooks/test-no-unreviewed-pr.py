@@ -5,8 +5,17 @@ legitimately defers review, and a session that already requested a reviewer
 must not be nagged. A guard that fires on correct behaviour gets disabled,
 and then the case it exists for goes unprotected too.
 
+Fixtures mirror real transcripts: every tool_use carries an `id`, and every
+tool_result references it via `tool_use_id`, because the guard correlates a
+result to its own call by identity. Crucially, a `gh pr create` command does
+NOT embed its PR number -- the number arrives only in the command's result --
+so the create fixtures deliberately keep the number OUT of the command and
+put it in the result, the shape the position/number-in-command model got
+wrong.
+
 Run: python3 hooks/test-no-unreviewed-pr.py hooks/no-unreviewed-pr.py
 """
+import importlib.util
 import json
 import os
 import subprocess
@@ -15,20 +24,43 @@ import tempfile
 
 HOOK = sys.argv[1]
 
+_n = [0]
 
-def bash(cmd):
+
+def _id():
+    _n[0] += 1
+    return f"t{_n[0]}"
+
+
+def use(name, tid=None, **inp):
+    """One assistant message with a single tool_use block."""
     return {"type": "assistant", "message": {"content": [
-        {"type": "tool_use", "name": "Bash", "input": {"command": cmd}}]}}
+        {"type": "tool_use", "id": tid or _id(), "name": name, "input": inp}]}}
 
 
-def tool(name, **inp):
-    return {"type": "assistant", "message": {"content": [
-        {"type": "tool_use", "name": name, "input": inp}]}}
+def bash(cmd, tid=None):
+    return use("Bash", tid=tid, command=cmd)
 
 
-def result(body):
+def res(tid, body, err=False):
+    """One user message with a single tool_result block for `tid`."""
     return {"type": "user", "message": {"content": [
-        {"type": "tool_result", "content": body}]}}
+        {"type": "tool_result", "tool_use_id": tid, "content": body,
+         "is_error": err}]}}
+
+
+def results(*pairs):
+    """One user message with several tool_result blocks (a batched turn)."""
+    return {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": tid, "content": body,
+         "is_error": err} for (tid, body, err) in pairs]}}
+
+
+def uses(*triples):
+    """One assistant message with several tool_use blocks (a batched turn)."""
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": tid, "name": name, "input": inp}
+        for (name, inp, tid) in triples]}}
 
 
 def say(text):
@@ -36,102 +68,190 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
-OK = result("{\"requested_reviewers\":[{\"login\":\"Copilot\"}]}")
-FAILED = result("{\"status\":422,\"message\":\"Review cannot be requested\"}")
+URL = "https://github.com/o/r/pull/1038\n"          # a `gh pr create` result
+OK = '{"requested_reviewers":[{"login":"Copilot"}]}'  # a successful request
+FAIL = '{"status":422,"message":"Review cannot be requested"}'
+REQ_CMD = ("gh api repos/o/r/pulls/1038/requested_reviewers -X POST "
+           "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'")
 
-CREATE = bash("gh pr create --base main --title x --body y  # pulls/1038")
-CREATE_DRAFT = bash("gh pr create --draft --base main --title x")
-READY = bash("gh pr ready 1038")
-UNDO = bash("gh pr ready 1038 --undo")
-REQUEST = bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST "
-               "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'")
-CREATE_WITH_REVIEWER = bash("gh pr create --base main --title x --reviewer "
-                            "copilot-pull-request-reviewer  # pulls/1038")
-# A file whose CONTENT mentions the CLI strings. Matching a non-shell tool's
-# serialized input is the heredoc false positive README.md:265-271 warns
-# about, and these very hook files contain both strings in their prose.
-WRITE_DOC = tool("create", path="hooks/no-unreviewed-pr.py",
-                 file_text="matches gh pr create and requested_reviewers")
 
-CASES = [
-    ([CREATE, say("Opened #1038. Review owed.")], True,
-     "gh pr create with no reviewer request blocks"),
-    ([tool("create_pull_request", title="x", body="y"), say("Opened.")], True,
-     "the harness create tool with no request blocks"),
-    ([READY, say("Marked it ready.")], True,
-     "gh pr ready with no request blocks"),
+def create(tid, result=URL, err=False):
+    """A realistic `gh pr create`: number in the RESULT, never the command."""
+    return [bash("gh pr create --base main --title x --body y", tid=tid),
+            res(tid, result, err)]
 
-    ([CREATE, REQUEST, OK, say("Opened and requested.")], False,
-     "a SUCCESSFUL request discharges it"),
-    ([CREATE, CREATE_WITH_REVIEWER, OK, say("Opened with a reviewer.")], False,
-     "gh pr create --reviewer discharges it"),
 
-    # A 422 still produces a tool_use, so trusting the attempt alone would let
-    # the session stop with no reviewer attached.
-    ([CREATE, REQUEST, FAILED, say("Requested.")], True,
-     "a FAILED (422) request does not discharge it"),
+CASES = []
 
-    ([CREATE_DRAFT, say("Opened as a draft.")], False,
-     "a draft PR does not block"),
-    ([tool("create_pull_request", title="x", draft=True), say("Draft.")], False,
-     "the harness draft flag does not block"),
-    ([CREATE_DRAFT, READY, say("Ready now.")], True,
-     "readying a draft later re-arms the guard"),
-    # `gh pr ready --undo` converts BACK to draft. Without the negative
-    # lookahead it matches RX_OPEN and behaves in exactly the wrong direction.
-    ([CREATE, UNDO, say("Held as a draft.")], False,
-     "gh pr ready --undo is a draft action, not an open one"),
-    # --undo also matches RX_OPEN's own `gh pr ready` alternative, so this
-    # only passes because RX_DRAFT is checked FIRST (if/elif). A version
-    # that checked RX_OPEN first, or as an independent `if`, would open the
-    # PR here instead of holding it -- covered by re-deriving the case
-    # directly against the hook rather than trusting the label above.
-    ([CREATE, UNDO], "ordering", "RX_DRAFT must be checked before RX_OPEN"),
-    ([tool("create_pull_request", title="x", body="y  pulls/1038"),
-      tool("update_pull_request", pull_number=1038, draft=True),
+
+def case(events, expected, label):
+    CASES.append((events, expected, label))
+
+
+# --- opens with no request block ---
+case(create("c") + [say("Opened. Review owed.")], True,
+     "gh pr create with no reviewer request blocks")
+case([use("create_pull_request", tid="c", title="x", body="y"),
+      res("c", '{"number":1038,"html_url":"https://github.com/o/r/pull/1038"}'),
+      say("Opened.")], True,
+     "the harness create tool with no request blocks")
+case([bash("gh pr ready 1038", tid="c"), res("c", "{}"), say("Ready.")], True,
+     "gh pr ready with no request blocks")
+
+# --- a successful request discharges; a failed one does not ---
+case(create("c") + [bash(REQ_CMD, tid="q"), res("q", OK),
+                    say("Opened and requested.")], False,
+     "a create keyed from its result is cleared by a numbered request")
+case([bash("gh pr create --base main --title x --reviewer "
+           "copilot-pull-request-reviewer", tid="c"), res("c", URL),
+      say("Opened with a reviewer.")], False,
+     "gh pr create --reviewer self-discharges")
+case([use("create_pull_request", tid="c", title="x",
+          reviewers=["copilot-pull-request-reviewer"]),
+      res("c", '{"number":1038}'), say("Opened with a reviewer.")], False,
+     "the harness create tool with a reviewers field self-discharges")
+case(create("c") + [bash(REQ_CMD, tid="q"), res("q", FAIL, err=True),
+                    say("Requested.")], True,
+     "a FAILED (422) request does not discharge it")
+
+# --- draft carve-out ---
+case([bash("gh pr create --draft --base main --title x", tid="c"),
+      res("c", URL), say("Draft.")], False,
+     "a draft PR does not block")
+case([use("create_pull_request", tid="c", title="x", draft=True),
+      res("c", '{"number":1038}'), say("Draft.")], False,
+     "the harness draft flag does not block")
+case([bash("gh pr create --draft --title x", tid="c"), res("c", URL),
+      bash("gh pr ready 1038", tid="r"), res("r", "{}"), say("Ready now.")],
+     True, "readying a draft later re-arms the guard")
+case(create("c") + [bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}"),
+                    say("Held as a draft.")], False,
+     "gh pr ready --undo is a draft action, not an open one")
+case([use("create_pull_request", tid="c", title="x", body="y"),
+      res("c", '{"number":1038,"html_url":"https://github.com/o/r/pull/1038"}'),
+      use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=True), res("u", "{}"),
       say("Converted back to draft.")], False,
-     "update_pull_request draft:true defers review again"),
+     "update_pull_request draft:true defers review again")
 
-    # Scalar timestamps lose obligations across PRs: opening A then B and
-    # requesting only B silently forgot A. That IS the two-PR failure this
-    # hook exists to catch, so it must be tracked per PR.
-    ([bash("gh pr create --title a  # pulls/1038"),
-      bash("gh pr create --title b  # pulls/1040"),
-      bash("gh api repos/o/r/pulls/1040/requested_reviewers -X POST"), OK,
-      say("Opened both, requested one.")], True,
-     "requesting for one PR does not clear another's obligation"),
-    ([bash("gh pr create --title a  # pulls/1038"),
-      bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST"), OK,
-      bash("gh pr create --draft --title b  # pulls/1040"),
+# --- per-PR identity: one request does not clear another PR ---
+case([bash("gh pr create --title a", tid="a"), res("a", URL),
+      bash("gh pr create --title b",
+           tid="b"), res("b", "https://github.com/o/r/pull/1040\n"),
+      bash("gh api repos/o/r/pulls/1040/requested_reviewers -X POST", tid="q"),
+      res("q", OK), say("Opened both, requested one.")], True,
+     "requesting for one PR does not clear another's obligation")
+case([bash("gh pr create --title a", tid="a"), res("a", URL),
+      bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      bash("gh pr create --draft --title b",
+           tid="b"), res("b", "https://github.com/o/r/pull/1040\n"),
       say("One reviewed, one draft.")], False,
-     "a later draft does not silence an already-satisfied PR"),
+     "a later draft does not silence an already-satisfied PR")
 
-    # Non-shell tools must never be text-matched.
-    ([WRITE_DOC, say("Wrote the hook file.")], False,
-     "writing a file mentioning the CLI strings creates no obligation"),
-    ([CREATE, tool("create", path="doc.md",
-                   file_text="see requested_reviewers"), say("Documented.")],
-     True, "a file mentioning requested_reviewers does not discharge"),
+# --- multi-repository identity (same PR number, two repos) ---
+case([bash("gh pr create -R o1/r --title a", tid="a"),
+      res("a", "https://github.com/o1/r/pull/10\n"),
+      bash("gh pr create -R o2/r --title b", tid="b"),
+      res("b", "https://github.com/o2/r/pull/10\n"),
+      bash("gh api repos/o1/r/pulls/10/requested_reviewers -X POST", tid="q"),
+      res("q", OK), say("Opened in two repos, requested one.")], True,
+     "same PR number in two repos: requesting one leaves the other")
+# Requesting the SAME repo's PR twice must not discharge the OTHER repo's
+# same-numbered PR. A number-only identity would clear both here; owner/repo
+# in the identity is what keeps o2/r#10 outstanding.
+case([bash("gh pr create -R o1/r --title a", tid="a"),
+      res("a", "https://github.com/o1/r/pull/10\n"),
+      bash("gh pr create -R o2/r --title b", tid="b"),
+      res("b", "https://github.com/o2/r/pull/10\n"),
+      bash("gh api repos/o1/r/pulls/10/requested_reviewers -X POST", tid="q1"),
+      res("q1", OK),
+      bash("gh api repos/o1/r/pulls/10/requested_reviewers -X POST", tid="q2"),
+      res("q2", OK), say("Requested o1's PR twice.")], True,
+     "requesting one repo's PR twice does not clear the other repo's")
 
-    ([bash("git status --short"), say("All clean.")], False,
-     "a session that opened no PR does not block"),
-    ([REQUEST, OK, say("Re-requested on #1029.")], False,
-     "a bare re-request with no open does not block"),
-]
+# --- id-correlated results: an unrelated batched result must not mislead ---
+case(create("c") + [
+    uses(("Bash", {"command": "gh pr checks 1038"}, "chk"),
+         ("Bash", {"command": REQ_CMD}, "q")),
+    results(("chk", '{"conclusion":"failure"}', False), ("q", OK, False)),
+    say("Checked and requested.")], False,
+     "a batched unrelated failing result does not block a real request")
+case(create("c") + [
+    uses(("Bash", {"command": REQ_CMD}, "q"),
+         ("Bash", {"command": "gh pr checks 1038"}, "chk")),
+    results(("q", OK, False), ("chk", '{"conclusion":"failure"}', False)),
+    say("Requested and checked.")], False,
+     "request success is read from its own result regardless of batch order")
+# The sharp case: an unrelated call in the batch returns a genuine 4xx/error.
+# Positional correlation would attribute that failure to the real request and
+# block; id-correlation reads only the request's OWN (successful) result.
+case(create("c") + [
+    uses(("Bash", {"command": "gh pr view 1038 --json state"}, "v"),
+         ("Bash", {"command": REQ_CMD}, "q")),
+    results(("v", '{"status":404,"message":"not found error"}', False),
+            ("q", OK, False)),
+    say("Viewed then requested.")], False,
+     "an unrelated 4xx result in the batch does not fail the real request")
+
+# --- a read-only GET of the endpoint is NOT a request ---
+case(create("c") + [
+    bash("gh api repos/o/r/pulls/1038/requested_reviewers", tid="g"),
+    res("g", OK), say("Checked who is requested.")], True,
+     "a read-only GET of requested_reviewers does not discharge")
+
+# --- non-shell tools must never be text-matched ---
+case([use("create", tid="w", path="hooks/no-unreviewed-pr.py",
+          file_text="matches gh pr create and requested_reviewers"),
+      res("w", "ok"), say("Wrote the hook file.")], False,
+     "writing a file mentioning the CLI strings creates no obligation")
+case(create("c") + [
+    use("create", tid="w", path="doc.md",
+        file_text="see requested_reviewers"), res("w", "ok"),
+    say("Documented.")], True,
+     "a file mentioning requested_reviewers does not discharge")
+
+# --- sessions that opened no PR, and a bare re-request ---
+case([bash("git status --short", tid="g"), res("g", ""), say("All clean.")],
+     False, "a session that opened no PR does not block")
+case([bash("gh api repos/o/r/pulls/1029/requested_reviewers -X POST", tid="q"),
+      res("q", OK), say("Re-requested on #1029.")], False,
+     "a bare re-request with no open does not block")
+
+# The draft-before-open ordering is load-bearing: `gh pr ready --undo` matches
+# RX_OPEN too, so only checking RX_DRAFT first keeps it a draft action. Inspect
+# the actual obligation state, not just the block decision.
+case(create("c") + [bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}")],
+     "ordering", "RX_DRAFT must be checked before RX_OPEN")
 
 
-def run(events):
+def block_of(events):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         for e in events:
             fh.write(json.dumps(e) + "\n")
     try:
-        env = dict(os.environ, TMPDIR=tempfile.mkdtemp())
         out = subprocess.run(
             [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True, env=env,
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
         ).stdout
         return '"decision": "block"' in out or '"decision":"block"' in out
+    finally:
+        os.unlink(path)
+
+
+def obligations_of(events):
+    spec = importlib.util.spec_from_file_location("_h", HOOK)
+    hookmod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hookmod)
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        obs, _ = hookmod.scan(path)
+        return obs
     finally:
         os.unlink(path)
 
@@ -140,29 +260,16 @@ def main():
     passes = failures = 0
     for events, expected, label in CASES:
         if expected == "ordering":
-            # Re-derive PR state directly: after --undo, the PR must be
-            # ABSENT from open_prs (drafted), not merely "not blocking" --
-            # a coincidentally-passing block check would not catch a wrong
-            # check order the way inspecting the actual state does.
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("_h", HOOK)
-            hookmod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(hookmod)
-            fd, path = tempfile.mkstemp(suffix=".jsonl")
-            with os.fdopen(fd, "w") as fh:
-                for e in events:
-                    fh.write(json.dumps(e) + "\n")
-            open_prs, _ = hookmod.scan(path)
-            os.unlink(path)
-            got_ordering = "1038" not in open_prs
-            if got_ordering:
+            obs = obligations_of(events)
+            ok = "1038" not in {o["num"] for o in obs}
+            if ok:
                 print(f"PASS: {label}")
                 passes += 1
             else:
-                print(f"FAIL: {label} (PR #1038 still marked open after --undo)")
+                print(f"FAIL: {label} (#1038 still open after --undo)")
                 failures += 1
             continue
-        got = run(events)
+        got = block_of(events)
         if got == expected:
             print(f"PASS: {label}")
             passes += 1
@@ -170,11 +277,11 @@ def main():
             print(f"FAIL: {label} (expected block={expected}, got {got})")
             failures += 1
 
-    # The recovery commands must be copy-pasteable: an unquoted `<` is a shell
+    # Recovery commands must be copy-pasteable: an unquoted `<` is a shell
     # redirect, so a placeholder-bearing argument has to be quoted.
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
-        for e in [CREATE, say("Opened it.")]:
+        for e in create("c") + [say("Opened it.")]:
             fh.write(json.dumps(e) + "\n")
     out = subprocess.run(
         [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
@@ -183,16 +290,14 @@ def main():
     ).stdout
     os.unlink(path)
     reason = json.loads(out).get("reason", "") if out.strip() else ""
-    bare = [ln for ln in reason.splitlines()
-            if "<" in ln and "gh " in ln and '"<' not in ln and "'<" not in ln
-            and "/<" not in ln.split("#")[0].replace('"', "")]
-    if not [ln for ln in reason.splitlines()
-            if ln.strip().startswith("gh ") and "<" in ln
-            and '"' not in ln and "'" not in ln]:
+    bad = [ln for ln in reason.splitlines()
+           if ln.strip().startswith("gh ") and "<" in ln
+           and '"' not in ln and "'" not in ln]
+    if not bad:
         print("PASS: recovery commands quote their placeholders")
         passes += 1
     else:
-        print(f"FAIL: unquoted placeholder in recovery command: {bare[:1]}")
+        print(f"FAIL: unquoted placeholder in recovery command: {bad[:1]}")
         failures += 1
 
     out = subprocess.run(
@@ -204,6 +309,35 @@ def main():
         passes += 1
     else:
         print("FAIL: should fail open on an unreadable transcript")
+        failures += 1
+
+    # Sentinel scope: within ONE transcript the guard fires at most once per
+    # message, but a DIFFERENT transcript ending with the same recap must not
+    # inherit that suppression. Share one TMPDIR so the sentinel files persist
+    # across runs, the way they do within a real machine's temp dir.
+    tmp = tempfile.mkdtemp()
+    env = dict(os.environ, TMPDIR=tmp)
+
+    def once(events, transcript_name):
+        p = os.path.join(tmp, transcript_name)
+        with open(p, "w") as fh:
+            for e in events:
+                fh.write(json.dumps(e) + "\n")
+        out = subprocess.run(
+            [sys.executable, HOOK], input=json.dumps({"transcript_path": p}),
+            capture_output=True, text=True, env=env).stdout
+        return "block" in out
+
+    ev = create("c") + [say("Opened it.")]
+    first = once(ev, "sessionA.jsonl")
+    repeat = once(ev, "sessionA.jsonl")
+    other = once(ev, "sessionB.jsonl")
+    if first and not repeat and other:
+        print("PASS: sentinel is per-message and per-transcript")
+        passes += 1
+    else:
+        print(f"FAIL: sentinel scope wrong "
+              f"(first={first} repeat={repeat} other={other})")
         failures += 1
 
     print(f"\n{passes} passed, {failures} failed")

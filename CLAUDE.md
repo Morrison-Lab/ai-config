@@ -530,7 +530,7 @@ Completed runs start the body with `**Claude finished`, so match that instead:
 
 ```bash
 gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
-  --jq '[.[] | select(.body | test("\\*\\*Claude finished|### Verdict"))] | last | .body'
+  | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict"))] | last | .body'
 ```
 
 `memories/github.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.

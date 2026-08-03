@@ -1170,3 +1170,146 @@ The flagged commits were in the **ai-config** checkout, pulled in minutes
 earlier by a routine `git pull --ff-only`, authored by the repo owner.
 `git merge-base --is-ancestor HEAD origin/main` returned true, settling it
 in one command.)
+
+## A ref pattern is not a pathspec: `*` does NOT cross a slash in `for-each-ref`, but DOES in `ls-files`
+
+The section above establishes that a **pathspec** `*` matches `/` too.
+Git's other pattern matcher does the opposite, with identical syntax, so the
+intuition you just built is wrong one command over.
+
+`git for-each-ref <pattern>` (and `git branch --list`, and a refspec's left
+side) matches with `fnmatch` under `FNM_PATHNAME`, where `*` stops at a slash.
+So `refs/remotes/origin/*` matches `origin/main` and misses
+`origin/feat/anything`.
+
+Measured together on git 2.34.1, in one repo, same syntax:
+
+```bash
+git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/*'    # 8
+git for-each-ref --format='%(refname:short)' 'refs/remotes/origin/**'   # 18
+git ls-files -- 'skills/*'                                              # 180
+git ls-files -- 'skills/**'                                             # 180
+```
+
+The ref matcher halves the result; the pathspec matcher cannot tell the two
+patterns apart.
+
+**The failure direction is a silent false all-clear, and it is biased toward
+the refs that matter.**
+Slash-named branches are exactly the conventional ones -- `feat/`, `fix/`,
+`docs/`, `claude/` -- so a sweep keyed on the single star quietly omits every
+branch anyone named properly, including the ones carrying open PRs, while
+reporting a clean run over whatever is left.
+Nothing errors and the count looks plausible.
+
+Use `**` for ref patterns, or `git branch -r` / `git branch --list`, which
+enumerate without a pattern.
+And per [[algorithmatize-checks]], give any ref sweep a control: check that a
+known slash-named branch appears in its output before trusting a total.
+
+- **Do:** use `refs/remotes/origin/**` when you mean every remote branch.
+- **Do:** confirm a known nested ref is in the result before quoting a count.
+- **Don't:** carry pathspec intuition into `for-each-ref` -- the two matchers
+  disagree on the one character that decides it.
+- **Don't:** read a smaller-than-expected ref count as "this repo is tidy".
+
+(2026-08-02, a `clean-branches` sweep on `Morrison-Lab/ai-config`: the single
+star reported 17 of 34 `origin/**` refs and hid all five open PRs' branches.
+Caught only because the open-PR column came back empty against a known count of
+five.)
+
+## GitHub keeps `refs/pull/N/head` forever, so deleting a closed PR's branch loses nothing
+
+Deleting the head branch of a **closed, unmerged** PR feels lossy, since the
+commits are on no branch afterwards and `main` never absorbed them.
+It is not.
+GitHub retains the PR's own head ref permanently, and it still resolves after
+the branch is gone.
+
+Check before deleting, and recover afterwards:
+
+```bash
+git ls-remote origin 'refs/pull/669/head'          # still resolves post-deletion
+git fetch origin refs/pull/669/head
+git checkout -b recover/669 FETCH_HEAD
+```
+
+Verify rather than assume, since it is one call: `git ls-remote`'s SHA should
+equal the branch tip you are about to delete.
+Measured across six closed PRs on `Morrison-Lab/ai-config`
+(#305, #306, #430, #553, #610, #669):
+every `refs/pull/N/head` resolved and matched its branch tip exactly.
+
+Two consequences worth carrying:
+
+- A closed PR's branch is safe to delete, so the real deliverable is a tracking
+  issue recording *what* was unlanded and the recovery command -- not keeping
+  the ref.
+- These refs are **not** fetched by the default refspec
+  (`+refs/heads/*:refs/remotes/origin/*`), so they cost nothing until asked for.
+
+- **Do:** cite the `refs/pull/N/head` recovery command in the issue that
+  records the unlanded work.
+- **Don't:** hold a dead branch open as the backup copy -- GitHub already is
+  one.
+
+## An orphaned `refs/remotes/<ns>/*` namespace inflates every branch count
+
+A one-off `git fetch origin '+refs/pull/*/head:refs/remotes/pr/*'` writes refs
+that **no configured refspec matches**.
+Nothing updates them, `--prune` never touches them (it prunes only what a
+refspec covers), and they persist indefinitely.
+
+They are counted by `git branch -r`, so a repo can report hundreds of "remote
+branches" that are neither remote nor branches.
+
+```bash
+git config --get-all remote.origin.fetch      # what is actually tracked
+git for-each-ref --format='%(refname)' | grep -v '^refs/remotes/origin/'   # what is not
+git for-each-ref --format='delete %(refname)' refs/remotes/pr/ | git update-ref --stdin
+```
+
+Before sweeping branches, separate the tracked namespace from stray ones ---
+otherwise the sweep's scope is wrong from the first command.
+
+(2026-08-02: `git branch -r` reported 741 on `Morrison-Lab/ai-config`, of which
+709 were orphaned `refs/remotes/pr/*` from an earlier PR-head fetch and only 31
+were real branches.
+Deleting them took the repo from ~800 refs to 49.)
+
+## Uncommitted leftovers on a merged branch can be a REJECTED direction, not unfinished work
+
+Finding staged or unstaged edits on a branch whose PR already merged reads as
+"work someone did not finish", and the reflex is to complete and land it.
+Check the opposite hypothesis first, because the working tree records only that
+an edit was *made*, never that it was *kept*.
+
+Two shapes seen together on one branch:
+
+- **A stale base.** The edits were written against an older `main`, so applying
+  them now silently reverts whatever landed in between.
+- **A rejected direction.** The edits contradict what the merged PR concluded,
+  because they predate its final review round.
+
+The second is the dangerous one: it looks like unfinished work and is actually
+a bug someone already fixed correctly.
+
+So before completing leftover work, check the branch's PR state, then verify
+the edit's own claim independently rather than inferring intent from its
+presence.
+
+- **Do:** run the leftover edit's central claim as an experiment before landing
+  it.
+- **Do:** diff each leftover file against current `main`, not against the
+  branch tip, to separate genuinely new content from stale-base reverts.
+- **Don't:** treat an uncommitted edit as an unfinished intention -- it may be
+  a draft the review already overruled.
+
+(2026-08-02, after `Morrison-Lab/ai-config#900` merged: three staged files
+proposed *unquoting* git's `branch -d` warning literal.
+Reproducing the command showed git prints the quoted form with a trailing
+period, which is what `main` already had -- so the leftovers would have
+reintroduced the exact defect that PR's final round fixed.
+A fourth, unstaged file held genuinely new content plus a stale-base reversion
+of a taxonomy that had landed meanwhile; only the new half was carried forward,
+as #1054.)

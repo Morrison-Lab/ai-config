@@ -109,6 +109,15 @@ Every fix is individually correct while the coverage claim over them is false,
 so the gap is a property of the **set** rather than of any member --- nothing
 in the diff, the tests, or the thread reports it.
 
+Distinct from
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "never predict which case
+will fail; enumerate the class", which shares this remedy and has a different
+trigger.
+There the list is one **you** produced from intuition, so the rule fires on
+your own naming of a member.
+Here the list arrived from someone with more standing to write it than you had,
+which is why nothing about accepting it feels like guessing.
+
 - **Do:** derive the site list by grepping the whole diff for the flagged
   phrase, and fix what the grep returns.
 - **Do:** report the sweep --- the pattern searched and the hit count ---

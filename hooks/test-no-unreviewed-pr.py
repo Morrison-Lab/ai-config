@@ -449,6 +449,38 @@ case([bash("gh pr create -R o1/r --title a", tid="a"),
       res("q2", OK), say("Requested o1's PR twice.")], True,
      "requesting one repo's PR twice does not clear the other repo's")
 
+# --- open IDENTITY is structural: a decoy verb in a chained open does not
+# misattribute the obligation ---
+# `gh pr view 42 && gh pr ready` checks an unrelated PR #42, then readies the
+# CURRENT branch's own PR (#1038, learned from the ready result). A whole-string
+# identity scan matched the decoy `pr view 42` and mislabeled the obligation as
+# #42 -- so a later, entirely unrelated request for #42 discharged the (real,
+# unreviewed) #1038. open_ident scopes identity to the `gh pr ready` command
+# itself, so the obligation is #1038 (backfilled from its result) and the #42
+# request cannot clear it.
+case([bash("gh pr view 42 && gh pr ready", tid="c"),
+      res("c", 'Pull request o/r#1038 is marked as "ready for review"'),
+      bash("gh api repos/o/r/pulls/42/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("Checked #42, readied the current PR, later requested on #42.")], True,
+     "a decoy verb before a chained open does not misattribute the obligation")
+# The mirror control: the SAME open, but the later request targets the ACTUAL
+# readied PR (#1038) -- it must discharge, proving identity resolved to #1038.
+case([bash("gh pr view 42 && gh pr ready", tid="c"),
+      res("c", 'Pull request o/r#1038 is marked as "ready for review"'),
+      bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("Checked #42, readied #1038, then requested on #1038.")], False,
+     "a chained open resolves its own PR identity (a request for it discharges)")
+# An explicit `gh pr ready <N>` chained after a decoy verb takes ITS OWN number,
+# not the decoy's: `gh pr checks 1029 && gh pr ready 1038` opens #1038, so a
+# request for the decoy #1029 must not discharge it.
+case([bash("gh pr checks 1029 && gh pr ready 1038", tid="c"), res("c", "{}"),
+      bash("gh api repos/o/r/pulls/1029/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("Checked #1029, readied #1038, requested on #1029.")], True,
+     "a decoy verb does not override an explicit `gh pr ready <N>` identity")
+
 # --- id-correlated results: an unrelated batched result must not mislead ---
 case(create("c") + [
     uses(("Bash", {"command": "gh pr checks 1038"}, "chk"),

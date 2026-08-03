@@ -103,20 +103,6 @@ RX_DRAFT = re.compile(
 # obligation outstanding and the hook warns), so it never silently discharges.
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
-# The quoted value of a free-text payload flag. Used only for cmd_ident's
-# identity on a REAL open/draft command (`gh pr ready N`, `-R o/r`), so a
-# `--body` mentioning a `pulls/N` path cannot forge a draft-clear target.
-RX_PAYLOAD = re.compile(
-    r"((?:--body|--title|--notes|--message|-b|-t|-m)[=\s]+)"
-    r"(\"(?:[^\"\\]|\\.)*\"|'[^']*')"
-)
-
-
-def _scrub_payload(cmd):
-    """Blank heredoc bodies and free-text payload-flag values only."""
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    return RX_PAYLOAD.sub(lambda m: m.group(1) + '""', cmd)
-
 
 def _scrub_all(cmd):
     """Blank heredoc bodies and EVERY quoted span (safe for RX_OPEN only)."""
@@ -344,6 +330,50 @@ def draft_ident(cmd):
     return False, None, None, False
 
 
+def _argv_open(argv):
+    """(is_open, num, repo) for one simple command's argv: a create/ready open.
+
+    Structural and gh-SCOPED, exactly like _argv_draft/_argv_request. Identity
+    comes from the open command ITSELF, so a decoy PR verb earlier in a chained
+    command (`gh pr view 42 && gh pr ready`) cannot misattribute the obligation's
+    number. A `gh pr create`'s number is never in the command -- it comes from
+    the result -- so num is None for create; a `gh pr ready [<N>]` carries a
+    number only when one is given explicitly (a bare `gh pr ready` yields None,
+    backfilled from the ready command's own `owner/repo#N` result).
+    """
+    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+        return False, None, None
+    if argv[2] == "create":
+        _, repo = _verb_ident(argv)
+        return True, None, repo          # a create's number is in its result
+    if argv[2] == "ready":
+        num, repo = _verb_ident(argv)
+        return True, num, repo
+    return False, None, None
+
+
+def open_ident(cmd):
+    """(num, repo) from the actual `gh pr create`/`gh pr ready` simple command.
+
+    Mirrors draft_ident/request_ident: the OPEN identity is located
+    structurally from the create/ready command, never from the whole raw string.
+    A whole-string search (the old cmd_ident) matched a decoy PR number from an
+    unrelated verb chained ahead (`gh pr checks 1029 && gh pr ready`), mislabeled
+    the obligation, and let a later unrelated request for that decoy PR silently
+    discharge the real one. Returns (None, None) when no open command carries a
+    number -- the bare `gh pr ready` case -- so the number backfills from the
+    open's own result instead. Fails toward no-identity on a parse error.
+    """
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return None, None
+    for argv in cmds:
+        ok, num, repo = _argv_open(argv)
+        if ok:
+            return num, repo
+    return None, None
+
+
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
 # other tool's serialized input is the documentation/heredoc false positive
 # README.md:265-271 warns about -- self-demonstrating here, since these very
@@ -355,16 +385,13 @@ OPEN_TOOLS = {"create_pull_request", "mcp__github__create_pull_request"}
 EDIT_TOOLS = {"update_pull_request", "mcp__github__update_pull_request"}
 REQ_TOOLS = {"request_copilot_review", "mcp__github__request_copilot_review"}
 
-# A PR number plus owner/repo carried by a shell command: an API path
-# (`repos/o/r/pulls/1038`), a CLI verb (`gh pr ready 1038`), or a `-R o/r`
-# flag. `gh pr create` carries NEITHER -- its number is learned from the
-# result -- which is the whole reason opens are keyed from their result.
+# A PR API path (`repos/o/r/pulls/1038`) inside a shell command, used by
+# _url_ident to read identity from a request command's own `gh api` URL. Open,
+# draft, and request identity are all resolved STRUCTURALLY from the specific
+# simple command (open_ident/draft_ident/request_ident), never from a
+# whole-string scan -- a decoy PR number chained ahead would otherwise mislabel
+# the obligation (see open_ident).
 RX_CMD_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
-RX_CMD_VERB = re.compile(
-    r"\bpr\s+(?:ready|edit|view|comment|review|merge|close|diff|checks)\s+#?(\d+)",
-    re.I,
-)
-RX_CMD_REPO = re.compile(r"(?:-R|--repo)[=\s]+([\w.-]+/[\w.-]+)", re.I)
 
 # A PR identity carried by a tool RESULT: the PR URL (owner/repo/number), gh's
 # `Pull request owner/repo#N` success line, or a bare `"number"` field.
@@ -373,7 +400,7 @@ RX_RES_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
 # `gh pr ready`/`gh pr create` print `... Pull request owner/repo#N ...` (e.g.
 # `Pull request o/r#42 is marked as "ready for review"`). A BARE `gh pr ready`
 # (no number -- the ordinary way to ready the current branch's PR) carries no
-# number in the command, so RX_CMD_VERB yields None and the obligation is
+# number in the command, so open_ident yields None and the obligation is
 # appended with num=None. Without recognizing this result shape the number never
 # backfills, and _clear() (which refuses to touch a num=None obligation) can
 # never discharge it -- a bare `gh pr ready` would then block every message for
@@ -410,21 +437,6 @@ RX_REQ_FAILED = re.compile(
     r"\\?\"status\\?\"\s*:\s*4\d\d|HTTP\s+4\d\d|cannot be requested",
     re.I,
 )
-
-
-def cmd_ident(cmd):
-    """(num, repo) from a shell command; each None when absent."""
-    repo = None
-    m = RX_CMD_REPO.search(cmd)
-    if m:
-        repo = m.group(1)
-    m = RX_CMD_API.search(cmd)
-    if m:
-        return m.group(3), f"{m.group(1)}/{m.group(2)}"
-    m = RX_CMD_VERB.search(cmd)
-    if m:
-        return m.group(1), repo
-    return None, repo
 
 
 def input_ident(inp):
@@ -688,18 +700,17 @@ def scan(path):
                     continue  # never text-match a non-shell tool
 
                 cmd_raw = inp.get("command") or ""
-                # Open/draft detection blanks EVERY quote (leading-word checks,
-                # never quoted); open/draft IDENTITY reads the payload-scrubbed
-                # string, so a `--body` mentioning a `pulls/N` path cannot forge
-                # a draft-clear target on a real open/draft command.
+                # DETECTION (is this an open/draft?) blanks EVERY quote, since
+                # `gh pr create`/`ready` is always a leading command word and a
+                # quoted example must not forge an obligation. IDENTITY (which
+                # PR) is resolved STRUCTURALLY from the specific simple command
+                # by open_ident/draft_ident/request_ident -- never a whole-string
+                # scan, which matched a decoy PR number chained ahead
+                # (`gh pr view 42 && gh pr ready`) and mislabeled the obligation.
                 cmd_open = _scrub_all(cmd_raw)
-                num, repo = cmd_ident(_scrub_payload(cmd_raw))
                 draft = bool(RX_DRAFT.search(cmd_open))
                 opened = bool(RX_OPEN.search(cmd_open)) and not draft
-                # Request detection is STRUCTURAL (per simple command), so an
-                # example request quoted in a body/echo/heredoc/herestring
-                # never forges or discharges an obligation. Its identity comes
-                # from the request command itself.
+                onum, orepo = open_ident(cmd_raw)
                 requested, rnum, rrepo, rlast = request_ident(cmd_raw)
                 _dok, dnum, drepo, dlast = draft_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
@@ -709,21 +720,21 @@ def scan(path):
                 # tool_use time would silently forget it.
                 if draft:
                     # Identity and `last` come from the draft command ITSELF
-                    # (draft_ident), mirroring the reviewer-request path: a decoy
-                    # PR verb earlier in the line cannot misdirect the clear onto
-                    # the wrong PR, and a draft chained AHEAD of another command
-                    # is correctly seen as not-last (so is_error is ambiguous and
-                    # the clear is withheld). cmd_ident is the fallback for a
-                    # draft form RX_DRAFT matched but draft_ident did not resolve.
-                    pending_clear[tid] = (dnum or num, drepo or repo, dlast)
+                    # (draft_ident): a decoy PR verb earlier in the line cannot
+                    # misdirect the clear onto the wrong PR, and a draft chained
+                    # AHEAD of another command is seen as not-last (dlast=False),
+                    # so the clear is withheld (is_error ambiguous). A draft form
+                    # draft_ident does not resolve leaves dnum=None/dlast=False,
+                    # which never clears -- the safe over-warn direction.
+                    pending_clear[tid] = (dnum, drepo, dlast)
                 elif opened:
-                    obligations.append({"num": num, "repo": repo, "tid": tid,
+                    obligations.append({"num": onum, "repo": orepo, "tid": tid,
                                         "self": requested})
                 # A create --reviewer both opens and requests; its `self` flag
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.
                 if requested and not opened:
-                    pending[tid] = (rnum or num, rrepo or repo, rlast)
+                    pending[tid] = (rnum, rrepo, rlast)
     return obligations, text
 
 

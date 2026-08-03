@@ -49,6 +49,45 @@
   failed `validate` on three `MD010` hits, after the link, memory-size, and
   line-break checks had all passed.)
 
+## A literal backtick inside a Markdown code span needs a longer delimiter, not a backslash
+
+To include a literal backtick in an inline code span, the span's delimiter
+must be a **longer** run of backticks than any run inside it --- a
+double-backtick delimiter holds single backticks verbatim, a triple holds
+double backticks, and so on.
+Backslash escaping does not work: per
+[CommonMark's code-span rule](https://spec.commonmark.org/0.31.2/#code-spans),
+backslash escapes are **not** processed inside code spans, and delimiter
+matching is purely lexical --- the first backtick-run of equal length closes
+the span.
+So a single-backtick span wrapping text that itself contains a backtick closes
+at that inner backtick and splits the line into garbled fragments, with the
+stray backticks rendered as literal text.
+
+No content check catches this.
+It is well-formed Markdown, so `markdownlint`, the semantic-line-break check,
+and `validate` all pass; only a human reviewer or a fetch of the rendered blob
+sees the garble.
+That puts it in the same class as the `MD010`-in-fences gotcha above: a
+rendering defect the added-line checks are structurally blind to.
+
+- **Do:** widen the delimiter to a double backtick when a code span must
+  contain a single backtick, and drop any backslash escapes.
+- **Do:** eyeball the rendered result (or fetch the blob) for any code span you
+  write that quotes a backtick-bearing command or identifier.
+- **Don't:** backslash-escape an inner backtick inside a single-backtick span
+  --- CommonMark ignores the escape and the span closes early.
+- **Don't:** trust green CI as evidence a code span renders correctly.
+
+(Morrison-Lab/ai-config#1104 round 2, 2026-08-03: a new `memories/git.md`
+section documenting bash command-substitution wrote
+`` `git commit -m "fix the \`slast\` guard"` `` with backslash-escaped inner
+backticks inside a single-backtick span.
+It passed every check and garbled on GitHub; the reviewer traced the delimiter
+matching and supplied a verified double-backtick fix, applied as `4b30781`.
+The irony that the example *about* a backtick pitfall hit a different backtick
+pitfall is the reason it is worth its own entry.)
+
 ## Office Open XML (.docx / .xlsx) — editing committed content
 - `.docx`/`.xlsx` are zip archives. To strip or edit content (e.g. remove a sensitive
   link from a committed Word doc): `unzip` the file, edit `word/document.xml` for body

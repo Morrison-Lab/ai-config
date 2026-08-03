@@ -654,10 +654,70 @@ reasons" across roughly six status updates, while the failure actually
 observed under that spelling was the node-versus-declared-string comparison.
 `memories/github-mcp-tools.md` records both gates and their verbatim errors.)
 
+**When the blocker is a hang, inspect the process rather than re-guessing
+what it is waiting on.**
+The bullet above governs a real failure whose gate was misnamed from an error
+message, so there is at least a message to re-read.
+A hang gives you nothing to quote and nothing to classify, and that vacuum
+gets filled by a guess about mechanism.
+The guess then arrives feeling like a measurement, because something really
+was run and something really did block.
+
+"It needs a TTY" and "it hangs when run non-interactively" are both category
+words in the sense the bullet above means.
+Each names a plausible mechanism, neither was observed, and a reader cannot
+tell which one you checked.
+Replacing the first with the second after a probe returns nothing feels like
+progress, and moves you no closer to a gate you can name.
+
+A blocked process answers the question directly, and the reads are cheap:
+
+```bash
+ps -o pid=,stat= -p <pid>        # S: alive and blocked, rather than spinning or gone
+lsof -p <pid> -a -d 0            # what fd 0 actually is: tty, pipe, or socket
+ps -o ppid=,command= -p <pid>    # what launched it, and with what arguments
+```
+
+Those turn "it hangs" into a specific, checkable fact about *what* it is
+waiting on, which is the gate the bullet above asks you to name.
+They also separate two states that no amount of re-running distinguishes: a
+capability check refusing at startup, and a read reached only late in the
+flow after the interactive step succeeded.
+Those call for opposite responses, so guessing between them is not a
+harmless imprecision.
+
+- **Do:** read `ps -o stat=`, `lsof -d 0`, and the process tree before
+  describing what a hung command is waiting for.
+- **Do:** say which read produced the answer, so the gate is checkable rather
+  than asserted.
+- **Don't:** substitute one guessed mechanism for another because a probe
+  produced no output.
+- **Don't:** report a timeout signal as evidence about *why* something
+  blocked; it is evidence only that it had not finished.
+
+Do not reach for the probe first, either.
+The probe that produces the hang is itself a live command with its own first
+instant, and running an interactive one to see what it does is the failure
+[`growth-mindset`](growth-mindset.md)'s "A timeout bounds how long you wait"
+section covers.
+
+(2026-08-02, `Morrison-Lab/ai-config#1056`: a claim that `claude setup-token`
+"needs a TTY" was written into a skill without measurement, then replaced
+with "it hangs when non-interactive" on the strength of a probe that returned
+exit 142 and no output.
+Both were guesses, and the second read as the correction of the first.
+`ps -o pid=,stat= -p <pid>` then reported `S` -- alive and blocked -- *after*
+the browser authorization had completed, and `lsof -p <pid> -a -d 0` showed
+fd 0 as a unix socket rather than a terminal.
+So the gate is a post-authorize read on stdin, not a startup capability
+check, and the same claim was wrong three times in one session before anyone
+measured it.
+Recorded in [`memories/claude-code.md`](../../memories/claude-code.md).)
+
 **A blocker that was true when you published it can stop being true while
 the PR is open, and withdrawing it is your job, not the reviewer's.**
 The verify-a-blocker bullet above covers a blocker that was never true, and
-the gate-naming bullet between it and this one covers a real blocker whose
+the "Name the specific gate" bullet covers a real blocker whose
 mechanism was misnamed.
 This is the harder case, because the caveat was correct and diligent when
 written, so nothing about it reads as a defect later --- and a sentence

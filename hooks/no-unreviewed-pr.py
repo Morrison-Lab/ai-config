@@ -387,7 +387,8 @@ def scan(path):
     two PRs, or the same number in two repositories, are two obligations.
     """
     obligations = []
-    pending = {}  # tool_use_id -> (num, repo) for reviewer requests
+    pending = {}        # tool_use_id -> (num, repo) for reviewer requests
+    pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
     text = ""
     with open(path, errors="ignore") as fh:
         for line in fh:
@@ -481,6 +482,14 @@ def scan(path):
                             or bool(RX_REQ_FAILED.search(body))
                         if not req_failed:
                             _clear(obligations, rnum2 or rnum, rrepo2 or rrepo)
+                    # A deferred draft transition clears its PR only if the
+                    # transition's own result did not fail. `failed` here is the
+                    # broad whole-body flag, so any hint of failure keeps the PR
+                    # tracked -- the safe over-warn direction for a clear.
+                    if rid in pending_clear:
+                        cnum, crepo = pending_clear.pop(rid)
+                        if not failed:
+                            _clear(obligations, cnum, crepo)
                     continue
 
                 if kind != "tool_use":
@@ -505,7 +514,11 @@ def scan(path):
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
                     if inp.get("draft") is True:
-                        _clear(obligations, num, repo)
+                        # Converting a ready PR back to draft defers review, but
+                        # only if it SUCCEEDS. Clearing at tool_use time would
+                        # forget a still-ready PR when the transition fails, so
+                        # defer the clear to this call's own non-failed result.
+                        pending_clear[tid] = (num, repo)
                     elif inp.get("draft") is False:
                         obligations.append({"num": num, "repo": repo,
                                             "tid": tid,
@@ -538,9 +551,12 @@ def scan(path):
                 # from the request command itself.
                 requested, rnum, rrepo, rlast = request_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
-                # too, and it is the draft action that decides.
+                # too, and it is the draft action that decides. The clear is
+                # deferred to the command's own non-failed result: a `gh pr
+                # ready --undo` that fails leaves the PR ready, so clearing at
+                # tool_use time would silently forget it.
                 if draft:
-                    _clear(obligations, num, repo)
+                    pending_clear[tid] = (num, repo)
                 elif opened:
                     obligations.append({"num": num, "repo": repo, "tid": tid,
                                         "self": requested})

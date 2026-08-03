@@ -247,6 +247,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit` | reminds, never blocks, that an admitted mistake owes a *mechanism*, not just a note |
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
+| `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested |
 
 A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse

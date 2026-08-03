@@ -276,6 +276,20 @@ case([use("create_pull_request", tid="c", title="x", body="y"),
           pull_number=1038, draft=True), res("u", "{}"),
       say("Converted back to draft.")], False,
      "update_pull_request draft:true defers review again")
+# A draft transition clears its PR only on a NON-failed result: a `draft:true`
+# edit whose conversion 422s leaves the PR ready, so the obligation must stay
+# outstanding rather than be cleared at tool_use time (the dangerous direction).
+case([use("update_pull_request", tid="o", owner="o", repo="r",
+          pull_number=1038, draft=False), res("o", '{"number":1038}'),
+      use("update_pull_request", tid="d", owner="o", repo="r",
+          pull_number=1038, draft=True),
+      res("d", '{"status":422,"message":"could not convert"}', err=True),
+      say("Tried to hold it as a draft; the conversion failed.")], True,
+     "a failed draft:true conversion keeps the ready PR tracked")
+case(create("c") + [bash("gh pr ready 1038 -R o/r --undo", tid="d"),
+                    res("d", "failed to convert PR to draft", err=True),
+                    say("Tried to undo ready; it failed.")], True,
+     "a failed gh pr ready --undo keeps the ready PR tracked")
 
 # --- per-PR identity: one request does not clear another PR ---
 case([bash("gh pr create --title a", tid="a"), res("a", URL),

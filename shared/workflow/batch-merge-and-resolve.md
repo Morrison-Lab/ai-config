@@ -134,7 +134,7 @@ The bullets above establish that the legacy form needs the grep and
 Neither says what happens when they are crossed, and crossing them is the
 natural mistake: `--write-tree` is what
 [`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md),
-[`ardi`](ardi.md), [`post-merge`](../../skills/post-merge/SKILL.md), and
+[`ardi`](../../skills/ardi/SKILL.md), [`post-merge`](../../skills/post-merge/SKILL.md), and
 [`wrap-up`](../../skills/wrap-up/SKILL.md) all reach for, while the grep is
 what this fragment prints.
 
@@ -165,15 +165,15 @@ If you must grep `--write-tree`, match `^CONFLICT` rather than a marker.
 The legacy three-arg form on the same pair exits 0 and prints
 `+<<<<<<< .our` --- diff-indented, as the bullet above says.
 Hit live during a `post-merge` cascade scan on `ucdavis/bcs#536`, where a
-`--write-tree` sweep reported `conflict_markers=0` for both open PRs; the
-positive control is what exposed the grep as vacuous, and the PRs happened to
-be genuinely clean.)
+`--write-tree` sweep reported `conflict_markers=0` for both open PRs; a
+negative control against a known-conflicting pair is what exposed the grep as
+vacuous, and the PRs happened to be genuinely clean.)
 
 ## Any conflict sweep needs a negative control
 
 A matrix of zeros is indistinguishable from a detector that never ran.
-This is not a hypothetical: both failure modes above produce exactly that
-matrix, and both look like good news arriving from a real command.
+This is not a hypothetical: all three failure modes above produce exactly that
+matrix, and each looks like good news arriving from a real command.
 
 So before trusting any zero, run the sweep against a pair you already know
 conflicts, and confirm it reports the conflict.

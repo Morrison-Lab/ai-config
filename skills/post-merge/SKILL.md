@@ -300,15 +300,27 @@ A blocked `git checkout main` reads as the diverged case, since the symptom is
 the same and diverged is the case this skill warns about.
 Stale is far commoner: local `main` is merely behind `origin/main` and **0
 ahead**, carrying nobody's work.
-Two counts separate them exactly:
+Two counts separate the cases exactly, and the rule is three-way rather than
+two:
 
 ```bash
 git fetch origin main
 echo "behind: $(git rev-list --count main..origin/main)  ahead: $(git rev-list --count origin/main..main)"
 ```
 
-`ahead: 0` means stale, and then the bullet below is the wrong remedy --- it
-would leave `main` behind for no reason.
+| `ahead` | `behind` | what it is | what to do |
+|---|---|---|---|
+| any | 0 | nothing to pull | leave `main` alone; just delete the branch |
+| 0 | > 0 | **stale** | fast-forward by refspec, below |
+| > 0 | > 0 | **diverged** | the bullet below |
+
+Both counts matter, so do not key the decision on `ahead` alone.
+`git pull --ff-only` fails only in the last row: with `behind: 0` it reports
+`Already up to date.` and exits 0 even when `ahead` is non-zero, so routing
+that row to the diverged bullet mislabels it (harmlessly --- there is nothing
+to pull either way).
+The row that actually misleads is the middle one, where treating stale as
+diverged leaves `main` behind for no reason.
 
 What blocks the switch in that case is usually an **unrelated dirty file**
 (a `renv.lock` an `renv::snapshot()` rewrote, a lockfile, a local config)
@@ -328,10 +340,12 @@ than clobbering, so it cannot destroy a genuinely diverged local `main`.
 Preserve the dirty file rather than stashing or discarding it --- it is
 unrelated to this PR, and may be another session's or the user's.
 
-- **Do:** read `behind`/`ahead` before deciding, and fast-forward by refspec
-  when `ahead` is 0.
+- **Do:** read both counts before deciding, and fast-forward by refspec when
+  `ahead` is 0 and `behind` is not.
 - **Don't:** treat a blocked checkout as evidence of divergence, or leave
   `main` stale because the bullet below said to skip the pull.
+- **Don't:** key the decision on `ahead` alone --- `behind: 0` is not
+  divergence, whatever `ahead` reads.
 
 (`ucdavis/bcs#536`, 2026-08-02: `git checkout main` aborted on a modified
 `renv.lock`, which looked like the diverged case.
@@ -342,7 +356,8 @@ between HEAD and `origin/main` --- it differed only from the 54-commit-stale
 succeeded with the local edit intact; skipping the pull as the bullet below
 prescribes would have left `main` 54 commits behind.)
 
-**Diverged main checkout** (`ahead` is non-zero)**:** `git pull --ff-only`
+**Diverged main checkout** (`ahead` and `behind` both non-zero)**:**
+`git pull --ff-only`
 fails when the main checkout
 has local commits from a concurrent session that hasn't been pushed. Don't
 force-merge or reset their work — skip the pull and delete the branch only.

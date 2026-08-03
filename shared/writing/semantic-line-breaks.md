@@ -158,6 +158,25 @@ The check had passed on the old branch and was not re-run against the new
 head; review then flagged a two-sentence line, which the re-run reproduced on
 the first try.)
 
+**Relocating prose makes its multi-sentence lines yours, for the same
+diff-scoped reason.**
+Moving a section between files edits none of its lines and still puts every one
+of them in the diff as an added line, so a file split or extraction hands you
+the whole moved body to reformat.
+[`ascii-punctuation-in-source`](../coding/ascii-punctuation-in-source.md) owns
+the full statement of this, including why the scope-creep caution does not apply
+and why deferring to a corpus-wide sweep does not either --- read it there
+rather than re-deriving it.
+
+Two mechanics specific to this check when you do the pass.
+Use the real `check-new-line-breaks` rather than a hand-rolled matcher: a local
+heuristic disagrees with it in both directions, over-reporting on ordered-list
+markers and under-reporting a boundary like `.)` where the period is not the
+last character before the space.
+And prove the reflow changed nothing else, by comparing whitespace- and
+markup-normalized word lists against the pre-move version --- a mechanical
+reflow is exactly the operation that can silently drop a marker or a clause.
+
 **When hand-reformatting a line the check flagged, copy the raw line rather
 than the check's own report of it.**
 The script strips a bullet marker or blockquote prefix before handing the

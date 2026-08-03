@@ -105,6 +105,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | [`r-pkg-cran-checklist`](skills/r-pkg-cran-checklist/SKILL.md) | | Walk through the standard CRAN submission checklist |
 | [`reproducibility-audit`](skills/reproducibility-audit/SKILL.md) | | Audit a project for reproducibility gaps: hidden deps, hardcoded paths, undocumented prerequisites, output traceability |
 | [`measure-performance`](skills/measure-performance/SKILL.md) | `perf`, `benchmark` | Profile R code to find the real bottleneck, microbenchmark only that, then confirm the win survives end to end |
+| [`refresh-claude-token`](skills/refresh-claude-token/SKILL.md) | `rct` | Rotate `CLAUDE_CODE_OAUTH_TOKEN` across the repos that carry it, without `/install-github-app`'s workflow scaffolding, then verify the new token authenticates |
 
 ### Session management
 
@@ -126,7 +127,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 
 ## Full skill list
 
-All 175+ canonical skills are in [`skills/`](https://github.com/d-morrison/ai-config/tree/main/skills)
+All 177+ canonical skills are in [`skills/`](https://github.com/d-morrison/ai-config/tree/main/skills)
 on GitHub. Generated Codex wrappers live in
 [`codex-skills/`](https://github.com/d-morrison/ai-config/tree/main/codex-skills).
 Each canonical `SKILL.md` has a `description` field that lists the trigger

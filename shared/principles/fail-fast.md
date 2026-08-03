@@ -467,8 +467,10 @@ from the second, so on any PR carrying no prior bot comment the two differ and
 the check again reported success whatever the run did.
 Round 2 caught it, and the landed fix is a single filter naming all four
 outcomes rather than a patched sentinel.
-That PR's `refresh-claude-token` skill carries the worked commands; this entry
-is the general rule.)
+The worked commands live in
+[`refresh-claude-token`](../../skills/refresh-claude-token/SKILL.md), which
+that PR merged on 2026-08-03.
+This entry is the general rule.)
 
 ## In a guard you ship: partial is worse than absent
 

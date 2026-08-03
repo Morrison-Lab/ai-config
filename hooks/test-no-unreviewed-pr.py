@@ -73,6 +73,12 @@ OK = '{"requested_reviewers":[{"login":"Copilot"}]}'  # a successful request
 FAIL = '{"status":422,"message":"Review cannot be requested"}'
 REQ_CMD = ("gh api repos/o/r/pulls/1038/requested_reviewers -X POST "
            "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'")
+# The hook's OWN recovery text quotes the URL (an unquoted `<N>` placeholder is
+# a shell redirect), so the single commonest real request shape has the
+# `requested_reviewers` endpoint INSIDE double quotes. This must still discharge
+# -- blanking every quoted span (not just free-text payload values) erases it.
+REQ_CMD_Q = ('gh api "repos/o/r/pulls/1038/requested_reviewers" -X POST '
+             "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'")
 
 
 def create(tid, result=URL, err=False):
@@ -221,6 +227,26 @@ case([bash("gh pr create --title x --body \"$(cat <<'EOF'\n"
            "the body\nEOF\n)\"", tid="c"), res("c", URL),
       say("Opened with a heredoc body.")], True,
      "a real create with a heredoc body still blocks")
+# The mirror of the two above: the hook's OWN recovery command quotes its URL,
+# so a GENUINE quoted request must still discharge. A blanket blank of every
+# quote (the round-4 over-correction) would erase `requested_reviewers` from
+# the URL and leave the obligation standing forever after the user runs exactly
+# the command the hook printed -- the single most common real request shape.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    say("Opened and requested with the quoted recovery cmd.")],
+     False, "the quoted-URL recovery command still discharges")
+# A quoted-URL GET (no POST) still must NOT discharge: the URL survives the
+# payload-only scrub, so is_request must still gate on the mutating method.
+case(create("c") + [
+    bash('gh api "repos/o/r/pulls/1038/requested_reviewers"', tid="g"),
+    res("g", OK), say("Checked who is requested, quoted URL.")], True,
+     "a quoted-URL read-only GET does not discharge")
+# A bare `echo` of the create string (an example NOT in a --body/heredoc) must
+# still forge nothing: open-detection blanks every quote, so the leading word
+# is `echo`, not `gh pr create`.
+case([bash('echo "gh pr create"', tid="e"), res("e", ""),
+      say("Just echoed an example.")], False,
+     "a quoted create outside any payload flag forges no obligation")
 
 # --- non-shell tools must never be text-matched ---
 case([use("create", tid="w", path="hooks/no-unreviewed-pr.py",

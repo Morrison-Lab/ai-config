@@ -99,18 +99,48 @@ def is_request(cmd):
 # otherwise forge an obligation, and a `--body "... requested_reviewers -X
 # POST ..."` would silently DISCHARGE a real one -- the exact false negative
 # this hook exists to catch (the README.md:265-271 heredoc trap, one layer in
-# from the non-shell-tool case). So blank the CONTENTS of heredoc bodies and
-# quoted arguments before matching. A gh invocation is normally the leading
-# word of its command, before any quote, so real opens/requests survive;
-# over-blanking only ever drops a real match (a missed obligation -- the
-# fail-open direction), never forges or discharges one.
+# from the non-shell-tool case). So blank quoted example text before matching.
+#
+# But WHICH quotes to blank depends on the check, because RX_OPEN and
+# is_request have opposite quoting properties -- and a single blanket blank of
+# every quote (which is what a naive fix reaches for) breaks is_request:
+#
+#   * RX_OPEN keys on `gh pr create`/`ready`, always a LEADING command word,
+#     never legitimately inside quotes. So for open-detection every quoted span
+#     can be blanked (`_scrub_all`) -- that catches an example create quoted in
+#     a `--body` AND a bare `echo "gh pr create"`, with no risk to a real open.
+#   * is_request keys on `requested_reviewers`, which is a STRUCTURAL URL-path
+#     ARGUMENT (`gh api "repos/o/r/pulls/N/requested_reviewers" -X POST`) --
+#     and double-quoting a `gh api` URL is standard shell. Blanking every quote
+#     there erases the hook's OWN recovery command, so a genuine request never
+#     discharges the obligation and the hook nags forever after the user does
+#     exactly what it asked. So for request-detection only FREE-TEXT payload
+#     arguments (a `--body`/`--title`/`--notes` value) and heredoc bodies are
+#     blanked (`_scrub_payload`), leaving the structural URL intact.
+#
+# Over-blanking only ever DROPS a match (a missed obligation -- the fail-open
+# direction), never forges or discharges one.
 RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
+# The quoted value of a free-text payload flag, where an example command can
+# hide. A `gh api` URL argument is NOT a payload flag value, so it survives.
+RX_PAYLOAD = re.compile(
+    r"((?:--body|--title|--notes|--message|-b|-t|-m)[=\s]+)"
+    r"(\"(?:[^\"\\]|\\.)*\"|'[^']*')"
+)
 
-def _scrub(cmd):
-    cmd = RX_HEREDOC.sub("<<", cmd)              # drop heredoc bodies
-    cmd = re.sub(r'"(?:[^"\\]|\\.)*"', '""', cmd)  # blank "..." contents
-    cmd = re.sub(r"'[^']*'", "''", cmd)          # blank '...' contents
+
+def _scrub_payload(cmd):
+    """Blank heredoc bodies and free-text payload-flag values only."""
+    cmd = RX_HEREDOC.sub("<<", cmd)
+    return RX_PAYLOAD.sub(lambda m: m.group(1) + '""', cmd)
+
+
+def _scrub_all(cmd):
+    """Blank heredoc bodies and EVERY quoted span (safe for RX_OPEN only)."""
+    cmd = RX_HEREDOC.sub("<<", cmd)
+    cmd = re.sub(r'"(?:[^"\\]|\\.)*"', '""', cmd)
+    cmd = re.sub(r"'[^']*'", "''", cmd)
     return cmd
 
 
@@ -305,13 +335,19 @@ def scan(path):
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
 
-                cmd = _scrub(inp.get("command") or "")
-                num, repo = cmd_ident(cmd)
-                requested = is_request(cmd)
-                opened = bool(RX_OPEN.search(cmd)) and not RX_DRAFT.search(cmd)
+                cmd_raw = inp.get("command") or ""
+                # Open/draft detection blanks EVERY quote (leading-word checks,
+                # never quoted); request/identity detection blanks only payload
+                # values so a genuine quoted `gh api` URL still reads.
+                cmd_open = _scrub_all(cmd_raw)
+                cmd_req = _scrub_payload(cmd_raw)
+                num, repo = cmd_ident(cmd_req)
+                requested = is_request(cmd_req)
+                draft = bool(RX_DRAFT.search(cmd_open))
+                opened = bool(RX_OPEN.search(cmd_open)) and not draft
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
                 # too, and it is the draft action that decides.
-                if RX_DRAFT.search(cmd):
+                if draft:
                     _clear(obligations, num, repo)
                 elif opened:
                     obligations.append({"num": num, "repo": repo, "tid": tid,

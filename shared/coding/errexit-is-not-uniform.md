@@ -212,8 +212,11 @@ and its preferred fix is a `set` line to amend.
 A batch of checks run as a single shell invocation has neither.
 There is no `set -e`, no `set -o pipefail`, and no file to add either one to,
 so the `&&` between the stages is the entire error handling.
-Piping any stage then removes that stage from the chain's verdict, and every
-later check runs as though it had passed.
+Piping a stage then collapses the chain's verdict onto the pipeline's last
+command: without `pipefail` the `&&` sees only that final status, so a failure
+in an earlier stage is masked whenever the last stage --- typically a formatter
+like `tail` --- succeeds, and every later check runs as though the piped one
+had passed.
 
 The symptom differs from the `||` case in a way worth seeing.
 There the fallback is unreachable, so nothing happens that should have.
@@ -239,8 +242,12 @@ thing that mattered.
 So the anti-pattern the bullets above name, tidying output when the status is
 the point, is reached precisely when the status is least visible.
 
-- **Do:** open an ad-hoc chain with `set -o pipefail;` whenever any stage in
-  it is piped.
+- **Do:** open an ad-hoc chain with `set -o pipefail;` when every stage's
+  non-zero exit is a genuine failure.
+  Where a stage legitimately exits early --- a producer piped to `head`, which
+  `SIGPIPE`s the producer once `head` has read enough --- `pipefail` turns that
+  into a false failure, so there prefer the split-command remedy in the next
+  bullet over blanket `pipefail`.
 - **Do:** run a check whose output needs trimming as its own command, and read
   its status, rather than folding it into a chain.
 - **Don't:** read "set `pipefail` in any script" as inapplicable because there

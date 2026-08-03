@@ -124,9 +124,18 @@ So re-read the three surfaces once more before closing the PR out, with no
 upper bound at all, and treat a `submitted_at` later than `mergedAt` as an
 ordinary finding rather than as an anomaly.
 
+That re-read catches a review already sitting on the PR; it cannot catch one
+still in flight.
+A single synchronous read narrows the window but does not close it --- the
+review that posted ten minutes after the merge in the case below would still
+be unposted at the moment `post-merge` runs.
+The durable catch is staying subscribed to the merged PR's review activity, so
+the review notification wakes the session when the late verdict actually posts,
+or re-arming a delayed check with a defined completion condition.
+
 Two things change when the review lands after the merge rather than before it.
 
-The merged PR is **no longer a place to address anything**.
+The merged PR is **no longer a place to land code fixes**.
 That is a third reason for moving work elsewhere, distinct from the two the
 corpus already carries: ARD's Defer moves a finding because fixing it would
 widen the PR's scope, and
@@ -137,9 +146,12 @@ is gone.
 
 And the vehicle is a **follow-up PR against `main`**, narrower than the
 "issue or PR" item 2 above leaves open.
-The findings are valid against `main` by construction, since `main` now holds
-the merged code they were written about, and the fixes are already known, so
-an issue would record work that could simply be done.
+The findings usually still apply to `main`, since `main` now holds the merged
+code they were written about --- but confirm that against current `main` first,
+since an overlapping merge can have changed or removed that code before the
+follow-up runs.
+Where they do still apply, the fixes are already known, so an issue would
+record work that could simply be done.
 
 **Post the back-pointer on the merged PR, not only the forward link.**
 Item 2 asks the follow-up to link back to the merged PR, which serves a reader
@@ -160,6 +172,9 @@ neither case fires on the other.
 
 - **Do:** re-read the three surfaces with no upper bound before closing out,
   and treat a review submitted after `mergedAt` as ordinary.
+- **Do:** stay subscribed to the merged PR, or re-arm a delayed check with a
+  completion condition, to catch a review that posts after `post-merge` runs
+  --- a single synchronous re-read cannot close that window.
 - **Do:** open a follow-up PR against `main` when the findings are in scope
   and the fixes are known, rather than filing an issue.
 - **Do:** comment on the merged PR naming the follow-up and each finding's

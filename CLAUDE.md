@@ -521,7 +521,21 @@ So `#316 session title convention`, not `PR #316 session title convention` or `P
 Don't trust an earlier "verdict" you've cached — a new review may have been posted since (by the @claude bot, by a human, or by a re-trigger), and that newer review may contain findings the old one missed.
 
 Specifically: when scanning checks (`gh pr checks`) shows green or "no failures", that's about CI state, **not** review verdict.
-Always pull the latest claude comment (`gh pr view N --json comments --jq '[.comments[] | select(.author.login == "claude")] | last | .body'`) and parse it for any "Findings", "Issues", "Remaining" sections before declaring a PR ready.
+Always pull the latest review comment and parse it for any "Findings", "Issues", "Remaining" sections before declaring a PR ready.
+
+**Filter on the body marker, not on an author login.**
+The login a review posts under varies by repo and by run --- `claude`, `claude[bot]`, and `github-actions[bot]` have each been observed carrying a real, complete verdict --- so a login-filtered query silently returns the *previous* round's comment and reads exactly like "no new review yet".
+That is a false negative on the one question this section exists to answer, and nothing in the output announces it.
+Completed runs start the body with `**Claude finished`, so match that instead:
+
+```bash
+gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
+  | jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict"))] | last | .body'
+```
+
+`memories/github.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
+(Morrison-Lab/ai-config#1054, 2026-08-03: the round-3 verdict --- **Ready for merge**, all four findings independently re-verified --- posted as `github-actions[bot]` at `03:04:19Z`.
+The login-filtered query returned the round-2 comment from `02:12:52Z` instead, so a clean PR read as unreviewed.)
 
 **Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
 ```

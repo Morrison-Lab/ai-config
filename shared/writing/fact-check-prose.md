@@ -221,16 +221,23 @@ round that edits the rule.
 A round addressing a finding about the claim is a likely place for the
 contradiction to enter, since attention is on the reviewer's wording rather than
 on the evidence below it.
-Prefer the record over the rule when they disagree, as the numbers check
-already says, and expect the correction to sharpen the rule rather than only
-delete a clause: the record is the concrete thing the generalization was
-abstracted from, so what it refutes is usually the step where the abstraction
-went wrong.
+A mismatch means one of the two is wrong, and the numbers check above already
+says which is usually which, and that the rule still needs verifying directly
+afterwards.
+Both halves hold here, with one addition: a case record is authored prose too,
+so its own figures are recalled until checked.
+A record that contradicts a rule is therefore a counterexample to verify, not a
+source to copy from.
+Check each side against its referent before re-deriving, and expect the
+correction to sharpen the rule rather than only delete a clause: the record is
+the concrete thing the generalization was abstracted from, so what it refutes
+is usually the step where the abstraction went wrong.
 
 - **Do:** read a case record back against the rule it supports, before shipping
   and after every edit to the rule.
-- **Do:** re-derive the rule from the record when the two disagree, rather than
-  striking the contradicted clause and leaving the rest.
+- **Do:** verify both sides against their referents when they disagree, then
+  re-derive the rule rather than striking the contradicted clause and leaving
+  the rest.
 - **Don't:** read a case record as corroboration, which is the stance its
   placement invites and the reason nothing tests the rule against it.
 - **Don't:** exempt a bullet you have just rewritten to satisfy a review
@@ -254,7 +261,10 @@ The numbers check above had been on the books since 2026-07-29, via
 [#816](https://github.com/Morrison-Lab/ai-config/pull/816), and did not fire.
 The escalation itself concerned
 [#1056](https://github.com/Morrison-Lab/ai-config/pull/1056), merged as
-`e1875ff7`.)
+`e1875ff7`.
+This entry's own first draft put that distance at eight lines, and measuring it
+against the branch gave fifteen, which is why the rule above checks the record
+against its referent rather than preferring it outright.)
 
 
 ## Check that a stated trigger actually fired

@@ -145,6 +145,99 @@ A test that passes against both is not a test.
 - **Don't:** wrap the call in `( ... ) ||`, `if`, or `!` when testing whether
   it aborts --- all three are the very contexts that suppress the abort.
 
+## A status consumed as a predicate cannot say "I could not run"
+
+Everything above is about a script failing to **abort**.
+When the suppressed status is fed to an `if`, the script does something worse
+than continue: it **chooses a branch** on it.
+
+A command's exit status is a single integer doing two jobs at once, and a
+boolean test collapses them.
+`grep` answers "no match" with 1 and "I am not installed" with 127, and
+`if ! cmd` maps both to true.
+So a missing dependency does not report a missing dependency.
+It reports a negative result, confidently, in the vocabulary the script was
+expecting.
+
+The shape, from a git pre-commit hook:
+
+```bash
+set -euo pipefail
+
+if ! git diff --cached --name-only | rg -q '^R/.*\.R$'; then
+  exit 0
+fi
+
+Rscript -e 'devtools::document()'
+```
+
+With ripgrep absent the pipeline exits 127, `!` inverts it to true, and the
+hook exits 0 having done nothing.
+Note that `set -euo pipefail` is present and buys nothing here: the `if`
+condition and the `!` operand are both on the suppression list above, so the
+hardening is real everywhere except the one line that decides what the script
+does.
+
+Two properties make this worse than the cases above.
+
+The wrong branch is usually the **cheap** one.
+A guard asks "is there anything to do?", so the error is absorbed into "no",
+and the failure mode is skipping the work rather than doing it twice.
+That is [`fail-fast`](../principles/fail-fast.md)'s guard rule arriving through
+the exit status: an assertion of absence resting on the non-appearance of a
+success.
+
+And the result is **machine-dependent**, which is why it survives review.
+It behaves correctly for whoever has the tool installed, so the author cannot
+reproduce it and the hook looks like it works.
+Reach for a portable tool in anything you ship to other people's machines, and
+check the dependency up front so a missing one is loud:
+
+```bash
+command -v rg >/dev/null || { echo "rg not installed" >&2; exit 1; }
+```
+
+Where the three outcomes genuinely differ, read the status rather than testing
+it, per [`fail-fast`](../principles/fail-fast.md)'s rule that 0, 1, and
+anything else are three answers and not two:
+
+```bash
+rc=0
+git diff --cached --name-only | grep -qE '^R/.*\.R$' || rc=$?
+case $rc in
+  0) : ;;                                     # matched
+  1) exit 0 ;;                                # no match
+  *) echo "grep failed ($rc)" >&2; exit 1 ;;  # broken
+esac
+```
+
+The `|| rc=$?` is required rather than decorative, and it is the same
+suppression the rest of this fragment warns about, used deliberately: a bare
+pipeline under `set -e` aborts on the no-match case before `case` ever runs,
+so capturing the status is the only way to reach the branch that handles it.
+Measured on bash 5.1.16: no match gives `rc=1`, and substituting a
+nonexistent command gives `rc=127`.
+
+- **Do:** verify a tool exists before branching on its exit status, in
+  anything that runs on a machine you do not control.
+- **Do:** distinguish 0, 1, and 2-or-more when a command's failure and its
+  negative answer call for different actions.
+- **Don't:** read `set -euo pipefail` at the top of a script as covering an
+  `if` condition -- that is the one place it is switched off.
+- **Don't:** treat a guard that skipped its work as having found nothing to
+  do; on a missing dependency those are the same observation.
+
+(`ucdavis/bcs#554`, 2026-08-03: the hook above is the verbatim one shipped in
+that repo.
+Observed live on a machine without ripgrep -- a commit staging an `R/*.R` file
+printed `.githooks/pre-commit: line 4: rg: command not found` and was accepted,
+with `devtools::document()` never running.
+Confirmed with a negative control: the same logic with `grep -qE` substituted
+takes the other branch on the same staged files, so the branch really was
+selected by the missing binary rather than by the file list.
+How many other contributors lack ripgrep was not established -- the point is
+that the hook's behaviour depends on it and says so nowhere.)
+
 ## A pipe discards the status of everything left of it
 
 Everything above is about `errexit` not firing.
@@ -273,3 +366,10 @@ in a one-off command line rather than a committed script, since there the
 `&&` is the only thing sequencing failure at all.
 Flag it even when every current call site masks it: the finding is that the
 behaviour is call-site dependent, not that it misbehaves today.
+
+Flag an `if` or `!` that branches on a command which might not be installed,
+too.
+That one has to be asked for separately, because every check above is about an
+exit status the author *expected*, so "does this exit non-zero on legitimate
+input?" comes back no and the finding is missed.
+Ask instead what the branch does when the command cannot run at all.

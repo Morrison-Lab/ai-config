@@ -781,6 +781,60 @@ you in the first place. (Hit on `ucdavis/bcs`, 2026-07-13: the auth failure
 blocked a data-examination step for an entire session under the user's standing
 "use codex whenever examining the actual data" rule, until they reset it.)
 
+## `claude setup-token` opens a browser first, then blocks on a stdin read an agent session cannot satisfy
+
+Never run `claude setup-token` from an agent session, under any guard.
+Two separate facts, and the first one is why no guard helps.
+
+**It opens a browser on the user's machine as its very first act.**
+The command is an OAuth flow, so running it launches a real browser window on
+whatever profile that machine's default browser happens to be on, in the
+middle of whatever the user was doing.
+That lands immediately, so a `timeout`, an `alarm`, a `< /dev/null`, or a
+subshell does not prevent it.
+The general rule is
+[`growth-mindset`](../shared/workflow/growth-mindset.md)'s
+"A timeout bounds how long you wait, not what the command already did".
+
+**It then blocks reading an authorization code from stdin, after the user has
+authorized.**
+The hang is not a startup capability check and not a refusal to run
+non-interactively.
+The process reaches the browser step, waits for the authorization to complete,
+and only then reads the code back from stdin.
+In an agent-spawned process fd 0 is a unix socket rather than a terminal, so
+that read can never be satisfied and the process sits there indefinitely.
+
+That second half generalizes past this one command: any process an agent
+spawns has a socket on fd 0, so anything that reads a terminal for input
+blocks forever rather than failing.
+It is the same shape as the `codex logout && codex login` case above, where
+the fix is likewise the user's to run.
+
+So the token has to be minted by the user, in their own terminal, and handed
+back.
+`scripts/rotate-claude-token.py` is written for exactly that -- it reads a
+token on stdin, so the user runs
+`claude setup-token | python3 scripts/rotate-claude-token.py --apply`
+themselves.
+
+- **Do:** ask the user to run `claude setup-token` in their own terminal, with
+  the `! ` prefix when its output should land in the session.
+- **Don't:** run it from an agent session behind a timeout, an `alarm`, a
+  closed stdin, or a subshell -- none of those stop the browser.
+- **Don't:** read a bounded probe's empty output as evidence it did nothing.
+
+(2026-08-02, while verifying a claim written into
+[ai-config#1056](https://github.com/Morrison-Lab/ai-config/pull/1056), the
+skill filed against
+[#1055](https://github.com/Morrison-Lab/ai-config/issues/1055):
+`perl -e 'alarm 8; exec "claude","setup-token"' < /dev/null` returned exit 142
+with no output, having already opened a browser window on the user's machine
+on the wrong browser profile.
+An unbounded run then measured the mechanism: `ps -o pid=,stat= -p <pid>`
+reported `S`, alive and blocked, *after* the browser authorization completed,
+and `lsof -p <pid> -a -d 0` showed fd 0 as a unix socket.)
+
 ## Resuming a subagent mid-run tends to restart its long check, not resume it — verify the process directly before nudging it again
 
 When a background subagent pauses its own turn while a long-running local

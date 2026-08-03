@@ -265,15 +265,24 @@ def request_ident(cmd):
 def _argv_draft(argv):
     """(is_draft, num, repo) for one simple command's argv: a draft transition.
 
-    Structural and gh-SCOPED, exactly like _argv_request: a `--draft` /
-    `draft=true` token counts as a draft action ONLY as the flag/field of an
-    actual `gh` invocation of the right shape -- never as a bare token in an
-    UNRELATED command (a `--body` value, a different subcommand's argument).
-    Without that scope, a failed `gh pr ready --undo` chained ahead of an
-    unrelated command whose argv merely CONTAINS a `--draft`/`draft=true` token
-    (`... ; gh pr comment N --body "draft=true"`, or a follow-up `gh pr create
-    --draft`) is misread as the transition being last, silently discharging a
-    still-ready PR -- the exact silent-discharge class every prior round blocked.
+    Structural and gh-SCOPED, exactly like _argv_request: a `--draft` token
+    counts as a draft action ONLY as the flag of an actual `gh` invocation of
+    the right shape -- never as a bare token in an UNRELATED command (a `--body`
+    value, a different subcommand's argument). Without that scope, a failed
+    `gh pr ready --undo` chained ahead of an unrelated command whose argv merely
+    CONTAINS a `--draft`/`draft=true` token (`... ; gh pr comment N --body
+    "draft=true"`, or a follow-up `gh pr create --draft`) is misread as the
+    transition being last, silently discharging a still-ready PR -- the exact
+    silent-discharge class every prior round blocked.
+
+    Only the two shell forms that genuinely change draft state are matched:
+    `gh pr ready [<N>] --undo` (ready -> draft) and `gh pr create --draft` (a
+    new draft). A `gh api ... -f draft=true` is deliberately NOT matched: the
+    REST `PATCH /pulls/{n}` endpoint does not accept `draft` (title/body/state/
+    base/maintainer_can_modify only), so such a call does NOT convert a PR to
+    draft -- treating it as one would discharge the obligation on a no-op
+    success, silently clearing a still-ready PR. A real toggle is GraphQL
+    (convert/markReady), which `gh pr ready` wraps and which this matches above.
 
     Identity comes from the draft command ITSELF, so a decoy PR verb elsewhere
     in the line (`gh pr comment 42 ... ; gh pr ready 1038 --undo`) cannot
@@ -291,20 +300,6 @@ def _argv_draft(argv):
     if len(argv) >= 3 and argv[1] == "pr" and argv[2] == "create" \
             and _has_flag(argv[3:], "--draft"):
         return True, None, None
-    # `gh api ... -f/-F draft=true`: a genuine field-setting flag VALUE on a gh
-    # api call, matched as the argument of -f/-F/--field/--raw-field (or the
-    # attached `-fdraft=true` form) -- not a bare token anywhere in the argv.
-    if len(argv) >= 2 and argv[1] == "api":
-        def _field(v):
-            return v.replace('"', "").replace("'", "").replace(" ", "").lower()
-        for i, a in enumerate(argv):
-            if a in ("-f", "-F", "--field", "--raw-field") and i + 1 < len(argv):
-                if _field(argv[i + 1]) == "draft=true":
-                    url = next((t for t in argv if "pulls" in t), "")
-                    return (True,) + _url_ident(url)
-            if _field(a) in ("-fdraft=true", "-fdraft:true"):
-                url = next((t for t in argv if "pulls" in t), "")
-                return (True,) + _url_ident(url)
     return False, None, None
 
 

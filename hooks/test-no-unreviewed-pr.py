@@ -340,6 +340,23 @@ case(create("c") + [bash('gh pr comment 42 --body "draft=true"; '
                     res("u", "posted comment 42\n{}", err=False),
                     say("Commented, then held as a draft.")], False,
      "a successful --undo last, after a draft-token decoy, still clears")
+# A `gh api ... -f draft=true` is NOT a draft transition: REST PATCH /pulls/{n}
+# does not accept `draft` (title/body/state/base/maintainer_can_modify only), so
+# the call does not convert the PR -- it stays ready. Treating it as a draft
+# conversion would DISCHARGE on the no-op's success, silently clearing a
+# still-ready PR. It must keep the PR tracked, whether the field is quoted (the
+# gate's _scrub_all blanks it) or not (matched by the gate but draft_ident finds
+# no structural transition, so `last` is False and the clear is withheld).
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -f 'draft=true' -X PATCH",
+                         tid="u"),
+                    res("u", '{"number":1038,"draft":false}', err=False),
+                    say("Tried to draft via the REST API.")], True,
+     "a quoted `gh api -f draft=true` does not clear (REST cannot draft)")
+case(create("c") + [bash("gh api repos/o/r/pulls/1038 -f draft=true -X PATCH",
+                         tid="u"),
+                    res("u", '{"number":1038,"draft":false}', err=False),
+                    say("Tried to draft via the REST API.")], True,
+     "an unquoted `gh api -f draft=true` does not clear (REST cannot draft)")
 
 # --- per-PR identity: one request does not clear another PR ---
 case([bash("gh pr create --title a", tid="a"), res("a", URL),

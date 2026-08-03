@@ -178,6 +178,29 @@ case(create("c") + [
     say("Ran a check, then a request that 422'd.")], True,
      "a chained request that itself 422s does not discharge")
 
+# --- err is the WHOLE call's exit status (the LAST command), so an API POST
+# request followed by an unrelated FAILING command must still discharge ---
+# The `gh api` POST fails with a clean 4xx body, so the discharge reads that
+# body shape (ordering-independent) rather than `err`, which reflects the
+# trailing command. A trailing `--jq` field error sets is_error=True for the
+# whole result but leaves no 4xx shape, so the successful request discharges.
+case(create("c") + [
+    bash("gh api repos/o/r/pulls/1038/requested_reviewers -X POST "
+         "-f reviewers=x; gh pr view 1038 --jq .nonexistent", tid="q"),
+    res("q", '{"requested_reviewers":[{"login":"Copilot"}]}\n'
+             "jq: error: nonexistent field", err=True),
+    say("Requested a reviewer, then a verify step that errored.")], False,
+     "an api request followed by an unrelated failing command discharges")
+# A CLI `--add-reviewer` request can fail through GraphQL with NO 4xx body, so
+# for the CLI form `err` is kept -- a genuinely failed CLI request (is_error)
+# must still block, since RX_REQ_FAILED alone would not catch it.
+case(create("c") + [
+    bash("gh pr edit 1038 -R o/r --add-reviewer baduser", tid="q"),
+    res("q", "GraphQL: Could not resolve to a User with the login of "
+             "'baduser'", err=True),
+    say("A CLI add-reviewer that failed without a 4xx body.")], True,
+     "a failed CLI add-reviewer with no 4xx body does not discharge")
+
 # --- draft carve-out ---
 case([bash("gh pr create --draft --base main --title x", tid="c"),
       res("c", URL), say("Draft.")], False,

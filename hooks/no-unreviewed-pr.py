@@ -211,24 +211,31 @@ def _verb_ident(argv):
 
 
 def _argv_request(argv):
-    """(is_request, num, repo) for one simple command's argv.
+    """(is_request, num, repo, api) for one simple command's argv.
 
     Identity comes from the request command ITSELF -- the `gh api` URL, or the
     `gh pr edit` number/`-R` -- so a different PR path echoed earlier in the
     line cannot misdirect the discharge. `-r` (reviewer) differs from `-R`
     (repo) only by case, and argv tokens are matched case-sensitively, so the
     two never collide.
+
+    `api` is True only for the `gh api`/`curl`/`wget` POST form, whose failure
+    is a clean 4xx-shaped body (RX_REQ_FAILED) readable regardless of where the
+    command sits in a chain. The CLI forms (`--add-reviewer`, `--reviewer`) go
+    through GraphQL, whose errors need not carry a 4xx status, so their failure
+    is caught by the harness `is_error` exit status instead -- see the discharge
+    in scan() for why that distinction decides which signal to trust.
     """
     if not argv:
-        return False, None, None
+        return False, None, None, False
     a0 = argv[0]
     if a0 == "gh" and len(argv) >= 3 and argv[1] == "pr":
         sub, rest = argv[2], argv[3:]
         if sub == "create" and _has_flag(rest, "--reviewer", "-r"):
-            return True, None, None       # a create's number is in its result
+            return True, None, None, False  # a create's number is in its result
         if sub == "edit" and _has_flag(rest, "--add-reviewer"):
             num, repo = _verb_ident(argv)
-            return True, num, repo
+            return True, num, repo, False
     # `gh api`/`curl`/`wget` hitting the requested_reviewers endpoint with a
     # POST. The same endpoint is read via GET (to CHECK who is requested), and
     # a GET must NOT discharge, which is why the method is required.
@@ -238,20 +245,20 @@ def _argv_request(argv):
         url = next((t for t in argv if "requested_reviewers" in t), None)
         if url and _post_method(argv):
             num, repo = _url_ident(url)
-            return True, num, repo
-    return False, None, None
+            return True, num, repo, True
+    return False, None, None, False
 
 
 def request_ident(cmd):
-    """(is_request, num, repo): does `cmd` genuinely request a reviewer?"""
+    """(is_request, num, repo, api): does `cmd` genuinely request a reviewer?"""
     cmds = _simple_commands(cmd)
     if cmds is None:
-        return False, None, None
+        return False, None, None, False
     for argv in cmds:
-        ok, num, repo = _argv_request(argv)
+        ok, num, repo, api = _argv_request(argv)
         if ok:
-            return True, num, repo
-    return False, None, None
+            return True, num, repo, api
+    return False, None, None, False
 
 
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
@@ -432,16 +439,27 @@ def scan(path):
                             continue
                         keep.append(ob)
                     obligations[:] = keep
-                    # Discharge the reviewer request that produced this result.
-                    # Gate on the REQUEST's own outcome (`err` exit status, or an
-                    # API-failure shape), NOT the broad `failed` flag: an
-                    # unrelated command chained into the same call
-                    # (`some_check; gh api ... POST`) can put `error`/`not found`
-                    # shell noise in the shared body, and reusing `failed` here
-                    # would nag forever after a genuinely successful request.
+                    # Discharge the reviewer request that produced this result,
+                    # gated on the REQUEST's own outcome -- never the broad
+                    # `failed` flag, which an unrelated chained command's
+                    # `error`/`not found` shell noise would trip.
+                    #
+                    # `err` (is_error) is the exit status of the WHOLE Bash call,
+                    # i.e. the LAST simple command, so it is trustworthy for the
+                    # request ONLY when nothing runs after it. For the `gh api`
+                    # POST form (api=True) that is not safe to assume -- the hook
+                    # even suggests chaining a verify step after the POST -- but
+                    # that form fails with a clean 4xx-shaped body, so
+                    # RX_REQ_FAILED alone decides it, ordering-independent, and
+                    # `err` is dropped. The CLI/structured forms (api=False) can
+                    # fail without a 4xx body (a GraphQL error, an MCP failure),
+                    # so `err` is kept -- reliable for the atomic structured
+                    # tools, and only over-blocking (the safe direction) in the
+                    # rare case a CLI request is chained ahead of another command.
                     if rid in pending:
-                        rnum2, rrepo2 = pending.pop(rid)
-                        req_failed = err or bool(RX_REQ_FAILED.search(body))
+                        rnum2, rrepo2, api2 = pending.pop(rid)
+                        req_failed = bool(RX_REQ_FAILED.search(body)) \
+                            or (err and not api2)
                         if not req_failed:
                             _clear(obligations, rnum2 or rnum, rrepo2 or rrepo)
                     continue
@@ -474,10 +492,14 @@ def scan(path):
                                             "tid": tid,
                                             "self": bool(inp.get("reviewers"))})
                     if inp.get("reviewers"):
-                        pending[tid] = (num, repo)
+                        # A structured tool call is atomic -- one tool_use, one
+                        # result -- so is_error reflects THIS request, with no
+                        # chained command to poison it. api=False -> trust err.
+                        pending[tid] = (num, repo, False)
                     continue
                 if name in REQ_TOOLS:
-                    pending[tid] = input_ident(inp)
+                    rn, rr = input_ident(inp)
+                    pending[tid] = (rn, rr, False)  # atomic; trust err
                     continue
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
@@ -495,7 +517,7 @@ def scan(path):
                 # example request quoted in a body/echo/heredoc/herestring
                 # never forges or discharges an obligation. Its identity comes
                 # from the request command itself.
-                requested, rnum, rrepo = request_ident(cmd_raw)
+                requested, rnum, rrepo, rapi = request_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
                 # too, and it is the draft action that decides.
                 if draft:
@@ -507,7 +529,7 @@ def scan(path):
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.
                 if requested and not opened:
-                    pending[tid] = (rnum or num, rrepo or repo)
+                    pending[tid] = (rnum or num, rrepo or repo, rapi)
     return obligations, text
 
 

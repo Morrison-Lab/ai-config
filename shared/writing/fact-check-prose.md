@@ -337,3 +337,68 @@ Walking `memories/github.md` on `main` found a peak of 1199 lines at
 `3eb15a4c`, so the gate never fired and the split was pre-emptive.
 The same false justification appeared in the new file's header and in
 `memories/MEMORY.md`'s index row.)
+
+
+## A superlative you inherited is one you are now asserting
+
+The **claims inherited from the tracking issue** bullet above covers the
+general case.
+This is the shape it takes most often and catches least, and two things narrow
+it.
+
+The inheritance source need not be the issue.
+A sibling repo's code comment is the same unverified input, and porting a fix
+between repos is precisely when you reach for one --- the phrase arrives
+carrying the authority of having already shipped somewhere else, which the
+original never earned either.
+And the claim is a **superlative** --- "the most common", "the usual", "almost
+always" --- which is the class where measuring is cheapest and the answer is
+most often no.
+
+Copying such a phrase does not feel like asserting it.
+It feels like carrying context over faithfully, which is a virtue, so nothing
+about the moment prompts a check.
+It is an assertion, and it inherits none of the verification the original never
+had.
+
+A superlative is a quantitative claim wearing prose, so it is decidable by one
+command rather than by judgment, per
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
+Run that command before copying the phrase, rather than after a reviewer asks
+for it.
+
+Two notes for when you do measure it.
+Fix the wrong claim at every site it reached, deriving that list by grepping
+rather than by recollection --- see
+[`address-every-comment`](../workflow/address-every-comment.md)'s rule on
+deriving a finding's site list, since a superlative that got copied once tends
+to have been copied more than once.
+And name the denominator of whatever figure replaces it: a percentage
+**increase** and a **share of total** answer different questions, and the two
+are easy to swap without noticing.
+
+- **Do:** measure a superlative before restating it, whatever its source.
+- **Do:** treat a sibling repo's code comment as unverified input, exactly as
+  you would an issue body.
+- **Do:** name the denominator when a figure replaces a superlative.
+- **Don't:** read faithful porting as an exemption, since the copy is your
+  assertion now.
+- **Don't:** ship a superlative you have not counted even where it turns out to
+  be true --- an undefended claim is a finding on its own, per the bullet above.
+
+(`Morrison-Lab/gha#398`, 2026-08-03: a sentence-splitting regex fix was ported
+from `Morrison-Lab/ai-config`, and the claim that `**Claim.** Explanation.` is
+"the corpus's most common paragraph opener" came across with it --- out of
+gha#397's issue body, and out of ai-config's own
+`scripts/semantic-line-breaks.py` comment, added by ai-config#1098.
+It was restated in four places before review flagged it as an unquantified
+superlative.
+Measured 2026-08-03, it is false: the construction accounts for 561 of 3398
+multi-sentence lines in ai-config's Markdown, 16.5%, about one in six --- so
+common, and not most common.
+The upstream instance is filed as
+[ai-config#1101](https://github.com/Morrison-Lab/ai-config/issues/1101).
+The denominator note above comes from a separate finding on the same PR, which
+caught 561/2837 = 19.8% --- the increase over the old count --- being reported
+where 561/3398 = 16.5% was meant; only the second answers how much the old
+regex had been hiding.)

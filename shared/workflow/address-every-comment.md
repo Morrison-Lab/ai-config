@@ -785,6 +785,60 @@ error is dangerous.
 The reviewer's actual worry -- that a reader might not reproduce it -- was
 right, and sharper than stated.)
 
+**A third direction, which no verification reflex covers: agreeing with a
+finding and then escalating it.**
+The bullets above check the reviewer's *fix*, and the one above checks their
+*premise*.
+Both assume you are deciding whether the finding is right.
+This is the case where it is right, and correctly scoped, and you tell the
+reviewer it understated the problem.
+
+Amplifying is the one response that feels like the opposite of disputing, so
+none of the checks above fire on it.
+Rebutting is adversarial and prompts you to verify.
+Extending is agreement wearing extra diligence, and agreement is not a thing
+anyone verifies.
+The escalation then ships under the reviewer's authority, with your own
+addition having had less scrutiny than a rebuttal would have got.
+
+[`metacognitive-monitoring`](metacognitive-monitoring.md) supplies the reason
+to expect an escalation to be wrong.
+A competent reviewer's conclusion is usually sound while its *particulars* are
+much less reliable, and an escalation is nothing but a new particular: a wider
+scope, a bigger count, one more failing case.
+So it lands squarely in the class that fragment names as least dependable, and
+it does so where the reviewer's credibility will carry it.
+
+Hold an escalation to the standard a rebuttal gets.
+Measure with an instrument at least as wide as the one that produced the
+finding, and say which instrument that was.
+When the escalation turns out to be wrong, correct it on the thread that
+carried it, not only in a later round's summary.
+A reader who saw "it is worse than you reported" has no other way to learn
+that it was not.
+
+- **Do:** verify an escalation with an instrument at least as wide as the one
+  behind the finding you are widening.
+- **Do:** post the correction to the thread that carried the escalation.
+- **Don't:** treat agreeing-and-extending as exempt from the checks a rebuttal
+  gets, since agreement suppresses the reflex that disagreement triggers.
+- **Don't:** report a finding as understated on a measurement you have not
+  shown covers the whole field set.
+
+(Morrison-Lab/ai-config#1056, 2026-08-02: Copilot found that the
+`LIST_SECRETS` row promised `created_at`, which `gh secret list` does not
+expose, and that finding was correct and correctly scoped to one field.
+The session ran `gh secret list --repo <owner>/<repo> --json 2>&1 | head -3`,
+read the two field names that survived its own truncation, and replied that
+the CLI failed on two of three fields rather than one, writing that into
+`tool-mappings.yml` as measured fact.
+On gh 2.96.0 that usage message lists five fields: `name`,
+`numSelectedRepos`, `selectedReposURL`, `updatedAt`, and `visibility`.
+A usage line plus the first two of those is exactly what `head -3` returns, so
+`updatedAt` was reachable all along and only `created_at` was not.
+A later round caught it, and the correction had to be posted to the original
+thread.)
+
 **When a finding cites a source, read the cited source before reproducing
 anything -- it is the cheaper instrument, and it is the one that can show the
 finding backwards rather than merely unsupported.**

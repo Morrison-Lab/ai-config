@@ -395,7 +395,7 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="orchestration" class="level2">
 <h2 class="anchored" data-anchor-id="orchestration">Orchestration</h2>
-<p>The ARDIA phase is serial by design — shared review runners, see <code>ardia</code> — so don’t fan out the push — re-review loop; at most orchestrate the read-only review survey across PRs. The UMS phase reasons over the whole session’s learnings at once and is not decomposable, so it stays inline. Consult <code>shared/workflow/when-to-orchestrate.md</code> (the shared-runner exception).</p>
+<p>The ARDIA phase serializes every action that <strong>mutates</strong> a PR — shared review runners, see <code>ardia</code> — so don’t fan out the claim — push — re-review loop. You may orchestrate <code>ardia</code>’s step 2: the read-only survey across PRs, plus worktree-isolated local patch preparation, which touches no forge state. The UMS phase reasons over the whole session’s learnings at once and is not decomposable, so it stays inline. Consult <code>shared/workflow/when-to-orchestrate.md</code> (the shared-runner exception).</p>
 <p>Phase 1 can still delegate sidecar work directly via the <code>Agent</code> tool within a single PR’s own ARDI round — see <code>ardia</code>’s “Lightweight sidecar delegation” note, including its guidance on giving a judgment-heavy sidecar task a stronger model, a mechanical one a cheaper tier, and a heavy fan-out pass to <code>codex</code> when available. Phase 2 has no sidecar-delegation angle of its own, per the non-decomposable note above.</p>
 </section>
 <section id="relationship-to-other-skills" class="level2">

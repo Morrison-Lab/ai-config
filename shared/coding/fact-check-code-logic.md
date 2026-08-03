@@ -36,6 +36,34 @@ written in prose; this one fact-checks the logic embedded in code itself.
   `age` column --- derived from that same rescaled range --- was returned
   unconverted, so it shipped ~365x too large; caught by a follow-up review
   round, not the same pass that fixed the input side.)
+  **When one parser construct becomes tolerant of a condition,
+  audit its siblings for the same condition.**
+  A regex or parser that handles CRLF, indentation, escaping,
+  or blank-line boundaries in one construct
+  makes the file *look* tolerant of that condition.
+  That appearance is dangerous if sibling constructs still hard-code
+  the old assumption.
+  Grep for every construct that consumes the same syntax class,
+  not only the one a reviewer named,
+  and add fixtures that move the measurement in both directions.
+  A missed sibling can create either a false inclusion or a false exclusion,
+  so a one-sided test is not enough.
+
+  - **Do:** grep for every sibling parser construct
+    when one construct gains tolerance for a syntax condition.
+  - **Do:** add fixtures that prove the tolerance works in each direction
+    the measurement can move.
+  - **Don't:** treat one CRLF-aware or indentation-aware regex
+    as evidence the file is tolerant as a whole.
+  - **Don't:** test only the construct the reviewer named
+    when neighbouring constructs parse the same text.
+
+  (Morrison-Lab/ai-config#1029:
+  round 5 made `_ANCHORED_IMPORT_RE` tolerant of CRLF,
+  but round 7 found fence closers and span blank-line bounds still LF-only.
+  The remaining two defects moved the context-closure measurement
+  in opposite directions,
+  so the earlier CRLF-looking code hid both.)
 - **Math and statistics embedded in code.** When code implements a formula,
   statistical test, or model, verify it against its source (a paper, a
   textbook, a package's reference implementation, a spec) with the same
@@ -134,6 +162,66 @@ asserted `expect_false(any(grepl("_GITHUB", out)))` while also expecting
 input line that survives substitution, then verified by swapping the two
 source lines into the wrong order and watching both assertions fail on the
 resulting `"* [GitHub](_GITHUB)"` residue.)
+
+### Mutate the fix, not only the test
+
+The rule above says a regression test must be seen to fail.
+The cheapest way to make that routine is mutation testing:
+temporarily revert, delete, or corrupt the exact fix,
+then run the new test and require it to fail for the intended reason.
+Reading the test is not a substitute.
+A vacuous test usually looks targeted,
+because it was written from the same mental model that produced the fix.
+
+Six distinct mechanisms can make a test pass against the reverted fix:
+
+- **Wrong entry point.**
+  The test calls a helper directly,
+  while the bug lives in the caller or parser path that feeds it.
+- **Earlier guard.**
+  The fixture is caught by a pre-existing check
+  before it reaches the branch the new test claims to exercise.
+- **Neighbouring mechanism.**
+  Another rule strips or rewrites the fixture incidentally,
+  so the assertion passes for the wrong reason.
+- **Boundary fixture.**
+  The fixture sits on a line or span boundary
+  where existing syntax rules already make the changed behaviour irrelevant.
+- **Wrong expectation.**
+  The asserted behaviour contradicts the specification,
+  so the test protects a bug rather than the fix.
+- **Misleading label.**
+  The test name or comment says one property is under test
+  while the assertion checks another.
+
+Those are test bugs,
+not merely weak tests.
+A suite with all six can still be green,
+and coverage can still report the lines as exercised.
+Only the mutation answers whether the assertion depends on the fix.
+
+- **Do:** mutate the exact fix and watch the new test fail before trusting it.
+- **Do:** route the fixture through the real entry point
+  and confirm it reaches the branch whose behaviour the test names.
+- **Don't:** accept a test because it mentions the helper that changed,
+  or because a coverage report marks the line covered.
+- **Don't:** trust a test label as evidence of what the assertion checks.
+
+(Morrison-Lab/ai-config#1029,
+seven Copilot review rounds on `scripts/check-context-closure.py`,
+produced six tests that passed against a reverted fix.
+One called `positive_int()` directly and missed the parser's `type=int` crash;
+one lost-import test used an anchored import already caught by an earlier guard;
+one indented-fence fixture lacked the blank line needed to avoid a neighbouring
+code-span rule;
+one span-boundary fixture was line-initial
+and therefore a legitimate fence opener;
+one expected CommonMark multi-line code spans not to be spans,
+contradicting the spec;
+and one `positive_int` label said "rejects zero"
+while asserting acceptance of `"4"`.
+Each was caught by mutating the fix,
+not by reading the test.)
 
 ## When the runtime is available, run the claim instead of reasoning about it
 

@@ -94,12 +94,15 @@ each to a clean review verdict in series.
    Drive each to a terminal state:
    - **Clean** — zero flagged items under any heading; post the unclaim
      comment, record the round count.
-   - **Deadlocked** --- a specific item where you and the reviewer have argued
-     and cannot reach an understanding. Escalate that item to a human, record
-     it, move on. A round count is never a terminal state on its own: see
-     [`ardi`](../ardi/SKILL.md)'s "Stopping conditions".
-   - **Blocked** — needs a human decision, has unresolvable conflicts, or fails
-     preflight in a way your change didn't cause. Record what's blocking, move on.
+   - **Escalated** --- every remaining **review finding** is deadlocked and waiting on a human ruling.
+     Record which findings, move to the next PR, and return when the human rules.
+     Escalating *some* findings is not this: keep driving the PR on everything else.
+     A round count is never a terminal state at all --- see [`ardi`](../ardi/SKILL.md)'s "Stopping conditions".
+   - **Blocked** --- an **external or operational** obstacle rather than a review finding: an unresolvable conflict, a needed human decision outside the review, or a preflight failure your change didn't cause.
+     Record what's blocking, move on.
+
+   The two are disjoint by construction: `Escalated` is about the *review* deadlocking, `Blocked` about everything else.
+   A PR meeting both is `Blocked`, since the external obstacle has to clear before the review matters.
 
    **Process PRs one at a time, not concurrently.** Each ARDI run pushes
    commits, triggers review workflows, and polls for the result; running them
@@ -112,7 +115,7 @@ each to a clean review verdict in series.
    | MR/PR | Rounds | Final status |
    |-------|--------|--------------|
    | [#25](url) | 3 | ✅ Clean |
-   | [#26](url) | 4 | ⚠️ Stalled (noise) — open items: … |
+   | [#26](url) | 4 | ⏸️ Escalated --- awaiting human on: … |
    | [#27](url) | 1 | ⛔ Blocked — needs human decision on … |
 
    For any PR not driven to clean, **list its remaining open items** so triage

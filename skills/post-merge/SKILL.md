@@ -41,6 +41,75 @@ Confirm `state == MERGED` and `mergedAt` is set. If it isn't actually merged,
 **stop and report** — don't tidy a branch whose work hasn't landed. (The
 standing **never assume; always verify** rule applied to closing out a PR.)
 
+### 1.25. Check for reviews that landed just before the merge
+
+A review can post after your last processed round and before the human merges.
+Those findings are real even though they are absent from the merge commit.
+After confirming `mergedAt`,
+identify the last review this session explicitly dispositioned,
+then read every formal review and PR comment after that timestamp
+and before `mergedAt`.
+Do not use an imprecise "near the merge time" window.
+The lower bound is the last dispositioned review,
+and `mergedAt` is only the upper bound.
+
+**When this session never dispositioned a review on this PR** --- entering
+through the "the PR merged -- now what?" route, or picking up a PR another
+session drove --- there is no last-dispositioned-review timestamp to anchor
+on.
+Don't skip the scan for lack of a lower bound.
+Scan the complete review and comment history through `mergedAt` instead,
+with no lower bound at all,
+since anything on the PR is late from this session's point of view.
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<N>/reviews --paginate    # formal review bodies
+gh api repos/<owner>/<repo>/pulls/<N>/comments --paginate   # inline review comments
+gh api repos/<owner>/<repo>/issues/<N>/comments --paginate  # top-level PR comments
+```
+
+A formal review's top-level body is not enough.
+For each late review,
+filter the inline comments by `pull_request_review_id`,
+because an empty-body review can carry every finding inline.
+This is the same two-surface shape `ardi` already requires when reading
+formal reviews;
+do not reimplement it as a body-only scan here.
+
+**A finding can also arrive as a plain top-level PR comment rather than a
+formal review** --- a bot posting a summary via `gh pr comment` (or the
+equivalent API call) rather than through the reviews endpoint, or a human
+commenting directly on the PR conversation.
+`pulls/<N>/reviews` and `pulls/<N>/comments` are both scoped to formal
+reviews and their inline threads; neither surface returns a plain PR
+conversation comment.
+Those live on the **issue comments** endpoint --- a pull request is also an
+issue in GitHub's data model --- so the scan needs all three surfaces, not
+two, to cover every place a late finding can land.
+
+If a late review contains findings:
+
+1. Confirm the merge commit does not contain the fix.
+2. File or use a follow-up issue or PR, and carry the findings there with a link back to the merged PR.
+3. Do not count the merged PR's review loop as clean for those findings; the new PR owns them.
+
+- **Do:** check every review and PR comment posted after the last dispositioned review and before `mergedAt`.
+- **Do:** fetch late formal reviews' inline comments, not only their top-level bodies.
+- **Do:** fetch the issue-comments endpoint too, not just the two review surfaces --- a late finding can arrive as a plain top-level PR comment.
+- **Do:** carry late findings forward to a new tracked fix when the merge beat the ARD round.
+- **Don't:** use a vague "near merge time" window that can skip a late finding posted well before a delayed merge.
+- **Don't:** treat the merge as proof the final review round was clean.
+- **Don't:** drop a finding because it arrived too late for the merged branch.
+- **Don't:** skip this scan because no last-dispositioned-review timestamp exists --- scan the whole history through `mergedAt` instead.
+- **Don't:** stop at the two formal-review surfaces --- a bot or human can post a late finding as a plain issue comment that neither one returns.
+
+(Morrison-Lab/ai-config#1029:
+Copilot round 7 posted at 2026-08-02T06:29:10Z,
+and the PR merged at 06:30:55Z as `1e0b5fdf`.
+The suppressed findings were real,
+absent from the merged code,
+and had to be carried forward to #1034.)
+
 ### 1.5. Cascade conflict scan
 
 **In an ultracode/coordinator session, delegate this whole step to a

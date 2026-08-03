@@ -120,6 +120,40 @@ case(create("c") + [bash(REQ_CMD, tid="q"), res("q", FAIL, err=True),
                     say("Requested.")], True,
      "a FAILED (422) request does not discharge it")
 
+# --- create and request CHAINED into one Bash call (one tool_use_id) ---
+# `failed` is one flag over the whole result body, so a trailing request's 422
+# must NOT be read as the create failing and silently drop the (real,
+# unreviewed) PR. This is the dangerous direction -- a genuinely-opened PR the
+# guard goes silent about.
+case([bash("gh pr create --title x --body y && "
+           "gh api repos/o/r/pulls/1038/requested_reviewers -X POST", tid="c"),
+      res("c", "https://github.com/o/r/pull/1038\n"
+               '{"status":422,"message":"cannot be requested"}'),
+      say("Opened then tried to request in one call; the request 422'd.")],
+     True, "a chained create + FAILED request in one call keeps the PR tracked")
+# The realistic form: `gh pr create --reviewer` creates the PR, then its
+# reviewer step 422s -- gh prints the URL and exits non-zero. The PR is real
+# and unreviewed, so the obligation must stay.
+case([bash("gh pr create --base main --title x --reviewer "
+           "copilot-pull-request-reviewer", tid="c"),
+      res("c", "https://github.com/o/r/pull/1038\n"
+               '{"status":422,"message":"Reviewers could not be requested"}',
+          err=True),
+      say("Created, but the reviewer step failed.")], True,
+     "create --reviewer whose reviewer step 422s still blocks (PR created)")
+# The mirror: both halves succeed in one call -> discharged.
+case([bash("gh pr create --title x --body y && "
+           "gh api repos/o/r/pulls/1038/requested_reviewers -X POST", tid="c"),
+      res("c", "https://github.com/o/r/pull/1038\n"
+               '{"requested_reviewers":[{"login":"Copilot"}]}'),
+      say("Opened and requested in one call; both succeeded.")], False,
+     "a chained create + successful request in one call discharges")
+# A create that itself fails carries NO PR URL/number, so no PR was opened.
+case([bash("gh pr create --title x --body y", tid="c"),
+      res("c", '{"status":422,"message":"validation failed"}', err=True),
+      say("The create itself failed.")], False,
+     "a create that itself fails opens no PR")
+
 # --- draft carve-out ---
 case([bash("gh pr create --draft --base main --title x", tid="c"),
       res("c", URL), say("Draft.")], False,

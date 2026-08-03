@@ -392,14 +392,29 @@ def scan(path):
                         if ob["tid"] != rid:
                             keep.append(ob)
                             continue
-                        if failed:
-                            continue  # a failed open opened no PR
+                        # `failed` is one flag over the WHOLE result body, but a
+                        # single Bash call can chain a create with a trailing
+                        # request (`gh pr create ... && gh api ...
+                        # requested_reviewers -X POST`, or `gh pr create
+                        # --reviewer` whose reviewer step 422s). A failure there
+                        # must not be read as the create failing:
+                        #   * failed AND no PR identity resolved -> the open
+                        #     itself failed, no PR exists, so drop it.
+                        #   * failed BUT a PR URL/number is present -> the create
+                        #     SUCCEEDED and the trailing request is what failed;
+                        #     the PR is real and unreviewed, so keep tracking it.
+                        if failed and rnum is None:
+                            continue
                         if ob["num"] is None and rnum:
                             ob["num"] = rnum
                         if ob["repo"] is None and rrepo:
                             ob["repo"] = rrepo
-                        if ob["self"]:
-                            continue  # create --reviewer already requested
+                        # A create --reviewer (self) discharges only when its
+                        # result did NOT fail: a reviewer request that 422'd on
+                        # an otherwise-created PR leaves the PR unreviewed, so
+                        # the obligation must stay outstanding.
+                        if ob["self"] and not failed:
+                            continue
                         keep.append(ob)
                     obligations[:] = keep
                     # Discharge the reviewer request that produced this result.

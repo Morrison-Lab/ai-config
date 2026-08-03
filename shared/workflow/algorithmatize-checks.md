@@ -250,6 +250,72 @@ The filtering step was sound --- against green `main` it separated the four
 possessives exactly, `arm's` 4 files, `manuscript's` 2, `simulation's` 6, and
 `SAS's` 0 --- which is what makes the extraction the whole of the defect.)
 
+## A reminder guard's discharge condition is a second matcher, and its failure is silence
+
+The two sections above test a guard's *fire* condition: does the matcher catch
+the reported input, and does a benign mention pass through as a negative case.
+A guard that reminds rather than blocks carries a second matcher --- the
+**discharge** condition, which decides the obligation was already met and the
+reminder should stay quiet.
+It fails in the opposite direction from the fire condition, and the two
+failures do not cost the same.
+
+An over-broad *fire* condition is noise: the reminder fires when it should not,
+which is annoying and visible, so someone notices and narrows it.
+An over-broad *discharge* condition is **silence**: the reminder never fires,
+because every session looks already discharged.
+Silence reads as compliance, so nothing prompts anyone to look --- the
+[`fail-fast`](../principles/fail-fast.md) shape where the failure path and the
+pass path print the same thing, here both printing nothing.
+
+**A discharge scoped by file path cannot separate the obligation from adjacent
+routine work that touches the same paths, and in the guard's own home repo that
+routine work is everywhere.**
+When the proxy for "a lesson was recorded" is a write to `memories/`,
+`CLAUDE.md`, `skills/`, or `shared/`, the very act of *addressing* a review
+finding --- editing one of those files to fix it --- satisfies the proxy, with
+no lesson recorded.
+Fixing the finding is not learning from it, but both write the same paths, so
+the discharge cannot tell them apart.
+The guard therefore goes dark in exactly the repo it ships to protect, while
+working in every consumer repo where those paths are rarely touched.
+So the adversarial test for a self-hosted guard's discharge is an ordinary,
+unrelated edit **in its own repo**, run as a negative case beside the
+fire-condition tests --- not the incident that prompted the guard.
+
+How tight the discharge must be depends on what the guard is for.
+A coarse discharge is tolerable for a **defensive backstop**, where a missed
+fire only forfeits a nag and the real signal lives elsewhere.
+It is a defect for a guard meant to **fire on one specific event**, where a
+missed fire is the whole failure.
+Decide which kind the guard is before choosing how loose the discharge can be.
+
+- **Do:** test a reminder guard's discharge against a benign, unrelated edit in
+  its own home repo, as a negative case alongside the fire-condition tests.
+- **Do:** scope a load-bearing discharge to the artifact the obligation
+  actually produces (a `hooks/`/CI path, an explicit signal), not to a path
+  prefix the home repo edits routinely.
+- **Don't:** treat a write to a broad path prefix as proof the obligation was
+  met --- in the home repo that prefix matches almost every edit.
+- **Don't:** read a reminder's silence as evidence the obligation is being met;
+  an over-broad discharge produces the same silence as a repo full of compliant
+  sessions.
+
+(`Morrison-Lab/ai-config#1075`, 2026-08-03: the review of a new inject-only
+`UserPromptSubmit` hook, `remind-learn-from-review.py`, found its
+mechanism-discharge branch matched `memories?/`, `CLAUDE.md`, `/skills/`, and
+`/shared/` --- roughly half the repo --- so an ordinary Address-fix edit
+discharged the reminder by path match alone, with no check that a lesson had
+been recorded, silencing the hook in its own home repo.
+The fix scoped mechanism-discharge to `hooks/` and CI paths and required an
+explicit learning signal.
+The same `UMS_PATH` prefix already ships in `remind-ums-after-error.py`
+(`memories?/|MEMORY\.md|CLAUDE\.md|/skills/|^skills/|/shared/|^shared/`,
+commented "A write to any of these is a recorded learning"), so the proxy is
+not hypothetical; whether its looser fire trigger there --- an error admission
+rather than a finding whose fix edits those paths --- makes the coarse
+discharge acceptable is the backstop-versus-fire-on-event judgment above.)
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

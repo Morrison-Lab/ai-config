@@ -4,7 +4,7 @@
 
 Generated from [`tool-mappings.yml`](tool-mappings.yml). Edit that file, then
 run `python3 scripts/sync-codex-skill-wrappers.py` to regenerate this page and
-the embedded tables in `codex-skills/`.
+the links in `codex-skills/`.
 
 The canonical skills under `skills/` are written for Claude Code and name
 concrete tools — mostly `gh`/`git` commands. This registry maps each canonical

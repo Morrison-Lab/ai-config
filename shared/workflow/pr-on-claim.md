@@ -70,6 +70,34 @@ Verify the request landed: the POST response should include the requested review
 A POST response alone is not enough; if the pending request disappears and no current-head review appears after a short poll, treat the reviewer request as blocked and start the documented fallback.
 Do not leave it as "review owed".
 
+**That blocked-request test has a false positive, and it is on exactly the repos the section above describes.**
+Where a ruleset auto-requests Copilot, the pending request disappears *by design*: the POST returns success naming the reviewer, and `reviewRequests` reads **empty** moments later, because the auto-management consumes it.
+That is the literal signature the test above calls blocked --- request gone, no review yet --- so the two paragraphs contradict each other on any repo with `review_on_push: true`, and the earlier one is the one that is wrong there.
+
+Reading it as blocked costs more than a wasted call.
+It routes you to the self-review fallback while a working reviewer is queued, which [`fully-clean`](fully-clean.md) treats as a fallback for when *no* external reviewer is reachable --- so the PR ends up carrying a weaker verdict than it could have.
+
+Settle it by reading the ruleset rather than by polling harder:
+
+```bash
+for id in $(gh api "repos/<owner>/<repo>/rulesets" --jq '.[].id'); do
+  gh api "repos/<owner>/<repo>/rulesets/$id" \
+    --jq '.rules[]? | select(.type=="copilot_code_review") | .parameters'
+done
+```
+
+A `review_on_push: true` result means the disappearance is expected,
+and that the next push re-requests automatically.
+Only then does an absent review become a question about the reviewer rather
+than about the request.
+
+- **Do:** check for a `copilot_code_review` rule before concluding a vanished pending request means a blocked one.
+- **Don't:** re-POST the request on such a repo --- it is auto-requested on every push, so the retry changes nothing and the empty read repeats.
+
+(Morrison-Lab/ai-config#1077, 2026-08-03: two explicit requests each returned `["Copilot"]` and each left `reviewRequests` empty within a minute, and both were reported as a possible blocked/silent reviewer.
+The repo's `main` ruleset carries `copilot_code_review` with `review_on_push: true` and `review_draft_pull_requests: false`, so neither request was ever needed.
+Copilot separately did stay silent on that PR, which is the distinct third state [`fully-clean`](fully-clean.md) records --- the point here is that the empty pending-list was not the evidence for it.)
+
 This is part of opening the PR, not a follow-up task.
 A status sentence like "review owed on #N" is the anti-pattern: it names a debt that should already have been discharged, the same way an offer to file an issue names work instead of doing it.
 The sentence is the trigger to request the review now.

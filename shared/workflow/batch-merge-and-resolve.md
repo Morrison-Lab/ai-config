@@ -126,11 +126,54 @@ status:
 git merge-tree "$base" "$a" "$b" | grep -c '<<<<<<< '
 ```
 
+**The two forms carry opposite signals, so pairing one form's command with the
+other's test is a third way to a false all-clear --- and the likeliest one,
+because each half is separately recommended.**
+The bullets above establish that the legacy form needs the grep and
+`--write-tree` needs the exit status.
+Neither says what happens when they are crossed, and crossing them is the
+natural mistake: `--write-tree` is what
+[`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md),
+[`ardi`](../../skills/ardi/SKILL.md), [`post-merge`](../../skills/post-merge/SKILL.md), and
+[`wrap-up`](../../skills/wrap-up/SKILL.md) all reach for, while the grep is
+what this fragment prints.
+
+`--write-tree` emits **no `<<<<<<<` markers at all**.
+On a conflict it writes the tree OID, the stage entries, and a
+`CONFLICT (content): Merge conflict in <path>` line, so the marker grep returns
+0 whether or not anything conflicted, and the unanchored-match fix above does
+not help --- there is nothing to match.
+The mirror error is equally quiet: the legacy form's status is always 0, so an
+`rc`-keyed sweep over it reports every pair clean.
+
+Pick one form and use its own test:
+
+```bash
+git merge-tree --write-tree "$a" "$b" >/dev/null 2>&1; echo "rc=$?"   # rc IS the signal
+git merge-tree "$base" "$a" "$b" | grep -c '<<<<<<< '                 # grep IS the signal
+```
+
+If you must grep `--write-tree`, match `^CONFLICT` rather than a marker.
+
+- **Do:** state which form a sweep used, next to the test it keyed on.
+- **Don't:** grep `--write-tree` output for conflict markers, or read the
+  legacy form's exit status --- each returns the clean answer unconditionally.
+
+(Measured on git 2.50.1 against a two-commit synthetic conflict:
+`--write-tree` exits 1 and prints a tree OID, three stage entries, and
+`CONFLICT (content): Merge conflict in f.txt`, with zero `<<<<<<<` occurrences.
+The legacy three-arg form on the same pair exits 0 and prints
+`+<<<<<<< .our` --- diff-indented, as the bullet above says.
+Hit live during a `post-merge` cascade scan on `ucdavis/bcs#536`, where a
+`--write-tree` sweep reported `conflict_markers=0` for both open PRs; a
+negative control against a known-conflicting pair is what exposed the grep as
+vacuous, and the PRs happened to be genuinely clean.)
+
 ## Any conflict sweep needs a negative control
 
 A matrix of zeros is indistinguishable from a detector that never ran.
-This is not a hypothetical: both failure modes above produce exactly that
-matrix, and both look like good news arriving from a real command.
+This is not a hypothetical: all three failure modes above produce exactly that
+matrix, and each looks like good news arriving from a real command.
 
 So before trusting any zero, run the sweep against a pair you already know
 conflicts, and confirm it reports the conflict.

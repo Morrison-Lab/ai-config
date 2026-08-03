@@ -527,3 +527,60 @@ Read its output, not its conclusion.
 (2026-07-31, [ai-config#964](https://github.com/Morrison-Lab/ai-config/pull/964):
 the review caught 8 of the 12 lines my own detector had missed, and then a
 further one that the maintained tool had missed too.)
+
+## `cmd | python3 - <<EOF` reads the heredoc, not the pipe, so `sys.stdin` scans nothing
+
+Piping data into an interpreter invoked as `python3 -` (or `sh -`, `bash -`)
+while *also* supplying the script through a `<<'EOF'` heredoc puts two things in
+line for one stdin, and the heredoc wins.
+The interpreter consumes the heredoc as its program, so the `-` that was meant
+to read the piped data has nothing left to read.
+A script that loops over `sys.stdin` iterates zero times, whatever was piped in:
+
+```bash
+some_command | python3 - <<'EOF'
+import sys
+for line in sys.stdin:   # reads the ALREADY-CONSUMED heredoc, i.e. nothing
+    ...                  # loop body never runs
+EOF
+```
+
+A scan built this way reports "0 found" on every input, which is a false
+all-clear of exactly the shape [`fail-fast`](../shared/principles/fail-fast.md)
+warns about in its "check you run by hand" section --- the pass path and the
+failure path print the same thing.
+It is also a "false claim about state" of the kind `CLAUDE.md`'s "Run UMS
+proactively" section makes a trigger, since the scan asserts the corpus is
+clean when it was never read.
+
+The fix is to keep the pipe as the only stdin, or read a file instead of stdin:
+
+- **Read a file.** Write the piped output to a temp file, then `python3 check.py
+  <file>` reading `sys.argv[1]` --- the heredoc/`-` collision disappears because
+  there is no `-`.
+- **Put the script in its own file.** `some_command | python3 check.py` leaves
+  the pipe as stdin, since no heredoc competes for it.
+- **Use `-c` for a one-liner.** `some_command | python3 -c '...'` keeps stdin
+  the pipe, because the program arrives as an argument rather than on stdin.
+
+And give any such scan a **positive control** before trusting a zero: feed it
+input you KNOW contains a violation and confirm it flags that, per
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)'s
+positive-control discipline and [`fail-fast`](../shared/principles/fail-fast.md).
+An instrument never once seen to flag anything is not yet an instrument.
+This is the specific-mechanism companion to "A hand-rolled verification check is
+worth nothing until it has caught something" above; that entry's heredoc failure
+was shell *quoting*, this one is stdin *contention*.
+
+- **Do:** read the data from a file argument (`sys.argv[1]`), or pipe into a
+  script file or `python3 -c`, so the piped bytes are what gets scanned.
+- **Do:** run a positive control that must flag, before believing a zero.
+- **Don't:** pipe into `python3 -`/`sh -`/`bash -` and also feed the program
+  through a `<<EOF` heredoc --- `sys.stdin` then reads the heredoc, not the pipe.
+- **Don't:** trust a "0 candidates" result from a scan that has never been seen
+  to report a nonzero.
+
+(2026-08-03, an ai-config session: this idiom was used to verify ai-config#1078's
+diff for semantic-line-breaks, and it read nothing --- a real multi-sentence-line
+violation was reported as "0 found" and the vacuous all-clear was stated to the
+user before the method was caught.)

@@ -313,6 +313,33 @@ case(create("c") + [bash("echo start; gh pr ready 1038 --undo", tid="u"),
                     res("u", "start\n{}", err=False),
                     say("Held as a draft after a preamble.")], False,
      "a successful --undo as the last command still clears")
+# The `last` check must find the ACTUAL draft transition structurally, not just
+# inspect whichever command happens to be last. A failed `--undo` chained ahead
+# of an UNRELATED command whose argv merely contains a `--draft`/`draft=true`
+# token -- a `gh pr comment` whose --body is `draft=true`, or a follow-up
+# `gh pr create --draft` that succeeds -- must NOT be read as the transition
+# being last. Both would silently discharge #1038 (still ready, never reviewed)
+# if `_argv_draft` matched a bare token or `_draft_last` looked only at cmds[-1].
+case(create("c") + [bash('gh pr ready 1038 --undo; gh pr comment 42 '
+                         '--body "draft=true"', tid="u"),
+                    res("u", "pull request cannot revert to draft state\n"
+                        "posted comment 42", err=False),
+                    say("Tried to undo; also commented.")], True,
+     "a failed --undo ahead of a draft-token-bearing command keeps it tracked")
+case(create("c") + [bash("gh pr ready 1038 --undo; gh pr create --draft "
+                         "--title y --body z", tid="u"),
+                    res("u", "pull request cannot revert to draft state\n"
+                        "https://github.com/o/r/pull/1099", err=False),
+                    say("Tried to undo; opened a fresh draft.")], True,
+     "a failed --undo ahead of a successful `create --draft` keeps it tracked")
+# The gh-scope must not OVER-match: a draft-token inside an unrelated command
+# that PRECEDES a genuine successful `--undo` (the real last command) must still
+# let the undo clear -- the scope drops the decoy, so the undo is found last.
+case(create("c") + [bash('gh pr comment 42 --body "draft=true"; '
+                         "gh pr ready 1038 --undo", tid="u"),
+                    res("u", "posted comment 42\n{}", err=False),
+                    say("Commented, then held as a draft.")], False,
+     "a successful --undo last, after a draft-token decoy, still clears")
 
 # --- per-PR identity: one request does not clear another PR ---
 case([bash("gh pr create --title a", tid="a"), res("a", URL),

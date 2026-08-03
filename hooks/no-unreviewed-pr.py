@@ -263,50 +263,72 @@ def request_ident(cmd):
 
 
 def _argv_draft(argv):
-    """True if one simple command's argv is a draft transition.
+    """(is_draft, num, repo) for one simple command's argv: a draft transition.
 
-    Structural, exactly like _argv_request: a `--draft`/`gh pr ready --undo`
-    quoted inside a DIFFERENT command's `--body` tokenizes as a single argument
-    and so does not match, preserving the anti-forgery property RX_DRAFT gets
-    from _scrub_all. Identity is not needed here (the caller already has it from
-    cmd_ident); this only decides ordering.
+    Structural and gh-SCOPED, exactly like _argv_request: a `--draft` /
+    `draft=true` token counts as a draft action ONLY as the flag/field of an
+    actual `gh` invocation of the right shape -- never as a bare token in an
+    UNRELATED command (a `--body` value, a different subcommand's argument).
+    Without that scope, a failed `gh pr ready --undo` chained ahead of an
+    unrelated command whose argv merely CONTAINS a `--draft`/`draft=true` token
+    (`... ; gh pr comment N --body "draft=true"`, or a follow-up `gh pr create
+    --draft`) is misread as the transition being last, silently discharging a
+    still-ready PR -- the exact silent-discharge class every prior round blocked.
+
+    Identity comes from the draft command ITSELF, so a decoy PR verb elsewhere
+    in the line (`gh pr comment 42 ... ; gh pr ready 1038 --undo`) cannot
+    misdirect the clear onto the wrong PR.
     """
-    if not argv:
-        return False
+    if not argv or argv[0] != "gh":
+        return False, None, None
     # `gh pr ready [<N>] --undo` converts a ready PR BACK to draft.
-    if len(argv) >= 3 and argv[0] == "gh" and argv[1] == "pr" \
-            and argv[2] == "ready" and _has_flag(argv[3:], "--undo"):
-        return True
-    # A real `--draft` flag, or a `draft=true`/`draft:true` key/value token
-    # (`gh pr create --draft`, `gh api ... -f draft=true`) -- a bare argv token,
-    # never the interior of a quoted string.
-    for a in argv:
-        if a == "--draft":
-            return True
-        if a.replace('"', "").replace("'", "").replace(" ", "").lower() \
-                in ("draft=true", "draft:true"):
-            return True
-    return False
+    if len(argv) >= 3 and argv[1] == "pr" and argv[2] == "ready" \
+            and _has_flag(argv[3:], "--undo"):
+        num, repo = _verb_ident(argv)
+        return True, num, repo
+    # `gh pr create --draft` opens a NEW draft PR (a draft action for ordering);
+    # like any create, its number is in the result, not the command.
+    if len(argv) >= 3 and argv[1] == "pr" and argv[2] == "create" \
+            and _has_flag(argv[3:], "--draft"):
+        return True, None, None
+    # `gh api ... -f/-F draft=true`: a genuine field-setting flag VALUE on a gh
+    # api call, matched as the argument of -f/-F/--field/--raw-field (or the
+    # attached `-fdraft=true` form) -- not a bare token anywhere in the argv.
+    if len(argv) >= 2 and argv[1] == "api":
+        def _field(v):
+            return v.replace('"', "").replace("'", "").replace(" ", "").lower()
+        for i, a in enumerate(argv):
+            if a in ("-f", "-F", "--field", "--raw-field") and i + 1 < len(argv):
+                if _field(argv[i + 1]) == "draft=true":
+                    url = next((t for t in argv if "pulls" in t), "")
+                    return (True,) + _url_ident(url)
+            if _field(a) in ("-fdraft=true", "-fdraft:true"):
+                url = next((t for t in argv if "pulls" in t), "")
+                return (True,) + _url_ident(url)
+    return False, None, None
 
 
-def _draft_last(cmd):
-    """True if the draft transition is the LAST simple command in the chain.
+def draft_ident(cmd):
+    """(is_draft, num, repo, last): does `cmd` perform a draft transition, and
+    is that transition the LAST simple command?
 
-    That is exactly when the harness `is_error` (the WHOLE call's exit status,
-    i.e. its last command) is authoritative for the transition's own outcome --
-    the same reasoning `request_ident`'s `last` encodes for a reviewer request.
-    A draft action chained AHEAD of another command has an is_error belonging to
-    a later command, so the discharge must treat it as AMBIGUOUS.
-
-    Conservative on every uncertainty (unparseable command, or a last simple
-    command that is not itself a draft action): returns False, the safe
-    over-warn direction, which keeps the PR tracked rather than risk silently
-    clearing a genuinely-failed transition.
+    Mirrors request_ident exactly: it locates the draft action STRUCTURALLY (the
+    first simple command that is a gh draft invocation) and reports whether THAT
+    command is last -- which is exactly when the harness is_error (the whole
+    call's exit status) is authoritative for the transition's own outcome. A
+    draft action chained AHEAD of another command has an is_error belonging to a
+    later command, so the discharge treats it as AMBIGUOUS and keeps the PR
+    tracked (the safe over-warn direction). Fails toward not-a-draft on a parse
+    error, so it never fabricates a clear.
     """
     cmds = _simple_commands(cmd)
-    if not cmds:
-        return False
-    return _argv_draft(cmds[-1])
+    if cmds is None:
+        return False, None, None, False
+    for i, argv in enumerate(cmds):
+        ok, num, repo = _argv_draft(argv)
+        if ok:
+            return True, num, repo, (i == len(cmds) - 1)
+    return False, None, None, False
 
 
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
@@ -619,16 +641,21 @@ def scan(path):
                 # never forges or discharges an obligation. Its identity comes
                 # from the request command itself.
                 requested, rnum, rrepo, rlast = request_ident(cmd_raw)
+                _dok, dnum, drepo, dlast = draft_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
                 # too, and it is the draft action that decides. The clear is
                 # deferred to the command's own non-failed result: a `gh pr
                 # ready --undo` that fails leaves the PR ready, so clearing at
                 # tool_use time would silently forget it.
                 if draft:
-                    # last=whether the draft action is the last simple command,
-                    # so the discharge can trust is_error only then (mirrors the
-                    # `rlast` guard a chained-ahead reviewer request needs).
-                    pending_clear[tid] = (num, repo, _draft_last(cmd_raw))
+                    # Identity and `last` come from the draft command ITSELF
+                    # (draft_ident), mirroring the reviewer-request path: a decoy
+                    # PR verb earlier in the line cannot misdirect the clear onto
+                    # the wrong PR, and a draft chained AHEAD of another command
+                    # is correctly seen as not-last (so is_error is ambiguous and
+                    # the clear is withheld). cmd_ident is the fallback for a
+                    # draft form RX_DRAFT matched but draft_ident did not resolve.
+                    pending_clear[tid] = (dnum or num, drepo or repo, dlast)
                 elif opened:
                     obligations.append({"num": num, "repo": repo, "tid": tid,
                                         "self": requested})

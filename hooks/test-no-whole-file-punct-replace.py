@@ -150,6 +150,15 @@ NEWLINE_FALSEPOS = (
     "print(pathlib.Path('a.md').read_text().replace('\\u2014','---')[:80])\"\n"
     "python3 -c \"import pathlib; pathlib.Path('report.md').write_text('done')\""
 )
+# A backslash-newline is a line CONTINUATION, not a statement separator, so
+# splitting the interpreter from its `-c` payload across a continued line must
+# still keep them in one segment. (Regression the newline-split fix would open
+# without this: `python3 \<nl>-c "..."` is one command per `bash -n`.)
+BACKSLASH_CONT = (
+    "python3 \\\n"
+    "-c \"import pathlib; p=pathlib.Path('a.md'); "
+    "t=p.read_text().replace('\\u2014','---'); p.write_text(t)\""
+)
 
 CASES = [
     (UNSCOPED, True, "the unscoped python replace is blocked"),
@@ -173,6 +182,8 @@ CASES = [
      "the escape form of a curly double quote is blocked"),
     (NEWLINE_BYPASS, True,
      "an unrelated line before the payload (bare newline) does not disarm it"),
+    (BACKSLASH_CONT, True,
+     "a backslash-newline continuation keeps the interpreter with its payload"),
     (SCOPED, False, "a base-branch-scoped replace is allowed"),
     (NEWLINE_FALSEPOS, False,
      "two safe lines separated by a newline are not jointly blocked"),

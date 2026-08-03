@@ -179,6 +179,12 @@ def split_segments(cmd):
         if c == "\n":
             i += 1
             if not pending:
+                s = "".join(cur)
+                if (len(s) - len(s.rstrip("\\"))) % 2 == 1:
+                    # backslash-newline is a line continuation, not a
+                    # separator: drop the trailing `\` and join the lines.
+                    cur = [s[:-1]]
+                    continue
                 flush()                           # bare newline = separator
                 continue
             cur.append("\n")                      # opener line's own segment

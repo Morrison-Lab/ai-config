@@ -116,7 +116,7 @@ def wrapper_description(name: str, source_description: str) -> str:
     )
 
 
-def wrapper_text(name: str, source_description: str, table: str) -> str:
+def wrapper_text(name: str, source_description: str) -> str:
     description = wrapper_description(name, source_description)
     source_path = f"../../skills/{name}/SKILL.md"
     return f"""---
@@ -141,11 +141,10 @@ The source lives at `skills/{name}/SKILL.md` in the same ai-config checkout as t
 
 ## Tool mappings
 
-The canonical skill names `gh`/`git` commands (and sometimes `mcp__github__*`
-tools). Use the GitHub MCP tool below if this Codex session has it; otherwise
-run the CLI command. Full per-model reference: [tool-mappings.md](../../tool-mappings.md).
-
-{table}
+The canonical skill names `gh`/`git` commands (and sometimes
+`mcp__github__*` tools). Resolve those operations using the full per-model
+reference at [tool-mappings.md](../../tool-mappings.md), preferring the
+GitHub MCP tool when this Codex session has it and otherwise using the CLI.
 """
 
 
@@ -160,7 +159,7 @@ def reference_doc(mappings: dict) -> str:
 
 Generated from [`tool-mappings.yml`](tool-mappings.yml). Edit that file, then
 run `python3 scripts/sync-codex-skill-wrappers.py` to regenerate this page and
-the embedded tables in `codex-skills/`.
+the links in `codex-skills/`.
 
 The canonical skills under `skills/` are written for Claude Code and name
 concrete tools — mostly `gh`/`git` commands. This registry maps each canonical
@@ -185,9 +184,8 @@ def generated_wrapper_dir(path: Path) -> bool:
 
 def expected_files() -> dict[Path, str]:
     mappings = load_mappings()
-    table = operations_table(mappings)
     expected = {
-        WRAPPER_DIR / name / "SKILL.md": wrapper_text(name, description, table)
+        WRAPPER_DIR / name / "SKILL.md": wrapper_text(name, description)
         for name, description in source_skills()
     }
     expected[REFERENCE_FILE] = reference_doc(mappings)

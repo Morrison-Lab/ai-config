@@ -352,7 +352,7 @@ that had to be fixed with a follow-up commit.)
 A commit message passed through a double-quoted `-m` goes through the shell
 first, so any backtick span inside it is command substitution: the shell
 *runs* the backticked text and drops it from the message.
-`git commit -m "fix the \`slast\` guard"` commits `fix the  guard` --- the
+``git commit -m "fix the `slast` guard"`` commits `fix the  guard` --- the
 `slast` span is gone, and whatever running `slast` printed (usually nothing,
 often an error to stderr) is spliced in where it stood.
 Nothing errors on the commit itself, and the corrupted message is what lands in

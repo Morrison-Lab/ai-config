@@ -81,15 +81,23 @@ A PR/MR is **fully clean** when **both** of these hold:
    `04:05:51`: 26 seconds, identical to the other six.)
 
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
-   settle "has everything finished" from the commit check-runs endpoint
-   instead.**
-   This is a different gap from the workflow-run one above, and the remedy
-   there does not close it.
-   That paragraph warns that a workflow run may produce **no check run**, so a
-   check-runs query cannot see it, and sends you to the raw workflow runs.
+   read the commit check-runs endpoint before deciding that everything has
+   finished.**
+   This is a different gap from the workflow-run one above, and that gap's
+   remedy is not the direct answer to it.
+   The earlier paragraph warns that a workflow run may produce **no check
+   run**, so a check-runs query cannot see it, and sends you to the raw
+   workflow runs.
    Here the check run **exists** and the check-runs endpoint returns it.
-   It is `gh pr checks` that does not list it, so a raw workflow-run
-   cross-check finds nothing missing and confirms the wrong surface.
+   It is `gh pr checks` that omits it.
+
+   The raw-run route is not blind to this, but it is indirect, and every
+   caveat that paragraph attaches to it applies unchanged.
+   The omitted check does have a backing Actions run, so a
+   `gh run list --commit <head-sha>` sweep can surface it under the run's own
+   name rather than the check's --- which means the raw-run sweep is a
+   best-effort corroboration here, not the instrument to reach for.
+   The check-runs endpoint names the check directly and answers in one call.
 
    The failure direction is the expensive one, because the omitted check run
    can be `in_progress` while `gh pr checks` reports zero pending.
@@ -98,9 +106,32 @@ A PR/MR is **fully clean** when **both** of these hold:
    which is precisely the state this criterion exists to catch.
 
    ```bash
-   gh api "repos/<owner>/<repo>/commits/<head-sha>/check-runs" \
+   gh api --paginate "repos/<owner>/<repo>/commits/<head-sha>/check-runs?per_page=100" \
      --jq '.check_runs[] | select(.status != "completed") | "\(.name) \(.status)"'
    ```
+
+   **`--paginate` is load-bearing, not tidiness.**
+   That endpoint returns 30 check runs per page by default, so on a head with
+   more than 30 an unfinished run can sit on page 2 while the unpaginated
+   query returns nothing and reads as an all-clear --- reintroducing, one
+   surface over, the exact incompleteness this block is about.
+
+   **The endpoint covers check runs only, so a repo that still uses legacy
+   commit statuses needs a second query.**
+   `gh pr checks` folds both surfaces into one rollup; the check-runs endpoint
+   does not, so swapping one for the other can hide a pending or failing
+   status context.
+   Read `commits/<head-sha>/status` alongside it wherever statuses are in
+   play, and note that its combined `state` reads `pending` when the repo
+   posts no statuses at all, which is not a pending status:
+
+   ```bash
+   gh api "repos/<owner>/<repo>/commits/<head-sha>/status" \
+     --jq '{state, n: (.statuses | length)}'
+   ```
+
+   `Morrison-Lab/ai-config` returns `{"state": "pending", "n": 0}` on every
+   head checked here, so the caveat is about other repos rather than this one.
 
    **Why the two surfaces disagree is unexplained, so do not assert a
    mechanism for it.**
@@ -116,12 +147,15 @@ A PR/MR is **fully clean** when **both** of these hold:
    What is measured is the disagreement, and that alone decides which surface
    to read.
 
-   - **Do:** decide criterion 1 from the commit check-runs endpoint, and treat
-     `gh pr checks` as a convenience view of it.
-   - **Do:** report both counts when they disagree, so the gap stays visible
-     to whoever reads the status next.
+   - **Do:** take the check-run half of criterion 1 from the paginated
+     check-runs endpoint, and add `commits/<sha>/status` where the repo uses
+     commit statuses, rather than treating either query as sufficient alone.
+   - **Do:** report both counts when the endpoint and the rollup disagree, so
+     the gap stays visible to whoever reads the status next.
    - **Don't:** read `0 pending` from `gh pr checks` as evidence that nothing
      is still running.
+   - **Don't:** drop `--paginate` --- an unfinished run on page 2 returns the
+     same empty result as a finished head.
    - **Don't:** offer a reason for the omission --- none was established.
 
    (`Morrison-Lab/ai-config#1056`, merged as `e1875ff7`, at head
@@ -656,9 +690,9 @@ Do not read that pair as the behaviour having changed.
 Two dates cannot establish a change, and no change is needed to explain the
 original record: the two surfaces disagreed with each other on the *same* PRs
 on the *same* day, so reading the rollup accounts for it entirely.
-Treat the check surface as unreliable about this reviewer in both directions:
-it can omit a check run that exists, and the check run it does report can be
-green with nothing behind it.
+Treat the check surface as unreliable about this reviewer in both directions.
+The `gh pr checks` rollup can omit a check run that exists, per criterion 1
+above, and the run itself can be green with no review behind it.
 
 That second mode is the sharper one, and it is the newly evidenced one.
 On #1008 `copilot-pull-request-reviewer` completed `success` while Copilot
@@ -690,9 +724,13 @@ Read past the first page before concluding an entry is absent, since a busy PR c
 
 The two failure modes above strengthen that instruction rather than
 complicating it, because they land on the same remedy from opposite sides.
-An absent check run leaves nothing to read, and a present one answers a
-narrower question than the one being asked, so no amount of care reading
-checks recovers the fact either way.
+A check run the **rollup** omits leaves a reader of that rollup nothing to
+read, and the run it does surface answers a narrower question than the one
+being asked.
+Note that the first of those is a gap in the rollup, never in the check run:
+the run exists, and criterion 1's endpoint returns it.
+Either way no amount of care reading checks recovers whether the reviewer
+reviewed.
 Read the reviews.
 
 - **Do:** confirm each external reviewer by an entry in `get_reviews`, not by the conclusion of its check run.
@@ -708,13 +746,32 @@ Read the reviews.
 On #1005 `copilot-pull-request-reviewer[bot]` posted its quota refusal as a `COMMENTED` review at `23:59:46Z`, which is the refusal above exactly.
 Under five hours later on #1008 it posted nothing at all.
 `get_reviews` returned eight reviews there, four from the repo's own review bot and four from the maintainer, none from Copilot, with page 2 confirmed empty.
-Neither PR's check **rollup** carries a Copilot-attributable context: re-measured 2026-08-03, `gh pr checks` returns 8 contexts for #1005 and 9 for #1008, and filtering either for a name matching `opilot` returns **0**.
-Every other check on both heads was green, so no signal short of the login-filtered review-list query distinguished a reviewer that had approved from one that never spoke.
-The commit check-runs endpoint disagrees with that rollup on both PRs, returning 9 and 11 respectively, the extra entries including one `copilot-pull-request-reviewer` run apiece.
-Two figures in the paragraph above have since been corrected, and the correction runs opposite to the one this record previously carried.
-An earlier revision claimed Copilot's own check run completed `success` at `04:50:41Z` on #1008, a later revision retracted that as an invented particular, and the retraction was the wrong one: check run `91327863807` on `7abfed6b` is named `copilot-pull-request-reviewer` and reads `completed_at: 2026-08-01T04:50:41Z`, `conclusion: success`.
-It is worth leaving the whole chain visible rather than quietly deleting it, because the retraction was produced by exactly the gap criterion 1 now documents --- a query against a surface that omits the check run, read as establishing that the check run does not exist.
-The record's other figure moved too: #1008's rollup count was written as 10 and re-measures at 9, and why was not determined.)
+Neither PR's check **rollup** carries a Copilot-attributable context.
+Re-measured 2026-08-03,
+`gh pr checks` returns 8 contexts for #1005 and 9 for #1008,
+and filtering either for a name matching `opilot` returns **0**.
+Every other check on both heads was green,
+so no signal short of the login-filtered review-list query
+distinguished a reviewer that had approved from one that never spoke.
+The commit check-runs endpoint disagrees with that rollup on both PRs,
+returning 9 and 11 respectively,
+the extra entries including one `copilot-pull-request-reviewer` run apiece.
+Two figures in the paragraph above have since been corrected,
+and the correction runs opposite to the one this record previously carried.
+An earlier revision claimed Copilot's own check run
+completed `success` at `04:50:41Z` on #1008,
+a later revision retracted that as an invented particular,
+and the retraction was the wrong one:
+check run `91327863807` on `7abfed6b` is named `copilot-pull-request-reviewer`
+and reads `completed_at: 2026-08-01T04:50:41Z`, `conclusion: success`.
+It is worth leaving the whole chain visible rather than quietly deleting it,
+because the retraction was produced by exactly the gap
+criterion 1 now documents ---
+a query against a surface that omits the check run,
+read as establishing that the check run does not exist.
+The record's other figure moved too:
+the #1008 rollup count was written as 10 and re-measures at 9,
+and why was not determined.)
 
 **A sixth case runs the other way from all five above: the review is genuine and complete, but the workflow posts the reviewer's own tool invocation instead of the review body.**
 The comment opens with a literal `gh pr comment <N> --repo <owner>/<repo> --body "$(cat <<'EOF'` and closes with `EOF\n)"`, wrapping a real, correct verdict as unrendered text --- the model emitted a shell command as its final response and the workflow posted that string verbatim.

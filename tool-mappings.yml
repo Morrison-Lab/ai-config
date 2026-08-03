@@ -224,11 +224,13 @@ operations:
     github_mcp: mcp__github__create_or_update_file (one file) / mcp__github__push_files (multiple)
   - id: LIST_SECRETS
     description: >-
-      List a repo's Actions secrets. Returns name, created_at, and updated_at
-      only; the value is never readable, so this can confirm a secret exists
-      and when it last changed, never what it is or whether it works.
-    cli: gh secret list --repo <owner>/<repo>
-    github_mcp: (no GitHub MCP tool; use gh api repos/<owner>/<repo>/actions/secrets)
+      List a repo's Actions secrets. The value is never readable, so this can
+      confirm a secret exists and when it last changed, never what it is or
+      whether it works. Use the REST endpoint rather than `gh secret list`:
+      the plain CLI prints only name and updated_at, and its --json accepts
+      only name and numSelectedRepos, so created_at is unreachable there.
+    cli: gh api repos/<owner>/<repo>/actions/secrets
+    github_mcp: (no GitHub MCP tool; use gh api)
   - id: SET_SECRET
     description: >-
       Set an Actions secret. Omit --body so the value is read from stdin,

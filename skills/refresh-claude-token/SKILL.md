@@ -1,6 +1,6 @@
 ---
 name: refresh-claude-token
-description: "Rotate CLAUDE_CODE_OAUTH_TOKEN across the repos that already carry it, without /install-github-app's App-install and workflow scaffolding. Wraps scripts/rotate-claude-token.py, hands the interactive minting step to the human, and closes the gap that script cannot: proving the new token authenticates, not merely that the secret changed. Use when asked to 'refresh the claude token', 'rotate the claude token', 'rct', 'update CLAUDE_CODE_OAUTH_TOKEN', 'the claude token expired', 'the review bot stopped working', 'reviews are failing at auth', 'set the token on a new repo', or 'is there a command that just updates the token'."
+description: "Rotate CLAUDE_CODE_OAUTH_TOKEN across the repos that already carry it, without /install-github-app's App-install and workflow scaffolding. Wraps scripts/rotate-claude-token.py, hands the interactive minting step to the human, and closes the gap that script cannot: proving the new token authenticates, not merely that the secret changed. Use when asked to 'refresh the claude token', 'rotate the claude token', 'rct', 'update CLAUDE_CODE_OAUTH_TOKEN', 'the claude token expired', 'reviews are failing with a credential error', or 'is there a command that just updates the token'."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -31,11 +31,24 @@ Read that script's docstring before changing anything here.
 
 - "refresh the claude token", "rotate the claude token", "rct"
 - "update CLAUDE_CODE_OAUTH_TOKEN", "the claude token expired"
-- "the review bot stopped working", "reviews are failing at auth"
-- "set the token on a new repo"
-- A `claude-review` job failing in well under a minute
-  with `is_error: true` and `total_cost_usd: 0`,
-  which is the signature of a credential rejected before the model is reached.
+- A review job whose log carries an explicit credential rejection:
+  a 401, an `OAuth token has expired`, or an `Invalid bearer token`.
+
+**A short failing run is not on that list, deliberately.**
+It is tempting to add one, because a rejected credential does produce a fast
+`is_error: true` run with no verdict.
+So do a checkout failure, an App-token exchange failure,
+and a workflow-validation refusal,
+which step 4 below and
+[`fully-clean`](../../shared/workflow/fully-clean.md) both say cannot be told
+apart by duration.
+
+Since this skill's whole output is a secret rewrite,
+firing it on the ambiguous signal spends a rotation on a problem a rotation
+cannot fix,
+and then credits the rotation when the real cause clears on its own.
+Read the log and find the rejection line first.
+No line, no rotation.
 
 ## What this is not
 
@@ -43,12 +56,26 @@ Installing the GitHub App,
 committing or editing anything under `.github/workflows/`,
 or provisioning the secret into a repo that has never had it.
 
-That last one is deliberate.
-The script touches only repos that **already** carry the secret,
-because adding it to a new repo is a per-repo decision
-about which account's quota that repo should spend.
-Pass `--repos <owner>/<name>` explicitly to do that,
-and say so out loud rather than letting a sweep decide it.
+That last one is a hard limit of the script, not a policy choice.
+
+`--repos` bypasses **repo discovery**, not **secret discovery**.
+`find_targets()` keeps a repo only when `secret_updated_at()` returns
+non-`None`,
+so a repo lacking the secret is dropped even when named explicitly,
+and `--apply` then reports `Nothing to rotate` without ever calling
+`rotate()`.
+
+The script's own docstring says the opposite,
+telling you to "pass `--repos` explicitly to do that".
+That sentence is wrong, and is tracked separately.
+Provision with `gh secret set` directly instead:
+
+```bash
+gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>   # SET_SECRET
+```
+
+Do that deliberately, one repo at a time,
+since it decides which account's quota that repo spends.
 
 For authoring or changing the workflows themselves,
 use `claude-agent-workflow` or `claude-review-workflow`.
@@ -139,28 +166,37 @@ so step 3 finishing clean proves the secret **changed**
 and says nothing about whether it **works**.
 
 Settle it on the artifact rather than on the write.
-Pick one repo with an open PR, dispatch a review, and look for a posted verdict:
+Pick one **non-draft** PR, record what already exists, then dispatch:
 
 ```bash
-gh run list --workflow claude-review.yml --repo <owner>/<repo> \
-  --limit 1 --json databaseId --jq '.[0].databaseId'          # note this, to spot the new run
+BEFORE=$(gh pr view <N> --repo <owner>/<repo> --json comments \
+  --jq '[.comments[] | select(.author.login == "claude")] | last | .id // "none"')
+echo "newest existing claude comment: $BEFORE"
 gh workflow run claude-review.yml --repo <owner>/<repo> \
   --field pr_number=<N>                                       # RUN_WORKFLOW
 ```
 
-Then read the run that appears, and the PR:
+**Capturing `BEFORE` is the whole point of this step, so do not skip it.**
+Asking only for the latest Claude comment *after* the run
+returns whatever was already there,
+so any PR with an older review satisfies the check
+and a rejected token reads as working.
+The test is a comment **newer than `BEFORE`**, not a comment.
+
+Once the run completes:
 
 ```bash
 gh run list --workflow claude-review.yml --repo <owner>/<repo> --limit 3 \
   --json databaseId,conclusion,createdAt,updatedAt \
-  --jq '.[] | "\(.databaseId) \(.conclusion) \(.createdAt) -> \(.updatedAt)"'
+  --jq '.[] | "\(.databaseId) \(.conclusion) \(.createdAt) -> \(.updatedAt)"'   # LIST_WORKFLOW_RUNS
 gh pr view <N> --repo <owner>/<repo> --json comments \
-  --jq '[.comments[] | select(.author.login == "claude")] | last | .createdAt'
+  --jq '[.comments[] | select(.author.login == "claude")] | last | "\(.id) \(.createdAt)"'
 ```
 
-- **Working.** A review comment appears at the current head,
-  and the run spans minutes.
-- **Still broken.** The run finishes in tens of seconds and posts nothing.
+- **Working.** The trailing comment's id differs from `BEFORE`,
+  it carries a `### Verdict`, and the run spans minutes.
+- **Still broken.** The id equals `BEFORE`, so this run posted nothing,
+  however the run's own conclusion reads.
 
 Take the run's length from its own `createdAt` and `updatedAt` once it has
 completed, never from a `status` field read mid-flight.
@@ -219,8 +255,9 @@ only a working control on a different credential did.
 ## Edge cases
 
 - **A repo that has never had the secret.**
-  Discovery skips it by design.
-  Pass `--repos <owner>/<name>` to provision it deliberately.
+  The script cannot reach it at all, with or without `--repos`,
+  for the reason in "What this is not" above.
+  Use `gh secret set` directly.
 - **Re-running with an unchanged token.**
   If GitHub does not bump `updated_at` when the value is identical,
   the script reports the write as unverified.

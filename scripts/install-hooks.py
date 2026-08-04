@@ -124,6 +124,30 @@ def command_for(entry: dict) -> str:
     return rel if entry["script"].endswith(".sh") else f"python3 {rel}"
 
 
+def enabled_ai_config_plugin(settings: dict) -> str | None:
+    """Return the name of an enabled ai-config plugin in this settings.json.
+
+    The plugin loader reads `hooks/hooks.json` directly whenever the plugin is
+    enabled, so registering the same hooks here as well double-registers every
+    one: the two paths carry different command strings
+    (`${CLAUDE_PLUGIN_ROOT}/...` vs `$HOME/.claude/...`), so Claude Code keeps
+    both and each hook fires twice.
+
+    Best-effort by design: this inspects only the settings.json this script
+    reads, so it catches the common case (plugin enabled in the same file) and
+    can miss a project-level enablement. It has no false positives -- it fires
+    only on a truthy `enabledPlugins` entry named `ai-config` (any marketplace
+    suffix). The README caveat covers what this cannot see.
+    """
+    plugins = settings.get("enabledPlugins")
+    if not isinstance(plugins, dict):
+        return None
+    for name, on in plugins.items():
+        if on and name.split("@", 1)[0] == "ai-config":
+            return name
+    return None
+
+
 def find_entry(settings: dict, entry: dict) -> dict | None:
     for group in settings.get("hooks", {}).get(entry["event"], []):
         if entry.get("matcher") and group.get("matcher") != entry["matcher"]:
@@ -172,6 +196,12 @@ def main() -> int:
     cdir = claude_dir()
     settings_path = cdir / "settings.json"
     settings = load_settings(settings_path)
+    if (plugin := enabled_ai_config_plugin(settings)):
+        print(f"WARNING: the '{plugin}' plugin is enabled in {settings_path}; it\n"
+              "  already loads these hooks directly. Registering them here too "
+              "makes every\n  hook fire twice -- the plugin and settings.json "
+              "paths carry different command\n  strings, so Claude Code keeps "
+              "both. Use one path, not both (see README).\n")
     hooks_dir = cdir / "hooks"
 
     rows = [(e, classify(settings, e, hooks_dir)) for e in entries]

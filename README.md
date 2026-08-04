@@ -274,6 +274,22 @@ is idempotent.
 Hooks connect at session start, so restart before expecting a newly registered
 one to fire.
 
+**The two paths are mutually exclusive --- don't use both on one machine.**
+If the ai-config plugin is enabled, it already loads every hook in
+`hooks/hooks.json`, so also running `install-hooks.py --fix` there registers
+each hook a second time.
+The two registrations carry different command strings ---
+`${CLAUDE_PLUGIN_ROOT}/hooks/<script>` for the plugin,
+`$HOME/.claude/hooks/<script>` for `--fix` --- so Claude Code keeps both, and
+every hook fires twice: the `UserPromptSubmit` hooks inject their context twice
+per turn, and the `Stop` guards' fire-once `/tmp` sentinel becomes a
+check-then-create race between the two copies.
+So pick one path: the plugin for a plugin install, `install-hooks.py --fix` for
+a non-plugin (bootstrap-symlink) install.
+`install-hooks.py` warns when it detects the plugin already enabled in the
+`settings.json` it edits (best-effort --- it cannot see a project-level
+enablement).
+
 Bindings live in [`hooks/hooks.json`](hooks/hooks.json), in the native Claude
 Code plugin-hooks schema (`hooks` keyed by event) --- a script cannot declare
 its own event, so the file names the event, matcher, and, as tolerated extra

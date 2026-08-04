@@ -99,6 +99,31 @@
             "timeout": 10,
             "script": "no-whole-file-punct-replace.py",
             "why": "shared/coding/ascii-punctuation-in-source.md's over-application warning. A whole-file glyph replace converts pre-existing glyphs on untouched lines, and the resulting mechanical diff HIDES real changes -- on 2026-08-02 it concealed two dropped paragraphs. Blocks only when a glyph replace, a write-back, and no scoping token all co-occur under an interpreter."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-heavy-work-on-head-node.py\"",
+            "timeout": 10,
+            "script": "no-heavy-work-on-head-node.py",
+            "why": "On 2026-07-31 a shiva sysadmin reported login-node CPU-load alerts from two R devtools::test() processes at 262 and 90 CPU-minutes. The rule they broke was already written down twice, and a passive prose rule only fires if you happen to read it as you type the command -- so the check has to run at the command. Whether this host is a SLURM compute node needs no judgment: sinfo answers it exactly.",
+            "_note_safe_off_cluster": [
+              "Belongs in the shared registry rather than under dotfiles/shiva/,",
+              "even though its subject is one cluster, because the cost of",
+              "carrying it everywhere is ~50ms of Python startup -- the same",
+              "shape as the two PreToolUse guards above -- and dotfiles/ has no",
+              "hook plumbing at all, so scoping it there would mean building a",
+              "second registration mechanism for a single hook.",
+              "",
+              "Measured 2026-08-04 on shiva: a non-Bash call and an ordinary",
+              "Bash call each cost ~52ms and never reach sinfo, because the",
+              "regex prefilter returns first. Only a command that would",
+              "actually be blocked pays the sinfo subprocess.",
+              "",
+              "Fails OPEN in three separate ways, each verified: sinfo missing",
+              "(OSError), sinfo present but erroring (non-zero return), and",
+              "already-on-a-compute-node. Off a cluster the first branch is the",
+              "one taken, so the guard is inert rather than merely quiet."
+            ]
           }
         ]
       },

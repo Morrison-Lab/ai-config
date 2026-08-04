@@ -414,7 +414,8 @@ In every session — at session start, and again periodically during long sessio
    ```
    Two caveats before running `--fix`.
    Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
-   And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart; say so rather than reporting the guards as live.
+   And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
+   Say so rather than reporting the guards as live.
    - **Do:** run both instruments each session, and report the two counts separately.
    - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.
 

@@ -69,7 +69,8 @@ the same rule governs a `gh pr ready` draft transition the hook tracks.
 The rule above is stated in terms of *verification reads*, which is how it is usually broken and is also the version a reader recognizes themselves in.
 A formatting pipe does not feel like chaining a second step --- `| tail -3` or `| jq` is a decision about how much of one command's output to look at, not an extra command in a sequence --- so it slips past a reader who has just agreed with the rule as written.
 The shell does not draw that distinction: the last command in the pipeline owns the exit status either way, so `gh api ... | tail -3` leaves the POST non-last exactly as a chained `gh pr view` does.
-Use `--silent`, or `--jq` **inside** the `gh api` call, when the output needs narrowing; both keep the POST the last command.
+Use `--silent`, or `--jq` **inside** the `gh api` call, when the output needs narrowing.
+Both keep the POST the last command.
 
 - **Do:** narrow the response with a flag on the POST itself rather than a downstream pipe.
 - **Don't:** pipe the POST anywhere, including to `tail`, `head`, or `jq` --- the hook cannot tell a formatting pipe from a chained verification, because the shell does not either.

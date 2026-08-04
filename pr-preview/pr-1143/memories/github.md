@@ -168,14 +168,17 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
   # the authoritative outstanding-work list
   gh api graphql -f query='{ repository(owner:"<o>", name:"<r>") {
-    pullRequest(number:<N>) { reviewThreads(first:50) { nodes {
-      id isResolved path line comments(first:1){nodes{databaseId}} } } } } }'
+    pullRequest(number:<N>) { reviewThreads(first:100) {
+      totalCount
+      nodes { id isResolved path line comments(first:1){nodes{databaseId}} } } } } }'
   ```
 
+  Select `totalCount` and page at `first:100`, the guard `skills/pr-status/SKILL.md` and `skills/pr-status-all/SKILL.md` already use: a `totalCount` above the number of `nodes` means the 100-thread cap was hit, so the list is itself a truncated subset and cannot confirm clean --- exactly the silent-subset failure this bullet is about, one query lower.
   The unresolved-thread count is the check worth trusting: it is per-thread rather than per-review, so it cannot be split across review objects.
   Keep the id filter for drilling into a specific review a human pointed at.
   Never use it to decide a round is complete.
-  The same caveat applies wherever this filter appears --- `skills/ardi/SKILL.md`, `skills/post-merge/SKILL.md`, and `skills/pr-status-all/SKILL.md` all prescribe it.
+  The same caveat applies wherever this filter still appears as a drill-down --- `skills/ardi/SKILL.md` and `skills/pr-status-all/SKILL.md`.
+  `skills/post-merge/SKILL.md` was the one call site using it as a completeness check, and now reads the inline comments unfiltered instead.
   (UCD-SERG/lab-manual#452, 2026-08-04: `claude[bot]` posted review `4851937544` at `07:57:27Z` and `4851938388` at `07:57:34Z`, one finding each, and the linked review's own body was **empty** so both findings were inline-only.
   Filtering on the linked id found the Wayland finding and missed the "Windows" one, which surfaced only from the unresolved-thread count after the first had been resolved.)
 

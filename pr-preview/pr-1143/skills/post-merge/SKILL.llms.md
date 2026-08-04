@@ -41,11 +41,12 @@ Take the timestamp window from the enumeration above, and take *outstanding* fro
 
 ``` bash
 gh api graphql -f query='{ repository(owner:"<owner>", name:"<repo>") {
-  pullRequest(number:<N>) { reviewThreads(first:50) { nodes {
-    id isResolved path line comments(first:1){nodes{databaseId}} } } } } }'
+  pullRequest(number:<N>) { reviewThreads(first:100) {
+    totalCount
+    nodes { id isResolved path line comments(first:1){nodes{databaseId}} } } } } }'
 ```
 
-`memories/github.md` carries the full statement and the case record.
+Page at `first:100` and select `totalCount`: a `totalCount` above the node count means the cap was hit, so the thread list is itself truncated — treat that as not-yet-clean, the guard `skills/pr-status/SKILL.md` and `skills/pr-status-all/SKILL.md` already use. `memories/github.md` carries the full statement and the case record.
 
 **A finding can also arrive as a plain top-level PR comment rather than a formal review** — a bot posting a summary via `gh pr comment` (or the equivalent API call) rather than through the reviews endpoint, or a human commenting directly on the PR conversation. `pulls/<N>/reviews` and `pulls/<N>/comments` are both scoped to formal reviews and their inline threads; neither surface returns a plain PR conversation comment. Those live on the **issue comments** endpoint — a pull request is also an issue in GitHub’s data model — so the scan needs all three surfaces, not two, to cover every place a late finding can land.
 

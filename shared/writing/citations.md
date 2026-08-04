@@ -39,7 +39,8 @@ statement --- it had moved to the "Triggering a workflow" article; caught by
 review.)
 
 **The other authoring-side counterpart: run the exact-substring check on your
-own quotation, not only on one a reviewer disputes.** The bullet further down
+own quotation, not only on one a reviewer disputes.**
+The bullet further down
 this file gives the deciding instrument --- `grep -c "<the quoted sentence>"
 <fetched source>`, with whitespace normalized --- but offers it *defensively*,
 for testing a citation someone has called hallucinated.

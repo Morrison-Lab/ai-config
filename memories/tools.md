@@ -545,10 +545,12 @@ bash script.sh, after
   export -f grep        type -t grep -> function   the function runs
 ```
 
-Two consequences. A **git hook is a child shell**, so it gets the real binary,
-and validating a hook's pipeline by pasting it at the prompt measures a
-different program than git will run. And `type -t` inside a throwaway script
-is what settles which one a script gets --- ask the script, not the prompt.
+Two consequences.
+A **git hook is a child shell**, so it gets the real binary, and validating a
+hook's pipeline by pasting it at the prompt measures a different program than
+git will run.
+And `type -t` inside a throwaway script is what settles which one a script
+gets --- ask the script, not the prompt.
 
 - **Do:** use `type -a`, plus `type -t` from inside a throwaway script, to
   establish what a command resolves to.
@@ -559,8 +561,10 @@ is what settles which one a script gets --- ask the script, not the prompt.
 
 (Morrison-Lab/ai-config#1110, 2026-08-03: a `grep -q` exit-status divergence
 between a prompt and a script was published as `ugrep 7.5.0` sitting on `PATH`
-ahead of `/usr/bin/grep`. Neither half held. Corrected in `9c986521`, and the
-function above is this environment's own `type -a grep` output.)
+ahead of `/usr/bin/grep`.
+Neither half held.
+Corrected in `9c986521`, and the function above is this environment's own
+`type -a grep` output.)
 
 ## A hand-rolled verification check is worth nothing until it has caught something
 

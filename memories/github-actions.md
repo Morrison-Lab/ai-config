@@ -261,7 +261,11 @@ common patterns.
 ## GitHub Actions workflow authoring gotchas
 
 - **`${{ env.PATH }}` evaluates to an empty string in step `env:` context.**
-  Setting `env: PATH: ${{ github.workspace }}/bin:${{ env.PATH }}` in Actions step context overwrites `PATH` with only that directory (dropping `/usr/bin`, `/bin`, etc.), causing `command not found` (exit code 127). Use `echo "${GITHUB_WORKSPACE}/bin" >> "$GITHUB_PATH"` in a setup step to safely prepend to `PATH` while preserving system directories.
+  Setting `env: PATH: ${{ github.workspace }}/bin:${{ env.PATH }}` in Actions
+  step context overwrites `PATH` with only that directory (dropping
+  `/usr/bin`, `/bin`, etc.), causing `command not found` (exit code 127).
+  Use `echo "${GITHUB_WORKSPACE}/bin" >> "$GITHUB_PATH"` in a setup step to
+  safely prepend to `PATH` while preserving system directories.
 - **A bare `devtools::test()` in a gating CI step never fails the job.**
   `devtools::test()`'s signature sets `stop_on_failure = FALSE` and forwards
   it to `testthat::test_local()` — overriding `test_local()`'s own `TRUE`

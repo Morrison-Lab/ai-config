@@ -43,12 +43,31 @@ For a repository whose Copilot review isn't already scheduled automatically (see
 ```bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
   -f 'reviewers[]=copilot-pull-request-reviewer[bot]'   # REQUEST_COPILOT_REVIEW
+```
+
+Then, in a **separate** call (see the sole-command rule below), verify it landed:
+
+```bash
 gh pr view <N> --json reviewRequests,reviews
 gh pr checks <N>
 ```
 
 In a remote/web session without `gh`, use the equivalent tool
 (`mcp__github__request_copilot_review`) instead.
+
+**Run that `requested_reviewers` POST as the sole (or last) command in its Bash call.**
+The [`no-unreviewed-pr`](../../hooks/no-unreviewed-pr.py) Stop hook discharges the reviewer-request obligation only on positive evidence the request itself succeeded, and the one reliable success signal is the whole Bash call's exit status --- which belongs to that call's **last** command.
+So chaining the verification reads (`gh pr view ... --json reviews`, `gh pr checks`) *after* the POST in the same call makes the request non-last, which the hook treats as ambiguous: it keeps warning even though the POST returned 200.
+Run the POST alone, then do the pending/reviews/checks verification in a **separate** later call.
+This is [`fail-fast`](../principles/fail-fast.md)'s "a combined result cannot attribute a per-step outcome" applied to a review request;
+the same rule governs a `gh pr ready` draft transition the hook tracks.
+
+- **Do:** issue the Copilot-request POST as its own Bash call, with nothing chained after it.
+- **Don't:** fold the `--json reviews` / `gh pr checks` verification into the same call --- that makes the request non-last, and the hook cannot discharge it.
+
+(Morrison-Lab/rpt#181, 2026-08-03: the POST was chained ahead of `gh pr view`/`gh pr checks` in one call across six turns, so the hook re-fired every Stop;
+running the POST bare discharged it.
+The failure was misread as the hook not recognizing a Copilot quota refusal, which it was not about.)
 
 **Some repos schedule Copilot automatically, and this step is redundant there.**
 A repository ruleset can carry a `copilot_code_review` rule with

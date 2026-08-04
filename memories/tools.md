@@ -512,6 +512,56 @@ The second time, a branch sweep reported all 19 local branches as having no
 PR; the immediately preceding run of the same data had correctly shown 16 as
 `MERGED`, which is the only reason the contradiction was noticed at all.)
 
+## `grep` in a Claude Code session is a shell function, so a script gets a different program
+
+Sibling of the entry above: another case where the harness's shell is not the
+one you are reasoning about, and it also answers rather than erroring.
+
+`grep` at the Bash tool's prompt is a **function** the harness installs, which
+routes to a `ugrep` bundled inside the `claude` binary
+(`exec -a ugrep "$_cc_bin" -G --ignore-files ...`, falling back to
+`command grep` for a handful of flags).
+No `ugrep` exists on `PATH` --- `type -a grep` reports the function plus
+`/usr/bin/grep` and `/bin/grep`, both GNU 3.7.
+
+**Identifying it is where the usual commands fail**, which is the part worth
+memorizing:
+
+| command | on a function | why it misleads |
+|---|---|---|
+| `command -v grep` | prints bare `grep` | a **path** means a binary; a bare name is the function signature, and reads like a successful lookup |
+| `type -aP grep` | prints only binaries (rc=1 if none) | reports `-P`aths, so it hides the function that is actually winning |
+| `type -a grep` | prints the function first | the one that shows it |
+
+**A function does not cross into a child shell by default, but `export -f`
+propagates it** --- so "functions are not exported" is true of how they
+usually behave and not of what they can do.
+Measured on bash 5.2.21 with a `grep()` function defined in the parent:
+
+```
+parent                  type -t grep -> function   the function runs
+bash script.sh          type -t grep -> file       GNU grep 3.7 runs
+bash script.sh, after
+  export -f grep        type -t grep -> function   the function runs
+```
+
+Two consequences. A **git hook is a child shell**, so it gets the real binary,
+and validating a hook's pipeline by pasting it at the prompt measures a
+different program than git will run. And `type -t` inside a throwaway script
+is what settles which one a script gets --- ask the script, not the prompt.
+
+- **Do:** use `type -a`, plus `type -t` from inside a throwaway script, to
+  establish what a command resolves to.
+- **Don't:** read `command -v <name>` returning the bare name as confirmation
+  that a binary was found; that output is the tell for a function.
+- **Don't:** infer a `PATH`-shadowing binary from a command behaving oddly ---
+  check for a function first, since no such binary need exist.
+
+(Morrison-Lab/ai-config#1110, 2026-08-03: a `grep -q` exit-status divergence
+between a prompt and a script was published as `ugrep 7.5.0` sitting on `PATH`
+ahead of `/usr/bin/grep`. Neither half held. Corrected in `9c986521`, and the
+function above is this environment's own `type -a grep` output.)
+
 ## A hand-rolled verification check is worth nothing until it has caught something
 
 Two ad-hoc pre-push checks failed in one session, in opposite directions,

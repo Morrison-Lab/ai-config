@@ -38,6 +38,44 @@ source repo instead --- see the `github/docs` bullet in `memories/claude-code.md
 statement --- it had moved to the "Triggering a workflow" article; caught by
 review.)
 
+**The other authoring-side counterpart: run the exact-substring check on your
+own quotation, not only on one a reviewer disputes.** The bullet further down
+this file gives the deciding instrument --- `grep -c "<the quoted sentence>"
+<fetched source>`, with whitespace normalized --- but offers it *defensively*,
+for testing a citation someone has called hallucinated. It decides the
+authoring case just as exactly, and costs one command at the moment you paste
+the quote.
+
+The defect it catches there is a **silent elision**: a clause dropped from the
+middle of a quoted sentence with no ellipsis marking the cut, so the result
+reads as contiguous verbatim text while never having appeared in the source in
+that form. This is not cherry-picking, which selects a genuinely contiguous
+span and is honest about its boundaries; here the contiguity itself is
+fabricated, and the substring test is what separates the two. The remaining
+words can each be the source's own and the sentence still be one the source
+never wrote.
+
+Reading the two side by side is what fails, because a spliced quote is
+*designed* to scan as fluent --- the elision is invisible precisely when the
+splice is clean. So run the check rather than re-reading, and mark any cut you
+do want with an ellipsis.
+
+- **Do:** substring-test a quotation against its fetched source, with
+  whitespace normalized, before pushing it.
+- **Do:** mark a deliberate cut with an ellipsis, so the quote stops claiming
+  a contiguity it does not have.
+- **Don't:** settle a quotation's fidelity by reading it against the source; a
+  clean splice is exactly the case that survives that.
+
+(Morrison-Lab/ai-config#1110, 2026-08-03: a `man grep` quotation dropped "the
+exit status is 0" from the middle of its source sentence, with no ellipsis.
+Caught in review, and confirmed mechanically both ways --- with whitespace
+normalized, the shipped string is not a substring of `man grep` and the
+corrected one is. The same rule holds for a repo artifact that claims to be
+verbatim; see
+[`fixtures-are-not-evidence`](../workflow/fixtures-are-not-evidence.md), where
+the deception runs by addition rather than by deletion.)
+
 **Mirroring a precedent's citation style doesn't guarantee the new citation
 holds.** When a new section is modeled on an existing one --- same structure,
 same "this is a global standing rule from X (see file Y)" closing sentence

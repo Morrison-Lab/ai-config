@@ -152,6 +152,131 @@ copying it would have built the very bug the section warns against.
 The reviewer caught it; the fix restored `req_failed`/`if not req_failed` and
 turned the mistake into an in-text warning.)
 
+## The general case: any condensation of a verified source is a fresh claim
+
+The section above is scoped to code, and the psychology it names is not.
+Its reason --- that a restatement gets less scrutiny than its source
+"because restating something already verified feels like transcription rather
+than a fresh claim" --- holds for every source, so the same exemption applies
+whenever prose condenses **prose**: a paragraph into a bullet, a section into
+a heading, a measurement into the sentence that reports what it showed.
+
+The condensed copy is where the falsehood enters, because condensing chooses
+the claim's *scope* again, and a shorter sentence is under pressure to choose
+it wider.
+The source says "the one line", meaning one specific hook; the bullet says
+"the one place", and a true narrow claim has become a false general one with
+no measurement having changed.
+
+Two things make this survive the checks that should catch it.
+
+**Re-checking the source catches nothing**, which is the whole difficulty.
+A pre-push pass that re-verifies your measurements re-verifies the half that
+was already right, and never reaches the sentence, because the sentence is
+not what you measured.
+The gap is not diligence; it is that the verified artifact and the false one
+are different artifacts and only one of them gets checked.
+
+**Adjacency launders the claim.**
+The false sentence usually sits directly beside the real measurement, so the
+measurement's credibility transfers to it while the verification does not.
+`fail-fast`'s
+["The narration can be the unfalsifiable part, while the check is
+fine"](../principles/fail-fast.md) is this exact mechanism in a shell script,
+and its explanation carries over unchanged: the label "is the part a reader
+believes, because it is phrased as a conclusion while the lines above it are
+raw data", and it "survives review of the command" because nothing is wrong
+with the command.
+Here the raw data is a measurement in the paragraph above rather than a
+command's stdout, and the reader who believes the conclusion is the author.
+
+Note that two neighbouring rules read as covering this and do not.
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md) supplies
+the right claim types -- a widened summary is a **scope** claim -- but its
+Do-bullet says to "re-measure any that is not from this turn", and a
+condensation and its source are both from this turn, so that bullet reads as
+already satisfied at exactly the moment it is needed.
+The same file's "a summary of settled conclusions cannot fail, so it cannot
+test anything" is true of a summary as an **instrument** and false of a
+summary as an **artifact**, which is the intuition this section exists to
+contradict.
+
+So check a condensation against its source before pushing, the way the
+section above checks prose against code: confirm the scope did not widen, and
+that any quantity, count, or uniqueness claim in the short copy is one the
+long copy actually supports.
+
+- **Do:** re-read a bullet, heading, or summary sentence against the passage
+  it condenses, treating the short copy as an unverified claim.
+- **Do:** re-read the bullets *after* correcting the prose above them --- a
+  bullet written before the correction is not covered by having made it.
+- **Do:** treat a sentence adjacent to a measurement as unverified unless the
+  measurement is about *that sentence*, not merely nearby.
+- **Don't:** count re-checking your measurements as having checked what you
+  wrote about them -- that pass cannot reach the condensed copy.
+- **Don't:** read "both are from this turn" as exempting a restatement from
+  re-verification; the source's freshness says nothing about the copy.
+
+(Morrison-Lab/ai-config#1110, 2026-08-03, **seven** findings on one added
+section, every one of them a sound observation with an unsound sentence
+written about it.
+Two were uniqueness claims.
+A Do/Don't bullet read "that is the one place it is switched off" in a file
+whose own enumeration lists four suppression contexts and closes "All four
+were confirmed directly rather than recalled"; the prose it condensed had
+said "the one line", scoped to a single hook.
+And "capturing the status is the only way to reach the branch that handles
+it" was followed immediately by "Measured on bash 5.1.16", a measurement of
+return codes that says nothing about whether other forms reach the branch --
+three do.
+Two were fidelity losses, covered by
+[`citations`](citations.md) and by the **cause** claim type respectively: a
+quotation with a clause silently dropped from its middle, and a `PATH`
+shadowing explanation for a divergence actually caused by a shell function.
+Two more were dropped hedges.
+One flattened `command -v` and `type -aP` into equivalents in a Do bullet,
+when the prose four lines above it had drawn the distinction correctly.
+The other shortened "reaches a child shell only if it was exported with
+`export -f`" into "a function is not exported", in a prose paragraph rather
+than a bullet.
+The seventh was a claim about what a *check* returns, asserted rather than
+run.
+
+**This record's own sentences kept committing the defect they describe**,
+which is the sharpest evidence the section has, and each one was caught by a
+reviewer rather than by re-reading.
+It read "four findings" because four was true when the sentence was written,
+and #1110 went on to seven.
+The attribution beside it said the author found the second of each pair by
+re-running the reviewer's check, which is true of the uniqueness pair and
+false of the fidelity pair, whose second finding records a different origin.
+The sentence *directly above this paragraph* then put both dropped hedges "in
+a bullet", which is true of one and false of the other -- a detail belonging
+to one finding, generalized to its neighbour.
+And in [`citations`](citations.md), the sibling entry this same PR added, a
+`Do` bullet went on prescribing "with whitespace normalized" after the prose
+five lines above it had been corrected to require markup normalization too --
+so the bullet recommended a test that the section's own worked example
+demonstrates failing.
+That one is worth separating, because its timing is the reverse of the
+others: the bullet was not condensed *from* stale prose, it was written
+first and never revisited when the prose it summarized was corrected.
+A bullet is the natural place for this to hide, since it reads as the
+settled form of whatever sits above it.
+
+None of those was a bad measurement.
+All were sentences *about* measurements, written once and not re-read.
+
+The instances are named rather than counted on purpose.
+An earlier draft said "twice over", which a third instance falsified within
+one review round -- a running total in a record about stale totals is the one
+figure guaranteed to go stale.
+
+ai-config#1101 is the same class arriving independently: an unquantified
+superlative in a script comment, false on measurement, in an issue whose own
+note records that it was "Corrected 2026-08-03, twice, after filing ... both
+the same errors it reports".)
+
 ## Check a general claim against the concrete numbers in the same document
 
 The checks above compare prose against an external referent --- the code,

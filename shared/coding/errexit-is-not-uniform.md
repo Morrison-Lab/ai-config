@@ -253,9 +253,14 @@ it.
 routing to a `ugrep` bundled inside another binary; `type -aP grep` finds
 only `/usr/bin/grep` and `/bin/grep`, both GNU, and no `ugrep` exists on
 `PATH` at all.
-A function is not exported, so it does not survive into a child shell.
+A function reaches a child shell only if it was exported with `export -f`,
+and this one was not --- `type -t grep` in a child reports `file`, the
+binary.
 The script therefore got GNU grep and masked; the prompt got ugrep and did
 not.
+Do not shorten that to "functions do not survive into child shells".
+`export -f` propagates one, measured, so the load-bearing fact is about this
+particular function rather than about functions.
 
 Which makes this worse than a portability footnote for the hook above, since
 **a git hook is a child shell**.

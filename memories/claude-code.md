@@ -665,6 +665,31 @@ checks — don't rely on remembering which directory the last call left you
 in. (Session sliding the `macros` submodule pin in `d-morrison/rme` and
 `ucdavis/epi204`, 2026-07-04.)
 
+**In an AGENT / subagent thread the cwd behavior INVERTS -- it RESETS to the
+project root between Bash calls, so a `cd` does NOT persist.**
+The main-session persistence above is a property of that tool;
+an Agent thread's Bash tool resets the working directory to the project root
+before every command (the harness states this outright: "Agent threads always
+have their cwd reset between bash calls ... please only use absolute file
+paths").
+The danger is a compound command like `cd /some/dir && <destructive cmds>`
+where the `cd` target is wrong: without `set -e`, a failed `cd` does NOT abort
+the command -- the shell prints its error and the remaining commands run in the
+RESET cwd (the project repo), so file overwrites, commits, and pushes silently
+execute in the WRONG repository.
+
+- **Do:** open every directory-dependent multi-step Bash command with `set -e`
+  and use absolute paths, so a bad `cd` aborts the chain instead of running
+  elsewhere.
+- **Don't:** chain `cd /x && <writes>` in an agent thread without `set -e` --
+  a failed `cd` leaves the writes running in the project repo rather than
+  stopping.
+
+(2026-08-03: `cd /tmp/rpt-test && cat > .github/workflows/... && git commit &&
+git push` ran in the `gha` repo -- clobbering a workflow file on a stray branch
+-- because the `cd` target was wrong and there was no `set -e` to stop the
+chain.)
+
 ## Workflow `agent()` — schema validates shape, not substance
 
 A `Workflow`-tool agent can pass its `schema` validation while returning

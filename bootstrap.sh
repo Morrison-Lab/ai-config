@@ -130,12 +130,16 @@ EOF
   else
     printf 'skip  skills.json (%s exists but does not register %s/skills)\n' "$SKILLS_JSON" "$GEMINI_DIR"
   fi
+
+  # Antigravity global customizations root (~/.gemini/config/skills)
+  link_one "$GEMINI_DIR/skills" "$GEMINI_CONFIG_DIR/skills"
 fi
 
 
 if [ -f "$SCRIPT_DIR/GEMINI.md" ]; then
-  mkdir -p "$GEMINI_DIR"
+  mkdir -p "$GEMINI_DIR" "$GEMINI_CONFIG_DIR"
   link_one "$SCRIPT_DIR/GEMINI.md" "$GEMINI_DIR/GEMINI.md"
+  link_one "$SCRIPT_DIR/GEMINI.md" "$GEMINI_CONFIG_DIR/GEMINI.md"
 fi
 
 # --- Machine-specific dotfiles ---

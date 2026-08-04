@@ -13,6 +13,7 @@
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
   state that reason before choosing it.
+- ALWAYS use an isolated Git worktree (e.g. via `session-lock` / `git worktree add`) when starting a write or edit session on a repository, so parallel local AI agent sessions never step on or clobber each other's working tree.
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.

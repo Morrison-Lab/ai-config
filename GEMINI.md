@@ -10,6 +10,10 @@ In every session — at session start, and again periodically during long sessio
 2. **The consumer copies / symlinks.** Ensure `bootstrap.sh` has run so `~/.gemini/skills` contains up-to-date symlinks to `skills/`.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
 
+## Worktree isolation
+
+- **Always use a worktree.** When starting write/edit tasks in a repository, isolate into a dedicated `git worktree` (e.g. via `session-lock` / `git worktree add`) so parallel sessions never step on or clobber each other's working directory or branch state.
+
 ## Timestamp recaps in local time
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` — get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).

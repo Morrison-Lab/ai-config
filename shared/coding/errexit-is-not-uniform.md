@@ -220,12 +220,15 @@ case $rc in
 esac
 ```
 
-The `|| rc=$?` is required rather than decorative, and it is the same
+The `|| rc=$?` is load-bearing rather than decorative, and it is the same
 suppression the rest of this fragment warns about, used deliberately: a bare
 pipeline under `set -e` aborts on the no-match case before `case` ever runs,
-so capturing the status is the only way to reach the branch that handles it.
-Measured on bash 5.1.16: no match gives `rc=1`, and substituting a
-nonexistent command gives `rc=127`.
+so the status has to be captured somehow before the branch that handles it is
+reachable.
+That form is the most compact way, not the only one --- `set +e` around the
+call, or `if cmd; then rc=0; else rc=$?; fi`, reach the same branch.
+All three were measured on bash 5.1.16 and give `rc=1` on no match; the
+`|| rc=$?` form gives `rc=127` when the command does not exist.
 
 One residual that `-q` introduces, worth knowing precisely because `-q` is
 what a guard reaches for --- and which turns out to prove this section's own

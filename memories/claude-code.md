@@ -621,6 +621,12 @@ The plugin loads its hooks whenever the plugin is *enabled*, so merging a hook
 entry activates it for every plugin-enabled consumer.
 The `install-hooks.py --fix` path into `~/.claude/settings.json` stays a
 separate per-machine opt-in.
+The two paths are **mutually exclusive on one machine** -- enable the plugin,
+or run `install-hooks.py --fix`, not both.
+Claude Code does not dedup a hook across them, because their command strings
+differ (`${CLAUDE_PLUGIN_ROOT}/hooks/<script>` vs `$HOME/.claude/hooks/<script>`),
+so registering both fires every hook twice, and a `Stop` guard's fire-once
+`/tmp` sentinel (`exists()`-then-`open()`) then races between the two copies.
 
 ### Testing plugin hooks locally, without publishing to a marketplace
 

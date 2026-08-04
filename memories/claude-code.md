@@ -586,6 +586,72 @@ public repos need no authentication --- confirmed empirically by the PR's
 own `claude-review` check (which runs with submodule checkout on) completing
 successfully. (rme#982, epi204#359/#360, 2026-07-04.)
 
+## Plugin hooks ship in a native `hooks/hooks.json`, NOT the `install-hooks.py` array format
+
+A marketplace plugin auto-loads hooks from `hooks/hooks.json` at the plugin
+root, but that file must be the **native** plugin-hooks schema, which is a
+different shape from ai-config's bespoke `install-hooks.py` manifest:
+
+- Native: `{"hooks": {"<Event>": [ {"matcher"?: "...", "hooks": [ {"type":
+  "command", "command": "...", "timeout"?: N} ]} ]}}`.
+  `hooks` is an **object keyed by event**, and commands use
+  `${CLAUDE_PLUGIN_ROOT}`.
+- Bespoke (install-hooks.py): `{"hooks": [ {"script", "event", "matcher"?,
+  ...} ]}`.
+  `hooks` is a flat **array**.
+
+Feed the loader the array form and it silently ships zero hooks.
+`claude plugin validate` prints
+`x hooks: Invalid input: expected record, received array` and fails, and at
+runtime the debug log carries `[ERROR] Failed to load hooks ... error type:
+hook-load-failed`.
+The failure is isolated: skills still load and the session does not crash, so a
+plugin can carry broken hooks indefinitely without any visible symptom.
+
+**Extra keys are tolerated.**
+The native schema ignores unknown keys, verified with `claude plugin validate`,
+so metadata can live co-located on each hook entry (`script`, `why`, doc
+`_note` arrays) plus a top-level `_comment`.
+That lets one file serve both the plugin loader and `install-hooks.py`, which
+reads the same file and keys off the preserved `script` to build its own
+`~/.claude/settings.json` command.
+
+**Activation differs by path.**
+The plugin loads its hooks whenever the plugin is *enabled*, so merging a hook
+entry activates it for every plugin-enabled consumer.
+The `install-hooks.py --fix` path into `~/.claude/settings.json` stays a
+separate per-machine opt-in.
+The two paths are **mutually exclusive on one machine** -- enable the plugin,
+or run `install-hooks.py --fix`, not both.
+Claude Code does not dedup a hook across them, because their command strings
+differ (`${CLAUDE_PLUGIN_ROOT}/hooks/<script>` vs `$HOME/.claude/hooks/<script>`),
+so registering both fires every hook twice, and a `Stop` guard's fire-once
+`/tmp` sentinel (`exists()`-then-`open()`) then races between the two copies.
+
+### Testing plugin hooks locally, without publishing to a marketplace
+
+- **Schema:** `claude plugin validate <plugin-dir>` deep-checks
+  `hooks/hooks.json`.
+  It needs `.claude-plugin/plugin.json` present; a `marketplace.json` is not
+  required, so point it at a single-plugin dir.
+- **Firing:** `echo "<prompt>" | claude -p --plugin-dir <dir> --debug-file
+  <log>`.
+  A `UserPromptSubmit` hook that injects a sentinel line proves it fired; grep
+  the debug log for `Read hooks.json for plugin <name>` and confirm
+  `hook-load-failed` is absent.
+- **Gotcha:** `claude --debug [filter]` takes an optional positional filter, so
+  `claude --debug -p "prompt"` mis-parses the prompt as the filter.
+  Pass the prompt on **stdin** and capture the log with `--debug-file <path>`.
+
+(Morrison-Lab/ai-config discussion #1123 / PR #1125, 2026-08-04: ai-config's
+plugin had shipped its hooks in the install-hooks array format ever since they
+were added, so `claude plugin validate` failed and the plugin loaded zero
+hooks -- the skills half of the plugin worked the whole time, which is why it
+went unnoticed.
+PR #1125 converts the file to native schema, keeping the metadata as extra
+keys, and reduces `install-hooks.py` to flattening the native structure back
+into the entry list it already consumed.)
+
 ## A plugin ref resolves by the marketplace's *declared* name, not by its URL
 
 The section above covers the submodule-plus-symlink path.

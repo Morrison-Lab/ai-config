@@ -1060,3 +1060,58 @@ rather than by hand; ai-config#765 added it, and the repo's own
 (ai-config#755/#765, 2026-07-28: 42 of 172 skills were stale in one container,
 `ardi` at 80 lines against 403 and `ums` at 94 against 365, so the session was
 running materially older versions of its own review procedures.)
+
+## Custom slash commands have been merged into skills
+
+`.claude/commands/deploy.md` and `.claude/skills/deploy/SKILL.md` both create
+`/deploy`, and they work the same way.
+Existing `commands/` files keep working, so nothing breaks and nothing signals
+the change.
+
+Verbatim from
+[Extend Claude with skills](https://code.claude.com/docs/en/skills), fetched
+2026-08-04 (its inline doc link flattened to plain text):
+
+> **Custom commands have been merged into skills.**
+> A file at `.claude/commands/deploy.md` and a skill at
+> `.claude/skills/deploy/SKILL.md` both create `/deploy` and work the same way.
+> Your existing `.claude/commands/` files keep working.
+> Skills add optional features: a directory for supporting files, frontmatter
+> to control whether you or Claude invokes them, and the ability for Claude to
+> load them automatically when relevant.
+
+Three further facts from that page, all as of 2026-08-04:
+
+- `https://code.claude.com/docs/en/slash-commands` and
+  `https://code.claude.com/docs/en/skills` serve the **same document**, titled
+  "Extend Claude with skills".
+  So an old bookmark does not land you on an older, still-accurate page.
+- When a skill and a command share a name, the skill takes precedence.
+- Invocation is carried by **frontmatter**, not by directory.
+  `disable-model-invocation: true` makes a skill user-only,
+  `user-invocable: false` makes it model-only, and the default is that both can
+  invoke it.
+  Note the second field is narrower than it reads: `user-invocable` controls
+  visibility in the `/` menu, not access through the Skill tool, so
+  `disable-model-invocation` is the one that actually blocks programmatic
+  invocation.
+
+**The belief this corrects.**
+That commands and skills are two mechanisms, told apart by file type, a command
+being user-invoked-only and unable to bundle supporting files.
+There is one mechanism, and the invocation contract is a frontmatter switch.
+A supporting-file directory is an optional skill feature rather than the thing
+separating two kinds.
+
+This corpus is a live instance of the state that makes the retired distinction
+feel current: 177 skill directories and exactly one `commands/` file
+(`commands/release-pr.md`), counted 2026-08-04.
+
+- **Do:** describe a `/name` invocation as a skill, and reach for frontmatter
+  when the question is who may invoke it.
+- **Do:** read a surviving `commands/*.md` file as a still-supported older
+  spelling of a skill.
+- **Don't:** infer from a file's directory whether a user or the model can
+  invoke it.
+- **Don't:** cite "a command cannot bundle supporting files" as a distinction
+  between two mechanisms.

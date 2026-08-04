@@ -72,6 +72,11 @@
   Verifying each claim directly against the PR's own actual runs (not reasoning abstractly) confirmed all three were correct in sequence, while a separate claim in the same PR --- that markdown skill docs are bound by the repo's source-code-only em-dash rule --- checked out FALSE against the rule's own explicit scope and was rebutted.
   The review loop only reached zero new comments once every claim got the same live-query treatment, rather than being pattern-matched as "probably right" or "probably just noise" this many rounds in.)
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
+- Before dispatching an expensive external action from committed source -- for
+  example, a pinned worktree build, release, deployment, or batch computation --
+  create, push, and open the feature PR first. The PR must expose the exact SHA
+  that performs the action; opening it afterward turns a costly run into an
+  unreviewed fait accompli. (User correction, 2026-08-03.)
 - NEVER auto-merge a Pull Request unless the user has explicitly granted session permission (e.g. via `/mwc` or `/maw`) or explicitly instructed to merge that specific PR (e.g. `/merge-it` or "merge this").
   Creating or pushing a PR does NOT imply permission to merge it.
 - If the user says the work belongs on a specific existing branch or on top of a

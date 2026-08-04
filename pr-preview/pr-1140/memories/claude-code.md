@@ -641,10 +641,14 @@ seen.
 - **Don't:** label a hook result from its exit code --- a denial and an allow
   are both 0.
 
-(Verified 2026-08-04 against `hooks/no-heavy-work-on-head-node.py`, whose deny
-branch is a `print(json.dumps(...))` followed by `return 0`.
-A hand-written test harness labelled its rows `rc != 0 -> BLOCKED` and so
-reported the hook as allowing a command it had correctly denied.)
+(Verified 2026-08-04 against `hooks/require-gh-repo-flag.py`, whose deny branch
+is a `print(json.dumps(...))` at lines 103--109 followed by `return 0` at line
+110.
+The harness that surfaced this was exercising a different hook, one proposed in
+ai-config#1139 and so not on `main` while that PR stays open; the mechanism is
+identical, so this entry cites the merged instance instead.
+That harness labelled its rows `rc != 0 -> BLOCKED`, and so reported the hook as
+allowing a command it had correctly denied.)
 
 ## Plugin hooks ship in a native `hooks/hooks.json`, NOT the `install-hooks.py` array format
 

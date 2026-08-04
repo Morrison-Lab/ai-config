@@ -512,6 +512,68 @@ The second time, a branch sweep reported all 19 local branches as having no
 PR; the immediately preceding run of the same data had correctly shown 16 as
 `MERGED`, which is the only reason the contradiction was noticed at all.)
 
+## `grep` in a Claude Code session is a shell function, so a script gets a different program
+
+Sibling of the entry above: another case where the harness's shell is not the
+one you are reasoning about, and it also answers rather than erroring.
+
+`grep` at the Bash tool's prompt is a **function** the harness installs,
+routing to a `ugrep` bundled inside the `claude` binary rather than to any
+`ugrep` on `PATH`.
+A function does not reach a child shell unless it was exported, so a script
+or a git hook gets the real binary instead.
+
+**The mechanism, the `export -f` caveat, and the git-hook consequence live in
+[`errexit-is-not-uniform`](../shared/coding/errexit-is-not-uniform.md)** ---
+read it there rather than here.
+That file is auto-loaded via `CLAUDE.md`, and its "A status consumed as a
+predicate" section carries all three; it reached `main` with ai-config#1110
+(merged 2026-08-04 as `fcb4ee10`).
+This entry keeps only what a *tool* lookup needs, since that is what someone
+grepping this file is after.
+
+**Identification is the part that misleads**, because the obvious commands
+disagree about what they are reporting:
+
+| command | when a function is winning | what it actually reports |
+|---|---|---|
+| `command -v grep` | prints bare `grep` | that the winner is **not a binary on `PATH`** --- it does not say what kind |
+| `type -aP grep` | prints only binaries (rc=1 if none) | `-P`aths only, so it hides the function entirely |
+| `type -a grep` | prints the function first | the full resolution order |
+| `type -t grep` | `function` / `file` / `builtin` | the kind --- run it *inside a script* to learn what a script gets |
+
+**A bare name from `command -v` is not specific to functions.**
+Measured on bash 5.1.16: `command -v` prints a bare name for builtins and
+keywords too --- `cd`, `echo`, `test`, and `if` all print just themselves,
+while `command -v /usr/bin/grep` prints the path.
+So the bare name means "not a binary on `PATH`", and `type -t` is what
+narrows it to a function.
+
+- **Do:** use `type -a` for the resolution order and `type -t` from inside a
+  throwaway script to learn what a script will actually get.
+- **Don't:** read a bare name from `command -v` as confirming a binary was
+  found, and don't read it as proving a *function* either --- builtins and
+  keywords print the same thing.
+- **Don't:** infer a `PATH`-shadowing binary from a command behaving oddly ---
+  check for a function first, since no such binary need exist.
+
+(Morrison-Lab/ai-config#1110, 2026-08-03: a `grep -q` exit-status divergence
+between a prompt and a script was published as `ugrep 7.5.0` sitting on `PATH`
+ahead of `/usr/bin/grep`.
+Neither half held.
+Corrected in `9c986521`.
+
+Version numbers here are deliberately scoped rather than stated flat.
+An earlier draft said the two `grep` binaries were "both GNU 3.7", which is
+what this machine reports and is false elsewhere --- the reviewer that caught
+it measured **3.11** on a GitHub Actions runner, and both readings are
+correct.
+On this machine `/usr/bin/grep --version` and `/bin/grep --version` both
+report 3.7, and `readlink -f` shows they are the same file, so even "two
+binaries" was generous.
+An unscoped version claim is not merely imprecise; it is false on some
+machine, which is why every number in this entry names where it was taken.)
+
 ## A hand-rolled verification check is worth nothing until it has caught something
 
 Two ad-hoc pre-push checks failed in one session, in opposite directions,

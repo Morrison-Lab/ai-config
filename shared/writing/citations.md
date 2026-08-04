@@ -38,6 +38,74 @@ source repo instead --- see the `github/docs` bullet in `memories/claude-code.md
 statement --- it had moved to the "Triggering a workflow" article; caught by
 review.)
 
+**The other authoring-side counterpart: run the exact-substring check on your
+own quotation, not only on one a reviewer disputes.**
+The bullet further down
+this file gives the deciding instrument --- `grep -c "<the quoted sentence>"
+<fetched source>` --- but offers it *defensively*, for testing a citation
+someone has called hallucinated.
+It decides the authoring case just as exactly, and costs one command at the
+moment you paste the quote.
+
+**Run it on normalized text, not on the raw files, or it returns a false
+negative on the very quotes you most need to check.**
+That bullet does not say so, and this section originally attributed the
+qualifier to it, which was wrong twice: the bullet is silent, and whitespace
+alone is not enough.
+`grep` is line-oriented, so a quotation spanning two source lines never
+matches.
+Source formatting adds more: a `man` page justifies with double spaces, and
+your own copy usually adds Markdown code spans the source has no idea about.
+Normalize whitespace **and** inline markup on both sides, per
+[`address-every-comment`](../workflow/address-every-comment.md)'s rule that
+the same normalizer must run over the needle and the haystack:
+
+```python
+norm = lambda s: re.sub(r"[\s`*_]+", " ", s).strip()
+norm(quote) in norm(source)
+```
+
+The defect it catches there is a **silent elision**: a clause dropped from the
+middle of a quoted sentence with no ellipsis marking the cut, so the result
+reads as contiguous verbatim text while never having appeared in the source in
+that form.
+This is not cherry-picking, which selects a genuinely contiguous span and is
+honest about its boundaries; here the contiguity itself is fabricated, and the
+substring test is what separates the two.
+The remaining words can each be the source's own and the sentence still be one
+the source never wrote.
+
+Reading the two side by side is what fails, because a spliced quote is
+*designed* to scan as fluent --- the elision is invisible precisely when the
+splice is clean.
+So run the check rather than re-reading, and mark any cut you do want with an
+ellipsis.
+
+- **Do:** substring-test a quotation against its fetched source, with
+  whitespace **and inline markup** normalized on both sides, before pushing
+  it.
+- **Do:** mark a deliberate cut with an ellipsis, so the quote stops claiming
+  a contiguity it does not have.
+- **Don't:** settle a quotation's fidelity by reading it against the source; a
+  clean splice is exactly the case that survives that.
+- **Don't:** normalize whitespace alone and call it done --- the worked
+  example below is a quotation that test rejects and the source contains.
+
+(Morrison-Lab/ai-config#1110, 2026-08-03: a `man grep` quotation dropped "the
+exit status is 0" from the middle of its source sentence, with no ellipsis.
+Caught in review, and confirmed mechanically once the normalization above was
+right.
+That example is also this section's own worked case for why the raw
+instrument is not enough.
+Measured against GNU grep 3.7's man page, where the sentence occupies
+`EXIT STATUS` lines 440 to 442: literal `grep -c` returns **0**, a
+whitespace-only normalization still returns **False** because the quotation
+adds Markdown backticks the man page does not have, and only whitespace plus
+markup returns **True**.
+The same rule holds for a repo artifact that claims to be verbatim; see
+[`fixtures-are-not-evidence`](../workflow/fixtures-are-not-evidence.md), where
+the deception runs by addition rather than by deletion.)
+
 **Mirroring a precedent's citation style doesn't guarantee the new citation
 holds.** When a new section is modeled on an existing one --- same structure,
 same "this is a global standing rule from X (see file Y)" closing sentence

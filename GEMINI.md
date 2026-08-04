@@ -19,3 +19,10 @@ When printing a status recap or summary, include a timestamp in the user's local
 - Use GitHub-style markdown for all responses and documentation.
 - When referencing files or code symbols in workspace paths, use relative markdown links (e.g. `[filename](relative/path/to/file)`) or inline code backticks (e.g. `` `path/to/file` ``).
 - Preserve semantic line breaks and formatting conventions when editing markdown docs in this repo.
+
+## Antigravity Plugin & Customization Integration
+
+- **Plugin manifest**: `plugins/ai-config/plugin.json` defines the `ai-config` plugin bundle for Google Antigravity.
+- **Workspace discovery**: `.agents/skills.json` and `.agents/plugins.json` configure workspace-level skill and plugin discovery when opening this repository directly in Antigravity.
+- **Global configuration**: Running `bootstrap.sh` symlinks `plugins/ai-config` into `~/.gemini/config/plugins/ai-config` and registers `plugins.json` for user-wide Antigravity sessions.
+

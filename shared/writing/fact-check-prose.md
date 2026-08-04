@@ -234,8 +234,8 @@ shadowing explanation for a divergence actually caused by a shell function.
 Two more were dropped hedges, both in a bullet condensing prose four lines
 above it that had drawn the distinction correctly: one flattened `command -v`
 and `type -aP` into equivalents when only the second hides a shell function,
-and one shortened "a function reaches a child shell only if it was exported
-with `export -f`" into "a function is not exported".
+and one shortened "reaches a child shell only if it was exported with
+`export -f`" into "a function is not exported".
 The seventh was a claim about what a *check* returns, asserted rather than
 run.
 

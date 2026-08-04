@@ -722,3 +722,37 @@ attribute a per-step outcome" failure in
 [`fail-fast`](../shared/principles/fail-fast.md).
 (Morrison-Lab/ai-config#1042, 2026-08-03: both surfaced while building
 `hooks/no-unreviewed-pr.py`'s shell-command parser during its review.)
+
+## Two awk gotchas when an awk program is embedded in a single-quoted shell string
+
+Many of our shell scripts pass an awk program as a **single-quoted** bash string
+(`tr -d '\r' | awk -v ... '<program>'`).
+Two failure modes recur when editing the program, and both are worth knowing
+before touching one.
+
+**An apostrophe or a bare backtick inside the awk body breaks the whole script.**
+Inside the single-quoted program, any `'` closes the bash quote, and a `` ` ``
+after it becomes command substitution.
+The offending token is almost always in an awk **comment**, where it reads as
+harmless prose: `awk's`, `#345's`, `iteration's` each broke the script.
+The symptom is a bash error, not an awk one --- `line N: <word>: command not
+found`, then `awk: syntax error ... missing }` --- because bash tears the string
+apart before awk ever runs.
+Reword the comment (`awk's` -> "the ... that awk uses"); the gha strip scripts
+deliberately keep apostrophes out of awk comments.
+It is algorithmatizable: a check that flags an apostrophe or backtick inside a
+single-quoted awk body would catch it every time.
+
+**awk regexes are POSIX ERE, which has no backreferences, so a `\1` pattern
+silently never matches** --- it does not error, it just fails, which is the
+dangerous direction (the check quietly passes instead of blowing up).
+A thematic-break regex `/^([-*_])[ \t]*(\1[ \t]*){2,}$/`, meant to match `---` /
+`***` / `___`, matched nothing.
+Rewrite "the same character repeated" as an explicit character-count loop: read
+the first character, require every later character to equal it or be a
+space/tab, and require the count to be `>= 3`.
+
+(Both surfaced on Morrison-Lab/gha#403, 2026-08-03, in the same
+`strip-non-invoking-markup.sh`.
+Sibling embedding trap: a bare `---` at column 0 inside a YAML `run: |` block is
+a document separator that truncates the generated script.)

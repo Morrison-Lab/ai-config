@@ -217,6 +217,8 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   The script stays and only the local registration goes.
   Re-add it after September 2026 alongside re-enabling the request.
   One Morrison-Lab/gha session spent over a dozen turns in this loop before the collision was recognized.
+  That loop persisted even though each request POST succeeded, because the hook discharges only on a reviewer-request that is the **last simple command in the call** (its exit status is then unambiguous), and every turn chained a verify `gh pr view` after the POST, leaving it non-last.
+  Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids, so unregistering is the right fix while the quota is out.
   (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
 - **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
   when its output is not a terminal --- which is always, for an agent.**

@@ -260,7 +260,7 @@ Drop `-q` and redirect to `/dev/null` where that difference matters, and read
 - **Do:** distinguish 0, 1, and 2-or-more when a command's failure and its
   negative answer call for different actions.
 - **Don't:** read `set -euo pipefail` at the top of a script as covering an
-  `if` condition -- that is the one place it is switched off.
+  `if` condition or a `!` operand -- both are on the suppression list above.
 - **Don't:** treat a guard that skipped its work as having found nothing to
   do; on a missing dependency those are the same observation.
 

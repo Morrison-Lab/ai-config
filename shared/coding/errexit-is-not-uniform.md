@@ -234,9 +234,10 @@ One residual that `-q` introduces, worth knowing precisely because `-q` is
 what a guard reaches for --- and which turns out to prove this section's own
 point a second time.
 
-GNU grep's manual says the status is 0 "if the `-q` or `--quiet` or
-`--silent` is used and a line is selected, even if an error occurred", so the
-flag that makes a check quiet also lets a match **outrank** a genuine error.
+GNU grep's manual says that "if the `-q` or `--quiet` or `--silent` is used
+and a line is selected, the exit status is 0 even if an error occurred", so
+the flag that makes a check quiet also lets a match **outrank** a genuine
+error.
 Measured on GNU grep 3.7, matching one readable file and one missing file:
 `-q` gives `rc=0` and the same command without `-q` gives `rc=2`.
 

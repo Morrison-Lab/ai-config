@@ -312,7 +312,7 @@ So before opening a new PR, pause and pick from the same menu, by what the *new*
 - Small, fresh context -> do nothing and open the PR.
 
 The bright line still governs, and it changes what "reset" can even mean here.
-If this session has an unmerged PR it opened or pushed to, it owes that PR active monitoring (per [`ardi`](shared/workflow/ardi.md)), so *this* session must not be `/clear`ed or walked away from -- the new PR either rides along in the same window, accepting the context cost, or goes to a genuinely separate fresh session while this one keeps monitoring.
+If this session has an unmerged PR it opened or pushed to, it owes that PR active monitoring (per [`ardi`](shared/workflow/ardi.md)), so *this* session must not be `/clear`ed or walked away from -- the new PR either rides along in the same window (where `compress-session` or `/compact` can still lighten the carried context, per the next section), or goes to a genuinely separate fresh session while this one keeps monitoring.
 Only when no such live PR remains is the full menu (archive-and-start-new, `/clear`, `/compact`, or nothing) open, chosen by the criteria above.
 Run UMS first if it is owed, per "Recommending that the session end is itself a UMS trigger" above -- not disclosed inside the flag.
 

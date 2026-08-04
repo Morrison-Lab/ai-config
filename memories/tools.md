@@ -536,7 +536,7 @@ memorizing:
 **A function does not cross into a child shell by default, but `export -f`
 propagates it** --- so "functions are not exported" is true of how they
 usually behave and not of what they can do.
-Measured on bash 5.2.21 with a `grep()` function defined in the parent:
+Measured on bash 5.1.16 with a `grep()` function defined in the parent:
 
 ```
 parent                  type -t grep -> function   the function runs

@@ -43,6 +43,11 @@ For a repository whose Copilot review isn't already scheduled automatically (see
 ```bash
 gh api -X POST "repos/<owner>/<repo>/pulls/<N>/requested_reviewers" \
   -f 'reviewers[]=copilot-pull-request-reviewer[bot]'   # REQUEST_COPILOT_REVIEW
+```
+
+Then, in a **separate** call (see the sole-command rule below), verify it landed:
+
+```bash
 gh pr view <N> --json reviewRequests,reviews
 gh pr checks <N>
 ```

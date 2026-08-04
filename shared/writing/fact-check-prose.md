@@ -231,24 +231,33 @@ Two were fidelity losses, covered by
 [`citations`](citations.md) and by the **cause** claim type respectively: a
 quotation with a clause silently dropped from its middle, and a `PATH`
 shadowing explanation for a divergence actually caused by a shell function.
-Two more were dropped hedges, both in a bullet condensing prose four lines
-above it that had drawn the distinction correctly: one flattened `command -v`
-and `type -aP` into equivalents when only the second hides a shell function,
-and one shortened "reaches a child shell only if it was exported with
-`export -f`" into "a function is not exported".
+Two more were dropped hedges.
+One flattened `command -v` and `type -aP` into equivalents in a Do bullet,
+when the prose four lines above it had drawn the distinction correctly.
+The other shortened "reaches a child shell only if it was exported with
+`export -f`" into "a function is not exported", in a prose paragraph rather
+than a bullet.
 The seventh was a claim about what a *check* returns, asserted rather than
 run.
 
-**The count in this record was itself the defect, twice over**, which is the
-sharpest evidence the section has.
+**This record's own sentences kept committing the defect they describe**,
+which is the sharpest evidence the section has, and each one was caught by a
+reviewer rather than by re-reading.
 It read "four findings" because four was true when the sentence was written,
-and #1110 went on to seven; a reviewer caught the stale number.
-The attribution beside it was wrong the same way -- it said the author found
-the second of each pair by re-running the reviewer's check, which is true of
-the uniqueness pair and false of the fidelity pair, whose second finding
-records a different origin entirely.
-Neither error was a bad measurement.
-Both were sentences *about* measurements, written once and not re-read.
+and #1110 went on to seven.
+The attribution beside it said the author found the second of each pair by
+re-running the reviewer's check, which is true of the uniqueness pair and
+false of the fidelity pair, whose second finding records a different origin.
+The sentence *directly above this paragraph* then put both dropped hedges "in
+a bullet", which is true of one and false of the other -- a detail belonging
+to one finding, generalized to its neighbour.
+None of those was a bad measurement.
+All were sentences *about* measurements, written once and not re-read.
+
+The instances are named rather than counted on purpose.
+An earlier draft said "twice over", which a third instance falsified within
+one review round -- a running total in a record about stale totals is the one
+figure guaranteed to go stale.
 
 ai-config#1101 is the same class arriving independently: an unquantified
 superlative in a script comment, false on measurement, in an issue whose own

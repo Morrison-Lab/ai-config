@@ -104,5 +104,10 @@ jobs:
     # scanning the whole tree -- see check-new-line-breaks.yml gha#300.
     uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76bd412aa10d4d56a809d791a6dc8f10df # v2, gha#300
     with:
-      globs: '**/*.md'
+      # This value is a git pathspec, not a shell glob: `*.md` already matches
+      # at any depth (CLAUDE.md and shared/**/foo.md alike), while `**/*.md`
+      # requires a directory component and so silently excludes CLAUDE.md and
+      # every other root-level .md -- the action's own default is `*.md`
+      # (ai-config#962).
+      globs: '*.md'
       paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'

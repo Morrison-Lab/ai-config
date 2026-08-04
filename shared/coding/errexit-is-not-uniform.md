@@ -145,6 +145,174 @@ A test that passes against both is not a test.
 - **Don't:** wrap the call in `( ... ) ||`, `if`, or `!` when testing whether
   it aborts --- all three are the very contexts that suppress the abort.
 
+## A status consumed as a predicate cannot say "I could not run"
+
+Everything above is about a script failing to **abort**.
+When the suppressed status is fed to an `if`, the script does something worse
+than continue: it **chooses a branch** on it.
+
+A command's exit status is a single integer doing two jobs at once, and a
+boolean test collapses them.
+`grep` answers "no match" with 1, and a command that is not installed never
+answers at all --- the shell reports 127 on its behalf.
+`if ! cmd` maps both to true.
+So a missing dependency does not report a missing dependency.
+It reports a negative result, confidently, in the vocabulary the script was
+expecting.
+
+Keep those two sources straight when reading a status, because only one of
+them is documented anywhere you would think to look.
+`man grep` lists 0, 1, and 2 and stops, so a reader who goes looking for 127
+there finds nothing and concludes the claim is wrong.
+127 is the shell's, for a command it could not find, and it is therefore
+available from *any* command --- which is exactly why a predicate cannot
+distinguish it from that command's own answer.
+
+The shape, from a git pre-commit hook:
+
+```bash
+set -euo pipefail
+
+if ! git diff --cached --name-only | rg -q '^R/.*\.R$'; then
+  exit 0
+fi
+
+Rscript -e 'devtools::document()'
+```
+
+With ripgrep absent the pipeline exits 127, `!` inverts it to true, and the
+hook exits 0 having done nothing.
+Note that `set -euo pipefail` is present and buys nothing here: the `if`
+condition and the `!` operand are both on the suppression list above, so the
+hardening is real everywhere except the one line that decides what the script
+does.
+
+Two properties make this worse than the cases above.
+
+The wrong branch is usually the **cheap** one.
+A guard asks "is there anything to do?", so the error is absorbed into "no",
+and the failure mode is skipping the work rather than doing it twice.
+That is [`fail-fast`](../principles/fail-fast.md)'s guard rule arriving through
+the exit status: an assertion of absence resting on the non-appearance of a
+success.
+
+And the result is **machine-dependent**, which is why it survives review.
+It behaves correctly for whoever has the tool installed, so the author cannot
+reproduce it and the hook looks like it works.
+Reach for a portable tool in anything you ship to other people's machines, and
+check the dependency up front so a missing one is loud:
+
+```bash
+command -v rg >/dev/null || { echo "rg not installed" >&2; exit 1; }
+```
+
+Where the three outcomes genuinely differ, read the status rather than testing
+it, per [`fail-fast`](../principles/fail-fast.md)'s rule that 0, 1, and
+anything else are three answers and not two:
+
+```bash
+rc=0
+git diff --cached --name-only | grep -qE '^R/.*\.R$' || rc=$?
+case $rc in
+  0) : ;;                                     # matched
+  1) exit 0 ;;                                # no match
+  *) echo "grep failed ($rc)" >&2; exit 1 ;;  # broken
+esac
+```
+
+The `|| rc=$?` is load-bearing rather than decorative, and it is the same
+suppression the rest of this fragment warns about, used deliberately: a bare
+pipeline under `set -e` aborts on the no-match case before `case` ever runs,
+so the status has to be captured somehow before the branch that handles it is
+reachable.
+That form is the most compact way, not the only one --- `set +e` around the
+call, or `if cmd; then rc=0; else rc=$?; fi`, reach the same branch.
+All three were measured on bash 5.1.16 and give `rc=1` on no match; the
+`|| rc=$?` form gives `rc=127` when the command does not exist.
+
+One residual that `-q` introduces, worth knowing precisely because `-q` is
+what a guard reaches for --- and which turns out to prove this section's own
+point a second time.
+
+GNU grep's manual says that "if the `-q` or `--quiet` or `--silent` is used
+and a line is selected, the exit status is 0 even if an error occurred", so
+the flag that makes a check quiet also lets a match **outrank** a genuine
+error.
+Measured on GNU grep 3.7, matching one readable file and one missing file:
+`-q` gives `rc=0` and the same command without `-q` gives `rc=2`.
+
+The reason to measure rather than quote is that the same command on the same
+machine disagreed with itself, depending on whether it ran in a script.
+Typed at an interactive prompt there, `grep` reported `rc=2` for those
+identical inputs.
+Put into a file and run with `bash script.sh`, it reported `rc=0`.
+
+That is not `PATH` shadowing, and the distinction decides what to do about
+it.
+`grep` at that prompt was a **shell function**, installed by the harness and
+routing to a `ugrep` bundled inside another binary; `type -aP grep` finds
+only `/usr/bin/grep` and `/bin/grep`, both GNU, and no `ugrep` exists on
+`PATH` at all.
+A function reaches a child shell only if it was exported with `export -f`,
+and this one was not --- `type -t grep` in a child reports `file`, the
+binary.
+The script therefore got GNU grep and masked; the prompt got ugrep and did
+not.
+Do not shorten that to "functions do not survive into child shells".
+`export -f` propagates one, measured, so the load-bearing fact is about this
+particular function rather than about functions.
+
+Which makes this worse than a portability footnote for the hook above, since
+**a git hook is a child shell**.
+It gets GNU grep, so it does mask, and a developer who validates the hook's
+behaviour by running the same pipeline in their terminal is measuring a
+different program than the one git will run.
+
+The usual identification commands differ in how much they give you here,
+which is the part worth memorizing.
+`command -v grep` prints a bare `grep` when a function is winning and an
+absolute path when one is not, so it does signal that something off-`PATH`
+has taken over --- it just does not say what kind of thing.
+`type -aP grep` reports only binaries, so it hides the function entirely and
+is the one that will actively mislead you.
+`type -a grep` names it, and running the command inside a throwaway script
+settles what your hook will really get.
+
+Neither implementation reaches the missing-command case above, since a command
+that never ran cannot select a line, so 127 arrives intact either way.
+What `-q` costs you on GNU grep is the "broken" versus "matched" distinction,
+not "broken" versus "no match".
+Drop `-q` and redirect to `/dev/null` where that difference matters, and
+establish which implementation your *script* gets before trusting any of
+these codes --- from inside a script, not from your prompt.
+
+- **Do:** verify a tool exists before branching on its exit status, in
+  anything that runs on a machine you do not control.
+- **Do:** identify a command with `type -a` and a throwaway script, rather
+  than with `type -aP` alone, which reports only binaries and so hides a
+  shell function that is winning interactively and absent in the child shell
+  your hook runs in.
+- **Do:** read a bare name from `command -v` as the signal that something
+  off-`PATH` is winning; it is a real tell, and it does not tell you what
+  kind of thing, which is what `type -a` adds.
+- **Do:** distinguish 0, 1, and 2-or-more when a command's failure and its
+  negative answer call for different actions.
+- **Don't:** read `set -euo pipefail` at the top of a script as covering an
+  `if` condition or a `!` operand -- both are on the suppression list above.
+- **Don't:** treat a guard that skipped its work as having found nothing to
+  do; on a missing dependency those are the same observation.
+
+(`ucdavis/bcs#554`, 2026-08-03: the hook above is the verbatim one shipped in
+that repo.
+Observed live on a machine without ripgrep -- a commit staging an `R/*.R` file
+printed `.githooks/pre-commit: line 4: rg: command not found` and was accepted,
+with `devtools::document()` never running.
+Confirmed with a negative control: the same logic with `grep -qE` substituted
+takes the other branch on the same staged files, so the branch really was
+selected by the missing binary rather than by the file list.
+How many other contributors lack ripgrep was not established -- the point is
+that the hook's behaviour depends on it and says so nowhere.)
+
 ## A pipe discards the status of everything left of it
 
 Everything above is about `errexit` not firing.
@@ -273,3 +441,16 @@ in a one-off command line rather than a committed script, since there the
 `&&` is the only thing sequencing failure at all.
 Flag it even when every current call site masks it: the finding is that the
 behaviour is call-site dependent, not that it misbehaves today.
+
+Flag an `if` or `!` that branches on a command which might not be installed,
+too.
+That one has to be asked for separately, and not because the check above
+returns the wrong answer.
+It returns the right one: `grep -q` really does exit non-zero on legitimate
+input, since a no-match is exactly that.
+What lets the guard through is the rest of that check --- the tolerance *is*
+stated, because an `if` or a `!` is itself the statement that a non-zero exit
+is expected and handled.
+So the existing check passes cleanly while the missing-command case stays
+hidden, and it needs a question of its own.
+Ask what the branch does when the command cannot run at all.

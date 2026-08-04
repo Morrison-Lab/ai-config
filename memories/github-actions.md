@@ -122,6 +122,37 @@ common patterns.
   dispatching a new one (observed on UCD-SERG/serodynamics#193 — a direct
   `workflow_dispatch` via `actions_run_trigger` would have sidestepped this,
   but that call 403s in these sessions too, per the note above).
+- **Testing a reusable workflow that calls `anthropics/claude-code-action`
+  (a review or agent workflow) before merge is DOUBLY constrained -- a
+  branch-pinned caller cannot exercise the change even when it runs.**
+  Two independent mechanisms both defeat the obvious "point a caller at the test
+  branch and dispatch it" approach:
+  1. **The action's own workflow-validation guard refuses to run unless the
+     CALLER's workflow file is byte-identical to that repo's DEFAULT branch**
+     (`Workflow validation failed ... must exist and have identical content to
+     the version on the repository's default branch`).
+     A caller placed on a throwaway BRANCH therefore always fails validation and
+     skips the review BEFORE it starts -- producing no execution output at all.
+     This is the same guard `claude-bot-workflows.md` documents for the
+     review-workflow repo itself, but it fires in **consumer** repos too, not
+     just where the reusable workflow lives.
+     To actually run it, the caller has to be on the default branch: add a
+     throwaway dispatch-only caller workflow to `main`, `workflow_dispatch` it,
+     then delete it.
+  2. **A nested `uses: <owner>/<repo>/.github/actions/<x>@v2` composite ref
+     inside the reusable workflow resolves at its OWN literal `@v2`,
+     independent of the ref the reusable workflow was called at.**
+     GitHub resolves each full-path `uses:@ref` independently, so
+     SHA/branch-pinning a consumer's caller to a test branch runs the workflow
+     FILE at that branch but still pulls the composite actions at `@v2` (the
+     old code).
+     This is a different fact from the "resolves ONCE at run creation" bullet
+     above (that one is about re-runs of one run; this is about which ref each
+     nested reference picks up on a fresh run).
+     To exercise a change that lives in a nested composite action, you must ALSO
+     temporarily bump the reusable workflow's own internal `@v2` refs to the
+     test branch -- scaffolding you revert before merge. (gha#400 test,
+     2026-08-03.)
 - **`check-non-standard-chars` (the `chars` selftest job) scans only `.qmd` and
   `.R` files.** Em dashes / smart quotes in workflow YAML comments, README, or
   example stubs pass; the SAME character in a `.qmd` fails CI (`U+2014` etc.).

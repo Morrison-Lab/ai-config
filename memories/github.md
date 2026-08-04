@@ -112,6 +112,28 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   So this needs no external `jq` and no `date -d`, which is GNU-only and absent on macOS.
   (Morrison-Lab/ai-config#908, 2026-07-30: the `clean-worktrees` merged-PR guard shipped the string comparison.
   Review caught it, and the repro above confirmed the failure direction before the fix went in.)
+- **A MERGED (or closed) PR reads exactly like a "GitHub sync delay" --- check `state` before theorizing about lag.**
+  Its signature is three symptoms that each look like webhook/replication lag:
+  `gh pr view --json headRefOid` stays frozen at the last-merged SHA (lagging the actual branch tip),
+  `mergeable`/`mergeStateStatus` read `UNKNOWN`,
+  and pushing new commits to the branch triggers NO new synchronize review.
+  All three are the merged/closed steady state, not a transient delay.
+  Don't attribute them to a lag: `gh pr view <N> --json state` (or `mergedAt`/`mergeCommit`) returns `MERGED` immediately and settles it in one call.
+  Corollary: after a squash-merge that auto-deletes the head branch, a later push RE-CREATES the branch as an orphan,
+  so the pushed commit is NOT on `main` --- verify with `git merge-base --is-ancestor <sha> origin/main`.
+  - **Do:** when a PR's head looks stuck and pushes don't trigger reviews, read `state`/`mergedAt` first.
+  - **Don't:** read a frozen `headRefOid` plus `UNKNOWN` mergeable plus no-new-review as a sync lag --- that is the merged state.
+  (gha#400, 2026-08-03: the PR merged at 15:54 PT as squash `03a046a`,
+  but work continued on it for over an hour --- live verification, two nit-fix commits, posting evidence, resolving threads ---
+  all on an already-merged PR, because the frozen-head/`UNKNOWN`-mergeable/no-new-review state was read as a sync delay instead of `state: MERGED`;
+  the nit-fix commit ended up orphaned, not on `main`.)
+  - **Mis-tracking a merged PR as still-open does not only misreport status --- it SILENTLY suppresses the "flag a good moment to `/clear`" suggestion, on false data.**
+    The "Flag good moments to `/clear` in long-running sessions" rule in the user `CLAUDE.md` says not to flag a stopping point while any PR you opened or pushed to is still unmerged --- so "I still have open PRs" is that rule's own suppression clause.
+    A remembered "it is still open" therefore does two things at once: it misreports the PR's status, and it invisibly cancels the stopping-point flag the user would otherwise get.
+    The suppression fires correctly on stale input, so nothing looks wrong --- the user simply never receives the suggestion and has to ask.
+    - **Do:** after confirming a merge, or at any long-session lull, re-query `gh pr view <N> --json state` for every PR you opened before either raising OR suppressing a stopping-point suggestion.
+    - **Don't:** let a remembered "it is still open" both misreport status and silently cancel the `/clear` flag --- recollection about merge-state is exactly what the `--json state` query exists to replace.
+    (This session, 2026-08-03/04, gha#400/#401 + ai-config#1111: three PRs were described as "open follow-ups I'm watching" after all three had merged, and no stopping-point flag was raised until the user asked whether to compact or start a new session.)
 - **`gh pr list --state merged` plus a low `--limit` can miss recent merges:**
   The list is ordered by PR list order, effectively number/creation, before your `--jq` filter runs.
   That means an old, low-numbered PR that merged recently can sit below a page of higher-numbered PRs and never reach the filter.

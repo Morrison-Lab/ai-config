@@ -242,25 +242,48 @@ Measured on GNU grep 3.7, matching one readable file and one missing file:
 `-q` gives `rc=0` and the same command without `-q` gives `rc=2`.
 
 The reason to measure rather than quote is that the same command on the same
-machine disagreed.
-`grep` there resolved to **ugrep 7.5.0**, on `PATH` ahead of
-`/usr/bin/grep`, and ugrep reports `rc=2` for those identical inputs --- it
-does not mask.
-So the manual is right about GNU grep and wrong about what `grep` runs, which
-is the machine-dependence this section already warns about arriving through
-the tool you were told to prefer as the portable one.
-A `command -v rg` guard would not have helped, because `grep` was present the
-whole time; it was a different `grep`.
+machine disagreed with itself, depending on whether it ran in a script.
+Typed at an interactive prompt there, `grep` reported `rc=2` for those
+identical inputs.
+Put into a file and run with `bash script.sh`, it reported `rc=0`.
+
+That is not `PATH` shadowing, and the distinction decides what to do about
+it.
+`grep` at that prompt was a **shell function**, installed by the harness and
+routing to a `ugrep` bundled inside another binary; `type -aP grep` finds
+only `/usr/bin/grep` and `/bin/grep`, both GNU, and no `ugrep` exists on
+`PATH` at all.
+A function is not exported, so it does not survive into a child shell.
+The script therefore got GNU grep and masked; the prompt got ugrep and did
+not.
+
+Which makes this worse than a portability footnote for the hook above, since
+**a git hook is a child shell**.
+It gets GNU grep, so it does mask, and a developer who validates the hook's
+behaviour by running the same pipeline in their terminal is measuring a
+different program than the one git will run.
+
+The usual identification commands do not help here, which is the part worth
+memorizing.
+`command -v grep` prints `grep` for a function and tells you nothing.
+`type -aP grep` reports only binaries, so it hides the function that is
+actually winning.
+`type -a grep` shows it, and running the command inside a throwaway script
+settles what your hook will really get.
 
 Neither implementation reaches the missing-command case above, since a command
 that never ran cannot select a line, so 127 arrives intact either way.
 What `-q` costs you on GNU grep is the "broken" versus "matched" distinction,
 not "broken" versus "no match".
-Drop `-q` and redirect to `/dev/null` where that difference matters, and read
-`grep --version` before trusting any of these codes.
+Drop `-q` and redirect to `/dev/null` where that difference matters, and
+establish which implementation your *script* gets before trusting any of
+these codes --- from inside a script, not from your prompt.
 
 - **Do:** verify a tool exists before branching on its exit status, in
   anything that runs on a machine you do not control.
+- **Do:** identify a command with `type -a` and a throwaway script, not with
+  `command -v` or `type -aP`, either of which can miss a shell function that
+  is winning interactively and absent in the child shell your hook runs in.
 - **Do:** distinguish 0, 1, and 2-or-more when a command's failure and its
   negative answer call for different actions.
 - **Don't:** read `set -euo pipefail` at the top of a script as covering an

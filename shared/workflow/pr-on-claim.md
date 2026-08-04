@@ -65,9 +65,23 @@ the same rule governs a `gh pr ready` draft transition the hook tracks.
 - **Do:** issue the Copilot-request POST as its own Bash call, with nothing chained after it.
 - **Don't:** fold the `--json reviews` / `gh pr checks` verification into the same call --- that makes the request non-last, and the hook cannot discharge it.
 
+**"Nothing chained after it" includes a pipe added purely to trim the output.**
+The rule above is stated in terms of *verification reads*, which is how it is usually broken and is also the version a reader recognizes themselves in.
+A formatting pipe does not feel like chaining a second step --- `| tail -3` or `| jq` is a decision about how much of one command's output to look at, not an extra command in a sequence --- so it slips past a reader who has just agreed with the rule as written.
+The shell does not draw that distinction: the last command in the pipeline owns the exit status either way, so `gh api ... | tail -3` leaves the POST non-last exactly as a chained `gh pr view` does.
+Use `--silent`, or `--jq` **inside** the `gh api` call, when the output needs narrowing; both keep the POST the last command.
+
+- **Do:** narrow the response with a flag on the POST itself rather than a downstream pipe.
+- **Don't:** pipe the POST anywhere, including to `tail`, `head`, or `jq` --- the hook cannot tell a formatting pipe from a chained verification, because the shell does not either.
+
 (Morrison-Lab/rpt#181, 2026-08-03: the POST was chained ahead of `gh pr view`/`gh pr checks` in one call across six turns, so the hook re-fired every Stop;
 running the POST bare discharged it.
 The failure was misread as the hook not recognizing a Copilot quota refusal, which it was not about.)
+
+(Morrison-Lab/ai-config#1139, 2026-08-04: the pipe variant, in a session that had already cited this rule's reasoning aloud earlier in the same hour.
+The request was written `gh api -X POST .../requested_reviewers -f 'reviewers[]=...' 2>&1 | tail -3`, and it genuinely succeeded --- the response named `Copilot` in `requested_reviewers`, and Copilot posted its quota refusal at `07:22:15Z`.
+The hook still fired at Stop, correctly, because `tail` owned the exit status.
+Re-running the POST bare discharged it and produced a second, identical refusal at `07:53:03Z`.)
 
 **Some repos schedule Copilot automatically, and this step is redundant there.**
 A repository ruleset can carry a `copilot_code_review` rule with

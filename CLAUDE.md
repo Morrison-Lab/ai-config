@@ -400,6 +400,28 @@ In every session — at session start, and again periodically during long sessio
    (ai-config#755, 2026-07-28: 42 of 172 skills were stale in a web session, most at under half their real length -- `ardi` 80 lines vs 403, `ums` 94 vs 365, `ard` 134 vs 308 -- plus 3 latent unlinked copies the old `SKILL.md`-only sweep counted as identical.
    Caught only because a `ums` step contradicted a change known to have merged.
    The damage stayed small because `CLAUDE.md` itself was symlinked and restates most operative rules inline, which is the concrete argument for keeping local restatements alongside citations rather than trimming to bare pointers.)
+   **`check-install.py` says nothing about whether the hooks are *registered*, so run `install-hooks.py` as a separate freshness check.**
+   The two answer different questions and are easy to conflate, because both concern `~/.claude` and both report a tidy count.
+   `check-install.py` compares **files**: it asks whether `~/.claude/hooks/<script>` tracks the checkout.
+   `install-hooks.py` compares **bindings**: it asks whether `~/.claude/settings.json` actually invokes those scripts on an event.
+   A hook can be perfectly linked and never run, so a clean report from the first is not evidence about the second.
+   The failure is silent in the way this corpus is worst at noticing: an unregistered guard and a guard with nothing to block look identical, since neither ever produces output.
+   It also degrades **one hook at a time** rather than all at once, which is why nothing announces it --- `bootstrap.sh` places every new script, while registration happens only when someone runs the second command, so each hook added since the last run sits inert.
+   That makes it a per-session freshness item rather than a one-time setup step.
+   ```bash
+   python3 <ai-config-checkout>/scripts/install-hooks.py          # report
+   python3 <ai-config-checkout>/scripts/install-hooks.py --fix     # register the missing ones
+   ```
+   Two caveats before running `--fix`.
+   Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
+   And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart; say so rather than reporting the guards as live.
+   - **Do:** run both instruments each session, and report the two counts separately.
+   - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.
+
+   (2026-08-04, this machine: `check-install.py` reported 32 of 34 entries ok while `install-hooks.py` reported `registered=3 missing=8`, so 8 of 11 guards had never been bound to an event.
+   Among them was `flag-unassigned-worktree.py`, and in that same session two `Agent` calls were launched with no `isolation` --- exactly what it exists to warn about --- with no warning possible.
+   The lapse was first self-attributed to ignoring the hook, which was wrong in a way worth recording: the guard was never installed, so there was nothing to ignore.
+   `install-hooks.py --fix` took it to `registered=11 missing=0`, and merging the then-open #1139 made it 12.)
 3. **The working repo's main checkout.** Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) — it goes stale as the session's own PRs and other sessions' PRs merge.
    **The same "diverged" failure from point 1 above can hit any repo's `main`, not just ai-config's own** — a fresh container's checkout isn't guaranteed fresh for every repo it holds. Apply the same recovery: confirm the working tree is clean, then check whether the local tip's commit is actually reachable from `origin/main` (`git merge-base --is-ancestor <local-tip> origin/main`) before force-realigning with `git checkout -B main origin/main`. Don't rely on a commit-message grep alone to decide safety — the same message can appear under a *different hash* after a squash-merge or rebase (so the grep matches but the underlying commits differ, the milder case in point 1), and `git log origin/main` only reflects whatever your local remote-tracking ref last fetched (so a check run before fetching in this session can miss commits that already landed). Re-run `git fetch origin main` immediately beforehand and use the hash-based ancestry check as the authoritative signal. A clean working tree plus a non-ancestor local `main` tip is still safe to realign in the common case (the checkout is stale, not carrying real work), since realigning only moves a local branch ref — the discarded commits stay recoverable via `git reflog` regardless. (Hit in both `ai-config` and `gha` checkouts in the same session, 2026-07-06: `gha`'s local `main` tip commit didn't match `origin/main` by hash *or* message at all — unlike the milder "same content, rewritten hash" case documented in point 1 — but was still just a stale checkout snapshot with nothing of value, confirmed once the working tree was verified clean.)
 4. **The `.ai-config` submodule pin, in any repo that vendors ai-config as a git submodule** (check `.gitmodules` for a `.ai-config` entry — not every repo has one; most consume ai-config only via the Plugin Marketplace, which doesn't need this). Compare the pinned commit against ai-config's current `origin/main`: `git rev-parse HEAD:.ai-config` for the pin's SHA, then `git -C <path-to-a-local-ai-config-clone> rev-list --count <pin>..origin/main` for how far behind it is.

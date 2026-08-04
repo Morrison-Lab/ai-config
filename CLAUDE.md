@@ -300,6 +300,29 @@ the gist in the same window is `/compact`;
 the full live task state is the `compress-session` flag, not this one.
 Archive still beats compact for pure *reference*, since a retrievable full thread dominates a lossy summary, so reserve the compact recommendation for continuation rather than preservation.
 
+**Starting a new PR is itself a moment to weigh compacting, clearing, or a fresh session -- not only a natural stopping point is.**
+The options above all fire on a *stopping* point: a task wrapped, a PR merged, a question answered.
+Opening a new PR is a *starting* point, and it feels the opposite -- momentum rather than pause -- which is exactly why the consideration gets skipped.
+But a new PR is where a fresh chunk of context begins accumulating, so it is the cleanest seam at which to decide whether to carry this session forward or reset, and deciding *before* the new state exists is cheaper than untangling it after.
+
+So before opening a new PR, pause and pick from the same menu, by what the *new* PR needs from this session:
+
+- Unrelated to everything in the current window, and nothing here is worth revisiting -> archive-and-start-new (the default), or a bare `/clear` only when nothing is worth revisiting.
+- Builds loosely on the current thread -> `/compact`.
+- Small, fresh context -> do nothing and open the PR.
+
+The bright line still governs, and it changes what "reset" can even mean here.
+If this session has an unmerged PR it opened or pushed to, it owes that PR active monitoring (per [`ardi`](shared/workflow/ardi.md)), so *this* session must not be `/clear`ed or walked away from -- the new PR either rides along in the same window, accepting the context cost, or goes to a genuinely separate fresh session while this one keeps monitoring.
+Only when no such live PR remains is the full menu (archive-and-start-new, `/clear`, `/compact`, or nothing) open, chosen by the criteria above.
+Run UMS first if it is owed, per "Recommending that the session end is itself a UMS trigger" above -- not disclosed inside the flag.
+
+- **Do:** pause at the new-PR boundary and recommend the fitting session-management option, before opening the PR.
+- **Do:** keep monitoring an unmerged PR in the session that owns it -- send only the *new* PR to a fresh session, rather than resetting the one that owes monitoring.
+- **Don't:** barrel into a new PR carrying a long, unrelated session by reflex, just because opening a PR feels like forward motion rather than a stopping point.
+- **Don't:** `/clear` or abandon a session while a PR it opened is still unmerged -- that drops the monitoring loop the bright line protects.
+
+(Directive from the user, 2026-08-04: "cai: before starting a new pr, consider whether we should compact/clear/start a new session.")
+
 ## Flag good moments to run `compress-session`, too
 
 The mid-task counterpart to the section above: don't wait for the automatic compaction to guess what matters, and don't wait to be asked.

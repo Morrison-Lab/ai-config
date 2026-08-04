@@ -155,10 +155,11 @@ turned the mistake into an in-text warning.)
 ## The general case: any condensation of a verified source is a fresh claim
 
 The section above is scoped to code, and the psychology it names is not.
-"Restating something already verified feels like transcription rather than a
-fresh claim" is true of every source, so the same exemption applies whenever
-prose condenses **prose**: a paragraph into a bullet, a section into a
-heading, a measurement into the sentence that reports what it showed.
+Its reason --- that a restatement gets less scrutiny than its source
+"because restating something already verified feels like transcription rather
+than a fresh claim" --- holds for every source, so the same exemption applies
+whenever prose condenses **prose**: a paragraph into a bullet, a section into
+a heading, a measurement into the sentence that reports what it showed.
 
 The condensed copy is where the falsehood enters, because condensing chooses
 the claim's *scope* again, and a shorter sentence is under pressure to choose

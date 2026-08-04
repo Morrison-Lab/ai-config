@@ -65,10 +65,8 @@ so a repo lacking the secret is dropped even when named explicitly,
 and `--apply` then reports `Nothing to rotate` without ever calling
 `rotate()`.
 
-The script's own docstring says the opposite,
-telling you to "pass `--repos` explicitly to do that".
-That sentence is wrong, and is tracked separately.
-Provision with `gh secret set` directly instead:
+The script's docstring says the same, so provision with `gh secret set`
+directly instead:
 
 ```bash
 gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<repo>   # SET_SECRET

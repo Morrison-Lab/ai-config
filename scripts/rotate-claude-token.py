@@ -37,9 +37,13 @@ Four properties are deliberate:
   unchanged token reports the write as unverified. That errs toward a false
   alarm rather than a false pass, which is the safe direction.
 
-Only repos that ALREADY carry the secret are touched. Provisioning it into a
-repo that lacks it is a separate per-repo decision and stays deliberate; pass
-`--repos` explicitly to do that.
+Only repos that ALREADY carry the secret are touched.
+`--repos` bypasses repo discovery, not secret discovery, so naming a repo that
+lacks the secret just drops it from the run, the same as any other repo
+without the secret.
+Provisioning the secret into a repo that lacks it is a separate, deliberate
+per-repo decision and out of this script's scope; do it directly with
+`gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <owner>/<name>`.
 
 `claude setup-token` is the USER's to run, in their own terminal. It opens a
 browser as its first act and then blocks reading an authorization code from

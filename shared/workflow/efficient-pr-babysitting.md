@@ -4,6 +4,24 @@ When babysitting a PR (subscribed to its activity, driving ARDI, watching CI), d
 Each separate push re-triggers CI and the review bot from scratch, and two pushes close together race each other's review runs (see [`fully-clean`](fully-clean.md) and gha's own `CLAUDE.md` "canceled review" section for the concrete failure mode this causes).
 Fewer, complete pushes mean fewer wasted CI minutes and fewer webhook events to triage.
 
+**A trickled push does not just cancel a review -- it can starve a reviewer of ever posting one, leaving a green check with no verdict.**
+The rule above frames the cost as a *cancelled* review run.
+Copilot fails a step further: a quick follow-up push supersedes its in-progress run before it posts, so `copilot-pull-request-reviewer` completes `success` while `get_reviews` stays empty -- the silent-reviewer state [`fully-clean`](fully-clean.md) documents, except self-inflicted rather than Copilot's choice.
+The reading-side trap is that a green Copilot check with no review reads either as an approval (false) or as Copilot refusing or broken (also false), when the real cause was your own pushes.
+
+The pushes usually get trickled for the worst reason: chasing optional polish the reviewer explicitly *declined* to raise.
+Each such fix can draw a fresh declined-non-finding on the fix itself, so one clean verdict becomes three review rounds and a starved Copilot.
+When two clean verdicts already stand and the outstanding note is a stylistic-completeness item the reviewer chose not to make a finding, holding beats polishing -- see [`address-every-comment`](address-every-comment.md)'s per-item noise rule for the reviewer-raised counterpart.
+
+- **Do:** batch a round's fixes into one push, and let the head stabilize before reading whether Copilot posted a verdict.
+- **Do:** read an empty `get_reviews` under a green Copilot check as *possibly self-starved*, not as approval -- confirm the verdict from `get_reviews`, never from the check run's color.
+- **Don't:** trickle a push per review round to chase a note the reviewer declined to raise, when clean verdicts already stand.
+- **Don't:** count a green `copilot-pull-request-reviewer` check as a Copilot verdict; the verdict lives in `get_reviews`, not the check run.
+
+(Morrison-Lab/ai-config#1115, 2026-08-04: a one-rule CLAUDE.md addition drew three `claude-review` "Ready for merge" verdicts across three heads.
+Rounds 1 and 2 each noted an optional item they declined to raise -- a missing cross-link, then a forward-pointing phrase in the fix for it -- and each was acted on with a quick push.
+All three pushes superseded Copilot's in-progress run, so its check finished green with `get_reviews` empty and no verdict on any head.)
+
 **When a round needs both a `main` merge and a code fix, merge first, then commit the fix, then push once.**
 This is the ordering the batch rule implies but doesn't spell out, and the natural sequence is the wrong one: you fix what the review flagged, push it, then notice `main` moved, merge, and push again --- two pushes seconds apart, two review runs, the second cancelling the first.
 Merging first costs nothing (the merge commit and the fix commit both ride out in the same push) and collapses the round to a single review run.

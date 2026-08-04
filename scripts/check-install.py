@@ -79,11 +79,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Mirrors bootstrap.sh's own exclusions, and must stay in step with them:
-# references/ is example material rather than consumable config, and
-# codex-skills/ is installed into ~/.codex, not ~/.claude. Dot-directories are
+# references/ is example material rather than consumable config,
+# codex-skills/ is installed into ~/.codex, not ~/.claude, and plugins/ is
+# installed into ~/.gemini/config/plugins, not ~/.claude. Dot-directories are
 # excluded implicitly -- bootstrap's `for src in "$SCRIPT_DIR"/*/` loop runs
 # without dotglob, so .github/ and .claude/ never enter it.
-EXCLUDED_DIRS = {"references", "codex-skills", "node_modules"}
+EXCLUDED_DIRS = {"references", "codex-skills", "node_modules", "plugins"}
 
 # bootstrap.sh links every top-level *.md except the repo's own README.
 EXCLUDED_TOP_LEVEL_FILES = {"README.md"}

@@ -51,9 +51,11 @@ for src in "$SCRIPT_DIR"/*/; do
     # references/ is documentation/example material, not consumable config, so
     # it is deliberately NOT symlinked into ~/.claude.
     # codex-skills/ is linked into ~/.codex/skills below, not ~/.claude.
+    # plugins/ is an Antigravity plugin manifest bundle linked into ~/.gemini/config/plugins below, not ~/.claude.
     # dotfiles/ is machine-specific shell tooling installed into ~/bin and
     # friends by its own per-machine installer at the bottom of this script.
-    .git|node_modules|references|codex-skills|dotfiles) continue ;;
+    .git|node_modules|references|codex-skills|dotfiles|plugins) continue ;;
+
   esac
 
   dest="$CLAUDE_DIR/$name"
@@ -130,17 +132,43 @@ EOF
   else
     printf 'skip  skills.json (%s exists but does not register %s/skills)\n' "$SKILLS_JSON" "$GEMINI_DIR"
   fi
-
   # Antigravity global customizations root (~/.gemini/config/skills)
   link_one "$GEMINI_DIR/skills" "$GEMINI_CONFIG_DIR/skills"
 fi
 
+if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
+  printf '\n--- Antigravity plugins ---\n'
+  mkdir -p "$GEMINI_CONFIG_DIR/plugins"
+  link_one "$SCRIPT_DIR/plugins/ai-config" "$GEMINI_CONFIG_DIR/plugins/ai-config"
+  PLUGINS_JSON="$GEMINI_CONFIG_DIR/plugins.json"
+  if [ ! -f "$PLUGINS_JSON" ]; then
+    cat <<EOF > "$PLUGINS_JSON"
+{
+  "entries": [
+    { "path": "$GEMINI_CONFIG_DIR/plugins/ai-config" }
+  ]
+}
+EOF
+    printf 'write plugins.json (%s) -> %s/plugins/ai-config\n' "$PLUGINS_JSON" "$GEMINI_CONFIG_DIR"
+  elif grep -q "$GEMINI_CONFIG_DIR/plugins/ai-config" "$PLUGINS_JSON" 2>/dev/null; then
+    printf 'ok    plugins.json (%s/plugins/ai-config already registered)\n' "$GEMINI_CONFIG_DIR"
+  else
+    printf 'skip  plugins.json (%s exists but does not register %s/plugins/ai-config)\n' "$PLUGINS_JSON" "$GEMINI_CONFIG_DIR"
+  fi
+fi
 
 if [ -f "$SCRIPT_DIR/GEMINI.md" ]; then
   mkdir -p "$GEMINI_DIR" "$GEMINI_CONFIG_DIR"
   link_one "$SCRIPT_DIR/GEMINI.md" "$GEMINI_DIR/GEMINI.md"
   link_one "$SCRIPT_DIR/GEMINI.md" "$GEMINI_CONFIG_DIR/GEMINI.md"
 fi
+
+if [ -f "$SCRIPT_DIR/AGENTS.md" ]; then
+  mkdir -p "$GEMINI_DIR" "$GEMINI_CONFIG_DIR"
+  link_one "$SCRIPT_DIR/AGENTS.md" "$GEMINI_DIR/AGENTS.md"
+  link_one "$SCRIPT_DIR/AGENTS.md" "$GEMINI_CONFIG_DIR/AGENTS.md"
+fi
+
 
 # --- Machine-specific dotfiles ---
 # Each dotfiles/<machine>/install.sh gates on its own host and exits quietly

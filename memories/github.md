@@ -204,6 +204,14 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
   The operational advice does not depend on resolving it.
   Don't spend a call on this endpoint either way -- the ruleset already requests the review, and neither response tells you whether one is pending.
+
+  **As of 2026-08-04, Copilot is quota-exhausted across Morrison-Lab and unavailable until September 2026, so do not request it at all until then.**
+  The user stated this directly on 2026-08-04, in the words "copilot is unavailable until september" and "stop trying to get copilot reviews".
+  Until then, skip both the `requested_reviewers` POST for `copilot-pull-request-reviewer[bot]` and the `request_copilot_review` MCP tool: either only produces a `COMMENTED` review whose whole body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."*, which wastes a round and is not a verdict.
+  This is a time-bounded override of two standing instructions that otherwise say to request Copilot every round: `shared/workflow/pr-on-claim.md`'s "Request the external reviewer in the same stride" and `shared/workflow/fully-clean.md`'s fifth case ("Keep re-requesting each round anyway").
+  Until September 2026, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
+  Re-verify Copilot's quota and re-enable the per-round request after September 2026, per `shared/writing/timestamp-volatile-claims.md`.
+  (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
 - **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
   when its output is not a terminal --- which is always, for an agent.**
   A cancellation and a real failure are therefore the same word in the column

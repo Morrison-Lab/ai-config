@@ -51,9 +51,11 @@ for src in "$SCRIPT_DIR"/*/; do
     # references/ is documentation/example material, not consumable config, so
     # it is deliberately NOT symlinked into ~/.claude.
     # codex-skills/ is linked into ~/.codex/skills below, not ~/.claude.
+    # plugins/ is an Antigravity plugin manifest bundle linked into ~/.gemini/config/plugins below, not ~/.claude.
     # dotfiles/ is machine-specific shell tooling installed into ~/bin and
     # friends by its own per-machine installer at the bottom of this script.
-    .git|node_modules|references|codex-skills|dotfiles) continue ;;
+    .git|node_modules|references|codex-skills|dotfiles|plugins) continue ;;
+
   esac
 
   dest="$CLAUDE_DIR/$name"
@@ -148,8 +150,10 @@ if [ -d "$SCRIPT_DIR/plugins/ai-config" ]; then
 }
 EOF
     printf 'write plugins.json (%s) -> %s/plugins/ai-config\n' "$PLUGINS_JSON" "$GEMINI_CONFIG_DIR"
-  elif grep -q "plugins/ai-config" "$PLUGINS_JSON" 2>/dev/null; then
+  elif grep -q "$GEMINI_CONFIG_DIR/plugins/ai-config" "$PLUGINS_JSON" 2>/dev/null; then
     printf 'ok    plugins.json (%s/plugins/ai-config already registered)\n' "$GEMINI_CONFIG_DIR"
+  else
+    printf 'skip  plugins.json (%s exists but does not register %s/plugins/ai-config)\n' "$PLUGINS_JSON" "$GEMINI_CONFIG_DIR"
   fi
 fi
 

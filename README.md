@@ -445,7 +445,7 @@ These are either machine-specific, sensitive, or pure session state:
   and per-CWD memory state, keyed by absolute home path.
 - `cache/`, `shell-snapshots/`, `file-history/`, `ide/`, `telemetry/`,
   `backups/`, `downloads/`, `session-env/` — ephemera.
-- `plugins/` — managed by Claude Code itself from marketplaces.
+- `plugins/` (in `~/.claude`) — managed by Claude Code itself from marketplaces. (Note: The top-level `plugins/` directory in this repo contains Antigravity plugin manifests and is linked into `~/.gemini/config/plugins/`.)
 
 If a per-machine variation appears that's worth syncing (e.g., a global
 `CLAUDE.md`), add it as a top-level entry here and update `bootstrap.sh`

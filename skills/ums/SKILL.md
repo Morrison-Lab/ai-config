@@ -104,6 +104,11 @@ committed pass.
 4. **Commit and push — via a branch + PR, not direct to `main`, in whichever
    repo step 2 routed the item to.**
 
+   If the work will dispatch an expensive external action from a pinned commit
+   (such as a release, deployment, or batch computation), create, push, and
+   open the PR **before** dispatching it. The PR is the reviewable record of the
+   exact SHA that performed the action; opening it afterward is too late.
+
    **Do this in an isolated `git worktree`, not the shared ai-config checkout
    directly** -- `memories/preferences.md`'s "Run a local session in an
    isolated git worktree by DEFAULT" rule applies here too.

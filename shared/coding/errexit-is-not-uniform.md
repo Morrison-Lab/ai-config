@@ -263,12 +263,14 @@ It gets GNU grep, so it does mask, and a developer who validates the hook's
 behaviour by running the same pipeline in their terminal is measuring a
 different program than the one git will run.
 
-The usual identification commands do not help here, which is the part worth
-memorizing.
-`command -v grep` prints `grep` for a function and tells you nothing.
-`type -aP grep` reports only binaries, so it hides the function that is
-actually winning.
-`type -a grep` shows it, and running the command inside a throwaway script
+The usual identification commands differ in how much they give you here,
+which is the part worth memorizing.
+`command -v grep` prints a bare `grep` when a function is winning and an
+absolute path when one is not, so it does signal that something off-`PATH`
+has taken over --- it just does not say what kind of thing.
+`type -aP grep` reports only binaries, so it hides the function entirely and
+is the one that will actively mislead you.
+`type -a grep` names it, and running the command inside a throwaway script
 settles what your hook will really get.
 
 Neither implementation reaches the missing-command case above, since a command
@@ -281,9 +283,13 @@ these codes --- from inside a script, not from your prompt.
 
 - **Do:** verify a tool exists before branching on its exit status, in
   anything that runs on a machine you do not control.
-- **Do:** identify a command with `type -a` and a throwaway script, not with
-  `command -v` or `type -aP`, either of which can miss a shell function that
-  is winning interactively and absent in the child shell your hook runs in.
+- **Do:** identify a command with `type -a` and a throwaway script, rather
+  than with `type -aP` alone, which reports only binaries and so hides a
+  shell function that is winning interactively and absent in the child shell
+  your hook runs in.
+- **Do:** read a bare name from `command -v` as the signal that something
+  off-`PATH` is winning; it is a real tell, and it does not tell you what
+  kind of thing, which is what `type -a` adds.
 - **Do:** distinguish 0, 1, and 2-or-more when a command's failure and its
   negative answer call for different actions.
 - **Don't:** read `set -euo pipefail` at the top of a script as covering an
@@ -433,7 +439,13 @@ behaviour is call-site dependent, not that it misbehaves today.
 
 Flag an `if` or `!` that branches on a command which might not be installed,
 too.
-That one has to be asked for separately, because every check above is about an
-exit status the author *expected*, so "does this exit non-zero on legitimate
-input?" comes back no and the finding is missed.
-Ask instead what the branch does when the command cannot run at all.
+That one has to be asked for separately, and not because the check above
+returns the wrong answer.
+It returns the right one: `grep -q` really does exit non-zero on legitimate
+input, since a no-match is exactly that.
+What lets the guard through is the rest of that check --- the tolerance *is*
+stated, because an `if` or a `!` is itself the statement that a non-zero exit
+is expected and handled.
+So the existing check passes cleanly while the missing-command case stays
+hidden, and it needs a question of its own.
+Ask what the branch does when the command cannot run at all.

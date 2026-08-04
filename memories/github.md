@@ -211,6 +211,12 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   This is a time-bounded override of two standing instructions that otherwise say to request Copilot every round: `shared/workflow/pr-on-claim.md`'s "Request the external reviewer in the same stride" and `shared/workflow/fully-clean.md`'s fifth case ("Keep re-requesting each round anyway").
   Until September 2026, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
   Re-verify Copilot's quota and re-enable the per-round request after September 2026, per `shared/writing/timestamp-volatile-claims.md`.
+  A `no-unreviewed-pr.py` `Stop` hook (ai-config#1041) enforces the opposite instruction and collides with this override while the quota is out.
+  It fires every turn a PR opened or readied this session sits awaiting review, demanding a Copilot request -- the one action this override forbids -- so a session that honors the override never satisfies it and the demand repeats each turn.
+  Unregister it from `~/.claude/settings.json`'s `Stop` hooks while Copilot is out.
+  The script stays and only the local registration goes.
+  Re-add it after September 2026 alongside re-enabling the request.
+  One Morrison-Lab/gha session spent over a dozen turns in this loop before the collision was recognized.
   (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
 - **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
   when its output is not a terminal --- which is always, for an agent.**

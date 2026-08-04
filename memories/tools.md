@@ -526,8 +526,9 @@ or a git hook gets the real binary instead.
 **The mechanism, the `export -f` caveat, and the git-hook consequence live in
 [`errexit-is-not-uniform`](../shared/coding/errexit-is-not-uniform.md)** ---
 read it there rather than here.
-(That file is auto-loaded via `CLAUDE.md`; the section covering this is added
-by ai-config#1110 and lands when it merges.)
+That file is auto-loaded via `CLAUDE.md`, and its "A status consumed as a
+predicate" section carries all three; it reached `main` with ai-config#1110
+(merged 2026-08-04 as `fcb4ee10`).
 This entry keeps only what a *tool* lookup needs, since that is what someone
 grepping this file is after.
 

@@ -55,13 +55,43 @@ def claude_dir() -> Path:
 
 
 def load_manifest() -> list[dict]:
+    """Flatten hooks/hooks.json (native plugin-hooks schema) to a flat entry list.
+
+    The file is the native Claude Code plugin-hooks schema so the plugin loader
+    reads it directly: ``hooks`` is an object keyed by event, each value a list
+    of groups ``{matcher?, hooks: [{script, timeout, if?, ...}]}``. This
+    reconstructs the flat ``{script, event, matcher?, timeout?, if?}`` entries
+    the rest of this file consumes. Each hook entry preserves a ``script`` key
+    precisely so this needs nothing from the plugin-only ``command`` field.
+    """
     if not MANIFEST.is_file():
         sys.exit(f"FATAL: manifest not found at {MANIFEST}")
     try:
         data = json.loads(MANIFEST.read_text())
     except json.JSONDecodeError as exc:
         sys.exit(f"FATAL: {MANIFEST} is not valid JSON: {exc}")
-    entries = data.get("hooks")
+    hooks = data.get("hooks")
+    if not isinstance(hooks, dict) or not hooks:
+        sys.exit(f"FATAL: {MANIFEST} declares no hooks, or `hooks` is not the "
+                 "native object-keyed-by-event schema")
+    entries: list[dict] = []
+    for event, groups in hooks.items():
+        for group in groups:
+            matcher = group.get("matcher")
+            for hook in group.get("hooks", []):
+                script = hook.get("script")
+                if not script:
+                    sys.exit(f"FATAL: a {event} hook entry in {MANIFEST} has no "
+                             "`script` key; install-hooks.py needs it to build "
+                             "the settings.json command.")
+                entry = {"script": script, "event": event}
+                if matcher:
+                    entry["matcher"] = matcher
+                if hook.get("timeout"):
+                    entry["timeout"] = hook["timeout"]
+                if hook.get("if"):
+                    entry["if"] = hook["if"]
+                entries.append(entry)
     if not entries:
         sys.exit(f"FATAL: {MANIFEST} declares no hooks")
     return entries
@@ -92,6 +122,30 @@ def command_for(entry: dict) -> str:
     base = "$HOME/.claude" if cdir.resolve() == default.resolve() else str(cdir)
     rel = f'"{base}/hooks/{entry["script"]}"'
     return rel if entry["script"].endswith(".sh") else f"python3 {rel}"
+
+
+def enabled_ai_config_plugin(settings: dict) -> str | None:
+    """Return the name of an enabled ai-config plugin in this settings.json.
+
+    The plugin loader reads `hooks/hooks.json` directly whenever the plugin is
+    enabled, so registering the same hooks here as well double-registers every
+    one: the two paths carry different command strings
+    (`${CLAUDE_PLUGIN_ROOT}/...` vs `$HOME/.claude/...`), so Claude Code keeps
+    both and each hook fires twice.
+
+    Best-effort by design: this inspects only the settings.json this script
+    reads, so it catches the common case (plugin enabled in the same file) and
+    can miss a project-level enablement. It has no false positives -- it fires
+    only on a truthy `enabledPlugins` entry named `ai-config` (any marketplace
+    suffix). The README caveat covers what this cannot see.
+    """
+    plugins = settings.get("enabledPlugins")
+    if not isinstance(plugins, dict):
+        return None
+    for name, on in plugins.items():
+        if on and name.split("@", 1)[0] == "ai-config":
+            return name
+    return None
 
 
 def find_entry(settings: dict, entry: dict) -> dict | None:
@@ -142,6 +196,12 @@ def main() -> int:
     cdir = claude_dir()
     settings_path = cdir / "settings.json"
     settings = load_settings(settings_path)
+    if (plugin := enabled_ai_config_plugin(settings)):
+        print(f"WARNING: the '{plugin}' plugin is enabled in {settings_path}; it\n"
+              "  already loads these hooks directly. Registering them here too "
+              "makes every\n  hook fire twice -- the plugin and settings.json "
+              "paths carry different command\n  strings, so Claude Code keeps "
+              "both. Use one path, not both (see README).\n")
     hooks_dir = cdir / "hooks"
 
     rows = [(e, classify(settings, e, hooks_dir)) for e in entries]

@@ -661,3 +661,34 @@ Two practical consequences:
   exactly like a clean one.
   (2026-07-28: a 947-repo scan reported 910 scanned; the 37-repo shortfall
   was the whole signal that anything had gone wrong.)
+
+## A workflow-only PR is exempt from the changelog and version checks; adding any other file trips both
+
+`Morrison-Lab/rpt` (and the UCD-SERG R-package repos built from that template)
+gate `news.yaml`'s `Check Changelog Action` and `version-check.yaml` on
+`paths-ignore: ['.github/workflows/**']`, so a PR touching **only** files under
+`.github/workflows/**` skips both.
+Add any other file --- a `.github/copilot-instructions.md` tweak, a README, a
+doc --- and both checks run.
+The changelog check then fails with no `NEWS.md` entry, and `version-check`
+fails because the branch's `DESCRIPTION` version does not exceed `main`'s.
+
+For a genuinely non-user-visible change (a CI or dev-doc tweak), do **not** add
+a spurious `NEWS.md` bullet or bump the package version.
+Apply the two override labels instead: `no changelog` (the changelog action's
+own opt-out) and `no version increment` (which `version-check.yaml` reads via
+`contains(github.event.pull_request.labels.*.name, 'no version increment')`).
+Both workflows list `labeled` (and `unlabeled`) among their `pull_request`
+types, so adding a label **re-triggers and clears** the check with no new commit.
+
+`labeled` does *not* re-trigger the review workflow (`claude-code-review.yml`
+runs on `[opened, synchronize, ready_for_review, reopened]` plus
+`workflow_dispatch`), so after labeling, re-dispatch the review
+(`gh workflow run claude-code-review.yml -f pr_number=<N> --ref <branch>`) if a
+fresh clean verdict at the current head is needed.
+
+**General ARDI tell:** when a fix for a review finding adds a file of a new
+*category* to an otherwise workflow-only PR, re-check that it does not trip a
+path-filtered check.
+(Morrison-Lab/rpt#183, 2026-08-03: a `copilot-instructions.md` timeout-exception
+fix broke both checks; the two labels resolved them without a commit.)

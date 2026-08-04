@@ -755,9 +755,12 @@ reported `installed-only=0 repo-only=0` for all six files, which was read as
 Every one of those runs had emitted the `/proc/self/fd/11` error on stderr.
 Re-run against temp files, four of the six differed --- `tui-alloc` by 6
 installed-only and 15 repo-only lines.
-The two `<(...)` uses already in this corpus were checked and are safe, since
-neither feeds a pipeline: `skills/use-math-macros/SKILL.md`'s bare `comm -23`,
-and `skills/cascade/SKILL.md`'s `while ... < <(...)` redirect.)
+Every `<(...)` use already in this corpus was checked and is safe, since none
+feeds a pipeline: `skills/use-math-macros/SKILL.md`'s bare `comm -23`, plus the
+`< <(...)` redirects in `skills/cascade/SKILL.md` and
+`references/cloud-setup/cloud-setup.sh`.
+Derive that set rather than counting it, since a count goes stale on the next
+one added: `git grep -n '<(' -- ':!memories/'`.)
 
 ## Splitting a shell command into simple commands in Python: two `shlex` gotchas
 

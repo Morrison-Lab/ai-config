@@ -33,7 +33,20 @@ gh api repos/<owner>/<repo>/pulls/<N>/comments --paginate   # inline review comm
 gh api repos/<owner>/<repo>/issues/<N>/comments --paginate  # top-level PR comments
 ```
 
-A formal review’s top-level body is not enough. For each late review, filter the inline comments by `pull_request_review_id`, because an empty-body review can carry every finding inline. This is the same two-surface shape `ardi` already requires when reading formal reviews; do not reimplement it as a body-only scan here.
+A formal review’s top-level body is not enough. For each late review, read the inline comments too, because an empty-body review can carry every finding inline. This is the same two-surface shape `ardi` already requires when reading formal reviews; do not reimplement it as a body-only scan here.
+
+**Read the inline comments unfiltered, though — do not narrow them to one `pull_request_review_id`.** That filter is the natural way to pair each late review with its own findings, and it is the correct way to drill into a review a human pointed at. It is unsound as a completeness check, because the round and the review object are not the same unit: a reviewer can emit two review objects seconds apart carrying one finding each, so filtering by either id returns a strict subset that reads exactly like a complete answer.
+
+Take the timestamp window from the enumeration above, and take *outstanding* from the **thread list**, which is per-thread rather than per-review and so cannot be split across review objects:
+
+``` bash
+gh api graphql -f query='{ repository(owner:"<owner>", name:"<repo>") {
+  pullRequest(number:<N>) { reviewThreads(first:100) {
+    totalCount
+    nodes { id isResolved path line comments(first:1){nodes{databaseId}} } } } } }'
+```
+
+Page at `first:100` and select `totalCount`: a `totalCount` above the node count means the cap was hit, so the thread list is itself truncated — treat that as not-yet-clean, the guard `skills/pr-status/SKILL.md` and `skills/pr-status-all/SKILL.md` already use. `memories/github.md` carries the full statement and the case record.
 
 **A finding can also arrive as a plain top-level PR comment rather than a formal review** — a bot posting a summary via `gh pr comment` (or the equivalent API call) rather than through the reviews endpoint, or a human commenting directly on the PR conversation. `pulls/<N>/reviews` and `pulls/<N>/comments` are both scoped to formal reviews and their inline threads; neither surface returns a plain PR conversation comment. Those live on the **issue comments** endpoint — a pull request is also an issue in GitHub’s data model — so the scan needs all three surfaces, not two, to cover every place a late finding can land.
 

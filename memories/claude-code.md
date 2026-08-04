@@ -642,9 +642,9 @@ plugin had shipped its hooks in the install-hooks array format ever since they
 were added, so `claude plugin validate` failed and the plugin loaded zero
 hooks -- the skills half of the plugin worked the whole time, which is why it
 went unnoticed.
-#1125 converts the file to native schema, keeping the metadata as extra keys,
-and reduces `install-hooks.py` to flattening the native structure back into the
-entry list it already consumed.)
+PR #1125 converts the file to native schema, keeping the metadata as extra
+keys, and reduces `install-hooks.py` to flattening the native structure back
+into the entry list it already consumed.)
 
 ## A plugin ref resolves by the marketplace's *declared* name, not by its URL
 

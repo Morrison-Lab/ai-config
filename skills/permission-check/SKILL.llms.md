@@ -25,6 +25,8 @@ Beyond the managed-settings special cases above, once a layer’s rules are in t
 
 **Hooks** (`PreToolUse`) run *before* the permission prompt but don’t bypass this chain: a matching `deny`/`ask` rule still applies regardless of what a hook itself returns. A hook that exits with code 2 is a separate, stronger mechanism — it blocks the call *before* permission rules are even evaluated, so it can stop a call an `allow` rule would otherwise have let through.
 
+Exit 2 is not the only way to deny, and it is not the way this repo’s own blocking hooks do it: they print a `permissionDecision: "deny"` JSON object to stdout and exit 0. That matters when testing one, since an exit-code check then reads a denial as an allow — see [`memories/claude-code.md`](../../memories/claude-code.md)’s “A `PreToolUse` hook denies on stdout and still exits 0”.
+
 Source: [Claude Code permissions docs](https://code.claude.com/docs/en/permissions.md) (rule evaluation order, hook interaction) and [settings docs](https://code.claude.com/docs/en/settings.md) (layer list and paths). If either page has since changed its ordering or paths, that page wins over this skill’s restatement — re-fetch it rather than trust this file blindly on a stale point.
 
 ## Procedure

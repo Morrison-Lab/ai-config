@@ -592,6 +592,64 @@ public repos need no authentication --- confirmed empirically by the PR's
 own `claude-review` check (which runs with submodule checkout on) completing
 successfully. (rme#982, epi204#359/#360, 2026-07-04.)
 
+## A `PreToolUse` hook denies on stdout and still exits 0, so an exit-code check reads a denial as an allow
+
+A hook blocks a tool call by printing its decision to stdout and returning
+success:
+
+```json
+{"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": "..."}}
+```
+
+The process exits 0 while doing it.
+So a harness that classifies by exit status --- `rc != 0` meaning blocked,
+`rc == 0` meaning allowed --- reports a correctly-denying hook as having
+permitted the call.
+That is a false negative on the one question such a harness exists to answer,
+and it is the [`fail-fast`](../shared/principles/fail-fast.md) shape where the
+pass path and the failure path print the same thing: denying and permitting
+both exit 0, so the exit status cannot separate them.
+
+Read the decision out of stdout instead, and keep a non-zero exit meaning what
+it actually means --- the hook crashed:
+
+```python
+if p.returncode != 0:
+    sys.exit(f"FATAL: hook exited {p.returncode}")   # a bug, not a block
+blocked = '"permissionDecision": "deny"' in p.stdout
+```
+
+Exiting 2 is a genuine blocking mechanism in Claude Code, and
+[`permission-check`](../skills/permission-check/SKILL.md) documents it --- but it
+is not the one this repo uses.
+Every hook here signals on stdout and returns 0
+(`grep -rn 'sys.exit(2)' hooks/` returns nothing, measured 2026-08-04), so an
+exit-code classifier would read **every** blocking hook in `hooks/` as allowing
+its call.
+Knowing only the exit-2 path is therefore enough to build exactly this bug.
+
+Absence of a `permissionDecision` key is a third state, and it is not an allow:
+it defers to the normal permission flow, which is what an inject-only hook
+wants.
+Naming `"allow"` there would suppress a prompt the user would otherwise have
+seen.
+
+- **Do:** decide blocked-versus-allowed from the stdout JSON, and treat a
+  non-zero exit as a crash to fail loudly on.
+- **Don't:** label a hook result from its exit code --- a denial and an allow
+  are both 0.
+
+(Verified 2026-08-04 against `hooks/require-gh-repo-flag.py`, whose deny branch
+is a `print(json.dumps(...))` at lines 103--109 followed by `return 0` at line
+110.
+The harness that surfaced this was exercising a different hook, one proposed in
+ai-config#1139 and so not on `main` while that PR stays open; the mechanism is
+identical, so this entry cites the merged instance instead.
+That harness labelled its rows `rc != 0 -> BLOCKED`, and so reported the hook as
+allowing a command it had correctly denied.)
+
 ## Plugin hooks ship in a native `hooks/hooks.json`, NOT the `install-hooks.py` array format
 
 A marketplace plugin auto-loads hooks from `hooks/hooks.json` at the plugin

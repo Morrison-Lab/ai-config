@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export GPG_TTY="$(tty)"
+GPG_TTY="$(tty)" || { echo "no controlling tty; run this in a terminal" >&2; exit 1; }
+export GPG_TTY
 
 HOSTS=~/.config/gh/hosts.yml
 OUT=~/.gh-token.gpg

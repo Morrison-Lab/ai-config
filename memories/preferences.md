@@ -13,7 +13,6 @@
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
   state that reason before choosing it.
-- ALWAYS use an isolated Git worktree (e.g. via `session-lock` / `git worktree add`) when starting a write or edit session on a repository, so parallel local AI agent sessions never step on or clobber each other's working tree.
 - When the user corrects my behavior or identifies a workflow gap, invoke UMS
   immediately and persist the lesson before resuming the main task. Do not wait
   for the user to say `ums` or to remind me again.
@@ -324,8 +323,8 @@
   The working tree often holds unrelated in-flight edits (the user's own UMS/skill commits, another draft); `git add -A` silently sweeps those into your commit and onto your PR, bloating the review and extending the cycle.
   List paths explicitly, and `git status` before committing to confirm only intended files are staged. (Learned the hard way: a `git add -A` swept the user's `scout-peers` skill into an unrelated `/prune` PR, adding several extra review rounds.)
 - Run a local session in an isolated `git worktree` by DEFAULT, not directly in the shared working copy --- only use the working copy when the user explicitly says to.
-  This default holds for EVERY local session, not just substantial multi-file work or when the user flags the wd as "in use" / "do this in a separate repo".
-  The ai-config working copy is often in use by CONCURRENT Claude sessions; untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
+  This default holds for EVERY local session, not just substantial multi-file work or when the user flags the wd as "in use" / "do this in a separate repo", so parallel local AI agent sessions never step on or clobber each other's working directory or branch state.
+  The ai-config working copy is often in use by CONCURRENT local AI agent sessions; untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
   Create it off `origin/main` (`git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main`), not the shared wd.
   Clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
   The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.

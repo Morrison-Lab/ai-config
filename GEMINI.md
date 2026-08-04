@@ -12,7 +12,8 @@ In every session — at session start, and again periodically during long sessio
 
 ## Worktree isolation
 
-- **Always use a worktree.** When starting write/edit tasks in a repository, isolate into a dedicated `git worktree` (e.g. via `session-lock` / `git worktree add`) so parallel sessions never step on or clobber each other's working directory or branch state.
+- **Always use a worktree.**
+  When starting write/edit tasks in a repository, isolate into a dedicated `git worktree` (e.g. via `session-lock` / `git worktree add`) so parallel sessions never step on or clobber each other's working directory or branch state.
 
 ## Timestamp recaps in local time
 

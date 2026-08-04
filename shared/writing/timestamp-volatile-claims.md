@@ -48,8 +48,8 @@ It is a design decision someone at that vendor can revisit, and revisiting it
 is ordinary product work.
 
 So before writing down a dichotomy between two mechanisms of a third-party
-tool, check that tool's current docs that the dichotomy still exists.
-Then date it, per the rest of this fragment.
+tool, check in that tool's current docs that the dichotomy still exists.
+Then date it, per the absolute-date rule above.
 Two file types can collapse into one mechanism with a frontmatter switch, and
 the sentence you learned a year ago will not have changed to tell you.
 

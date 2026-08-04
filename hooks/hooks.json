@@ -1,132 +1,170 @@
 {
   "_comment": [
-    "Binding metadata for the hooks in this directory. A hook script cannot",
-    "declare its own event, so scripts/install-hooks.py reads it from here.",
+    "Native Claude Code plugin-hooks schema (hooks = object keyed by event).",
+    "This file is dual-purpose:",
+    "  1. The plugin loader reads it directly when the ai-config plugin is",
+    "     enabled, so each entry's `command` uses ${CLAUDE_PLUGIN_ROOT}.",
+    "  2. scripts/install-hooks.py reads it to register the same hooks into",
+    "     ~/.claude/settings.json for the opt-in per-machine path; it rebuilds",
+    "     its own $HOME/.claude command from the preserved `script` key and",
+    "     ignores the `command`/`why`/`_note_*` fields.",
     "",
-    "Each entry: the script's filename, the harness event it binds to, an",
-    "optional tool matcher, an optional `if` permission-rule prefilter (which",
-    "keeps the hook from spawning on every unrelated call), and a one-line",
-    "reason naming the rule it enforces."
+    "Extra keys (`script`, `why`, `_note_*`) are metadata the plugin schema",
+    "tolerates and ignores. `event` is the object key; `matcher` sits at the",
+    "group level; `timeout` and an optional `if` sit on the hook entry."
   ],
-  "hooks": [
-    {
-      "script": "inject-local-time.sh",
-      "event": "UserPromptSubmit",
-      "timeout": 10,
-      "why": "CLAUDE.md 'Timestamp recaps in local time' -- supplies the real local time each turn, because a fabricated timestamp is indistinguishable from a remembered one."
-    },
-    {
-      "_note_no_if": [
-        "Deliberately carries no `if` prefilter. `Bash(gh *)` was tried and",
-        "verified working in the live harness -- it fires on `cd /tmp && gh ...`",
-        "and on `GH_TOKEN=x gh ...`, so it is not a strict prefix glob today.",
-        "It is still removed, because the asymmetry is bad: if that matching",
-        "ever tightens to a prefix check, the guard stops firing on exactly the",
-        "compound and env-prefixed shapes it exists to catch, and it stops",
-        "SILENTLY -- a disabled guard and a guard with nothing to block look",
-        "identical. The prefilter buys one Python startup (~30ms) per gh-less",
-        "Bash call; that is not worth a silent-failure mode."
-      ],
-      "script": "require-gh-repo-flag.py",
-      "event": "PreToolUse",
-      "matcher": "Bash",
-      "timeout": 10,
-      "why": "Blocks mutating repo-scoped gh commands lacking -R, so a write never silently targets whatever repo the cwd happens to be."
-    },
-    {
-      "script": "no-offer-to-file.py",
-      "event": "Stop",
-      "timeout": 10,
-      "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
-    },
-    {
-      "script": "no-stale-pr-status.py",
-      "event": "Stop",
-      "timeout": 10,
-      "why": "Blocks a reply asserting a PR's check state when the last status query predates the last push, so a stale reading is never reported as current."
-    },
-    {
-      "_note_warns_never_blocks": [
-        "Emits `additionalContext` and a `systemMessage` and nothing else --",
-        "no `permissionDecision` key at all, so the normal permission flow is",
-        "untouched. Naming `allow` there would BYPASS a prompt the user would",
-        "otherwise have seen, which is a hook making the harness more",
-        "permissive than it was without it.",
-        "",
-        "Deny was considered and rejected on the numbers: 60 of 121 real Agent",
-        "launches in this machine's transcripts are write-capable with no",
-        "`isolation`, so a blocking guard would interrupt 49% of agent",
-        "launches. The lapse it catches is a visibility failure, and a warning",
-        "at the moment of the call fixes visibility completely.",
-        "",
-        "NOT REGISTERED on any machine yet. Activation is a separate decision",
-        "after review -- run scripts/install-hooks.py --fix to opt in."
-      ],
-      "script": "flag-unassigned-worktree.py",
-      "event": "PreToolUse",
-      "matcher": "Agent",
-      "timeout": 10,
-      "why": "Surfaces a write-capable Agent launch with no `isolation`, so a decided practice cannot lapse silently -- the omission lives in a tool call, the one surface review, tests, and lint all miss."
-    },
-    {
-      "_note_not_a_stop_hook": [
-        "Deliberately UserPromptSubmit rather than Stop, which is the shape",
-        "the three guards above use. A Stop guard suppresses a message that is",
-        "wrong to send. An error admission is RIGHT to send: blocking it would",
-        "suppress the honest correction, delay it reaching the user, and remove",
-        "the very signal that surfaces the mistake. So this reminds on the next",
-        "prompt and can only ever ADD context -- there is no code path in it",
-        "that suppresses, delays, or alters a message."
-      ],
-      "script": "remind-ums-after-error.py",
-      "event": "UserPromptSubmit",
-      "timeout": 10,
-      "why": "CLAUDE.md 'Run UMS proactively' -- discovering you were wrong is a trigger with no artifact, so nothing else prompts the pass; this injects a reminder naming the admitted error when no memory/skill write followed it."
-    },
-    {
-      "script": "no-unfiled-finding.py",
-      "event": "Stop",
-      "timeout": 10,
-      "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER (needs a `?`); this catches the DECLARATIVE form, which asks nothing and so slips past it."
-    },
-    {
-      "script": "no-mistake-without-a-hook.py",
-      "event": "UserPromptSubmit",
-      "timeout": 10,
-      "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring'. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
-    },
-    {
-      "script": "no-unreviewed-pr.py",
-      "event": "Stop",
-      "timeout": 10,
-      "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down."
-    },
-    {
-      "script": "no-whole-file-punct-replace.py",
-      "event": "PreToolUse",
-      "matcher": "Bash",
-      "timeout": 10,
-      "why": "shared/coding/ascii-punctuation-in-source.md's over-application warning. A whole-file glyph replace converts pre-existing glyphs on untouched lines, and the resulting mechanical diff HIDES real changes -- on 2026-08-02 it concealed two dropped paragraphs. Blocks only when a glyph replace, a write-back, and no scoping token all co-occur under an interpreter."
-    },
-    {
-      "_note_covers_external_correction": [
-        "UserPromptSubmit, inject-only, for the same reason as the two",
-        "reminders above: accepting a reviewer's finding and fixing it is",
-        "RIGHT, so this can only ADD context and never blocks. It fills the",
-        "hole those two leave -- both key on a FIRST-PERSON admission and",
-        "remind-ums-after-error.py explicitly excludes correcting someone",
-        "else, so agreeing with a reviewer triggers neither. That is the",
-        "commonest way a mistake surfaces and the class ai-config#1065 is",
-        "about.",
-        "",
-        "NOT REGISTERED on any machine yet. Activation is a separate decision",
-        "after this PR merges (README's activation gate) -- run",
-        "scripts/install-hooks.py --fix to opt in then, not before."
-      ],
-      "script": "remind-learn-from-review.py",
-      "event": "UserPromptSubmit",
-      "timeout": 10,
-      "why": "ai-config#1065 'any time a reviewer brings up valid concerns, learn from that'. Injects, never blocks, when an accepted reviewer finding has no recorded learning or mechanism after it -- the external-correction sibling of remind-ums-after-error.py, which fires only on first-person admissions."
-    }
-  ]
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/inject-local-time.sh\"",
+            "timeout": 10,
+            "script": "inject-local-time.sh",
+            "why": "CLAUDE.md 'Timestamp recaps in local time' -- supplies the real local time each turn, because a fabricated timestamp is indistinguishable from a remembered one."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-after-error.py\"",
+            "timeout": 10,
+            "script": "remind-ums-after-error.py",
+            "why": "CLAUDE.md 'Run UMS proactively' -- discovering you were wrong is a trigger with no artifact, so nothing else prompts the pass; this injects a reminder naming the admitted error when no memory/skill write followed it.",
+            "_note_not_a_stop_hook": [
+              "Deliberately UserPromptSubmit rather than Stop, which is the shape",
+              "the Stop guards use. A Stop guard suppresses a message that is",
+              "wrong to send. An error admission is RIGHT to send: blocking it would",
+              "suppress the honest correction, delay it reaching the user, and remove",
+              "the very signal that surfaces the mistake. So this reminds on the next",
+              "prompt and can only ever ADD context -- there is no code path in it",
+              "that suppresses, delays, or alters a message."
+            ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
+            "timeout": 10,
+            "script": "no-mistake-without-a-hook.py",
+            "why": "cai 2026-08-02 'every time you make a mistake, write a hook to prevent it recurring'. Injects rather than blocks, because an error admission is RIGHT to send -- only the follow-up is owed. Complements remind-ums-after-error.py: that one wants a recorded learning, this one wants a mechanism."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-learn-from-review.py\"",
+            "timeout": 10,
+            "script": "remind-learn-from-review.py",
+            "why": "ai-config#1065 'any time a reviewer brings up valid concerns, learn from that'. Injects, never blocks, when an accepted reviewer finding has no recorded learning or mechanism after it -- the external-correction sibling of remind-ums-after-error.py, which fires only on first-person admissions.",
+            "_note_covers_external_correction": [
+              "UserPromptSubmit, inject-only, for the same reason as the two",
+              "reminders above: accepting a reviewer's finding and fixing it is",
+              "RIGHT, so this can only ADD context and never blocks. It fills the",
+              "hole those two leave -- both key on a FIRST-PERSON admission and",
+              "remind-ums-after-error.py explicitly excludes correcting someone",
+              "else, so agreeing with a reviewer triggers neither. That is the",
+              "commonest way a mistake surfaces and the class ai-config#1065 is",
+              "about.",
+              "",
+              "Activation follows this file's uniform model (see the top-level",
+              "_comment and README): the plugin loads it on enable, and",
+              "install-hooks.py --fix registers it for a non-plugin install."
+            ]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-gh-repo-flag.py\"",
+            "timeout": 10,
+            "script": "require-gh-repo-flag.py",
+            "why": "Blocks mutating repo-scoped gh commands lacking -R, so a write never silently targets whatever repo the cwd happens to be.",
+            "_note_no_if": [
+              "Deliberately carries no `if` prefilter. `Bash(gh *)` was tried and",
+              "verified working in the live harness -- it fires on `cd /tmp && gh ...`",
+              "and on `GH_TOKEN=x gh ...`, so it is not a strict prefix glob today.",
+              "It is still removed, because the asymmetry is bad: if that matching",
+              "ever tightens to a prefix check, the guard stops firing on exactly the",
+              "compound and env-prefixed shapes it exists to catch, and it stops",
+              "SILENTLY -- a disabled guard and a guard with nothing to block look",
+              "identical. The prefilter buys one Python startup (~30ms) per gh-less",
+              "Bash call; that is not worth a silent-failure mode."
+            ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-whole-file-punct-replace.py\"",
+            "timeout": 10,
+            "script": "no-whole-file-punct-replace.py",
+            "why": "shared/coding/ascii-punctuation-in-source.md's over-application warning. A whole-file glyph replace converts pre-existing glyphs on untouched lines, and the resulting mechanical diff HIDES real changes -- on 2026-08-02 it concealed two dropped paragraphs. Blocks only when a glyph replace, a write-back, and no scoping token all co-occur under an interpreter."
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unassigned-worktree.py\"",
+            "timeout": 10,
+            "script": "flag-unassigned-worktree.py",
+            "why": "Surfaces a write-capable Agent launch with no `isolation`, so a decided practice cannot lapse silently -- the omission lives in a tool call, the one surface review, tests, and lint all miss.",
+            "_note_warns_never_blocks": [
+              "Emits `additionalContext` and a `systemMessage` and nothing else --",
+              "no `permissionDecision` key at all, so the normal permission flow is",
+              "untouched. Naming `allow` there would BYPASS a prompt the user would",
+              "otherwise have seen, which is a hook making the harness more",
+              "permissive than it was without it.",
+              "",
+              "Deny was considered and rejected on the numbers: 60 of 121 real Agent",
+              "launches in this machine's transcripts are write-capable with no",
+              "`isolation`, so a blocking guard would interrupt 49% of agent",
+              "launches. The lapse it catches is a visibility failure, and a warning",
+              "at the moment of the call fixes visibility completely.",
+              "",
+              "Activation follows this file's uniform model (see the top-level",
+              "_comment and README): the plugin loads it on enable, and",
+              "install-hooks.py --fix registers it for a non-plugin install."
+            ]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-offer-to-file.py\"",
+            "timeout": 10,
+            "script": "no-offer-to-file.py",
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-stale-pr-status.py\"",
+            "timeout": 10,
+            "script": "no-stale-pr-status.py",
+            "why": "Blocks a reply asserting a PR's check state when the last status query predates the last push, so a stale reading is never reported as current."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfiled-finding.py\"",
+            "timeout": 10,
+            "script": "no-unfiled-finding.py",
+            "why": "report-mistakes-proactively 'Filing is not gated on approval' -- no-offer-to-file.py catches the OFFER (needs a `?`); this catches the DECLARATIVE form, which asks nothing and so slips past it."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unreviewed-pr.py\"",
+            "timeout": 10,
+            "script": "no-unreviewed-pr.py",
+            "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down."
+          }
+        ]
+      }
+    ]
+  }
 }

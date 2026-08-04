@@ -55,13 +55,43 @@ def claude_dir() -> Path:
 
 
 def load_manifest() -> list[dict]:
+    """Flatten hooks/hooks.json (native plugin-hooks schema) to a flat entry list.
+
+    The file is the native Claude Code plugin-hooks schema so the plugin loader
+    reads it directly: ``hooks`` is an object keyed by event, each value a list
+    of groups ``{matcher?, hooks: [{script, timeout, if?, ...}]}``. This
+    reconstructs the flat ``{script, event, matcher?, timeout?, if?}`` entries
+    the rest of this file consumes. Each hook entry preserves a ``script`` key
+    precisely so this needs nothing from the plugin-only ``command`` field.
+    """
     if not MANIFEST.is_file():
         sys.exit(f"FATAL: manifest not found at {MANIFEST}")
     try:
         data = json.loads(MANIFEST.read_text())
     except json.JSONDecodeError as exc:
         sys.exit(f"FATAL: {MANIFEST} is not valid JSON: {exc}")
-    entries = data.get("hooks")
+    hooks = data.get("hooks")
+    if not isinstance(hooks, dict) or not hooks:
+        sys.exit(f"FATAL: {MANIFEST} declares no hooks, or `hooks` is not the "
+                 "native object-keyed-by-event schema")
+    entries: list[dict] = []
+    for event, groups in hooks.items():
+        for group in groups:
+            matcher = group.get("matcher")
+            for hook in group.get("hooks", []):
+                script = hook.get("script")
+                if not script:
+                    sys.exit(f"FATAL: a {event} hook entry in {MANIFEST} has no "
+                             "`script` key; install-hooks.py needs it to build "
+                             "the settings.json command.")
+                entry = {"script": script, "event": event}
+                if matcher:
+                    entry["matcher"] = matcher
+                if hook.get("timeout"):
+                    entry["timeout"] = hook["timeout"]
+                if hook.get("if"):
+                    entry["if"] = hook["if"]
+                entries.append(entry)
     if not entries:
         sys.exit(f"FATAL: {MANIFEST} declares no hooks")
     return entries

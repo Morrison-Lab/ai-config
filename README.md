@@ -274,9 +274,14 @@ is idempotent.
 Hooks connect at session start, so restart before expecting a newly registered
 one to fire.
 
-Bindings live in [`hooks/hooks.json`](hooks/hooks.json) --- a script cannot
-declare its own event, so the manifest names the event, matcher, and the rule
-each one enforces.
+Bindings live in [`hooks/hooks.json`](hooks/hooks.json), in the native Claude
+Code plugin-hooks schema (`hooks` keyed by event) --- a script cannot declare
+its own event, so the file names the event, matcher, and, as tolerated extra
+keys, the `script` and the rule each one enforces.
+The file is dual-purpose: the plugin loader reads it directly when the
+ai-config plugin is enabled, and `install-hooks.py` reads the same file to
+register the hooks into `~/.claude/settings.json` for a non-plugin
+(bootstrap-symlink) install.
 
 **A hook that misfires is worse than a missing one**, since it trains everyone
 to work around the guard.
@@ -289,19 +294,24 @@ including a heredoc documenting one.
 **Never activate a new hook before its PR merges.**
 Writing the script into `hooks/` and testing it is *authoring*, and needs no
 permission.
-Adding the entry to `~/.claude/settings.json` --- by hand or via
-`install-hooks.py --fix` --- is *activation*, and it waits for review.
-That line is what makes this checkable rather than a general instruction to be
-careful: the file existing is harmless, the registration is not.
+There are two activation paths, and merge gates both.
+For a plugin install, the hook's entry in `hooks/hooks.json` activates it: the
+plugin loader reads that entry wherever the ai-config plugin is enabled, so the
+hook reaches consumers as soon as the entry lands on `main`.
+For a non-plugin install, `install-hooks.py --fix` registers it in
+`~/.claude/settings.json` as a per-machine opt-in.
+Neither reaches anyone else before merge --- a branch's `hooks/hooks.json`
+never reaches a consumer, and `--fix` only edits the running machine --- so the
+*script* existing is harmless while merging its entry is activation.
 
-This makes hooks the deliberate exception to the ordering
-[`record-learnings`](skills/record-learnings/SKILL.md) states for a new skill,
-where "the skill becomes available locally immediately (via symlink)" is
-listed as a feature.
-The mechanism is what separates them, and it is what makes the exception cheap
-to honour: a skill goes live by symlink whether you like it or not, whereas a
-hook goes live only when someone deliberately runs `install-hooks.py --fix`.
-Declining to run it is the entire cost of compliance.
+On the plugin path a hook now behaves like a skill --- both go live on merge ---
+so the distinction [`record-learnings`](skills/record-learnings/SKILL.md) draws
+for a new skill, where "the skill becomes available locally immediately (via
+symlink)" is listed as a feature, narrows to the non-plugin path.
+There a symlinked skill is live at once, whereas a hook stays inert until
+someone runs `install-hooks.py --fix`.
+Either way the hazard the gate addresses is the same --- pre-merge
+self-activation --- and neither path allows it.
 
 CI already takes this position.
 `claude-code-action`'s `restoreConfigFromBase` restores `.claude/` from `main`

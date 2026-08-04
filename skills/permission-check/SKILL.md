@@ -73,9 +73,9 @@ hook itself returns. A hook that exits with code 2 is a separate, stronger
 mechanism — it blocks the call *before* permission rules are even evaluated,
 so it can stop a call an `allow` rule would otherwise have let through.
 
-Exit 2 is not the only way to deny, and it is not the way this repo's own hooks
-do it: they print a `permissionDecision: "deny"` JSON object to stdout and exit
-0.
+Exit 2 is not the only way to deny, and it is not the way this repo's own
+blocking hooks do it: they print a `permissionDecision: "deny"` JSON object to
+stdout and exit 0.
 That matters when testing one, since an exit-code check then reads a denial as
 an allow --- see
 [`memories/claude-code.md`](../../memories/claude-code.md)'s "A `PreToolUse`

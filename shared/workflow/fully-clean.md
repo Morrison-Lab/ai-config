@@ -359,7 +359,7 @@ correction as `2229655d` at `07:05:28Z`, about ninety seconds before that
 verdict posted at `07:06:55Z`.
 So the only thing that caught it was `git grep -n '<(' -- ':!memories/'`, which
 the entry now carries in place of the count.
-Round 2 derived the set itself, confirmed the correction, and merged as
+Round 2 derived the set itself and confirmed the correction; the PR merged as
 `bea50421`.)
 
 **What "an approving review" means here is not a review state.**

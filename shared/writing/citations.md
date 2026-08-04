@@ -82,11 +82,14 @@ So run the check rather than re-reading, and mark any cut you do want with an
 ellipsis.
 
 - **Do:** substring-test a quotation against its fetched source, with
-  whitespace normalized, before pushing it.
+  whitespace **and inline markup** normalized on both sides, before pushing
+  it.
 - **Do:** mark a deliberate cut with an ellipsis, so the quote stops claiming
   a contiguity it does not have.
 - **Don't:** settle a quotation's fidelity by reading it against the source; a
   clean splice is exactly the case that survives that.
+- **Don't:** normalize whitespace alone and call it done --- the worked
+  example below is a quotation that test rejects and the source contains.
 
 (Morrison-Lab/ai-config#1110, 2026-08-03: a `man grep` quotation dropped "the
 exit status is 0" from the middle of its source sentence, with no ellipsis.

@@ -208,6 +208,8 @@ long copy actually supports.
 
 - **Do:** re-read a bullet, heading, or summary sentence against the passage
   it condenses, treating the short copy as an unverified claim.
+- **Do:** re-read the bullets *after* correcting the prose above them --- a
+  bullet written before the correction is not covered by having made it.
 - **Do:** treat a sentence adjacent to a measurement as unverified unless the
   measurement is about *that sentence*, not merely nearby.
 - **Don't:** count re-checking your measurements as having checked what you
@@ -251,6 +253,17 @@ false of the fidelity pair, whose second finding records a different origin.
 The sentence *directly above this paragraph* then put both dropped hedges "in
 a bullet", which is true of one and false of the other -- a detail belonging
 to one finding, generalized to its neighbour.
+And in [`citations`](citations.md), the sibling entry this same PR added, a
+`Do` bullet went on prescribing "with whitespace normalized" after the prose
+five lines above it had been corrected to require markup normalization too --
+so the bullet recommended a test that the section's own worked example
+demonstrates failing.
+That one is worth separating, because its timing is the reverse of the
+others: the bullet was not condensed *from* stale prose, it was written
+first and never revisited when the prose it summarized was corrected.
+A bullet is the natural place for this to hide, since it reads as the
+settled form of whatever sits above it.
+
 None of those was a bad measurement.
 All were sentences *about* measurements, written once and not re-read.
 

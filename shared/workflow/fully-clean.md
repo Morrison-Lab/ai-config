@@ -292,6 +292,76 @@ It balanced only because the four were subtracted from the wrong group.
 Nothing in the diff was false, but "Four further comments" read as a disjoint
 third bucket, which is how a careful reader reached the wrong partition.)
 
+**A clean verdict can ratify an enumeration instead of testing it, and then it
+reads as independent corroboration of a false scope claim.**
+The entry above is the reviewer's own arithmetic going wrong.
+This one contains no arithmetic error at all: every member the reviewer checked
+was real, described accurately, and correctly called safe.
+It took the *set* from the diff rather than deriving it, so it verified the
+members that were named and never asked whether the naming was complete.
+
+That leaves the claim worse off than if nobody had looked.
+An unchecked enumeration is merely unsupported, while one a reviewer has
+restated in its own words now carries a second signature, and the thread records
+the scope as confirmed by someone independent.
+The verdict is not evidence of independence on that point, because the
+reviewer's population came from the author.
+
+The tell sits in the review's own account of what it did.
+A sentence naming the members it verified is reporting a check of the *cited*
+set, which is a different claim from the one the diff makes.
+So read any verdict that quotes your own count back to you as leaving exactly
+that count unconfirmed.
+
+The remedy belongs in the diff rather than in the review round, because no
+reviewer can supply it: publish the command that derives the set instead of the
+count it returned, so the next reader re-derives rather than inherits.
+That is
+[`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md)'s
+prose-enumeration rule, and it is also what keeps the claim true when the next
+member is added.
+
+This is the mirror of
+[`address-every-comment`](address-every-comment.md)'s "a reviewer who enumerates
+the sites is the reason the scope goes unquestioned", and the direction is what
+changes the cost.
+There the author inherits the reviewer's list, and the failure surfaces one
+round later in a site the enumeration missed.
+Here the reviewer inherits the author's list, and nothing surfaces at all ---
+the verdict is clean, so the loop ends.
+[`derive-dont-enumerate`](derive-dont-enumerate.md) is the general principle
+behind both.
+
+- **Do:** derive any enumeration you publish with a command, and publish the
+  command beside it.
+- **Do:** treat a reviewer restating your count as that count still being
+  unverified.
+- **Don't:** read a clean verdict as evidence that a scope claim in the diff is
+  complete --- a reviewer can only check the members you named.
+- **Don't:** count a reviewer's agreement as independent when its population
+  came from your own prose.
+
+(Morrison-Lab/ai-config#1137, 2026-08-04: a `memories/tools.md` entry asserted
+"The two `<(...)` uses already in this corpus were checked and are safe".
+The corpus held three files, the third being
+`references/cloud-setup/cloud-setup.sh:118`'s `done < <(grep -rlE ...)` redirect
+--- safe for the same reason, so the conclusion held and only the scope was
+false.
+`claude-review` returned **Ready for merge** with no findings, listing among the
+things it had verified "the accuracy of the two cited `<(...)` corpus usages",
+and writing that "the two `<(...)` usages audited in the PR body ... are
+correctly described as safe --- neither feeds a pipe".
+Both statements are true of the two files they name.
+Run `30886075254` started `07:00:24Z` against head `1c688889`, where that third
+file was already present, so it was reachable throughout.
+Nothing shipped: the author derived the set independently and pushed the
+correction as `2229655d` at `07:05:28Z`, about ninety seconds before that
+verdict posted at `07:06:55Z`.
+So the only thing that caught it was `git grep -n '<(' -- ':!memories/'`, which
+the entry now carries in place of the count.
+Round 2 derived the set itself, confirmed the correction, and merged as
+`bea50421`.)
+
 **What "an approving review" means here is not a review state.**
 Across the 25 most recent merged PRs, all 106 posted reviews are `COMMENTED` and
 none is `APPROVED` --- `d-morrison`'s own included, so this is not a bot

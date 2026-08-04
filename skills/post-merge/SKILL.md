@@ -70,11 +70,32 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate  # top-level PR comme
 
 A formal review's top-level body is not enough.
 For each late review,
-filter the inline comments by `pull_request_review_id`,
+read the inline comments too,
 because an empty-body review can carry every finding inline.
 This is the same two-surface shape `ardi` already requires when reading
 formal reviews;
 do not reimplement it as a body-only scan here.
+
+**Read the inline comments unfiltered, though --- do not narrow them to one
+`pull_request_review_id`.**
+That filter is the natural way to pair each late review with its own findings,
+and it is the correct way to drill into a review a human pointed at.
+It is unsound as a completeness check, because the round and the review object
+are not the same unit: a reviewer can emit two review objects seconds apart
+carrying one finding each, so filtering by either id returns a strict subset
+that reads exactly like a complete answer.
+
+Take the timestamp window from the enumeration above, and take *outstanding*
+from the **thread list**, which is per-thread rather than per-review and so
+cannot be split across review objects:
+
+```bash
+gh api graphql -f query='{ repository(owner:"<owner>", name:"<repo>") {
+  pullRequest(number:<N>) { reviewThreads(first:50) { nodes {
+    id isResolved path line comments(first:1){nodes{databaseId}} } } } } }'
+```
+
+`memories/github.md` carries the full statement and the case record.
 
 **A finding can also arrive as a plain top-level PR comment rather than a
 formal review** --- a bot posting a summary via `gh pr comment` (or the

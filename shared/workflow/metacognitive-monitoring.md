@@ -298,6 +298,50 @@ having checked what it covered.
 this family; the general form is that an instrument's answer is only as wide
 as its input.
 
+## Verification of the reachable half does not transfer to the unreachable half
+
+The section above concerns one claim whose supporting command was narrower than
+it looked.
+This concerns a **document** whose claims divide into two populations: the ones
+about a system you can probe, and the ones about systems you cannot.
+
+Verifying the first population well is what makes the second feel verified.
+Both sets get written in one pass, in one voice, so they inherit the same felt
+confidence --- and the effort spent measuring the reachable half is exactly the
+"lack of effort" inversion above, one level up: the diligence is real, and it
+attaches to the wrong sentences.
+
+The asymmetry runs backwards from caution.
+The systems you cannot test are where you hold the **least** evidence, so they
+warrant more hedging than the parts you measured, not the same declarative
+tone.
+
+So when a document mixes both, name the boundary while writing, and treat
+everything past it as owing a citation rather than a recollection.
+Third-party defaults change underneath a claim that was true when learned,
+which is why the citation and a date do work that careful memory cannot.
+
+This is only partly mechanizable, and the honest limit is worth stating:
+"is this claim about someone else's platform still current" has no decidable
+condition, so it stays judgment.
+The checkable proxy is **coverage** --- every claim about a system you cannot
+reach carries a link or a date --- which a reviewer can verify even though no
+script can judge the claim itself.
+
+- **Do:** mark which claims are measured and which are recalled, and cite the
+  recalled ones.
+- **Do:** date a claim about a third-party platform, since its defaults move.
+- **Don't:** let a rigorously verified section lend its tone to an adjacent
+  unverified one.
+
+(UCD-SERG/lab-manual#452, 2026-08-04: every claim about the cluster was
+established empirically --- a loopback `ssh -X` probe, `ldd`, `capabilities()`,
+`module avail`, `getent group sudo`.
+Every claim about the reader's own computer was written from memory, in the
+same table, and the Linux row asserted "your desktop session is already an X
+server", which is false on the many distributions now defaulting to Wayland.
+Review caught it; nothing in the verified half could have.)
+
 ## Search for the artifact instead of arguing about whether it would exist
 
 The section above concerns an instrument you ran whose scope you did not check.

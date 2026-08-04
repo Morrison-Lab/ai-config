@@ -153,6 +153,32 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 - **Backticks in a double-quoted `-m` / `--body` string get command-substituted by the shell.** In the Bash tool, `` git commit -m "... `origin` ..." `` or `` gh pr comment --body "use `foo`" `` makes the shell run `` `origin` ``/`` `foo` `` as a command and splice the (usually empty/erroring) output into the message — silently mangling it (seen on sparta 2026-06-30: a commit body's `` `origin` `` and `` `killer` `` vanished, with `origin: command not found` in stderr). For any message/body containing backticks, use a single-quoted **heredoc** (`` -m "$(cat <<'EOF' … EOF)" `` — the quoted `'EOF'` disables all expansion) or a `--body-file`, never a bare double-quoted string. (Same root cause as ARD inline reply bodies too; use `-F body=@<file>` for `gh api .../pulls/<N>/comments`/`glab api .../notes` so backticks in Markdown never get shell-expanded.)
 - **GitHub review inline comments are on a different API endpoint than top-level PR comments.** The top-level comment-view endpoint (`` `gh pr view <N> --json comments` `` or `gh api repos/<o>/<r>/issues/<N>/comments`) captures PR-level comments and bot-posted review overview summaries, but **not inline comments from formal reviews** (line-by-line inline findings). When a user links a specific review ID (e.g. `#pullrequestreview-4761444085`), fetch both the review overview and its inline comments separately: `gh api repos/<o>/<r>/pulls/<N>/reviews/<review-id> --jq '{state, body}'` for the overview, then `gh api repos/<o>/<r>/pulls/<N>/comments --jq '.[] | select(.pull_request_review_id == <review-id>) | {line: .line, body: .body}'` to get the inline findings. A review's overview body can be generic ("I reviewed the code") with all the actual findings in inline comments on specific lines — reading only the overview misses the findings. (Encountered on ai-config#647 review 4761444085: the overview body was generic, but the specific finding was in an inline comment on CLAUDE.md line 324.)
 
+- **One review round can post several review objects, so filtering by a single `pull_request_review_id` silently drops findings.**
+  The bullet above is right that inline comments need their own endpoint, and its `select(.pull_request_review_id == <review-id>)` filter is the correct way to drill into *one* review.
+  It is the wrong way to answer "what did this round find", because the round and the review object are not the same unit.
+  A reviewer can emit two review objects seconds apart, one finding in each, and a linked review URL names only one of them --- so the filter returns a strict subset and reads exactly like a complete answer.
+  Nothing in the output announces the omission.
+
+  Enumerate unfiltered instead, and let the **thread list** decide what is outstanding:
+
+  ```bash
+  # every inline comment, whatever review it belongs to
+  gh api repos/<o>/<r>/pulls/<N>/comments --paginate \
+    --jq '.[] | "review_id=\(.pull_request_review_id) \(.path):\(.line) [\(.user.login)] \(.body[0:90])"'
+
+  # the authoritative outstanding-work list
+  gh api graphql -f query='{ repository(owner:"<o>", name:"<r>") {
+    pullRequest(number:<N>) { reviewThreads(first:50) { nodes {
+      id isResolved path line comments(first:1){nodes{databaseId}} } } } } }'
+  ```
+
+  The unresolved-thread count is the check worth trusting: it is per-thread rather than per-review, so it cannot be split across review objects.
+  Keep the id filter for drilling into a specific review a human pointed at.
+  Never use it to decide a round is complete.
+  The same caveat applies wherever this filter appears --- `skills/ardi/SKILL.md`, `skills/post-merge/SKILL.md`, and `skills/pr-status-all/SKILL.md` all prescribe it.
+  (UCD-SERG/lab-manual#452, 2026-08-04: `claude[bot]` posted review `4851937544` at `07:57:27Z` and `4851938388` at `07:57:34Z`, one finding each, and the linked review's own body was **empty** so both findings were inline-only.
+  Filtering on the linked id found the Wayland finding and missed the "Windows" one, which surfaced only from the unresolved-thread count after the first had been resolved.)
+
 - **`repos/{owner}/{repo}/issues/comments` -- without a number -- is repo-wide, not PR-scoped, and it fails by returning another PR's review.**
   The bullet above gives the correct form, `issues/<N>/comments`.
   Dropping the `<N>` produces a path that still looks PR-shaped and still returns well-formed review JSON, so `--paginate | last` hands back whichever comment is newest **anywhere in the repository**.

@@ -42,10 +42,28 @@ review.)
 own quotation, not only on one a reviewer disputes.**
 The bullet further down
 this file gives the deciding instrument --- `grep -c "<the quoted sentence>"
-<fetched source>`, with whitespace normalized --- but offers it *defensively*,
-for testing a citation someone has called hallucinated.
-It decides the authoring case just as exactly,
-and costs one command at the moment you paste the quote.
+<fetched source>` --- but offers it *defensively*, for testing a citation
+someone has called hallucinated.
+It decides the authoring case just as exactly, and costs one command at the
+moment you paste the quote.
+
+**Run it on normalized text, not on the raw files, or it returns a false
+negative on the very quotes you most need to check.**
+That bullet does not say so, and this section originally attributed the
+qualifier to it, which was wrong twice: the bullet is silent, and whitespace
+alone is not enough.
+`grep` is line-oriented, so a quotation spanning two source lines never
+matches.
+Source formatting adds more: a `man` page justifies with double spaces, and
+your own copy usually adds Markdown code spans the source has no idea about.
+Normalize whitespace **and** inline markup on both sides, per
+[`address-every-comment`](../workflow/address-every-comment.md)'s rule that
+the same normalizer must run over the needle and the haystack:
+
+```python
+norm = lambda s: re.sub(r"[\s`*_]+", " ", s).strip()
+norm(quote) in norm(source)
+```
 
 The defect it catches there is a **silent elision**: a clause dropped from the
 middle of a quoted sentence with no ellipsis marking the cut, so the result
@@ -72,9 +90,15 @@ ellipsis.
 
 (Morrison-Lab/ai-config#1110, 2026-08-03: a `man grep` quotation dropped "the
 exit status is 0" from the middle of its source sentence, with no ellipsis.
-Caught in review, and confirmed mechanically both ways --- with whitespace
-normalized, the shipped string is not a substring of `man grep` and the
-corrected one is.
+Caught in review, and confirmed mechanically once the normalization above was
+right.
+That example is also this section's own worked case for why the raw
+instrument is not enough.
+Measured against GNU grep 3.7's man page, where the sentence occupies
+`EXIT STATUS` lines 440 to 442: literal `grep -c` returns **0**, a
+whitespace-only normalization still returns **False** because the quotation
+adds Markdown backticks the man page does not have, and only whitespace plus
+markup returns **True**.
 The same rule holds for a repo artifact that claims to be verbatim; see
 [`fixtures-are-not-evidence`](../workflow/fixtures-are-not-evidence.md), where
 the deception runs by addition rather than by deletion.)

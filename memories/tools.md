@@ -517,45 +517,42 @@ PR; the immediately preceding run of the same data had correctly shown 16 as
 Sibling of the entry above: another case where the harness's shell is not the
 one you are reasoning about, and it also answers rather than erroring.
 
-`grep` at the Bash tool's prompt is a **function** the harness installs, which
-routes to a `ugrep` bundled inside the `claude` binary
-(`exec -a ugrep "$_cc_bin" -G --ignore-files ...`, falling back to
-`command grep` for a handful of flags).
-No `ugrep` exists on `PATH` --- `type -a grep` reports the function plus
-`/usr/bin/grep` and `/bin/grep`, both GNU 3.7.
+`grep` at the Bash tool's prompt is a **function** the harness installs,
+routing to a `ugrep` bundled inside the `claude` binary rather than to any
+`ugrep` on `PATH`.
+A function does not reach a child shell unless it was exported, so a script
+or a git hook gets the real binary instead.
 
-**Identifying it is where the usual commands fail**, which is the part worth
-memorizing:
+**The mechanism, the `export -f` caveat, and the git-hook consequence live in
+[`errexit-is-not-uniform`](../shared/coding/errexit-is-not-uniform.md)** ---
+read it there rather than here.
+(That file is auto-loaded via `CLAUDE.md`; the section covering this is added
+by ai-config#1110 and lands when it merges.)
+This entry keeps only what a *tool* lookup needs, since that is what someone
+grepping this file is after.
 
-| command | on a function | why it misleads |
+**Identification is the part that misleads**, because the obvious commands
+disagree about what they are reporting:
+
+| command | when a function is winning | what it actually reports |
 |---|---|---|
-| `command -v grep` | prints bare `grep` | a **path** means a binary; a bare name is the function signature, and reads like a successful lookup |
-| `type -aP grep` | prints only binaries (rc=1 if none) | reports `-P`aths, so it hides the function that is actually winning |
-| `type -a grep` | prints the function first | the one that shows it |
+| `command -v grep` | prints bare `grep` | that the winner is **not a binary on `PATH`** --- it does not say what kind |
+| `type -aP grep` | prints only binaries (rc=1 if none) | `-P`aths only, so it hides the function entirely |
+| `type -a grep` | prints the function first | the full resolution order |
+| `type -t grep` | `function` / `file` / `builtin` | the kind --- run it *inside a script* to learn what a script gets |
 
-**A function does not cross into a child shell by default, but `export -f`
-propagates it** --- so "functions are not exported" is true of how they
-usually behave and not of what they can do.
-Measured on bash 5.1.16 with a `grep()` function defined in the parent:
+**A bare name from `command -v` is not specific to functions.**
+Measured on bash 5.1.16: `command -v` prints a bare name for builtins and
+keywords too --- `cd`, `echo`, `test`, and `if` all print just themselves,
+while `command -v /usr/bin/grep` prints the path.
+So the bare name means "not a binary on `PATH`", and `type -t` is what
+narrows it to a function.
 
-```
-parent                  type -t grep -> function   the function runs
-bash script.sh          type -t grep -> file       GNU grep 3.7 runs
-bash script.sh, after
-  export -f grep        type -t grep -> function   the function runs
-```
-
-Two consequences.
-A **git hook is a child shell**, so it gets the real binary, and validating a
-hook's pipeline by pasting it at the prompt measures a different program than
-git will run.
-And `type -t` inside a throwaway script is what settles which one a script
-gets --- ask the script, not the prompt.
-
-- **Do:** use `type -a`, plus `type -t` from inside a throwaway script, to
-  establish what a command resolves to.
-- **Don't:** read `command -v <name>` returning the bare name as confirmation
-  that a binary was found; that output is the tell for a function.
+- **Do:** use `type -a` for the resolution order and `type -t` from inside a
+  throwaway script to learn what a script will actually get.
+- **Don't:** read a bare name from `command -v` as confirming a binary was
+  found, and don't read it as proving a *function* either --- builtins and
+  keywords print the same thing.
 - **Don't:** infer a `PATH`-shadowing binary from a command behaving oddly ---
   check for a function first, since no such binary need exist.
 
@@ -563,8 +560,18 @@ gets --- ask the script, not the prompt.
 between a prompt and a script was published as `ugrep 7.5.0` sitting on `PATH`
 ahead of `/usr/bin/grep`.
 Neither half held.
-Corrected in `9c986521`, and the function above is this environment's own
-`type -a grep` output.)
+Corrected in `9c986521`.
+
+Version numbers here are deliberately scoped rather than stated flat.
+An earlier draft said the two `grep` binaries were "both GNU 3.7", which is
+what this machine reports and is false elsewhere --- the reviewer that caught
+it measured **3.11** on a GitHub Actions runner, and both readings are
+correct.
+On this machine `/usr/bin/grep --version` and `/bin/grep --version` both
+report 3.7, and `readlink -f` shows they are the same file, so even "two
+binaries" was generous.
+An unscoped version claim is not merely imprecise; it is false on some
+machine, which is why every number in this entry names where it was taken.)
 
 ## A hand-rolled verification check is worth nothing until it has caught something
 

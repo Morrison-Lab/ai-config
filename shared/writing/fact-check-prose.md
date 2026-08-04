@@ -215,9 +215,9 @@ long copy actually supports.
 - **Don't:** read "both are from this turn" as exempting a restatement from
   re-verification; the source's freshness says nothing about the copy.
 
-(Morrison-Lab/ai-config#1110, 2026-08-03, four findings on one added section,
-every one of them a sound observation with an unsound sentence written about
-it.
+(Morrison-Lab/ai-config#1110, 2026-08-03, **seven** findings on one added
+section, every one of them a sound observation with an unsound sentence
+written about it.
 Two were uniqueness claims.
 A Do/Don't bullet read "that is the one place it is switched off" in a file
 whose own enumeration lists four suppression contexts and closes "All four
@@ -231,10 +231,25 @@ Two were fidelity losses, covered by
 [`citations`](citations.md) and by the **cause** claim type respectively: a
 quotation with a clause silently dropped from its middle, and a `PATH`
 shadowing explanation for a divergence actually caused by a shell function.
-The reviewer caught the first of each pair; the author caught the second of
-each by re-running the reviewer's own check across the section, per
-[`address-every-comment`](../workflow/address-every-comment.md)'s rule that a
-finding which is a pattern gets applied everywhere it recurs.
+Two more were dropped hedges, both in a bullet condensing prose four lines
+above it that had drawn the distinction correctly: one flattened `command -v`
+and `type -aP` into equivalents when only the second hides a shell function,
+and one shortened "a function reaches a child shell only if it was exported
+with `export -f`" into "a function is not exported".
+The seventh was a claim about what a *check* returns, asserted rather than
+run.
+
+**The count in this record was itself the defect, twice over**, which is the
+sharpest evidence the section has.
+It read "four findings" because four was true when the sentence was written,
+and #1110 went on to seven; a reviewer caught the stale number.
+The attribution beside it was wrong the same way -- it said the author found
+the second of each pair by re-running the reviewer's check, which is true of
+the uniqueness pair and false of the fidelity pair, whose second finding
+records a different origin entirely.
+Neither error was a bad measurement.
+Both were sentences *about* measurements, written once and not re-read.
+
 ai-config#1101 is the same class arriving independently: an unquantified
 superlative in a script comment, false on measurement, in an issue whose own
 note records that it was "Corrected 2026-08-03, twice, after filing ... both

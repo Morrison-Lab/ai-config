@@ -72,6 +72,9 @@
   Verifying each claim directly against the PR's own actual runs (not reasoning abstractly) confirmed all three were correct in sequence, while a separate claim in the same PR --- that markdown skill docs are bound by the repo's source-code-only em-dash rule --- checked out FALSE against the rule's own explicit scope and was rebutted.
   The review loop only reached zero new comments once every claim got the same live-query treatment, rather than being pattern-matched as "probably right" or "probably just noise" this many rounds in.)
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
+  The one exception is `Lacaedemon/sparta`, which never requests him, on PR
+  creation or on deadlock escalation alike.
+  Every other repo is unchanged, `Morrison-Lab/ai-config` included.
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --
   create, push, and open the feature PR first. The PR must expose the exact SHA

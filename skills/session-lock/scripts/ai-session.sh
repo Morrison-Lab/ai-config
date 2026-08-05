@@ -383,7 +383,7 @@ case "$CMD" in
   worktree)  cmd_worktree ;;
   enable-mwc)
     id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
-    write_record "$id" "${OPT_TASK:-mwc-enabled}" ""
+    write_record "$id" "${OPT_TASK:-}" ""
     touch "$REG_DIR/$(sanitize "$id").mwc"
     printf 'enabled mwc (merge-when-confident) for session %s\n' "$id"
     ;;

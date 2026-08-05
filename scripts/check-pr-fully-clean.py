@@ -24,10 +24,15 @@ def run_cmd(cmd: List[str]) -> str:
     return res.stdout.strip()
 
 
-def get_pr_info(pr_num: str) -> Tuple[str, str, str]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--json", "headRefOid,headRefName,state"])
+def get_pr_info(pr_num: str) -> Tuple[str, str, str, str]:
+    out = run_cmd(["gh", "pr", "view", pr_num, "--json", "headRefOid,headRefName,state,commits"])
     data = json.loads(out)
-    return data["headRefOid"], data["headRefName"], data["state"]
+    head_sha = data["headRefOid"]
+    commits = data.get("commits", [])
+    commit_date = ""
+    if commits:
+        commit_date = commits[-1].get("committedDate", "")
+    return head_sha, data["headRefName"], data["state"], commit_date
 
 
 def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
@@ -53,7 +58,7 @@ def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
-def check_review_comments(pr_num: str, sha: str) -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--json", "comments,reviews"])
     data = json.loads(out)
 
@@ -75,13 +80,21 @@ def check_review_comments(pr_num: str, sha: str) -> Tuple[bool, List[str]]:
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
         return False, issues
 
-    # Find items mentioning the current commit SHA or posted for the commit
+    # Match items for HEAD commit SHA:
+    # 1. Matching commit OID (from reviews API)
+    # 2. SHA or short SHA in comment body
+    # 3. Created on or after the HEAD commit's timestamp, AND contains review report header/text
     sha_short = sha[:7]
     matching_items = []
     for item in all_items:
+        created_at = item[1]
         body = item[2]
         oid = item[3] if len(item) > 3 else ""
-        if oid == sha or sha_short in body or sha in body:
+
+        is_sha_match = (oid == sha or sha_short in body or sha in body)
+        is_timing_match = bool(commit_date and created_at >= commit_date and ("### 🤖" in body or "Code Review" in body or "Verdict:" in body))
+
+        if is_sha_match or is_timing_match:
             matching_items.append(item)
 
     if not matching_items:
@@ -121,11 +134,11 @@ def main():
     pr_num = sys.argv[1]
     print(f"Checking ARDI / fully-clean status for PR #{pr_num}...")
 
-    sha, branch, state = get_pr_info(pr_num)
-    print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]}")
+    sha, branch, state, commit_date = get_pr_info(pr_num)
+    print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha)
-    review_ok, review_issues = check_review_comments(pr_num, sha)
+    review_ok, review_issues = check_review_comments(pr_num, sha, commit_date)
 
     all_issues = ci_issues + review_issues
 

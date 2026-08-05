@@ -838,3 +838,13 @@ a document separator that truncates the generated script.)
 - **`validate-skills.py` checks backtick-wrapped `ALL_CAPS_WITH_UNDERSCORE` tokens against `tool-mappings.yml` operation IDs.**
   Any backtick-wrapped ALL_CAPS string (such as `GEMINI_API_KEY`, `GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) that represents an environment variable, secret, or API constant rather than an abstract operation ID must be added to `NON_OPERATION_TOKENS` in `scripts/validate-skills.py` to avoid validation errors.
 
+## check-pr-fully-clean.py automated ARDI verification
+
+- **[`scripts/check-pr-fully-clean.py`](scripts/check-pr-fully-clean.py) `<pr-number>` programmatically enforces ARDI fully-clean criteria.**
+  It checks that:
+  (1) all CI check runs for the PR's exact HEAD commit SHA are `completed` with conclusion `success`, `neutral`, or `skipped`,
+  (2) an automated review comment evaluating that HEAD SHA has been posted, and
+  (3) the latest review comment for that HEAD SHA contains zero findings.
+  Returns exit code 0 only when fully clean.
+  Run before declaring any ARDI loop complete or unclaiming a PR.
+

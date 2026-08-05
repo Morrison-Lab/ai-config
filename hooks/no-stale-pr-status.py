@@ -64,6 +64,7 @@ def scan(path):
     last_push = last_query = last_failing_query = -1
     text = ""
     i = 0
+    query_tool_use_ids = set()
     with open(path, errors="ignore") as fh:
         for line in fh:
             i += 1
@@ -87,14 +88,19 @@ def scan(path):
                     # MCP read names its own in a `method` input parameter.
                     blob = (b.get("name") or "") + " " + json.dumps(
                         b.get("input") or {})
+                    tool_id = b.get("id") or b.get("tool_use_id") or ""
                     if RX_PUSH.search(blob):
                         last_push = i
                     if RX_QUERY.search(blob):
                         last_query = i
-                elif b.get("type") in ("tool_result", "user"):
-                    content_text = json.dumps(b.get("content") or b.get("text") or "")
-                    if RX_FAIL_QUERY.search(content_text):
-                        last_failing_query = i
+                        if tool_id:
+                            query_tool_use_ids.add(tool_id)
+                elif b.get("type") == "tool_result":
+                    tool_id = b.get("tool_use_id") or b.get("id") or ""
+                    if not query_tool_use_ids or tool_id in query_tool_use_ids:
+                        content_text = json.dumps(b.get("content") or b.get("text") or "")
+                        if RX_FAIL_QUERY.search(content_text):
+                            last_failing_query = i
                 elif b.get("type") == "text" and role == "assistant":
                     if b.get("text", "").strip():
                         text = b["text"]

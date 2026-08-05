@@ -4,7 +4,7 @@
 Verifies that:
 1. All GitHub Actions check runs for the PR's HEAD commit SHA are completed and passing.
 2. A review comment evaluating the exact HEAD commit SHA has been posted.
-3. The latest review comment for the HEAD commit SHA contains zero actionable findings.
+3. The latest review comment for the HEAD commit SHA contains zero actionable findings and no CHANGES_REQUESTED state.
 
 Exit codes:
 0: Fully clean (safe to end ARDI loop)
@@ -82,22 +82,23 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
         body = c.get("body", "")
         body_lower = body.lower()
         if "### 🤖" in body or "code review" in body_lower or "claude finished review" in body_lower or "verdict" in body_lower:
-            all_items.append(("comment", c["createdAt"], body))
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT"))
 
     for r in reviews:
         body = r.get("body", "")
         commit_oid = r.get("commit", {}).get("oid", "")
-        if body or commit_oid:
-            all_items.append(("review", r.get("submittedAt", ""), body, commit_oid))
+        state = r.get("state", "").upper()
+        submitted_at = r.get("submittedAt", "")
+        if body or commit_oid or state in ("CHANGES_REQUESTED", "REJECTED"):
+            all_items.append(("review", submitted_at, body, commit_oid, state))
 
     if not all_items:
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
         return False, issues
 
     # Match items for HEAD commit SHA:
-    # 1. Matching commit OID (from reviews API)
-    # 2. SHA or short SHA in comment body
-    # 3. Created on or after the HEAD commit's timestamp AND contains review report header
+    # 1. Matching commit OID (from formal reviews API)
+    # 2. SHA or short SHA in comment body (or created on/after commit_dt AND referencing SHA/OID)
     sha_short = sha[:7]
     commit_dt = parse_iso_time(commit_date)
 
@@ -105,15 +106,16 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     for item in all_items:
         created_at_dt = parse_iso_time(item[1])
         body = item[2]
-        body_lower = body.lower()
-        oid = item[3] if len(item) > 3 else ""
+        oid = item[3]
+        state = item[4]
 
-        is_sha_match = (oid == sha or sha_short in body or sha in body)
+        is_sha_match = bool(oid == sha or sha_short in body or sha in body)
         is_timing_match = bool(
             commit_dt
             and created_at_dt
             and created_at_dt >= commit_dt
-            and ("### 🤖" in body or "code review" in body_lower or "claude finished review" in body_lower or "verdict" in body_lower)
+            and any(marker in body_lower for marker in ("### 🤖", "code review", "claude finished review", "verdict"))
+            and (is_sha_match or not oid)
         )
 
         if is_sha_match or is_timing_match:
@@ -126,9 +128,13 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     # Sort matching items chronologically by timestamp
     matching_items.sort(key=lambda x: x[1])
 
-    # Inspect the latest matching review comment
+    # Inspect the latest matching review item
     latest_item = matching_items[-1]
     latest_body = latest_item[2]
+    latest_state = latest_item[4]
+
+    if latest_state in ("CHANGES_REQUESTED", "REJECTED"):
+        issues.append(f"Latest formal review state for SHA {sha[:8]} is '{latest_state}'")
 
     # Check for finding indicators
     finding_patterns = [
@@ -152,7 +158,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
             has_findings = True
             issues.append(f"Latest review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
 
-    if not has_findings:
+    if not has_findings and latest_state not in ("CHANGES_REQUESTED", "REJECTED"):
         print(f"✓ Found clean review comment evaluating HEAD SHA {sha[:8]} (created {latest_item[1]})")
 
     return len(issues) == 0, issues

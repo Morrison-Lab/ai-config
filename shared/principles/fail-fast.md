@@ -528,6 +528,74 @@ The worked commands live in
 that PR merged on 2026-08-03.
 This entry is the general rule.)
 
+### An exclusion filter strips the line the diagnosis needs, during the diagnosis
+
+"The pattern itself is the other half" above catches a match pattern that is
+too loose or too narrow.
+This catches a third way for a grep to return a confident false negative: the
+match pattern is fine, and a downstream `grep -v` deletes the hit before you
+read it.
+It is worse than a merely narrow pattern, because it fires while you are
+diagnosing *why* a step failed, so the empty result reads as the failure being
+gone rather than as the instrument being wrong.
+
+The shape is a diagnostic pipeline that greps a failed step's log for a
+signature and then filters that grep:
+
+```bash
+<log> | grep -E 'error|401|failed' | grep -vE 'skipping|expected'
+```
+
+The exclusion arm gets added to quiet a line you have already decided is
+benign, and it deletes the one line that names the real cause -- because the
+failure line and the noise line are frequently the same words.
+A "skipping" that means "gracefully skipped, wrote no output" is exactly what
+`grep -v skipping` removes, so the filter written to hide noise hides the
+signal, and the pipeline reports nothing.
+
+The remedy is not a better filter.
+It is to **read the failed step's own raw output** when the question is "why
+did this fail", rather than grepping it for one string you expect: a positive
+scan for a guessed signature cannot answer "what happened", and its null
+result is a fact about your guess, not about the step.
+Confirm the *presence* of the success you wanted, never infer it from the
+*absence* of an error string you predicted.
+And never chain an exclusion arm onto a diagnostic grep -- `grep -v` on the
+one command whose output you do not yet understand is how the answer gets
+filtered out before you see it.
+
+This is the "test the instrument against a known positive before trusting a
+negative" remedy above, aimed at the filter rather than the pattern, and it
+composes with
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s rule
+against asserting a negative from an instrument whose scope you did not check,
+and with
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md), which governs
+the sound grep whose *conclusion* overreaches rather than the unsound pipeline
+here.
+
+- **Do:** read a failed step's raw log when diagnosing why it failed, rather
+  than grepping it for a signature you already expect.
+- **Do:** treat a diagnostic grep's null result as "my pattern did not match",
+  and confirm the success you wanted is present rather than concluding it from
+  a missing error string.
+- **Don't:** pipe a diagnostic grep through `grep -v` -- the excluded line is
+  routinely the one you are looking for.
+- **Don't:** report a fix as working on the strength of an expected error
+  string being absent.
+
+(Morrison-Lab/gha, 2026-08-05: an `anthropics/claude-code-action` review step
+failed in a few seconds with no execution output, and a grep of its log for
+`401|workflow validation failed` piped through `grep -vE 'skipping'` returned
+nothing -- read as "no 401, so the fix works".
+The step's own output said
+`Skipping action due to workflow validation: Workflow validation failed` and
+`Exiting due to workflow validation skip`, on the very lines the
+`grep -v skipping` had removed.
+Reading the raw step output settled it at once.
+The gha-side signature is recorded in that repo's `CLAUDE.md`, near its
+self-review-skip guard section.)
+
 ## In a guard you ship: partial is worse than absent
 
 Everything above concerns a check whose failure is invisible **at runtime**,

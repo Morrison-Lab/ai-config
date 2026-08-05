@@ -14,26 +14,28 @@ import sys
 import time
 from pathlib import Path
 
-LEAD = r"""(?:^|[\s;&|`()]|\$\(|\$\{IFS\}|\$IFS\b)"""
+LEAD = r"""(?:^|[\s;&|`()]|\$\(|\$\{IFS\}|\$IFS\b|\$[A-Za-z0-9_]+)"""
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
-OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+)"""
+OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
 HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
 API_WRITE_FLAG = rf"(?:-X\s*=?\s*{HTTP_METHOD}|--method\s*=?\s*{HTTP_METHOD}|-f\b|-F\b|--field\b|--raw-field\b|--input\b)"
 
-DELIM = r"(?:\s+|\$\{IFS\}|\$IFS\b)+"
+DELIM = r"(?:\s+|\$\{IFS\}|\$IFS\b|\$\([^)]*\)|\$[A-Za-z0-9_]+)+"
+GH_PROG = r"(?:[/\w.-]+/)?(?:gh|\$GH|\$\{GH\}|[a-zA-Z0-9_.-]*gh[a-zA-Z0-9_.-]*)\b"
+GLAB_PROG = r"(?:[/\w.-]+/)?(?:glab|\$GLAB|\$\{GLAB\}|[a-zA-Z0-9_.-]*glab[a-zA-Z0-9_.-]*)\b"
 
 MERGE_PATTERNS = [
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b" + OPT_FLAGS + DELIM + r"pr\b" + OPT_FLAGS + DELIM + r"merge\b", "gh pr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b" + OPT_FLAGS + DELIM + r"mr\b" + OPT_FLAGS + DELIM + r"merge\b", "glab mr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b", "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b", "gh api repository merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b", "glab api MR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + OPT_FLAGS + DELIM + r"pr\b" + OPT_FLAGS + DELIM + r"merge\b", "gh pr merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + OPT_FLAGS + DELIM + r"mr\b" + OPT_FLAGS + DELIM + r"merge\b", "glab mr merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b", "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b", "gh api repository merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b", "glab api MR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
 ]
 
 ALLOW_ENV_FLAG = re.compile(

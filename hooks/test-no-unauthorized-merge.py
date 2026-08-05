@@ -79,6 +79,8 @@ BLOCK = [
     ('"/usr/bin/gh" pr merge 123', "quoted full executable path"),
     ('gh${IFS}pr${IFS}merge 123', "IFS word-split gh pr merge"),
     ('gh$IFS pr$IFS merge 123', "short IFS word-split gh pr merge"),
+    ('gh$(true) pr merge 123', "subshell expansion inside executable name gh"),
+    ('GH=gh; $GH pr merge 123', "variable indirection for gh executable name"),
 ]
 
 ALLOW = [

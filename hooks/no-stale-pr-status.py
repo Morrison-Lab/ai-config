@@ -49,7 +49,7 @@ RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 RX_QUERY = re.compile(
     r"gh\s+pr\s+checks|statusCheckRollup|get_check_runs|"
     r"gh\s+run\s+view|checkSuites|mergeStateStatus|"
-    r"python3?\s+.*check-pr-fully-clean\.py",
+    r"python3?\s+.*(?<!test_)\bcheck-pr-fully-clean\.py",
     re.I,
 )
 
@@ -99,7 +99,7 @@ def scan(path):
                             query_tool_use_ids.add(tool_id)
                 elif b.get("type") == "tool_result":
                     tool_id = b.get("tool_use_id") or b.get("id") or ""
-                    if query_tool_use_ids and tool_id in query_tool_use_ids:
+                    if tool_id and query_tool_use_ids and tool_id in query_tool_use_ids:
                         content_text = json.dumps(b.get("content") or b.get("text") or "")
                         if RX_FAIL_QUERY.search(content_text):
                             last_failing_query = i

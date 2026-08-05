@@ -5,7 +5,8 @@ Tests:
 1. CI check run status filtering (completed with success/neutral/skipped vs in_progress/failure).
 2. Review comment parsing (clean verdict vs finding pattern matching).
 3. Formal GitHub review parsing with empty top-level comments (state: CHANGES_REQUESTED vs APPROVED/COMMENTED).
-4. Chronological sorting and body marker filtering.
+4. Review prose containing modifier variations like "No major changes requested".
+5. Robust handling of None author objects in review payloads.
 """
 import importlib.util
 import json
@@ -53,6 +54,19 @@ def main() -> int:
         "commit": {"oid": "sha123"}
     }
 
+    no_major_changes_comment = {
+        "createdAt": "2026-08-05T18:14:14Z",
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nNo major changes requested. Everything looks clean and ready for merge."
+    }
+
+    none_author_review = {
+        "submittedAt": "2026-08-05T18:14:14Z",
+        "body": "### \ud83e\udd16 Code Review\n\nLooks clean.",
+        "state": "COMMENTED",
+        "author": None,
+        "commit": {"oid": "sha123"}
+    }
+
     # Test 1: Clean review comment returns True
     mock_clean_data = json.dumps({"comments": [clean_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_clean_data):
@@ -71,7 +85,19 @@ def main() -> int:
         formal_ok, formal_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
         check("formal CHANGES_REQUESTED review with empty comments fails check_review_comments", not formal_ok and len(formal_issues) > 0)
 
-    # Test 4: CI check runs filtering
+    # Test 4: Review with 'No major changes requested' passes check_review_comments
+    mock_no_major_data = json.dumps({"comments": [no_major_changes_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_no_major_data):
+        no_major_ok, no_major_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        check("review with 'No major changes requested' passes check_review_comments", no_major_ok and no_major_issues == [])
+
+    # Test 5: Payload with None author in reviews does not raise exception
+    mock_none_author_data = json.dumps({"comments": [], "reviews": [none_author_review]})
+    with patch.object(checker, "run_cmd", return_value=mock_none_author_data):
+        none_author_ok, none_author_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        check("payload with None author handles safely", none_author_ok and none_author_issues == [])
+
+    # Test 6: CI check runs filtering
     mock_ci_success = json.dumps({
         "check_runs": [
             {"name": "build", "status": "completed", "conclusion": "success"},

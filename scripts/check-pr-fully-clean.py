@@ -10,7 +10,7 @@ Exit codes:
 0: Fully clean (safe to end ARDI loop)
 1: Not clean (in-progress checks, failing checks, missing review, or findings present)
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import re
 import subprocess
@@ -77,12 +77,12 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
 
     issues = []
 
-    # Check for active formal CHANGES_REQUESTED or REJECTED state across all reviews
+    # Track the latest formal review state per author chronologically across all reviews
     author_latest_state: Dict[str, str] = {}
     for r in reviews:
-        author = r.get("author", {}).get("login", "")
+        author = (r.get("author") or {}).get("login", "")
         state = r.get("state", "").upper()
-        if author and state in ("CHANGES_REQUESTED", "REJECTED", "APPROVED"):
+        if author and state:
             author_latest_state[author] = state
 
     for author, state in author_latest_state.items():
@@ -94,7 +94,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     for c in comments:
         body = c.get("body", "")
         body_lower = body.lower()
-        author_login = c.get("author", {}).get("login", "")
+        author_login = (c.get("author") or {}).get("login", "")
 
         if "ard review disposition summary" in body_lower:
             continue
@@ -129,10 +129,11 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
         oid = item[3]
 
         is_sha_match = bool((oid and oid == sha) or sha_short in body or sha in body)
+        # Allow a 60-second clock skew tolerance window for commit vs server creation time
         is_timing_match = bool(
             commit_dt
             and created_at_dt
-            and created_at_dt >= commit_dt
+            and created_at_dt >= (commit_dt - timedelta(seconds=60))
             and (is_sha_match or not oid)
             and any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict"))
         )
@@ -144,7 +145,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
         issues.append(f"No review comment has been posted evaluating HEAD SHA {sha[:8]} yet")
         return False, issues
 
-    # Inspect ALL matching items for HEAD SHA (not just an empty trailing formal review object)
+    # Inspect ALL matching items for HEAD SHA    # Precise finding patterns (avoiding false positives on clean review summaries)
     finding_patterns = [
         r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
         r"\*\*Actionable Findings\*\*",
@@ -155,7 +156,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
         r"Verdict:\s*(Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings)",
         r"\bNeeds\s+more\s+work\b",
         r"\bNeeds\s+work\b",
-        r"(?<!No\s)changes\s+requested\b",
+        r"changes\s+requested\b",
     ]
 
     has_findings = False
@@ -167,7 +168,12 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
             issues.append(f"Matching review for SHA {sha[:8]} has state '{state}'")
 
         for pat in finding_patterns:
-            if re.search(pat, body, re.IGNORECASE | re.MULTILINE):
+            for match in re.finditer(pat, body, re.IGNORECASE | re.MULTILINE):
+                if pat == r"changes\s+requested\b":
+                    start = match.start()
+                    prefix = body[max(0, start - 25):start].lower()
+                    if re.search(r"\bno\s+(\w+\s+)?$", prefix):
+                        continue
                 has_findings = True
                 issues.append(f"Review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
 

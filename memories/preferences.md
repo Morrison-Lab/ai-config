@@ -871,5 +871,20 @@ safer/preferred choice merely because the repo has external consumers.
   The same applies to any wrap-up point where context is about to end: `/clear`, archiving a session, handing off, or a container being reclaimed. (2026-07-31: offered exactly that framing at the end of a session; the owner's reply was "never risk letting work or lessons get lost.")
 
 ## AI code review prompt instructions
-- **Suppress asymptotic noise and legacy runtime nitpicks in AI code review prompts.** When building prompts for automated AI code reviewers, explicitly instruct the model to assume modern target runtimes (e.g., Python 3.10+) and suppress hyper-pedantic runtime compatibility warnings (e.g. PEP 604 `A | B` union syntax or `list[T]` generics for EOL Python 3.8/3.9) unless explicit legacy runtime support is declared in the repository. (Learned on gha#412, 2026-08-05.)
-- **Always verify relative dates against current time.** When discussing End-of-Life (EOL) or deprecation milestones, verify the current date first (e.g. 2026) so past dates (like October 2025) are correctly identified as elapsed past events rather than future occurrences.
+
+- **Suppress low-signal, hyper-pedantic noise in AI code review prompts.**
+  When building prompts for automated AI code reviewers,
+  instruct the model to assume modern target runtimes (e.g. Python 3.10+)
+  and to suppress hyper-pedantic runtime-compatibility warnings
+  (e.g. PEP 604 `A | B` unions or `list[T]` generics for EOL Python 3.8/3.9)
+  unless the repository declares explicit legacy-runtime support.
+  (Learned on gha#412, 2026-08-05.)
+- **Demand a single, exhaustive review pass.**
+  Instruct the reviewer to report every finding, recommendation, and edge case in one pass,
+  rather than withholding or staggering feedback across rounds.
+  (Learned on gha#412, 2026-08-05.)
+- **Always verify relative dates against the current time.**
+  When evaluating End-of-Life (EOL) or deprecation milestones,
+  check the current date first (e.g. via the system clock or `date`)
+  so an elapsed date (like October 2025) is recognized as past rather than future.
+  (Learned on gha#412, 2026-08-05.)

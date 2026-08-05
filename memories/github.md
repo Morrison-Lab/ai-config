@@ -805,3 +805,25 @@ Two practical consequences:
   exactly like a clean one.
   (2026-07-28: a 947-repo scan reported 910 scanned; the 37-repo shortfall
   was the whole signal that anything had gone wrong.)
+
+## Markdown PR Review Parsing & Regex Match-Boundary Splitting
+
+- **Avoid lookahead regexes across markdown finding bodies containing code blocks.**
+  Single-line comments in code blocks (`# comment` in Python, Bash, R, Ruby, YAML) start with `# `. A lookahead regex matching `\n\#{1,6}[ \t]+` to detect section headers treats single-line code comments inside code blocks as markdown headings, cutting off code block suggestions mid-snippet.
+- **Use match-boundary splitting instead of single-pass lookaheads.**
+  Search for location headers (`**Location:** [file.ext:L10]`) to collect all finding match spans `matches`. Then compute each finding body's boundaries linearly as `content[match[i].end() : match[i+1].start()]`. This completely eliminates catastrophic regex backtracking on nested code blocks and single-line `#` code comments. (Morrison-Lab/gha#412, 2026-08-05).
+- **Decouple section header calculation from location tag lines.**
+  When introductory text lines exist between a section heading (e.g. `#### 1. Critical Bug`) and its `Location:` tag, immediate-prefix header regexes fail to capture the heading and finding body boundaries absorb adjacent headings. Pre-calculate section header start positions preceding each location match to accurately slice finding bodies. (Morrison-Lab/gha#412, 2026-08-05).
+- **Restrict header extraction regex to sub-headings (`##` through `######`).**
+  Using `\#{1,6}` matches single `#` top-level document headers (e.g. `# Antigravity Code Review Report`), setting `header_text` to the report title for the first comment. Use `\#{2,6}` so top-level report titles are ignored. (Morrison-Lab/gha#412, 2026-08-05).
+- **Strip leading slashes and backticks from location file paths.**
+  LLMs formatted location headers as `[ /src/main.py:L10 ]` or `[ \`src/main.py\`:L10 ]`. `POST /repos/{owner}/{repo}/pulls/{number}/reviews` rejects paths with leading slashes (`/src/main.py`) with HTTP 422 (`path cannot start with /`). Apply `.strip("'\"` ").lstrip("/")` during path normalization. (Morrison-Lab/gha#412, 2026-08-05).
+- **Match start-of-string or newlines (`(?:^|\n+)`) when truncating summary headers.**
+  Trimming summary sections using `\n+` fails when `### Summary` directly follows a `Location:` tag with 0 body lines, causing summary text to leak into inline comments. Using `(?:^|\n+)` captures summary headers at index 0 or after newlines cleanly. (Morrison-Lab/gha#412, 2026-08-05).
+- **Validate `repo_slug` before calling GitHub API endpoints.**
+  If `GITHUB_REPOSITORY` is environment-unset and `gh repo view` fails, fallback literal strings like `"{owner}/{repo}"` execute invalid HTTP requests returning HTTP 404. Check `not repo_slug or repo_slug == "{owner}/{repo}"` and handle cleanly. (Morrison-Lab/gha#412, 2026-08-05).
+- **Resolve candidate instruction paths relative to `GITHUB_WORKSPACE`.**
+  Relative path lookups for `CLAUDE.md` / `AGENTS.md` depend on the current working directory. Use `os.path.join(os.environ.get("GITHUB_WORKSPACE", "."), rel_path)` so root instruction files are discovered when scripts are called from subdirectories. (Morrison-Lab/gha#412, 2026-08-05).
+- **Enforce single-pass exhaustive review instructions.**
+  Prompt instructions for AI code reviewers should explicitly demand a single-pass, comprehensive review reporting all findings, recommendations, and edge cases in a single pass rather than withholding or staggering feedback across multiple review rounds. (Morrison-Lab/gha#412, 2026-08-05).
+

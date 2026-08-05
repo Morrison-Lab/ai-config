@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Add or modify the Google Antigravity PR review, security audit, and test generation workflow (.github/workflows/antigravity-review.yml). Preserves load-bearing patterns — workflow_call delegation to Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2, GEMINI_API_KEY secret propagation, mode selection (code-review, security-audit, test-generation), and event-gated trigger policies.">
+<meta name="description" content="Add or modify the Google Antigravity PR review, security audit, and test generation workflow (.github/workflows/antigravity-review.yml). Preserves load-bearing patterns – workflow_call delegation to Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2, GEMINI_API_KEY secret propagation, mode selection (code-review, security-audit, test-generation), and event-gated trigger policies.">
 
 <title>skill – ai-config</title>
 <style>
@@ -352,10 +352,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <ul class="collapse">
   <li><a href="#delegation-to-morrison-labgha-reusable-workflow" id="toc-delegation-to-morrison-labgha-reusable-workflow" class="nav-link" data-scroll-target="#delegation-to-morrison-labgha-reusable-workflow">1. Delegation to <code>Morrison-Lab/gha</code> reusable workflow</a></li>
   <li><a href="#required-permissions" id="toc-required-permissions" class="nav-link" data-scroll-target="#required-permissions">2. Required permissions</a></li>
-  <li><a href="#secret-propagation-gemini_api_key" id="toc-secret-propagation-gemini_api_key" class="nav-link" data-scroll-target="#secret-propagation-gemini_api_key">3. Secret propagation (<code>GEMINI_API_KEY</code>)</a></li>
-  <li><a href="#operational-modes" id="toc-operational-modes" class="nav-link" data-scroll-target="#operational-modes">4. Operational modes</a></li>
-  <li><a href="#event-gated-trigger-policy" id="toc-event-gated-trigger-policy" class="nav-link" data-scroll-target="#event-gated-trigger-policy">5. Event-gated trigger policy</a></li>
-  <li><a href="#fork-dependabot-safeguards" id="toc-fork-dependabot-safeguards" class="nav-link" data-scroll-target="#fork-dependabot-safeguards">6. Fork &amp; Dependabot safeguards</a></li>
+  <li><a href="#concurrency-management" id="toc-concurrency-management" class="nav-link" data-scroll-target="#concurrency-management">3. Concurrency management</a></li>
+  <li><a href="#secret-propagation-gemini_api_key" id="toc-secret-propagation-gemini_api_key" class="nav-link" data-scroll-target="#secret-propagation-gemini_api_key">4. Secret propagation (<code>GEMINI_API_KEY</code>)</a></li>
+  <li><a href="#operational-modes" id="toc-operational-modes" class="nav-link" data-scroll-target="#operational-modes">5. Operational modes</a></li>
+  <li><a href="#event-gated-trigger-policy" id="toc-event-gated-trigger-policy" class="nav-link" data-scroll-target="#event-gated-trigger-policy">6. Event-gated trigger policy</a></li>
+  <li><a href="#fork-dependabot-safeguards" id="toc-fork-dependabot-safeguards" class="nav-link" data-scroll-target="#fork-dependabot-safeguards">7. Fork &amp; Dependabot safeguards</a></li>
   </ul></li>
   <li><a href="#setting-up-in-a-new-repo" id="toc-setting-up-in-a-new-repo" class="nav-link" data-scroll-target="#setting-up-in-a-new-repo">Setting up in a new repo</a>
   <ul class="collapse">
@@ -375,8 +376,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="agy-review-workflow" class="level1">
 <h1>agy-review-workflow</h1>
-<p>Sets up or edits the Google Antigravity PR <strong>review, security audit, and test generation</strong> workflow (<code>antigravity-review.yml</code>), which invokes the reusable <code>antigravity-code-review.yml</code> workflow from <code>Morrison-Lab/gha</code>.</p>
-<p>Path: <code>.github/workflows/antigravity-review.yml</code></p>
+<p>Sets up or edits the Google Antigravity PR <strong>review, security audit, and test generation</strong> workflow (<a href="../../.github/workflows/antigravity-review.yml">antigravity-review.yml</a>), which invokes the reusable <a href="https://github.com/Morrison-Lab/gha/blob/main/.github/workflows/antigravity-code-review.yml">antigravity-code-review.yml</a> workflow from <code>Morrison-Lab/gha</code>.</p>
+<p>Path: <a href="../../.github/workflows/antigravity-review.yml">.github/workflows/antigravity-review.yml</a></p>
 <section id="load-bearing-pieces-dont-simplify-away" class="level2">
 <h2 class="anchored" data-anchor-id="load-bearing-pieces-dont-simplify-away">Load-bearing pieces (don’t “simplify” away)</h2>
 <section id="delegation-to-morrison-labgha-reusable-workflow" class="level3">
@@ -392,35 +393,44 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">contents</span><span class="kw">:</span><span class="at"> read</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">pull-requests</span><span class="kw">:</span><span class="at"> write</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">issues</span><span class="kw">:</span><span class="at"> write</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">actions</span><span class="kw">:</span><span class="at"> read</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li><code>contents: read</code>: Allows reading repository code and diffs.</li>
 <li><code>pull-requests: write</code>: Grants permission to post review comments and verdicts on PRs.</li>
 <li><code>issues: write</code>: Allows writing issue comments where required.</li>
 <li><code>id-token: write</code>: Enables OIDC authentication where required.</li>
+<li><code>actions: read</code>: Lets automated review agents inspect CI run status.</li>
 </ul>
 </section>
+<section id="concurrency-management" class="level3">
+<h3 class="anchored" data-anchor-id="concurrency-management">3. Concurrency management</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">concurrency</span><span class="kw">:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">group</span><span class="kw">:</span><span class="at"> antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cancel-in-progress</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>cancel-in-progress: true</code> cancels superseded runs on rapid sequential pushes, preventing API quota waste and review comment race conditions.</p>
+</section>
 <section id="secret-propagation-gemini_api_key" class="level3">
-<h3 class="anchored" data-anchor-id="secret-propagation-gemini_api_key">3. Secret propagation (<code>GEMINI_API_KEY</code>)</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">secrets</span><span class="kw">:</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">GEMINI_API_KEY</span><span class="kw">:</span><span class="at"> ${{ secrets.GEMINI_API_KEY }}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<h3 class="anchored" data-anchor-id="secret-propagation-gemini_api_key">4. Secret propagation (<code>GEMINI_API_KEY</code>)</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">secrets</span><span class="kw">:</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">GEMINI_API_KEY</span><span class="kw">:</span><span class="at"> ${{ secrets.GEMINI_API_KEY }}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Antigravity uses the Gemini API. Ensure the target repo has <code>GEMINI_API_KEY</code> defined in repository or organization secrets (<code>gh secret list</code>).</p>
 </section>
 <section id="operational-modes" class="level3">
-<h3 class="anchored" data-anchor-id="operational-modes">4. Operational modes</h3>
+<h3 class="anchored" data-anchor-id="operational-modes">5. Operational modes</h3>
 <p>Supported operational modes passed via <code>inputs.mode</code>: - <code>code-review</code> (default): Performs an automated PR code review. - <code>security-audit</code>: Runs targeted security inspection on modified code. - <code>test-generation</code>: Generates suggested test cases for changed files.</p>
 </section>
 <section id="event-gated-trigger-policy" class="level3">
-<h3 class="anchored" data-anchor-id="event-gated-trigger-policy">5. Event-gated trigger policy</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">with</span><span class="kw">:</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">trigger-policy</span><span class="kw">:</span><span class="at"> ${{ github.event_name == 'pull_request' &amp;&amp; 'on-push' || 'on-request' }}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<h3 class="anchored" data-anchor-id="event-gated-trigger-policy">6. Event-gated trigger policy</h3>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">with</span><span class="kw">:</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">trigger-policy</span><span class="kw">:</span><span class="at"> ${{ github.event_name == 'pull_request' &amp;&amp; 'on-push' || 'on-request' }}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li><code>on-push</code>: Automatically reviews PR updates on <code>pull_request</code> events (<code>opened</code>, <code>synchronize</code>, <code>ready_for_review</code>, <code>reopened</code>).</li>
 <li><code>on-request</code>: Restricts review to manual execution via <code>workflow_dispatch</code>.</li>
 </ul>
 </section>
 <section id="fork-dependabot-safeguards" class="level3">
-<h3 class="anchored" data-anchor-id="fork-dependabot-safeguards">6. Fork &amp; Dependabot safeguards</h3>
+<h3 class="anchored" data-anchor-id="fork-dependabot-safeguards">7. Fork &amp; Dependabot safeguards</h3>
 <p>The underlying action (<code>Morrison-Lab/gha/antigravity-review@v2</code>) enforces guards so draft PRs, cross-repository (fork) PRs, and <code>dependabot[bot]</code> runs do not leak secrets or execute untrusted code.</p>
 </section>
 </section>
@@ -433,53 +443,57 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ol>
 <section id="canonical-workflow-template" class="level3">
 <h3 class="anchored" data-anchor-id="canonical-workflow-template">Canonical Workflow Template</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Active caller for Morrison-Lab/gha's reusable Antigravity PR review workflow.</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> Antigravity Code Review</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">on</span><span class="kw">:</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">pull_request</span><span class="kw">:</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">opened</span><span class="kw">,</span><span class="at"> synchronize</span><span class="kw">,</span><span class="at"> ready_for_review</span><span class="kw">,</span><span class="at"> reopened</span><span class="kw">]</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">workflow_dispatch</span><span class="kw">:</span></span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">inputs</span><span class="kw">:</span></span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pr_number</span><span class="kw">:</span></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">'Pull request number to review'</span></span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">required</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">type</span><span class="kw">:</span><span class="at"> string</span></span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">mode</span><span class="kw">:</span></span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">'Operational mode: code-review, security-audit, or test-generation'</span></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">required</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">default</span><span class="kw">:</span><span class="at"> </span><span class="st">'code-review'</span></span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">type</span><span class="kw">:</span><span class="at"> choice</span></span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">options</span><span class="kw">:</span></span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> code-review</span></span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> security-audit</span></span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> test-generation</span></span>
-<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
-<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">review</span><span class="kw">:</span></span>
-<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">if</span><span class="kw">:</span><span class="at"> github.event_name != 'issue_comment'</span></span>
-<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">permissions</span><span class="kw">:</span></span>
-<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">contents</span><span class="kw">:</span><span class="at"> read</span></span>
-<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pull-requests</span><span class="kw">:</span><span class="at"> write</span></span>
-<span id="cb5-30"><a href="#cb5-30" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">issues</span><span class="kw">:</span><span class="at"> write</span></span>
-<span id="cb5-31"><a href="#cb5-31" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span>
-<span id="cb5-32"><a href="#cb5-32" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2</span></span>
-<span id="cb5-33"><a href="#cb5-33" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">with</span><span class="kw">:</span></span>
-<span id="cb5-34"><a href="#cb5-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> ${{ inputs.mode || 'code-review' }}</span></span>
-<span id="cb5-35"><a href="#cb5-35" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pr-number</span><span class="kw">:</span><span class="at"> ${{ inputs.pr_number }}</span></span>
-<span id="cb5-36"><a href="#cb5-36" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">model</span><span class="kw">:</span><span class="at"> </span><span class="st">''</span></span>
-<span id="cb5-37"><a href="#cb5-37" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trigger-policy</span><span class="kw">:</span><span class="at"> ${{ github.event_name == 'pull_request' &amp;&amp; 'on-push' || 'on-request' }}</span></span>
-<span id="cb5-38"><a href="#cb5-38" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">secrets</span><span class="kw">:</span></span>
-<span id="cb5-39"><a href="#cb5-39" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">GEMINI_API_KEY</span><span class="kw">:</span><span class="at"> ${{ secrets.GEMINI_API_KEY }}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Active caller for Morrison-Lab/gha's reusable Antigravity PR review workflow.</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> Antigravity Code Review</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="fu">on</span><span class="kw">:</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">pull_request</span><span class="kw">:</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">types</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">opened</span><span class="kw">,</span><span class="at"> synchronize</span><span class="kw">,</span><span class="at"> ready_for_review</span><span class="kw">,</span><span class="at"> reopened</span><span class="kw">]</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">workflow_dispatch</span><span class="kw">:</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">inputs</span><span class="kw">:</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pr_number</span><span class="kw">:</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">'Pull request number to review'</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">required</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">type</span><span class="kw">:</span><span class="at"> string</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">mode</span><span class="kw">:</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">description</span><span class="kw">:</span><span class="at"> </span><span class="st">'Operational mode: code-review, security-audit, or test-generation'</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">required</span><span class="kw">:</span><span class="at"> </span><span class="ch">false</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">default</span><span class="kw">:</span><span class="at"> </span><span class="st">'code-review'</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">type</span><span class="kw">:</span><span class="at"> choice</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">options</span><span class="kw">:</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> code-review</span></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> security-audit</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="kw">-</span><span class="at"> test-generation</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a><span class="fu">concurrency</span><span class="kw">:</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">group</span><span class="kw">:</span><span class="at"> antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}</span></span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">cancel-in-progress</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span></span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">review</span><span class="kw">:</span></span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">permissions</span><span class="kw">:</span></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">contents</span><span class="kw">:</span><span class="at"> read</span></span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pull-requests</span><span class="kw">:</span><span class="at"> write</span></span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">issues</span><span class="kw">:</span><span class="at"> write</span></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">actions</span><span class="kw">:</span><span class="at"> read</span></span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2</span></span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">with</span><span class="kw">:</span></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> ${{ inputs.mode || 'code-review' }}</span></span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pr-number</span><span class="kw">:</span><span class="at"> ${{ github.event.pull_request.number || inputs.pr_number }}</span></span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">model</span><span class="kw">:</span><span class="at"> </span><span class="st">''</span></span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">trigger-policy</span><span class="kw">:</span><span class="at"> ${{ github.event_name == 'pull_request' &amp;&amp; 'on-push' || 'on-request' }}</span></span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">secrets</span><span class="kw">:</span></span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">GEMINI_API_KEY</span><span class="kw">:</span><span class="at"> ${{ secrets.GEMINI_API_KEY }}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><code>claude-review-workflow</code></strong> — sets up the Claude Code PR review workflow (<code>claude-code-review.yml</code>).</li>
-<li><strong><code>claude-agent-workflow</code></strong> — sets up the Claude Code agent workflow (<code>claude.yml</code>).</li>
-<li><strong><code>config-ai</code></strong> — routes AI capability and bot workflow requests to the appropriate skill.</li>
+<li><strong><code>claude-review-workflow</code></strong> – sets up the Claude Code PR review workflow (<code>claude-code-review.yml</code>).</li>
+<li><strong><code>claude-agent-workflow</code></strong> – sets up the Claude Code agent workflow (<code>claude.yml</code>).</li>
+<li><strong><code>config-ai</code></strong> – routes AI capability and bot workflow requests to the appropriate skill.</li>
 </ul>
 
 

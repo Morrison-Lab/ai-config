@@ -498,7 +498,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="stopping-conditions">Stopping conditions</h2>
 <p><strong>There is no round limit. Always request another review.</strong> The loop on a single PR ends on exactly three things:</p>
 <ol type="1">
-<li><strong>A totally clean review</strong> — no nits, no non-blocking comments, everything Addressed or agreed Deferred. See <a href="#the-bar-fully-clean"><em>The bar: “fully clean”</em></a>.</li>
+<li><strong>A totally clean review on the latest pushed commit</strong> – no nits, no non-blocking comments, everything Addressed or agreed Deferred, evaluating the exact HEAD SHA currently on the branch. <strong>Crucial:</strong> Pushing fixes for a review starts a new review cycle. The ARDI loop is <strong>NEVER</strong> finished when you push fixes for a finding-bearing review or post an ARD summary. You must wait for the new review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it contains zero findings before ending the loop. See <a href="#the-bar-fully-clean"><em>The bar: “fully clean”</em></a>.</li>
 <li><strong>Nothing actionable remains</strong> — every open item has been escalated to a human and is waiting on their decision, so there is no next action you can take. Not “some items are deadlocked”; <em>all</em> of them.</li>
 <li><strong>The user says stop.</strong></li>
 </ol>

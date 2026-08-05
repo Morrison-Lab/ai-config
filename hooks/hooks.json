@@ -49,6 +49,23 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-deserialize-before-binary-claim.py\"",
+            "timeout": 10,
+            "script": "remind-deserialize-before-binary-claim.py",
+            "why": "ucdavis/bcs#579, 2026-08-05: `gh pr diff --name-only` listed three .rds artifacts, that path list was read as a claim about their CONTENTS, and a boxed BLOCKER asked the maintainer to authorize ~1.5h of serial compute plus a 500-task SLURM array. All three were byte-different re-serializations of the same run -- each `identical()` to its predecessor, provenance included. Serialization is not canonical, so a changed blob is not evidence content changed, and nothing in a diff reveals the difference. Injects rather than blocks: an escalation about a binary artifact's size, path, or tracking is right to send, and a guard that misfires on those gets switched off.",
+            "_note_discharge_is_path_scoped": [
+              "The discharge matches a deserialization and the artifact path in",
+              "the SAME tool_use blob. A readRDS of file B must not discharge a",
+              "claim about file A -- an over-broad discharge produces silence,",
+              "which is indistinguishable from compliance (algorithmatize-checks,",
+              "'A reminder guard's discharge condition is a second matcher').",
+              "It also requires a command that RAN: prose asserting the check",
+              "happened is the claim under suspicion, not evidence for it",
+              "(fail-fast, 'A guard's discharge fires on positive success')."
+            ]
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-learn-from-review.py\"",
             "timeout": 10,
             "script": "remind-learn-from-review.py",

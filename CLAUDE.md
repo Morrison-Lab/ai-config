@@ -1306,6 +1306,14 @@ assignment you actually checked.
 For a posed choice, state what its options presuppose before answering within
 them.
 
+It binds the **author** of an assignment too, and that half has no other rule
+pointed at it: writing a brief feels like instructing rather than asserting,
+so nothing fires on a premise stated inside one.
+When a brief you write asserts corpus state --- a file's contents, a rule's
+location, a site count --- run the deriving query and paste it beside the
+claim, rather than leaving the recipient's discretionary premise check as the
+only detector.
+
 @shared/workflow/challenge-the-assignment.md
 
 ## Check for merge conflicts on every merge in an ultracode session

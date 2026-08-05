@@ -13,12 +13,14 @@ import sys
 import time
 from pathlib import Path
 
-LEAD = r"""^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
+LEAD = r"""(?:^|[\s;&|`]|(?:\$\())"""
+ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
+EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command)\s+"""
 
 MERGE_PATTERNS = [
-    (LEAD + r"gh(?:\s+[^\n]+)?\s+pr\s+merge\b", "gh pr merge"),
-    (LEAD + r"glab(?:\s+[^\n]+)?\s+mr\s+merge\b", "glab mr merge"),
-    (LEAD + r"gh(?:\s+[^\n]+)?\s+api\b[^\n]*/pulls/\d+/merge\b", "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh(?:\s+[^\n]+)?\s+pr(?:\s+[^\n]+)?\s+merge\b", "gh pr merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab(?:\s+[^\n]+)?\s+mr(?:\s+[^\n]+)?\s+merge\b", "glab mr merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh(?:\s+[^\n]+)?\s+api\b[^\n]*/pulls/(?:\d+|\$[A-Za-z_][A-Za-z0-9_]*|\$\{[A-Za-z_][A-Za-z0-9_]*\})/merge\b", "gh api PR merge"),
 ]
 
 ALLOW_FLAG = re.compile(r"\bALLOW_MERGE=1\b|\b--allow-merge\b")
@@ -54,24 +56,37 @@ def is_session_alive(sess_file: Path) -> bool:
     return False
 
 
-def check_mwc_active() -> bool:
+def get_git_common_dir() -> Path:
     try:
         common_dir = subprocess.check_output(
             ["git", "rev-parse", "--git-common-dir"],
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-        reg_dir = Path(common_dir) / "ai-sessions"
+        return Path(common_dir).resolve()
+    except Exception:
+        pass
+
+    pwd_git = Path.cwd() / ".git"
+    if pwd_git.exists():
+        return pwd_git.resolve()
+    return Path.home() / ".git"
+
+
+def check_mwc_active() -> bool:
+    try:
+        current_session = os.environ.get("AI_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
+        if not current_session:
+            return False
+
+        common_dir = get_git_common_dir()
+        reg_dir = common_dir / "ai-sessions"
         if not reg_dir.exists():
             return False
 
-        current_session = os.environ.get("AI_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
-
-        for mwc_file in reg_dir.glob("*.mwc"):
-            s_id = mwc_file.stem
-            if current_session and s_id != current_session:
-                continue
-            sess_file = reg_dir / f"{s_id}.session"
+        mwc_file = reg_dir / f"{current_session}.mwc"
+        if mwc_file.exists():
+            sess_file = reg_dir / f"{current_session}.session"
             if sess_file.exists() and is_session_alive(sess_file):
                 return True
     except Exception:

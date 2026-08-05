@@ -30,6 +30,9 @@
 #   ai-session.sh release   [--id ID]                # drop this session's record
 #   ai-session.sh prune                              # drop stale records
 #   ai-session.sh worktree  BRANCH [--base REF]      # isolate: new worktree + branch
+#   ai-session.sh enable-mwc  [--id ID]              # enable merge-when-confident permission
+#   ai-session.sh disable-mwc [--id ID]              # revoke merge-when-confident permission
+#   ai-session.sh check-mwc   [--id ID]              # check if MWC permission is active
 #
 # Identity (--id) resolves: --id flag > $AI_SESSION_ID > $CLAUDE_SESSION_ID.
 # Stale threshold: $AI_SESSION_STALE_SECONDS (default 1800 = 30 min).
@@ -353,7 +356,7 @@ cmd_worktree() {
 # ---------------------------------------------------------------------------
 # arg parsing
 # ---------------------------------------------------------------------------
-[ $# -ge 1 ] || die "usage: ai-session.sh {register|heartbeat|check|list|release|prune|worktree} [opts]  (see header)"
+[ $# -ge 1 ] || die "usage: ai-session.sh {register|heartbeat|check|list|release|prune|worktree|enable-mwc|disable-mwc|check-mwc} [opts]  (see header)"
 CMD="$1"; shift
 
 OPT_ID=""; OPT_TASK=""; OPT_AGENT=""; OPT_ALL=""; OPT_BASE=""; OPT_WT_BRANCH=""
@@ -390,20 +393,17 @@ case "$CMD" in
     ;;
   check-mwc)
     prune_stale >/dev/null
-    for f in "$REG_DIR"/*.mwc; do
-      if [ -e "$f" ]; then
-        s_id="$(basename "$f" .mwc)"
-        s_file="$(session_file "$s_id")"
-        if [ -f "$s_file" ]; then
-          load_session "$s_file"
-          if ! is_stale; then
-            printf 'mwc is active for session %s\n' "$s_id"
-            exit 0
-          fi
-        fi
+    id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+    f="$REG_DIR/$(sanitize "$id").mwc"
+    s_file="$(session_file "$id")"
+    if [ -f "$f" ] && [ -f "$s_file" ]; then
+      load_session "$s_file"
+      if ! is_stale; then
+        printf 'mwc is active for session %s\n' "$id"
+        exit 0
       fi
-    done
-    printf 'mwc is not active\n'
+    fi
+    printf 'mwc is not active for session %s\n' "$id"
     exit 1
     ;;
   -h|--help) sed -n '2,40p' "$0" ;;

@@ -37,8 +37,8 @@ operation to the equivalent GitHub MCP tool so any model can run a skill.
 | `MARK_PR_READY` | Flip a draft pull request to ready for review. | `gh pr ready <N>` | `mcp__github__update_pull_request (draft=false)` |
 | `REOPEN_PR` | Reopen a closed pull request. | `gh pr reopen <N>` | `mcp__github__update_pull_request (state=open)` |
 | `COMMENT_PR` | Post a top-level comment on a pull request. | `gh pr comment <N> --body "..."` | `mcp__github__add_issue_comment` |
-| `REPLY_REVIEW_COMMENT` | Reply to an inline pull-request review comment. | `gh api (reply to review comment)` | `mcp__github__add_reply_to_pull_request_comment` |
-| `RESOLVE_REVIEW_THREAD` | Mark an inline pull-request review thread as resolved. | `gh api graphql (resolveReviewThread)` | `mcp__github__resolve_review_thread` |
+| `REPLY_REVIEW_COMMENT` | Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead. | `gh api -X POST repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies -F body=@<file>` | `mcp__github__add_reply_to_pull_request_comment` |
+| `RESOLVE_REVIEW_THREAD` | Mark an inline pull-request review thread as resolved. | `gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"<thread_node_id>"}) { thread { isResolved } } }'` | `mcp__github__resolve_review_thread` |
 | `WATCH_PR` | Subscribe to / unsubscribe from a pull request's activity. | (no CLI equivalent) | `mcp__github__subscribe_pr_activity / mcp__github__unsubscribe_pr_activity` |
 | `VIEW_ISSUE` | Read an issue's details. | `gh issue view <N>` | `mcp__github__issue_read` |
 | `LIST_ISSUES` | List issues. | `gh issue list` | `mcp__github__list_issues` |

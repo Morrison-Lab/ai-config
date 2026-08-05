@@ -819,3 +819,11 @@ Two practical consequences:
   exactly like a clean one.
   (2026-07-28: a 947-repo scan reported 910 scanned; the 37-repo shortfall
   was the whole signal that anything had gone wrong.)
+
+## Markdown PR Review Parsing & Regex Match-Boundary Splitting
+
+- **Avoid lookahead regexes across markdown finding bodies containing code blocks.**
+  Single-line comments in code blocks (`# comment` in Python, Bash, R, Ruby, YAML) start with `# `. A lookahead regex matching `\n\#{1,6}[ \t]+` to detect section headers treats single-line code comments inside code blocks as markdown headings, cutting off code block suggestions mid-snippet.
+- **Use match-boundary splitting instead of single-pass lookaheads.**
+  Search for location headers (`**Location:** [file.ext:L10]`) to collect all finding match spans `matches`. Then compute each finding body's boundaries linearly as `content[match[i].end() : match[i+1].start()]`. This completely eliminates catastrophic regex backtracking on nested code blocks and single-line `#` code comments. (Morrison-Lab/gha#412, 2026-08-05).
+

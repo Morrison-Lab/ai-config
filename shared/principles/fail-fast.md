@@ -601,6 +601,70 @@ shell-command parser underlying them, then the `open` path (`open_ident`), then
 the `self` discharge.
 The per-path *discharge* mechanics of that same PR are in the section below.)
 
+**When the siblings are members of one pattern rather than sites in one file,
+the remedy above has nothing to grep.**
+Both cases so far spread the guard across *locations* --- three emitters, four
+discharge paths --- which is what makes "grep for the operation being guarded"
+work: the operation occurs somewhere the guard does not.
+An alternation, an allowlist, or a set of accepted tokens has no such spread.
+The member you fixed and the member you missed are in the same expression, on
+the same screen, so there is no second site to find and the enumeration step
+silently does not fire.
+The unit to enumerate is the pattern's own members, and nothing about editing a
+pattern prompts you to list them.
+
+What makes it worse than an ordinary miss is that the fix usually arrives with
+a **comment explaining itself**, and the comment records a *removal*: which
+members were taken out, and why they were unsafe.
+That is the inverse of the guidance above, which asks you to say why an
+unguarded site is safe.
+A note saying why something is safe invites the reader to check the claim.
+A note saying why something was *removed* reads as the hazard having been
+surveyed and settled, so it discharges the reader's suspicion about the members
+still in the pattern --- the same "spends the one signal that would have
+surfaced it" trade this section already prices, arriving through the artifact
+written to demonstrate diligence.
+
+The remedy is cheap because that comment has already done the hard part.
+A stated reason for removing some members is a **predicate**, so run it over
+the members that remain.
+The reason is the strongest evidence available that the survivors are defective,
+since it was derived from the same hazard they sit in.
+It just has to be applied rather than read.
+That turns a prose rationale into a check, per
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md), and it is the
+step to take at the moment you write the comment, not at review.
+
+- **Do:** treat an alternation, allowlist, or token set as a list of sites, and
+  check the fix against every member before committing it.
+- **Do:** apply a comment's stated exclusion reason as a predicate to the
+  members still present, in the same edit that writes the comment.
+- **Don't:** read "grep for the operation" as covering this --- when the
+  siblings share one expression, that grep returns the line you are already
+  looking at.
+- **Don't:** treat a considered comment about a hazard as evidence the hazard
+  was handled everywhere it applies; a removal note is the artifact most likely
+  to stop the search early.
+
+(Morrison-Lab/ai-config#1151, 2026-08-04/05: at `dcd7eb0c^`,
+`hooks/remind-brief-premises.py` carried a six-line comment at lines 185 to 190
+recording that `cat`, `head`, and `tail` had been dropped from `DERIVE_ANY`
+because "head commit", "head node", and "head_sha" occur constantly here, so
+"a sentence merely naming a file next to the word `head` silently discharged a
+real claim".
+It even named the failure class and its symptom: "That is the
+over-broad-discharge failure, and its symptom is silence, so nothing would have
+reported it."
+Two lines below, line 192 still read
+`\b(?:git\s+)?(?:grep|rg|ag|ack)\b`, so the same hazard applied unchanged to
+`grep`.
+Review found that a claim sentence using "grep" as an English verb, or merely
+naming `shared/workflow/grep-is-not-coverage.md`, discharged itself --- the
+filename matching because `\b` treats `-` as a word boundary.
+The stated reason covers both forms, so applying it as a predicate would have
+caught them when the comment was written.
+Fixed in `dcd7eb0c` by giving every command name a `(?![-\w])` suffix.)
+
 ## A guard's discharge fires on positive success, not the absence of failure
 
 The section above is about a guard that runs on too few sites.

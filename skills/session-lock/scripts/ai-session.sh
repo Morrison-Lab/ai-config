@@ -134,10 +134,16 @@ prune_stale() {
     [ -e "$f" ] || continue
     load_session "$f"
     if is_stale; then
-      rm -f "$f"
+      rm -f "$f" "$REG_DIR/$S_id.mwc"
       printf 'pruned stale session %s (%s on %s)\n' "$S_id" "${S_branch:-?}" "${S_host:-?}"
       removed=$((removed + 1))
     fi
+  done
+  # Sweep orphaned .mwc files whose session file is gone
+  for f in "$REG_DIR"/*.mwc; do
+    [ -e "$f" ] || continue
+    local sid; sid="$(basename "$f" .mwc)"
+    [ -f "$REG_DIR/$sid.session" ] || rm -f "$f"
   done
   # Belt-and-suspenders: sweep temp files orphaned by a SIGKILL (where the EXIT
   # trap in write_record can't fire). Only old ones, never a write in flight.

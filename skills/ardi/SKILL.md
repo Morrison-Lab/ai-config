@@ -274,6 +274,7 @@ thread) and your reply to it. (Thread mechanics live in the `ard` skill, step
 Do-Confirm; per
 [`shared/workflow/skill-checklists.md`](../../shared/workflow/skill-checklists.md).
 
+- [ ] **Run automated clean check**: `python3 scripts/check-pr-fully-clean.py <pr-number>` returned exit code `0` (confirming all CI check runs completed with success AND a clean review comment for current HEAD SHA has been posted).
 - [ ] **Killer item:** all workflows and check runs are green **and completed** for the current head --- re-fetched and re-counted now, not checked off from the names you were watching.
   Marked because a posted verdict does not mean the review job finished, the check set can *grow* mid-run as jobs spawn others, and two check runs can share a name (a stale green plus a live one), so matching on name returns the wrong one.
   Key on check-run id, and read `status` before `conclusion`.
@@ -288,8 +289,8 @@ Do-Confirm; per
 Always request another review.**
 The loop on a single PR ends on exactly three things:
 
-1. **A totally clean review** --- no nits, no non-blocking comments, everything Addressed or agreed Deferred.
-   See [*The bar: "fully clean"*](#the-bar-fully-clean).
+1. **A totally clean review on the latest pushed commit** -- no nits, no non-blocking comments, everything Addressed or agreed Deferred, evaluating the exact HEAD SHA currently on the branch.
+   **Crucial:** Pushing fixes for a review starts a new review cycle. The ARDI loop is **NEVER** finished when you push fixes for a finding-bearing review or post an ARD summary. You must wait for the new review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it contains zero findings before ending the loop. See [*The bar: "fully clean"*](#the-bar-fully-clean).
 2. **Nothing actionable remains** --- every open item has been escalated to a human and is waiting on their decision, so there is no next action you can take.
    Not "some items are deadlocked"; *all* of them.
 3. **The user says stop.**

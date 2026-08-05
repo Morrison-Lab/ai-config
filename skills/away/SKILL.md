@@ -124,11 +124,13 @@ for everything still to come.
 ## Relationship to other skills
 
 - **`daytb`** -- the per-decision sibling, and the one most easily confused
-  with this. `away` presumes the user is *gone*, so it suppresses questions
-  for the whole session, keeps a decision log, and is revoked by `back`.
+  with this.
+  `away` presumes the user is *gone*, so it suppresses questions for the whole
+  session, keeps a decision log, and is revoked by `back`.
   `daytb` presumes the user is *here* and simply declining to adjudicate one
-  thing, so it expires with that task and needs no counterpart. Reading a
-  bare "do as you think best" as `away` grants far more than was asked.
+  thing, so it expires with that task and needs no counterpart.
+  Reading a bare "do as you think best" as `away` grants far more than was
+  asked.
 - **`back`** — the named counterpart that revokes this grant and surfaces
   the decision log described in Procedure step 4, so the user has a
   reviewable record of what was decided (and skipped) while they were

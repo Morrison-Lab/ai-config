@@ -84,9 +84,12 @@ what that session had derived at the time.
     claim-kind matching doing its job.
 
 Read 26 as a small denominator rather than a settled rate.
-It is every Agent prompt this machine still holds, but transcripts rotate:
+It is every Agent prompt this machine still holds, but transcripts rotate.
 `flag-unassigned-worktree.py` measured 121 launches a few days earlier, and
-those records are gone.
+`remind-ums-after-error.py` counted 138 transcripts under `~/.claude/projects`
+in the same period; `find ~/.claude/projects -name '*.jsonl' | wc -l` returns
+77 today, so roughly half those files are gone rather than the two counts
+having been taken differently.
 Two matcher false positives were found and fixed during that measurement, both
 recorded at their fix sites -- a citation whose next verb belonged to the
 reader, and a count that reached back across a paragraph break.

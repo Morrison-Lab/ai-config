@@ -14,9 +14,9 @@ import sys
 import time
 from pathlib import Path
 
-LEAD = r"""(?:^|[\s;&|`()\"']|(?:\$\())"""
+LEAD = r"""(?:^|[\s;&|`()]|\$\()"""
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
-EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)\s+"""
+EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
 HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
@@ -78,7 +78,7 @@ def is_session_alive(sess_file: Path) -> bool:
         pid = sess_data.get("pid")
         host = sess_data.get("host")
         local_host = platform.node()
-        if pid and (not host or host == local_host):
+        if pid and pid.isdigit() and int(pid) > 0 and (not host or host == local_host):
             try:
                 os.kill(int(pid), 0)
                 return True
@@ -160,8 +160,6 @@ def offending(command: str):
     # 2. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
     masked_command = mask_payloads(norm_command)
 
-    mwc_active = check_mwc_active()
-
     # 3. Use finditer on masked_command to derive exact character slice offsets for norm_command
     matches = list(SPLIT.finditer(masked_command))
     starts = [0] + [m.end() for m in matches]
@@ -170,10 +168,12 @@ def offending(command: str):
     for start, end in zip(starts, ends):
         masked_seg = masked_command[start:end]
         orig_seg = norm_command[start:end]
-        if ALLOW_FLAG.search(masked_seg) or mwc_active:
+        if ALLOW_FLAG.search(masked_seg):
             continue
         for pattern, label in MERGE_PATTERNS:
             if re.search(pattern, masked_seg):
+                if check_mwc_active():
+                    break  # Allowed via active MWC session grant
                 return label, orig_seg.strip()
     return None
 

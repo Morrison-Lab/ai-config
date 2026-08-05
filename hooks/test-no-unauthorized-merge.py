@@ -64,6 +64,8 @@ ALLOW = [
     ("gh pr checkout merge", "checking out branch named merge"),
     ("gh pr list --label merge", "listing PRs with label merge"),
     ("gh search prs --label merge", "searching PRs with label merge"),
+    ("grep \"gh pr merge\" README.md", "grep search for gh pr merge string in docs"),
+    ("git log --grep \"gh pr merge\"", "git log search for gh pr merge"),
     ("gh pr comment 123 --body-file /tmp/gh-pr-merge-notes.txt", "unquoted body-file path containing hyphens and merge keyword"),
     ('gh pr comment 123 --body "He said \\"gh pr merge\\""', "comment with escaped quotes around trigger text"),
     ('gh api /repos/owner/repo/issues/1/comments -f body="Discussing gh pr merge command"', "gh api -f body payload containing trigger text"),
@@ -126,10 +128,16 @@ try:
     v_b = verdict("gh pr merge 411 --squash", env=env_b)
     wrong += (v_b != "BLOCK")
     print(f"  {v_b:<6} cross-session isolation for sanitized session B")
+
+    # Disable MWC for Session A -> must block immediately
+    subprocess.run([str(script_path), "disable-mwc", "--id", session_a], check=True, capture_output=True)
+    v_a_revoked = verdict("gh pr merge 411 --squash", env=env_a)
+    wrong += (v_a_revoked != "BLOCK")
+    print(f"  {v_a_revoked:<6} revoked MWC grant blocks for session A")
 finally:
     subprocess.run([str(script_path), "release", "--id", session_a], check=True, capture_output=True)
     subprocess.run([str(script_path), "release", "--id", session_b], check=True, capture_output=True)
 
-total = len(BLOCK) + len(ALLOW) + 2
+total = len(BLOCK) + len(ALLOW) + 3
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

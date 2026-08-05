@@ -167,7 +167,11 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
   The discriminator is whether the PR number is present, which is the least memorable difference the two could have had, and the id-only form is the one that reads as the tidier of the two.
   Both were confirmed against GitHub's own reference: `PATCH /repos/{owner}/{repo}/pulls/comments/{comment_id}` updates a review comment, while `POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies` creates a reply.
-  `GET` follows the edit route's shape rather than the reply route's, so the id-only form is also the one you have most likely used before, while reading.
+  The underlying rule is that collection-scoped routes carry the PR number while single-comment-by-id routes do not, and that split cuts across the read/write divide rather than along it.
+  `GET .../pulls/<N>/comments` lists a PR's comments and `GET .../pulls/comments/<id>` fetches one, so the id-only shape is already familiar from reading before you ever write with it.
+
+  GitHub documents a second reply form, and it carries the PR number too: `POST .../pulls/<N>/comments` with `-F in_reply_to=<id>`, which is what [`ard`](../skills/ard/SKILL.md)'s step 4b uses.
+  Either reply form is fine, and the discriminator holds for both, which is the point: every route that adds a comment names the PR, and the one that overwrites an existing comment does not.
 
   Nothing warns you.
   On a repo where you have write access the `PATCH` returns success, and success is exactly what an overwrite looks like.

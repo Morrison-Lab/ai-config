@@ -1,5 +1,5 @@
 "Fully clean" is the terminal state the ARDI review loop drives toward.
-A PR/MR is **fully clean** when **both** of these hold:
+A PR/MR is **fully clean** when **both** of these hold (and verified via `python3 scripts/check-pr-fully-clean.py <pr-number>`):
 
 1. **All CI workflows and check runs are green AND completed.** Every workflow and check run passes --- not just the required checks and not just the review job.
    "Green" means finished with a passing outcome (success or skipped), not merely "currently reporting green while still running" --- never treat a workflow or check run that's still queued or in progress as clean, even if nothing has failed yet.
@@ -185,6 +185,9 @@ A PR/MR is **fully clean** when **both** of these hold:
    fallback for when no working external reviewer is available, never a
    substitute once one is (see the `ardi` skill's step 2 for the
    availability-recheck procedure).
+   **Pushing fixes for a finding-bearing review starts a new review cycle.**
+   The ARDI loop is **NEVER** finished when you push fixes for a review or post an ARD disposition summary.
+   You must wait for the new review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it contains zero findings before declaring the PR clean or ending the loop.
    Re-check availability right before declaring clean, not just at whichever
    round self-review first started; an inferred "probably clean" from green
    CI and resolved threads does not satisfy this.

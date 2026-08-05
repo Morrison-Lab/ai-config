@@ -272,10 +272,19 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   Single-line comments in code blocks (`# comment` in Python, Bash, R, Ruby, YAML) start with `# `.
   A lookahead like `\n\#{1,6}[ \t]+` for section headers then treats those code comments as markdown headings, cutting a code-block suggestion off mid-snippet.
   (Morrison-Lab/gha#412, 2026-08-05).
+- **Line-anchor the fence pattern when masking code blocks.**
+  Mask fenced blocks before location matching with a line-anchored fence (`^[ \t]{0,3}```...`) under `re.MULTILINE`, and match each block's opening and closing fence as a balanced pair.
+  Do not span blocks with a single `re.DOTALL` match: an unclosed fence then swallows everything up to a *later* block's closing fence, masking the valid location headers in between.
+  (Morrison-Lab/gha#412, 2026-08-05).
 - **Use match-boundary splitting instead of single-pass lookaheads.**
   Collect every finding's location header (`**Location:** [file.ext:L10]`) into `matches`, then slice each body between consecutive matches.
-  An interior body is `content[matches[i].end():matches[i+1].start()]`; the last match has no `matches[i+1]`, so its body runs to `content[matches[-1].end():]` (end of content) rather than indexing past the list.
+  An interior body is `content[matches[i].end():matches[i+1].start()]`.
+  The last match has no `matches[i+1]`, so its body runs to `content[matches[-1].end():]` (end of content) rather than indexing past the list.
   This eliminates catastrophic backtracking on nested code blocks and `#` code comments.
+  (Morrison-Lab/gha#412, 2026-08-05).
+- **Anchor a location match to its heading, not just the `Location:` line.**
+  When intro text sits between a section heading (`#### 1. Critical Bug`) and its `Location:` tag, a regex keyed only on the immediate prefix of `Location:` misses the heading, and finding bodies then absorb the adjacent heading.
+  Precompute each heading's start position preceding its location match and slice bodies from there.
   (Morrison-Lab/gha#412, 2026-08-05).
 - **Strip backticks and leading slashes from location file paths.**
   LLMs sometimes wrap the path in backticks (e.g. ``**Location:** [`file.py`:L12]``) or prefix a leading `/` (`/src/main.py`).
@@ -286,7 +295,7 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   Relative lookups for root files (`CLAUDE.md`, `AGENTS.md`) depend on the working directory, so a script invoked from a subdirectory misses them.
   Use `os.path.join(os.environ.get("GITHUB_WORKSPACE", "."), rel_path)`, and `.lstrip("/")` the `rel_path` first: `os.path.join` discards the base whenever its second argument is absolute.
   (Morrison-Lab/gha#412, 2026-08-05).
-- **Require double newlines `\n\s*\n` when truncating summary headers.**
-  Trimming a summary on single newlines (`\n+#{1,6}`) can cut an inline comment body short when a finding contains a sub-heading like `### Recommendation`.
-  Requiring `\n\s*\n` keeps such sub-headings intact.
+- **Require double newlines `\n\s*\n` (or a compound section phrase) when truncating summary headers.**
+  Trimming a summary on single newlines (`\n+#{1,6}`) or a bare keyword (`Recommendation`) can cut an inline comment body short when a finding contains a sub-heading like `### Recommendation`.
+  Requiring `\n\s*\n`, or matching a compound phrase (`Overall Summary`, `General Recommendations`) with a negative lookahead, keeps such sub-headings intact.
   (Morrison-Lab/gha#413, 2026-08-05).

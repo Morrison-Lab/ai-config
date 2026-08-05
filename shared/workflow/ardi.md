@@ -17,6 +17,8 @@ status item to hand back to the user.
 Keep polling while a review or check is
 in progress; do not call the PR clean from an earlier head or from green CI
 without a current-head review verdict.
+Pushing fixes for a finding-bearing review starts a new review cycle: the ARDI loop is NOT finished when you push fixes or post an ARD summary.
+You must wait for the fresh review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it is clean before declaring the loop finished.
 This applies transitively to PR-driving
 workflows such as `gi`, `gii`, and `ardia`; only monitor PRs the session owns or
 has explicitly claimed, so the rule does not authorize changing someone else's

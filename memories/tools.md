@@ -840,7 +840,7 @@ a document separator that truncates the generated script.)
 
 ## check-pr-fully-clean.py automated ARDI verification
 
-- **[`scripts/check-pr-fully-clean.py`](scripts/check-pr-fully-clean.py) `<pr-number>` programmatically enforces ARDI fully-clean criteria.**
+- **[scripts/check-pr-fully-clean.py](scripts/check-pr-fully-clean.py) `<pr-number>` programmatically enforces ARDI fully-clean criteria.**
   It checks that:
   (1) all CI check runs for the PR's exact HEAD commit SHA are `completed` with conclusion `success`, `neutral`, or `skipped`,
   (2) an automated review comment evaluating that HEAD SHA has been posted, and

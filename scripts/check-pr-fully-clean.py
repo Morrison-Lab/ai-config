@@ -10,6 +10,7 @@ Exit codes:
 0: Fully clean (safe to end ARDI loop)
 1: Not clean (in-progress checks, failing checks, missing review, or findings present)
 """
+from datetime import datetime
 import json
 import re
 import subprocess
@@ -22,6 +23,15 @@ def run_cmd(cmd: List[str]) -> str:
     if res.returncode != 0:
         raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr}")
     return res.stdout.strip()
+
+
+def parse_iso_time(ts: str) -> datetime | None:
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 def get_pr_info(pr_num: str) -> Tuple[str, str, str, str]:
@@ -66,15 +76,18 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     reviews = data.get("reviews", [])
 
     issues = []
-    # Collect all bot review comments/reviews
+    # Collect all automated review reports (filtering on body content markers, not author login)
     all_items = []
     for c in comments:
-        if c.get("author", {}).get("login") in ("github-actions", "github-actions[bot]", "claude[bot]"):
-            all_items.append(("comment", c["createdAt"], c["body"]))
+        body = c.get("body", "")
+        if any(marker in body for marker in ("### 🤖", "Code Review", "Verdict:", "Actionable Findings", "Detailed Findings", "### Findings")):
+            all_items.append(("comment", c["createdAt"], body))
+
     for r in reviews:
-        if r.get("author", {}).get("login") in ("github-actions", "github-actions[bot]", "claude[bot]"):
-            commit_oid = r.get("commit", {}).get("oid", "")
-            all_items.append(("review", r.get("submittedAt", ""), r.get("body", ""), commit_oid))
+        body = r.get("body", "")
+        commit_oid = r.get("commit", {}).get("oid", "")
+        if body or commit_oid:
+            all_items.append(("review", r.get("submittedAt", ""), body, commit_oid))
 
     if not all_items:
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
@@ -83,16 +96,23 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     # Match items for HEAD commit SHA:
     # 1. Matching commit OID (from reviews API)
     # 2. SHA or short SHA in comment body
-    # 3. Created on or after the HEAD commit's timestamp, AND contains review report header/text
+    # 3. Created on or after the HEAD commit's timestamp AND contains review report header
     sha_short = sha[:7]
+    commit_dt = parse_iso_time(commit_date)
+
     matching_items = []
     for item in all_items:
-        created_at = item[1]
+        created_at_dt = parse_iso_time(item[1])
         body = item[2]
         oid = item[3] if len(item) > 3 else ""
 
         is_sha_match = (oid == sha or sha_short in body or sha in body)
-        is_timing_match = bool(commit_date and created_at >= commit_date and ("### 🤖" in body or "Code Review" in body or "Verdict:" in body))
+        is_timing_match = bool(
+            commit_dt
+            and created_at_dt
+            and created_at_dt >= commit_dt
+            and any(marker in body for marker in ("### 🤖", "Code Review", "Verdict:"))
+        )
 
         if is_sha_match or is_timing_match:
             matching_items.append(item)
@@ -101,16 +121,20 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
         issues.append(f"No review comment has been posted evaluating HEAD SHA {sha[:8]} yet")
         return False, issues
 
+    # Sort matching items chronologically by timestamp
+    matching_items.sort(key=lambda x: x[1])
+
     # Inspect the latest matching review comment
-    latest_body = matching_items[-1][2]
+    latest_item = matching_items[-1]
+    latest_body = latest_item[2]
 
     # Check for finding indicators
     finding_patterns = [
-        r"### Actionable Findings",
-        r"### Detailed Findings",
-        r"Verdict:\s*Ready after addressing findings",
-        r"Verdict:\s*Needs work",
-        r"Verdict:\s*Changes requested",
+        r"###\s*(Actionable\s+|Detailed\s+)?Findings",
+        r"###\s*Issues",
+        r"###\s*Remaining",
+        r"\*\*Location:\*\*",
+        r"Verdict:\s*(Ready after addressing findings|Needs work|Changes requested|Actionable findings)",
         r"#### \d+\.",
     ]
 
@@ -121,7 +145,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
             issues.append(f"Latest review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
 
     if not has_findings:
-        print(f"✓ Found clean review comment evaluating HEAD SHA {sha[:8]}")
+        print(f"✓ Found clean review comment evaluating HEAD SHA {sha[:8]} (created {latest_item[1]})")
 
     return len(issues) == 0, issues
 

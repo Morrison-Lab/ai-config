@@ -819,21 +819,3 @@ Two practical consequences:
   exactly like a clean one.
   (2026-07-28: a 947-repo scan reported 910 scanned; the 37-repo shortfall
   was the whole signal that anything had gone wrong.)
-
-## Markdown PR Review Parsing & Regex Match-Boundary Splitting
-
-- **Avoid lookahead regexes across markdown finding bodies containing code blocks.**
-  Single-line comments in code blocks (`# comment` in Python, Bash, R, Ruby, YAML) start with `# `. A lookahead regex matching `\n\#{1,6}[ \t]+` to detect section headers treats single-line code comments inside code blocks as markdown headings, cutting off code block suggestions mid-snippet.
-- **Use match-boundary splitting instead of single-pass lookaheads.**
-  Search for location headers (`**Location:** [file.ext:L10]`) to collect all finding match spans `matches`. Then compute each finding body's boundaries linearly as `content[match[i].end() : match[i+1].start()]`. This completely eliminates catastrophic regex backtracking on nested code blocks and single-line `#` code comments. (Morrison-Lab/gha#412, 2026-08-05).
-- **Decouple section header calculation from location tag lines.**
-  When introductory text lines exist between a section heading (e.g. `#### 1. Critical Bug`) and its `Location:` tag, immediate-prefix header regexes fail to capture the heading and finding body boundaries absorb adjacent headings. Pre-calculate section header start positions preceding each location match to accurately slice finding bodies. (Morrison-Lab/gha#412, 2026-08-05).
-- **Strip leading slashes and backticks from location file paths.**
-  LLMs formatted location headers as `[ /src/main.py:L10 ]` or `[ \`src/main.py\`:L10 ]`. `POST /repos/{owner}/{repo}/pulls/{number}/reviews` rejects paths with leading slashes (`/src/main.py`) with HTTP 422 (`path cannot start with /`). Apply `.strip("'\"` ").lstrip("/")` during path normalization. (Morrison-Lab/gha#412, 2026-08-05).
-- **Require double newlines or compound phrases when truncating report summary headers.**
-  Trimming summary sections using single newlines (`\n+#{1,6}`) or bare keywords (`Recommendation`) risks truncating inline comment bodies when findings contain sub-headings like `### Recommendation`. Use compound phrases (`Overall Summary`, `General Recommendations`) with negative lookahead to exclude sub-headings inside findings. (Morrison-Lab/gha#412, 2026-08-05).
-- **Line-anchor fenced code block masking.**
-  When masking code blocks (```` ... ````) before location regex matching, line-anchor the fence pattern (`^[ \t]{0,3}```...`) with `re.MULTILINE | re.DOTALL` to prevent unclosed backticks or nested code blocks from masking valid location headers across the entire document. (Morrison-Lab/gha#412, 2026-08-05).
-- **Enforce single-pass exhaustive review instructions.**
-  Prompt instructions for AI code reviewers should explicitly demand a single-pass, comprehensive review reporting all findings, recommendations, and edge cases in a single pass rather than withholding or staggering feedback across multiple review rounds. (Morrison-Lab/gha#412, 2026-08-05).
-

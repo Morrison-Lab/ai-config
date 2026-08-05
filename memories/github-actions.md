@@ -993,5 +993,7 @@ merging.)
 ## Python Execution in Runner Environments
 
 - **Add `from __future__ import annotations` when using built-in generic types (`list[str]`, `dict[str, Any]`).**
-  Standard generic syntax (e.g. `def f() -> list[str]:`) in standalone Python helper scripts called by actions or workflows raises `TypeError: 'type' object is not subscriptable` in Python environments < 3.9. While default runner environments (e.g. `ubuntu-latest`) use Python 3.10+, adding `from __future__ import annotations` or importing `List, Dict` from `typing` ensures compatibility across custom Python setup versions. (Morrison-Lab/gha#413, 2026-08-05).
+  Standard generic syntax (e.g. `def f() -> list[str]:`) in a standalone Python helper called by an action or workflow raises `TypeError: 'type' object is not subscriptable` under Python < 3.9.
+  Default runners (e.g. `ubuntu-latest`) use Python 3.10+, but adding `from __future__ import annotations` (or importing `List`, `Dict` from `typing`) keeps the script compatible across custom `setup-python` versions.
+  (Morrison-Lab/gha#413, 2026-08-05).
 

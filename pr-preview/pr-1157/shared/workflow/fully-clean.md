@@ -1479,8 +1479,9 @@ its existing 5m26s `is_error: true`, `subtype: "success"`,
 `permission_denials_count: null` stub ran an hour before #998 merged, so it was
 a different bug; merge first, then retry.)
 
-**The expensive stub has no stopping rule yet, and the fingerprints this file
-already trusts cannot supply one.**
+**The expensive stub --- a `claude-review` run that bills minutes of model time
+and posts no verdict --- has no stopping rule yet, and the fingerprints this
+file already trusts cannot supply one.**
 Everything above about when to stop retrying is built on runs that die before
 the model call: the short-duration band, `total_cost_usd: 0`, `num_turns: 1`,
 `Error is not retryable`.

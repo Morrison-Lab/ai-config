@@ -67,12 +67,28 @@ transcript with its output actually present.
 
 PRECISION, MEASURED
 -------------------
-Over all 26 `Agent`/`Task` prompts retained in this machine's transcripts on
-2026-08-04, this matcher fires on 3.
-Both incidents are among them; the third is the brief that commissioned this
-hook, which quotes both incidents and is a true positive by the matcher's own
-definition rather than noise.
-23 of 26 stay silent, including every prompt that merely names a corpus path.
+Measured over every `Agent`/`Task` prompt retained in this machine's
+transcripts on 2026-08-04, each replayed against its own session transcript
+truncated to the records that preceded the launch, so the discharge saw exactly
+what that session had derived at the time.
+
+  - 26 prompts examined, 7 fired, 19 silent.
+  - Those 7 carry 9 claims, and on inspection all 9 are genuine corpus-state
+    assertions rather than incidental mentions. Two were the false ones above.
+    The other seven were true, and none of them had been derived: they were
+    asserted from recollection and happened to be right.
+  - Both incidents fire. Incident 2 fires on its cardinality claim ALONE, its
+    two content claims correctly discharged by that session's own earlier
+    `grep -n`, which is the claim-kind matching doing its job.
+
+Read 26 as a small denominator rather than a settled rate.
+It is every Agent prompt this machine still holds, but transcripts rotate:
+`flag-unassigned-worktree.py` measured 121 launches a few days earlier, and
+those records are gone.
+Two matcher false positives were found and fixed during that measurement, both
+recorded at their fix sites -- a citation whose next verb belonged to the
+reader, and a count that reached back across a paragraph break.
+
 See `hooks/test-remind-brief-premises.py` for the corpus cases and the
 clause-isolation mutation checks.
 

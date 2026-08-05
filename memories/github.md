@@ -271,7 +271,21 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   On `ucdavis/bcs` (2026-07-30) ruleset `19248641`, scoped to `~DEFAULT_BRANCH`, returns `{"review_on_push":true,"review_draft_pull_requests":true}` -- which is why draft PRs there get Copilot reviews at all.
   Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
 
-  **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
+- **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:
+  - `pull_number` MUST be an explicit integer in the URL path (e.g. `/pulls/412/reviews`), not `'current'` or branch names. Query `number` and `headRefOid` via `gh pr view --json number,headRefOid`.
+  - Line numbers must be `>= 1` and `line >= start_line`. Normalize ranges with `min(start_line, end_line)` and `max(start_line, end_line)` to avoid `422 Unprocessable Entity` errors on inverted range inputs.
+  - Multi-line inline review comments require `start_line` (start line), `line` (end line), and `start_side: "RIGHT"`.
+  - Inline comments on files or lines outside active PR diff hunks return `422 Unprocessable Entity`; automatically catch `gh api` non-zero exit status and fall back to top-level issue comments (`gh pr comment`).
+  - Prepend matched section headers (e.g. `#### 1. 🚨 Critical Issue`) to inline comment bodies so comments retain context and severity indicators on GitHub diff cards. (Morrison-Lab/gha#412, 2026-08-05).
+
+- **Regex Parsing for Automated Agent Reports (`re.VERBOSE`)**:
+  - Standardize on Python's built-in `re.compile` with `re.VERBOSE` (`re.X`) instead of third-party DSL wrappers (`humre`) or dual regex fallback paths. Dual regex definitions introduce implementation drift between local unit tests and CI runners.
+  - Lookahead section delimiters should NOT terminate on bullet lists (`- `) or internal subheadings (`### Subheading`) inside finding bodies unless followed by a `Location:` header directive. Escape `#` as `\#` inside `re.VERBOSE` patterns. (Morrison-Lab/gha#412, 2026-08-05).
+
+- **Shell Script Fail-Closed Safety in Workflows**:
+  - Under `set -e`, use `if ! CMD; then` to safely handle non-zero exit status without `set +e`. Disabling `set +e` turns off `errexit` for subsequent pipeline steps (e.g., `jq`), risking failing open instead of closed on JSON parse errors. (Morrison-Lab/gha#412, 2026-08-05).
+
+- **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
   `POST /repos/<o>/<r>/pulls/<N>/requested_reviewers` with `reviewers[]=copilot-pull-request-reviewer[bot]` returned **201**, and the plain `Copilot` and `copilot` logins were accepted the same way.
   So the login spelling is not what decides the outcome, and a `422` seen elsewhere is likelier to be about whether Copilot review is enabled for that repo at all -- untested here, since bcs has it enabled.
   The 201 body lists Copilot under `requested_reviewers`, but an immediate `GET .../requested_reviewers` returns `{"users":[],"teams":[]}` and `gh pr view --json reviewRequests` returns `[]`.

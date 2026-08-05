@@ -34,15 +34,16 @@ def parse_iso_time(ts: str) -> Optional[datetime]:
         return None
 
 
-def get_pr_info(pr_num: str) -> Tuple[str, str, str, str]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--json", "headRefOid,headRefName,state,commits"])
+def get_pr_info(pr_num: str) -> Tuple[str, str, str, str, str]:
+    out = run_cmd(["gh", "pr", "view", pr_num, "--json", "headRefOid,headRefName,state,commits,reviewDecision"])
     data = json.loads(out)
     head_sha = data["headRefOid"]
     commits = data.get("commits", [])
     commit_date = ""
     if commits:
         commit_date = commits[-1].get("committedDate", "")
-    return head_sha, data["headRefName"], data["state"], commit_date
+    review_decision = data.get("reviewDecision") or ""
+    return head_sha, data["headRefName"], data["state"], commit_date, review_decision
 
 
 def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
@@ -68,7 +69,7 @@ def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
-def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, commit_date: str, review_decision: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--json", "comments,reviews"])
     data = json.loads(out)
 
@@ -77,12 +78,16 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
 
     issues = []
 
-    # Track the latest formal review state per author chronologically across all reviews
+    # Direct GitHub computed review decision check
+    if review_decision in ("CHANGES_REQUESTED", "REJECTED"):
+        issues.append(f"PR formal review decision is '{review_decision}'")
+
+    # Track the latest formal review decision per author chronologically across all reviews
     author_latest_state: Dict[str, str] = {}
     for r in reviews:
         author = (r.get("author") or {}).get("login", "")
         state = r.get("state", "").upper()
-        if author and state:
+        if author and state in ("CHANGES_REQUESTED", "REJECTED", "APPROVED"):
             author_latest_state[author] = state
 
     for author, state in author_latest_state.items():
@@ -129,23 +134,26 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
         oid = item[3]
 
         is_sha_match = bool((oid and oid == sha) or sha_short in body or sha in body)
-        # Allow a 60-second clock skew tolerance window for commit vs server creation time
-        is_timing_match = bool(
-            commit_dt
-            and created_at_dt
-            and created_at_dt >= (commit_dt - timedelta(seconds=60))
-            and (is_sha_match or not oid)
-            and any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict"))
-        )
+        if oid:
+            # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
+            is_match = (oid == sha)
+        else:
+            # Issue comments without OID match if SHA is present OR posted after commit_dt (with 60s skew tolerance)
+            is_match = is_sha_match or bool(
+                commit_dt
+                and created_at_dt
+                and created_at_dt >= (commit_dt - timedelta(seconds=60))
+                and any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict"))
+            )
 
-        if is_sha_match or is_timing_match:
+        if is_match:
             matching_items.append(item)
 
     if not matching_items:
         issues.append(f"No review comment has been posted evaluating HEAD SHA {sha[:8]} yet")
         return False, issues
 
-    # Inspect ALL matching items for HEAD SHA    # Precise finding patterns (avoiding false positives on clean review summaries)
+    # Inspect ALL matching items for HEAD SHA (not just an empty trailing formal review object)
     finding_patterns = [
         r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
         r"\*\*Actionable Findings\*\*",
@@ -191,11 +199,11 @@ def main():
     pr_num = sys.argv[1]
     print(f"Checking ARDI / fully-clean status for PR #{pr_num}...")
 
-    sha, branch, state, commit_date = get_pr_info(pr_num)
+    sha, branch, state, commit_date, review_decision = get_pr_info(pr_num)
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha)
-    review_ok, review_issues = check_review_comments(pr_num, sha, commit_date)
+    review_ok, review_issues = check_review_comments(pr_num, sha, commit_date, review_decision)
 
     all_issues = ci_issues + review_issues
 

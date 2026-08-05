@@ -69,6 +69,14 @@ BLOCK = [
     ('echo "closes #1156, needs review" && gh pr merge 1157 --squash', "double-quoted issue reference with hash followed by double-ampersand and merge command"),
     ('gh pr merge 123 --reviewer "please --allow-merge this"', "unauthorized merge with --allow-merge forged inside unmasked flag value"),
     ('gh pr merge 123 "junk --allow-merge junk"', "unauthorized merge with --allow-merge forged inside positional argument"),
+    ('"gh" pr merge 123', "quoted executable name gh"),
+    ("'gh' pr merge 123", "single-quoted executable name gh"),
+    ('gh "pr" merge 123', "quoted subcommand pr"),
+    ('gh pr "merge" 123', "quoted subcommand merge"),
+    ('g""h pr merge 123', "empty quote concatenation inside executable name"),
+    ('"glab" mr merge 12', "quoted executable name glab"),
+    ('glab "mr" "merge" 12', "quoted subcommands mr and merge"),
+    ('"/usr/bin/gh" pr merge 123', "quoted full executable path"),
 ]
 
 ALLOW = [

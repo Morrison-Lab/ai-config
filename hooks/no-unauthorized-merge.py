@@ -40,6 +40,23 @@ ALLOW_ENV_FLAG = re.compile(
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
+def unquote_words(text: str) -> str:
+    """Normalize bash quote-removal on individual command/subcommand word tokens.
+
+    In Bash, quoting part or all of a word token without spaces or subshells
+    (e.g. "gh", 'gh', "pr", "merge", g""h, 'glab', "mr", "/usr/bin/gh")
+    is identical to the unquoted word. This function strips inert quotes from single-word tokens
+    so MERGE_PATTERNS matches regardless of quote placement on command/subcommand names.
+    """
+    prev = None
+    while prev != text:
+        prev = text
+        text = re.sub(r'''(["'])([A-Za-z0-9_./-]+)\1''', r'\2', text)
+        text = re.sub(r'''(?<=[A-Za-z0-9_./-])(?:""|'')(?:(?=[A-Za-z0-9_./-])|$)''', '', text)
+        text = re.sub(r'''(?:^|(?<=[\s;&|`()]))(?:""|'')(?:(?=[A-Za-z0-9_./-])|$)''', '', text)
+    return text
+
+
 def has_allow_override(segment: str) -> bool:
     """Check if command segment contains an explicit authorization override.
 
@@ -250,17 +267,19 @@ def check_mwc_active() -> bool:
 def offending(command: str):
     # 1. Normalize bash backslash-newline line continuations (matching bash semantics: remove backslash and newline without inserting a space)
     norm_command = re.sub(r"\\\n", "", command)
-    # 2. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
-    masked_command = mask_payloads(norm_command)
+    # 2. Normalize single-word token quote removal (e.g. "gh" -> gh, "pr" -> pr, "merge" -> merge, g""h -> gh)
+    unquoted_command = unquote_words(norm_command)
+    # 3. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
+    masked_command = mask_payloads(unquoted_command)
 
-    # 3. Use finditer on masked_command to derive exact character slice offsets for norm_command
+    # 4. Use finditer on masked_command to derive exact character slice offsets for unquoted_command
     matches = list(SPLIT.finditer(masked_command))
     starts = [0] + [m.end() for m in matches]
     ends = [m.start() for m in matches] + [len(masked_command)]
 
     for start, end in zip(starts, ends):
         masked_seg = masked_command[start:end]
-        orig_seg = norm_command[start:end]
+        orig_seg = unquoted_command[start:end]
         if has_allow_override(orig_seg):
             continue
         for pattern, label in MERGE_PATTERNS:

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Extend AI capabilities via the ai-config and/or gha repos – given a stated capability (‘teach Claude to X’, ‘add an AI capability for Y’), determine on the fly which implementation form fits (skill, subagent, memory/preference, harness hook, shared prompt fragment, or a gha reusable GitHub Actions capability / bot-workflow tweak) and dispatch to the specific builder skill – or gha’s composite-action + workflow_call convention – that builds it. Falls back to filing a fully-specified issue on the target repo (or, if even that’s unreachable, on the current repo for later transfer) when the session can’t push there. Use when asked to ‘config-ai’, ‘ca’, ‘cai’, ‘extend AI capabilities’, ‘add an AI capability’, ‘teach Claude to do X’, ‘give Claude the ability to X’, or when a request names a desired behavior but not a mechanism.">
+<meta name="description" content="Alias for agy-review-workflow. Use when asked to ‘antigravity-review-workflow’.">
 
 <title>skill – ai-config</title>
 <style>
@@ -311,18 +311,9 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#config-ai-route-ai-capability-requests-to-the-right-implementation-ca-cai" id="toc-config-ai-route-ai-capability-requests-to-the-right-implementation-ca-cai" class="nav-link active" data-scroll-target="#config-ai-route-ai-capability-requests-to-the-right-implementation-ca-cai">config-ai – route AI-capability requests to the right implementation (ca, cai)</a>
-  <ul class="collapse">
-  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#step-0-restate-the-capability-not-the-mechanism" id="toc-step-0-restate-the-capability-not-the-mechanism" class="nav-link" data-scroll-target="#step-0-restate-the-capability-not-the-mechanism">Step 0 – Restate the capability, not the mechanism</a></li>
-  <li><a href="#step-1-pick-the-implementation-form" id="toc-step-1-pick-the-implementation-form" class="nav-link" data-scroll-target="#step-1-pick-the-implementation-form">Step 1 – Pick the implementation form</a></li>
-  <li><a href="#step-2-reuse-check-before-building-anything" id="toc-step-2-reuse-check-before-building-anything" class="nav-link" data-scroll-target="#step-2-reuse-check-before-building-anything">Step 2 – Reuse-check before building anything</a></li>
-  <li><a href="#step-3-check-push-access-to-the-target-repo-then-ship" id="toc-step-3-check-push-access-to-the-target-repo-then-ship" class="nav-link" data-scroll-target="#step-3-check-push-access-to-the-target-repo-then-ship">Step 3 – Check push access to the target repo, then ship</a></li>
-  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
-  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
-  </ul></li>
+  <li><a href="#antigravity-review-workflow-alias-for-agy-review-workflow" id="toc-antigravity-review-workflow-alias-for-agy-review-workflow" class="nav-link active" data-scroll-target="#antigravity-review-workflow-alias-for-agy-review-workflow">antigravity-review-workflow (alias for <code>agy-review-workflow</code>)</a></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/config-ai/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/config-ai/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/antigravity-review-workflow/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/antigravity-review-workflow/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -331,138 +322,12 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="config-ai-route-ai-capability-requests-to-the-right-implementation-ca-cai" class="level1">
-<h1>config-ai – route AI-capability requests to the right implementation (ca, cai)</h1>
-<p>This skill doesn’t build anything itself. It figures out <em>what kind</em> of thing a capability request needs, then hands off to the skill (or repo convention) that actually builds it – with a repo-access-aware fallback so a request never gets silently dropped just because the current session can’t push to <code>ai-config</code> or <code>gha</code>.</p>
-<section id="when-this-fires" class="level2">
-<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
-<ul>
-<li>“config-ai”, “ca”, “cai”</li>
-<li>“extend AI capabilities”, “add an AI capability for X”, “teach Claude to X”, “give Claude the ability to X”, “make Claude able to X”, “wire this up so Claude always/automatically does X”</li>
-<li>A request names a desired behavior without naming a mechanism – that’s the tell that this skill, not a specific builder skill, is the right entry point.</li>
-</ul>
-</section>
-<section id="step-0-restate-the-capability-not-the-mechanism" class="level2">
-<h2 class="anchored" data-anchor-id="step-0-restate-the-capability-not-the-mechanism">Step 0 – Restate the capability, not the mechanism</h2>
-<p>State in one sentence what the requester wants Claude (or Codex, or the <code>@claude</code> bot, or a <code>gha</code> consumer’s CI) to be able to do. Don’t presuppose the implementation yet – “add a hook that reminds me to X” is already half an answer the requester may not have meant.</p>
-<p>Then check it’s actually reusable, not a one-off. A single favor for right now doesn’t need infrastructure – just do it. <code>config-ai</code> is for capability that should persist beyond this conversation.</p>
-</section>
-<section id="step-1-pick-the-implementation-form" class="level2">
-<h2 class="anchored" data-anchor-id="step-1-pick-the-implementation-form">Step 1 – Pick the implementation form</h2>
-<p>Work down this table; stop at the first row that fits. Each row hands off to the skill or convention that owns that mechanism – this skill does not duplicate their build steps.</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>The capability is…</th>
-<th>Form</th>
-<th>Home</th>
-<th>Hand off to</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>A repeatable, multi-step procedure a user (or the <code>@claude</code> bot) invokes on demand</td>
-<td>Skill</td>
-<td><code>ai-config</code> <code>skills/&lt;name&gt;/</code></td>
-<td><code>skill-builder</code></td>
-</tr>
-<tr class="even">
-<td>A persistent, read-only fan-out worker persona a heavy skill spawns</td>
-<td>Subagent</td>
-<td><code>ai-config</code> <code>.claude/agents/&lt;name&gt;.md</code></td>
-<td><code>agent-builder</code></td>
-</tr>
-<tr class="odd">
-<td>A standing fact, preference, or behavioral rule Claude should just know</td>
-<td>Memory / <code>CLAUDE.md</code> section</td>
-<td><code>ai-config</code> <code>memories/</code>, <code>CLAUDE.md</code>, or a <code>shared/&lt;category&gt;/&lt;name&gt;.md</code> fragment</td>
-<td><code>memorize</code> (working repo is <code>ai-config</code>) or <code>push-memory</code> (working repo is something else)</td>
-</tr>
-<tr class="even">
-<td>An automated action the harness itself must trigger on an event Claude doesn’t control the timing of (session start, before/after a tool call, on stop)</td>
-<td>Hook</td>
-<td><code>ai-config</code> <code>.claude/settings.json</code> (project-level; a user-level hook goes in <code>~/.claude/settings.json</code> instead, which is not synced from this repo)</td>
-<td>the harness’s built-in <code>update-config</code> skill (not part of this repo’s <code>skills/</code> tree)</td>
-</tr>
-<tr class="odd">
-<td>Reusable text shared verbatim across multiple skills or docs – not itself a rule</td>
-<td>Shared prompt fragment</td>
-<td><code>ai-config</code> <code>shared/&lt;category&gt;/&lt;name&gt;.md</code>, referenced with <code>@shared/...</code></td>
-<td>no builder skill owns this; follow the existing <code>shared/</code> layout (<code>coding/</code>, <code>vendored/</code>, <code>workflow/</code>, <code>writing/</code>) and wire the <code>@shared/...</code> reference into <code>CLAUDE.md</code> and/or the skill(s) that need it</td>
-</tr>
-<tr class="even">
-<td>A capability <em>other repos’</em> CI should be able to call – a composite action a workflow step runs, or a <code>workflow_call</code> reusable workflow consumers pin to <code>@v1</code></td>
-<td>GitHub Action</td>
-<td><code>gha</code> repo root composite + <code>.github/workflows/&lt;name&gt;.yml</code> wrapper + <code>examples/&lt;name&gt;.yml</code></td>
-<td>follow <code>gha</code>’s own <code>CLAUDE.md</code> “Layout” section: composite (+ helper script if R/Python) → wrapper → example stub → <code>README.md</code>/<code>website/</code> doc sync (see its “new <code>workflow_call</code> input” doc-sync-site list)</td>
-</tr>
-<tr class="odd">
-<td>A change to how the <code>@claude</code> or <code>@agy</code> bot itself behaves when invoked on a PR/issue – not what it can do for consumers, how <em>it</em> runs</td>
-<td>Bot CI workflow</td>
-<td><code>gha</code> <code>.github/workflows/claude.yml</code>, <code>claude-code-review.yml</code>, <code>antigravity-review.yml</code>, or <code>antigravity-code-review.yml</code></td>
-<td><code>claude-agent-workflow</code> (agent workflow), <code>claude-review-workflow</code> (Claude PR review), or <code>agy-review-workflow</code> (Antigravity PR review)</td>
-</tr>
-</tbody>
-</table>
-<p>If more than one row plausibly fits (common: “always check X before Y” could be a memory <em>or</em> a hook), prefer the <strong>least mechanism</strong>: memory over hook (a hook needs harness config that can silently stop firing if <code>settings.json</code> drifts; a memory just needs Claude to read <code>CLAUDE.md</code>), a skill over a subagent (a subagent only earns its keep when reused across call sites or the tool boundary is load-bearing – see <code>agent-builder</code>’s step 2), and a shared fragment over a new skill when the content already lives inside another skill’s procedure and a new skill would just duplicate it.</p>
-<p><strong>“Least mechanism” is a tiebreaker between two forms that would produce the <em>same behavior</em>, not a default toward the cheaper form when the request’s own phrasing signals something more active.</strong> A request built around a verb – “go through X”, “trigger Y”, “sweep Z for W”, “check for V” – is naming a repeatable, on-demand <em>action</em>, which is what a Skill is for; reading it as a passive standing preference just because memory is the lighter mechanism produces an artifact that does something different from what was asked, not a cheaper version of the same thing. When it’s genuinely unclear which the user means, and the two readings would build materially different artifacts (not just the same content in a different location), ask before committing – one clarifying question costs far less than a full build-and-PR cycle spent on the wrong mechanism. (ai-config#583 vs.&nbsp;#585, 2026-07-16: “go through the decisions you need from me one at a time” was built as a <code>CLAUDE.md</code> standing rule about presentation – least mechanism, but the wrong reading. The user meant a skill that actively sweeps GitHub issues/PRs for decisions waiting on them; the <code>CLAUDE.md</code> rule turned out to be a useful, real, but <em>different</em> capability from the one asked for, requiring a second full issue → PR cycle to build the one actually requested.)</p>
-<p><strong>The “Skill” row’s <code>ai-config skills/&lt;name&gt;/</code> home assumes the capability is reusable <em>across</em> repos.</strong> When the capability only makes sense for one project’s own domain (game-specific terminology, a codebase’s own internal tooling) – especially when that project already has a precedent skill of its own under its <code>.claude/skills/</code> – extend or add to <em>that project’s</em> skill directory via a PR in that repo instead, the same way a project-specific memory goes in the project’s own docs rather than <code>ai-config</code>’s <code>memories/</code>. <code>skill-builder</code>’s own Step 0 reuse-check is scoped to the <code>ai-config</code> repo only, so run an equivalent check against the <em>project’s</em> own <code>skills/</code> dir by hand first – don’t rely on <code>skill-builder</code> to catch this case for you. (<code>Lacaedemon/sparta</code>, 2026-07-14: a request to check every demo for specific simulation-defect patterns – terminology with no meaning outside that one game – extended the project’s existing <code>.claude/skills/verify-via-state-dump/SKILL.md</code> rather than creating a new <code>ai-config</code> skill.)</p>
-</section>
-<section id="step-2-reuse-check-before-building-anything" class="level2">
-<h2 class="anchored" data-anchor-id="step-2-reuse-check-before-building-anything">Step 2 – Reuse-check before building anything</h2>
-<p>Every mechanism above already has its own extend-first check; run it rather than scaffolding cold:</p>
-<ul>
-<li>Skill / subagent → <code>skill-builder</code> step 0 / <code>agent-builder</code> step 0 (search <code>skills/</code>, scan every branch and worktree, check open PRs).</li>
-<li>Memory → grep <code>memories/*.md</code> and <code>CLAUDE.md</code> for the same fact before adding a new bullet.</li>
-<li>Shared fragment → grep <code>shared/**/*.md</code> for the same content before writing a new file.</li>
-<li><code>gha</code> capability → <code>ls</code> the repo root for an existing composite that’s adjacent, and check <code>examples/</code> for a stub that already covers it.</li>
-<li>Bot workflow → read the existing <code>claude.yml</code> / <code>claude-code-review.yml</code> end to end first; both skills document the load-bearing patterns not to break.</li>
-</ul>
-</section>
-<section id="step-3-check-push-access-to-the-target-repo-then-ship" class="level2">
-<h2 class="anchored" data-anchor-id="step-3-check-push-access-to-the-target-repo-then-ship">Step 3 – Check push access to the target repo, then ship</h2>
-<p>The target repo is <code>ai-config</code> for the first five rows above, <code>gha</code> for the last two.</p>
-<ol type="1">
-<li><strong>Can this session push to the target repo?</strong> Check the session’s GitHub scope (the “Repository Scope” list in a remote/web session’s system prompt, or a <code>git remote -v</code> / <code>gh repo view &lt;owner&gt;/&lt;repo&gt;</code> probe locally), and whether a push would actually be accepted – a scoped session may be able to push only its own harness-assigned branch (see <code>CLAUDE.md</code>’s “Use the existing PR branch” 403 exception).
-<ul>
-<li><strong>Yes</strong> → proceed normally: branch off <code>main</code> in the target repo, build via the skill/convention chosen in Step 1, open a PR, request review, <code>ardi</code> to clean. The common case; nothing extra needed from this skill.</li>
-</ul></li>
-<li><strong>No push access, but the session can still read the target repo and open issues on it</strong> (GitHub MCP scope or <code>gh</code>/API access, just not write access to code) → don’t lose the request. File one fully-specified issue on the target repo describing: the capability in one sentence, the implementation form chosen in Step 1 and why, the target file(s)/path(s), and enough detail that a future <code>gi</code>/<code>grab-issue</code> session – which does have push access – can build it unattended. Don’t claim it (<code>claim-pr</code>’s “paws off” comment is for a session about to implement); leave it open for whoever picks it up.</li>
-<li><strong>No access to the target repo at all</strong> (not in the session’s GitHub scope, no network path, issue creation itself fails) → file the issue in the <strong>current</strong> repo instead – whatever repo the session is actually working in. Write it standalone, since a future reader won’t have this conversation’s context: state plainly that it’s really a request for <code>ai-config</code>/<code>gha</code> and needs to move there. Ask the user to use GitHub’s <strong>Transfer issue</strong> feature once a session with access is available. This mirrors <code>shared/workflow/upstream-issues.md</code>’s own-repo fallback (its step 3), applied here because <code>ai-config</code>/<code>gha</code> are just as “upstream” of a differently-scoped session as any external dependency is.</li>
-</ol>
-<p>Never silently drop a capability request because the current session happens to lack push access to the target repo – one of these three always applies.</p>
-</section>
-<section id="relationship-to-other-skills" class="level2">
-<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
-<ul>
-<li><strong><code>skill-builder</code></strong>, <strong><code>agent-builder</code></strong> – the construction steps for the first two rows of the decision table; this skill is the router that decides <em>which</em> of them (or a different mechanism entirely) applies, then gets out of the way.</li>
-<li><strong><code>spot-skill-opportunities</code></strong> – proactively notices, mid-task, when a <em>skill or agent</em> specifically is warranted; narrower than this skill (only those two forms) and unprompted (it doesn’t wait for the user to name a capability). <code>config-ai</code> is the explicit, user-invoked entry point across the <em>full</em> mechanism set – memory, hooks, shared fragments, and <code>gha</code> Actions/bot-workflow tuning included, not just skills/agents.</li>
-<li><strong><code>memorize</code></strong> / <strong><code>push-memory</code></strong> / <strong><code>ums</code></strong> – own the memory/preference row; <code>push-memory</code> is specifically the delivery mechanism when the working repo isn’t <code>ai-config</code> but the session still has API/branch access to it – narrower than this skill’s Step 3, which also covers the case where even that access is missing.</li>
-<li><strong><code>claude-agent-workflow</code></strong>, <strong><code>claude-review-workflow</code></strong>, <strong><code>agy-review-workflow</code></strong> – own the bot-CI-tuning row; all document the load-bearing patterns in their respective workflows (<code>claude.yml</code>, <code>claude-code-review.yml</code>, <code>antigravity-review.yml</code>) this skill doesn’t repeat.</li>
-<li><strong><code>upstream-issues</code></strong> (<code>shared/workflow/upstream-issues.md</code>) – the general escalation pattern (PR → issue on target → issue on own repo, ask for transfer) this skill’s Step 3 specializes for the <code>ai-config</code>/<code>gha</code> case, where the “external” repos are the user’s own but may still be out of the current session’s scope.</li>
-<li><strong><code>issue-first</code></strong> (<code>shared/workflow/issue-first.md</code>) / <strong><code>st</code></strong> – the issue-before-PR discipline Step 3’s normal push-access path still follows once a form is chosen.</li>
-</ul>
-</section>
-<section id="anti-patterns" class="level2">
-<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
-<ul>
-<li>❌ Picking a form and building it without running Step 2’s reuse/extend check – <code>skill-builder</code>/<code>agent-builder</code>/etc. already require it; this skill doesn’t get an exemption.</li>
-<li>❌ Reaching for a hook when a <code>CLAUDE.md</code> memory would do – a hook adds harness-config surface area a memory doesn’t need.</li>
-<li>❌ Applying “least mechanism” to a verb-first request (“go through X”, “trigger Y”, “sweep Z”) and building a passive memory rule when the phrasing named a repeatable on-demand action – that’s a Skill, not a cheaper restatement of one. Ask first when the two readings would build genuinely different artifacts.</li>
-<li>❌ Building a <code>gha</code> capability as an <code>ai-config</code> skill (or vice versa) because it’s the repo the session happens to be in – the mechanism’s home is fixed by what it serves (Claude/Codex behavior vs.&nbsp;other repos’ CI), not by convenience.</li>
-<li>❌ Silently dropping a request when the session lacks push access instead of running Step 3’s fallback ladder.</li>
-<li>❌ Filing the fallback issue in the current repo without explicitly asking for a GitHub “Transfer issue” – an untransferred issue is a request nobody will ever see again.</li>
-<li>❌ Duplicating a builder skill’s procedure inline instead of handing off to it.</li>
-</ul>
+<section id="antigravity-review-workflow-alias-for-agy-review-workflow" class="level1">
+<h1>antigravity-review-workflow (alias for <code>agy-review-workflow</code>)</h1>
+<p>This is an alias for the <strong>agy-review-workflow</strong> skill. Read and follow the canonical skill:</p>
+<p>-&gt; <strong><a href="../../skills/agy-review-workflow/SKILL.html">agy-review-workflow</a></strong></p>
 
 
-</section>
 </section>
 
 <a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
@@ -889,7 +754,7 @@ ul.task-list li input[type="checkbox"] {
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/config-ai/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/config-ai/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/antigravity-review-workflow/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/antigravity-review-workflow/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

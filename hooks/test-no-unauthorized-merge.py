@@ -21,6 +21,7 @@ BLOCK = [
     ("sh -c 'gh pr merge 411 --squash'", "subshell sh -c gh pr merge inside single quotes"),
     ("eval \"gh pr merge 411\"", "eval string execution gh pr merge"),
     ("gh pr \\\n merge 411 --squash", "backslash-newline line continuation gh pr merge"),
+    ("gh pr me\\\nrge 411 --squash", "mid-word backslash-newline continuation gh pr merge"),
     ('(gh pr merge 411)', "parenthesized subshell gh pr merge"),
     ('gh pr comment 123 --body "hi"\ngh pr merge 999', "multiline script: comment on line 1, merge on line 2"),
     ('gh pr comment 123 --body "Line 1\nLine 2\nLine 3"\ngh pr merge 999', "multiline comment body with multiple newlines before merge command"),

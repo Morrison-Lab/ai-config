@@ -83,7 +83,7 @@ def is_session_alive(sess_file: Path) -> bool:
                 os.kill(int(pid), 0)
                 return True
             except OSError:
-                pass  # Subshell PID may have exited; fall through to heartbeat timestamp check
+                return False  # PID is dead on local host
         hb = int(sess_data.get("heartbeat") or sess_data.get("started") or 0)
         return (time.time() - hb) < 1800
     except Exception:
@@ -155,8 +155,8 @@ def check_mwc_active() -> bool:
 
 
 def offending(command: str):
-    # 1. Normalize bash backslash-newline line continuations
-    norm_command = re.sub(r"\\\n", " ", command)
+    # 1. Normalize bash backslash-newline line continuations (matching bash semantics: remove backslash and newline without inserting a space)
+    norm_command = re.sub(r"\\\n", "", command)
     # 2. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
     masked_command = mask_payloads(norm_command)
 

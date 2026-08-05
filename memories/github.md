@@ -826,4 +826,8 @@ Two practical consequences:
   Single-line comments in code blocks (`# comment` in Python, Bash, R, Ruby, YAML) start with `# `. A lookahead regex matching `\n\#{1,6}[ \t]+` to detect section headers treats single-line code comments inside code blocks as markdown headings, cutting off code block suggestions mid-snippet.
 - **Use match-boundary splitting instead of single-pass lookaheads.**
   Search for location headers (`**Location:** [file.ext:L10]`) to collect all finding match spans `matches`. Then compute each finding body's boundaries linearly as `content[match[i].end() : match[i+1].start()]`. This completely eliminates catastrophic regex backtracking on nested code blocks and single-line `#` code comments. (Morrison-Lab/gha#412, 2026-08-05).
+- **Strip backticks from location file paths.**
+  LLMs sometimes format location headers with backticks inside brackets (e.g. `**Location:** [\`file.py\`:L12]`). Include backticks in `.strip("'\"` ")` so the GitHub REST API receives a clean file path rather than returning `HTTP 422: File path does not exist`.
+- **Require double newlines `\n\s*\n` when truncating summary headers.**
+  Trimming summary sections using single newlines (`\n+#{1,6}`) risks truncating inline comment bodies when findings contain sub-headings like `### Recommendation`. Requiring `\n\s*\n` ensures sub-headings inside findings remain intact. (Morrison-Lab/gha#413, 2026-08-05).
 

@@ -345,7 +345,7 @@ ul.task-list li input[type="checkbox"] {
 <section id="what-counts-as-independent-concerns" class="level2">
 <h2 class="anchored" data-anchor-id="what-counts-as-independent-concerns">What counts as “independent concerns”</h2>
 <p>Two changes are independent if: - They could be merged in either order without conflict - They solve different problems / close different issues - A revert of one wouldn’t affect the other - They’d have different reviewers in an ideal world</p>
-<p>Examples: - Bug fix + unrelated refactor → split - Feature + the test for that feature → keep together - CI template fix + documentation update for that fix → keep together - CI template fix + unrelated linter config change → split - CI/workflow infrastructure change + precomputed simulation/validation dataset artifacts → split - Dependency update + code that uses the new dependency → keep together</p>
+<p>Examples: - Bug fix + unrelated refactor → split - Feature + the test for that feature → keep together - CI template fix + documentation update for that fix → keep together - CI template fix + unrelated linter config change → split - CI/workflow change + simulation/validation dataset artifacts (<code>inst/extdata/*.rds</code>, <code>.parquet</code>, <code>.RData</code>) or HPC job array updates → split - Dependency update + code that uses the new dependency → keep together</p>
 </section>
 <section id="process" class="level2">
 <h2 class="anchored" data-anchor-id="process">Process</h2>

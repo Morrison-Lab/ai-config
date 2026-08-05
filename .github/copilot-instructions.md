@@ -11,7 +11,8 @@ Review prose with the rigor you would apply to code.
 ## Hard conventions, worth flagging on sight
 
 **ASCII punctuation only.** Never em-dashes, en-dashes, curly quotes, or the multiplication sign, anywhere in a tracked file, including code comments and Markdown prose.
-Write `--` where a dash is wanted.
+Write a spaced `---` or `--` where a dash is wanted; `---` is the corpus's prevailing form, and both are ASCII, so do not flag either one.
+The banned characters are the four named above, not a particular number of hyphens.
 This is enforced by convention rather than by CI, so review is the main line of defence.
 
 **Semantic line breaks.**

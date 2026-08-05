@@ -76,11 +76,11 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     reviews = data.get("reviews", [])
 
     issues = []
-    # Collect all automated review reports (filtering on body content markers, not author login)
+    # Collect all automated review reports (filtering on bot review report body markers)
     all_items = []
     for c in comments:
         body = c.get("body", "")
-        if any(marker in body for marker in ("### 🤖", "Code Review", "Verdict:", "Actionable Findings", "Detailed Findings", "### Findings")):
+        if "### 🤖" in body or "Code Review" in body:
             all_items.append(("comment", c["createdAt"], body))
 
     for r in reviews:

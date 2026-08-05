@@ -72,6 +72,10 @@
   Verifying each claim directly against the PR's own actual runs (not reasoning abstractly) confirmed all three were correct in sequence, while a separate claim in the same PR --- that markdown skill docs are bound by the repo's source-code-only em-dash rule --- checked out FALSE against the rule's own explicit scope and was rebutted.
   The review loop only reached zero new comments once every claim got the same live-query treatment, rather than being pattern-matched as "probably right" or "probably just noise" this many rounds in.)
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
+  **Except in `Morrison-Lab/ai-config`, which never requests `d-morrison` at all** --- not on PR creation, and not as a deadlock escalation, which goes to the user in chat as a boxed `🛑 BLOCKER` instead of to a review request.
+  The exception is scoped to that one repo; requesting `d-morrison` everywhere else is unchanged.
+  See [`request-pr-review`](../skills/request-pr-review/SKILL.md)'s Scope section for the full statement.
+  (User directive, 2026-08-05: "cai: stop requesting reviews from d-morrison in this repo".)
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --
   create, push, and open the feature PR first. The PR must expose the exact SHA
@@ -659,7 +663,8 @@
   Treat "waiting on a background job" and "watching a subagent" as tracked to-do items in their own right, not just implicit background state. (Learned on sparta 2026-07-24.)
 
 - When a request matches "add/build/create a skill" (skill-builder's own trigger phrases), invoke the `skill-builder` skill via the Skill tool rather than freehand-implementing the scaffold-and-ship flow.
-  Skill-builder encodes steps that are easy to skip when done ad hoc: the extend-first check, running the four local validation scripts (`validate-skills.py`, `check-links.py`, `check-vendored-drift.py`, `markdownlint-cli2`) before pushing, registering any cited MCP tool in `tool-mappings.yml`, updating `skills.qmd`'s count from the actual `skills/` directory count (not a manual +1), cross-linking related skills, and explicitly requesting `d-morrison` as reviewer. (Learned on ai-config#338 --- the `prompt-me`/`pm` skill was built and shipped without invoking `skill-builder`, so none of those steps ran; CI happened to catch what the scripts would have.
+  Skill-builder encodes steps that are easy to skip when done ad hoc: the extend-first check, running the four local validation scripts (`validate-skills.py`, `check-links.py`, `check-vendored-drift.py`, `markdownlint-cli2`) before pushing, registering any cited MCP tool in `tool-mappings.yml`, updating `skills.qmd`'s count from the actual `skills/` directory count (not a manual +1), and cross-linking related skills.
+  (Learned on ai-config#338 --- the `prompt-me`/`pm` skill was built and shipped without invoking `skill-builder`, so none of those steps ran; CI happened to catch what the scripts would have.
   Reinforced on ai-config#347 --- `resolve-pr-threads` was hand-authored and needed a review round to catch a `tool-mappings.yml` gap `skill-builder` already documented from a near-identical miss in `push-memory` #311.)
 - Claim a PR before pushing iterative commits to it, even when you opened the PR yourself in the same session --- this repo's `@claude` review workflow can fire and interleave with an in-flight push.
   Post the "paws off" comment from `claim-pr` right after opening the PR, not just for PRs you're joining mid-flight. (Missed on ai-config#338: several commits were pushed across an ARDI-style review loop with no claim comment posted.)

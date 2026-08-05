@@ -1,6 +1,6 @@
 ---
 name: request-pr-review
-description: Request d-morrison as reviewer after creating a GitHub PR. Run immediately after `gh pr create` succeeds, in the same response. Standing rule across all repos unless told otherwise.
+description: Request d-morrison as reviewer after creating a GitHub PR. Run immediately after `gh pr create` succeeds, in the same response. Standing rule across all repos except `Morrison-Lab/ai-config`, which never requests d-morrison (see Scope).
 user-invocable: true
 allowed-tools:
   - Bash(gh api *)
@@ -50,3 +50,50 @@ and `<num>` from the PR URL returned by `gh pr create`.
 Applies by default to all GitHub repos. If the user tells you a specific
 repo shouldn't auto-request d-morrison, honor that override per-repo via a
 project-level memory.
+
+### Exception: `Morrison-Lab/ai-config`
+
+Never request `d-morrison` as a reviewer on a PR in this repo.
+
+The exception is repo-scoped, not rule-wide.
+Requesting `d-morrison` in every other repo stays correct and unchanged,
+on PR creation and on deadlock alike.
+Within this repo it covers every path that would reach a request:
+the standing post-`gh pr create` request above,
+the ship step of any skill whose own PR lands in ai-config,
+and the deadlock escalation below.
+
+A skill that routes its request through this skill inherits the exception
+automatically, so nothing had to change in `ard`, `ardi`, `merge-it`, or `st`
+--- each is cross-repo, and each defers here.
+What did change is the skills that hardcoded the request while always shipping
+to ai-config; their ship step now requests nobody.
+Derive that set rather than trusting a list, since it grows.
+This lists every site that names `d-morrison` as a reviewer; a site is covered
+whenever its PR lands in ai-config:
+
+```sh
+git grep -nE 'add-reviewer d-morrison|request `d-morrison`' -- skills/
+```
+
+**A review deadlock on an ai-config PR escalates to the user in chat,
+not to a review request.**
+Escalation is not retired here, only re-routed:
+its purpose was always that a human decides, and that is unchanged.
+Post a boxed `🛑 BLOCKER` (per `CLAUDE.md`'s chat-output-tagging convention)
+naming the PR, the single disputed item, and both sides of the exchange,
+then stop iterating that item and wait for the user's call.
+
+- **Do:** open an ai-config PR with no human reviewer requested.
+- **Do:** take an ai-config deadlock to the user in chat as a boxed
+  `🛑 BLOCKER`, and keep requesting `d-morrison` for a deadlock in any
+  other repo.
+- **Don't:** run `gh pr edit --add-reviewer d-morrison`, or POST to
+  `requested_reviewers` with that login, against an ai-config PR --- not on
+  creation, and not as a deadlock escalation.
+- **Don't:** read this as ending escalation on ai-config; an unresolved
+  deadlock still needs a human, and chat is now where it goes.
+
+(Directive from the user, 2026-08-05, verbatim:
+"cai: stop requesting reviews from d-morrison in this repo".
+No reason was given, and none is recorded here.)

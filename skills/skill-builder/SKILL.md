@@ -361,8 +361,10 @@ lines around tables (MD058).
 
 Then, as their own explicit steps (don't leave them buried in a comment):
 
-1. **Request the reviewer:** `gh pr edit --add-reviewer d-morrison` (`EDIT_PR`; see
-   `request-pr-review`).
+1. **Request no human reviewer.**
+   This PR lands in ai-config, where `request-pr-review`'s Scope section
+   forbids requesting `d-morrison`.
+   Leave the human-reviewer slot empty and let the automated reviewers run.
 2. **Drive to clean:** run the `ardi` skill on the new PR until the verdict has
    zero findings.
 

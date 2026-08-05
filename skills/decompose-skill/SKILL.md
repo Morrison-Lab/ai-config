@@ -167,8 +167,10 @@ python3 scripts/check-links.py
 python3 scripts/check-vendored-drift.py
 ```
 
-Branch + PR (not direct to `main`), request `d-morrison` as reviewer
-(`request-pr-review`), then **ARDI to clean** (`ardi`). If a new sibling
+Branch + PR (not direct to `main`), then **ARDI to clean** (`ardi`).
+Request no human reviewer: this PR lands in ai-config, where
+`request-pr-review`'s Scope section forbids requesting `d-morrison`.
+If a new sibling
 skill was added, bump `skills.qmd`'s "All N+ canonical skills" count to the
 *actual* directory count (`ls -d skills/*/ | wc -l`), not a manual +1 — see
 `skill-builder`'s own note on why a hand-incremented count drifts.

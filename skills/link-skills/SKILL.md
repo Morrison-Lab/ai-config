@@ -138,8 +138,10 @@ python3 scripts/validate-skills.py   # if present — schema/frontmatter sanity
 ### 6. Ship it
 
 Skill edits live in the ai-config repo — never local-only. Commit on a branch,
-open a PR, request `d-morrison` (see `request-pr-review`), and ARDI to clean
-(see `ardi`). Stage skills via their real `skills/<name>/SKILL.md` path, not
+open a PR, and ARDI to clean (see `ardi`).
+Request no human reviewer: this PR lands in ai-config, where
+`request-pr-review`'s Scope section forbids requesting `d-morrison`.
+Stage skills via their real `skills/<name>/SKILL.md` path, not
 through the `.claude/skills` symlink (`git add` rejects the symlinked path).
 
 ## Relationship to other skills

@@ -143,8 +143,9 @@ python3 scripts/check-links.py          # no broken relative links
 ```
 
 Memories live in the ai-config repo — never leave changes local-only. Branch +
-PR (not direct to main), request `d-morrison` as reviewer (`request-pr-review`),
-then **ARDI to clean** (`ardi`).
+PR (not direct to main), then **ARDI to clean** (`ardi`).
+Request no human reviewer: this PR lands in ai-config, where
+`request-pr-review`'s Scope section forbids requesting `d-morrison`.
 
 ```bash
 git checkout -b consolidate-memory-<topic> origin/main   # CREATE_BRANCH

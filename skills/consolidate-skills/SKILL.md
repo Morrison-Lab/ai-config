@@ -160,8 +160,9 @@ python3 scripts/validate-skills.py      # if present — must pass
 ```
 
 Skills live in the ai-config repo — never leave changes local-only. Branch +
-PR (not direct to main), request `d-morrison` as reviewer (`request-pr-review`),
-then **ARDI to clean** (`ardi`).
+PR (not direct to main), then **ARDI to clean** (`ardi`).
+Request no human reviewer: this PR lands in ai-config, where
+`request-pr-review`'s Scope section forbids requesting `d-morrison`.
 
 ```bash
 git checkout -b consolidate-<canonical>-skill origin/main   # CREATE_BRANCH

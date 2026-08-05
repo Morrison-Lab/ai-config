@@ -235,8 +235,10 @@ git push -u origin HEAD && gh pr create --fill   # PUSH, CREATE_PR
 
 Then, as explicit steps:
 
-1. **Request the reviewer:** `gh pr edit --add-reviewer d-morrison` (`EDIT_PR`; see
-   `request-pr-review`).
+1. **Request no human reviewer.**
+   This PR lands in ai-config, where `request-pr-review`'s Scope section
+   forbids requesting `d-morrison`.
+   Leave the human-reviewer slot empty and let the automated reviewers run.
 2. **Drive to clean:** run `ardi` on the new PR until the verdict has zero
    findings.
 

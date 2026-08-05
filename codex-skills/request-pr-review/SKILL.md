@@ -1,6 +1,6 @@
 ---
 name: "request-pr-review"
-description: "Codex wrapper for the ai-config Claude skill `request-pr-review`. Request d-morrison as reviewer after creating a GitHub PR. Run immediately after `gh pr create` succeeds, in the same response. Standing rule across all repos unless told otherwise. Use when Codex is asked to use `request-pr-review`, `/request-pr-review`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `request-pr-review`. Request d-morrison as reviewer after creating a GitHub PR. Run immediately after `gh pr create` succeeds, in the same response. Standing rule across all repos except `Morrison-Lab/ai-config`, which never requests d-morrison (see Scope). Use when Codex is asked to use `request-pr-review`, `/request-pr-review`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # request-pr-review (Codex wrapper)

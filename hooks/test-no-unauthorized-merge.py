@@ -77,6 +77,8 @@ BLOCK = [
     ('"glab" mr merge 12', "quoted executable name glab"),
     ('glab "mr" "merge" 12', "quoted subcommands mr and merge"),
     ('"/usr/bin/gh" pr merge 123', "quoted full executable path"),
+    ('gh${IFS}pr${IFS}merge 123', "IFS word-split gh pr merge"),
+    ('gh$IFS pr$IFS merge 123', "short IFS word-split gh pr merge"),
 ]
 
 ALLOW = [

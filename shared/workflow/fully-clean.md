@@ -1478,3 +1478,65 @@ PR #994 was 24 commits behind and would have hit the same block if rerun then, b
 its existing 5m26s `is_error: true`, `subtype: "success"`,
 `permission_denials_count: null` stub ran an hour before #998 merged, so it was
 a different bug; merge first, then retry.)
+
+**The expensive stub has no stopping rule yet, and the fingerprints this file
+already trusts cannot supply one.**
+Everything above about when to stop retrying is built on runs that die before
+the model call: the short-duration band, `total_cost_usd: 0`, `num_turns: 1`,
+`Error is not retryable`.
+The long stub the entry above mentions in passing --- 5m26s, `is_error: true`,
+`subtype: "success"`, `permission_denials_count: null` --- fits none of them.
+It reached the model, worked for minutes, spent real money, and returned no
+verdict, so every discriminator this file offers either does not apply or
+points the wrong way.
+A credential before/after is pointless against a run that just billed five
+dollars, and the empty denial count means nothing was refused.
+What is left is the default, which is to retry --- and each retry costs a full
+review.
+
+**`num_turns` is the stopping rule, and it is sharp exactly where cost and
+duration are noise.**
+Those two vary between runs, because the model's own output length varies.
+The turn count does not: it is the shape of the work rather than its size.
+So compare it across **independent heads** --- different commits, different
+diffs, a fresh run each time.
+Identical `num_turns` there means the job walked the same path to the same
+wall, and no further commit will move it.
+That is a deterministic failure wearing an infrastructure failure's clothes,
+and it is the one case where a second identical result is enough to stop on.
+
+Note this inverts the file's usual use of the field.
+Above, `num_turns: 1` is read as a *value* naming the quota case, and read on
+its own that is an over-reading.
+Here the value carries nothing --- 11 says no more than 9 would --- and the
+whole signal is that two independent runs **agree**.
+
+Then look at what the diff makes the reviewer read, because a deterministic
+failure is a property of the task.
+A PR touching a directory whose sibling files run to thousands of lines can
+exhaust the reviewer's context during its reading phase, every time, before a
+verdict exists to post.
+That recurs on every future PR of the same shape, so it belongs in an issue
+against the reviewer's own configuration --- a file-size cap, a narrower tool
+allowlist --- rather than in a wait for something to recover.
+
+- **Do:** compare `num_turns` across the failed runs before paying for another
+  attempt.
+- **Do:** file it against the reviewer's setup once two independent heads fail
+  identically, naming the diff shape that reproduces it.
+- **Don't:** run the credential before/after against a failure that spent real
+  money --- the spend already proved the credential authenticates.
+- **Don't:** read varying cost and duration as evidence of transience while
+  the turn count is fixed.
+
+(Morrison-Lab/ai-config#973, 2026-08-05: `claude-review` failed on heads
+`ed5cd8d` and `cf824cc`.
+Run `30645784194` took `630325ms` and `$5.77`; run `30647021192` took
+`545700ms` and `$4.78` --- a 13% spread on duration and 17% on cost.
+Both reported `num_turns: 11`, `is_error: true` with `subtype: "success"`,
+`permission_denials_count: null`, exit 1, and no verdict posted.
+The PR touched `memories/`, where at that head `debugging.md` was 1115 lines,
+`github.md` 1080, `github-actions.md` 865, and `r-quarto.md` 730.
+A third run was declined on the matching turn count rather than attempted, so
+the determinism is the observation and context exhaustion is the untested
+hypothesis.)

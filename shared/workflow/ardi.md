@@ -13,6 +13,7 @@ base-branch advance, query the current head for all three surfaces: mergeability
 top-level/inline review comments. A conflict, CI failure, or newly posted
 finding is ARDI work immediately --- sync and resolve the conflict, investigate
 and fix or track the CI failure, or disposition the finding --- not merely a
+status item to hand back to the user.
 Keep polling while a review or check is
 in progress; do not call the PR clean from an earlier head or from green CI
 without a current-head review verdict.

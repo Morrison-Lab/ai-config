@@ -271,7 +271,7 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 - **Shell Script Fail-Closed Safety in Workflows**:
   - Under `set -e`, use `if ! CMD; then` to safely handle non-zero exit status without `set +e`. Disabling `set +e` turns off `errexit` for subsequent pipeline steps (e.g., `jq`), risking failing open instead of closed on JSON parse errors. (Morrison-Lab/gha#412, 2026-08-05).
 
-  **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
+- **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
   `POST /repos/<o>/<r>/pulls/<N>/requested_reviewers` with `reviewers[]=copilot-pull-request-reviewer[bot]` returned **201**, and the plain `Copilot` and `copilot` logins were accepted the same way.
   So the login spelling is not what decides the outcome, and a `422` seen elsewhere is likelier to be about whether Copilot review is enabled for that repo at all -- untested here, since bcs has it enabled.
   The 201 body lists Copilot under `requested_reviewers`, but an immediate `GET .../requested_reviewers` returns `{"users":[],"teams":[]}` and `gh pr view --json reviewRequests` returns `[]`.

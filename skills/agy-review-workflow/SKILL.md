@@ -12,7 +12,7 @@ allowed-tools:
 # agy-review-workflow
 
 Sets up or edits the Google Antigravity PR **review, security audit, and test generation** workflow ([antigravity-review.yml](../../.github/workflows/antigravity-review.yml)),
-which invokes the reusable [antigravity-code-review.yml](https://github.com/Morrison-Lab/gha/blob/main/.github/workflows/antigravity-code-review.yml) workflow from `Morrison-Lab/gha`.
+which invokes the reusable [antigravity-code-review.yml](https://github.com/Morrison-Lab/gha/blob/v2/.github/workflows/antigravity-code-review.yml) workflow from `Morrison-Lab/gha`.
 
 Path: [.github/workflows/antigravity-review.yml](../../.github/workflows/antigravity-review.yml)
 
@@ -137,7 +137,7 @@ jobs:
     uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2
     with:
       mode: ${{ inputs.mode || 'code-review' }}
-      pr-number: ${{ github.event.pull_request.number || inputs.pr_number }}
+      pr-number: ${{ github.event.pull_request.number || inputs.pr_number || '' }}
       model: ''
       trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}
     secrets:

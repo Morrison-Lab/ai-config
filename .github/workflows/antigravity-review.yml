@@ -36,7 +36,7 @@ jobs:
     uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2
     with:
       mode: ${{ inputs.mode || 'code-review' }}
-      pr-number: ${{ github.event.pull_request.number || inputs.pr_number }}
+      pr-number: ${{ github.event.pull_request.number || inputs.pr_number || '' }}
       model: ''
       trigger-policy: ${{ github.event_name == 'pull_request' && 'on-push' || 'on-request' }}
     secrets:

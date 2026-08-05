@@ -18,7 +18,9 @@ if not os.path.isfile(HOOK):
 BLOCK = [
     ("gh pr merge 411 --squash", "bare gh pr merge"),
     ("gh pr \\\n merge 411 --squash", "backslash-newline line continuation gh pr merge"),
-    ("(gh pr merge 411)", "parenthesized subshell gh pr merge"),
+    ('(gh pr merge 411)', "parenthesized subshell gh pr merge"),
+    ('gh pr comment 123 --body "hi"\ngh pr merge 999', "multiline script: comment on line 1, merge on line 2"),
+    ('gh pr comment 123 --body "hi";gh pr merge 999', "semicolon without trailing space before merge command"),
     ("gh -R owner/repo pr merge 411 --squash", "gh pr merge with -R flag before subcommands"),
     ("gh pr -R owner/repo merge 411 --squash", "gh pr merge with -R flag between pr and merge"),
     ("gh --repo owner/repo pr merge 411", "gh pr merge with --repo flag before subcommands"),

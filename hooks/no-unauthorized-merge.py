@@ -33,22 +33,23 @@ SPLIT = re.compile(r"&&|\|\||;|\||\n")
 def mask_payloads(text: str) -> str:
     """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files)
     so trigger patterns inside prose or file paths do not cause false positives or allow-flag bypasses.
-    Handles escaped quotes inside string literals, multiline strings (re.DOTALL), and unquoted file/field values.
+    Handles escaped quotes inside multiline string literals without consuming command separators.
     """
     # 1. Mask trailing shell comments (# ...)
     text = re.sub(r"#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
 
     # 2. Mask values of prose/file-carrying flags (--body, --body-file, --title, --comment, --message, -m, -b, -F, -f, --raw-field, --field, etc.)
     flag_pattern = r"(?:--body-file|--body|--title|--comment|--message|--reason|--notes|--description|-m|-b|-F|-f|--raw-field|--field|--template|--search)"
+    hspace = r"[ \t]*"
 
     def repl_flag(m):
         flag = m.group(1)
         val = m.group(2)
         return flag + (" " * len(val))
 
-    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\"(?:\\.|[^\"])*\")", repl_flag, text, flags=re.DOTALL)
-    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\'(?:\\.|[^\'])*\')", repl_flag, text, flags=re.DOTALL)
-    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\S+)", repl_flag, text)
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_flag, text, flags=re.DOTALL)
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_flag, text, flags=re.DOTALL)
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^;\s&|\n]+)", repl_flag, text)
 
     return text
 

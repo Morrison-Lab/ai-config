@@ -21,6 +21,10 @@ on:
           - security-audit
           - test-generation
 
+concurrency:
+  group: antigravity-review-${{ inputs.mode || 'code-review' }}-${{ inputs.pr_number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     if: github.event_name != 'issue_comment'
@@ -29,6 +33,7 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
+      actions: read
     uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2
     with:
       mode: ${{ inputs.mode || 'code-review' }}

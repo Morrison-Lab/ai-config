@@ -247,6 +247,16 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   (ucdavis/bcs, 2026-07-26: a red `docs` check was twice reported non-required and a PR reported "ready" on that basis; `docs` is required under ruleset 11050897, so the merge was blocked the whole time and a queue-wide blocker was mislabeled a cosmetic flake. The legacy endpoint's 404 would have reinforced the error if consulted alone.)
   Note: the two commands above cover only **repo-level** rulesets. Org-level rulesets (`gh api "orgs/<org>/rulesets"`) can also gate branches in member repos and would still return "nothing required" with the repo queries alone; add that sweep when the repo belongs to an org.
 
+  **Required checks are not the only thing a ruleset carries -- Copilot code review is turned on there too.**
+  A `copilot_code_review` rule schedules Copilot itself, so nothing in the PR requests the review and no per-PR reviewer entry explains where it came from.
+  Read it off the same endpoint:
+  ```bash
+  gh api "repos/<o>/<r>/rulesets/<id>" \
+    --jq '.rules[] | select(.type=="copilot_code_review") | .parameters'
+  ```
+  On `ucdavis/bcs` (2026-07-30) ruleset `19248641`, scoped to `~DEFAULT_BRANCH`, returns `{"review_on_push":true,"review_draft_pull_requests":true}` -- which is why draft PRs there get Copilot reviews at all.
+  Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
+
 - **GitHub PR Reviews REST API (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`) Requirements & Fallbacks**:
   - `pull_number` MUST be an explicit integer in the URL path (e.g. `/pulls/412/reviews`), not `'current'` or branch names. Query `number` and `headRefOid` via `gh pr view --json number,headRefOid`.
   - Line numbers must be `>= 1` and `line >= start_line`. Normalize ranges with `min(start_line, end_line)` and `max(start_line, end_line)` to avoid `422 Unprocessable Entity` errors on inverted range inputs.
@@ -260,16 +270,6 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
 - **Shell Script Fail-Closed Safety in Workflows**:
   - Under `set -e`, use `if ! CMD; then` to safely handle non-zero exit status without `set +e`. Disabling `set +e` turns off `errexit` for subsequent pipeline steps (e.g., `jq`), risking failing open instead of closed on JSON parse errors. (Morrison-Lab/gha#412, 2026-08-05).
-
-  **Required checks are not the only thing a ruleset carries -- Copilot code review is turned on there too.**
-  A `copilot_code_review` rule schedules Copilot itself, so nothing in the PR requests the review and no per-PR reviewer entry explains where it came from.
-  Read it off the same endpoint:
-  ```bash
-  gh api "repos/<o>/<r>/rulesets/<id>" \
-    --jq '.rules[] | select(.type=="copilot_code_review") | .parameters'
-  ```
-  On `ucdavis/bcs` (2026-07-30) ruleset `19248641`, scoped to `~DEFAULT_BRANCH`, returns `{"review_on_push":true,"review_draft_pull_requests":true}` -- which is why draft PRs there get Copilot reviews at all.
-  Check this before concluding that a Copilot review was requested by a person, or that its absence means nobody asked.
 
   **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
   `POST /repos/<o>/<r>/pulls/<N>/requested_reviewers` with `reviewers[]=copilot-pull-request-reviewer[bot]` returned **201**, and the plain `Copilot` and `copilot` logins were accepted the same way.

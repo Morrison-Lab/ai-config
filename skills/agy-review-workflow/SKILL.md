@@ -1,6 +1,6 @@
 ---
 name: agy-review-workflow
-description: "Add or modify the Google Antigravity PR review, security audit, and test generation workflow (`.github/workflows/antigravity-review.yml`). Preserves load-bearing patterns — workflow_call delegation to Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2, GEMINI_API_KEY secret propagation, mode selection (code-review, security-audit, test-generation), and event-gated trigger policies."
+description: "Add or modify the Google Antigravity PR review, security audit, and test generation workflow (`.github/workflows/antigravity-review.yml`). Preserves load-bearing patterns -- workflow_call delegation to Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2, GEMINI_API_KEY secret propagation, mode selection (code-review, security-audit, test-generation), and event-gated trigger policies."
 user-invocable: true
 allowed-tools:
   - Read
@@ -11,9 +11,10 @@ allowed-tools:
 
 # agy-review-workflow
 
-Sets up or edits the Google Antigravity PR **review, security audit, and test generation** workflow (`antigravity-review.yml`), which invokes the reusable `antigravity-code-review.yml` workflow from `Morrison-Lab/gha`.
+Sets up or edits the Google Antigravity PR **review, security audit, and test generation** workflow ([`antigravity-review.yml`](../../.github/workflows/antigravity-review.yml)),
+which invokes the reusable [`antigravity-code-review.yml`](https://github.com/Morrison-Lab/gha/blob/main/.github/workflows/antigravity-code-review.yml) workflow from `Morrison-Lab/gha`.
 
-Path: `.github/workflows/antigravity-review.yml`
+Path: [`.github/workflows/antigravity-review.yml`](../../.github/workflows/antigravity-review.yml)
 
 ## Load-bearing pieces (don't "simplify" away)
 
@@ -25,7 +26,9 @@ jobs:
     uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2
 ```
 
-The workflow delegates execution to `Morrison-Lab/gha`'s reusable workflow, which executes `Morrison-Lab/gha/antigravity-review@v2`. This ensures updates, safety checks, and runner handling in `gha` are automatically shared across repos.
+The workflow delegates execution to `Morrison-Lab/gha`'s reusable workflow,
+which executes `Morrison-Lab/gha/antigravity-review@v2`.
+This ensures updates, safety checks, and runner handling in `gha` are automatically shared across repos.
 
 ### 2. Required permissions
 
@@ -35,30 +38,44 @@ permissions:
   pull-requests: write
   issues: write
   id-token: write
+  actions: read
 ```
 
 - `contents: read`: Allows reading repository code and diffs.
 - `pull-requests: write`: Grants permission to post review comments and verdicts on PRs.
 - `issues: write`: Allows writing issue comments where required.
 - `id-token: write`: Enables OIDC authentication where required.
+- `actions: read`: Lets automated review agents inspect CI run status.
 
-### 3. Secret propagation (`GEMINI_API_KEY`)
+### 3. Concurrency management
+
+```yaml
+concurrency:
+  group: antigravity-review-${{ inputs.mode || 'code-review' }}-${{ inputs.pr_number || github.event.pull_request.number }}
+  cancel-in-progress: true
+```
+
+`cancel-in-progress: true` cancels superseded runs on rapid sequential pushes,
+preventing API quota waste and review comment race conditions.
+
+### 4. Secret propagation (`GEMINI_API_KEY`)
 
 ```yaml
 secrets:
   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 ```
 
-Antigravity uses the Gemini API. Ensure the target repo has `GEMINI_API_KEY` defined in repository or organization secrets (`gh secret list`).
+Antigravity uses the Gemini API.
+Ensure the target repo has `GEMINI_API_KEY` defined in repository or organization secrets (`gh secret list`).
 
-### 4. Operational modes
+### 5. Operational modes
 
 Supported operational modes passed via `inputs.mode`:
 - `code-review` (default): Performs an automated PR code review.
 - `security-audit`: Runs targeted security inspection on modified code.
 - `test-generation`: Generates suggested test cases for changed files.
 
-### 5. Event-gated trigger policy
+### 6. Event-gated trigger policy
 
 ```yaml
 with:
@@ -68,9 +85,10 @@ with:
 - `on-push`: Automatically reviews PR updates on `pull_request` events (`opened`, `synchronize`, `ready_for_review`, `reopened`).
 - `on-request`: Restricts review to manual execution via `workflow_dispatch`.
 
-### 6. Fork & Dependabot safeguards
+### 7. Fork & Dependabot safeguards
 
-The underlying action (`Morrison-Lab/gha/antigravity-review@v2`) enforces guards so draft PRs, cross-repository (fork) PRs, and `dependabot[bot]` runs do not leak secrets or execute untrusted code.
+The underlying action (`Morrison-Lab/gha/antigravity-review@v2`) enforces guards so draft PRs,
+cross-repository (fork) PRs, and `dependabot[bot]` runs do not leak secrets or execute untrusted code.
 
 ## Setting up in a new repo
 
@@ -104,6 +122,10 @@ on:
           - security-audit
           - test-generation
 
+concurrency:
+  group: antigravity-review-${{ inputs.mode || 'code-review' }}-${{ inputs.pr_number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     if: github.event_name != 'issue_comment'
@@ -112,6 +134,7 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
+      actions: read
     uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2
     with:
       mode: ${{ inputs.mode || 'code-review' }}
@@ -124,6 +147,6 @@ jobs:
 
 ## Relationship to other skills
 
-- **`claude-review-workflow`** — sets up the Claude Code PR review workflow (`claude-code-review.yml`).
-- **`claude-agent-workflow`** — sets up the Claude Code agent workflow (`claude.yml`).
-- **`config-ai`** — routes AI capability and bot workflow requests to the appropriate skill.
+- **`claude-review-workflow`** -- sets up the Claude Code PR review workflow (`claude-code-review.yml`).
+- **`claude-agent-workflow`** -- sets up the Claude Code agent workflow (`claude.yml`).
+- **`config-ai`** -- routes AI capability and bot workflow requests to the appropriate skill.

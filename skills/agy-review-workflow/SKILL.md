@@ -51,7 +51,7 @@ permissions:
 
 ```yaml
 concurrency:
-  group: antigravity-review-${{ inputs.mode || 'code-review' }}-${{ inputs.pr_number || github.event.pull_request.number }}
+  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
   cancel-in-progress: true
 ```
 
@@ -123,7 +123,7 @@ on:
           - test-generation
 
 concurrency:
-  group: antigravity-review-${{ inputs.mode || 'code-review' }}-${{ inputs.pr_number || github.event.pull_request.number }}
+  group: antigravity-review-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
   cancel-in-progress: true
 
 jobs:

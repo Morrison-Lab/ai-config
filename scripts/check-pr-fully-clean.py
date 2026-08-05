@@ -76,11 +76,12 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     reviews = data.get("reviews", [])
 
     issues = []
-    # Collect all automated review reports (filtering on bot review report body markers)
+    # Collect all automated review reports (case-insensitive marker filtering)
     all_items = []
     for c in comments:
         body = c.get("body", "")
-        if "### 🤖" in body or "Code Review" in body:
+        body_lower = body.lower()
+        if "### 🤖" in body or "code review" in body_lower or "claude finished review" in body_lower or "verdict" in body_lower:
             all_items.append(("comment", c["createdAt"], body))
 
     for r in reviews:
@@ -104,6 +105,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     for item in all_items:
         created_at_dt = parse_iso_time(item[1])
         body = item[2]
+        body_lower = body.lower()
         oid = item[3] if len(item) > 3 else ""
 
         is_sha_match = (oid == sha or sha_short in body or sha in body)
@@ -111,7 +113,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
             commit_dt
             and created_at_dt
             and created_at_dt >= commit_dt
-            and any(marker in body for marker in ("### 🤖", "Code Review", "Verdict:"))
+            and ("### 🤖" in body or "code review" in body_lower or "claude finished review" in body_lower or "verdict" in body_lower)
         )
 
         if is_sha_match or is_timing_match:
@@ -131,16 +133,22 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     # Check for finding indicators
     finding_patterns = [
         r"###\s*(Actionable\s+|Detailed\s+)?Findings",
+        r"\*\*Findings\b",
+        r"Findings\s*\(posted\s+inline",
         r"###\s*Issues",
         r"###\s*Remaining",
         r"\*\*Location:\*\*",
-        r"Verdict:\s*(Ready after addressing findings|Needs work|Changes requested|Actionable findings)",
+        r"Verdict:\s*(Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings)",
+        r"\bNeeds\s+more\s+work\b",
+        r"\bNeeds\s+work\b",
+        r"\bChanges\s+requested\b",
         r"#### \d+\.",
+        r"^\s*\d+\.\s+\*\*",
     ]
 
     has_findings = False
     for pat in finding_patterns:
-        if re.search(pat, latest_body, re.IGNORECASE):
+        if re.search(pat, latest_body, re.IGNORECASE | re.MULTILINE):
             has_findings = True
             issues.append(f"Latest review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
 

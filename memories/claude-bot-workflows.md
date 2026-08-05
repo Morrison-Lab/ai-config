@@ -327,6 +327,24 @@ generic Actions-authoring and reusable-workflow material.
     regardless, because it isn't metered per-call — so cost=0 + 1 turn + immediate `is_error`
     points to a **subscription usage-limit**, not only API credits; confirm via the Anthropic
     Console usage for that account.
+    ⚠️ **That signature is necessary for a usage-limit and not sufficient for one**, which is
+    why this bullet is headed "Quota/auth" rather than "Quota": an expired or invalid token
+    dies at the same model call, having done the same zero billable work, so the result object
+    is indistinguishable on every field the guard reads.
+    The test that settles it is a **before/after on this repo alone**: rewrite its
+    `CLAUDE_CODE_OAUTH_TOKEN` from a known account, change nothing else, and re-run.
+    A run that then reaches the model proves the credential was the fault, because it is the
+    only variable that moved.
+    A **cross-repo** success (the same reviewer working on a different repo at the same time)
+    proves only that the **service** is up --- not that the account has quota, because
+    `rotate-claude-token.py`'s docstring records that each repo's secret is minted by whichever
+    account the local CLI happened to be logged into, and that a mix provisioned across several
+    sittings "cannot be untangled after the fact".
+    Use
+    `gh api repos/<owner>/<repo>/actions/secrets --jq '.secrets[] | "\(.name) \(.updated_at)"'`
+    to pick which repo to rewrite --- a token written long before a working repo's is a rotation
+    that plausibly missed it --- but treat that as triage, not evidence.
+    See [`fully-clean`](../shared/workflow/fully-clean.md) for the full statement.
   - **Intermittent upstream bug** (`total_cost_usd > 0`, `duration_ms` ~192 s): the
     `claude-code-action` completes a real review but exits with `is_error=true` anyway.
     The guard step fails the check ❌. The prior clean review on the same diff is still

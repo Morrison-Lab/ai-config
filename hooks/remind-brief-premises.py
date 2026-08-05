@@ -292,6 +292,20 @@ def visible_prose(text):
     return text.replace("`", "")
 
 
+# The two windows differ by EXACTLY one character, `,`, and that is the whole
+# design: a comma can set off an aside interrupting a verb and its object, and
+# a semicolon cannot -- it joins independent clauses.
+#
+# An earlier revision built the sentence window as `[.!?:]`, dropping `;` along
+# with `,`. That let an aside-interrupted imperative reach across a semicolon
+# and govern a wholly unrelated clause, silently discharging its claim. The
+# invariant below is asserted by the test suite rather than left to a comment,
+# because the leak was a missing character in a regex and no case in a
+# by-example suite is obliged to notice one.
+CLAUSE_BOUNDS = r"(?:\n|(?<=[.!?:,;])\s)"
+SENTENCE_BOUNDS = r"(?:\n|(?<=[.!?:;])\s)"
+
+
 def segment_start(text, pos, clauses=True):
     """Index of the start of the segment containing `pos`.
 
@@ -300,7 +314,7 @@ def segment_start(text, pos, clauses=True):
     "Update the changelog, since `CLAUDE.md` carries ..." was suppressed by an
     "update" that asks for no verification of `CLAUDE.md` at all.
     """
-    bounds = r"(?:\n|(?<=[.!?:,;])\s)" if clauses else r"(?:\n|(?<=[.!?:])\s)"
+    bounds = CLAUSE_BOUNDS if clauses else SENTENCE_BOUNDS
     best = 0
     for m in re.finditer(bounds, text[:pos]):
         best = m.end()
@@ -320,6 +334,11 @@ def imperative_governs(text, pos, upto):
     There the clause window starts after the aside and clips "Verify" out
     entirely, so a brief that already asks for the check gets reminded to ask
     for it.
+
+    The fallback window stops at a semicolon even though it does not stop at
+    a comma, so an aside cannot reach across an independent clause: "Verify,
+    before merging, that CI passes; `CLAUDE.md` carries X" leaves the claim
+    ungoverned, which is right, because the aside has nothing to do with it.
 
     What separates that from the compound-sentence case is whether the verb
     had reached its object before the comma. An interrupted imperative is

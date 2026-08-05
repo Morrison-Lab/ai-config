@@ -142,6 +142,19 @@ REMIND = [
      "R1: same, across a semicolon"),
     ("`CLAUDE.md` has 1200 lines of guidance.\n`grep -n quota CLAUDE.md`\n",
      None, "R1: a 4-digit count is still a COUNT, so a plain grep cannot clear it"),
+
+    # Round 3 finding: the R2 fallback window skipped `;` along with `,`, so an
+    # aside-interrupted imperative reached across an independent clause and
+    # silently discharged a claim it had nothing to do with.
+    ("Verify, before merging, that the branch is synced; "
+     "`shared/workflow/ardi.md` covers the merged-PR case.", None,
+     "R3: an aside must not reach across a semicolon"),
+    ("Verify, before merging, that CI passes; "
+     "`CLAUDE.md` carries a quota carve-out.", None,
+     "R3: same, with the docstring's own wording"),
+    ("Before merging, that the branch is synced; "
+     "`shared/workflow/ardi.md` covers the merged-PR case.", None,
+     "R3 control: no leading aside, so nothing could have governed it anyway"),
 ]
 
 SILENT = [
@@ -373,6 +386,12 @@ MUTANTS = [
      lambda: fires("Verify, before merging, that `CLAUDE.md` carries the rule."),
      False, True),
 
+    ("an aside must not reach across a semicolon",
+     "SENTENCE_BOUNDS", r"(?:\n|(?<=[.!?:])\s)",
+     lambda: fires("Verify, before merging, that CI passes; "
+                   "`CLAUDE.md` carries a quota carve-out."),
+     True, False),
+
     ("tool_result must carry output",
      "_none_", None,
      lambda: fires(INCIDENT_1,
@@ -397,7 +416,17 @@ for desc, attr, mutant, probe, want_before, want_after in MUTANTS:
     flip = "" if attr == "_none_" else f" -> {after}"
     print(f"  {'ok   ' if ok else 'WRONG'}  {desc}: {before}{flip}")
 
-total = len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + len(seq) + len(MUTANTS)
+# A property, not another example. Round 3's leak was one missing character in
+# a regex, and no by-example suite is obliged to notice one -- so assert the
+# invariant the two windows are supposed to hold instead of adding a case and
+# hoping the next omission looks like this one.
+print("\nsegment-boundary invariant:")
+diff = set(hook.CLAUSE_BOUNDS) ^ set(hook.SENTENCE_BOUNDS)
+ok = diff == {","}
+wrong += not ok
+print(f"  {'ok   ' if ok else 'WRONG'}  the two windows differ by exactly ',' (got {diff or 'nothing'})")
+
+total = 1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + len(seq) + len(MUTANTS)
 print(f"\n{total - wrong}/{total} correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

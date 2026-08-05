@@ -46,6 +46,10 @@ def mask_payloads(text: str) -> str:
     so trigger patterns inside prose or file paths do not cause false positives or allow-flag bypasses.
     Handles escaped quotes inside multiline string literals without consuming command separators.
     Preserves newlines inside multiline string literals so segment alignment remains 1-to-1.
+
+    Unquoted values and double-quoted values containing backticks or $(...) command substitutions are NOT masked
+    because Bash expands and executes command substitutions in double-quoted or unquoted contexts.
+    Single-quoted values ('...') strictly suppress command substitution and remain safe to mask unconditionally.
     """
     flag_pattern = (
         r"(?:--body-file\b|--body\b|--title\b|--subject\b|--comment\b|--message\b|"
@@ -56,21 +60,31 @@ def mask_payloads(text: str) -> str:
     )
     hspace = r"[ \t]*"
 
-    def repl_flag(m):
-        flag = m.group(1)
+    def repl_double(m):
         val = m.group(2)
-        masked_val = "".join("\n" if c == "\n" else " " for c in val)
-        return flag + masked_val
+        if "`" in val or "$(" in val:
+            return m.group(0)  # Do not mask if command substitution (` or $(...)) is present
+        return m.group(1) + "".join("\n" if c == "\n" else " " for c in val)
 
-    # 1. Mask quoted string payloads first (so # inside string literals is preserved for flag parsing)
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_flag, text, flags=re.DOTALL)
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_flag, text, flags=re.DOTALL)
+    def repl_single(m):
+        val = m.group(2)
+        return m.group(1) + "".join("\n" if c == "\n" else " " for c in val)  # Single quotes strictly disable bash command expansion
+
+    def repl_unquoted(m):
+        val = m.group(2)
+        if "`" in val or "$(" in val:
+            return m.group(0)  # Do not mask unquoted values containing command substitutions
+        return m.group(1) + "".join("\n" if c == "\n" else " " for c in val)
+
+    # 1. Mask quoted string payloads first (handling double-quoted and single-quoted separately for expansion safety)
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_double, text, flags=re.DOTALL)
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_single, text, flags=re.DOTALL)
 
     # 2. Mask trailing shell comments (# ...) only when preceded by whitespace/separator
     text = re.sub(r"(?:^|[\s;&|`()])#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
 
     # 3. Mask unquoted single-token flag values (e.g. --body-file /tmp/file.txt), allowing hyphens inside paths
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^-;\s&|\n][^;\s&|\n]*)", repl_flag, text)
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^-;\s&|\n][^;\s&|\n]*)", repl_unquoted, text)
 
     return text
 

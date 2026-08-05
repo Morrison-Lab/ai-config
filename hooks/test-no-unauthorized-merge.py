@@ -59,6 +59,10 @@ BLOCK = [
     ('gh pr merge 123 -t " ALLOW_MERGE=1"', "ALLOW_MERGE inside -t string argument with leading space"),
     ('gh pr merge 123 --subject " ALLOW_MERGE=1"', "ALLOW_MERGE inside --subject string argument with leading space"),
     ("gh pr merge 123 # ALLOW_MERGE=1", "ALLOW_MERGE inside trailing shell comment"),
+    ('gh pr comment 999 --body "Log: `gh pr merge 123 --squash`"', "backtick command substitution inside double-quoted payload"),
+    ('gh pr comment 999 --body "Log: $(gh pr merge 123 --squash)"', "dollar-subshell command substitution inside double-quoted payload"),
+    ('gh pr comment 999 --body $(gh pr merge 123 --squash)', "dollar-subshell command substitution inside unquoted payload"),
+    ('gh pr comment 999 --body `gh pr merge 123 --squash`', "backtick command substitution inside unquoted payload"),
 ]
 
 ALLOW = [
@@ -78,6 +82,8 @@ ALLOW = [
     ("gh pr comment 1157 --body \"This hook blocks unauthorized\ngh pr merge attempts.\"", "multiline body string containing trigger text across newlines"),
     ("gh pr comment 411 --body 'gh pr merge failed'", "quoted string containing trigger text"),
     ("gh pr comment 411 --body 'ALLOW_MERGE=1 in comment body'", "ALLOW_MERGE inside string argument"),
+    ("gh pr comment 999 --body 'Log: `gh pr merge 123 --squash`'", "backtick inside single-quoted payload (inert)"),
+    ("gh pr comment 999 --body 'Log: $(gh pr merge 123 --squash)'", "dollar-subshell inside single-quoted payload (inert)"),
     ("ALLOW_MERGE=1 gh pr merge 411 --squash", "explicit ALLOW_MERGE=1 env flag"),
     ('ALLOW_MERGE="1" gh pr merge 411 --squash', "explicit ALLOW_MERGE=\"1\" env flag with double quotes"),
     ("ALLOW_MERGE='1' gh pr merge 411 --squash", "explicit ALLOW_MERGE='1' env flag with single quotes"),

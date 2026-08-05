@@ -34,11 +34,46 @@ MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
 ]
 
-ALLOW_FLAG = re.compile(
+ALLOW_ENV_FLAG = re.compile(
     r"^(?:\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
-    r"|(?:^|[\s;&|`\n])--allow-merge\b"
 )
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
+
+
+def has_allow_override(segment: str) -> bool:
+    """Check if command segment contains an explicit authorization override.
+
+    Matches either:
+    1. ALLOW_MERGE=1 env assignment anchored at segment start.
+    2. Standalone --allow-merge flag token occurring OUTSIDE of string quotes.
+       Tokenizing quote context ensures forged --allow-merge strings inside unmasked flag values
+       or bare positional text (e.g. --reviewer "please --allow-merge this") do not bypass authorization.
+    """
+    if ALLOW_ENV_FLAG.search(segment):
+        return True
+
+    for m in re.finditer(r"(?:^|[\s;&|`\n])(--allow-merge)\b", segment):
+        idx = m.start(1)
+        in_single = False
+        in_double = False
+        escaped = False
+        for i in range(idx):
+            c = segment[i]
+            if escaped:
+                escaped = False
+                continue
+            if c == "\\" and not in_single:
+                escaped = True
+                continue
+            if c == "'" and not in_double:
+                in_single = not in_single
+                continue
+            if c == '"' and not in_single:
+                in_double = not in_double
+                continue
+        if not in_single and not in_double:
+            return True
+    return False
 
 
 def mask_trailing_comments(text: str) -> str:
@@ -81,7 +116,7 @@ def mask_trailing_comments(text: str) -> str:
 
 def mask_payloads(text: str) -> str:
     """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files, API payload fields)
-    so trigger patterns inside prose or file paths do not cause false positives or allow-flag bypasses.
+    so trigger patterns inside prose or file paths do not cause false positives.
     Handles escaped quotes inside multiline string literals without consuming command separators.
     Preserves newlines inside multiline string literals so segment alignment remains 1-to-1.
 
@@ -226,7 +261,7 @@ def offending(command: str):
     for start, end in zip(starts, ends):
         masked_seg = masked_command[start:end]
         orig_seg = norm_command[start:end]
-        if ALLOW_FLAG.search(masked_seg):
+        if has_allow_override(orig_seg):
             continue
         for pattern, label in MERGE_PATTERNS:
             if re.search(pattern, masked_seg):

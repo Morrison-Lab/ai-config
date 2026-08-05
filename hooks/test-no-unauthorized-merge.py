@@ -67,6 +67,8 @@ BLOCK = [
     ("echo 'note #' ; gh pr merge 999", "single-quoted string with hash followed by semicolon and merge command"),
     ('echo "closes #1156, needs review" ; gh pr merge 1157 --squash', "double-quoted issue reference with hash followed by semicolon and merge command"),
     ('echo "closes #1156, needs review" && gh pr merge 1157 --squash', "double-quoted issue reference with hash followed by double-ampersand and merge command"),
+    ('gh pr merge 123 --reviewer "please --allow-merge this"', "unauthorized merge with --allow-merge forged inside unmasked flag value"),
+    ('gh pr merge 123 "junk --allow-merge junk"', "unauthorized merge with --allow-merge forged inside positional argument"),
 ]
 
 ALLOW = [

@@ -35,6 +35,7 @@ Examples:
 - Feature + the test for that feature → keep together
 - CI template fix + documentation update for that fix → keep together
 - CI template fix + unrelated linter config change → split
+- CI/workflow infrastructure change + precomputed simulation/validation dataset artifacts → split
 - Dependency update + code that uses the new dependency → keep together
 
 ## Process

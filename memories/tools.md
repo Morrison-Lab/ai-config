@@ -832,3 +832,9 @@ space/tab, and require the count to be `>= 3`.
 `strip-non-invoking-markup.sh`.
 Sibling embedding trap: a bare `---` at column 0 inside a YAML `run: |` block is
 a document separator that truncates the generated script.)
+
+## validate-skills.py token validation
+
+- **`validate-skills.py` checks backtick-wrapped `ALL_CAPS_WITH_UNDERSCORE` tokens against `tool-mappings.yml` operation IDs.**
+  Any backtick-wrapped ALL_CAPS string (such as `GEMINI_API_KEY`, `GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) that represents an environment variable, secret, or API constant rather than an abstract operation ID must be added to `NON_OPERATION_TOKENS` in `scripts/validate-skills.py` to avoid validation errors.
+

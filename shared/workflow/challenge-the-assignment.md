@@ -107,12 +107,90 @@ line in the report, while one whose falsity would waste the work gets raised
 before the work starts.
 Where the assignment is sound, the whole cost is one sentence.
 
+## The authoring side
+
+Everything above is written for the recipient.
+The author is the other half, and it is the half with no rule pointed at it.
+
+The trigger gap is the same one this fragment opens with, running the other
+direction.
+[`metacognitive-monitoring`](metacognitive-monitoring.md) monitors claims as
+they are composed and keys on claim type, and a sentence saying that a file
+contains a phrase, that a rule lives at a path, or that N sites exist is a
+**state** claim, which that rule says to re-query rather than recall.
+That machinery is right and it never runs, because writing a brief feels like
+*instructing* rather than asserting, so the premise reads as setup for the
+task instead of as an assertion inside it.
+
+Two properties already named above then make the brief the worst place for
+such a claim to land.
+It is self-contained by force, so nothing the agent can see contradicts it.
+And it arrives as **authority**, which is exactly what the "Why nothing prompts
+the check" section says makes adoption feel like compliance.
+
+So the only detector is the recipient's own premise check, and that check is
+discretionary.
+An agent that runs it and pushes back is the good outcome rather than the
+default one, which leaves a false premise in a brief resting on the diligence
+of whoever receives it.
+
+The remedy is cheap and it removes that dependency.
+When a brief asserts corpus state, paste the query that derives it beside the
+claim, or instruct the agent to verify the claim before acting on it.
+Prefer the query: it costs one command, it settles the claim for the author
+first, and it survives an agent who would otherwise have taken your word for
+it.
+
+Two neighbouring rules look like they already cover this, and neither does.
+The stripping pass in
+[`metacognitive-monitoring`](metacognitive-monitoring.md) is authoring-side
+and asks of each element whether the task depends on it, so it removes the
+claims the task does not need --- while a load-bearing premise is precisely
+what stripping keeps.
+[`derive-dont-enumerate`](derive-dont-enumerate.md) arrives at the same remedy
+from a different failure: there the enumeration is true when written and rots
+as the set grows, whereas here the premise is false at the moment it is
+written and rots nothing.
+
+- **Do:** run the deriving query before writing a claim about corpus state
+  into a brief, and paste that query beside the claim.
+- **Do:** instruct the agent to verify a premise you could not derive, and say
+  which claim you mean.
+- **Don't:** state a file's contents, a rule's location, or a site count from
+  recollection because the sentence is an instruction rather than an
+  assertion.
+- **Don't:** rely on the recipient's premise check to catch it --- that check
+  is discretionary, and your brief carries the authority that argues against
+  running it.
+
+(2026-08-04, this fragment's own subject: a brief asserted that `CLAUDE.md`
+carries a review-quota carve-out phrased as "`total_cost` 0 at `num_turns` 1",
+written from recollection and never queried.
+`grep -nE "total_cost|num_turns" CLAUDE.md` returns nothing, and
+`git grep -n 'total_cost` 0 at' -- '*.md'` returns exactly one hit,
+`shared/workflow/fully-clean.md:651`, which is where that carve-out actually
+lives.
+`CLAUDE.md`'s quota material is about a bot comment stating that the review
+was skipped for an exhausted quota --- a signal the bot posts, rather than an
+inference drawn from a zero cost.
+The receiving agent checked and pushed back, which is the discretionary
+detector working rather than a mechanism.
+The brief written to record this entry then repeated the shape at smaller
+scale, saying `CLAUDE.md` had "five quota mentions" where `grep -ci quota`
+returns 6 lines and `grep -oi quota | wc -l` returns 7 occurrences.)
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise
   stated as background fact, and the claims you generate yourself.
   This governs the instruction, which asserts nothing and so trips none of its
   four claim types.
+  Its stripping pass is the nearest authoring-side rule, and the section above
+  says why it does not reach a load-bearing premise.
+- [`derive-dont-enumerate`](derive-dont-enumerate.md) also tells an author to
+  hand over a query rather than an assertion, for a set that can grow while
+  the work runs.
+  That is staleness in something true; this is a premise that was never true.
 - [`grep-is-not-coverage`](grep-is-not-coverage.md) is the same failure inside
   a single step: a real result, a sound command, and a conclusion that
   overreaches it.

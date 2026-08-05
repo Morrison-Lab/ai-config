@@ -50,6 +50,12 @@ spec.loader.exec_module(hook)
 
 # --------------------------------------------------------------- the incidents
 # Both pasted unaltered from the 2026-08-04 session transcripts.
+#
+# The source lines below pack more than one sentence, and are left that way on
+# purpose. Re-wrapping them at sentence boundaries would preserve the string
+# values but is exactly the tidying pass that loses a fixture's fidelity, and
+# the corpus's own semantic-line-break check scopes to prose (`*.md`) rather
+# than to string literals.
 
 INCIDENT_1 = (
     "`shared/workflow/fully-clean.md` documents a reviewer-run result object "

@@ -14,4 +14,4 @@ allowed-tools:
 This is an alias for the **agy-review-workflow** skill. Read and follow the
 canonical skill:
 
-→ **[agy-review-workflow](../agy-review-workflow/SKILL.md)**
+-> **[agy-review-workflow](../agy-review-workflow/SKILL.md)**

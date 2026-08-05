@@ -23,8 +23,8 @@ HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
 API_WRITE_FLAG = rf"(?:-X\s*=?\s*{HTTP_METHOD}|--method\s*=?\s*{HTTP_METHOD}|-f\b|-F\b|--field\b|--raw-field\b|--input\b)"
 
 DELIM = r"(?:\s+|\$\{IFS\}|\$IFS\b|\$\([^)]*\)|\$[A-Za-z0-9_]+)+"
-GH_PROG = r"(?:[/\w.-]+/)?(?:gh|\$GH|\$\{GH\}|[a-zA-Z0-9_.-]*gh[a-zA-Z0-9_.-]*)\b"
-GLAB_PROG = r"(?:[/\w.-]+/)?(?:glab|\$GLAB|\$\{GLAB\}|[a-zA-Z0-9_.-]*glab[a-zA-Z0-9_.-]*)\b"
+GH_PROG = r"(?:[/\w.-]+/)?(?:gh|\$GH|\$\{GH\})\b"
+GLAB_PROG = r"(?:[/\w.-]+/)?(?:glab|\$GLAB|\$\{GLAB\})\b"
 
 MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + OPT_FLAGS + DELIM + r"pr\b" + OPT_FLAGS + DELIM + r"merge\b", "gh pr merge"),

@@ -106,6 +106,8 @@ ALLOW = [
     ('ALLOW_MERGE="1" gh pr merge 411 --squash', "explicit ALLOW_MERGE=\"1\" env flag with double quotes"),
     ("ALLOW_MERGE='1' gh pr merge 411 --squash", "explicit ALLOW_MERGE='1' env flag with single quotes"),
     ("echo ALLOW_MERGE=1 && gh pr view 411", "ALLOW_MERGE in benign command"),
+    ("echo Even though pr merge conflicts arose it is fine", "prose sentence containing though followed by pr merge"),
+    ("echo high pr merge priority task", "prose sentence containing high followed by pr merge"),
 ]
 
 

@@ -613,6 +613,62 @@ Note that a run started shortly before the cutover can still succeed, so two
 attempts of the *same run* can disagree --- which is the cheapest available
 proof that the cause is environmental rather than in the diff.
 
+## `gh pr create` fails on a transferred repo whose `origin` still names the old owner
+
+The section above covers which paths a transfer redirects.
+This is a case where the redirect holds for `git` and not for `gh`: a checkout
+whose `origin` URL still carries the old owner pushes fine and then cannot open
+a PR.
+
+`git push` is therefore useless as a control, because it succeeds.
+Git follows GitHub's transfer redirect, so the branch really does land on the
+new repo, and the failure arrives only at PR creation:
+
+```
+GraphQL: Head sha can't be blank, Base sha can't be blank, Head repository
+can't be blank, No commits between Morrison-Lab:main and
+d-morrison:docs/customization-surface, Head ref must be a branch, not all refs
+are readable (createPullRequest)
+```
+
+Read that error's owner names, not its most legible clause.
+"No commits between `<base>` and `<head>`" describes a base-versus-head
+relationship, which sends you to check whether the push landed any commits ---
+the one thing that is definitely fine here.
+The actual finding is that the two sides carry **different owners**:
+`Morrison-Lab` for the base, which followed the transfer redirect, and
+`d-morrison` for the head, which tracked the stale `origin` URL.
+Five of that message's six clauses are downstream noise from the head repo not
+resolving.
+
+Pass the repo explicitly, with an explicit head and base:
+
+```bash
+gh pr create -R Morrison-Lab/wai --head <branch> --base main --title ... --body ...
+```
+
+Repointing `origin` at the new owner is the durable fix and was not tested
+here; `-R` unblocks the PR without mutating a checkout other sessions may be
+using.
+
+- **Do:** compare the two owner names inside a `No commits between` error
+  before concluding anything about commits.
+- **Do:** pass `-R <new-owner>/<repo>` with explicit `--head` and `--base` when
+  the remote still names the old owner.
+- **Don't:** read a successful `git push` as evidence that `gh` resolves the
+  same repo --- git follows the transfer redirect here and `gh pr create` does
+  not.
+- **Don't:** re-push, re-commit, or rebuild the branch in response to `No
+  commits between`; the commits are there, under a repository name `gh` is not
+  looking at.
+
+(`Morrison-Lab/wai`, 2026-08-04: `git remote get-url origin` returned
+`https://github.com/d-morrison/wai`, while `gh api repos/Morrison-Lab/wai`
+reported `Morrison-Lab/wai` and `gh api repos/d-morrison/wai` returned that
+same `full_name`, confirming the redirect.
+The push succeeded, `gh pr create` failed with the message above, and the `-R`
+form worked.)
+
 ## `gh search code` is not a reliable way to enumerate consumers
 
 When a shared repo moves or cuts a breaking release, the question is which

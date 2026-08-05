@@ -155,6 +155,13 @@ REMIND = [
     ("Before merging, that the branch is synced; "
      "`shared/workflow/ardi.md` covers the merged-PR case.", None,
      "R3 control: no leading aside, so nothing could have governed it anyway"),
+
+    # Round 4 finding: `imperative_governs`'s docstring named this as a
+    # residual it still misses. It fires -- the verb reaches its object before
+    # the comma, so the fallback correctly declines. Pinned as a case so the
+    # docstring cannot drift from the behaviour again.
+    ("Verify the changelog, before merging, since `CLAUDE.md` carries X.", None,
+     "R4: an imperative with a COMPLETE object does not govern a later clause"),
 ]
 
 SILENT = [
@@ -205,6 +212,16 @@ SILENT = [
      "R2: a comma-set-off aside must not defeat the imperative guard"),
     ("Check, if unsure, whether `CLAUDE.md` carries the rule.", None,
      "R2: same, with a different aside"),
+
+    # The accepted residual, pinned deliberately rather than left to prose.
+    # The fallback must skip commas to reach back over an aside at all, so it
+    # cannot tell a comma-joined clause from the aside's own comma. A
+    # semicolon there IS caught (see the R3 cases under REMIND). If this case
+    # ever starts firing, that is a behaviour change to argue for, not a bug
+    # fix to land quietly.
+    ("Verify, before merging, that CI passes, and `CLAUDE.md` carries a "
+     "quota carve-out.", None,
+     "R4: accepted residual -- an aside cannot reach across a comma-joined clause"),
 ]
 
 # ------------------------------------------------------------------- runner

@@ -347,9 +347,22 @@ def imperative_governs(text, pos, upto):
     rather than merely requiring a sentence-initial imperative, which would
     re-suppress the compound case this pair of rules exists to separate.
 
-    A parenthetical after a COMPLETE object ("Verify the changelog, before
-    merging, since `CLAUDE.md` carries X") is still missed. That direction is
-    the deliberate one for this guard: a missed reminder, never a wrong one.
+    The residual is a claim in a COMMA-joined clause after an interrupted
+    imperative: "Verify, before merging, that CI passes, and `CLAUDE.md`
+    carries X" stays suppressed, because the fallback must skip commas to
+    reach back over the aside at all, so it cannot tell that comma from the
+    aside's own. A semicolon there is caught; a comma is not. That is
+    intrinsic to the two-window design rather than an oversight, and the
+    direction is the deliberate one for this guard: a missed reminder, never
+    a wrong one.
+
+    Both this case and its opposite are pinned by the test suite rather than
+    asserted here. An earlier revision of this docstring named a DIFFERENT
+    residual -- "Verify the changelog, before merging, since `CLAUDE.md`
+    carries X" -- which in fact fires, since the verb reaches its object
+    before the comma and the fallback correctly declines. A review caught it.
+    Stating a behaviour no test pinned is the exact failure this hook exists
+    to flag, so the examples above are now cases rather than prose.
     """
     seg = segment_start(text, pos)
     if IMPERATIVE.match(text[seg:upto]):

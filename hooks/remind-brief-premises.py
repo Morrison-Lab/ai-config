@@ -74,12 +74,14 @@ what that session had derived at the time.
 
   - 26 prompts examined, 7 fired, 19 silent.
   - Those 7 carry 9 claims, and on inspection all 9 are genuine corpus-state
-    assertions rather than incidental mentions. Two were the false ones above.
+    assertions rather than incidental mentions.
+    Two were the false ones above.
     The other seven were true, and none of them had been derived: they were
     asserted from recollection and happened to be right.
-  - Both incidents fire. Incident 2 fires on its cardinality claim ALONE, its
-    two content claims correctly discharged by that session's own earlier
-    `grep -n`, which is the claim-kind matching doing its job.
+  - Both incidents fire.
+    Incident 2 fires on its cardinality claim ALONE, its two content claims
+    correctly discharged by that session's own earlier `grep -n`, which is the
+    claim-kind matching doing its job.
 
 Read 26 as a small denominator rather than a settled rate.
 It is every Agent prompt this machine still holds, but transcripts rotate:
@@ -201,16 +203,17 @@ def visible_prose(text):
     Backticks are removed rather than deleted with their contents, unlike
     `remind-ums-after-error.py`, because in this corpus the path itself is
     nearly always inside backticks -- deleting inline code would delete clause
-    A's own anchor and the guard would never fire at all. They are removed
-    rather than replaced by a space so that "`CLAUDE.md`'s" still reads as a
-    possessive.
+    A's own anchor and the guard would never fire at all.
+    They are removed rather than replaced by a space so that "`CLAUDE.md`'s"
+    still reads as a possessive.
 
     Nothing here tracks WHICH text came from inside a code span, deliberately.
     Two earlier drafts tried, one toggling on each backtick and one pairing
     them with a regex, and both are defeated the same way: prose in this corpus
     carries odd backticks inside quoted shell strings, such as
     `grep -rn 'total_cost` 0 at'`, and a single stray one shifts the parity of
-    everything after it. The job that mask was doing -- keeping a code literal
+    everything after it.
+    The job that mask was doing -- keeping a code literal
     from supplying a cardinality claim's plural noun -- is done instead by
     NOT_A_NOUN below, which rejects the identifier by its own shape and cannot
     be knocked out of alignment.

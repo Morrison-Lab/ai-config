@@ -6,18 +6,22 @@ for everything else.
 
 Three properties this suite exists to pin:
 
-  1. It may only ADD context. It must never exit non-zero, never emit a
-     `permissionDecision`, and never rewrite the prompt. A brief is right to
-     send; only the underived premise inside it is the problem.
+  1. It may only ADD context.
+     It must never exit non-zero, never emit a `permissionDecision`, and never
+     rewrite the prompt.
+     A brief is right to send; only the underived premise inside it is the
+     problem.
   2. Both real incidents fire, pasted in VERBATIM from the transcripts that
      produced them rather than retyped into a tidied form, per
      `shared/workflow/algorithmatize-checks.md`'s "Test the instrument against
-     the incident that prompted it, verbatim". The odd backtick inside
-     incident 2's quoted shell string is exactly the kind of thing a tidied
-     fixture loses, and it defeated two earlier drafts of the matcher.
+     the incident that prompted it, verbatim".
+     The odd backtick inside incident 2's quoted shell string is exactly the
+     kind of thing a tidied fixture loses, and it defeated two earlier drafts
+     of the matcher.
   3. Each clause of the ANDed fire condition is mutation-checked ALONE, against
-     a case only that clause keeps correct. Reverting one clause otherwise
-     still passes any case a sibling clause happens to decide.
+     a case only that clause keeps correct.
+     Reverting one clause otherwise still passes any case a sibling clause
+     happens to decide.
 
 Run:  python3 hooks/test-remind-brief-premises.py hooks/remind-brief-premises.py
 """

@@ -3,8 +3,8 @@
 
 Verifies that:
 1. All GitHub Actions check runs for the PR's HEAD commit SHA are completed and passing.
-2. A review comment evaluating the exact HEAD commit SHA has been posted.
-3. The latest review comment for the HEAD commit SHA contains zero actionable findings and no CHANGES_REQUESTED state.
+2. An automated review comment evaluating the exact HEAD commit SHA has been posted.
+3. The latest review comment for the HEAD commit SHA contains zero actionable findings and no CHANGES_REQUESTED or REJECTED state.
 
 Exit codes:
 0: Fully clean (safe to end ARDI loop)
@@ -76,12 +76,21 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     reviews = data.get("reviews", [])
 
     issues = []
-    # Collect all automated review reports (case-insensitive marker filtering)
+    # Collect automated review reports only (filtering out human/author comments like ARD summaries)
     all_items = []
     for c in comments:
         body = c.get("body", "")
         body_lower = body.lower()
-        if "### 🤖" in body or "code review" in body_lower or "claude finished review" in body_lower or "verdict" in body_lower:
+        author_login = c.get("author", {}).get("login", "")
+
+        # Exclude human PR disposition comments
+        if "ard review disposition summary" in body_lower:
+            continue
+
+        is_bot_author = author_login in ("github-actions", "github-actions[bot]", "claude[bot]")
+        is_review_header = any(marker in body_lower for marker in ("### 🤖", "code review", "claude finished review", "verdict:"))
+
+        if is_bot_author or is_review_header:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT"))
 
     for r in reviews:
@@ -96,9 +105,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
         return False, issues
 
-    # Match items for HEAD commit SHA:
-    # 1. Matching commit OID (from formal reviews API)
-    # 2. SHA or short SHA in comment body (or created on/after commit_dt AND referencing SHA/OID)
+    # Match items evaluating the target HEAD commit SHA
     sha_short = sha[:7]
     commit_dt = parse_iso_time(commit_date)
 
@@ -110,13 +117,13 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
         oid = item[3]
         state = item[4]
 
-        is_sha_match = bool(oid == sha or sha_short in body or sha in body)
+        is_sha_match = bool((oid and oid == sha) or sha_short in body or sha in body)
         is_timing_match = bool(
             commit_dt
             and created_at_dt
             and created_at_dt >= commit_dt
-            and any(marker in body_lower for marker in ("### 🤖", "code review", "claude finished review", "verdict"))
             and (is_sha_match or not oid)
+            and any(marker in body_lower for marker in ("### 🤖", "code review", "claude finished review", "verdict"))
         )
 
         if is_sha_match or is_timing_match:
@@ -137,20 +144,18 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     if latest_state in ("CHANGES_REQUESTED", "REJECTED"):
         issues.append(f"Latest formal review state for SHA {sha[:8]} is '{latest_state}'")
 
-    # Check for finding indicators
+    # Precise finding patterns (avoiding false positives on clean review summaries)
     finding_patterns = [
         r"###\s*(Actionable\s+|Detailed\s+)?Findings",
-        r"\*\*Findings\b",
-        r"Findings\s*\(posted\s+inline",
+        r"\*\*Actionable Findings\*\*",
+        r"\*\*Detailed Findings\*\*",
         r"###\s*Issues",
         r"###\s*Remaining",
         r"\*\*Location:\*\*",
         r"Verdict:\s*(Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings)",
         r"\bNeeds\s+more\s+work\b",
         r"\bNeeds\s+work\b",
-        r"\bChanges\s+requested\b",
-        r"#### \d+\.",
-        r"^\s*\d+\.\s+\*\*",
+        r"(?<!No\s)changes\s+requested\b",
     ]
 
     has_findings = False

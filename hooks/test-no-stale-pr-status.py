@@ -36,9 +36,14 @@ def say(text):
 
 
 CHECK_CLEAN_QUERY = {"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "input": {"command": "python3 scripts/check-pr-fully-clean.py 1167"}}]}}
+    {"type": "tool_use", "id": "t1", "name": "run_command", "input": {"command": "python3 scripts/check-pr-fully-clean.py 1167"}}]}}
 CHECK_CLEAN_FAIL_RESULT = {"type": "user", "message": {"content": [
-    {"type": "tool_result", "content": "❌ PR is NOT fully clean:\n  - Check run 'validate' is still in status 'in_progress'"}]}}
+    {"type": "tool_result", "tool_use_id": "t1", "content": "❌ PR is NOT fully clean:\n  - Check run 'validate' is still in status 'in_progress'"}]}}
+
+READ_FILE_QUERY = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "t2", "name": "view_file", "input": {"AbsolutePath": "/path/to/scripts/check-pr-fully-clean.py"}}]}}
+READ_FILE_RESULT = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "t2", "content": "print('❌ PR is NOT fully clean:')"}]}}
 
 # (events, should_block, label)
 CASES = [
@@ -52,6 +57,9 @@ CASES = [
      "an MCP push_files is a push -- the reading predates it"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say("PR #1167 is fully clean.")], True,
      "claiming fully clean when check-pr-fully-clean.py returned NOT fully clean"),
+
+    ([READ_FILE_QUERY, READ_FILE_RESULT, say("Checked the file contents.")], False,
+     "reading script source containing failure text must not trip query block"),
 
     ([PUSH, QUERY, say("493 is green: 11 pass.")], False,
      "queried AFTER the push -- the claim is current"),

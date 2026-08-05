@@ -49,7 +49,7 @@ RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 RX_QUERY = re.compile(
     r"gh\s+pr\s+checks|statusCheckRollup|get_check_runs|"
     r"gh\s+run\s+view|checkSuites|mergeStateStatus|"
-    r"check-pr-fully-clean\.py",
+    r"python3?\s+.*check-pr-fully-clean\.py",
     re.I,
 )
 
@@ -83,10 +83,13 @@ def scan(path):
                 if not isinstance(b, dict):
                     continue
                 if b.get("type") == "tool_use":
+                    tool_name = (b.get("name") or "").lower()
+                    if tool_name in ("view_file", "read_file", "grep_search", "list_dir"):
+                        continue
                     # The name matters as much as the input: an MCP write names
                     # its verb only there (mcp__github__push_files), while the
                     # MCP read names its own in a `method` input parameter.
-                    blob = (b.get("name") or "") + " " + json.dumps(
+                    blob = tool_name + " " + json.dumps(
                         b.get("input") or {})
                     tool_id = b.get("id") or b.get("tool_use_id") or ""
                     if RX_PUSH.search(blob):

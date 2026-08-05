@@ -844,7 +844,7 @@ a document separator that truncates the generated script.)
   It checks that:
   (1) all CI check runs for the PR's exact HEAD commit SHA are `completed` with conclusion `success`, `neutral`, or `skipped`,
   (2) an automated review comment evaluating that HEAD SHA has been posted, and
-  (3) the latest review comment for that HEAD SHA contains zero findings.
+  (3) the latest review comment for that HEAD SHA contains zero findings and no formal `CHANGES_REQUESTED` or `REJECTED` state.
   Returns exit code 0 only when fully clean.
   Run before declaring any ARDI loop complete or unclaiming a PR.
 

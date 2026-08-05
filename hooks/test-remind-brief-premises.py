@@ -123,6 +123,25 @@ REMIND = [
     ("There are three sites in `hooks/no-unreviewed-pr.py` that discharge.", None,
      "prepositional cardinality"),
     (INCIDENT_2, None, "incident 2 with no transcript at all"),
+
+    # Round 1 review findings, each reproduced from the reviewer's own repro.
+    # All four discharge-side ones are SILENT false negatives, which is the
+    # dangerous direction: a guard that goes quiet looks exactly like a corpus
+    # where nobody asserts anything.
+    ("`skills/ardi/SKILL.md` carries a step requiring a claim comment first.\n"
+     "Unrelated check: `grep -n paws skills/gip/SKILL.md`.\n", None,
+     "R1: a same-BASENAME derivation must not discharge another file's claim"),
+    ("`CLAUDE.md` carries the rule that a phrase grep returning nothing is "
+     "not evidence.", None,
+     "R1: the bare word 'grep' in PROSE is not a derivation"),
+    ("`CLAUDE.md` carries a pointer to `shared/workflow/grep-is-not-coverage.md`.",
+     None, "R1: a filename containing 'grep' is not a derivation"),
+    ("Update the changelog, since `CLAUDE.md` carries a quota carve-out.", None,
+     "R1: an imperative governing a DIFFERENT clause must not suppress"),
+    ("Land the fix; `CLAUDE.md` carries a quota carve-out.", None,
+     "R1: same, across a semicolon"),
+    ("`CLAUDE.md` has 1200 lines of guidance.\n`grep -n quota CLAUDE.md`\n",
+     None, "R1: a 4-digit count is still a COUNT, so a plain grep cannot clear it"),
 ]
 
 SILENT = [
@@ -150,6 +169,21 @@ SILENT = [
      "discharged by a command pasted beside the claim"),
     ("The `hooks/` directory holds the guards; `scripts/install-hooks.py` "
      "registers them.", None, "paths named with no assertion about contents"),
+
+    # Controls for the round 1 findings: the same shapes where the discharge
+    # SHOULD fire. Without these, the fixes above could have been "never
+    # discharge anything", which passes every REMIND case and guards nothing.
+    ("`skills/ardi/SKILL.md` carries a step requiring a claim comment.\n"
+     "Derived: `grep -n paws skills/ardi/SKILL.md`.\n", None,
+     "R1 control: the SAME file's derivation still discharges"),
+    ("`CLAUDE.md` carries the carve-out.\nDerived: `grep -n carve-out CLAUDE.md`",
+     None, "R1 control: a grep in a CODE span still discharges"),
+    ("Update `shared/workflow/ardi.md` so it covers the merged-PR case.", None,
+     "R1 control: an imperative on the claim's OWN object still suppresses"),
+    ("context\n\n\n\n\n\n\n> a quoted requirement\n"
+     "`CLAUDE.md` carries a quota carve-out.\n"
+     "`grep -n quota CLAUDE.md`\n", None,
+     "R1: blank lines before a blockquote must not drift the claim's line"),
 ]
 
 # ------------------------------------------------------------------- runner
@@ -307,6 +341,19 @@ MUTANTS = [
      "NOT_A_NOUN", re.compile(r"zzz-never-matches"),
      lambda: kinds(INCIDENT_1) == ["cardinality", "cardinality"],
      False, True),
+
+    ("discharge key is the full path, not the basename",
+     "key_for", staticmethod(lambda p: __import__("os").path.basename(p)),
+     lambda: fires("`skills/ardi/SKILL.md` carries a step requiring a claim.\n"
+                   "Unrelated: `grep -n paws skills/gip/SKILL.md`.\n"),
+     True, False),
+
+    ("an in-brief derivation must sit in a CODE span, not prose",
+     "code_segments",
+     staticmethod(lambda prompt: enumerate(prompt.splitlines())),
+     lambda: fires("`CLAUDE.md` carries the rule that a phrase grep returning "
+                   "nothing is not evidence."),
+     True, False),
 
     ("tool_result must carry output",
      "_none_", None,

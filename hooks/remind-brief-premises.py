@@ -72,11 +72,11 @@ transcripts on 2026-08-04, each replayed against its own session transcript
 truncated to the records that preceded the launch, so the discharge saw exactly
 what that session had derived at the time.
 
-  - 26 prompts examined, 7 fired, 19 silent.
-  - Those 7 carry 9 claims, and on inspection all 9 are genuine corpus-state
+  - 26 prompts examined, 8 fired, 18 silent.
+  - Those 8 carry 11 claims, and on inspection all 11 are genuine corpus-state
     assertions rather than incidental mentions.
     Two were the false ones above.
-    The other seven were true, and none of them had been derived: they were
+    The other nine were true, and none of them had been derived: they were
     asserted from recollection and happened to be right.
   - Both incidents fire.
     Incident 2 fires on its cardinality claim ALONE, its two content claims
@@ -93,6 +93,27 @@ having been taken differently.
 Two matcher false positives were found and fixed during that measurement, both
 recorded at their fix sites -- a citation whose next verb belonged to the
 reader, and a count that reached back across a paragraph break.
+
+Review round 1 then found five more, four of them silent discharges, and each
+is fixed and pinned by a regression case plus a control:
+a same-BASENAME derivation vouching for a different file (this corpus holds 177
+files named `SKILL.md`), the bare English word "grep" in prose reading as a
+command, an imperative governing one clause of a compound sentence suppressing
+a claim in another, `QUOTED` consuming blank-line newlines and drifting a
+claim's line number away from its own adjacent derivation, and a count of four
+or more digits falling back to CONTENT.
+The first two are the reason the fire count moved from 7 to 8: both were
+silencing real assertions in the measured corpus.
+
+Every clause here is a heuristic, and each one's failure direction is chosen
+deliberately.
+The verb list, the imperative guard, and the path set all fail toward a MISSED
+reminder rather than a wrong one, which for an inject-only guard costs nothing
+but the reminder itself.
+The discharge rules fail the other way on purpose, staying narrow, because
+their wrong direction is SILENCE -- and a guard that goes quiet is
+indistinguishable from a corpus where nobody ever asserts anything, which is
+the failure `algorithmatize-checks` says nothing will report.
 
 See `hooks/test-remind-brief-premises.py` for the corpus cases and the
 clause-isolation mutation checks.
@@ -126,6 +147,33 @@ PATH = re.compile(
     re.X,
 )
 
+# The same set as PATH, but reachable after a `/`, so an absolute path in a
+# command (`grep -n x /repo/shared/workflow/ardi.md`) or a `Read`'s
+# `file_path` resolves to the same corpus-relative key a brief would write.
+# Used ONLY for derivations, never for claim detection, where the stricter
+# lookbehind is what keeps `some/other/shared/x.md` out.
+PATH_IN_CMD = re.compile(
+    r"""(?<![\w.-])(
+        CLAUDE\.md
+      | MEMORY\.md
+      | (?:\./)?(?:shared|memories|skills|hooks|scripts|codex-skills)
+          /[\w./-]*[\w-]
+    )(?![\w/-])""",
+    re.X,
+)
+
+
+def key_for(path):
+    """The discharge key for a path: corpus-relative, no leading `./`.
+
+    NOT the basename. Keying on the basename let a derivation about one file
+    discharge a claim about another entirely -- this corpus holds 177 files
+    named `SKILL.md`, so a grep of `skills/gip/SKILL.md` silently vouched for
+    an assertion about `skills/ardi/SKILL.md`.
+    """
+    return path[2:] if path.startswith("./") else path
+
+
 # ---------------------------------------------------------------- clause B
 # Verbs that assert what a file CONTAINS, as opposed to what should be done to
 # it. "already covers" and "does not mention" are reached via the 0-2 word gap.
@@ -143,8 +191,13 @@ VERB = (
 # assertion. The conjunction stoplist closes the same hole one token over.
 GAP = r"(?:(?!and\b|or\b|but\b|nor\b|see\b|then\b|to\b|for\b)[A-Za-z][\w'-]*\s+){0,2}?"
 
+# Unbounded and comma-tolerant. `\d{1,3}` capped counts at three digits, so
+# "`CLAUDE.md` has 1200 lines" fell back to CONTENT and was then discharged by
+# a merely-inspecting grep -- the exact silent discharge the claim-kind rule
+# exists to prevent. `[\d,]*` also keeps "1,200" whole, which otherwise quoted
+# back as "200".
 COUNT = (
-    r"\d{1,3}"
+    r"\d[\d,]*"
     r"|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
     r"|zero|no"
 )
@@ -177,7 +230,12 @@ IMPERATIVE = re.compile(
 )
 
 FENCE = re.compile(r"```.*?```", re.S)
-QUOTED = re.compile(r"^\s*>.*$", re.M)
+# `[ \t]*`, never `\s*`: `\s` matches a newline, so a blockquote preceded by
+# blank lines swallowed those newlines into one substituted space and broke
+# the line-count-preserving contract `visible_prose` depends on, drifting a
+# claim's reported line away from an adjacent derivation's.
+QUOTED = re.compile(r"^[ \t]*>.*$", re.M)
+INLINE_CODE = re.compile(r"`([^`\n]+)`")
 
 # ---------------------------------------------------------------- discharge
 # Any command that inspects a file's contents.
@@ -188,14 +246,18 @@ QUOTED = re.compile(r"^\s*>.*$", re.M)
 # sentence merely naming a file next to the word "head" silently discharged a
 # real claim. That is the over-broad-discharge failure, and its symptom is
 # silence, so nothing would have reported it.
+# `(?![-\w])` after each command name, so `grep-is-not-coverage.md` is a
+# filename rather than an invocation. The bare-word problem it leaves --
+# "a phrase grep returning nothing" -- is closed separately, by only searching
+# CODE spans of a brief rather than its prose; see `code_segments`.
 DERIVE_ANY = re.compile(
-    r"\b(?:git\s+)?(?:grep|rg|ag|ack)\b|\bsed\s+-n\b|\bwc\s+-|\bjq\b"
-    r"|\|\s*length\b",
+    r"\b(?:git\s+)?(?:grep|rg|ag|ack)(?![-\w])|\bsed\s+-n\b|\bwc\s+-"
+    r"|\bjq(?![-\w])|\|\s*length\b",
 )
 # Commands that produce a NUMBER. Bundled short flags are handled by the
 # character class, so `grep -ci` and `grep -rc` both match.
 DERIVE_COUNT = re.compile(
-    r"\b(?:git\s+)?(?:grep|rg|ag)\s+(?:-[a-z]*c[a-z]*\b|--count\b)"
+    r"\b(?:git\s+)?(?:grep|rg|ag)(?![-\w])\s+(?:-[a-z]*c[a-z]*\b|--count\b)"
     r"|\bwc\s+-[a-z]*l\b|\|\s*wc\b|\|\s*length\b|\bcount\s*\(",
 )
 
@@ -232,8 +294,12 @@ def visible_prose(text):
 
 def segment_start(text, pos):
     """Index of the start of the sentence or line containing `pos`."""
+    # `,` and `;` are boundaries too. Without them the imperative guard read
+    # one verb as governing a whole compound sentence, so "Update the
+    # changelog, since `CLAUDE.md` carries ..." was suppressed by an "update"
+    # that asks for no verification of `CLAUDE.md` at all.
     best = 0
-    for m in re.finditer(r"(?:\n|(?<=[.!?:])\s)", text[:pos]):
+    for m in re.finditer(r"(?:\n|(?<=[.!?:,;])\s)", text[:pos]):
         best = m.end()
     return best
 
@@ -317,20 +383,42 @@ def claims(prompt):
 NEAR_LINES = 5
 
 
+def code_segments(prompt):
+    """Yield (line_number, code_text) for every code span and fenced line.
+
+    A brief's PROSE is not a derivation, however command-shaped its vocabulary
+    is. "a phrase grep returning nothing is not evidence" contains the word
+    `grep` and derives nothing, and this corpus writes sentences like that
+    constantly -- so an in-brief derivation must sit in a code span or a
+    fenced block, which is where anyone pasting a command actually puts it.
+    """
+    fenced = False
+    for n, line in enumerate(prompt.splitlines()):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            yield n, line
+        else:
+            for m in INLINE_CODE.finditer(line):
+                yield n, m.group(1)
+
+
 def derivations(prompt):
     """Line numbers where the brief itself derives a path.
 
-    Returns (any_lines, count_lines), each a basename -> [line] mapping.
+    Returns (any_lines, count_lines), each a path -> [line] mapping.
     """
     any_p, count_p = {}, {}
-    for n, line in enumerate(prompt.splitlines()):
-        for pm in PATH.finditer(line):
-            base = os.path.basename(pm.group(1))
-            if DERIVE_COUNT.search(line):
-                count_p.setdefault(base, []).append(n)
-                any_p.setdefault(base, []).append(n)
-            elif DERIVE_ANY.search(line):
-                any_p.setdefault(base, []).append(n)
+    for n, seg in code_segments(prompt):
+        counts = bool(DERIVE_COUNT.search(seg))
+        if not counts and not DERIVE_ANY.search(seg):
+            continue
+        for pm in PATH_IN_CMD.finditer(seg):
+            k = key_for(pm.group(1))
+            if counts:
+                count_p.setdefault(k, []).append(n)
+            any_p.setdefault(k, []).append(n)
     return any_p, count_p
 
 
@@ -371,8 +459,8 @@ def transcript_derivations(path):
                     elif b.get("name") in ("Read", "Grep", "Glob"):
                         # A Read shows the file; it never yields a count.
                         blob = str(inp.get("file_path") or inp.get("path") or "")
-                        if blob:
-                            any_p.add(os.path.basename(blob))
+                        for pm in PATH_IN_CMD.finditer(blob):
+                            any_p.add(key_for(pm.group(1)))
 
             elif m.get("type") == "user":
                 for b in blocks:
@@ -385,13 +473,14 @@ def transcript_derivations(path):
                     # is empty or errored derived nothing.
                     if not str(b.get("content") or "").strip():
                         continue
-                    for pm in PATH.finditer(cmd):
-                        base = os.path.basename(pm.group(1))
-                        if DERIVE_COUNT.search(cmd):
-                            count_p.add(base)
-                            any_p.add(base)
-                        elif DERIVE_ANY.search(cmd):
-                            any_p.add(base)
+                    counts = bool(DERIVE_COUNT.search(cmd))
+                    if not counts and not DERIVE_ANY.search(cmd):
+                        continue
+                    for pm in PATH_IN_CMD.finditer(cmd):
+                        k = key_for(pm.group(1))
+                        if counts:
+                            count_p.add(k)
+                        any_p.add(k)
 
     return any_p, count_p
 
@@ -430,7 +519,7 @@ def evaluate(prompt, tpath=""):
 
     undischarged = []
     for kind, quote, path, line in found:
-        base = os.path.basename(path)
+        base = key_for(path)
         if kind == "cardinality":
             if base in t_count or near(in_count, base, line):
                 continue

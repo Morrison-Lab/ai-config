@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-LEAD = r"""(?:^|[\s;&|`]|(?:\$\())"""
+LEAD = r"""(?:^|[\s;&|`()]|(?:\$\())"""
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command)\s+"""
 
@@ -27,15 +27,30 @@ ALLOW_FLAG = re.compile(r"\bALLOW_MERGE=1\b|\b--allow-merge\b")
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
-def mask_strings(text: str) -> str:
-    """Mask string literals so trigger patterns inside comments/bodies are not matched."""
-    def repl(m):
-        raw = m.group(0)
-        return raw[0] + (" " * (len(raw) - 2)) + raw[-1] if len(raw) >= 2 else raw
+def mask_payloads(text: str) -> str:
+    """Mask text payloads (comment bodies, commit messages, trailing shell comments)
+    so trigger patterns inside prose do not cause false positives or allow-flag bypasses.
+    """
+    # Mask trailing shell comments (# ...)
+    text = re.sub(r"#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
 
-    text = re.sub(r'"[^"\\]*(?:\\.[^"\\]*)*"', repl, text)
-    text = re.sub(r"'[^'\\]*(?:\\.[^'\\]*)*'", repl, text)
+    # Mask values of prose-carrying flags (--body, --title, -m, -b, --message, --reason, --notes, --description)
+    flag_pattern = r"(?:--body|--title|--comment|--message|--reason|--notes|--description|-m|-b)"
+
+    def repl_flag(m):
+        flag = m.group(1)
+        val = m.group(2)
+        return flag + (" " * len(val))
+
+    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\"[^\"]*\")", repl_flag, text)
+    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\'[^\']*\')", repl_flag, text)
+
     return text
+
+
+def sanitize(name: str) -> str:
+    """Sanitize session ID matching ai-session.sh: tr -c 'A-Za-z0-9._-' '_'"""
+    return re.sub(r"[^A-Za-z0-9._-]", "_", name)
 
 
 def is_session_alive(sess_file: Path) -> bool:
@@ -48,7 +63,7 @@ def is_session_alive(sess_file: Path) -> bool:
                 os.kill(int(pid), 0)
                 return True
             except OSError:
-                return False
+                pass
         hb = int(sess_data.get("heartbeat", 0))
         return (time.time() - hb) < 1800
     except Exception:
@@ -84,9 +99,10 @@ def check_mwc_active() -> bool:
         if not reg_dir.exists():
             return False
 
-        mwc_file = reg_dir / f"{current_session}.mwc"
+        sanitized_session = sanitize(current_session)
+        mwc_file = reg_dir / f"{sanitized_session}.mwc"
         if mwc_file.exists():
-            sess_file = reg_dir / f"{current_session}.session"
+            sess_file = reg_dir / f"{sanitized_session}.session"
             if sess_file.exists() and is_session_alive(sess_file):
                 return True
     except Exception:
@@ -97,9 +113,9 @@ def check_mwc_active() -> bool:
 def offending(command: str):
     mwc_active = check_mwc_active()
     for segment in SPLIT.split(command):
-        if ALLOW_FLAG.search(segment) or mwc_active:
+        masked_segment = mask_payloads(segment)
+        if ALLOW_FLAG.search(masked_segment) or mwc_active:
             continue
-        masked_segment = mask_strings(segment)
         for pattern, label in MERGE_PATTERNS:
             if re.search(pattern, masked_segment):
                 return label, segment.strip()

@@ -17,6 +17,7 @@ if not os.path.isfile(HOOK):
 
 BLOCK = [
     ("gh pr merge 411 --squash", "bare gh pr merge"),
+    ("(gh pr merge 411)", "parenthesized subshell gh pr merge"),
     ("gh -R owner/repo pr merge 411 --squash", "gh pr merge with -R flag before subcommands"),
     ("gh pr -R owner/repo merge 411 --squash", "gh pr merge with -R flag between pr and merge"),
     ("gh --repo owner/repo pr merge 411", "gh pr merge with --repo flag before subcommands"),
@@ -29,9 +30,13 @@ BLOCK = [
     ("glab -R owner/repo mr merge 12", "glab mr merge with -R flag before subcommands"),
     ("glab mr --repo owner/repo merge 12", "glab mr merge with --repo flag between mr and merge"),
     ("gh api -X PUT /repos/owner/repo/pulls/123/merge", "gh api PR merge with integer ID"),
+    ('gh api -X PUT "/repos/owner/repo/pulls/123/merge"', "gh api PR merge with double-quoted URL"),
+    ("gh api -X PUT '/repos/owner/repo/pulls/123/merge'", "gh api PR merge with single-quoted URL"),
     ("gh api /repos/owner/repo/pulls/$PR_NUM/merge -X PUT", "gh api PR merge with shell variable ID"),
     ("gh api /repos/owner/repo/pulls/${PR_NUM}/merge -X PUT", "gh api PR merge with braced shell variable ID"),
     ("echo foo && gh pr merge 123", "compound command with merge segment"),
+    ('gh pr merge 123 --body "ALLOW_MERGE=1"', "ALLOW_MERGE inside --body string argument"),
+    ("gh pr merge 123 # ALLOW_MERGE=1", "ALLOW_MERGE inside trailing shell comment"),
 ]
 
 ALLOW = [
@@ -69,27 +74,27 @@ for cmd, desc in ALLOW:
     wrong += (v != "allow")
     print(f"  {v:<6} {desc}")
 
-# Test active MWC grant integration and session isolation
+# Test active MWC grant integration and session isolation with sanitized session IDs
 script_path = Path(__file__).parent.parent / "skills" / "session-lock" / "scripts" / "ai-session.sh"
-session_a = f"test-mwc-a-{os.getpid()}"
-session_b = f"test-mwc-b-{os.getpid()}"
+session_a = f"session:mwc-a/{os.getpid()}"
+session_b = f"session:mwc-b/{os.getpid()}"
 
 subprocess.run([str(script_path), "register", "--id", session_a], check=True, capture_output=True)
 subprocess.run([str(script_path), "register", "--id", session_b], check=True, capture_output=True)
 subprocess.run([str(script_path), "enable-mwc", "--id", session_a], check=True, capture_output=True)
 
 try:
-    # Session A has MWC enabled -> allowed
+    # Session A (sanitized) has MWC enabled -> allowed
     env_a = dict(os.environ, AI_SESSION_ID=session_a)
     v_a = verdict("gh pr merge 411 --squash", env=env_a)
     wrong += (v_a != "allow")
-    print(f"  {v_a:<6} active MWC grant for session A")
+    print(f"  {v_a:<6} active MWC grant for sanitized session A")
 
-    # Session B does NOT have MWC enabled -> blocked (cross-session isolation)
+    # Session B (sanitized) does NOT have MWC enabled -> blocked (cross-session isolation)
     env_b = dict(os.environ, AI_SESSION_ID=session_b)
     v_b = verdict("gh pr merge 411 --squash", env=env_b)
     wrong += (v_b != "BLOCK")
-    print(f"  {v_b:<6} cross-session isolation for session B")
+    print(f"  {v_b:<6} cross-session isolation for sanitized session B")
 finally:
     subprocess.run([str(script_path), "release", "--id", session_a], check=True, capture_output=True)
     subprocess.run([str(script_path), "release", "--id", session_b], check=True, capture_output=True)

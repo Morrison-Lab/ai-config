@@ -292,16 +292,52 @@ def visible_prose(text):
     return text.replace("`", "")
 
 
-def segment_start(text, pos):
-    """Index of the start of the sentence or line containing `pos`."""
-    # `,` and `;` are boundaries too. Without them the imperative guard read
-    # one verb as governing a whole compound sentence, so "Update the
-    # changelog, since `CLAUDE.md` carries ..." was suppressed by an "update"
-    # that asks for no verification of `CLAUDE.md` at all.
+def segment_start(text, pos, clauses=True):
+    """Index of the start of the segment containing `pos`.
+
+    With `clauses`, `,` and `;` end a segment as well. Without them the
+    imperative guard read one verb as governing a whole compound sentence, so
+    "Update the changelog, since `CLAUDE.md` carries ..." was suppressed by an
+    "update" that asks for no verification of `CLAUDE.md` at all.
+    """
+    bounds = r"(?:\n|(?<=[.!?:,;])\s)" if clauses else r"(?:\n|(?<=[.!?:])\s)"
     best = 0
-    for m in re.finditer(r"(?:\n|(?<=[.!?:,;])\s)", text[:pos]):
+    for m in re.finditer(bounds, text[:pos]):
         best = m.end()
     return best
+
+
+def imperative_governs(text, pos, upto):
+    """True when an imperative verb governs the claim starting at `pos`.
+
+    Two windows, because one alone gets a real case wrong in each direction.
+
+    The clause-bounded window is the primary test, and it is what keeps a verb
+    from governing a clause it has nothing to do with.
+
+    The sentence window is the fallback, for an aside interrupting a verb and
+    its object: "Verify, before merging, that `CLAUDE.md` carries the rule."
+    There the clause window starts after the aside and clips "Verify" out
+    entirely, so a brief that already asks for the check gets reminded to ask
+    for it.
+
+    What separates that from the compound-sentence case is whether the verb
+    had reached its object before the comma. An interrupted imperative is
+    followed IMMEDIATELY by the comma ("Verify,"), while a complete one is
+    not ("Update the changelog,"). So the fallback requires that adjacency
+    rather than merely requiring a sentence-initial imperative, which would
+    re-suppress the compound case this pair of rules exists to separate.
+
+    A parenthetical after a COMPLETE object ("Verify the changelog, before
+    merging, since `CLAUDE.md` carries X") is still missed. That direction is
+    the deliberate one for this guard: a missed reminder, never a wrong one.
+    """
+    seg = segment_start(text, pos)
+    if IMPERATIVE.match(text[seg:upto]):
+        return True
+    sent = segment_start(text, pos, clauses=False)
+    m = IMPERATIVE.match(text[sent:upto])
+    return bool(m and text[sent + m.end():sent + m.end() + 1] == ",")
 
 
 def plural_after(text, start, span=90):
@@ -326,7 +362,7 @@ def claims(prompt):
         path, end = pm.group(1), pm.end()
 
         seg = segment_start(text, pm.start())
-        if IMPERATIVE.match(text[seg:pm.start() + len(path) + 1]):
+        if imperative_governs(text, pm.start(), pm.start() + len(path) + 1):
             continue
 
         kind = quote = None

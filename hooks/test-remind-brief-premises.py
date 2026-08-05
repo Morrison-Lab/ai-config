@@ -184,6 +184,14 @@ SILENT = [
      "`CLAUDE.md` carries a quota carve-out.\n"
      "`grep -n quota CLAUDE.md`\n", None,
      "R1: blank lines before a blockquote must not drift the claim's line"),
+
+    # Round 2 finding: the R1 comma fix clipped the imperative verb out of the
+    # window whenever an aside interrupted it and its object, so a brief that
+    # already asks for the check got reminded to ask for it.
+    ("Verify, before merging, that `CLAUDE.md` carries the rule.", None,
+     "R2: a comma-set-off aside must not defeat the imperative guard"),
+    ("Check, if unsure, whether `CLAUDE.md` carries the rule.", None,
+     "R2: same, with a different aside"),
 ]
 
 # ------------------------------------------------------------------- runner
@@ -354,6 +362,16 @@ MUTANTS = [
      lambda: fires("`CLAUDE.md` carries the rule that a phrase grep returning "
                    "nothing is not evidence."),
      True, False),
+
+    # The R2 fix must not silently undo the R1 one: reverting to the
+    # clause-only window has to flip the aside case and ONLY that case, and
+    # the R1 compound-sentence case is asserted above under `REMIND`.
+    ("an aside between an imperative and its object still suppresses",
+     "imperative_governs",
+     staticmethod(lambda text, pos, upto: bool(
+         hook.IMPERATIVE.match(text[hook.segment_start(text, pos):upto]))),
+     lambda: fires("Verify, before merging, that `CLAUDE.md` carries the rule."),
+     False, True),
 
     ("tool_result must carry output",
      "_none_", None,

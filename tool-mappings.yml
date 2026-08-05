@@ -97,12 +97,12 @@ operations:
     cli: gh pr comment <N> --body "..."
     github_mcp: mcp__github__add_issue_comment
   - id: REPLY_REVIEW_COMMENT
-    description: Reply to an inline pull-request review comment.
-    cli: gh api (reply to review comment)
+    description: Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead.
+    cli: gh api -X POST repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies -F body=@<file>
     github_mcp: mcp__github__add_reply_to_pull_request_comment
   - id: RESOLVE_REVIEW_THREAD
     description: Mark an inline pull-request review thread as resolved.
-    cli: gh api graphql (resolveReviewThread)
+    cli: gh api graphql -f query='mutation { resolveReviewThread(input:{threadId:"<thread_node_id>"}) { thread { isResolved } } }'
     github_mcp: mcp__github__resolve_review_thread
   - id: WATCH_PR
     description: Subscribe to / unsubscribe from a pull request's activity.

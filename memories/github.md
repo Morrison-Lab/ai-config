@@ -153,6 +153,49 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 - **Backticks in a double-quoted `-m` / `--body` string get command-substituted by the shell.** In the Bash tool, `` git commit -m "... `origin` ..." `` or `` gh pr comment --body "use `foo`" `` makes the shell run `` `origin` ``/`` `foo` `` as a command and splice the (usually empty/erroring) output into the message — silently mangling it (seen on sparta 2026-06-30: a commit body's `` `origin` `` and `` `killer` `` vanished, with `origin: command not found` in stderr). For any message/body containing backticks, use a single-quoted **heredoc** (`` -m "$(cat <<'EOF' … EOF)" `` — the quoted `'EOF'` disables all expansion) or a `--body-file`, never a bare double-quoted string. (Same root cause as ARD inline reply bodies too; use `-F body=@<file>` for `gh api .../pulls/<N>/comments`/`glab api .../notes` so backticks in Markdown never get shell-expanded.)
 - **GitHub review inline comments are on a different API endpoint than top-level PR comments.** The top-level comment-view endpoint (`` `gh pr view <N> --json comments` `` or `gh api repos/<o>/<r>/issues/<N>/comments`) captures PR-level comments and bot-posted review overview summaries, but **not inline comments from formal reviews** (line-by-line inline findings). When a user links a specific review ID (e.g. `#pullrequestreview-4761444085`), fetch both the review overview and its inline comments separately: `gh api repos/<o>/<r>/pulls/<N>/reviews/<review-id> --jq '{state, body}'` for the overview, then `gh api repos/<o>/<r>/pulls/<N>/comments --jq '.[] | select(.pull_request_review_id == <review-id>) | {line: .line, body: .body}'` to get the inline findings. A review's overview body can be generic ("I reviewed the code") with all the actual findings in inline comments on specific lines — reading only the overview misses the findings. (Encountered on ai-config#647 review 4761444085: the overview body was generic, but the specific finding was in an inline comment on CLAUDE.md line 324.)
 
+- **Replying to an inline review comment and editing one are two routes on the same comment id, and the destructive one is the shorter path.**
+  The bullets above are about *reading* inline comments.
+  Writing back to one has a trap they do not cover, because both routes take the same `<id>` and only the surrounding path distinguishes them:
+
+  ```bash
+  # REPLY: adds a comment alongside theirs. Note the PR number.
+  gh api -X POST repos/<o>/<r>/pulls/<N>/comments/<id>/replies -F body=@<file>
+
+  # EDIT: OVERWRITES their comment. No PR number.
+  gh api -X PATCH repos/<o>/<r>/pulls/comments/<id> -F body=@<file>
+  ```
+
+  The discriminator is whether the PR number is present, which is the least memorable difference the two could have had, and the id-only form is the one that reads as the tidier of the two.
+  Both were confirmed against GitHub's own reference: `PATCH /repos/{owner}/{repo}/pulls/comments/{comment_id}` updates a review comment, while `POST /repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies` creates a reply.
+  The underlying rule is that collection-scoped routes carry the PR number while single-comment-by-id routes do not, and that split cuts across the read/write divide rather than along it.
+  `GET .../pulls/<N>/comments` lists a PR's comments and `GET .../pulls/comments/<id>` fetches one, so the id-only shape is already familiar from reading before you ever write with it.
+
+  GitHub documents a second reply form, and it carries the PR number too: `POST .../pulls/<N>/comments` with `-F in_reply_to=<id>`, which is what [`ard`](../skills/ard/SKILL.md)'s step 4b uses.
+  Either reply form is fine, and the discriminator holds for both, which is the point: every route that adds a comment names the PR, and the one that overwrites an existing comment does not.
+
+  Nothing warns you.
+  On a repo where you have write access the `PATCH` returns success, and success is exactly what an overwrite looks like.
+  The review-comment REST surface exposes no edit-history read either, so a restore cannot be diffed against the original.
+  The only durable trace is that `updated_at` stops matching `created_at`, and the comments render as edited from then on.
+
+  The transferable shape is not about `gh`.
+  A comment id addresses an artifact belonging to someone else, so a verb that writes *to* that id writes over their work rather than adding alongside it.
+  The id being correct is therefore no evidence that the verb is, which is what makes this survive the check you would actually run: you verify the id, it is right, and the call succeeds.
+
+  Use [`REPLY_REVIEW_COMMENT`](../tool-mappings.md) rather than composing the path by hand.
+  That row carried a non-runnable `gh api (reply to review comment)` placeholder until this entry was written, which is the specific reason the path got improvised in the first place.
+
+  - **Do:** reply with the `/replies` route, and read the PR number's presence as the check that you are on it.
+  - **Do:** resolve the operation through `tool-mappings.yml`'s token rather than reconstructing a URL from the read endpoint you just used.
+  - **Don't:** reach for `PATCH` on `pulls/comments/<id>` or `issues/comments/<id>` to respond to someone; that edits their comment.
+  - **Don't:** read a `200` as confirmation you added something, on any id-addressed route you did not intend to write to.
+
+  (Morrison-Lab/ai-config#1151, 2026-08-05: replying to five `claude[bot]` review findings was attempted with `-X PATCH repos/<o>/<r>/pulls/comments/<id>`, once per id, and all five findings were replaced by the reply text before anything reported a problem.
+  They were restored from copies already read, and the replies reposted on the `/replies` route.
+  The five comments (`3717322685`, `3717323117`, `3717323586`, `3717324073`, `3717324556`) were created `01:33:18Z` to `01:33:57Z` and last updated `01:40:35Z` to `01:40:38Z`, so the overwrite and the restore both fall inside that 7-minute bracket and cannot be separated any more finely than that, which is the missing-edit-history residual in concrete form.
+  The five replies, created `01:41:03Z` to `01:41:07Z`, still carry `updated_at == created_at`.
+  The correct route was already written down in [`skills/claude-agent-workflow/SKILL.md`](../skills/claude-agent-workflow/SKILL.md), so this was a placement failure rather than a knowledge gap: the command existed in a skill about a CI workflow, and the registry a person replying to a review would actually consult had a placeholder.)
+
 - **One review round can post several review objects, so filtering by a single `pull_request_review_id` silently drops findings.**
   The bullet above is right that inline comments need their own endpoint, and its `select(.pull_request_review_id == <review-id>)` filter is the correct way to drill into *one* review.
   It is the wrong way to answer "what did this round find", because the round and the review object are not the same unit.

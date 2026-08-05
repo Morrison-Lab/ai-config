@@ -7,21 +7,22 @@ where the em-dash joined clauses, a spaced run of hyphens (`---` or `--`) when
 a dash is genuinely wanted, or a plain hyphen (`-`) for a compound.
 
 **Either spaced form is fine, and `---` is what this corpus actually writes.**
-Both are ASCII, so neither can break the rule above: the choice is house style
-rather than hygiene.
-As of 2026-08-05 the corpus held 1747 spaced `---` against 434 spaced `--`, so
-a new fragment matching its neighbours will use `---`.
-Do not flag either form in review, and do not convert a file from one to the
-other as a drive-by.
+Both are ASCII, so neither can break the rule above:
+the choice is house style rather than hygiene.
+As of 2026-08-05 the corpus held 1747 spaced `---` against 434 spaced `--`,
+so a new fragment matching its neighbours will use `---`.
+Do not flag either form in review,
+and do not convert a file from one to the other as a drive-by.
 
 That last sentence is the point of this paragraph rather than a footnote to it.
-An earlier wording named only `--`, which left roughly 80% of the corpus
-nominally in breach of its own convention --- so a reviewer reading the rule
-would flag the majority form and ask the author to make their own block the
-minority style inside the very file they were editing.
-Two reviewers on one diff duly reached opposite verdicts, one quoting this rule
-and one describing the practice, and both were reasoning honestly from what the
-corpus told them.
+An earlier wording named only `--`,
+which left roughly 80% of the corpus nominally in breach of its own convention
+--- so a reviewer reading the rule would flag the majority form
+and ask the author to make their own block the minority style
+inside the very file they were editing.
+Two reviewers on one diff duly reached opposite verdicts,
+one quoting this rule and one describing the practice,
+and both were reasoning honestly from what the corpus told them.
 (Morrison-Lab/ai-config#1169, from a finding on #1168.)
 
 The same rule extends to the other non-ASCII punctuation that slips in from

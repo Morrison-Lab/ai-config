@@ -62,4 +62,5 @@ If a finding rests on a file you could not read or a command you could not run, 
 - **Long files.** Several fragments are long by design; length alone is not a finding here.
 - **An item already dispositioned as Deferred** with a linked tracking issue.
   Re-raising it each round costs a round and changes nothing.
-- **`--` sequences in prose.** That is the required dash form, not a typo.
+- **Spaced `---` or `--` sequences in prose.**
+  Both are house dash forms, not typos.

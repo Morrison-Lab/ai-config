@@ -137,7 +137,7 @@ prune_stale() {
     [ -e "$f" ] || continue
     load_session "$f"
     if is_stale; then
-      rm -f "$f" "$REG_DIR/$S_id.mwc"
+      rm -f "$f" "$REG_DIR/$(sanitize "$S_id").mwc"
       printf 'pruned stale session %s (%s on %s)\n' "$S_id" "${S_branch:-?}" "${S_host:-?}"
       removed=$((removed + 1))
     fi

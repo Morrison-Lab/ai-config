@@ -2,8 +2,8 @@
 """PreToolUse guard: mechanistically prohibit PR/MR merge commands.
 
 Prohibits commands attempting to merge PRs/MRs (e.g. `gh pr merge`, `glab mr merge`,
-or `gh api .../merge`) unless explicit authorization is present via ALLOW_MERGE=1
-or --allow-merge.
+`gh api .../merge`, `glab api .../merge`, or GraphQL `mergePullRequest`) unless
+explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
 """
 import json
 import os
@@ -16,11 +16,14 @@ from pathlib import Path
 LEAD = r"""(?:^|[\s;&|`()]|(?:\$\())"""
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command)\s+"""
+OPT_FLAGS = r"(?:\s+-[A-Za-z0-9_-]+(?:[=\s][^\s;&|`()]+)?)*"
 
 MERGE_PATTERNS = [
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh(?:\s+[^\n]+)?\s+pr(?:\s+[^\n]+)?\s+merge\b", "gh pr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab(?:\s+[^\n]+)?\s+mr(?:\s+[^\n]+)?\s+merge\b", "glab mr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh(?:\s+[^\n]+)?\s+api\b[^\n]*/pulls/(?:\d+|\$[A-Za-z_][A-Za-z0-9_]*|\$\{[A-Za-z_][A-Za-z0-9_]*\})/merge\b", "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b" + OPT_FLAGS + r"\s+pr\b" + OPT_FLAGS + r"\s+merge\b", "gh pr merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b" + OPT_FLAGS + r"\s+mr\b" + OPT_FLAGS + r"\s+merge\b", "glab mr merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*/pulls/[^\n]+/merge\b", "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*mergePullRequest", "gh api GraphQL PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b(?:\s+[^\n]+)?\s+api\b[^\n]*/merge_requests/[^\n]+/merge\b", "glab api MR merge"),
 ]
 
 ALLOW_FLAG = re.compile(r"\bALLOW_MERGE=1\b|\b--allow-merge\b")
@@ -28,22 +31,24 @@ SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
 def mask_payloads(text: str) -> str:
-    """Mask text payloads (comment bodies, commit messages, trailing shell comments)
-    so trigger patterns inside prose do not cause false positives or allow-flag bypasses.
+    """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files)
+    so trigger patterns inside prose or file paths do not cause false positives or allow-flag bypasses.
+    Handles escaped quotes inside string literals and unquoted file/field values.
     """
-    # Mask trailing shell comments (# ...)
+    # 1. Mask trailing shell comments (# ...)
     text = re.sub(r"#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
 
-    # Mask values of prose-carrying flags (--body, --title, -m, -b, --message, --reason, --notes, --description)
-    flag_pattern = r"(?:--body|--title|--comment|--message|--reason|--notes|--description|-m|-b)"
+    # 2. Mask values of prose/file-carrying flags (--body, --body-file, --title, --comment, --message, -m, -b, -F, -f, --raw-field, --field, etc.)
+    flag_pattern = r"(?:--body-file|--body|--title|--comment|--message|--reason|--notes|--description|-m|-b|-F|-f|--raw-field|--field|--template|--search)"
 
     def repl_flag(m):
         flag = m.group(1)
         val = m.group(2)
         return flag + (" " * len(val))
 
-    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\"[^\"]*\")", repl_flag, text)
-    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\'[^\']*\')", repl_flag, text)
+    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\"(?:\\.|[^\"])*\")", repl_flag, text)
+    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\'(?:\\.|[^\'])*\')", repl_flag, text)
+    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\S+)", repl_flag, text)
 
     return text
 
@@ -58,12 +63,14 @@ def is_session_alive(sess_file: Path) -> bool:
         content = sess_file.read_text(encoding="utf-8")
         sess_data = dict(line.split("=", 1) for line in content.splitlines() if "=" in line)
         pid = sess_data.get("pid")
-        if pid:
+        host = sess_data.get("host")
+        local_host = os.uname().nodename
+        if pid and (not host or host == local_host):
             try:
                 os.kill(int(pid), 0)
                 return True
             except OSError:
-                pass
+                return False
         hb = int(sess_data.get("heartbeat", 0))
         return (time.time() - hb) < 1800
     except Exception:

@@ -34,6 +34,9 @@ BLOCK = [
     ("gh api -X PUT '/repos/owner/repo/pulls/123/merge'", "gh api PR merge with single-quoted URL"),
     ("gh api /repos/owner/repo/pulls/$PR_NUM/merge -X PUT", "gh api PR merge with shell variable ID"),
     ("gh api /repos/owner/repo/pulls/${PR_NUM}/merge -X PUT", "gh api PR merge with braced shell variable ID"),
+    ("gh api repos/owner/repo/pulls/$(echo 123)/merge", "gh api PR merge with subshell PR number"),
+    ("gh api graphql -f query='mutation { mergePullRequest(input: {...}) }'", "gh api GraphQL PR merge mutation"),
+    ("glab api -X PUT projects/1/merge_requests/2/merge", "glab api MR merge endpoint"),
     ("echo foo && gh pr merge 123", "compound command with merge segment"),
     ('gh pr merge 123 --body "ALLOW_MERGE=1"', "ALLOW_MERGE inside --body string argument"),
     ("gh pr merge 123 # ALLOW_MERGE=1", "ALLOW_MERGE inside trailing shell comment"),
@@ -41,6 +44,11 @@ BLOCK = [
 
 ALLOW = [
     ("gh pr view 411", "read-only gh pr view"),
+    ("gh pr checkout merge", "checking out branch named merge"),
+    ("gh pr list --label merge", "listing PRs with label merge"),
+    ("gh search prs --label merge", "searching PRs with label merge"),
+    ("gh pr comment 123 --body-file /tmp/merge_notes.txt", "commenting with body-file path containing merge"),
+    ('gh pr comment 123 --body "He said \\"gh pr merge\\""', "comment with escaped quotes around trigger text"),
     ("gh pr comment 411 --body 'gh pr merge failed'", "quoted string containing trigger text"),
     ("gh pr comment 411 --body 'ALLOW_MERGE=1 in comment body'", "ALLOW_MERGE inside string argument"),
     ("ALLOW_MERGE=1 gh pr merge 411 --squash", "explicit ALLOW_MERGE=1 env flag"),

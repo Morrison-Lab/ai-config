@@ -327,6 +327,18 @@ generic Actions-authoring and reusable-workflow material.
     regardless, because it isn't metered per-call — so cost=0 + 1 turn + immediate `is_error`
     points to a **subscription usage-limit**, not only API credits; confirm via the Anthropic
     Console usage for that account.
+    ⚠️ **That signature is necessary for a usage-limit and not sufficient for one**, which is
+    why this bullet is headed "Quota/auth" rather than "Quota": an expired or invalid token
+    dies at the same model call, having done the same zero billable work, so the result object
+    is identical.
+    Discriminate before naming a cause, per
+    [`fully-clean`](../shared/workflow/fully-clean.md)'s cross-repo test: run the same reviewer
+    against a **different** repo at the same time, and a success there rules out the service
+    and the account's quota together, leaving this repo's own credential.
+    Then localize it with
+    `gh api repos/<owner>/<repo>/actions/secrets --jq '.secrets[] | "\(.name) \(.updated_at)"'`,
+    comparing the working repo against the failing one --- tokens written days apart are a
+    rotation that missed one repo.
   - **Intermittent upstream bug** (`total_cost_usd > 0`, `duration_ms` ~192 s): the
     `claude-code-action` completes a real review but exits with `is_error=true` anyway.
     The guard step fails the check ❌. The prior clean review on the same diff is still

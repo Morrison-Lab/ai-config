@@ -649,6 +649,9 @@ nothing is malfunctioning.
 It reads the run's result object and, on `is_error == "true"`, prints
 `Claude review ended in an error state` and exits 1, with a single carve-out
 for the quota case (`total_cost` 0 at `num_turns` 1).
+That carve-out's condition is necessary for a quota stop and not sufficient for
+one, since an expired credential dies at the same point and produces the same
+numbers --- so read it as "this run did no billable work", never as "quota".
 At `@v1` the step is inline in `claude-code-review.yml` and contains no verdict
 test whatsoever.
 At `@v2` the logic moved into `check-review-execution.sh`, which does scan for
@@ -1080,6 +1083,83 @@ The nearest pair is 38 seconds apart: the run on altdoc#95 failed
 So the service was fine and the `d-morrison` credential was not, which no
 number of re-runs would have shown.
 Tracked in d-morrison/altdoc#99.)
+
+**The zero-cost signature that names the quota case is necessary and not
+sufficient, so reading it as "quota" is an inference rather than an
+observation.**
+The section above offers the duration signature as the *corroborating* half of
+a diagnosis the cross-repo test has already made, and it is right to.
+This is what happens when that signature is read on its own: `is_error: true`
+with `total_cost_usd: 0` at `num_turns: 1` is genuinely what a quota stop looks
+like, and it is equally what an expired or invalid credential looks like,
+because in both cases the run dies at the model call having done no billable
+work.
+The result object cannot distinguish them, since the work that would have
+distinguished them never happened.
+
+Two things make the wrong reading feel confirmed rather than assumed.
+
+The signature is **documented as the quota case**, in the review guard's own
+carve-out and in
+[`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md).
+Matching a documented signature reads as recognition, so nothing about it
+presents as a step you took.
+
+And a **second reviewer can genuinely be quota-limited at the same time**, in
+words, on the same PR.
+That is a coincidence rather than corroboration, since the two reviewers hold
+different credentials, and it is the trap worth naming: it arrives as an
+independent source agreeing with you.
+
+The cross-repo test above is what discriminates them, and it discriminates
+three ways rather than two.
+A success elsewhere at the same time rules out the service **and** rules out
+the account's quota, which leaves this repo's own credential.
+So run it before naming a cause, not only before calling a reviewer
+permanently unreachable.
+
+The secret's own timestamp then settles which repo was left behind, in one
+call, and is the cheap general instrument for this class:
+
+```bash
+gh api repos/<owner>/<repo>/actions/secrets \
+  --jq '.secrets[] | "\(.name) \(.updated_at)"'
+```
+
+A working repo and a failing repo whose tokens were last written days apart is
+a rotation that missed one of them.
+[`refresh-claude-token`](../../skills/refresh-claude-token/SKILL.md) owns the
+rotation itself, and is right that no property of the secrets API proves a
+token will authenticate --- the timestamp does not certify the value, it
+localizes the gap once behaviour has already shown one repo failing and
+another working.
+
+- **Do:** run the cross-repo test before attributing a zero-cost failure to
+  quota, not only before calling the reviewer unreachable.
+- **Do:** compare `updated_at` across the two repos' secrets once a cross-repo
+  success has localized the failure to a credential.
+- **Don't:** read `total_cost_usd: 0` at `num_turns: 1` as evidence of quota
+  --- an expired credential produces the identical object.
+- **Don't:** count another reviewer's quota refusal as corroboration; it is a
+  different credential, so its exhaustion says nothing about yours.
+
+(Morrison-Lab/wai#35, 2026-08-04: `claude-review` run `30960909084`
+(`23:42:53Z -> 23:43:27Z`) returned `is_error: true`, `duration_ms: 372`,
+`num_turns: 1`, `total_cost_usd: 0`, `permission_denials_count: 0`.
+GitHub auth was fine, the log reading `App token successfully obtained` and
+`Actor has write access: admin`.
+A push retried it as run `30961183056` (`23:47:46Z -> 23:48:35Z`), with the
+identical signature at `duration_ms: 506`.
+Morrison-Lab/ai-config's own `claude-review` runs created `23:43:21Z` and
+`23:50:32Z` both succeeded, straddling the wai failure, so neither the service
+nor the account's quota was the cause.
+The secrets endpoint settles it: `CLAUDE_CODE_OAUTH_TOKEN` was last updated
+`2026-07-29T18:31:12Z` on wai against `2026-08-03T01:19:40Z` on ai-config, so
+wai's was stale and ai-config's had been rotated.
+Copilot **was** genuinely quota-limited at the same time, on both repos, and
+said so in words, which is the coincidence that made the quota reading feel
+confirmed.
+Filed as Morrison-Lab/wai#36, a recurrence of wai#27.)
 
 **A check-run reading `failure` is a fact about one *attempt*, not about the
 whole `run_id` -- a later attempt of that same run can still resolve on its

@@ -1,5 +1,5 @@
 "Fully clean" is the terminal state the ARDI review loop drives toward.
-A PR/MR is **fully clean** when **both** of these hold:
+A PR/MR is **fully clean** when **both** of these hold (and verified via `python3 scripts/check-pr-fully-clean.py <pr-number>`):
 
 1. **All CI workflows and check runs are green AND completed.** Every workflow and check run passes --- not just the required checks and not just the review job.
    "Green" means finished with a passing outcome (success or skipped), not merely "currently reporting green while still running" --- never treat a workflow or check run that's still queued or in progress as clean, even if nothing has failed yet.

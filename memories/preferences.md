@@ -77,8 +77,9 @@
   create, push, and open the feature PR first. The PR must expose the exact SHA
   that performs the action; opening it afterward turns a costly run into an
   unreviewed fait accompli. (User correction, 2026-08-03.)
-- NEVER auto-merge a Pull Request unless the user has explicitly granted session permission (e.g. via `/mwc` or `/maw`) or explicitly instructed to merge that specific PR (e.g. `/merge-it` or "merge this").
-  Creating or pushing a PR does NOT imply permission to merge it.
+- NEVER auto-merge or squash-merge a Pull Request or Merge Request unless the user has explicitly granted session permission (e.g. via `/mwc` or `/maw`) or explicitly instructed to merge that specific PR (e.g. `/merge-it` or "merge this").
+  Creating, pushing, resolving review threads, or driving a PR to 100% clean CI checks does NOT imply permission to merge it.
+  Merging without explicit permission is an irreversible action and is strictly prohibited. (User correction, 2026-08-04.)
 - If the user says the work belongs on a specific existing branch or on top of a
   specific PR branch, honor that branch/base instruction over auto branch-naming
   hygiene.

@@ -1,6 +1,12 @@
 ---
 name: mwc
-description: Grant standing session-scoped permission to merge fully-clean PRs autonomously, without asking per PR, for the rest of the current session. Use when the user says 'merge when confident', 'mwc', 'merge at will', 'maw', 'you can merge PRs when you're confident', or otherwise grants a forward-looking, session-wide merge exception.
+description: "Grant standing session-scoped permission to merge fully-clean PRs autonomously, without asking per PR, for the rest of the current session. Use when the user says 'merge when confident', 'mwc', 'merge at will', 'maw', 'you can merge PRs when you're confident', or otherwise grants a forward-looking, session-wide merge exception."
+user-invocable: true
+allowed-tools:
+  - Bash
+  - Read
+  - Edit
+  - Write
 ---
 
 # Merge-When-Confident (MWC) Session Grant

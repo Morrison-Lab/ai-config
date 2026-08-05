@@ -19,7 +19,7 @@ ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command)\s+"""
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
-API_WRITE_FLAG = r"(?:-X\s*=?\s*(?:PUT|POST|PATCH)|--method\s*=?\s*(?:PUT|POST|PATCH)|-f\b|-F\b|--field\b|--raw-field\b|--input\b)"
+API_WRITE_FLAG = r"(?i)(?:-X\s*=?\s*(?:PUT|POST|PATCH)|--method\s*=?\s*(?:PUT|POST|PATCH)|-f\b|-F\b|--field\b|--raw-field\b|--input\b)"
 
 MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b" + OPT_FLAGS + r"\s+pr\b" + OPT_FLAGS + r"\s+merge\b", "gh pr merge"),
@@ -31,7 +31,7 @@ MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*/merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
 ]
 
-ALLOW_FLAG = re.compile(r"\bALLOW_MERGE=1\b|(?:^|[\s;&|`()])--allow-merge\b")
+ALLOW_FLAG = re.compile(r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=1\b|(?:^|[\s;&|`()])--allow-merge\b")
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
@@ -41,10 +41,6 @@ def mask_payloads(text: str) -> str:
     Handles escaped quotes inside multiline string literals without consuming command separators.
     Preserves newlines inside multiline string literals so segment alignment remains 1-to-1.
     """
-    # 1. Mask trailing shell comments (# ...)
-    text = re.sub(r"#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
-
-    # 2. Mask values of prose/file-carrying flags strictly (--body, --body-file, --title, --comment, --message, -m, -b)
     flag_pattern = r"(?:--body-file\b|--body\b|--title\b|--comment\b|--message\b|--reason\b|--notes\b|--description\b|-m\b|-b\b)"
     hspace = r"[ \t]*"
 
@@ -54,12 +50,15 @@ def mask_payloads(text: str) -> str:
         masked_val = "".join("\n" if c == "\n" else " " for c in val)
         return flag + masked_val
 
-    # Double-quoted values
+    # 1. Mask quoted string payloads first (so # inside string literals is preserved for flag parsing)
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_flag, text, flags=re.DOTALL)
-    # Single-quoted values
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_flag, text, flags=re.DOTALL)
-    # Unquoted single-token values (e.g. --body-file /tmp/file.txt), ensuring we don't consume flags (-...) or separators
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^;\s&|\n-]+[^;\s&|\n]*)", repl_flag, text)
+
+    # 2. Mask trailing shell comments (# ...) only when preceded by whitespace/separator
+    text = re.sub(r"(?:^|[\s;&|`()])#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
+
+    # 3. Mask unquoted single-token flag values (e.g. --body-file /tmp/file.txt), allowing hyphens inside paths
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^-;\s&|\n][^;\s&|\n]*)", repl_flag, text)
 
     return text
 
@@ -93,6 +92,20 @@ def get_git_common_dir() -> Path:
     repo_dir = os.environ.get("CLAUDE_PROJECT_DIR") or str(Path(__file__).resolve().parents[1])
     try:
         common_dir = subprocess.check_output(
+            ["git", "rev-parse", "--git-common-dir"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            cwd=os.getcwd(),
+        ).strip()
+        common_path = Path(common_dir)
+        if not common_path.is_absolute():
+            common_path = (Path.cwd() / common_path).resolve()
+        return common_path
+    except Exception:
+        pass
+
+    try:
+        common_dir = subprocess.check_output(
             ["git", "-C", repo_dir, "rev-parse", "--git-common-dir"],
             text=True,
             stderr=subprocess.DEVNULL,
@@ -105,7 +118,7 @@ def get_git_common_dir() -> Path:
         pass
 
     pwd_git = Path.cwd() / ".git"
-    if pwd_git.exists():
+    if pwd_git.is_dir():
         return pwd_git.resolve()
     return Path.home() / ".git"
 

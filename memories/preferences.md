@@ -104,7 +104,7 @@
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, request `d-morrison` as reviewer, and report the PR link in the past tense immediately.
 - Keep PRs focused on a single concern:
   never mix CI/workflow infrastructure changes (`.github/workflows/`)
-  with heavy simulation/validation dataset artifacts (e.g. `inst/extdata/*.rds`, `.parquet`, `.RData`)
+  with heavy simulation/validation dataset artifacts (e.g. `inst/extdata/*.rds`, `*.parquet`, `*.RData`)
   or HPC job array updates in the same PR ---
   open dedicated PRs per concern (see [split-concerns](../skills/split-concerns/SKILL.md)).
   If one concern depends on another, stack the PRs using [stack-prs](../skills/stack-prs/SKILL.md).

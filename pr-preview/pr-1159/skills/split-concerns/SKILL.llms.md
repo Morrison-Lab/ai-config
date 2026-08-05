@@ -14,7 +14,7 @@ When a set of changes addresses multiple independent concerns, split them into s
 
 Two changes are independent if: - They could be merged in either order without conflict - They solve different problems / close different issues - A revert of one wouldn’t affect the other - They’d have different reviewers in an ideal world
 
-Examples: - Bug fix + unrelated refactor → split - Feature + the test for that feature → keep together - CI template fix + documentation update for that fix → keep together - CI template fix + unrelated linter config change → split - CI/workflow change + simulation/validation dataset artifacts (`inst/extdata/*.rds`, `.parquet`, `.RData`) or HPC job array updates → split - Dependency update + code that uses the new dependency → keep together
+Examples: - Bug fix + unrelated refactor → split - Feature + the test for that feature → keep together - CI template fix + documentation update for that fix → keep together - CI template fix + unrelated linter config change → split - CI/workflow change (`.github/workflows/`) + heavy simulation/validation dataset artifacts (`inst/extdata/*.rds`, `*.parquet`, `*.RData`) → split - CI/workflow change (`.github/workflows/`) + HPC job array updates → split - Heavy simulation/validation dataset artifacts (`inst/extdata/*.rds`, `*.parquet`, `*.RData`) + HPC job array updates → split - Dependency update + code that uses the new dependency → keep together
 
 ## Process
 

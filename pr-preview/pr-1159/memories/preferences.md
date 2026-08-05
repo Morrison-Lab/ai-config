@@ -104,9 +104,10 @@
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, request `d-morrison` as reviewer, and report the PR link in the past tense immediately.
 - Keep PRs focused on a single concern:
   never mix CI/workflow infrastructure changes (`.github/workflows/`)
-  with heavy simulation/validation dataset artifacts (e.g. `inst/extdata/*.rds`, `.parquet`, `.RData`)
-  or HPC job array updates in the same PR --
-  open dedicated PRs per concern (see [`split-concerns`](../skills/split-concerns/SKILL.md)).
+  with heavy simulation/validation dataset artifacts (e.g. `inst/extdata/*.rds`, `*.parquet`, `*.RData`)
+  or HPC job array updates in the same PR ---
+  open dedicated PRs per concern (see [split-concerns](../skills/split-concerns/SKILL.md)).
+  If one concern depends on another (e.g. CI workflow validation depends on new dataset artifacts), stack the dependent PR on top of the artifact PR using [stack-prs](../skills/stack-prs/SKILL.md).
   (Learned on ucdavis/ums, 2026-08-05.)
 - Always ARDI an open PR/MR to a clean review verdict --- don't ask "want me to ARDI it?" first, just drive it to clean. An ARDI loop is NOT finished when you push fixes for a finding-bearing review or post an ARD summary -- it is only finished when a fresh, clean review evaluating that latest pushed commit arrives and confirms zero findings. (Still don't merge unless asked; "always ardi" means always drive to clean, not always merge.)
 - "Fully clean" (the ARDI/iterate terminal state) means BOTH: (1) all CI workflows AND check runs have finished with a passing outcome (success or skipped) --- across every workflow and every individual check run, not just required checks, not just the review job; includes non-gating checks like Coverage/codecov; never merge while any workflow or check run is still queued or in progress, AND (2) the latest review is totally clean --- no nits, evaluating the current HEAD SHA on the branch, and every item not directly Addressed is either Deferred to a tracked issue or Rebutted with a rebuttal that actually CONVINCED the reviewer (they didn't re-raise it).

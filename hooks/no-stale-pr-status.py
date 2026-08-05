@@ -48,14 +48,20 @@ RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 # A fresh reading. Covers the CLI and the MCP surfaces.
 RX_QUERY = re.compile(
     r"gh\s+pr\s+checks|statusCheckRollup|get_check_runs|"
-    r"gh\s+run\s+view|checkSuites|mergeStateStatus",
+    r"gh\s+run\s+view|checkSuites|mergeStateStatus|"
+    r"check-pr-fully-clean\.py",
+    re.I,
+)
+
+RX_FAIL_QUERY = re.compile(
+    r"❌ PR is NOT fully clean|conclusion.*failure|status.*in_progress|No review comment has been posted",
     re.I,
 )
 
 
 def scan(path):
-    """Return (last_push_idx, last_query_idx, last_assistant_text)."""
-    last_push = last_query = -1
+    """Return (last_push_idx, last_query_idx, last_failing_query_idx, last_assistant_text)."""
+    last_push = last_query = last_failing_query = -1
     text = ""
     i = 0
     with open(path, errors="ignore") as fh:
@@ -68,7 +74,10 @@ def scan(path):
             role = m.get("type")
             blocks = (m.get("message") or {}).get("content") or []
             if not isinstance(blocks, list):
-                continue
+                # Handle direct tool_result content strings in JSONL format
+                blocks = m.get("content") or []
+                if not isinstance(blocks, list):
+                    continue
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -82,17 +91,21 @@ def scan(path):
                         last_push = i
                     if RX_QUERY.search(blob):
                         last_query = i
+                elif b.get("type") in ("tool_result", "user"):
+                    content_text = json.dumps(b.get("content") or b.get("text") or "")
+                    if RX_FAIL_QUERY.search(content_text):
+                        last_failing_query = i
                 elif b.get("type") == "text" and role == "assistant":
                     if b.get("text", "").strip():
                         text = b["text"]
-    return last_push, last_query, text
+    return last_push, last_query, last_failing_query, text
 
 
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
         path = payload.get("transcript_path") or ""
-        last_push, last_query, text = scan(path)
+        last_push, last_query, last_failing_query, text = scan(path)
     except Exception:
         return 0  # fail open
 
@@ -101,6 +114,19 @@ def main() -> int:
     hit = RX_ASSERT.search(text)
     if not hit:
         return 0
+
+    # If the last status query reported a failing or not-clean state, block clean assertions.
+    if last_failing_query > last_query and last_failing_query > last_push:
+        print(json.dumps({
+            "decision": "block",
+            "reason": (
+                f"Your message asserts a PR's clean state -- \"{hit.group(0).strip()}\" -- "
+                "but the most recent status query tool result in this transcript reported a FAILING or IN-PROGRESS check state. "
+                "You cannot declare a PR fully clean when a status query returned failure or in-progress checks."
+            ),
+        }))
+        return 0
+
     # Nothing pushed this session, so no reading can have gone stale.
     if last_push < 0:
         return 0

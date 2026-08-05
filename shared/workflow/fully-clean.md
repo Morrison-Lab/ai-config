@@ -1531,12 +1531,22 @@ allowlist --- rather than in a wait for something to recover.
 
 (Morrison-Lab/ai-config#973, 2026-08-05: `claude-review` failed on heads
 `ed5cd8d` and `cf824cc`.
-Run `30645784194` took `630325ms` and `$5.77`; run `30647021192` took
-`545700ms` and `$4.78` --- a 13% spread on duration and 17% on cost.
+Run `30645784194` **attempt 1** took `630325ms` and `$5.77`; run `30647021192`
+took `545700ms` and `$4.78` --- a 13% spread on duration and 17% on cost.
 Both reported `num_turns: 11`, `is_error: true` with `subtype: "success"`,
 `permission_denials_count: null`, exit 1, and no verdict posted.
+Cite the attempt, per the `run_attempt` section above: that run's attempt 2
+was cancelled after 73s for a higher-priority request, and a bare run id
+resolves to the latest attempt, so an unqualified link lands on a `cancelled`
+state that contradicts everything in this paragraph.
 The PR touched `memories/`, where at that head `debugging.md` was 1115 lines,
 `github.md` 1080, `github-actions.md` 865, and `r-quarto.md` 730.
 A third run was declined on the matching turn count rather than attempted, so
 the determinism is the observation and context exhaustion is the untested
-hypothesis.)
+hypothesis.
+One datum since, from the PR that added this entry: a 62-line diff touching
+only `shared/` drew a `claude-review` that ran `629s` and posted a full
+verdict, at `$7.43`.
+Same duration band, more spend, and it finished --- which rules out a budget
+or wall-clock ceiling and leaves what the diff makes the reviewer read as the
+live candidate.)

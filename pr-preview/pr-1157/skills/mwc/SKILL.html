@@ -335,7 +335,7 @@ ul.task-list li input[type="checkbox"] {
 <h2 class="anchored" data-anchor-id="standing-scope-policy">Standing Scope &amp; Policy</h2>
 <ul>
 <li><strong>Baseline Prohibition</strong>: AI assistants MUST NOT merge PRs/MRs without explicit user instruction for that specific PR. Pushing, building, or driving a PR to 100% clean CI DOES NOT grant permission to merge.</li>
-<li><strong>MWC Override Scope</strong>: When the user explicitly issues <code>/mwc</code>, “merge when confident”, “merge at will”, or “maw”, that baseline prohibition is suspended <strong>for the current session only</strong>.</li>
+<li><strong>MWC Override Scope</strong>: When the user explicitly issues <code>/mwc</code>, “merge when confident”, “merge at will”, or “maw”, that baseline prohibition is suspended for the current session only.</li>
 <li><strong>Scope Limit</strong>: An MWC grant applies ONLY to PRs that are 100% clean (all CI checks passing, review verdict clean, no unresolved comments, no open block labels). It NEVER authorizes merging a PR with failing CI, unresolved findings, or pending reviews.</li>
 <li><strong>Session Duration</strong>: The grant expires automatically when the session ends or when explicitly revoked via <code>/mwc revoke</code> or <code>disable-mwc</code>.</li>
 </ul>

@@ -5,7 +5,7 @@
 ## Standing Scope & Policy
 
 - **Baseline Prohibition**: AI assistants MUST NOT merge PRs/MRs without explicit user instruction for that specific PR. Pushing, building, or driving a PR to 100% clean CI DOES NOT grant permission to merge.
-- **MWC Override Scope**: When the user explicitly issues `/mwc`, “merge when confident”, “merge at will”, or “maw”, that baseline prohibition is suspended **for the current session only**.
+- **MWC Override Scope**: When the user explicitly issues `/mwc`, “merge when confident”, “merge at will”, or “maw”, that baseline prohibition is suspended for the current session only.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean (all CI checks passing, review verdict clean, no unresolved comments, no open block labels). It NEVER authorizes merging a PR with failing CI, unresolved findings, or pending reviews.
 - **Session Duration**: The grant expires automatically when the session ends or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 

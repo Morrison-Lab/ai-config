@@ -1111,35 +1111,75 @@ That is a coincidence rather than corroboration, since the two reviewers hold
 different credentials, and it is the trap worth naming: it arrives as an
 independent source agreeing with you.
 
-The cross-repo test above is what discriminates them, and it discriminates
-three ways rather than two.
-A success elsewhere at the same time rules out the service **and** rules out
-the account's quota, which leaves this repo's own credential.
-So run it before naming a cause, not only before calling a reviewer
-permanently unreachable.
+The cross-repo test above narrows this, and it is worth being exact about how
+far, because the obvious reading claims one step too much.
+A success elsewhere at the same time rules out **the service**.
+It does not rule out the account's quota, and reading it as though it did is
+the same over-reading one level up.
 
-The secret's own timestamp then settles which repo was left behind, in one
-call, and is the cheap general instrument for this class:
+The reason is in this repo's own tooling.
+`scripts/rotate-claude-token.py`'s docstring records that
+`CLAUDE_CODE_OAUTH_TOKEN` is "provisioned one repo at a time, by whichever
+Claude account the local CLI happened to be logged into", that "nothing
+records which account minted a given token, and nothing can", and that "an
+estate provisioned across several sittings ends up a mix of accounts that
+cannot be untangled after the fact".
+[`refresh-claude-token`](../../skills/refresh-claude-token/SKILL.md) says the
+same.
+So two repos' secrets are the same account only when someone has deliberately
+made them so, and after the fact that is unanswerable rather than merely
+unchecked.
+A cross-repo success therefore leaves *two* live explanations --- a different
+account with quota remaining, or the same account and a bad credential here ---
+and only the second is a credential problem.
+
+Note this is the Don't-bullet below about another reviewer's quota refusal,
+arriving in the direction that flatters you.
+There a different vendor's exhaustion is obviously not evidence about yours.
+Here a possibly-different account's health is not evidence about yours either,
+and it is harder to see precisely because both runs are the same reviewer
+reading the same variable name.
+The distinguishing fact is not "same tool" but "same account", which no API
+call can supply.
+
+**The decisive instrument is a before/after on the failing repo alone.**
+Rewrite that repo's secret from a known account, change nothing else, and
+re-run.
+A run that then reaches the model settles it outright, because the credential
+is the only variable that moved --- and it needs no assumption about any other
+repo's account, which is exactly what makes it stronger than the cross-repo
+comparison.
+[`refresh-claude-token`](../../skills/refresh-claude-token/SKILL.md) owns the
+rotation, and is right that no property of the secrets API proves a token will
+authenticate: the proof is the run afterwards, never the write.
+
+The secret's timestamps are a **triage** signal ahead of that, not a verdict,
+and are still the cheap first call for this class:
 
 ```bash
 gh api repos/<owner>/<repo>/actions/secrets \
   --jq '.secrets[] | "\(.name) \(.updated_at)"'
 ```
 
-A working repo and a failing repo whose tokens were last written days apart is
-a rotation that missed one of them.
-[`refresh-claude-token`](../../skills/refresh-claude-token/SKILL.md) owns the
-rotation itself, and is right that no property of the secrets API proves a
-token will authenticate --- the timestamp does not certify the value, it
-localizes the gap once behaviour has already shown one repo failing and
-another working.
+A failing repo whose token was written long before a working repo's is a
+rotation that plausibly missed it, which tells you where to point the
+before/after test.
+It is not itself evidence, since it says nothing about either value or either
+account.
 
-- **Do:** run the cross-repo test before attributing a zero-cost failure to
-  quota, not only before calling the reviewer unreachable.
-- **Do:** compare `updated_at` across the two repos' secrets once a cross-repo
-  success has localized the failure to a credential.
+- **Do:** rewrite the failing repo's secret from a known account and re-run,
+  and treat that before/after as the thing that settles a credential
+  diagnosis.
+- **Do:** run the cross-repo test to establish that the service is up, and
+  stop there.
+- **Do:** use the `updated_at` comparison to choose which repo to test, rather
+  than to conclude anything.
 - **Don't:** read `total_cost_usd: 0` at `num_turns: 1` as evidence of quota
-  --- an expired credential produces the identical object.
+  --- an expired credential produces an object indistinguishable from it on
+  every field the guard reads.
+- **Don't:** read a cross-repo success as ruling out the account's quota; that
+  holds only if both secrets were minted from one account, which after the
+  fact is unanswerable.
 - **Don't:** count another reviewer's quota refusal as corroboration; it is a
   different credential, so its exhaustion says nothing about yours.
 
@@ -1148,17 +1188,25 @@ another working.
 `num_turns: 1`, `total_cost_usd: 0`, `permission_denials_count: 0`.
 GitHub auth was fine, the log reading `App token successfully obtained` and
 `Actor has write access: admin`.
-A push retried it as run `30961183056` (`23:47:46Z -> 23:48:35Z`), with the
-identical signature at `duration_ms: 506`.
+A push retried it as run `30961183056` (`23:47:46Z -> 23:48:35Z`), matching on
+every field the guard reads, at `duration_ms: 506`.
 Morrison-Lab/ai-config's own `claude-review` runs created `23:43:21Z` and
-`23:50:32Z` both succeeded, straddling the wai failure, so neither the service
-nor the account's quota was the cause.
-The secrets endpoint settles it: `CLAUDE_CODE_OAUTH_TOKEN` was last updated
-`2026-07-29T18:31:12Z` on wai against `2026-08-03T01:19:40Z` on ai-config, so
-wai's was stale and ai-config's had been rotated.
-Copilot **was** genuinely quota-limited at the same time, on both repos, and
-said so in words, which is the coincidence that made the quota reading feel
-confirmed.
+`23:50:32Z` both succeeded, straddling the wai failure.
+That was read at the time as ruling out the service **and** the account's
+quota, which is the over-reading this entry is about: the two repos'
+`CLAUDE_CODE_OAUTH_TOKEN` secrets were last written `2026-07-29T18:31:12Z` and
+`2026-08-03T01:19:40Z` respectively, five days apart, so they are exactly the
+"several sittings" case the docstring above says cannot be untangled.
+Whether they were one account was, and remains, unknowable.
+
+What actually settled it was the before/after on wai alone.
+The secret was rewritten at `2026-08-05T00:05:40Z`, and the next
+`claude-review` runs --- `30962961775` and `30962961774` at `00:20:21Z`, then
+`30963459374` at `00:29:50Z` --- all succeeded, with nothing else changed.
+The stale timestamp was the triage signal that said which repo to rewrite; the
+run afterwards is the evidence.
+Copilot **was** genuinely quota-limited throughout, on both repos, and said so
+in words, which is the coincidence that made the quota reading feel confirmed.
 Filed as Morrison-Lab/wai#36, a recurrence of wai#27.)
 
 **A check-run reading `failure` is a fact about one *attempt*, not about the

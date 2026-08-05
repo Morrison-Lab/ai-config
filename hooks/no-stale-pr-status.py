@@ -54,7 +54,7 @@ RX_QUERY = re.compile(
 )
 
 RX_FAIL_QUERY = re.compile(
-    r"\\u274c|❌|\bNOT fully clean\b|contains findings|conclusion.*failure|status.*in_progress|No review comment has been posted",
+    r"\\u274c|\u274c|\bNOT fully clean\b|contains findings|conclusion.*failure|status.*in_progress|No review comment has been posted",
     re.I,
 )
 
@@ -73,12 +73,11 @@ def scan(path):
             except Exception:
                 continue
             role = m.get("type")
-            blocks = (m.get("message") or {}).get("content") or []
-            if not isinstance(blocks, list):
-                # Handle direct tool_result content strings in JSONL format
+            blocks = (m.get("message") or {}).get("content")
+            if blocks is None:
                 blocks = m.get("content") or []
-                if not isinstance(blocks, list):
-                    continue
+            if not isinstance(blocks, list):
+                continue
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -100,7 +99,7 @@ def scan(path):
                             query_tool_use_ids.add(tool_id)
                 elif b.get("type") == "tool_result":
                     tool_id = b.get("tool_use_id") or b.get("id") or ""
-                    if not query_tool_use_ids or tool_id in query_tool_use_ids:
+                    if query_tool_use_ids and tool_id in query_tool_use_ids:
                         content_text = json.dumps(b.get("content") or b.get("text") or "")
                         if RX_FAIL_QUERY.search(content_text):
                             last_failing_query = i

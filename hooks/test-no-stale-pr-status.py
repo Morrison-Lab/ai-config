@@ -38,12 +38,12 @@ def say(text):
 CHECK_CLEAN_QUERY = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "t1", "name": "run_command", "input": {"command": "python3 scripts/check-pr-fully-clean.py 1167"}}]}}
 CHECK_CLEAN_FAIL_RESULT = {"type": "user", "message": {"content": [
-    {"type": "tool_result", "tool_use_id": "t1", "content": "❌ PR is NOT fully clean:\n  - Check run 'validate' is still in status 'in_progress'"}]}}
+    {"type": "tool_result", "tool_use_id": "t1", "content": "\u274c PR is NOT fully clean:\n  - Check run 'validate' is still in status 'in_progress'"}]}}
 
 READ_FILE_QUERY = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "id": "t2", "name": "view_file", "input": {"AbsolutePath": "/path/to/scripts/check-pr-fully-clean.py"}}]}}
 READ_FILE_RESULT = {"type": "user", "message": {"content": [
-    {"type": "tool_result", "tool_use_id": "t2", "content": "print('❌ PR is NOT fully clean:')"}]}}
+    {"type": "tool_result", "tool_use_id": "t2", "content": "print('\u274c PR is NOT fully clean:')"}]}}
 
 # (events, should_block, label)
 CASES = [

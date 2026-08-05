@@ -38,12 +38,12 @@ def main() -> int:
 
     clean_comment = {
         "createdAt": "2026-08-05T18:14:14Z",
-        "body": "### 🤖 Antigravity Agent Report (Code-Review)\n\nEverything looks great! No issues found.\n\nVerdict: Clean / Ready for merge."
+        "body": "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\nEverything looks great! No issues found.\n\nVerdict: Clean / Ready for merge."
     }
 
     findings_comment = {
         "createdAt": "2026-08-05T18:14:37Z",
-        "body": "### 🤖 Antigravity Agent Report (Code-Review)\n\n## Actionable Findings\n\n### 1. Link Syntax Error\n**Location:** memories/tools.md:L843"
+        "body": "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n## Actionable Findings\n\n### 1. Link Syntax Error\n**Location:** memories/tools.md:L843"
     }
 
     formal_changes_requested_review = {

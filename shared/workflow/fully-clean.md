@@ -640,3 +640,58 @@ and then failed
 `d-morrison/qwt` run 30391041128 (28s) reached the model and returned
 `is_error:true` after a workflow-modification denial.
 Only the first was about permissions at all.)
+
+**A fourth shape inverts the duration signature entirely: the run that fails
+*expensively*, at the same point every time.**
+The three shapes above all die early, and every remedy they offer assumes it
+--- the retry, the cross-repo credential probe, the terminal-error read all
+start from a job that stopped before it did any work.
+This one reaches the model, works for minutes, spends real money, and then
+returns `is_error: true` with no verdict posted.
+None of the earlier discriminators fit it, and two of them mislead: a
+credential probe is pointless against a run that just billed five dollars,
+and `permission_denials_count` is empty because nothing was denied.
+
+Retrying does not separate transient from permanent here either, but for the
+opposite reason to the third shape.
+There the retries were cheap and uninformative; here each one costs the full
+price of a review and returns the same nothing.
+So the question is not whether to retry once more --- it is how to tell, after
+two failures, that a third is already paid for and wasted.
+
+**`num_turns` is the discriminator, and it is sharp precisely where cost and
+duration are not.**
+Those two vary run to run, because the model's own output length varies.
+The turn count does not: it is the shape of the work.
+Identical `num_turns` on two **independent heads** --- different commits,
+different diffs, a fresh run each time --- means the job is walking the same
+path to the same wall, so nothing a further commit changes will move it.
+That is a deterministic failure wearing an infrastructure failure's clothes.
+
+Treat it as a property of the *task* rather than of the runner, and look at
+what the diff makes the reviewer read.
+A PR touching a directory whose sibling files are very large can exhaust the
+reviewer's context during its reading phase, every time, before a verdict
+exists to post --- which will recur on every future PR of that shape.
+That is an issue to file against the reviewer's configuration, naming the
+diff shape that triggers it, not a wait for a service to recover.
+
+- **Do:** compare `num_turns` across the failed runs before paying for
+  another attempt.
+- **Do:** file it against the reviewer's own setup once two independent heads
+  fail identically, and name the diff shape that reproduces it.
+- **Don't:** run the cross-repo credential probe against a failure that spent
+  real money --- the spend already proved the credential works.
+- **Don't:** read varying cost and duration as evidence of transience when
+  the turn count is fixed.
+
+(Morrison-Lab/ai-config#973, 2026-08-05: `claude-review` failed twice, on
+heads `ed5cd8d` and `cf824cc`.
+Run 30645784194 took 630325ms and $5.77; run 30647021192 took 545700ms and
+$4.78 --- a 13% spread on duration and 17% on cost.
+Both reported `num_turns: 11`, `is_error: true` with `subtype: success`,
+`permission_denials_count: null`, exit 1, and no verdict.
+The PR touched `memories/`, whose neighbouring files run past a thousand
+lines apiece.
+A third run was declined on the strength of the matching turn count rather
+than attempted.)

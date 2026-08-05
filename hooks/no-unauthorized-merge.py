@@ -14,9 +14,9 @@ import sys
 import time
 from pathlib import Path
 
-LEAD = r"""(?:^|[\s;&|`()]|(?:\$\())"""
+LEAD = r"""(?:^|[\s;&|`()\"']|(?:\$\())"""
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
-EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command)\s+"""
+EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)\s+"""
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
 HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
@@ -27,6 +27,8 @@ MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b" + OPT_FLAGS + r"\s+mr\b" + OPT_FLAGS + r"\s+merge\b", "glab mr merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*/pulls/[^\n]+/merge\b", "gh api PR merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*/pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*/repos/[^\n]+/merges\b", "gh api repository merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*/repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*/merge_requests/[^\n]+/merge\b", "glab api MR merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*/merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
@@ -37,12 +39,12 @@ SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
 def mask_payloads(text: str) -> str:
-    """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files)
+    """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files, API payload fields)
     so trigger patterns inside prose or file paths do not cause false positives or allow-flag bypasses.
     Handles escaped quotes inside multiline string literals without consuming command separators.
     Preserves newlines inside multiline string literals so segment alignment remains 1-to-1.
     """
-    flag_pattern = r"(?:--body-file\b|--body\b|--title\b|--comment\b|--message\b|--reason\b|--notes\b|--description\b|-m\b|-b\b)"
+    flag_pattern = r"(?:--body-file\b|--body\b|--title\b|--comment\b|--message\b|--reason\b|--notes\b|--description\b|-m\b|-b\b|-d\b|(?:-f|-F|--field|--raw-field|--input)\s+(?:body|title|comment|message|reason|notes|description)\b)"
     hspace = r"[ \t]*"
 
     def repl_flag(m):
@@ -81,7 +83,7 @@ def is_session_alive(sess_file: Path) -> bool:
                 os.kill(int(pid), 0)
                 return True
             except OSError:
-                return False  # PID is dead on local host
+                pass  # Subshell PID may have exited; fall through to heartbeat timestamp check
         hb = int(sess_data.get("heartbeat") or sess_data.get("started") or 0)
         return (time.time() - hb) < 1800
     except Exception:

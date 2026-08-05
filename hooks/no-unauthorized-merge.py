@@ -81,7 +81,7 @@ def is_session_alive(sess_file: Path) -> bool:
                 os.kill(int(pid), 0)
                 return True
             except OSError:
-                pass  # PID terminated; fall through to heartbeat check
+                return False  # PID is dead on local host
         hb = int(sess_data.get("heartbeat") or sess_data.get("started") or 0)
         return (time.time() - hb) < 1800
     except Exception:
@@ -90,13 +90,17 @@ def is_session_alive(sess_file: Path) -> bool:
 
 
 def get_git_common_dir() -> Path:
+    repo_dir = os.environ.get("CLAUDE_PROJECT_DIR") or str(Path(__file__).resolve().parents[1])
     try:
         common_dir = subprocess.check_output(
-            ["git", "rev-parse", "--git-common-dir"],
+            ["git", "-C", repo_dir, "rev-parse", "--git-common-dir"],
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-        return Path(common_dir).resolve()
+        common_path = Path(common_dir)
+        if not common_path.is_absolute():
+            common_path = (Path(repo_dir) / common_path).resolve()
+        return common_path
     except Exception:
         pass
 
@@ -136,11 +140,14 @@ def offending(command: str):
 
     mwc_active = check_mwc_active()
 
-    # 3. Synchronously iterate through command segments
-    norm_segments = SPLIT.split(norm_command)
-    masked_segments = SPLIT.split(masked_command)
+    # 3. Use finditer on masked_command to derive exact character slice offsets for norm_command
+    matches = list(SPLIT.finditer(masked_command))
+    starts = [0] + [m.end() for m in matches]
+    ends = [m.start() for m in matches] + [len(masked_command)]
 
-    for orig_seg, masked_seg in zip(norm_segments, masked_segments):
+    for start, end in zip(starts, ends):
+        masked_seg = masked_command[start:end]
+        orig_seg = norm_command[start:end]
         if ALLOW_FLAG.search(masked_seg) or mwc_active:
             continue
         for pattern, label in MERGE_PATTERNS:

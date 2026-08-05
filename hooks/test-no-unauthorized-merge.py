@@ -21,6 +21,8 @@ BLOCK = [
     ('(gh pr merge 411)', "parenthesized subshell gh pr merge"),
     ('gh pr comment 123 --body "hi"\ngh pr merge 999', "multiline script: comment on line 1, merge on line 2"),
     ('gh pr comment 123 --body "Line 1\nLine 2\nLine 3"\ngh pr merge 999', "multiline comment body with multiple newlines before merge command"),
+    ('gh pr comment 123 --body "updating status && checking CI"; gh pr merge 411 --squash', "multiline body with && followed by merge command"),
+    ('gh pr comment 123 --body "foo; bar"; gh pr merge 411', "body with semicolon followed by merge command"),
     ('gh pr comment 123 --body "hi";gh pr merge 999', "semicolon without trailing space before merge command"),
     ("gh -R owner/repo pr merge 411 --squash", "gh pr merge with -R flag before subcommands"),
     ('gh -R "owner name/repo" pr merge 411', "gh pr merge with quoted repo containing spaces"),

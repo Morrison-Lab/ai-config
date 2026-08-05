@@ -35,6 +35,9 @@ Examples:
 - Feature + the test for that feature → keep together
 - CI template fix + documentation update for that fix → keep together
 - CI template fix + unrelated linter config change → split
+- CI/workflow change (`.github/workflows/`) + heavy simulation/validation dataset artifacts (`inst/extdata/*.rds`, `*.parquet`, `*.RData`) → split
+- CI/workflow change (`.github/workflows/`) + HPC job array updates → split
+- Heavy simulation/validation dataset artifacts (`inst/extdata/*.rds`, `*.parquet`, `*.RData`) + HPC job array updates → split
 - Dependency update + code that uses the new dependency → keep together
 
 ## Process

@@ -33,7 +33,7 @@ SPLIT = re.compile(r"&&|\|\||;|\||\n")
 def mask_payloads(text: str) -> str:
     """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files)
     so trigger patterns inside prose or file paths do not cause false positives or allow-flag bypasses.
-    Handles escaped quotes inside string literals and unquoted file/field values.
+    Handles escaped quotes inside string literals, multiline strings (re.DOTALL), and unquoted file/field values.
     """
     # 1. Mask trailing shell comments (# ...)
     text = re.sub(r"#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
@@ -46,8 +46,8 @@ def mask_payloads(text: str) -> str:
         val = m.group(2)
         return flag + (" " * len(val))
 
-    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\"(?:\\.|[^\"])*\")", repl_flag, text)
-    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\'(?:\\.|[^\'])*\')", repl_flag, text)
+    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\"(?:\\.|[^\"])*\")", repl_flag, text, flags=re.DOTALL)
+    text = re.sub(rf"({flag_pattern}\s+=?\s*)(\'(?:\\.|[^\'])*\')", repl_flag, text, flags=re.DOTALL)
     text = re.sub(rf"({flag_pattern}\s+=?\s*)(\S+)", repl_flag, text)
 
     return text
@@ -118,14 +118,23 @@ def check_mwc_active() -> bool:
 
 
 def offending(command: str):
+    # 1. Normalize bash backslash-newline line continuations
+    norm_command = re.sub(r"\\\n", " ", command)
+    # 2. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
+    masked_command = mask_payloads(norm_command)
+
     mwc_active = check_mwc_active()
-    for segment in SPLIT.split(command):
-        masked_segment = mask_payloads(segment)
-        if ALLOW_FLAG.search(masked_segment) or mwc_active:
+
+    # 3. Synchronously iterate through command segments
+    norm_segments = SPLIT.split(norm_command)
+    masked_segments = SPLIT.split(masked_command)
+
+    for orig_seg, masked_seg in zip(norm_segments, masked_segments):
+        if ALLOW_FLAG.search(masked_seg) or mwc_active:
             continue
         for pattern, label in MERGE_PATTERNS:
-            if re.search(pattern, masked_segment):
-                return label, segment.strip()
+            if re.search(pattern, masked_seg):
+                return label, orig_seg.strip()
     return None
 
 

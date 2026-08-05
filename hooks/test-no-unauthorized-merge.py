@@ -17,6 +17,7 @@ if not os.path.isfile(HOOK):
 
 BLOCK = [
     ("gh pr merge 411 --squash", "bare gh pr merge"),
+    ("gh pr \\\n merge 411 --squash", "backslash-newline line continuation gh pr merge"),
     ("(gh pr merge 411)", "parenthesized subshell gh pr merge"),
     ("gh -R owner/repo pr merge 411 --squash", "gh pr merge with -R flag before subcommands"),
     ("gh pr -R owner/repo merge 411 --squash", "gh pr merge with -R flag between pr and merge"),
@@ -49,6 +50,7 @@ ALLOW = [
     ("gh search prs --label merge", "searching PRs with label merge"),
     ("gh pr comment 123 --body-file /tmp/merge_notes.txt", "commenting with body-file path containing merge"),
     ('gh pr comment 123 --body "He said \\"gh pr merge\\""', "comment with escaped quotes around trigger text"),
+    ("gh pr comment 1157 --body \"This hook blocks unauthorized\ngh pr merge attempts.\"", "multiline body string containing trigger text across newlines"),
     ("gh pr comment 411 --body 'gh pr merge failed'", "quoted string containing trigger text"),
     ("gh pr comment 411 --body 'ALLOW_MERGE=1 in comment body'", "ALLOW_MERGE inside string argument"),
     ("ALLOW_MERGE=1 gh pr merge 411 --squash", "explicit ALLOW_MERGE=1 env flag"),

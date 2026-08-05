@@ -2,8 +2,8 @@
 """PreToolUse guard: mechanistically prohibit PR/MR merge commands.
 
 Prohibits commands attempting to merge PRs/MRs (e.g. `gh pr merge`, `glab mr merge`,
-`gh api .../merge`, `glab api .../merge`, or GraphQL `mergePullRequest`) unless
-explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
+`gh api .../merge`, `glab api .../merge`, or GraphQL `mergePullRequest` / `enablePullRequestAutoMerge`)
+unless explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
 """
 import json
 import os
@@ -16,13 +16,14 @@ from pathlib import Path
 LEAD = r"""(?:^|[\s;&|`()]|(?:\$\())"""
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command)\s+"""
-OPT_FLAGS = r"(?:\s+-[A-Za-z0-9_-]+(?:[=\s][^\s;&|`()]+)?)*"
+OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+)"""
+OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
 
 MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b" + OPT_FLAGS + r"\s+pr\b" + OPT_FLAGS + r"\s+merge\b", "gh pr merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b" + OPT_FLAGS + r"\s+mr\b" + OPT_FLAGS + r"\s+merge\b", "glab mr merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*/pulls/[^\n]+/merge\b", "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*mergePullRequest", "gh api GraphQL PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b(?:\s+[^\n]+)?\s+api\b[^\n]*/merge_requests/[^\n]+/merge\b", "glab api MR merge"),
 ]
 
@@ -38,8 +39,8 @@ def mask_payloads(text: str) -> str:
     # 1. Mask trailing shell comments (# ...)
     text = re.sub(r"#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
 
-    # 2. Mask values of prose/file-carrying flags (--body, --body-file, --title, --comment, --message, -m, -b, -F, -f, --raw-field, --field, etc.)
-    flag_pattern = r"(?:--body-file|--body|--title|--comment|--message|--reason|--notes|--description|-m|-b|-F|-f|--raw-field|--field|--template|--search)"
+    # 2. Mask values of prose/file-carrying flags strictly (--body, --body-file, --title, --comment, --message, -m, -b)
+    flag_pattern = r"(?:--body-file|--body|--title|--comment|--message|--reason|--notes|--description|-m|-b)"
     hspace = r"[ \t]*"
 
     def repl_flag(m):
@@ -71,8 +72,8 @@ def is_session_alive(sess_file: Path) -> bool:
                 os.kill(int(pid), 0)
                 return True
             except OSError:
-                return False
-        hb = int(sess_data.get("heartbeat", 0))
+                pass  # PID terminated; fall through to heartbeat check
+        hb = int(sess_data.get("heartbeat") or sess_data.get("started") or 0)
         return (time.time() - hb) < 1800
     except Exception:
         pass

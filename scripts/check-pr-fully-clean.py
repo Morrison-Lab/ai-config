@@ -106,6 +106,7 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str) -> Tuple[bool
     for item in all_items:
         created_at_dt = parse_iso_time(item[1])
         body = item[2]
+        body_lower = body.lower()
         oid = item[3]
         state = item[4]
 

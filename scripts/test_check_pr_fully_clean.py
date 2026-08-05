@@ -4,7 +4,8 @@
 Tests:
 1. CI check run status filtering (completed with success/neutral/skipped vs in_progress/failure).
 2. Review comment parsing (clean verdict vs finding pattern matching).
-3. Chronological sorting and body marker filtering.
+3. Formal GitHub review parsing with empty top-level comments (state: CHANGES_REQUESTED vs APPROVED/COMMENTED).
+4. Chronological sorting and body marker filtering.
 """
 import importlib.util
 import json
@@ -45,6 +46,13 @@ def main() -> int:
         "body": "### 🤖 Antigravity Agent Report (Code-Review)\n\n## Actionable Findings\n\n### 1. Link Syntax Error\n**Location:** memories/tools.md:L843"
     }
 
+    formal_changes_requested_review = {
+        "submittedAt": "2026-08-05T18:20:00Z",
+        "body": "",
+        "state": "CHANGES_REQUESTED",
+        "commit": {"oid": "sha123"}
+    }
+
     # Test 1: Clean review comment returns True
     mock_clean_data = json.dumps({"comments": [clean_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_clean_data):
@@ -57,7 +65,13 @@ def main() -> int:
         findings_ok, findings_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
         check("findings review comment fails check_review_comments", not findings_ok and len(findings_issues) > 0)
 
-    # Test 3: CI check runs filtering
+    # Test 3: Formal review with empty comments list and CHANGES_REQUESTED state fails
+    mock_formal_review_data = json.dumps({"comments": [], "reviews": [formal_changes_requested_review]})
+    with patch.object(checker, "run_cmd", return_value=mock_formal_review_data):
+        formal_ok, formal_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        check("formal CHANGES_REQUESTED review with empty comments fails check_review_comments", not formal_ok and len(formal_issues) > 0)
+
+    # Test 4: CI check runs filtering
     mock_ci_success = json.dumps({
         "check_runs": [
             {"name": "build", "status": "completed", "conclusion": "success"},

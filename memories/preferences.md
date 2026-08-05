@@ -869,3 +869,7 @@ safer/preferred choice merely because the repo has external consumers.
 - **Never present losing a lesson as an available option.** Offering "capture these first, or archive now and they're lost with the context" frames data loss as a legitimate branch and invites the user to pick it.
   It is not a choice to put in front of them; capture first, then report.
   The same applies to any wrap-up point where context is about to end: `/clear`, archiving a session, handing off, or a container being reclaimed. (2026-07-31: offered exactly that framing at the end of a session; the owner's reply was "never risk letting work or lessons get lost.")
+
+## AI code review prompt instructions
+- **Suppress asymptotic noise and legacy runtime nitpicks in AI code review prompts.** When building prompts for automated AI code reviewers, explicitly instruct the model to assume modern target runtimes (e.g., Python 3.10+) and suppress hyper-pedantic runtime compatibility warnings (e.g. PEP 604 `A | B` union syntax or `list[T]` generics for EOL Python 3.8/3.9) unless explicit legacy runtime support is declared in the repository. (Learned on gha#412, 2026-08-05.)
+- **Always verify relative dates against current time.** When discussing End-of-Life (EOL) or deprecation milestones, verify the current date first (e.g. 2026) so past dates (like October 2025) are correctly identified as elapsed past events rather than future occurrences.

@@ -63,6 +63,10 @@ BLOCK = [
     ('gh pr comment 999 --body "Log: $(gh pr merge 123 --squash)"', "dollar-subshell command substitution inside double-quoted payload"),
     ('gh pr comment 999 --body $(gh pr merge 123 --squash)', "dollar-subshell command substitution inside unquoted payload"),
     ('gh pr comment 999 --body `gh pr merge 123 --squash`', "backtick command substitution inside unquoted payload"),
+    ('echo "note #" ; gh pr merge 999', "double-quoted string with hash followed by semicolon and merge command"),
+    ("echo 'note #' ; gh pr merge 999", "single-quoted string with hash followed by semicolon and merge command"),
+    ('echo "closes #1156, needs review" ; gh pr merge 1157 --squash', "double-quoted issue reference with hash followed by semicolon and merge command"),
+    ('echo "closes #1156, needs review" && gh pr merge 1157 --squash', "double-quoted issue reference with hash followed by double-ampersand and merge command"),
 ]
 
 ALLOW = [

@@ -41,6 +41,44 @@ ALLOW_FLAG = re.compile(
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
+def mask_trailing_comments(text: str) -> str:
+    """Mask trailing shell comments (# ...) with spaces while respecting quote context.
+
+    In Bash, '#' inside quotes ('...' or "...") is a literal character, not a comment boundary.
+    This function tokenizes quote state line-by-line to ensure '#' inside quoted strings is NOT
+    mistaken for a shell comment, preventing quote-enclosed '#...' strings from swallowing
+    subsequent statement separators or merge commands.
+    """
+    lines = text.split("\n")
+    masked_lines = []
+    for line in lines:
+        in_single = False
+        in_double = False
+        escaped = False
+        comment_start = -1
+        for i, c in enumerate(line):
+            if escaped:
+                escaped = False
+                continue
+            if c == "\\" and not in_single:
+                escaped = True
+                continue
+            if c == "'" and not in_double:
+                in_single = not in_single
+                continue
+            if c == '"' and not in_single:
+                in_double = not in_double
+                continue
+            if c == "#" and not in_single and not in_double:
+                if i == 0 or line[i - 1] in " \t;&|`()":
+                    comment_start = i
+                    break
+        if comment_start != -1:
+            line = line[:comment_start] + " " * (len(line) - comment_start)
+        masked_lines.append(line)
+    return "\n".join(masked_lines)
+
+
 def mask_payloads(text: str) -> str:
     """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files, API payload fields)
     so trigger patterns inside prose or file paths do not cause false positives or allow-flag bypasses.
@@ -80,8 +118,8 @@ def mask_payloads(text: str) -> str:
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_double, text, flags=re.DOTALL)
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_single, text, flags=re.DOTALL)
 
-    # 2. Mask trailing shell comments (# ...) only when preceded by whitespace/separator
-    text = re.sub(r"(?:^|[\s;&|`()])#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
+    # 2. Mask trailing shell comments (# ...) only when preceded by whitespace/separator outside quotes
+    text = mask_trailing_comments(text)
 
     # 3. Mask unquoted single-token flag values (e.g. --body-file /tmp/file.txt), allowing hyphens inside paths
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^-;\s&|\n][^;\s&|\n]*)", repl_unquoted, text)

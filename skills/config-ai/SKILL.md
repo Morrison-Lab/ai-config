@@ -54,7 +54,7 @@ duplicate their build steps.
 | An automated action the harness itself must trigger on an event Claude doesn't control the timing of (session start, before/after a tool call, on stop) | Hook | `ai-config` `.claude/settings.json` (project-level; a user-level hook goes in `~/.claude/settings.json` instead, which is not synced from this repo) | the harness's built-in `update-config` skill (not part of this repo's `skills/` tree) |
 | Reusable text shared verbatim across multiple skills or docs — not itself a rule | Shared prompt fragment | `ai-config` `shared/<category>/<name>.md`, referenced with `@shared/...` | no builder skill owns this; follow the existing `shared/` layout (`coding/`, `vendored/`, `workflow/`, `writing/`) and wire the `@shared/...` reference into `CLAUDE.md` and/or the skill(s) that need it |
 | A capability *other repos'* CI should be able to call — a composite action a workflow step runs, or a `workflow_call` reusable workflow consumers pin to `@v1` | GitHub Action | `gha` repo root composite + `.github/workflows/<name>.yml` wrapper + `examples/<name>.yml` | follow `gha`'s own `CLAUDE.md` "Layout" section: composite (+ helper script if R/Python) → wrapper → example stub → `README.md`/`website/` doc sync (see its "new `workflow_call` input" doc-sync-site list) |
-| A change to how the `@claude` bot itself behaves when invoked on a PR/issue — not what it can do for consumers, how *it* runs | Bot CI workflow | `gha` `.github/workflows/claude.yml` or `claude-code-review.yml` | `claude-agent-workflow` (agent/action workflow) or `claude-review-workflow` (PR review workflow) |
+| A change to how the `@claude` or `@agy` bot itself behaves when invoked on a PR/issue — not what it can do for consumers, how *it* runs | Bot CI workflow | `gha` `.github/workflows/claude.yml`, `claude-code-review.yml`, `antigravity-review.yml`, or `antigravity-code-review.yml` | `claude-agent-workflow` (agent workflow), `claude-review-workflow` (Claude PR review), or `agy-review-workflow` (Antigravity PR review) |
 
 If more than one row plausibly fits (common: "always check X before Y" could
 be a memory *or* a hook), prefer the **least mechanism**: memory over hook (a
@@ -171,9 +171,9 @@ to lack push access to the target repo — one of these three always applies.
   repo isn't `ai-config` but the session still has API/branch access to it —
   narrower than this skill's Step 3, which also covers the case where even
   that access is missing.
-- **`claude-agent-workflow`**, **`claude-review-workflow`** — own the
-  bot-CI-tuning row; both already document the load-bearing patterns in
-  `claude.yml`/`claude-code-review.yml` this skill doesn't repeat.
+- **`claude-agent-workflow`**, **`claude-review-workflow`**, **`agy-review-workflow`** — own the
+  bot-CI-tuning row; all document the load-bearing patterns in their respective
+  workflows (`claude.yml`, `claude-code-review.yml`, `antigravity-review.yml`) this skill doesn't repeat.
 - **`upstream-issues`** (`shared/workflow/upstream-issues.md`) — the general
   escalation pattern (PR → issue on target → issue on own repo, ask for
   transfer) this skill's Step 3 specializes for the `ai-config`/`gha` case,

@@ -397,12 +397,15 @@ case "$CMD" in
     id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
     f="$REG_DIR/$(sanitize "$id").mwc"
     s_file="$(session_file "$id")"
-    if [ -f "$f" ] && [ -f "$s_file" ]; then
-      load_session "$s_file"
-      if ! is_stale; then
-        printf 'mwc is active for session %s\n' "$id"
-        exit 0
+    if [ -f "$f" ]; then
+      if [ -f "$s_file" ]; then
+        load_session "$s_file"
+        if ! is_stale; then
+          printf 'mwc is active for session %s\n' "$id"
+          exit 0
+        fi
       fi
+      rm -f "$f"
     fi
     printf 'mwc is not active for session %s\n' "$id"
     exit 1

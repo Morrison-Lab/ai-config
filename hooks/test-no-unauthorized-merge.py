@@ -67,6 +67,8 @@ ALLOW = [
     ("gh pr comment 411 --body 'gh pr merge failed'", "quoted string containing trigger text"),
     ("gh pr comment 411 --body 'ALLOW_MERGE=1 in comment body'", "ALLOW_MERGE inside string argument"),
     ("ALLOW_MERGE=1 gh pr merge 411 --squash", "explicit ALLOW_MERGE=1 env flag"),
+    ('ALLOW_MERGE="1" gh pr merge 411 --squash', "explicit ALLOW_MERGE=\"1\" env flag with double quotes"),
+    ("ALLOW_MERGE='1' gh pr merge 411 --squash", "explicit ALLOW_MERGE='1' env flag with single quotes"),
     ("echo ALLOW_MERGE=1 && gh pr view 411", "ALLOW_MERGE in benign command"),
 ]
 

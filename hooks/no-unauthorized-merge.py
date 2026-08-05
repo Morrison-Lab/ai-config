@@ -32,7 +32,7 @@ MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*/merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
 ]
 
-ALLOW_FLAG = re.compile(r"^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=1\b|(?:^|[\s;&|`()])--allow-merge\b")
+ALLOW_FLAG = re.compile(r"(?:^|[\s;&|`\n])\s*(?:export\s+)?ALLOW_MERGE=(?:\"1\"|'1'|1\b)|(?:^|[\s;&|`\n])--allow-merge\b")
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
@@ -89,8 +89,8 @@ def is_session_alive(sess_file: Path) -> bool:
     return False
 
 
-def get_git_common_dir() -> Path:
-    repo_dir = os.environ.get("CLAUDE_PROJECT_DIR") or str(Path(__file__).resolve().parents[1])
+def get_git_common_dirs() -> list[Path]:
+    dirs = []
     try:
         common_dir = subprocess.check_output(
             ["git", "rev-parse", "--git-common-dir"],
@@ -101,10 +101,11 @@ def get_git_common_dir() -> Path:
         common_path = Path(common_dir)
         if not common_path.is_absolute():
             common_path = (Path.cwd() / common_path).resolve()
-        return common_path
+        dirs.append(common_path)
     except Exception:
         pass
 
+    repo_dir = os.environ.get("CLAUDE_PROJECT_DIR") or str(Path(__file__).resolve().parents[1])
     try:
         common_dir = subprocess.check_output(
             ["git", "-C", repo_dir, "rev-parse", "--git-common-dir"],
@@ -114,14 +115,20 @@ def get_git_common_dir() -> Path:
         common_path = Path(common_dir)
         if not common_path.is_absolute():
             common_path = (Path(repo_dir) / common_path).resolve()
-        return common_path
+        if common_path not in dirs:
+            dirs.append(common_path)
     except Exception:
         pass
 
     pwd_git = Path.cwd() / ".git"
-    if pwd_git.is_dir():
-        return pwd_git.resolve()
-    return Path.home() / ".git"
+    if pwd_git.is_dir() and pwd_git.resolve() not in dirs:
+        dirs.append(pwd_git.resolve())
+
+    home_git = Path.home() / ".git"
+    if home_git not in dirs:
+        dirs.append(home_git)
+
+    return dirs
 
 
 def check_mwc_active() -> bool:
@@ -130,17 +137,16 @@ def check_mwc_active() -> bool:
         if not current_session:
             return False
 
-        common_dir = get_git_common_dir()
-        reg_dir = common_dir / "ai-sessions"
-        if not reg_dir.exists():
-            return False
-
         sanitized_session = sanitize(current_session)
-        mwc_file = reg_dir / f"{sanitized_session}.mwc"
-        if mwc_file.exists():
-            sess_file = reg_dir / f"{sanitized_session}.session"
-            if sess_file.exists() and is_session_alive(sess_file):
-                return True
+        for common_dir in get_git_common_dirs():
+            reg_dir = common_dir / "ai-sessions"
+            if not reg_dir.exists():
+                continue
+            mwc_file = reg_dir / f"{sanitized_session}.mwc"
+            if mwc_file.exists():
+                sess_file = reg_dir / f"{sanitized_session}.session"
+                if sess_file.exists() and is_session_alive(sess_file):
+                    return True
     except Exception:
         pass
     return False

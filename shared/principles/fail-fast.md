@@ -629,8 +629,8 @@ The remedy is cheap because that comment has already done the hard part.
 A stated reason for removing some members is a **predicate**, so run it over
 the members that remain.
 The reason is the strongest evidence available that the survivors are defective,
-since it was derived from the same hazard they sit in; it just has to be applied
-rather than read.
+since it was derived from the same hazard they sit in.
+It just has to be applied rather than read.
 That turns a prose rationale into a check, per
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md), and it is the
 step to take at the moment you write the comment, not at review.

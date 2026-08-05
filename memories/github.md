@@ -171,7 +171,8 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
   Nothing warns you.
   On a repo where you have write access the `PATCH` returns success, and success is exactly what an overwrite looks like.
-  The review-comment REST surface exposes no edit-history read either, so a restore cannot be diffed against the original; the only durable trace is that `updated_at` stops matching `created_at`, and the comments render as edited from then on.
+  The review-comment REST surface exposes no edit-history read either, so a restore cannot be diffed against the original.
+  The only durable trace is that `updated_at` stops matching `created_at`, and the comments render as edited from then on.
 
   The transferable shape is not about `gh`.
   A comment id addresses an artifact belonging to someone else, so a verb that writes *to* that id writes over their work rather than adding alongside it.

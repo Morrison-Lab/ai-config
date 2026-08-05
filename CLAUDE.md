@@ -453,6 +453,12 @@ I maintain a family of slash skills for managing the task queue and amending req
 When I write one of these keywords **without the leading slash** as a directive — e.g. "also fix the test", "remember that ...", "always link PRs in tables", "and bold it", "next, run the spellcheck", "first, revert that" — interpret it using the corresponding skill's semantics rather than as ordinary prose. (`/remember` and `/always` both route to the `memorize` skill; "cascade" means merge stacked PRs' base branches into the PRs stacked on top of them — including main into unstacked PRs — never the PRs into main; see the `cascade` skill.)
 When the word is genuinely just part of a sentence (ambiguous), fall back to the plain reading.
 
+The same bare-keyword reading applies to the **judgment-grant** keywords, which are not queue commands and differ from each other in scope.
+`daytb` ("do as you think best", and its longhand `do-as-you-think-best`) hands back **one** decision: choose what you would have recommended, act, and report the choice in the past tense -- it expires with that task.
+`away` is the session-scoped version, presuming I am not there to answer at all, and `back` revokes it.
+`mwc` is the separate grant covering merge authority, which none of the others extend to.
+Read a bare "do as you think best" as `daytb`, not as `away` -- the session-wide reading suspends clarifying questions long after I expected them back.
+
 ## Link PRs in tables
 
 When listing PRs in a table (or anywhere they could be clickable), make each PR number a markdown link to the PR URL — `[#237](https://github.com/<owner>/<repo>/pull/237)`.

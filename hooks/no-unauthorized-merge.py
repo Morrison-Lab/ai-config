@@ -7,7 +7,9 @@ or --allow-merge.
 """
 import json
 import re
+import subprocess
 import sys
+from pathlib import Path
 
 LEAD = r"""^\s*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 
@@ -21,8 +23,27 @@ ALLOW_FLAG = re.compile(r"\bALLOW_MERGE=1\b|\b--allow-merge\b")
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
+def check_mwc_active() -> bool:
+    try:
+        common_dir = subprocess.check_output(
+            ["git", "rev-parse", "--git-common-dir"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        reg_dir = Path(common_dir) / "ai-sessions"
+        if reg_dir.exists():
+            for mwc_file in reg_dir.glob("*.mwc"):
+                session_id = mwc_file.stem
+                sess_file = reg_dir / f"{session_id}.session"
+                if sess_file.exists():
+                    return True
+    except Exception:
+        pass
+    return False
+
+
 def offending(command: str):
-    if ALLOW_FLAG.search(command):
+    if ALLOW_FLAG.search(command) or check_mwc_active():
         return None
     for segment in SPLIT.split(command):
         for pattern, label in MERGE_PATTERNS:

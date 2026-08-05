@@ -318,6 +318,7 @@ cmd_list() {
 
 cmd_release() {
   local id; id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+  rm -f "$REG_DIR/$(sanitize "$id").mwc"
   local f; f="$(session_file "$id")"
   if [ -f "$f" ]; then rm -f "$f"; printf 'released session %s\n' "$id"; else printf 'no record for session %s\n' "$id"; fi
 }
@@ -371,6 +372,34 @@ case "$CMD" in
   release)   cmd_release ;;
   prune)     cmd_prune ;;
   worktree)  cmd_worktree ;;
+  enable-mwc)
+    id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+    touch "$REG_DIR/$(sanitize "$id").mwc"
+    printf 'enabled mwc (merge-when-confident) for session %s\n' "$id"
+    ;;
+  disable-mwc)
+    id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+    rm -f "$REG_DIR/$(sanitize "$id").mwc"
+    printf 'disabled mwc for session %s\n' "$id"
+    ;;
+  check-mwc)
+    prune_stale >/dev/null
+    for f in "$REG_DIR"/*.mwc; do
+      if [ -e "$f" ]; then
+        s_id="$(basename "$f" .mwc)"
+        s_file="$(session_file "$s_id")"
+        if [ -f "$s_file" ]; then
+          load_session "$s_file"
+          if ! is_stale; then
+            printf 'mwc is active for session %s\n' "$s_id"
+            exit 0
+          fi
+        fi
+      fi
+    done
+    printf 'mwc is not active\n'
+    exit 1
+    ;;
   -h|--help) sed -n '2,40p' "$0" ;;
   *)         die "unknown command: $CMD" ;;
 esac

@@ -42,6 +42,18 @@ class TestNoUnauthorizedMerge(unittest.TestCase):
         res = self.run_hook("ALLOW_MERGE=1 gh pr merge 411 --squash")
         self.assertEqual(res, {})
 
+    def test_allows_mwc_active(self):
+        # Register session and enable mwc
+        script_path = Path(__file__).parent.parent / "skills" / "session-lock" / "scripts" / "ai-session.sh"
+        test_id = "test-mwc-session"
+        subprocess.run([str(script_path), "register", "--id", test_id], check=True, capture_output=True)
+        subprocess.run([str(script_path), "enable-mwc", "--id", test_id], check=True, capture_output=True)
+        try:
+            res = self.run_hook("gh pr merge 411 --squash")
+            self.assertEqual(res, {})
+        finally:
+            subprocess.run([str(script_path), "release", "--id", test_id], check=True, capture_output=True)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1501,9 +1501,24 @@ The turn count does not: it is the shape of the work rather than its size.
 So compare it across **independent heads** --- different commits, different
 diffs, a fresh run each time.
 Identical `num_turns` there means the job walked the same path to the same
-wall, and no further commit will move it.
+wall, and nothing that leaves the diff's shape intact will move it.
+Say it that way rather than "no further commit will move it", which is the
+looser claim and a false one: a commit that *shrinks* what the reviewer has to
+read is exactly the thing that can clear the wall, and the paragraph after
+next is about finding it.
+What the turn count rules out is another attempt at the same work, which is
+the only decision this rule is being asked to make.
 That is a deterministic failure wearing an infrastructure failure's clothes,
 and it is the one case where a second identical result is enough to stop on.
+
+**Check for a configured turn cap before reading agreement as determinism.**
+If the workflow sets `max_turns`, then every run that reaches it stops at the
+same number by construction, and matching counts across two heads say nothing
+at all --- they are the cap, not the path.
+That reverses the diagnosis rather than weakening it: a capped run has been
+cut off, so raising the cap is the fix and the entry below does not apply.
+One grep of the workflow and whatever reusable workflow it calls settles it,
+and this rule is only safe once that grep comes back empty.
 
 Note this inverts the file's usual use of the field.
 Above, `num_turns: 1` is read as a *value* naming the quota case, and read on
@@ -1520,6 +1535,8 @@ That recurs on every future PR of the same shape, so it belongs in an issue
 against the reviewer's own configuration --- a file-size cap, a narrower tool
 allowlist --- rather than in a wait for something to recover.
 
+- **Do:** grep the workflow chain for `max_turns` first --- an agreement at
+  the cap is an artifact, and inverts the diagnosis.
 - **Do:** compare `num_turns` across the failed runs before paying for another
   attempt.
 - **Do:** file it against the reviewer's setup once two independent heads fail
@@ -1532,7 +1549,14 @@ allowlist --- rather than in a wait for something to recover.
 (Morrison-Lab/ai-config#973, 2026-08-05: `claude-review` failed on heads
 `ed5cd8d` and `cf824cc`.
 Run `30645784194` **attempt 1** took `630325ms` and `$5.77`; run `30647021192`
-took `545700ms` and `$4.78` --- a 13% spread on duration and 17% on cost.
+**attempt 1** took `545700ms` and `$4.78` --- a 13% spread on duration and 17%
+on cost.
+The second run has only that one attempt, so its bare id resolves correctly
+today; it is labelled anyway, because the first run's did too until someone
+re-ran it.
+Neither workflow set `max_turns` --- checked at the pinned
+`Morrison-Lab/gha` sha `8ad0b14f` that produced both runs, and in the calling
+workflow --- so 11 is a path, not a ceiling.
 Both reported `num_turns: 11`, `is_error: true` with `subtype: "success"`,
 `permission_denials_count: null`, exit 1, and no verdict posted.
 Cite the attempt, per the `run_attempt` section above: that run's attempt 2

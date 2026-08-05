@@ -7,6 +7,7 @@ unless explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
 """
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -18,16 +19,19 @@ ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command)\s+"""
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
+API_WRITE_FLAG = r"(?:-X\s*=?\s*(?:PUT|POST|PATCH)|--method\s*=?\s*(?:PUT|POST|PATCH)|-f\b|-F\b|--field\b|--raw-field\b|--input\b)"
 
 MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b" + OPT_FLAGS + r"\s+pr\b" + OPT_FLAGS + r"\s+merge\b", "gh pr merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b" + OPT_FLAGS + r"\s+mr\b" + OPT_FLAGS + r"\s+merge\b", "glab mr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*/pulls/[^\n]+/merge\b", "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*/pulls/[^\n]+/merge\b", "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*/pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b(?:\s+[^\n]+)?\s+api\b[^\n]*/merge_requests/[^\n]+/merge\b", "glab api MR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*/merge_requests/[^\n]+/merge\b", "glab api MR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*/merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
 ]
 
-ALLOW_FLAG = re.compile(r"\bALLOW_MERGE=1\b|\b--allow-merge\b")
+ALLOW_FLAG = re.compile(r"\bALLOW_MERGE=1\b|(?:^|[\s;&|`()])--allow-merge\b")
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
@@ -35,22 +39,27 @@ def mask_payloads(text: str) -> str:
     """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files)
     so trigger patterns inside prose or file paths do not cause false positives or allow-flag bypasses.
     Handles escaped quotes inside multiline string literals without consuming command separators.
+    Preserves newlines inside multiline string literals so segment alignment remains 1-to-1.
     """
     # 1. Mask trailing shell comments (# ...)
     text = re.sub(r"#.*$", lambda m: " " * len(m.group(0)), text, flags=re.MULTILINE)
 
     # 2. Mask values of prose/file-carrying flags strictly (--body, --body-file, --title, --comment, --message, -m, -b)
-    flag_pattern = r"(?:--body-file|--body|--title|--comment|--message|--reason|--notes|--description|-m|-b)"
+    flag_pattern = r"(?:--body-file\b|--body\b|--title\b|--comment\b|--message\b|--reason\b|--notes\b|--description\b|-m\b|-b\b)"
     hspace = r"[ \t]*"
 
     def repl_flag(m):
         flag = m.group(1)
         val = m.group(2)
-        return flag + (" " * len(val))
+        masked_val = "".join("\n" if c == "\n" else " " for c in val)
+        return flag + masked_val
 
+    # Double-quoted values
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_flag, text, flags=re.DOTALL)
+    # Single-quoted values
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_flag, text, flags=re.DOTALL)
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^;\s&|\n]+)", repl_flag, text)
+    # Unquoted single-token values (e.g. --body-file /tmp/file.txt), ensuring we don't consume flags (-...) or separators
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^;\s&|\n-]+[^;\s&|\n]*)", repl_flag, text)
 
     return text
 
@@ -66,7 +75,7 @@ def is_session_alive(sess_file: Path) -> bool:
         sess_data = dict(line.split("=", 1) for line in content.splitlines() if "=" in line)
         pid = sess_data.get("pid")
         host = sess_data.get("host")
-        local_host = os.uname().nodename
+        local_host = platform.node()
         if pid and (not host or host == local_host):
             try:
                 os.kill(int(pid), 0)

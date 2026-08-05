@@ -37,6 +37,58 @@ definition, a language's fixed semantics ("R uses 1-based indexing"), a
 historical event's date. Don't clutter these with an "as of"; the target is
 specifically claims that a future change could falsify.
 
+## A product's distinction between two mechanisms is not one of those definitions
+
+The exemption above is the one that gets misapplied, because a vendor's own
+taxonomy reads exactly like a definition.
+"A command is user-invoked and a skill is model-invoked" says what each thing
+*is*, which feels like a language's fixed semantics rather than a claim a
+future change could falsify.
+It is a design decision someone at that vendor can revisit, and revisiting it
+is ordinary product work.
+
+So before writing down a dichotomy between two mechanisms of a third-party
+tool, check in that tool's current docs that the dichotomy still exists.
+Then date it, per the absolute-date rule above.
+Two file types can collapse into one mechanism with a frontmatter switch, and
+the sentence you learned a year ago will not have changed to tell you.
+
+What makes this decay invisible is that the retired form usually keeps working.
+A vendor merging two mechanisms leaves the older spelling supported, so nothing
+in your own repo errors, no check goes red, and nothing prompts a reader to
+look anything up.
+The distinction has stopped being true while every artifact built on it goes on
+behaving exactly as before.
+That is sharper than an ordinary stale claim, because the usual evidence for a
+claim's currency --- everything still works --- is precisely what a
+compatibility shim manufactures.
+
+The tell is a corpus that still contains **both** forms, plus a mental model
+explaining why each one is there.
+That state is equally consistent with two live mechanisms and with one
+mechanism plus a legacy spelling, so it cannot itself tell them apart, and the
+presence of both is what keeps the retired distinction feeling current.
+
+- **Do:** re-read the vendor's own current docs before teaching a distinction
+  between two of its mechanisms, and date what you find.
+- **Do:** treat a corpus holding both forms as a prompt to re-check, since that
+  is the state a merge leaves behind.
+- **Don't:** file a vendor's taxonomy under the definitions exemption above ---
+  a definition cannot flip, and a product decision can.
+- **Don't:** read "everything still works" as evidence the distinction holds;
+  backward compatibility is what hides the collapse.
+
+(Morrison-Lab/ai-config, 2026-08-04: this corpus ships 177 skill directories
+and one `commands/` file, and a session explained that split to the user as two
+mechanisms told apart by file type.
+Claude Code had merged custom commands into skills: both spellings create the
+same `/name`, the skill wins a name collision, and invocation is carried by
+frontmatter rather than by directory.
+Nothing in the corpus was broken by the merge, which is why the belief survived
+unexamined.
+The product facts are in
+[`memories/claude-code.md`](../../memories/claude-code.md).)
+
 ## The failure mode it prevents
 
 Repo docs stated "snapr is not on CRAN or P3M." That was true when written,

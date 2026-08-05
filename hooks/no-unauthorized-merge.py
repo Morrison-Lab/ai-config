@@ -25,16 +25,19 @@ API_WRITE_FLAG = rf"(?:-X\s*=?\s*{HTTP_METHOD}|--method\s*=?\s*{HTTP_METHOD}|-f\
 MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b" + OPT_FLAGS + r"\s+pr\b" + OPT_FLAGS + r"\s+merge\b", "gh pr merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b" + OPT_FLAGS + r"\s+mr\b" + OPT_FLAGS + r"\s+merge\b", "glab mr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*/pulls/[^\n]+/merge\b", "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*/pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*/repos/[^\n]+/merges\b", "gh api repository merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*/repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b", "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b", "gh api repository merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b[^\n]*\s+api\b[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?gh\b(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*/merge_requests/[^\n]+/merge\b", "glab api MR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*/merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b", "glab api MR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?(?:[/\w.-]+/)?glab\b[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
 ]
 
-ALLOW_FLAG = re.compile(r"(?:^|[\s;&|`\n])\s*(?:export\s+)?ALLOW_MERGE=(?:\"1\"|'1'|1\b)|(?:^|[\s;&|`\n])--allow-merge\b")
+ALLOW_FLAG = re.compile(
+    r"^(?:\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
+    r"|(?:^|[\s;&|`\n])--allow-merge\b"
+)
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
 
@@ -44,7 +47,13 @@ def mask_payloads(text: str) -> str:
     Handles escaped quotes inside multiline string literals without consuming command separators.
     Preserves newlines inside multiline string literals so segment alignment remains 1-to-1.
     """
-    flag_pattern = r"(?:--body-file\b|--body\b|--title\b|--comment\b|--message\b|--reason\b|--notes\b|--description\b|-m\b|-b\b|-d\b|(?:-f|-F|--field|--raw-field|--input)\s+(?:body|title|comment|message|reason|notes|description)\b)"
+    flag_pattern = (
+        r"(?:--body-file\b|--body\b|--title\b|--subject\b|--comment\b|--message\b|"
+        r"--commit-title\b|--commit-message\b|--reason\b|--notes\b|--description\b|"
+        r"--summary\b|-m\b|-b\b|-d\b|-t\b|-s\b|"
+        r"(?:-f|-F|--field|--raw-field|--input)\s+"
+        r"(?:body|title|subject|comment|message|commit_title|commit_message|reason|notes|description|text|summary)\b)"
+    )
     hspace = r"[ \t]*"
 
     def repl_flag(m):
@@ -78,12 +87,13 @@ def is_session_alive(sess_file: Path) -> bool:
         pid = sess_data.get("pid")
         host = sess_data.get("host")
         local_host = platform.node()
-        if pid and pid.isdigit() and int(pid) > 0 and (not host or host == local_host):
-            try:
-                os.kill(int(pid), 0)
-                return True
-            except OSError:
-                return False  # PID is dead on local host
+        if pid and pid.isdigit() and int(pid) > 0:
+            if not host or host.split(".")[0].lower() == local_host.split(".")[0].lower():
+                try:
+                    os.kill(int(pid), 0)
+                    return True
+                except OSError:
+                    return False  # PID is dead on local host
         hb = int(sess_data.get("heartbeat") or sess_data.get("started") or 0)
         return (time.time() - hb) < 1800
     except Exception:
@@ -125,10 +135,6 @@ def get_git_common_dirs() -> list[Path]:
     pwd_git = Path.cwd() / ".git"
     if pwd_git.is_dir() and pwd_git.resolve() not in dirs:
         dirs.append(pwd_git.resolve())
-
-    home_git = Path.home() / ".git"
-    if home_git not in dirs:
-        dirs.append(home_git)
 
     return dirs
 

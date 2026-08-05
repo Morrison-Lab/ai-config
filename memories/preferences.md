@@ -71,6 +71,10 @@
   Learned again on ai-config#635 (2026-07-22): a Copilot review flagged a documented CI-check-state caveat across three review rounds (5, 7, and 8, with an unrelated finding at round 6 in between), each time with a specific, checkable claim --- first that `gh pr checks`/`get_check_runs` miss raw workflow runs, then that a `gh run list --commit <sha>` fix still misses some trigger types, then that a `--branch <pr-branch>` fix has the same class of gap.
   Verifying each claim directly against the PR's own actual runs (not reasoning abstractly) confirmed all three were correct in sequence, while a separate claim in the same PR --- that markdown skill docs are bound by the repo's source-code-only em-dash rule --- checked out FALSE against the rule's own explicit scope and was rebutted.
   The review loop only reached zero new comments once every claim got the same live-query treatment, rather than being pattern-matched as "probably right" or "probably just noise" this many rounds in.)
+- **Always query ALL PR comments and review objects across GitHub REST endpoints before checking PR status.**
+  When reviewing or auditing PR status, NEVER rely on a single endpoint or assume an absence of new comments because a check run completed.
+  Automated review agent reports (such as `Antigravity Agent Report` or `Claude Code Review`) post issue comments as `github-actions[bot]` or `claude[bot]`.
+  To ensure 0 unhandled findings, ALWAYS fetch all comments using `gh api repos/{owner}/{repo}/issues/{number}/comments` and all review objects using `gh api repos/{owner}/{repo}/pulls/{number}/reviews`, parse every comment payload, and confirm that all findings have been addressed or rebutted. (Learned on ai-config#1157, 2026-08-05).
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --

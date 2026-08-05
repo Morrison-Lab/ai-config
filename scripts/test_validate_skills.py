@@ -143,6 +143,9 @@ def main() -> int:
         errs, warns = run_check(root_source, ["not-an-object"])
         check("non-object plugin entry errors", len(errs) == 1)
 
+        # Allowlisted non-operation tokens (e.g. GEMINI_API_KEY) are recognized.
+        check("NON_OPERATION_TOKENS contains GEMINI_API_KEY", "GEMINI_API_KEY" in vs.NON_OPERATION_TOKENS)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

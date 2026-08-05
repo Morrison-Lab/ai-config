@@ -47,7 +47,7 @@ jobs:
     uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
     secrets: inherit
     with:
-      pr-number: ${{ inputs.pr_number }}
+      pr-number: ${{ github.event.pull_request.number || inputs.pr_number }}
       prompt-addendum: |
         ## Review scope
 

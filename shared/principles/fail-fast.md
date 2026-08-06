@@ -600,6 +600,50 @@ step to take at the moment you write the comment, not at review.
   was handled everywhere it applies; a removal note is the artifact most likely
   to stop the search early.
 
+**One level up from a partial guard: editing state that two consumers share
+regresses the consumer you were not looking at.**
+Every case above spreads a guard across *sites* --- emitters, discharge paths,
+members of one pattern.
+This is the inverse: a single object read by two consumers, where the edit that
+satisfies one silently breaks the other, because the two place *conflicting*
+demands on it and you only had one in view.
+An allowlist, a shared regex fragment, a config map, a lookup table are all this
+shape.
+
+It is nastier than the "members of one pattern" case above, because there the
+fix is still to edit the members correctly.
+Here no single edit to the shared object can satisfy both consumers at once, so
+each round of editing it trades one regression for another --- and that is the
+tell: a fix that *moves* the failure to the other consumer rather than removing
+it.
+When that happens, stop editing the shared object and **un-share it**: give the
+second consumer its own separately-scoped copy or pass, applied after the first
+consumer has run.
+
+The discipline that avoids the whole loop is the enumerate-the-sites rule one
+level up: before editing shared state, enumerate every consumer that reads it
+and check the edit against each, not only against the one whose bug you are
+fixing.
+
+- **Do:** enumerate every consumer of a shared object before editing it, and
+  check the edit against each.
+- **Do:** un-share the state --- a separately-scoped second pass --- when two
+  consumers place conflicting demands on it, rather than re-editing it round
+  after round.
+- **Don't:** read a fix as done when it moves the failure to a different
+  consumer of the same object; that is the shared-state loop, not progress.
+- **Don't:** assume an edit that fixes one reader of shared state leaves the
+  others intact.
+
+(Morrison-Lab/gha#425, 2026-08-05: one abbreviation list (`_ABBREV_RE`) fed two
+regex branches --- a lowercase-sentence branch and an uppercase one.
+Dropping `No` from the list fixed the lowercase branch and un-protected `No.` on
+the uppercase branch; registering every lowercase form then fixed the lowercase
+branch and leaked protection onto the uppercase one.
+Each edit traded one regression for the other until the fix became
+architectural: a second, separately-scoped pass applied only after the first
+branch ran.)
+
 ## A guard's discharge fires on positive success, not the absence of failure
 
 The section above is about a guard that runs on too few sites.

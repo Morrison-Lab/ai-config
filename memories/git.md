@@ -369,6 +369,31 @@ paths.
 backtick spans this way; the message landed at `97bf7d4` with the spans
 executed and deleted.)
 
+## `gh pr comment` / `gh api ... -f body="..."` run backtick spans too
+
+The identical bash mechanism corrupts any `gh` command that takes a body
+through a double-quoted argument, not just `git commit -m`.
+`gh pr comment <N> --body "..."`, `gh issue comment`, and
+`gh api .../comments -f body="..."` / `.../replies -f body="..."` pass the body
+through the shell first, so a backtick span is command substitution: the shell
+runs the backticked text and splices its output (usually nothing) where the
+span stood, and the corrupted comment lands on someone else's thread reading as
+though you wrote it that way.
+
+The remedy is `CLAUDE.md`'s "Use body files" rule, extended past PR
+descriptions and past PowerShell: write the body to a file and pass
+`--body-file <file>` (`gh pr comment`, `gh issue comment`) or `-F body=@<file>`
+(`gh api`), for comment and review-reply bodies too, in any shell.
+
+- **Do:** pass a backtick-carrying comment or review-reply body through
+  `--body-file` / `-F body=@<file>`, exactly as for a PR description.
+- **Don't:** inline a double-quoted `--body "..."` / `-f body="..."` that
+  contains a code span or identifier --- bash runs it as a command and drops it.
+
+(Morrison-Lab/gha#425, 2026-08-05: a `gh api .../replies -f body="..."` review
+reply carried a `ms.` code span; the posted comment ran that span as a command
+and dropped it, so the thread lost the identifier entirely.)
+
 ## Stacked PRs across a squash-merge: rebuild via cherry-pick, and verify force-pushes actually landed
 
 Two git/GitHub behaviors that compose on stacked PRs (learned on

@@ -40,6 +40,35 @@ complete and the repo's checks pass, mark the PR **ready for review**
 (`gh pr ready <N>`, or `mcp__github__update_pull_request` with `draft: false`).
 Marking it ready is what kicks off ARDI.
 
+**Marking a draft ready is a push-landed checkpoint, so verify the
+implementation actually reached the branch head before `gh pr ready`.**
+[`ardi`](ardi.md) already forbids claiming a fix is pushed until it is on the
+PR's head commit, and its pre-push checklist makes `git rev-parse HEAD
+origin/<branch>` agreeing a killer item --- but both fire *after a push* or
+*before a status report*, and neither fires on the draft-to-ready transition.
+That transition is where the gap bites: implementing on top of the empty
+`start:` scaffold commit, running self-review, and updating the PR body all feel
+like the work, so `git push` is the one step with nothing downstream to prompt
+it.
+The head then stays at the empty scaffold, every check is green on the empty
+diff (per [`ardi`](ardi.md)'s "a PR whose branch carries no implementation is
+green on every check"), and the reviewer correctly reports a zero-file diff.
+
+So immediately before `gh pr ready`, confirm both: `git rev-parse HEAD` equals
+`git ls-remote origin <branch>` (the implementation was pushed), and
+`gh pr diff <N> --name-only` is non-empty (the branch carries a diff).
+
+- **Do:** run the push-landed and non-empty-diff checks at the `gh pr ready`
+  transition, exactly as before a reply asserting a push.
+- **Don't:** mark a draft ready on the strength of a local commit, green checks,
+  and an updated PR body --- none of those proves the branch head moved.
+
+(Morrison-Lab/gha#427, 2026-08-06: a changelog fix was committed locally,
+self-reviewed, and the PR body updated, then `gh pr ready` ran and review was
+requested --- but `git push` never ran, so the branch head stayed at the empty
+`start:` scaffold and the reviewer reported the diff empty and the described fix
+"has not actually been committed to the branch".)
+
 **Request the external reviewer in the same stride.** Opening a PR or marking a draft ready can trigger the repo's own review workflow, but that does not summon every reviewer.
 For a repository whose Copilot review isn't already scheduled automatically (see the caveat below), Copilot only reviews when explicitly requested with the requested-reviewers API or the equivalent UI action --- the `REQUEST_COPILOT_REVIEW` operation token (`tool-mappings.md`):
 

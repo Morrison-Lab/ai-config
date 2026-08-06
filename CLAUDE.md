@@ -1722,6 +1722,7 @@ don't wait for confirmation.")
 
 - **Never pass backtick-containing content in PowerShell double-quoted strings**: PowerShell treats `` ` `` as its escape character — `` `b `` (Backspace, 0x08), `` `n ``, `` `t ``, `` `r ``, etc. — so Markdown code spans and other backtick-containing text will be silently corrupted. Use single-quoted strings (`'...'` / `@'...'@`) for inline content, or write to a file and pass `--body-file` for multi-line PR descriptions.
 - **Use body files for GitHub PR descriptions**: Write multi-line PR descriptions to a temp file and pass `--body-file <file>` to `gh pr create`/`gh pr edit`, or `gh api -F body=@<file>` for raw API calls. This avoids terminal string-escaping corruption for any content with backticks or other shell-special characters.
+- **The hazard is not PowerShell-specific, and not limited to PR descriptions**: bash and zsh double-quoted strings run backtick spans as command substitution, so `gh pr comment`, `gh issue comment`, and `gh api .../comments -f body="..."` / `.../replies -f body="..."` corrupt a backtick-carrying body exactly as `gh pr create --body "..."` does (a `` `ms.` `` code span runs `ms.` as a command and vanishes). Use `--body-file` / `-F body=@<file>` for comment and review-reply bodies too, in any shell. See `memories/git.md`'s "`gh pr comment` / `gh api ... -f body=` run backtick spans too" section.
 
 ## Strict Merge Control Policy
 

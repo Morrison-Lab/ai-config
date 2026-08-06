@@ -412,12 +412,28 @@ In every session — at session start, and again periodically during long sessio
    python3 <ai-config-checkout>/scripts/install-hooks.py          # report
    python3 <ai-config-checkout>/scripts/install-hooks.py --fix     # register the missing ones
    ```
-   Two caveats before running `--fix`.
+   Four caveats before running `--fix`.
    Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
    And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
    Say so rather than reporting the guards as live.
-   - **Do:** run both instruments each session, and report the two counts separately.
+   **Run `check-install.py --fix` first, so the scripts are on disk before anything binds to them.**
+   `install-hooks.py` only writes `settings.json`.
+   It never places a file, and it does not check that the script it is registering exists.
+   Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.
+   `--fix` prints the note naming this division of labour only when run *without* `--fix`, so the run that causes the damage is the one that stays silent about it.
+   **Point 1 governs this instrument too, and its stale run is the more dangerous of the two.**
+   A stale `check-install.py` run reports suspect numbers.
+   A stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
+   Pull first, then measure, and treat the examined count as the thing to read: it is the manifest's size, so a number below the current hook count means the checkout is behind rather than the machine being clean.
+   - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
+   - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`
    - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.
+   - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
+
+   (2026-08-05, this machine: `install-hooks.py` run against a checkout 31 commits behind read a stale manifest and reported `registered=12 missing=0 stale=0` / `All hooks registered.`
+   After `git pull --ff-only` the same command reported `examined 15 ... registered=12 missing=3`.
+   Running `--fix` then bound all three to scripts absent from `~/.claude/hooks/`, one of them a `PreToolUse` `Bash` hook, which blocked every Bash call until `/reload-plugins` placed the symlinks.
+   `memories/claude-code-hooks.md` carries the mechanism and the recovery.)
 
    (2026-08-04, this machine: `check-install.py` reported 32 of 34 entries ok while `install-hooks.py` reported `registered=3 missing=8`, so 8 of 11 guards had never been bound to an event.
    Among them was `flag-unassigned-worktree.py`, and in that same session two `Agent` calls were launched with no `isolation` --- exactly what it exists to warn about --- with no warning possible.
@@ -657,7 +673,6 @@ Re-derive it from a live query rather than trusting the earlier verdict.
 
 ## Claim a GitHub PR/issue before working on it
 
-<!-- Shared with the lab manual; edit shared/workflow/claim-pr.md, not here. -->
 @shared/workflow/claim-pr.md
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
@@ -864,7 +879,6 @@ Its last section generalizes past MCP: when a standing rule names a mechanism th
 
 ## File an issue before starting a new task
 
-<!-- Shared with the lab manual; edit shared/workflow/issue-first.md, not here. -->
 @shared/workflow/issue-first.md
 
 The `st` (Start Task) skill operationalizes this; `gi` (Grab Issue) is the path when the issue already exists.
@@ -905,7 +919,6 @@ Agreeing with a reviewer is the commoner case and the one that machinery misses 
 
 ## Tracking issues in upstream repos
 
-<!-- Shared with the lab manual; edit shared/workflow/upstream-issues.md, not here. -->
 @shared/workflow/upstream-issues.md
 
 The `sup` / `send-upstream` skill operationalizes steps 1--2 (the PR path, including fork-if-needed, and the issue path) and the link-back.
@@ -926,14 +939,12 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 
 ## What "fully clean" means
 
-<!-- Shared with the lab manual; edit shared/workflow/fully-clean.md, not here. -->
 @shared/workflow/fully-clean.md
 
 Escalate a deadlock via the `request-pr-review` skill (human reviewer `d-morrison`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 
-<!-- Shared with the lab manual; edit shared/workflow/ardi.md, not here. -->
 @shared/workflow/ardi.md
 
 The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" means* above; the mechanics for each step are in the sections around here.)
@@ -1009,14 +1020,12 @@ and a pure re-post webhook event doesn't need fresh analysis.
 
 ## Address every in-scope review comment, even non-blockers
 
-<!-- Shared with the lab manual; edit shared/workflow/address-every-comment.md, not here. -->
 @shared/workflow/address-every-comment.md
 
 If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the impasse — for the final call rather than looping.
 
 ## Keep PR branches synced with main
 
-<!-- Shared with the lab manual; edit shared/workflow/sync-with-main.md, not here. -->
 @shared/workflow/sync-with-main.md
 
 (Another instance of **never assume; always verify** — `git fetch` to check main's actual position instead of assuming the branch is current.
@@ -1056,7 +1065,6 @@ The key points, restated here because a bare pointer is invisible to a consumer 
 
 ## Prioritize internal infrastructure work slightly over feature work
 
-<!-- Shared with the lab manual; edit shared/workflow/pr-prioritization.md, not here. -->
 @shared/workflow/pr-prioritization.md
 
 A tie-breaker for `ardia`'s PR-ordering step and `gi`'s (and `gii`/`gip`'s) issue-priority table when candidates are otherwise close in priority.
@@ -1176,7 +1184,6 @@ More generally --- not just inside the named heavy skills --- always look for op
 When a task turns out to be workflow-shaped (decomposable, verification-bearing, and at a scale that earns it --- see the fragment's criteria), say so and propose a workflow even if no skill mandated one.
 The same opt-in gate still applies: propose with a cost estimate and wait unless an opt-in signal is already present.
 
-<!-- Shared with the lab manual; edit shared/workflow/when-to-orchestrate.md, not here. -->
 @shared/workflow/when-to-orchestrate.md
 
 ## Agent teams: a third parallelism primitive, human-gated and advisory
@@ -1506,7 +1513,6 @@ The `use-preferred-style` skill (alias `style`) spells out the procedure, the PS
 
 ## Writing style: semantic line breaks in prose
 
-<!-- Shared with the lab manual; edit shared/writing/semantic-line-breaks.md, not here. -->
 @shared/writing/semantic-line-breaks.md
 
 ## Quarto: link packages on first mention
@@ -1541,14 +1547,12 @@ This keeps figures consistent with tables, which already use div syntax.
 
 ## Challenge ambiguous phrasing and terminology in review
 
-<!-- Shared with the lab manual; edit shared/workflow/challenge-ambiguous-terminology.md, not here. -->
 @shared/workflow/challenge-ambiguous-terminology.md
 
 The `ard`/`ardi` skill family and `use-preferred-style`/`find-ai-tells` operationalize this in their respective review contexts.
 
 ## Challenge redundant content in review
 
-<!-- Shared with the lab manual; edit shared/workflow/challenge-redundant-content.md, not here. -->
 @shared/workflow/challenge-redundant-content.md
 
 The `ard`/`ardi` skill family and `code-review` apply this in PR/MR review; `find-overlap` (and its `consolidate-skills`/`consolidate-memory` actors) is the corpus-wide counterpart when redundancy spans more than the current diff.
@@ -1574,12 +1578,10 @@ The `find-ai-tells` skill (alias `ai-tells`) runs this same catalog on demand ag
 
 ## Writing style: cite sources thoroughly
 
-<!-- Shared with the lab manual; edit shared/writing/citations.md, not here. -->
 @shared/writing/citations.md
 
 ## Fact-check prose and internal reasoning in review
 
-<!-- Shared with the lab manual; edit shared/writing/fact-check-prose.md, not here. -->
 @shared/writing/fact-check-prose.md
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches prose, apply this policy in addition to the normal review — those skills don't name it internally, but this CLAUDE.md directive governs regardless.
@@ -1596,7 +1598,6 @@ re-verify it.
 
 ## Writing style: math derivations — include every step; flag gaps in review
 
-<!-- Shared with the lab manual; edit shared/writing/math-derivation-steps.md, not here. -->
 @shared/writing/math-derivation-steps.md
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
@@ -1667,7 +1668,6 @@ that works fine.
 
 ## Challenge unnecessary complexity in review
 
-<!-- Shared with the lab manual; edit shared/workflow/challenge-unnecessary-complexity.md, not here. -->
 @shared/workflow/challenge-unnecessary-complexity.md
 
 When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-style`, `find-ai-tells`, `fact-check-prose`), apply this alongside the normal review — those skills don't name it internally, so this CLAUDE.md directive governs regardless. It's distinct from `simplify` (a dead-code-after-refactor sweep) and `tidy` (a separate on-demand audit).

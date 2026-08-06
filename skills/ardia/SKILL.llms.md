@@ -29,6 +29,8 @@ Apply the ARDI loop (ARD + iterate) to every open PR/MR in the repo, driving eac
 
 2.  **Optionally fan out read-only triage and local preparation.** Independent PRs may be inspected concurrently, one worker per PR, each in its own worktree. A worker may read the latest review and CI logs, trace a finding to its cause, run the repo’s local checks, and prepare a focused patch. It must not claim a PR, post a comment, commit, push, request review, or otherwise mutate shared forge state — every one of those belongs to the serial loop below.
 
+    **Check for supersession before preparing a patch for an idle, non-clean PR.** Grep `origin/main` for the PR’s distinctive added phrases; if they are all already there, the PR is `Superseded` (see step 3’s terminal states) and its patch prep is wasted work — flag it for closure instead.
+
     **The patch has to leave the worktree as an artifact, not sit in it as a dirty tree.** A worker’s worktree is not durable: `isolation: 'worktree'` has reclaimed one mid-run before, which is the incident [`incidents-dont-repeal-decisions`](../../shared/workflow/incidents-dont-repeal-decisions.md) is written about. A dirty tree is also the one form the orchestrator cannot inspect, diff, or apply without re-entering that worktree, so it fails whether or not the worktree survives. Have each worker end by emitting a patch to an orchestrator-owned path, and return that path plus the SHAs below:
 
     ``` bash
@@ -65,18 +67,20 @@ Apply the ARDI loop (ARD + iterate) to every open PR/MR in the repo, driving eac
     - **Clean** — zero flagged items under any heading; post the unclaim comment, record the round count.
     - **Escalated** — every remaining **review finding** is deadlocked and waiting on a human ruling. Record which findings, move to the next PR, and return when the human rules. Escalating *some* findings is not this: keep driving the PR on everything else. A round count is never a terminal state at all — see [`ardi`](../../skills/ardi/SKILL.llms.md)’s “Stopping conditions”.
     - **Blocked** — an **external or operational** obstacle rather than a review finding: an unresolvable conflict, a needed human decision outside the review, or a preflight failure your change didn’t cause. Record what’s blocking, move on.
+    - **Superseded** — the PR’s content already landed on `main` via a sibling PR, so its remaining findings and any conflict are moot and the right action is to close it, not drive it. Recognize this before spending rounds: an idle, non-clean PR whose `main`-merge conflict pits its own added lines against a better-formatted copy already on `main` is the tell, and grepping `origin/main` for the PR’s distinctive added phrases confirms it (all present -\> superseded, and resolving toward `main` would leave an empty diff). Recommend closure — the content is preserved on `main` — and name the superseding PR, rather than pushing an empty diff to clean. See [`sync-with-main`](../../shared/workflow/sync-with-main.md)’s duplicate-issue and whole-file-split cases, which already say to keep `main`’s version when a sibling published the same content. This is that judgment applied up front, at the whole-PR scale, with closure as the terminal action.
 
-    The two are disjoint by construction: `Escalated` is about the *review* deadlocking, `Blocked` about everything else. A PR meeting both is `Blocked`, since the external obstacle has to clear before the review matters.
+    `Escalated` and `Blocked` are disjoint by construction: the first is about the *review* deadlocking, the second about everything else. A PR meeting both is `Blocked`, since the external obstacle has to clear before the review matters. `Superseded` takes precedence over either: once the content has landed on `main`, the findings and any conflict no longer matter.
 
     **Process PRs one at a time, not concurrently.** Each ARDI run pushes commits, triggers review workflows, and polls for the result; running them in parallel would interleave pushes, collide on shared review runners, and make per-PR status illegible. One PR stalling or blocking must not abort the batch — keep going to the next.
 
 4.  **Report a summary table** at the end, with clickable links:
 
-    | MR/PR       | Rounds | Final status                           |
-    |-------------|--------|----------------------------------------|
-    | [\#25](url) | 3      | ✅ Clean                               |
-    | [\#26](url) | 4      | ⏸️ Escalated — awaiting human on: …    |
-    | [\#27](url) | 1      | ⛔ Blocked — needs human decision on … |
+    | MR/PR | Rounds | Final status |
+    |----|----|----|
+    | [\#25](url) | 3 | ✅ Clean |
+    | [\#26](url) | 4 | ⏸️ Escalated — awaiting human on: … |
+    | [\#27](url) | 1 | ⛔ Blocked — needs human decision on … |
+    | [\#28](url) | 0 | 🔁 Superseded — content on `main` via [\#N](url); recommend closing |
 
     For any PR not driven to clean, **list its remaining open items** so triage is one glance, not a re-investigation. Don’t merge anything — opening merges is the user’s call.
 

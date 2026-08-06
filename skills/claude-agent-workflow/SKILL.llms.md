@@ -93,6 +93,8 @@ The concurrency block alone prevents *parallel* races, but a long-running sessio
 
 The post-step detects whether Claude actually pushed (comparing SHA before/after), re-requests `d-morrison` as reviewer, and dispatches `claude-code-review.yml` via `workflow_dispatch`. The dispatch is needed because `GITHUB_TOKEN`-driven pushes don’t fire `synchronize` events, so the review workflow wouldn’t auto-trigger otherwise.
 
+In `Lacaedemon/sparta`, omit the `requested_reviewers` line — that repo never requests `d-morrison` as reviewer (see [`request-pr-review`](../../skills/request-pr-review/SKILL.llms.md)’s Scope section). Keep the `claude-code-review.yml` dispatch: only the reviewer request is scoped out.
+
 ### 5. stats-allowlist for WebFetch
 
 ``` yaml

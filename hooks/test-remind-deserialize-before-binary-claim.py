@@ -115,6 +115,28 @@ OTHER_FILE_CHECK = tool(
         "readRDS(\"inst/extdata/msm-vs-truth-chunk-004.rds\"))'"},
 )
 
+# Same basename, different directory -- ordinary in a data repo. A basename
+# test would let this discharge the escalation below, which is a SILENT
+# discharge: the dangerous direction.
+SAME_BASENAME_CHECK = tool(
+    "Bash",
+    {"command":
+        "Rscript -e 'identical(readRDS(\"backup/model.parquet\"), "
+        "readRDS(\"backup/model.parquet\"))'"},
+)
+
+ESCALATE_PARQUET = txt(
+    "🛑 **BLOCKER** `results/model.parquet` changed. Your call: regenerate?"
+)
+
+# Ran from inside the artifact's own directory, so the path is written bare.
+RELATIVE_CHECK = tool(
+    "Bash",
+    {"command": "cd inst/extdata && Rscript -e "
+                "'identical(readRDS(\"/tmp/old.rds\"), "
+                "readRDS(\"ett-validation-true-effects.rds\"))'"},
+)
+
 ESCALATE_ONE_FILE = txt(
     "🛑 **BLOCKER**\n"
     "`inst/extdata/ett-validation-true-effects.rds` changed. "
@@ -148,6 +170,8 @@ REMIND = [
      "@-mention escalation naming a .parquet"),
     ([txt("Needs a decision: `data/cohort.sas7bdat` differs from main.")],
      "decision-seeking phrasing naming a .sas7bdat"),
+    ([ESCALATE_PARQUET, SAME_BASENAME_CHECK],
+     "SAME BASENAME, different directory: must not discharge"),
 ]
 
 SILENT = [
@@ -161,6 +185,8 @@ SILENT = [
      "escalation discharged by a scoped readRDS of THAT path"),
     ([SCOPED_CHECK, ESCALATE_ONE_FILE],
      "same, with the check running BEFORE the escalation"),
+    ([ESCALATE_ONE_FILE, RELATIVE_CHECK],
+     "check run from the artifact's own directory, path written bare"),
     ([MENTION_AND_SIDECHAIN],
      "a subagent's own escalation is not my outgoing message"),
     ([], "empty transcript"),

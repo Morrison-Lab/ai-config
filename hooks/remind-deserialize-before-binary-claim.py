@@ -191,6 +191,25 @@ def tool_blob(name, inp):
         return ""
 
 
+def same_artifact(a, b):
+    """True when two written paths denote the same artifact.
+
+    Equal, or one is a path-component suffix of the other -- so a check run
+    from inside the artifact's own directory (`readRDS("x.rds")`) discharges an
+    escalation that named `inst/extdata/x.rds`.
+
+    Deliberately NOT a bare substring or basename test. Same-basename,
+    different-directory pairs are ordinary in a data repo
+    (`arrow/raw_data.parquet` beside `R/raw_data.rds`), and a basename test
+    would let a deserialization of one discharge a claim about the other.
+    That is a silent discharge, the dangerous direction: an over-warn is
+    visible and gets fixed, silence is indistinguishable from compliance.
+    """
+    if a == b:
+        return True
+    return a.endswith("/" + b) or b.endswith("/" + a)
+
+
 def path_deserialized(blob, path):
     """True when this one blob both deserializes AND names this path.
 
@@ -199,14 +218,12 @@ def path_deserialized(blob, path):
     file B discharge a claim about file A, which is the over-broad discharge
     this guard exists to avoid.
 
-    The basename is accepted as well as the full path, because a real check
-    often round-trips through a temp copy and refers to the artifact by its
-    own name in a later argument.
+    Paths are re-extracted from the blob with the same ARTIFACT_PATH pattern
+    rather than substring-matched, so `y.rds` never matches inside `xy.rds`.
     """
     if not DESERIALIZE.search(blob):
         return False
-    base = os.path.basename(path)
-    return path in blob or (len(base) > 4 and base in blob)
+    return any(same_artifact(q, path) for q in ARTIFACT_PATH.findall(blob))
 
 
 def scan(path):

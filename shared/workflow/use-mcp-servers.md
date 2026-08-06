@@ -10,6 +10,9 @@ The work still gets done, with more calls and less structure, and whole
 capabilities stay quietly unavailable --- so there is no moment at which
 anything reports that a better tool existed.
 
+Worked-example case records for the rules below live in
+[`use-mcp-servers.cases.md`](use-mcp-servers.cases.md), moved out of the auto-loaded context.
+
 ## Prefer the typed tool over the shell, once one exists
 
 [`tool-mappings.md`](../../tool-mappings.md) maps each canonical `gh`/`glab`
@@ -220,18 +223,3 @@ another session opened.
 Often the equivalent is already installed and merely disabled.
 So when a named mechanism is missing, enumerate what the servers you *do*
 have can actually do before accepting the degraded path.
-
-(2026-07-29: an entire session ran `gh pr checks` polling loops because
-`subscribe_pr_activity` was absent.
-The GitHub MCP server's `notifications` toolset --- carrying
-`manage_notification_subscription` and a `list_notifications` call that covers
-every subscribed thread across every repo in one request --- was present the
-whole time, switched off.
-Those are the **server's own** tool names, as returned by a `tools/list` call
-against `github-mcp-server` 1.7.0.
-A harness that namespaces MCP tools surfaces them prefixed, which is why this
-repo's other references spell them `mcp__github__list_notifications`; ask the
-server rather than grepping our docs when you need to know what a toolset
-actually contains.
-The same session had already hit the shadowed-plugin and 400-vs-401 traps
-above, which is why they are written down here.)

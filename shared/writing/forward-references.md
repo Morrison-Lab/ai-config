@@ -12,6 +12,9 @@ case: **any** plain-text forward-pointing phrase, about **any** kind of
 content (a section, a figure, a table, an argument, not just a formal
 definition), in any prose --- READMEs, docs, papers, PR descriptions.
 
+Worked-example case records for the rules below live in
+[`forward-references.cases.md`](forward-references.cases.md), moved out of the auto-loaded context.
+
 ## The detection heuristic
 
 The primary signal is the directional word itself --- below, later,
@@ -61,10 +64,6 @@ list at the end of the document, say --- is a back-reference and fine.
 Prefer deleting the pointer over rewording it: in a sequential procedure
 the reader reaches the target anyway, so a step that states its own
 mechanism in brief needs no cross-reference at all.
-(ai-config#691: `ums`'s step 2 said "grep before writing, per step 3";
-dropping the pointer left "grep before writing", which carries the
-mechanism on its own, while the anti-patterns entry's own `(step 3)`
-correctly stayed.)
 
 ## Confirming a hit
 
@@ -99,7 +98,6 @@ Two options, in order of preference:
    Use this only when reordering is genuinely worse, not as a default
    shortcut.
 
-
 ## Moving prose makes self-references stale
 
 The same check fires after a file split or prose migration, even when the
@@ -130,13 +128,6 @@ self-reference.
   split.
 - **Don't:** rely on link checks for this class; the broken pointer is prose,
   not a link.
-
-(Morrison-Lab/ai-config#966 split `memories/github-mcp-tools.md` out of
-`memories/github.md`.
-A moved entry at `memories/github-mcp-tools.md:45` still said
-`This is the "Postcondition gate" bullet at the top of this file made concrete:`.
-After the split, that bullet remained in `memories/github.md:10`, so the
-sentence pointed to the wrong file until the reference was rewritten.)
 
 ## Inserting prose makes a downstream back-reference stale
 
@@ -176,15 +167,6 @@ so the next insertion cannot silently invalidate the reference.
 - **Don't:** rely on the directional-word grep above to catch this --- its word
   list is exclusively forward-pointing and never sees a backward reference
   like "above" in the first place.
-
-(Morrison-Lab/ai-config#1091, 2026-08-03: a new section was inserted between
-"A negative control must enter at the real input" and "A reminder guard's
-discharge condition...", whose opening "The two sections above test a guard's
-fire condition" then counted back to the new, unrelated section instead of the
-two fire-condition sections it described.
-Review caught it; the fix relocated the inserted section out of the arc so the
-count resolved again.
-CI was fully green throughout --- no mechanical check sees this.)
 
 ## The roadmap exception
 

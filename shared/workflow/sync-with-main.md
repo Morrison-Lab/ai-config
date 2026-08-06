@@ -364,6 +364,28 @@ Each had contained only a cross-reference repointing from `memories/github.md`
 to `memories/github-mcp-tools.md`, and
 `git show origin/main:<file> | grep -c github-mcp-tools` returned `1` for each.)
 
+**When the whole PR is superseded, not just one file, the conflict is telling
+you to close it rather than resolve it.**
+The two cases above keep `main`'s version of a file a sibling PR already
+published, and carry forward the current PR's distinct remainder.
+The remainder can be empty.
+When a `main`-merge conflict pits *every* added line of an idle PR against a
+better-formatted copy already on `main` --- a sibling PR having landed the same
+content --- resolving toward `main` leaves nothing, and the PR's own prior
+review findings are moot.
+Confirm by grepping `origin/main` for the PR's distinctive added phrases before
+resolving anything: all present means superseded.
+The right action is then to recommend closing the PR, since its content is
+preserved on `main`, not to push an empty diff to a clean verdict.
+For an ARDIA sweep this is a terminal state of its own --- see
+[`ardia`](../../skills/ardia/SKILL.md)'s `Superseded`, which also gives the
+up-front check that catches it before rounds are spent.
+(Morrison-Lab/ai-config#1188, 2026-08-06: an idle PR with a "Needs more work"
+verdict, driven toward clean, revealed on merging `origin/main` that all four
+of its `memories/preferences.md` bullets were already there in corrected form,
+landed by the already-merged #1189; resolving toward `main` would have left an
+empty diff, so the PR was superseded and the correct action was closure.)
+
 **A merge into a growing numbered list (e.g. `gha`'s `CLAUDE.md` "Code
 review guidelines" section) can produce zero blank lines between two
 adjacent headings

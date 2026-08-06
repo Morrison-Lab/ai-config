@@ -721,11 +721,12 @@ into the entry list it already consumed.)
 The double-registration case above is about a hook that fires twice.
 This is the opposite failure of the same `settings.json` machinery: a hook that cannot fire at all, because the file it points at is gone.
 
-`install-hooks.py --fix` writes a `PreToolUse` command into `~/.claude/settings.json` of the form
-`python3 $HOME/.claude/hooks/<script>.py`.
+`install-hooks.py --fix` writes a `PreToolUse` command into `~/.claude/settings.json` of the form `python3 $HOME/.claude/hooks/<script>.py`.
 If the repo later removes or renames that script, the settings.json line keeps pointing at a path that no longer exists.
-`python3` then exits non-zero with `can't open file '.../hooks/<script>.py': No such file or directory`,
-and the harness reads that non-zero exit as a **block** --- the crash-is-a-block case the "denies on stdout and still exits 0" section above warns about, arriving from a missing file rather than a bug.
+`python3` cannot open the file, so it exits with **code 2**: the `can't open file '.../hooks/<script>.py': [Errno 2] No such file or directory` startup error always exits `2` (verified).
+That matters because exit code 2 is specifically Claude Code's block signal, not a generic non-zero exit --- the "denies on stdout and still exits 0" section above records that "Exiting 2 is a genuine blocking mechanism in Claude Code", documented in [`permission-check`](../skills/permission-check/SKILL.md).
+An ordinary crash *inside* a hook that has already started exits `1`, which that same section marks `# a bug, not a block`, and does not stop Bash.
+So the missing file blocks every Bash call not because any hook crash blocks, but because `python3`'s missing-file startup failure happens to exit with `2`, the one code that does.
 
 The scope is the surprising part.
 A `PreToolUse` `Bash` matcher runs on *every* Bash call, so a merge-guard hook whose file is missing blocks all Bash, not merely a `git merge`.
@@ -743,12 +744,9 @@ The plugin and `install-hooks.py --fix` are mutually exclusive on one machine (p
 **The fix can be classifier-denied, so surface it rather than working around it.**
 Editing `~/.claude/settings.json` to drop the stale line is a hooks-config change, which Claude Code's auto-mode classifier can DENY.
 When it does, STOP and ask the user to make the edit, rather than routing around the denial.
-Two immediate unblock alternatives exist, if the user prefers:
-the user removes the stale line themselves,
-or someone recreates a no-op pass-through file at the referenced path so `python3` finds something to run.
+Two immediate unblock alternatives exist, if the user prefers: the user removes the stale line themselves, or someone recreates a no-op pass-through file at the referenced path so `python3` finds something to run.
 Prefer restoring the file for an *immediate* unblock.
-The hook *command* re-runs on every call, so a restored file unblocks at once,
-whereas a settings.json edit may not take effect until a Claude Code restart, because hooks load at session start.
+The hook *command* re-runs on every call, so a restored file unblocks at once, whereas a settings.json edit may not take effect until a Claude Code restart, because hooks load at session start.
 
 - **Do:** read a non-zero `python3: can't open file` error on every Bash call as a registered hook whose file is missing.
 - **Do:** diagnose with Read (settings.json, the hooks dir, the checkout's `hooks/hooks.json`) while Bash is blocked.
@@ -756,11 +754,7 @@ whereas a settings.json edit may not take effect until a Claude Code restart, be
 - **Don't:** read "a merge guard blocked my command" as meaning only merges are blocked --- a missing `PreToolUse` `Bash` hook blocks every Bash call.
 - **Don't:** work around a classifier-denied hooks-config edit yourself.
 
-(2026-08-05, Morrison-Lab/ai-config: `~/.claude/settings.json` referenced a removed `no-unauthorized-merge.py` hook,
-so every Bash call failed with `python3: can't open file '.../hooks/no-unauthorized-merge.py'`;
-the hook was absent from `main`'s `hooks/hooks.json` (which the still-open #1157 would add),
-the `ai-config` plugin was also enabled, so the same hooks were double-registered,
-and the settings.json edit to remove the stale line was classifier-denied, so it was surfaced to the user.)
+(2026-08-05, Morrison-Lab/ai-config: `~/.claude/settings.json` referenced a removed `no-unauthorized-merge.py` hook, so every Bash call failed with `python3: can't open file '.../hooks/no-unauthorized-merge.py'`; the hook was absent from `main`'s `hooks/hooks.json` (which #1157 has since added, merged 2026-08-06), the `ai-config` plugin was also enabled, so the same hooks were double-registered, and the settings.json edit to remove the stale line was classifier-denied, so it was surfaced to the user.)
 
 ## A plugin ref resolves by the marketplace's *declared* name, not by its URL
 

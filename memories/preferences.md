@@ -79,6 +79,8 @@
   `manage_task` lists harness-managed background tasks, but background script executions (such as async python test runners) can persist as live child OS processes. When checking task state or diagnosing running tasks, run `ps aux | grep ...` to inspect and verify live OS process state before declaring zero tasks running. (User correction, 2026-08-05).
 - **Always create a dedicated `ums-<topic>` branch off default branch (`main`) and open a standalone PR for UMS memory passes.**
   Never fold UMS memory updates into an in-progress feature PR branch or claim UMS is finished without opening a dedicated UMS pull request. (User correction, 2026-08-05).
+- **Always fetch and merge `origin/main` into the UMS branch before opening a UMS PR.**
+  When creating a dedicated `ums-<topic>` branch or preparing a UMS memory pass, always fetch `origin/main` and merge/rebase onto the latest default branch HEAD before opening the PR, ensuring zero initial merge conflicts. (User correction, 2026-08-05).
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --

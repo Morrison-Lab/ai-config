@@ -2,12 +2,12 @@
 """PreToolUse guard enforcing dedicated UMS branch naming and origin/main rebase freshness.
 
 CLAUDE.md / memories/preferences.md standing directives:
-1. "Always create a dedicated ums-<topic> branch off origin/main for UMS memory passes."
+1. "Always create a dedicated ums-<topic> or ums/<topic> branch off origin/main for UMS memory passes."
 2. "Always fetch and merge origin/main into the UMS branch before opening a UMS PR."
 
 This hook intercepts PreToolUse Bash calls to `git commit`, `git push`, and `gh pr create` that stage or modify memory/skill files (memories/*.md, MEMORY.md, CLAUDE.md, GEMINI.md, skills/*):
   1. BLOCKS commits/pushes of memory/skill files on non-UMS branches (e.g. main or feature branches like rule/*, feat/*).
-  2. BLOCKS commits/pushes/PR creation on `ums/*` branches if the branch is behind `origin/main`.
+  2. BLOCKS commits/pushes/PR creation on `ums/*` or `ums-*` branches if the branch is behind `origin/main`.
 """
 
 import json
@@ -32,8 +32,24 @@ def get_current_branch(cwd: str) -> str:
         return ""
 
 
+def get_changed_files_against_main(cwd: str) -> list[str]:
+    """Return all file paths changed between origin/main and HEAD."""
+    try:
+        res = subprocess.run(
+            ["git", "diff", "origin/main...HEAD", "--name-only"],
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+        )
+        if res.returncode == 0:
+            return [f.strip() for f in res.stdout.splitlines() if f.strip()]
+    except Exception:
+        pass
+    return []
+
+
 def get_staged_or_modified_files(cwd: str) -> list[str]:
-    """Return list of staged or modified file paths in the git worktree."""
+    """Return list of staged, modified, or branch-changed file paths."""
     files = set()
     try:
         # Check staged files
@@ -46,15 +62,8 @@ def get_staged_or_modified_files(cwd: str) -> list[str]:
         if res.returncode == 0:
             files.update(res.stdout.splitlines())
 
-        # Check last commit files if committing/pushing
-        res = subprocess.run(
-            ["git", "diff", "HEAD~1", "--name-only"],
-            cwd=cwd,
-            text=True,
-            capture_output=True,
-        )
-        if res.returncode == 0:
-            files.update(res.stdout.splitlines())
+        # Union with full diff against origin/main
+        files.update(get_changed_files_against_main(cwd))
     except Exception:
         pass
     return [f.strip() for f in files if f.strip()]
@@ -95,8 +104,8 @@ def inspect_command(command: str, cwd: str = ".") -> str | None:
     if not branch:
         return None
 
-    # Check if branch is a dedicated UMS / docs / chore branch
-    is_ums_branch = bool(re.match(r"^(?:ums|docs|chore)/", branch))
+    # Support both slash (ums/topic) and hyphen (ums-topic) branch naming conventions
+    is_ums_branch = bool(re.match(r"^(?:ums|docs|chore)[/-]", branch))
 
     # For PR creation on UMS branches
     if is_pr_create and is_ums_branch:
@@ -113,7 +122,7 @@ def inspect_command(command: str, cwd: str = ".") -> str | None:
         if not is_ums_branch:
             return (
                 f"MECHANISTIC PROHIBITION: UMS memory/skill updates (modifying {', '.join(f for f in files if touches_memory_or_skill([f]))}) "
-                f"must be committed to a dedicated 'ums/<topic>' branch off origin/main, not directly to feature branch '{branch}'. "
+                f"must be committed to a dedicated 'ums/<topic>' or 'ums-<topic>' branch off origin/main, not directly to feature branch '{branch}'. "
                 f"Please create a dedicated worktree via 'git worktree add -b ums/<topic> origin/main' first."
             )
         if is_behind_origin_main(cwd):
@@ -135,8 +144,15 @@ def main() -> int:
 
     reason = inspect_command(command, cwd)
     if reason:
-        print(reason, file=sys.stderr)
-        return 1
+        out = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
+            }
+        }
+        print(json.dumps(out))
+        return 0
 
     return 0
 

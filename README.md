@@ -257,6 +257,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
+| `enforce-ums-branch-and-rebase.py` | `PreToolUse` (Bash) | blocks commits/pushes of memory files on non-UMS branches or on branches behind origin/main |
 | `remind-brief-premises.py` | `PreToolUse` (Agent) | reminds, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
 
 A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs

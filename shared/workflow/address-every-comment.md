@@ -3,6 +3,9 @@ regardless of severity label. The reviewer's "Not a blocker", "minor", "nit",
 "optional", "consider", or "if you want" labels are for prioritization, not a
 free pass for the implementer.
 
+Worked-example case records for the rules below live in
+[`address-every-comment.cases.md`](address-every-comment.cases.md), moved out of the auto-loaded context.
+
 For each flagged item, do exactly one of:
 
 1. **Fix it in this PR.** The default path --- most nits are 1--3 line changes.
@@ -58,11 +61,7 @@ pointing at the tracked issue, and hold on it specifically rather than
 re-deferring it on each pass. Surface the pattern to the user (which item, how
 many rounds, where it's tracked) and let them decide whether to resolve it now
 (e.g. do the split) or leave it as accepted recurring noise --- don't decide
-unilaterally to either keep re-processing it or silently drop it. (rme#706 ran
-100+ review rounds: each round's *new* findings --- a missing derivation step,
-a missing i.i.d. hypothesis, an unverified citation locator --- got fixed
-every time; the one recurring file-length flag got a single reply-and-hold
-each round until the user weighed in.)
+unilaterally to either keep re-processing it or silently drop it.
 
 **When a finding is a pattern (a formatting/style rule broken in one spot),
 apply it everywhere it recurs in the same file, not just the flagged line.**
@@ -138,24 +137,6 @@ which is why nothing about accepting it feels like guessing.
 - **Don't:** read a null result as "no further sites"; it means no further hit
   for that pattern, and a differently-worded instance would not have matched.
 
-(`Morrison-Lab/gha#398`, 2026-08-03: round 1 flagged an unquantified
-superlative, "the corpus's most common paragraph opener", and named three sites
---- `CLAUDE.md`, a `changelog.d/` fragment, and a code comment in
-`check-new-line-breaks/check-new-line-breaks.py`.
-Commit `698d0af` touched exactly those three files, and the reply read "in all
-three spots you named".
-Round 4 then found a fourth site, a comment block in
-`check-new-line-breaks/tests/test_check_new_line_breaks.py`.
-Its finding opened "Fourth site with the same unquantified-superlative issue,
-missed by the two rounds that fixed the other three" --- the reviewer's words,
-not the code comment's, which says nothing about review rounds.
-The sweep was available in round 1 and would have closed it there:
-`git diff origin/main...e0e08e2 | grep -E 'most common|single most|house style'`,
-run against round 1's own head, returns five hits across all four files.
-The same grep at the fixed head returns no further hit for that pattern, which
-is the other half of the check --- though only for that pattern, since a
-superlative worded differently would not match it.)
-
 **The mirror case: the enumeration was complete and the fix was not.**
 The rule above governs a reviewer's list that was too short.
 This governs the one that was exactly right, and a reply that closed it anyway.
@@ -191,27 +172,13 @@ reach for it --- closing out a finding, not only checking a computed figure.
 - **Don't:** reach for the derive-the-site-list remedy above here --- that list
   was complete, and the shortfall was in the delivery.
 
-(`Lacaedemon/sparta` PR #1199, 2026-08-05: the review verdict flagged
-`website/combat.qmd` for reproducing "the *old* equation ... and old prose" at
-lines 88-97, quoting both.
-Commit `57d24b33` changed the equation, and the round-1 disposition table
-reported the finding Addressed while the prose two lines below still read
-"$\lambda$ is how much a shield ($b_D$) adds to a defence you can actually bring
-to bear" --- the exact skill-independent framing the PR existed to remove.
-Fetching the PR-preview build and reading the rendered page caught it: the
-equation had updated correctly, and a second `b_D` on the same page was the tell.
-Grepping the whole file for the concept then found two further stale statements
-the review had never mentioned --- the stat-list entry for `b`, and an "Armour
-and shields buy time" tactical bullet --- fixed together in `a9fff0d8`.)
-
 **When a prose fix changes wording that's also paraphrased elsewhere in the
 same PR (a CHANGELOG entry, a PR description, a cross-reference), sync that
 copy too.** A CHANGELOG entry written before the review lands often quotes or
 paraphrases the exact phrase a reviewer later flags; fixing the source
 prose but leaving the paraphrase stale reintroduces the same wording issue
 one file over. Grep the diff for the flagged phrase before considering the
-finding closed. (ai-config#373: fixed "routing/dispatch site" in the skill
-per review, but the CHANGELOG entry still said it until a follow-up commit.)
+finding closed.
 
 **When syncing copies, search the diff for the claim, not the files or symptom
 already in front of you.**
@@ -246,23 +213,6 @@ around.
 - **Don't:** accept a search for the visible contradiction as proof that the
   retired claim itself is gone.
 
-(Morrison-Lab/ai-config#981, round 2 commit `f616dc5a`, did both.
-A count fix followed this section's rule in name, but ran
-`grep -rn "122" hooks/*.py`, scoped to the two files already open.
-That missed `hooks/hooks.json:56` and
-`shared/workflow/incidents-dont-repeal-decisions.md:94`, so round 3 found the
-PR still disagreeing with itself: 121 in two places and 122 in two others for
-one unrecountable measurement.
-The round 3 fix `05486216` used the diff as the scope; after committing, the
-counts were `122: 0` and `121: 5`.
-The same round retired a rationale that `Explore` and `Plan` were exempt
-because they lacked `Edit`, `Write`, and `NotebookEdit`, while `Bash` was the
-hole in that role contract.
-Searching only for `Bash` missed a nearby code comment and two test labels that
-still said the agents were read-only "by definition".
-Those were corrected to the harness's declared read-only role, and both review
-threads were resolved.)
-
 **The PR description is on that list and is the one copy grepping the diff
 cannot find, so check it separately.**
 A PR body is not a file, so it appears in no diff and no reviewer reads it as
@@ -284,14 +234,6 @@ overwriting, since the wrong version is what earlier comments respond to.
   PR does or why, alongside the changelog check above.
 - **Don't:** treat a clean `grep` over the diff as evidence every paraphrase
   is synced --- the description was never in it.
-
-(ai-config#829, 2026-07-29: a review nit led to correcting a gha#350
-attribution in `memories/github-actions.md`.
-Both reviewers then approved, and the PR body still carried the original
-wrong claim verbatim --- "`continue-on-error` there, the dropped implicit
-`success()` here" --- because it had been written before the correction and
-was not part of the diff either reviewer read.
-Caught only while assembling the ready-for-merge summary.)
 
 **Following that "state it as history" advice is what produces the next
 block, because an automated reviewer reads the body as a flat statement of
@@ -339,20 +281,6 @@ can still block, at which point the only remaining move is deleting the
 history outright, which costs the earlier comments their referent.
 That trade belongs to the human, not to the agent driving the PR.
 
-(Morrison-Lab/ai-config#843, 2026-07-30: the maintainer asked for a fourth
-tool on an allowlist that had shipped with three.
-Jules blocked twice.
-The first was an ordinary stale snapshot --- its run started at `02:56:28Z`,
-two seconds before the body was corrected.
-The second re-ran at `03:00:31Z` against the corrected body, with a new
-session id and a different cited line number, read the reversal-history
-section, and praised the description for "explicitly documenting which
-permissions should be intentionally excluded" while demanding the requested
-tool be removed.
-`claude-review` saw the same inconsistency at the same stale head and graded
-it a minor, explicitly non-blocking prose note.
-Escalated; the human merged past it.)
-
 **The same sync is needed when the review fix is to CODE BEHAVIOR rather than
 to wording --- and that case is easier to miss, because nothing about fixing a
 bug points at the changelog.**
@@ -372,12 +300,6 @@ Fold it into the same pre-push self-review pass [`ardi`](ardi.md) already
 requires; a changelog entry is a claim about the diff, so
 [`fact-check-prose`](../writing/fact-check-prose.md) applies to it exactly as
 it applies to any other prose in the PR.
-(d-morrison/altdoc#78, 2026-07-27: review round 2 established that mkdocs
-serves `/man/foo/`, not `/man/foo.html`; the code and the PR body were
-corrected that round, while `NEWS.md` kept saying links point at `.html` under
-"`mkdocs` and `quarto_website`" through two further clean review rounds.
-Caught by a `main`-sync merge conflict that happened to land in that entry ---
-not by any review, and not by any check.)
 
 **Tighter still: a changelog entry can contradict its own commit message, in
 the same commit, with no review in the loop at all.**
@@ -403,15 +325,6 @@ message, grep that same commit's prose changes for a claim about the same
 mechanism, and read the two together before pushing.
 Where they differ, the commit message is usually the correct one, because it
 was written while the mechanism was in front of you.
-
-(`ucdavis/bcs#463`, 2026-07-30: `a0f4113d`'s commit body said `update_trigger`
-"can set `enabled: false` and rewrite a routine's prompt and cron outright".
-The `NEWS.md` entry edited by that same commit justified excluding a different
-tool on the grounds that the allowed set only changes *when* routines run ---
-which the commit body directly refutes, and which is wrong about
-`create_trigger` too, since it authors a whole new routine.
-Caught by `claude-review` as an inline finding, not by any check, and the
-correct framing turned out to be deferred versus immediate effect.)
 
 **One step further back: a figure inherited from the tracking issue is both
 the copy git keeps and the copy nobody verified.**
@@ -446,10 +359,6 @@ makes the weaker copy permanent.
 Read a recent squash commit on `main` if you want to know which way a given
 repo is set --- `git log -1 --format=%B <a squash merge>` shows it directly,
 and beats reasoning about settings pages.
-(Checked this way on this repo, 2026-07-30: `5670f9f`, the squash of
-[#855](https://github.com/Morrison-Lab/ai-config/pull/855), carries that PR's
-commit message rather than its body.
-So here the weaker copy is the one that persists.)
 
 And verifying once feels like verifying.
 Running the check for the PR body produces a real sense of having established
@@ -472,15 +381,6 @@ claims do not fire on it.
   unmerged --- `git commit --amend` still works, and is usually worth a fresh
   CI round against a wrong figure reaching `main`.
 
-(`ucdavis/bcs#465`, 2026-07-30: a submodule-pin bump whose PR body said
-`CLAUDE.md` resolves 33 `@.ai-config/...` imports and whose commit message,
-written minutes apart, said 25.
-33 came from a script; 25 came from the tracking issue, written from
-recollection.
-Review named the mechanism exactly --- inherited from the issue rather than
-re-checked against the file --- and graded it non-blocking on the grounds that
-it was already permanent, which was the one part that was not yet true.)
-
 **A corollary for checking any of this in a semantic-line-break corpus: a
 single-line `grep` returns false negatives on your own prose.**
 The instruments above and elsewhere in this file assume you can search for a
@@ -494,10 +394,6 @@ your work, which invites re-doing something already done.
 Normalize whitespace before matching --- read the file, collapse `\s+` to a
 single space, then search --- rather than trusting a line-oriented tool
 against deliberately broken lines.
-(Same day, verifying that
-[#855](https://github.com/Morrison-Lab/ai-config/pull/855) had landed: two of
-three greps reported present and the third reported absent, purely because
-that phrase happened to straddle a line break.)
 
 **Inline markup breaks the same search, and that variant aims the false
 negative at someone else's work rather than your own.**
@@ -532,13 +428,6 @@ unformatted fragment rather than the whole title.
 - **Don't:** file a dangling-citation issue while the only evidence is a
   literal grep that found nothing but the citation --- that is the search
   failing, until a normalized one agrees.
-
-(Morrison-Lab/ai-config, 2026-07-30: `skills/ums/SKILL.md:109` cites
-`memories/preferences.md`'s worktree-by-default rule, and a literal grep for
-the quoted title returned only the citation, which was reported as a
-dangling reference.
-The rule is at `memories/preferences.md:264`, differing from the quotation by
-two backticks; a backtick-normalized search found both files.)
 
 **Apply whatever normalization you choose to the search term as well as to
 the text, or the fix produces a third false negative of its own.**
@@ -575,14 +464,7 @@ norm(needle) in norm(haystack)
 - **Don't:** test a raw search term against normalized text, however plain
   the term looks.
 
-(Morrison-Lab/ai-config, 2026-07-30, verifying #919 on `main`: a probe
-collapsing backticks, asterisks, underscores, and whitespace in the file
-alone reported `SH_WORD_SPLIT` ABSENT, while `git grep -c` found it.
-The same needle normalized reported present.
-That was the third normalization-caused false negative of the session, and
-the first produced by the remedy rather than by the raw search.)
-
-**A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change. (`UCD-SERG/serocalculator#503`: a review flagged `.Rbuildignore`'s `^\.posit/assistant$` as redundant with the existing `^\.posit$` pattern above it --- both lines had landed together in an already-merged `main` commit (#579), picked up via a routine `main`-sync merge, not introduced by #503's own diff. Deferred to `main` instead of fixed on the branch.)
+**A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change.
 
 **This generalizes to a skill's own inline restatement of a fragment it
 links to.** A `SKILL.md` that links a backing `shared/` fragment for the
@@ -593,10 +475,7 @@ fragment doesn't automatically fix these inline restatements --- they're a
 second, independent copy of the same claim, and a review round after the
 fragment fix can catch them going stale exactly like a CHANGELOG paraphrase
 does. Grep the whole PR diff for the fixed phrase/word-list, not just the
-fragment file, before considering a fragment fix complete. (`ai-config#507`:
-fixing `forward-references.md`'s regex left `fix-forward-references/SKILL.md`'s
-own `description` field and Step 2 summary describing the old, already-fixed
-approach --- caught in a second review round.)
+fragment file, before considering a fragment fix complete.
 
 **A bot that re-raises an item as "not addressed" may simply not have seen
 your reply --- check the timestamps before treating it as an impasse.** An
@@ -618,11 +497,7 @@ The ordering fix is cheap: when a round is Rebut-only, post the rebuttal
 **before** anything that triggers the next review (a push, an `@claude`
 mention), so it is in the snapshot the next run reads. When a round mixes
 Address and Rebut, post the rebuttals first and push the code second, for
-the same reason. (d-morrison/altdoc#34: a `\pkg{}` rendering rebuttal
-carrying a `pandoc` run that disproved the finding's implied hazard was
-posted about a minute before the follow-up review job started; that review
-reported the item "wasn't addressed in `9398d5d`" and re-posted the
-identical suggestion.)
+the same reason.
 
 **Reply-first collides with citing the fix's SHA, and the way out is to commit
 between them rather than to pick one.**
@@ -653,12 +528,6 @@ bullet in [`ardi`](ardi.md).
 - **Don't:** treat "I need the SHA for the reply" as a reason to push before
   replying; that is the ordering the bullet above exists to prevent.
 
-(ai-config#871, 2026-07-30: a four-finding round with three Addresses and one
-Rebut was pushed first and replied to about a minute later, so the round-2
-review run started before the rebuttal was visible to it.
-It happened to engage the rebuttal anyway --- the evidence was in the diff as
-well as the thread --- but that was luck, not the ordering working.)
-
 **A finding can be right while its `suggestion` block is wrong --- verify
 the suggested literal before applying it.**
 A GitHub ```` ```suggestion ```` block is one-click-appliable, which is
@@ -673,13 +542,6 @@ publishes a specific wrong value under the reviewer's apparent authority.
 When the suggestion is wrong but its point stands, fix the underlying
 issue your own way and say in the reply why the suggested form was set
 aside --- silently deviating reads as having missed it.
-(ai-config#726: a review correctly flagged that a `<path>` placeholder
-didn't say where a script came from, but suggested
-`<path-to-gha-checkout>/check-new-line-breaks.py` --- one directory level
-too high, since the composite action's directory and the script inside it
-share a name. `git ls-files` in the gha checkout settled it in one command.
-Applying the suggestion verbatim would have documented a nonexistent path
-in the entry whose whole purpose is getting someone to run that script.)
 
 **The same check applies to a fix a reviewer describes in prose rather than
 in a `suggestion` block, and the sharpest test is the reviewer's own
@@ -695,14 +557,6 @@ When the proposed fix falls short, prefer eliminating the failure mode
 outright over layering another patch onto it, and post the evidence
 (the fix applied to their example, and what it still produces) rather than
 just asserting it was insufficient.
-(gha#318, 2026-07-26: a review correctly found that a heredoc-terminator
-regex lacked an end-of-line anchor, and suggested adding one.
-Tested against the reviewer's own indented-`EOF` example, the suggested
-anchor still truncated the body, because the terminator's leading `[ \t]*`
-accepted a space-indented closing line real bash rejects.
-Matching whole lines against the tag -- how bash itself ends a heredoc --
-removed the whole lazy-quantifier/anchor failure mode instead of narrowing
-it; the reply carried the failing output of the suggested form.)
 
 **A reviewer's corrected citation is another factual claim, so verify the
 replacement before adopting it.**
@@ -725,16 +579,6 @@ when the evidence points elsewhere, and say which query decided it.
   original was wrong.
 - **Don't:** use word overlap and same-day timing as a substitute for source
   history.
-
-(Morrison-Lab/ai-config#971 round 2, 2026-08-01: a review correctly found that
-PR #955 did not cover a "default nobody chose" case record.
-It then proposed #951 as the source because #951's `memories/tools.md` entry
-used the word "default" and merged the same day.
-That was the wrong default and the wrong file: #951 did not touch
-`shared/workflow/metacognitive-monitoring.md`.
-`git log -S "An unexamined default" -- shared/workflow/metacognitive-monitoring.md`
-identified #947 as the source for the default half, while #955 supplied the
-handed-premise half in the same fragment.)
 
 **The highest-yield version of that check: when a comment names an edge case
 in its own prose and also supplies a fix, run the fix against that edge
@@ -773,18 +617,6 @@ reads as having missed it.
   snippet --- they are separate claims.
 - **Don't:** discard a finding because its fix is wrong; the half that named
   the hazard usually still stands.
-
-(Morrison-Lab/ai-config#868, 2026-07-30: a review correctly found that
-`git merge-base --is-ancestor` prints nothing and answers by exit status, and
-its second paragraph noted the command exits 2 or higher when the ref has
-been pruned away.
-Its suggested `... && echo "ancestor" || echo "not ancestor"` maps that exit
-onto the `not ancestor` branch, since `&&` fails on any non-zero status --- so
-the fix printed a confident verdict for precisely the broken-check case the
-comment itself had raised, which is the shape
-[`fail-fast`](../principles/fail-fast.md) names.
-A three-arm `case $?` was used instead, reporting `0`, `1`, and `2+`
-distinctly.)
 
 **A quieter variant: the suggestion introduces no defect at all, it restates
 the line above it --- so applying it deletes coverage while reading as
@@ -828,18 +660,6 @@ fragile sentinel for another.
 - **Don't:** read a reviewer's own "the line above already covers this" as
   support for their replacement.
 
-(Morrison-Lab/ai-config#896, 2026-07-30: a review correctly called a test's
-`"user-invocable" not in body` sentinel fragile, and suggested
-`"---" not in body.lstrip()[:3]`.
-Evaluated against the real body, that is the same predicate as the
-`not body.lstrip().startswith("---")` assertion directly above it --- both
-test the first three characters, both returned `True` --- so adopting it would
-have left one property checked twice and the other not at all.
-A synthetic fixture replaced the corpus coupling instead, plus a third
-assertion that body prose *survives* stripping, which neither the original nor
-the suggestion covered.
-Tracked as #905.)
-
 **A finding can be right, and its fix adequate, while the *reason* it supplies
 is too weak to ship --- and in a corpus of rules, the reason is the
 deliverable.**
@@ -872,19 +692,6 @@ taste.
 - **Don't:** treat this as grounds to reject the finding --- the conclusion
   usually stands, and only its reason needs strengthening.
 
-(Morrison-Lab/ai-config#873, 2026-07-30: a review correctly found a `CC-BY-ND`
-table row that called verbatim copying allowed and then concluded idea-only with
-no bridge.
-Its suggested reason, "MIT grants modification rights; ND does not", frames the
-conflict as two grants differing in scope --- which licenses the workaround of
-keeping the file under its own notice inside the MIT repo, since on that framing
-no conflict arises.
-SPDX `license-list-data`'s `CC-BY-ND-4.0.txt` §2(a)(1) grants a
-**non-sublicensable** license, so the material cannot be re-offered under MIT at
-all, which is exactly what vendoring does.
-The conclusion was right, and its stated reason stopped short of the provision
-that actually forecloses the workaround.)
-
 **And the mirror case: a finding can be wrong on its stated grounds while
 still pointing at something real.**
 The bullets above check the reviewer's *fix*; this one checks their
@@ -905,17 +712,6 @@ problem even if their explanation of it was wrong.
 Expect the corrected mechanism to be more useful than the original text:
 a premise worth disputing usually sits on something you had not fully
 explained.
-(ai-config#756, 2026-07-28: a review held that `[\x{2014}]` is valid PCRE
-and so could not produce the "code point value too large" error the fragment
-described, and proposed an out-of-range `[\x{110000}]` instead.
-Running it showed the original failing exactly as written -- the cause is
-the locale, since PCRE in non-UTF mode rejects any `\x{}` above `0xFF`, and
-the same command succeeds under `LC_ALL=C.UTF-8`.
-The proposed replacement would have been worse, failing unconditionally and
-hiding that environment-dependence, which is the whole reason the swallowed
-error is dangerous.
-The reviewer's actual worry -- that a reader might not reproduce it -- was
-right, and sharper than stated.)
 
 **A third direction, which evades the verification reflex rather than lacking
 a rule: agreeing with a finding and then escalating it.**
@@ -970,28 +766,6 @@ that it was not.
 - **Don't:** report a finding as understated on a measurement you have not
   shown covers the whole field set.
 
-(Morrison-Lab/ai-config#1056, 2026-08-02: Copilot found that the
-`LIST_SECRETS` row promised `created_at`, which `gh secret list` does not
-expose, and that finding was correct and correctly scoped to one field.
-The session ran `gh secret list --repo <owner>/<repo> --json 2>&1 | head -3`,
-read the two field names that survived its own truncation, and replied that
-the CLI failed on two of three fields rather than one, writing that into
-`tool-mappings.yml` as measured fact.
-On gh 2.96.0 that usage message lists five fields: `name`,
-`numSelectedRepos`, `selectedReposURL`, `updatedAt`, and `visibility`.
-A usage line plus the first two of those is exactly what `head -3` returns, so
-`updatedAt` was reachable all along and only `created_at` was not.
-A later round caught it, and the correction had to be posted to the original
-thread.
-
-Note which instrument was the wider one, because it is the reverse of what
-escalating assumes.
-The reviewer's report named one field and its instrument showed all five,
-while the escalation named three fields on a view of two.
-The defect was truncating a full-scope instrument rather than choosing a
-narrow one, which is why the remedy is coverage of your own claim rather than
-a probe wider than the reviewer's.)
-
 **When a finding cites a source, read the cited source before reproducing
 anything -- it is the cheaper instrument, and it is the one that can show the
 finding backwards rather than merely unsupported.**
@@ -1018,20 +792,6 @@ A finding that misread a source usually did so because the claim it
 questioned had nothing checkable next to it, so fold the citation into the
 file itself, per [`fully-clean`](fully-clean.md)'s note that a fresh review
 run re-derives from scratch and will not read the thread.
-(ai-config#762, 2026-07-28: a review held that
-`htmlwidgets::saveWidget(selfcontained = TRUE)` no longer needs pandoc,
-citing htmlwidgets 1.6.0 as having "switched to `base64enc::dataURI()`", and
-supplied a suggestion block deleting the `rmarkdown::pandoc_available()`
-gate.
-`grep -inE 'pandoc|base64'` over that NEWS file returned six pandoc hits and
-zero base64 hits, and the 1.6.0 entry says the path "now uses the
-`{rmarkdown}` package to discover and call pandoc" -- so the citation
-established the opposite of the finding, and incidentally made the gate the
-*same lookup* htmlwidgets performs rather than a proxy for it.
-Applying the suggestion would have removed the only warning before a hard
-error, in the one step that exists for running headless.
-The reviewer accepted the rebuttal on the next round and called its own prior
-claim a hallucination.)
 
 **When a reviewer hedges a finding because it depends on code it cannot
 see, check whether *you* can see it --- the hedge is an invitation, not a
@@ -1055,17 +815,6 @@ Either way the next reader is spared re-deriving it.
 Quote the specific lines you checked, since a follow-up issue that merely
 repeats the reviewer's hedge is barely more useful than the review
 comment it came from.
-
-(`UCD-SERG/serodynamics#274`, 2026-07-28: a review flagged possible
-duplicate review dispatch at moderate confidence, explicitly because the
-reusable workflow in `d-morrison/gha` was not visible to it.
-That repo was cloned locally.
-Reading both matchers showed the reusable fires on `@claude[[:space:]]+review`
-and the local job on a punctuation-tolerant superset, so the plainest
-phrasing --- `@claude review` --- matches both and dispatches twice.
-The follow-up issue could then record the exact overlap table and note
-that the upstream gap motivating the local job had since been closed,
-making "broaden upstream, delete the local job" a real option.)
 
 **Timestamp the evidence before rebutting a finding with it --- during a live
 incident, a log from twenty minutes ago describes a different system.**
@@ -1099,13 +848,6 @@ Telling an author their diagnosis is contradicted by the logs is a strong
 claim that invites them to stop investigating.
 Getting it wrong can stall a correct fix for the exact bug still breaking
 everything.
-(gha#351, 2026-07-28: a PR correctly diagnosed that Actions had stopped
-resolving `uses:` after a repo transfer.
-Its premise was disputed on the strength of two run logs showing the
-workflow resolving fine --- logs from 45 and 30 minutes before the PR was
-opened, spanning the cutover.
-Re-running one of those very workflows reproduced `startup_failure`
-immediately, and the retraction had to be published in the same thread.)
 
 **A finding built on a *negative* result -- "I searched and it isn't there"
 -- is only as strong as the paths that were searched, and the search scope
@@ -1143,15 +885,3 @@ under-specified one.
   more confidently than a positive finding would be.
 - **Don't:** discard the finding once its negative result is disproved -- the
   thing it tripped over is often a real ambiguity.
-
-(`Morrison-Lab/gha#338`, 2026-07-28: a review reported a cited section as
-nonexistent, having "checked ai-config's full tree (`shared/workflow/*.md`,
-`skills/`, `codex-skills/`)".
-The heading was an H2 in that repo's **root** `CLAUDE.md`, the one directory
-those three paths skip.
-The reviewer had even found the phrase in `shared/workflow/fully-clean.md`
-and read it as pointing at a *consuming* repo's `CLAUDE.md`.
-The rebuttal carried the one-line grep; the underlying point was real
-anyway, since citing a section title without naming its file is what sent
-the search to the wrong directories, so the citation was fixed to name and
-link the file.)

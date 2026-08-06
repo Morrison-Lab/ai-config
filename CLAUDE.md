@@ -553,6 +553,10 @@ a PR that would conflict or show a misleading diff if the other landed first,
 a migration that must precede its consumer.
 Two PRs touching disjoint files have no constraint,
 and saying so plainly is the right answer, not an occasion for the marker.
+But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it ---
+`gh pr diff <N> --name-only` on each PR, and confirm no path appears in both ---
+rather than recalling what each PR is "about", which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
+A follow-up PR that extends into a `shared/` (or any) file a prior PR also edited is a common collision, and the two conflict at merge time.
 The rationale behind each surface lives in `memories/preferences.md`,
 alongside the rest of the taxonomy.
 
@@ -1174,6 +1178,23 @@ The same opt-in gate still applies: propose with a cost estimate and wait unless
 
 <!-- Shared with the lab manual; edit shared/workflow/when-to-orchestrate.md, not here. -->
 @shared/workflow/when-to-orchestrate.md
+
+## Agent teams: a third parallelism primitive, human-gated and advisory
+
+The corpus governs two primitives a session invokes itself --- a single `Agent` call ("Use subagents when helpful", above) and the `Workflow` tool ("Auto-orchestration", just above).
+An **agent team** is the third: several separate Claude Code sessions (a lead plus teammates, each its own context window) that coordinate through a shared task list and a mailbox and **message each other directly**, rather than only reporting back.
+Unlike the other two, a session cannot form one on its own, so the corpus's role is only to *recommend* it.
+
+The discriminator across all three is one question: **do the workers need to communicate with each other, or does a human want to steer individual workers mid-run?**
+No to both --- a subagent or a `Workflow` sweep, per the rules above.
+Yes --- an agent team, and only if it is enabled.
+
+**Never assume a team is available, and never author a step that spawns one.**
+Agent teams are experimental and off by default (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), and are spawned by the *user* in natural language and steered through an interactive agent panel --- not invoked by an autonomous or headless session.
+So a recommendation to the user is the only correct output; a skill or `Workflow` step that forms a team is a bug.
+The one concrete reuse angle: a `.claude/agents/<name>.md` subagent definition doubles as a teammate role (its `tools` and `model` apply, and its body is appended to the teammate's prompt), but its `skills`/`mcpServers` frontmatter is not applied to a teammate.
+
+@shared/workflow/agent-teams.md
 
 ## Algorithmatize checks: instruments over LLM reasoning
 

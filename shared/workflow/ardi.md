@@ -19,6 +19,8 @@ in progress; do not call the PR clean from an earlier head or from green CI
 without a current-head review verdict.
 Pushing fixes for a finding-bearing review starts a new review cycle: the ARDI loop is NOT finished when you push fixes or post an ARD summary.
 You must wait for the fresh review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it is clean before declaring the loop finished.
+NEVER use background tasks, async sleep commands, or schedule timers for ARDI status polling.
+Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn.
 This applies transitively to PR-driving
 workflows such as `gi`, `gii`, and `ardia`; only monitor PRs the session owns or
 has explicitly claimed, so the rule does not authorize changing someone else's
@@ -169,6 +171,45 @@ concluded they were "appropriate", reasoning that two restated surviving
 prose and the third was superseded.
 The third point was right and the other two were not; the bullets were
 restored, one reworded, and the deletion count fell from seven lines to two.)
+
+**When the edit is a regex or string patch rather than the Edit tool, two
+mechanisms turn that displacement into a silent over-deletion, and a self-check
+can wave both through.**
+A non-greedy `.*?` DOTALL span binds to the **first** occurrence of its start
+anchor, so when that anchor is not unique the match runs from the wrong site
+and swallows every intervening structure up to the target suffix.
+And a self-check that counts only the **changed** element passes by
+coincidental balance while its neighbours are gone: deleting one sibling append
+and adding one target append leaves the target count unmoved, so the count
+reports success over a diff that dropped whole intervening blocks.
+The assertion that actually catches it verifies that neighbouring structures
+**survive** --- the sibling loop still present, untouched element counts
+unchanged --- rather than that the changed element's count is as expected.
+
+- **Do:** anchor a string or regex patch on text unique to the intended site,
+  and prefer the Edit tool's exact-string matching over a broad `.*?` DOTALL
+  span.
+- **Do:** make a patch self-check assert that neighbouring structures survive
+  --- the sibling function or loop still present, untouched element counts
+  unchanged --- not merely that the changed element's count is as expected.
+- **Don't:** trust a `re.sub(..., flags=DOTALL, count=1)` whose non-greedy
+  `.*?` start anchor is non-unique; it binds to the first occurrence.
+- **Don't:** read "the assertions passed" as "the patch is correct"; a
+  count-based check can pass by coincidental balance, and the `git diff`
+  deletion-review is the real gate.
+
+(Morrison-Lab/ai-config#1167, round 12, 2026-08-05: a `re.sub` DOTALL patch to
+`scripts/check-pr-fully-clean.py`'s second `for r in reviews:` loop anchored on
+that same text, which also opens an earlier `author_latest_state` loop, so the
+match ran from the first occurrence and deleted both it and the intervening
+`for c in comments:` loop.
+The self-check `src.count('all_items.append(("review"') == 1` passed anyway,
+because the lost comment-append and the one added review-append balanced, and
+an `is_review_header == 0` check passed because both loops that used it were
+gone.
+Reading `git diff` before committing surfaced the deletion; the fix reverted
+and redid it with the Edit tool plus survival assertions, verified by a
+negative control.)
 
 **A clean verdict does not discharge the self-review against project
 conventions either, and the reviewer's own "not a finding" is where that
@@ -612,10 +653,57 @@ version `DESCRIPTION` pins --- was unavailable, inferred from one failed
 `install.packages()` disproved it, and the regeneration landed in the same
 round the finding did.)
 
+**Attempting the base form of a command is not attempting its variants ---
+a refusal describes the invocation you ran, never the flag you did not try.**
+The rule above is discharged by one attempt, which is what makes this the
+harder miss: the attempt genuinely happened, so the instinct that rule exists
+to trigger has already fired and reported itself satisfied.
+What ships anyway is a claim about a *different* command --- the same one plus
+a flag --- for which no attempt exists at all.
+
+The error message is what makes that generalization feel safe, because it is
+usually phrased about the operation rather than about the invocation.
+A refusal reading `cannot be moved or removed` sounds like a statement about
+the whole family, and it can even be half-true: that wording really is
+unconditional for one of the two operations it names.
+A half-true message is worse than a plainly wrong one, since re-reading it
+confirms the reading you already had.
+
+So before writing that something is impossible, check whether the tool's own
+`--help` or documentation offers a flag for exactly this case, and run that
+form too.
+One `--force` is cheaper than the correction round, and it is the only thing
+that turns "the command refused" into "the operation cannot be done".
+
+- **Do:** run the flag variant the docs or the error itself name, before
+  generalizing a refusal into an impossibility.
+- **Do:** scope the published claim to the invocation actually run, naming the
+  exact command and what it exited with.
+- **Don't:** read an unconditional-sounding error as covering flags you never
+  passed.
+- **Don't:** count an attempt at the base form as discharging the rule above
+  for a variant of it.
+
+(2026-08-05, `Morrison-Lab/ai-config`: `git worktree remove <path>` on a
+worktree holding a checked-out submodule failed with `fatal: working trees
+containing submodules cannot be moved or removed`, and a memory entry was
+written asserting that `--force` "does not help" and that git "declines this
+case unconditionally".
+`--force` had never been run.
+A reviewer challenged it against git's own documentation, which says
+"Unclean worktrees or ones with submodules can be removed with `--force`".
+Measured on git 2.37.2.windows.2: the plain form exits 128, while
+`git worktree remove --force <path>` exits 0, deletes the directory, and
+deregisters the worktree.
+The wording was genuinely unconditional for `git worktree move`, which is the
+half-truth that made it survive re-reading.
+[`memories/git-worktrees.md`](../../memories/git-worktrees.md) now records the
+working form.)
+
 **Name the specific gate when you report a blocker, not a category word that
 happens to be one of several.**
-The rule above governs *whether* something is blocked, and its remedy is to
-attempt the thing once.
+The verify-a-blocker rule two sections above governs *whether* something is
+blocked, and its remedy is to attempt the thing once.
 This governs *why*, and it fires after that remedy has already succeeded: the
 call was attempted, it genuinely failed, and the blocker is real.
 Only the attribution is wrong, which is why nothing about it feels like an

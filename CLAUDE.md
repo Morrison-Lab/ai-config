@@ -412,12 +412,28 @@ In every session — at session start, and again periodically during long sessio
    python3 <ai-config-checkout>/scripts/install-hooks.py          # report
    python3 <ai-config-checkout>/scripts/install-hooks.py --fix     # register the missing ones
    ```
-   Two caveats before running `--fix`.
+   Four caveats before running `--fix`.
    Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
    And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
    Say so rather than reporting the guards as live.
-   - **Do:** run both instruments each session, and report the two counts separately.
+   **Run `check-install.py --fix` first, so the scripts are on disk before anything binds to them.**
+   `install-hooks.py` only writes `settings.json`.
+   It never places a file, and it does not check that the script it is registering exists.
+   Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.
+   `--fix` prints the note naming this division of labour only when run *without* `--fix`, so the run that causes the damage is the one that stays silent about it.
+   **Point 1 governs this instrument too, and its stale run is the more dangerous of the two.**
+   A stale `check-install.py` run reports suspect numbers.
+   A stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
+   Pull first, then measure, and treat the examined count as the thing to read: it is the manifest's size, so a number below the current hook count means the checkout is behind rather than the machine being clean.
+   - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
+   - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`
    - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.
+   - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
+
+   (2026-08-05, this machine: `install-hooks.py` run against a checkout 31 commits behind read a stale manifest and reported `registered=12 missing=0 stale=0` / `All hooks registered.`
+   After `git pull --ff-only` the same command reported `examined 15 ... registered=12 missing=3`.
+   Running `--fix` then bound all three to scripts absent from `~/.claude/hooks/`, one of them a `PreToolUse` `Bash` hook, which blocked every Bash call until `/reload-plugins` placed the symlinks.
+   `memories/claude-code-hooks.md` carries the mechanism and the recovery.)
 
    (2026-08-04, this machine: `check-install.py` reported 32 of 34 entries ok while `install-hooks.py` reported `registered=3 missing=8`, so 8 of 11 guards had never been bound to an event.
    Among them was `flag-unassigned-worktree.py`, and in that same session two `Agent` calls were launched with no `isolation` --- exactly what it exists to warn about --- with no warning possible.

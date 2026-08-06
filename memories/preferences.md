@@ -87,6 +87,9 @@
   The moment the user corrects your behavior, or you realize you made an incorrect claim or missed something, run UMS right then --- do not wait for the task to finish, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
   This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section (a corrected understanding and a false claim about state both fire immediately); see that section for the full rationale and case records. (User directive / CAI, 2026-08-05).
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
+  The one exception is `Lacaedemon/sparta`, which never requests him, on PR
+  creation or on deadlock escalation alike.
+  Every other repo is unchanged, `Morrison-Lab/ai-config` included.
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --
   create, push, and open the feature PR first. The PR must expose the exact SHA

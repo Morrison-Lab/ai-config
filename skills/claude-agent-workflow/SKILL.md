@@ -127,6 +127,9 @@ before/after), re-requests `d-morrison` as reviewer, and dispatches
 needed because `GITHUB_TOKEN`-driven pushes don't fire `synchronize`
 events, so the review workflow wouldn't auto-trigger otherwise.
 
+In `Lacaedemon/sparta`, omit the `requested_reviewers` line --- that repo never requests `d-morrison` as reviewer (see [`request-pr-review`](../request-pr-review/SKILL.md)'s Scope section).
+Keep the `claude-code-review.yml` dispatch: only the reviewer request is scoped out.
+
 ### 5. stats-allowlist for WebFetch
 
 ```yaml

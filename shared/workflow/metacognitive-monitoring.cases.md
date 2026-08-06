@@ -151,9 +151,9 @@ then stepped to `12.22` and held while the live figure fell to `0.81` at the
 last logged sample.
 A separate 12-sample run caught the opposite error, `17.86` against a live
 24.35-24.45.
-Errors in both directions is what rules out treating it as a biased-but-usable
-gauge, and it is why two samples of it minutes apart produced contradictory
-conclusions with neither being a correction of the other.
+That the errors run in both directions is what rules out treating it as a
+biased-but-usable gauge, and it is why two samples of it minutes apart produced
+contradictory conclusions with neither being a correction of the other.
 
 The near-miss worth recording is the cross-check that would not have helped.
 on a read taken moments after the poll stopped,

@@ -129,6 +129,36 @@ self-reference.
 - **Don't:** rely on link checks for this class; the broken pointer is prose,
   not a link.
 
+**Sweep the general directional pattern, not the literal phrases you expect.**
+The self-review that verifies a move is where this check most often fails, and
+it fails by grepping for the *specific* wording the mover happens to remember
+--- `(below)`, `case below`, `per #N below` --- which is far narrower than the
+ordinary `the X above` / `Y below` / `here` phrasing the real danglers wear.
+Grep the general directional pattern instead, over both the moved content and
+the prose left behind, since a stranded reference can sit on either side of the
+split:
+
+```bash
+rg -niE '\b(above|below|here|earlier|later)\b|this (section|file)' <moved> <survivor>
+```
+
+Then classify each hit rather than trusting a zero count.
+A hit that now points **across the split** --- at content that moved to a
+different file --- is a dangling defect; fix it by naming the referent
+explicitly --- name the target rather than counting to a position --- not by
+flipping `above` to `below`.
+A hit that stays **within its own block**, is **quoted** (prose describing the
+very reference it quotes), or measures **elapsed time** ("minutes earlier", "a
+round later") is correct and must be left.
+The [`fix-forward-references`](../../skills/fix-forward-references/SKILL.md)
+skill (alias `ffr`) runs exactly this sweep and is the right tool for it.
+
+- **Do:** grep the general `\b(above|below|here|earlier|later)\b` pattern over
+  both sides of a split, and classify each hit as cross-file (fix) or
+  within-block/quoted/elapsed-time (leave).
+- **Don't:** report "no dangling references" from a literal-phrase grep --- it
+  is scoped to wording you already recalled, which is never where the misses
+  are.
 ## Inserting prose makes a downstream back-reference stale
 
 The section above covers the referrer *moving*.

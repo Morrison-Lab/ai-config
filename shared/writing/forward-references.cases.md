@@ -21,6 +21,17 @@ A moved entry at `memories/github-mcp-tools.md:45` still said
 After the split, that bullet remained in `memories/github.md:10`, so the
 sentence pointed to the wrong file until the reference was rewritten.)
 
+## Sweeping the general directional pattern, not literal phrases
+
+(Morrison-Lab/ai-config#1194, 2026-08-06: a pre-push self-review grepped
+`(below)` / `case below` / `as the case` / `per #N below` across 15 relocated
+fragments and reported none, but the round-1 `claude-review` found 7 dangling
+`above`/`below`/`here` references across 6 of them.
+The general `\b(above|below|here)\b` sweep that fixed them turned up an eighth
+the review had missed, and its remaining hits --- timeline and
+within-block/quoted phrasing --- were correctly left.
+The fixes named the referent inline rather than flipping the direction word.)
+
 ## "Inserting prose makes a downstream back-reference stale"
 
 (Morrison-Lab/ai-config#1091, 2026-08-03: a new section was inserted between

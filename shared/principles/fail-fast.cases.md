@@ -20,7 +20,8 @@ A rewrite in Python found a real em-dash on an added line.)
 rc=2.
 The fix adopted was rewriting the scan in Python, which also reports how many
 added lines it examined --- so a zero-hit result is distinguishable from a run
-that examined nothing, per the fan-out section below.)
+that examined nothing, per the fan-out section of
+[`fail-fast.md`](fail-fast.md).)
 
 ## "The narration can be the unfalsifiable part"
 
@@ -102,7 +103,9 @@ scoping --- was applied to them one at a time across the review rather than all
 at once, and each subsequent round surfaced the one path still unguarded: the
 shell-command parser underlying them, then the `open` path (`open_ident`), then
 the `self` discharge.
-The per-path *discharge* mechanics of that same PR are in the section below.)
+The per-path *discharge* mechanics of that same PR are in
+[`fail-fast.md`](fail-fast.md)'s "A combined result cannot attribute a
+per-step outcome" section.)
 
 ## "When the siblings are members of one pattern" --- the `grep` word boundary
 

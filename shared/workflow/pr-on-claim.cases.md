@@ -34,5 +34,5 @@ The repo's `claude-review` workflow was failing for the same context-closure lim
 
 (ucdavis/bcs `gia` session, 2026-07-06: SLURM-hardening changes for issue #286
 were written while still on issue #281's `chore/renv-explicit-snapshot`
-branch — caught before pushing, but only by re-checking `git status`/`git
+branch --- caught before pushing, but only by re-checking `git status`/`git
 diff --stat` against expectations, not because anything failed.)

@@ -5,6 +5,14 @@ Worked-example case records for the rules in
 auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
+## Re-scan the whole diff, not just the latest commit
+
+(gha#286: a changelog fragment
+added in the PR's first commit had a raw em-dash that a same-session grep
+check caught on that commit but missed on a later, narrower re-check scoped
+only to the commit being amended -- the gap was closed by the repo's own
+automated `@claude` self-review, not by the author's manual check.)
+
 ## Use the three-dot range for that scan, not the two-dot one
 
 (Morrison-Lab/ai-config#816, 2026-07-29: a pre-push scan reported 88 banned

@@ -79,7 +79,8 @@ The same `UMS_PATH` prefix already ships in `remind-ums-after-error.py`
 commented "A write to any of these is a recorded learning"), so the proxy is
 not hypothetical; whether its looser fire trigger there --- an error admission
 rather than a finding whose fix edits those paths --- makes the coarse
-discharge acceptable is the backstop-versus-fire-on-event judgment above.)
+discharge acceptable is the backstop-versus-fire-on-event judgment
+[`algorithmatize-checks.md`](algorithmatize-checks.md) draws.)
 
 ## A review flagging an overclaimed check is a prompt to build it, not to soften the claim
 

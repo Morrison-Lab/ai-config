@@ -20,4 +20,5 @@ repo's other references spell them `mcp__github__list_notifications`; ask the
 server rather than grepping our docs when you need to know what a toolset
 actually contains.
 The same session had already hit the shadowed-plugin and 400-vs-401 traps
-above, which is why they are written down here.)
+[`use-mcp-servers.md`](use-mcp-servers.md) documents, which is why they are
+recorded.)

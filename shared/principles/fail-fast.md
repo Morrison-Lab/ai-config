@@ -125,8 +125,8 @@ partner: that rule says build the instrument instead of eyeballing, and
 this one says an instrument that cannot fail loudly is not yet an
 instrument.
 
-Note what actually triggered that error, because it is the reason the
-pattern is worth keeping as the example.
+Note what actually triggered that "code point value ... too large" error,
+because it is the reason the pattern is worth keeping as the example.
 U+2014 is an unremarkable code point, well inside Unicode's range; the
 rejection came from the **locale**.
 With `LANG`/`LC_ALL` unset, PCRE runs in non-UTF mode, where any `\x{...}`

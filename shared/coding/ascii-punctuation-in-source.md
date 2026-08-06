@@ -102,11 +102,7 @@ commit.** A narrower check (`git diff -U0 <files-from-this-commit> | grep
 because that file never entered the narrower command's scope again. Use
 `git diff -U0 origin/main -- <all-changed-files>` (or `git diff -U0
 origin/main` with no path filter) so a fix pushed in round 2 doesn't
-silently leave round 1's violation standing. (gha#286: a changelog fragment
-added in the PR's first commit had a raw em-dash that a same-session grep
-check caught on that commit but missed on a later, narrower re-check scoped
-only to the commit being amended -- the gap was closed by the repo's own
-automated `@claude` self-review, not by the author's manual check.)
+silently leave round 1's violation standing.
 
 **Use the three-dot range for that scan, not the two-dot one, or a `main`
 that has advanced turns the check into a flood of false positives.**

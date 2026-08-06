@@ -37,7 +37,8 @@ The command's behaviour is recorded in
 
 ## "A refusal can name its own remedy" --- a GraphQL 403 naming the REST route
 
-(2026-07-30: a GraphQL call was refused with exactly the message above, read
+(2026-07-30: a GraphQL call was refused with exactly the message
+[`growth-mindset.md`](growth-mindset.md) quotes, read
 as a flat denial, and answered by searching the MCP registry and plugin
 catalog for a GitHub Discussions server to install.
 Neither could have helped -- a local server sits behind the same proxy.

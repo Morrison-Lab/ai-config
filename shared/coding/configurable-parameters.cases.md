@@ -33,4 +33,4 @@ actually built flags 1.1%.
 The maintainer's correction was "in general, useful features should be
 opt-out", and the 1.1% is what made that safe.
 The check is also warn-only unless a caller sets `fail`, which is the
-safe-on condition above doing its work.)
+"feature has to be safe on" precondition doing its work.)

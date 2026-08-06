@@ -31,7 +31,8 @@ The maintainer's correction was that the SAS programs are a proposal rather
 than a specification.
 By then the assertion had been treated as background fact by several agents and
 had propagated into issues and briefs, which is the convention-document shape
-above: no single reader invented it, and each one found it corroborated.)
+[`challenge-the-assignment.md`](challenge-the-assignment.md) describes: no
+single reader invented it, and each one found it corroborated.)
 
 ## This fragment's own brief overstated coverage
 

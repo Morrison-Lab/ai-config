@@ -83,6 +83,28 @@ generic Actions-authoring and reusable-workflow material.
     commit workaround above should no longer be necessary for a plain
     `@claude review`/`/review` dispatch -- verify the fix landed before
     reaching for the workaround on a repo that might already have it.
+- **Attribute a `workflow_dispatch`-triggered review run by its prompt or
+  `pr-number` input, not its head branch.**
+  A `claude-code-review` run dispatched with a `pr-number` input records
+  `head_branch: <default-branch>` (the PR is an INPUT, not the run's head), so
+  `gh run list` shows it as `Claude Code Review | head=main@<sha>` and two
+  concurrent dispatched review runs on different PRs are indistinguishable by
+  head, which defeats a `--headBranch`-filtered `gh run list` selection.
+  To pin a dispatched run to its PR, read the run's own prompt (it embeds
+  `/code-review ... /pull/NNNN`) or its `pr-number` input rather than its head
+  branch.
+  This is the same records-against-default-branch quirk
+  `shared/workflow/fully-clean.md` documents for a `--commit`-filtered lookup,
+  applied to a `--headBranch`-filtered one instead.
+- **A stalled or hung `claude-review` job posts NO comment on the PR, so a
+  stall leaves no PR-timeline breadcrumb.**
+  Only the success path posts a `Claude finished review -- View run <url>`
+  comment, so a run that hangs before reaching that step is invisible from the
+  PR's own conversation and must be found through the run list
+  (`gh run list --workflow`), not the PR timeline.
+  The fix is tracked in Morrison-Lab/gha#424 (have the workflow post an early,
+  PR-anchored comment linking the dispatched run so a stall is visible and the
+  run is attributable up front).
 - **A distinct stub-review signature: `is_error: false`, real `num_turns`/cost,
   but `permission_denials_count: 1` and no `Verdict` line.** (`permission_denials_count`
   is a field in the Claude Code SDK's runtime execution-output JSON, not

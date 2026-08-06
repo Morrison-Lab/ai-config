@@ -102,6 +102,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/enforce-ums-branch-and-rebase.py\"",
+            "timeout": 10,
+            "script": "enforce-ums-branch-and-rebase.py",
+            "why": "cai 2026-08-05 -- mechanistically blocks commits/pushes of memory/skill files on non-UMS branches or on branches that are behind origin/main."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-whole-file-punct-replace.py\"",
             "timeout": 10,
             "script": "no-whole-file-punct-replace.py",

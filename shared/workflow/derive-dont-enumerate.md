@@ -36,6 +36,41 @@ Give the recipient the derivation, not its result:
 When you genuinely must name specific items --- a stacked merge order, an exclusion --- say what the list is *for* and that it is a snapshot, so the recipient knows to re-derive rather than trust it.
 The distinction is between a list used as an **index** of the work, which rots, and one used as a **constraint** on it, which does not.
 
+## A derivation is still an enumeration of one pattern
+
+Everything above treats the query as the safe end of the trade, and against the failure it targets it is: a query re-derives the set, so it survives whatever gets added while you work.
+That is a claim about **time**, and it leaves the query's own **width** unexamined.
+
+A `git grep` is an enumeration too --- of one pattern --- and it can come back short at the instant it runs, against a frozen corpus, with no concurrency anywhere.
+The closedness test above answers **safe** for exactly that case: the inputs are fixed, the commit is frozen, nothing can extend the set mid-flight, and the derived list is still incomplete.
+So the test clears a list it should not, which is the gap.
+
+**The tell is that the search term names a command rather than an effect.**
+An effect usually has more than one command that produces it, and a pattern built from one of them cannot match the others.
+Before trusting a derived site list, ask how many distinct ways the corpus can express the thing being searched for, and search for the effect --- an endpoint, a field, a resulting state --- rather than for whichever spelling you reached for first.
+
+Two things make this hard to catch afterwards.
+The result is **non-empty**, so nothing about it invites suspicion; the too-narrow worry that a zero provokes never fires on a list of eight real hits.
+And it survives both remedies the corpus already offers.
+[`fail-fast`](../principles/fail-fast.md)'s "test the instrument against a known positive before trusting a negative" passes, because the pattern demonstrably matches --- every failure that section describes is a pattern that matched *nothing*, whereas this one matched most of the population.
+Its "grep for the operation being guarded, not for the guard" passes too, one notch short: `add-reviewer` **is** the operation, and the grep still missed a site.
+
+The general principle is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "an instrument's answer is only as wide as its input", and the conclusion already sits as a trailing caveat on [`address-every-comment`](address-every-comment.md)'s site-list rule --- "a differently-worded instance would not have matched".
+Read those rather than re-deriving them.
+What is added here is the tell, and the step from *the same idea worded differently* to *a different command with the same effect*.
+
+- **Do:** ask how many commands produce the effect you are searching for, before treating a derived site list as the population.
+- **Do:** search for the effect, alternating the spellings you know of when no single term covers them.
+- **Do:** report the pattern beside the hit count, so the width of the derivation is checkable rather than implied.
+- **Don't:** read the closedness test above as clearing a derived list --- it answers whether the set can grow, not whether your pattern found all of it.
+- **Don't:** treat a non-empty result as evidence the pattern was wide enough; an incomplete match looks exactly like a complete one.
+
+(Morrison-Lab/ai-config#1178, 2026-08-06: encoding a repo-scoped reviewer exception, `git grep -n 'add-reviewer d-morrison' -- skills/` returned eight hits across six files, including sites a reviewer's own enumeration had missed --- which is this fragment's rule working, and is why the list was trusted.
+It also missed `skills/claude-agent-workflow/SKILL.md:118`, which requests the same reviewer as `gh api -X POST repos/.../pulls/$PR_NUMBER/requested_reviewers -f "reviewers[]=d-morrison"`.
+A parallel session caught that site in `c9e70fc3` --- a PR-branch commit, squashed into `7a5b2ce0` --- and widened the sweep prescribed in `skills/request-pr-review/SKILL.md` to `add-reviewer d-morrison|requested_reviewers.*d-morrison`, so until then the incomplete pattern had been the corpus's own documented derivation.
+The alternatives were already enumerated twice in the same repository: `hooks/no-unreviewed-pr.py` matches five command forms for this one effect --- `gh pr create --reviewer/-r`, `gh pr edit --add-reviewer`, a `-X POST` to the `requested_reviewers` endpoint, and two `request_copilot_review` tool names --- and `tool-mappings.yml` is an effect-to-command registry whose `REQUEST_COPILOT_REVIEW` row carries the REST form outright.
+So the corpus's code already knew the effect had several spellings while the grep searched for one.)
+
 ## The instrument
 
 `scripts/pr-sweep.py` is this rule's deterministic half for the open-PR case.

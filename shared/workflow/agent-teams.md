@@ -63,13 +63,14 @@ each other*, which is exactly what a subagent and a `Workflow` cannot do:
 - **Competing-hypothesis debugging** --- teammates each pursue a theory and
   actively try to disprove each other's, like a scientific debate, so the
   surviving theory is the likely root cause.
-  This is the interactive-human counterpart of
-  [`opposition-research`](../../skills/opposition-research/SKILL.md), whose
-  adversarial verification runs headless under `Workflow`.
+  This is the interactive-human counterpart of the adversarial-verify pattern a
+  `Workflow` runs headless --- see
+  [`when-to-orchestrate`](when-to-orchestrate.md)'s adversarial-verify pass.
 - **Parallel review across independent lenses** --- one teammate on security,
   one on performance, one on test coverage, then the lead synthesizes.
-  The headless counterpart is [`ardia`](../../skills/ardia/SKILL.md)'s
-  per-dimension fan-out.
+  The headless counterpart is a `Workflow` fanning out per dimension, the same
+  structure [`grade-work`](../../skills/grade-work/SKILL.md) uses to grade one
+  item per dimension.
 - **New modules or cross-layer features** --- each teammate owns a distinct
   slice (frontend, backend, tests) with no same-file overlap.
 

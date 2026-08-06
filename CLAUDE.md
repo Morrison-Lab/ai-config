@@ -1181,7 +1181,7 @@ The same opt-in gate still applies: propose with a cost estimate and wait unless
 
 ## Agent teams: a third parallelism primitive, human-gated and advisory
 
-The two sections above govern the primitives a session invokes itself --- a single `Agent` call and the `Workflow` tool.
+The corpus governs two primitives a session invokes itself --- a single `Agent` call ("Use subagents when helpful", above) and the `Workflow` tool ("Auto-orchestration", just above).
 An **agent team** is the third: several separate Claude Code sessions (a lead plus teammates, each its own context window) that coordinate through a shared task list and a mailbox and **message each other directly**, rather than only reporting back.
 Unlike the other two, a session cannot form one on its own, so the corpus's role is only to *recommend* it.
 

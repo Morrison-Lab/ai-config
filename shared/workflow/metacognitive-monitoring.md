@@ -148,8 +148,9 @@ back and you read it".
 Reading is where this failure *begins* rather than where it ends: the answer
 comes back, it is read closely enough to act on, and its particulars are then
 repeated to a human as established fact.
-Nothing about reading a report feels like generating a claim, so no rule above
-fires on the repeating.
+Relaying does not feel like generating a claim, so the **state** check above --
+re-query, never recall -- does not reliably fire on it, even though the sentence
+you end up writing is exactly a state claim.
 
 Two things make a commissioned report harder to doubt than a reviewer's.
 
@@ -167,7 +168,9 @@ so the verification most likely to be run is the one that cannot discriminate.
 
 The conclusion-versus-particulars asymmetry above transfers unchanged, and it
 decides which half to spend the query on.
-A subagent's **conclusion** is usually sound, because it did the work.
+A subagent's **conclusion** is often sound, because it did the work -- and
+where it is not, it is usually adjacent to something that is, which is the
+neighbour effect above rather than an exception to it.
 Its **particulars** -- a count, a version, an error string, which workflow,
 which file -- are much less reliable, and particulars are exactly what gets
 quoted onward.

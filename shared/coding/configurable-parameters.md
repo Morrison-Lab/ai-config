@@ -6,6 +6,9 @@ today's value kept as the default. Never bury it as a bare literal inside
 the implementation where only an edit to that function's own source can
 change it.
 
+Worked-example case records for the rules below live in
+[`configurable-parameters.cases.md`](configurable-parameters.cases.md), moved out of the auto-loaded context.
+
 ## The exemption
 
 **Universal physical constants** (the speed of light, Avogadro's number,
@@ -50,11 +53,6 @@ and when call sites have accumulated downstream state that assumes the old
 value (timing, layout, positioning baked into other artifacts), that
 edit can cascade into a large, unplanned retiming/rework sweep instead of
 a single call-site argument change.
-(Lacaedemon/sparta#946 changed a shared compile-time battlefield-size
-constant and had to audit all 19 default-spawn demo clips, retargeting or
-retiming 8 of them that had baked in the old geometry;
-Lacaedemon/sparta#964 later moved to per-battle map definitions so this
-class of change no longer needs a repo-wide clip sweep.)
 
 ## Turning an extension point on by default: add a toggle, don't flip its default
 
@@ -91,14 +89,6 @@ Its meaning shifts from "the entries" to "further entries", and a reader who
 finds only one of the two docs will otherwise assume they conflict.
 Drop any example in that description that names the now-default entry --- the
 default is the worst possible illustration of an *extra*.
-
-(d-morrison/gha#321, 2026-07-27: `claude.yml` and `claude-code-review.yml`
-gained opt-in `plugin-marketplaces` / `plugins` inputs, then needed one plugin
-installed by default.
-Flipping those defaults would have meant a consumer adding their own
-marketplace silently dropped the default one, since `workflow_call` inputs
-replace rather than append.
-A `use-ai-config` boolean composed with both instead.)
 
 ## Default a useful feature on
 
@@ -142,16 +132,6 @@ Three things gate it:
 - **Turning it on is a behavior change for existing consumers**, who get it
   without asking, so it belongs under a changelog's `changed` heading rather
   than `added`.
-
-(d-morrison/gha#336, 2026-07-28: a new clause-break check for
-`check-new-line-breaks` was proposed opt-in, on the strength of a real noise
-measurement -- but the measurement that justified caution was for a *blanket
-punctuation* rule flagging 50.5% of already-conforming lines, while the check
-actually built flags 1.1%.
-The maintainer's correction was "in general, useful features should be
-opt-out", and the 1.1% is what made that safe.
-The check is also warn-only unless a caller sets `fail`, which is the
-safe-on condition above doing its work.)
 
 ## In review
 

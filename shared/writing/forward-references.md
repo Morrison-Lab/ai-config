@@ -138,6 +138,46 @@ A moved entry at `memories/github-mcp-tools.md:45` still said
 After the split, that bullet remained in `memories/github.md:10`, so the
 sentence pointed to the wrong file until the reference was rewritten.)
 
+**Sweep the general directional pattern, not the literal phrases you expect.**
+The self-review that verifies a move is where this check most often fails, and
+it fails by grepping for the *specific* wording the mover happens to remember
+--- `(below)`, `case below`, `per #N below` --- which is far narrower than the
+ordinary `the X above` / `Y below` / `here` phrasing the real danglers wear.
+Grep the general directional pattern instead, over both the moved content and
+the prose left behind, since a stranded reference can sit on either side of the
+split:
+
+```bash
+rg -niE '\b(above|below|here|earlier|later)\b|this (section|file)' <moved> <survivor>
+```
+
+Then classify each hit rather than trusting a zero count.
+A hit that now points **across the split** --- at content that moved to a
+different file --- is a dangling defect; fix it by naming the referent
+explicitly (per [`definition-crossrefs.md`](definition-crossrefs.md)'s "name
+the target, don't count to it"), not by flipping `above` to `below`.
+A hit that stays **within its own block**, is **quoted** (prose describing the
+very reference it quotes), or measures **elapsed time** ("minutes earlier", "a
+round later") is correct and must be left.
+The [`fix-forward-references`](../../skills/fix-forward-references/SKILL.md)
+skill (alias `ffr`) runs exactly this sweep and is the right tool for it.
+
+- **Do:** grep the general `\b(above|below|here|earlier|later)\b` pattern over
+  both sides of a split, and classify each hit as cross-file (fix) or
+  within-block/quoted/elapsed-time (leave).
+- **Don't:** report "no dangling references" from a literal-phrase grep --- it
+  is scoped to wording you already recalled, which is never where the misses
+  are.
+
+(Morrison-Lab/ai-config#1194, 2026-08-06: a pre-push self-review grepped
+`(below)` / `case below` / `as the case` / `per #N below` across 15 relocated
+fragments and reported none, but the round-1 `claude-review` found 7 dangling
+`above`/`below`/`here` references across 6 of them.
+The general `\b(above|below|here)\b` sweep that fixed them turned up an eighth
+the review had missed, and its remaining hits --- timeline and
+within-block/quoted phrasing --- were correctly left.
+The fixes named the referent inline rather than flipping the direction word.)
+
 ## Inserting prose makes a downstream back-reference stale
 
 The section above covers the referrer *moving*.

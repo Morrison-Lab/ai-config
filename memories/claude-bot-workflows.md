@@ -105,6 +105,24 @@ generic Actions-authoring and reusable-workflow material.
   The fix is tracked in Morrison-Lab/gha#424 (have the workflow post an early,
   PR-anchored comment linking the dispatched run so a stall is visible and the
   run is attributable up front).
+- **A `claude-review` run's `updated_at` can freeze mid-run, so it is not a
+  liveness signal.**
+  A dispatched `Morrison-Lab/gha` `claude-review` run can sit
+  `status: in_progress` with its run-object `updated_at` frozen for 10+ minutes
+  while it is genuinely working --- a real review runs ~13 min, costs real money
+  (~$28 for one three-sub-agent round), and only settles at the end.
+  Reading `updated_at` (or wall-clock time since it) as a liveness/stall signal
+  therefore produces a FALSE "stalled" conclusion.
+  Judge liveness from the job LOG's own timestamps (first line to `Cleaning up
+  orphan processes`) instead, per `shared/workflow/fully-clean.md`'s
+  "`status` itself can be stale, so never infer a job's duration from it" rule
+  --- this extends that rule from the check-run `status` field to the run-object
+  `updated_at` field.
+  (Morrison-Lab/ai-config#1194, 2026-08-06: run 31063429910 held
+  `updated_at=2026-08-06T01:41:25Z` for ~13 min and was misread as stalled ---
+  a false "stalled twice" claim was even published on Morrison-Lab/gha#362 and
+  had to be corrected --- then posted a complete $28.31 "Needs minor changes"
+  verdict from three parallel verify sub-agents.)
 - **A distinct stub-review signature: `is_error: false`, real `num_turns`/cost,
   but `permission_denials_count: 1` and no `Verdict` line.** (`permission_denials_count`
   is a field in the Claude Code SDK's runtime execution-output JSON, not

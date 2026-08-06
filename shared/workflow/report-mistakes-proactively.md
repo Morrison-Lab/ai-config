@@ -5,6 +5,9 @@ of scope for your current task.
 An observation that lives only in the conversation is lost when the session
 ends; the issue is what makes it durable.
 
+Worked-example case records for the rules below live in
+[`report-mistakes-proactively.cases.md`](report-mistakes-proactively.cases.md), moved out of the auto-loaded context.
+
 "Any medium" is literal: it includes our AI-config files themselves
 (skills, shared fragments, memories, `CLAUDE.md`s), `gha` workflows and
 composite actions, and generated or derived artifacts (test snapshots,
@@ -62,16 +65,6 @@ the new evidence onto an open one --- not **whether** to make it.
 Those are different questions, and only the first has a discretionary
 answer.
 
-(Corrected in an ai-config session, 2026-07-28: a sweep found 49 of 179
-installed skills stale or orphaned, and the finding was reported as "worth a
-tracking issue separately --- say the word and I'll file it".
-The user's correction was "always file issues as soon as you notice them" /
-"don't wait for my approval".
-The dupe-check then showed it was already tracked by #755 and #769, so the
-correct action was a comment with the new evidence rather than a new issue
---- which is step 2 doing its job, and is exactly the decision the offer had
-deferred instead of making.)
-
 ## A gated action bundled into a discretionary one is still an offer
 
 The section above rules out the *standalone* offer --- a message whose only
@@ -124,13 +117,6 @@ protects the machine it was written on and no other.
 Treat it as a backstop for your own setup rather than as a reason to relax the
 rule, since every other session still runs on the prose alone.
 
-(Corrected 2026-07-29, a bcs branch-sweep session: an unlanded engineering fix
-found on a closed branch was correctly identified as needing a tracking issue,
-and the closing line asked "want me to file the issue and open that PR?".
-The user's correction was that filing is not a thing to ask about.
-The issue --- `ucdavis/bcs#466` --- was filed immediately afterward, which is
-the evidence that nothing was blocking it in the first place.)
-
 ## Offering to hand over work you have already finished
 
 Both sections above concern work not yet done, where the offer at least
@@ -171,14 +157,6 @@ what you already made.
 - **Don't:** treat a scratch-file path as delivery --- naming where it lives
   is not the same as handing it over.
 
-(Corrected 2026-07-30: a drafted answer for a GitHub discussion sat complete
-in a scratchpad file across two replies, each offering to print it on
-request, while the surrounding messages explained at length why posting it
-directly was blocked.
-The user's correction was "why haven't you done it already then?".
-It was printed in full in the next message, which is the evidence that
-nothing was blocking it.)
-
 ## Never name an issue number before the issue exists
 
 The rule above pushes filing earlier, and step 4 asks you to link the filed
@@ -214,13 +192,6 @@ the API actually returned.
 - **Don't:** predict an issue number, however obvious the next one looks.
 - **Don't:** announce "filed as #N" while the dupe-check is still outstanding
   --- that asserts the new-issue outcome before anything has decided it.
-
-(Corrected 2026-07-29, an ai-config session: a PR comment said a noticed
-mistake was "filed as #821" before any issue had been created.
-The dupe-check then found #815 already covering it, so the correct action was
-a comment carrying the new evidence --- not a new issue at any number.
-Both halves had to be repaired: a correction comment on the PR withdrawing
-the citation, and the evidence re-posted onto #815.)
 
 ## Where to file
 

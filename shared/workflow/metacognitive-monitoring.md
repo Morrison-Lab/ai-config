@@ -141,6 +141,62 @@ reviewer standing on it.
   was checked -- confidence is the house style of that genre, not a signal.
 - **Don't:** count a dispatched verification as a completed one.
 
+**A subagent's report arrives in the same position, and the bullet directly
+above stops one step short of it.**
+That bullet ends by saying a dispatched check is settled "when its answer comes
+back and you read it".
+Reading is where this failure *begins* rather than where it ends: the answer
+comes back, it is read closely enough to act on, and its particulars are then
+repeated to a human as established fact.
+Nothing about reading a report feels like generating a claim, so no rule above
+fires on the repeating.
+
+Two things make a commissioned report harder to doubt than a reviewer's.
+
+**You framed the question.**
+A reviewer's finding arrives unbidden, so it is at least recognizable as
+somebody else's assertion.
+A subagent's report answers a question you wrote, and having framed the
+question feels like having controlled the answer.
+
+**Its conclusion usually has a true neighbour.**
+"A review workflow is failing repo-wide" can be true while "*this* workflow is
+failing repo-wide, with *this* error" is false in both particulars.
+The cheap spot check confirms the neighbour and reads as confirming the claim,
+so the verification most likely to be run is the one that cannot discriminate.
+
+The conclusion-versus-particulars asymmetry above transfers unchanged, and it
+decides which half to spend the query on.
+A subagent's **conclusion** is usually sound, because it did the work.
+Its **particulars** -- a count, a version, an error string, which workflow,
+which file -- are much less reliable, and particulars are exactly what gets
+quoted onward.
+So the cost lands differently from a reviewer's finding: that one mis-edits a
+PR, while this one **publishes**, and a retraction then has to reach everyone
+the first claim reached.
+
+Relaying a subagent's factual claim to a human therefore requires running the
+deriving query yourself first.
+It is nearly always one command, and usually the very command the report should
+have quoted.
+
+Distinguish this from [`preferences.md`](../../memories/preferences.md)'s rule
+on verifying a subagent's claim that it **pushed** a commit.
+That governs a claim about the agent's own **action** -- did you do what you
+said.
+This governs a claim about the **world** that you are about to repeat as your
+own.
+
+- **Do:** run the deriving query before repeating a subagent's factual claim to
+  a human, and name that query beside the claim.
+- **Do:** re-derive the particulars specifically -- the count, the identifier,
+  the error string -- even where the conclusion is obviously right.
+- **Don't:** treat having read a report as having checked it.
+- **Don't:** accept a check that confirms a true *neighbour* of the claim as
+  confirming the claim.
+- **Don't:** generalize this into distrusting subagents; the rule picks which
+  **half** of a report to re-derive, not whether to use one.
+
 ## An action you recommend is a claim about state
 
 The four types above fire on an assertion, and the section above extends them

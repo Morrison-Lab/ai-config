@@ -56,6 +56,42 @@ A verification inherits the scope of whatever instrument it reaches for, so
 "I checked and it is not there" stays a claim about the instrument until the
 instrument's own coverage has been established.)
 
+## A subagent's report arrives in the same position
+
+(2026-08-05/06, a `ucdavis/bcs` session driving several parallel agents: two
+subagent particulars were relayed to the user as established fact without the
+one query that settles each.
+
+A subagent reported `claude-review` "failing repo-wide in `Morrison-Lab/ai-config`
+with `API Error: Usage credits required for 1M context`", and that was published
+to the user as a boxed FLAG.
+`gh run list -R Morrison-Lab/ai-config --workflow claude-review.yml --limit 60
+--json conclusion,status` returns **36 success, 21 cancelled, 3 in flight, and 0
+failures**, so the workflow was never failing at all.
+The report's true neighbour is what made it survive: a review workflow *was*
+failing repo-wide across the same window, but it was `Antigravity Code Review`,
+4 failures, and its log gives a Google AI Studio 429 reading "Your project has
+exceeded its monthly spending cap" -- a different workflow, a different vendor,
+and a different error from the one reported.
+So a spot check confirming that "a reviewer is down" would have confirmed the
+wrong claim.
+
+The second was flatter: an array job was described as "a 500-task array" across
+several messages, inherited from an earlier framing.
+`data-raw/msm-vs-truth.sbatch` reads `--array=1-100%3`.
+
+**Provenance of the two sides.**
+The **Don't** side came from the session itself rather than from a directive:
+no user correction was issued, and the first claim was caught only when a later
+subagent contradicted the first, forcing a retraction.
+The **Do** side -- run the deriving query before relaying, and name it -- is
+inferred, by carrying the reviewer-finding rule above onto the commissioned-report
+case.
+A search at the time found the general rule cited but never written:
+`memories/preferences.md` appeals to "the standing `verify agent reports with
+unfakeable asks` rule", and `unfakeable` occurs nowhere else in the corpus, so
+only that rule's commit-SHA instance had ever been recorded.)
+
 ## An action you recommend is a claim about state
 
 (2026-08-02, this repo: a boxed RECOMMENDATION advised merging `#1058` and

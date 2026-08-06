@@ -892,3 +892,23 @@ safer/preferred choice merely because the repo has external consumers.
 - **Never present losing a lesson as an available option.** Offering "capture these first, or archive now and they're lost with the context" frames data loss as a legitimate branch and invites the user to pick it.
   It is not a choice to put in front of them; capture first, then report.
   The same applies to any wrap-up point where context is about to end: `/clear`, archiving a session, handing off, or a container being reclaimed. (2026-07-31: offered exactly that framing at the end of a session; the owner's reply was "never risk letting work or lessons get lost.")
+
+## AI code review prompt instructions
+
+- **Suppress low-signal, hyper-pedantic noise in AI code review prompts.**
+  When building prompts for automated AI code reviewers,
+  instruct the model to assume modern target runtimes (e.g. Python 3.10+ as of 2026-08)
+  and to down-rank hyper-pedantic runtime-compatibility warnings
+  (e.g. PEP 604 `A | B` unions on EOL Python 3.9, or PEP 585 `list[T]` generics on EOL Python 3.8).
+  Suppress such a warning only where a modern floor is positively declared -- a `requires-python` pin or a `setup-python` version.
+  Where no floor is declared, flag it at low severity rather than dropping it, so the guidance does not fail open on a repo that silently runs an older runtime (per `shared/principles/fail-fast.md`).
+  (Learned on gha#412, 2026-08-05.)
+- **Demand a single, exhaustive review pass.**
+  Instruct the reviewer to report every finding, recommendation, and edge case in one pass,
+  rather than withholding or staggering feedback across rounds.
+  (Learned on gha#412, 2026-08-05.)
+- **Always verify relative dates against the current time.**
+  When evaluating End-of-Life (EOL) or deprecation milestones,
+  check the current date first (e.g. via the system clock or `date`)
+  so an elapsed date (like October 2025) is recognized as past rather than future.
+  (Learned on gha#412, 2026-08-05.)

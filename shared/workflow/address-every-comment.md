@@ -156,6 +156,54 @@ The same grep at the fixed head returns no further hit for that pattern, which
 is the other half of the check --- though only for that pattern, since a
 superlative worded differently would not match it.)
 
+**The mirror case: the enumeration was complete and the fix was not.**
+The rule above governs a reviewer's list that was too short.
+This governs the one that was exactly right, and a reply that closed it anyway.
+A finding naming two artifacts --- a stale equation *and* the prose describing
+it, a constant *and* the comment above it --- is two findings sharing one
+comment, so it earns two dispositions rather than one.
+Fixing the first and writing "Addressed" under-delivers against a list nobody
+had to derive, which is why no sweep rule catches it: the grep the section
+above prescribes was never the missing step.
+
+What makes it survive the round is that the source diff looks finished.
+The flagged line is visibly changed, the commit message names the finding, and
+a reviewer re-reading the diff sees a real fix where the finding pointed.
+The unfixed half is *context* in that diff rather than a hunk, so nothing about
+reading the diff distinguishes "both halves done" from "one half done".
+
+So verify a prose or formula fix against the **rendered** artifact wherever the
+project builds one --- a PR-preview deploy, a `gh-pages` build, generated docs.
+The rendered page puts both halves of a finding in one view, in the order a
+reader meets them, which the diff never does.
+[`fact-check-prose`](../writing/fact-check-prose.md)'s rendered-artifacts bullet
+owns the mechanics of locating that preview; the increment here is *when* to
+reach for it --- closing out a finding, not only checking a computed figure.
+
+- **Do:** count the artifacts a single comment names, and give each one its own
+  disposition before replying.
+- **Do:** read the rendered page rather than the diff when confirming that a
+  prose or formula fix landed completely.
+- **Do:** grep the whole file for the underlying concept once a second half
+  surfaces --- a document stale in two places is usually stale in three.
+- **Don't:** let a visibly-changed flagged line stand in for the finding being
+  closed; the unfixed half appears in the diff as context.
+- **Don't:** reach for the derive-the-site-list remedy above here --- that list
+  was complete, and the shortfall was in the delivery.
+
+(`Lacaedemon/sparta` PR #1199, 2026-08-05: the review verdict flagged
+`website/combat.qmd` for reproducing "the *old* equation ... and old prose" at
+lines 88-97, quoting both.
+Commit `57d24b33` changed the equation, and the round-1 disposition table
+reported the finding Addressed while the prose two lines below still read
+"$\lambda$ is how much a shield ($b_D$) adds to a defence you can actually bring
+to bear" --- the exact skill-independent framing the PR existed to remove.
+Fetching the PR-preview build and reading the rendered page caught it: the
+equation had updated correctly, and a second `b_D` on the same page was the tell.
+Grepping the whole file for the concept then found two further stale statements
+the review had never mentioned --- the stat-list entry for `b`, and an "Armour
+and shields buy time" tactical bullet --- fixed together in `a9fff0d8`.)
+
 **When a prose fix changes wording that's also paraphrased elsewhere in the
 same PR (a CHANGELOG entry, a PR description, a cross-reference), sync that
 copy too.** A CHANGELOG entry written before the review lands often quotes or

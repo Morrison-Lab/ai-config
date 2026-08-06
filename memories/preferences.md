@@ -9,6 +9,7 @@
   If state is MERGED, trigger post-merge instead of reporting CI details. (Learned on ucdavis/bcs#266.)
   Same principle for tool availability: before telling a user a capability doesn't exist in the current session (e.g. "no `subscribe_pr_activity` tool here"), run a live check (`ToolSearch`, or the equivalent discovery mechanism) rather than reciting what a memory entry or a prior session documented --- a local CLI session's tool roster isn't fixed, and reciting stale documentation as current fact is the exact failure this rule exists to prevent. (Sparta gii-ffdb93 session, 2026-07-14: initially told the user no GitHub MCP server was available in local sessions based on documented prior-session behavior, without running `ToolSearch` first.
   The user's pushback "can't you use the GitHub mcp server?" was the correct challenge, and a live check would have shown the tool was in fact reachable --- that check should have been run before stating unavailability as fact, not after being questioned.)
+- **ARDI Loop Foreground Verification**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn; see [`shared/workflow/ardi.md`](shared/workflow/ardi.md) for the mandatory foreground-only polling rule.
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
@@ -71,6 +72,20 @@
   Learned again on ai-config#635 (2026-07-22): a Copilot review flagged a documented CI-check-state caveat across three review rounds (5, 7, and 8, with an unrelated finding at round 6 in between), each time with a specific, checkable claim --- first that `gh pr checks`/`get_check_runs` miss raw workflow runs, then that a `gh run list --commit <sha>` fix still misses some trigger types, then that a `--branch <pr-branch>` fix has the same class of gap.
   Verifying each claim directly against the PR's own actual runs (not reasoning abstractly) confirmed all three were correct in sequence, while a separate claim in the same PR --- that markdown skill docs are bound by the repo's source-code-only em-dash rule --- checked out FALSE against the rule's own explicit scope and was rebutted.
   The review loop only reached zero new comments once every claim got the same live-query treatment, rather than being pattern-matched as "probably right" or "probably just noise" this many rounds in.)
+- **Always query ALL PR comments and review objects across GitHub REST endpoints before checking PR status.**
+  When reviewing or auditing PR status, NEVER rely on a single endpoint or assume an absence of new comments because a check run completed.
+  Automated review agent reports (such as `Antigravity Agent Report` or `Claude Code Review`) post issue comments as `github-actions[bot]` or `claude[bot]`.
+  To ensure 0 unhandled findings, ALWAYS fetch all comments using `gh api repos/{owner}/{repo}/issues/{number}/comments` and all review objects using `gh api repos/{owner}/{repo}/pulls/{number}/reviews`, parse every comment payload, and confirm that all findings have been addressed or rebutted. (Learned on ai-config#1157, 2026-08-05).
+- **Always verify live OS processes (`ps aux`) when checking background task state.**
+  `manage_task` lists harness-managed background tasks, but background script executions (such as async python test runners) can persist as live child OS processes.
+  When checking task state or diagnosing running tasks, run `ps aux | grep ...` to inspect and verify live OS process state before declaring zero tasks running. (User correction, 2026-08-05).
+- **Always create a dedicated `ums-<topic>` branch off default branch (`main`) and open a standalone PR for UMS memory passes.**
+  Never fold UMS memory updates into an in-progress feature PR branch or claim UMS is finished without opening a dedicated UMS pull request. (User correction, 2026-08-05).
+- **Always fetch and merge `origin/main` into the UMS branch before opening a UMS PR.**
+  When creating a dedicated `ums-<topic>` branch or preparing a UMS memory pass, always fetch `origin/main` and merge/rebase onto the latest default branch HEAD before opening the PR, ensuring zero initial merge conflicts. (User correction, 2026-08-05).
+- **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, or missed item.**
+  The moment the user corrects your behavior, or you realize you made an incorrect claim or missed something, run UMS right then --- do not wait for the task to finish, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
+  This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section (a corrected understanding and a false claim about state both fire immediately); see that section for the full rationale and case records. (User directive / CAI, 2026-08-05).
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
   The one exception is `Lacaedemon/sparta`, which never requests him, on PR
   creation or on deadlock escalation alike.
@@ -80,8 +95,9 @@
   create, push, and open the feature PR first. The PR must expose the exact SHA
   that performs the action; opening it afterward turns a costly run into an
   unreviewed fait accompli. (User correction, 2026-08-03.)
-- NEVER auto-merge a Pull Request unless the user has explicitly granted session permission (e.g. via `/mwc` or `/maw`) or explicitly instructed to merge that specific PR (e.g. `/merge-it` or "merge this").
-  Creating or pushing a PR does NOT imply permission to merge it.
+- NEVER auto-merge or squash-merge a Pull Request or Merge Request unless the user has explicitly granted session permission (e.g. via `/mwc` or `/maw`) or explicitly instructed to merge that specific PR (e.g. `/merge-it` or "merge this").
+  Creating, pushing, resolving review threads, or driving a PR to 100% clean CI checks does NOT imply permission to merge it.
+  Merging without explicit permission is an irreversible action and is strictly prohibited. (User correction, 2026-08-04.)
 - If the user says the work belongs on a specific existing branch or on top of a
   specific PR branch, honor that branch/base instruction over auto branch-naming
   hygiene.

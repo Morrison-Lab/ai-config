@@ -80,6 +80,29 @@ A PR/MR is **fully clean** when **both** of these hold (and verified via `python
    The log showed that job starting at `04:05:25` and cleaning up at
    `04:05:51`: 26 seconds, identical to the other six.)
 
+   **A `BlobNotFound` / HTTP 404 on the job-log fetch means the job has not completed, not that it has hung.**
+   The block above says to read a run's duration from its log timestamps.
+   That remedy is unavailable while a job is still running, because there is no log to read yet: GitHub archives a job's log blob only when the job completes, so `gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs"` (and the MCP `get_job_logs`) returns `BlobNotFound` / 404 until then.
+   So a 404 there is evidence the job is still going, and reading it as a hang inverts the signal.
+
+   A still-in-flight job also legitimately reads `status: in_progress` with `conclusion: null`, and neither the 404 nor that status distinguishes a normal long-running review from a genuinely stalled one.
+   Only completion settles it, or the live streaming log in the Actions UI, which is served before the blob is archived.
+   So do not conclude "hung" or "produced no verdict" from a 404 plus an `in_progress` status; wait for the job to finish and read the verdict it then posts.
+
+   A bare 404 is ambiguous in one further way worth naming, because the two readings call for opposite responses.
+   A job that *completed* with no logs at all --- the ~1s concurrency self-collision in [`debugging.md`](../../memories/debugging.md)'s "An Actions job that fails in ~1s with NO logs" section --- also 404s on the log fetch.
+   The discriminator is the job's own `status`/`conclusion`, never the 404: `in_progress` / `null` is still running, while `completed` / `failure` with `completed_at` stamped before `started_at` is that instant-fail case.
+
+   - **Do:** read a 404 / `BlobNotFound` on the job-log endpoint as "the job has not finished", and wait for completion (or read the live UI log) before judging its outcome.
+   - **Do:** take a job's real state from its `status`/`conclusion`, since the same 404 covers a still-running job and a completed-with-no-logs one.
+   - **Don't:** read a 404 on the log fetch as positive evidence of a hang or a stall --- it is the opposite, evidence the job is still running.
+   - **Don't:** file an issue reporting a review job as hung or "no verdict produced" while its log fetch still 404s and its status is `in_progress`.
+
+   (`Morrison-Lab/ai-config#1187`, 2026-08-06, a review dispatched by an `@claude review` mention: the `review / claude-review` job `92487132786` in run `31060459989` was checked at ~`00:55Z` with `status: in_progress`, `conclusion: null`, and `gh api .../jobs/92487132786/logs` returning `BlobNotFound` / 404.
+   This was reported --- wrongly --- as a hang with "no verdict produced," and an issue was nearly filed against `Morrison-Lab/gha` on that false premise.
+   The job in fact completed `success` at `00:57:00Z` after a legitimate ~16-minute review that started `00:41:00Z`, posting a real `**Claude finished review**` verdict ("Needs minor changes", cost $15.07) at `00:56:55Z`.
+   The 404 had meant "still running"; every check before ~`00:57Z` was premature, and the job's own `timeout-minutes` was 60, so it was nowhere near timing out either.)
+
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
    read the commit check-runs endpoint before deciding that everything has
    finished.**

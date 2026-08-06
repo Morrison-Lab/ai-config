@@ -330,6 +330,44 @@ string.
 - **Don't:** report the `claude-review` failures as the same overflow --- that
   is a shape match, and no error string has been read for them.
 
+**A `shared/` fragment marked `<!-- Shared with the lab manual -->` in
+`CLAUDE.md` is transcluded WHOLE by the UCD-SERG lab manual, so restructuring
+one silently damages the manual.**
+Twenty-two `@shared/...` fragments carry that comment on 2026-08-05
+(`grep -c 'Shared with the lab manual' CLAUDE.md`), including the three heaviest
+closure fragments `shared/workflow/fully-clean.md`, `ardi.md`, and
+`address-every-comment.md`, and the two `shared/vendored/**` copies are the same
+kind of shared-source file.
+The manual transcludes each one with
+`{{< include .ai-config/shared/<area>/<topic>.md >}}` through its `.ai-config`
+git submodule (README, "Shared content"), rendering the file as it stands.
+So any edit to such a fragment's content or structure reaches the manual too:
+splitting part of it into a new sibling drops that part from the rendered manual,
+and a relative link to a companion the manual does not `include` dangles there.
+A corpus-restructuring pass that alters fragment content must therefore EXCLUDE
+the lab-manual-shared and `shared/vendored/**` fragments, or coordinate with the
+manual.
+This is why a 2026-08 case-record-extraction pass touched only the ai-config-only
+fragments (those without the marker); the lab-manual-shared ones are tracked in
+Morrison-Lab/ai-config#1191 (move records out) and #1192 (condense them in place).
+
+**Content leaves the always-loaded closure when it moves into a sibling file
+referenced by a PLAIN MARKDOWN LINK, not an `@`-import.**
+`scripts/check-context-closure.py`, which implements the closure walk, follows
+only `@path` imports (whole-line or inline in prose); a `[text](topic.cases.md)`
+markdown link matches neither, so its target is never followed into the closure.
+Relocating worked-example case records from a fragment into a
+`[...](<name>.cases.md)` sibling thus drops them from every session's
+always-loaded set while keeping them one click away.
+Run the script before and after to confirm: the file count is unchanged (the
+sibling never joins the closure, the parent stays imported) while the byte total
+falls by the relocated content.
+This is the concrete form of the section's "demoting a fragment to on-demand"
+lever, bounded by the lab-manual constraint above --- apply it only to
+ai-config-only fragments, since a markdown-linked sibling is invisible to the
+manual's whole-file `include`.
+(Tracked in Morrison-Lab/ai-config#1193.)
+
 ## Custom subagents (`.claude/agents/*.md`) — Bash is a write-access loophole
 
 The `tools:` frontmatter field (comma-separated, e.g. `tools: Bash, Read,
@@ -715,6 +753,46 @@ went unnoticed.
 PR #1125 converts the file to native schema, keeping the metadata as extra
 keys, and reduces `install-hooks.py` to flattening the native structure back
 into the entry list it already consumed.)
+
+## A registered hook whose file is MISSING blocks EVERY call it matches, not just its target action
+
+The double-registration case above is about a hook that fires twice.
+This is the opposite failure of the same `settings.json` machinery: a hook that cannot fire at all, because the file it points at is gone.
+
+`install-hooks.py --fix` writes a `PreToolUse` command into `~/.claude/settings.json` of the form `python3 $HOME/.claude/hooks/<script>.py`.
+If the repo later removes or renames that script, the settings.json line keeps pointing at a path that no longer exists.
+`python3` cannot open the file, so it exits with **code 2**: the `can't open file '.../hooks/<script>.py': [Errno 2] No such file or directory` startup error always exits `2` (verified).
+That matters because exit code 2 is specifically Claude Code's block signal, not a generic non-zero exit --- the "denies on stdout and still exits 0" section above records that "Exiting 2 is a genuine blocking mechanism in Claude Code", documented in [`permission-check`](../skills/permission-check/SKILL.md).
+An ordinary crash *inside* a hook that has already started exits `1`, which that same section marks `# a bug, not a block`, and does not stop Bash.
+So the missing file blocks every Bash call not because any hook crash blocks, but because `python3`'s missing-file startup failure happens to exit with `2`, the one code that does.
+
+The scope is the surprising part.
+A `PreToolUse` `Bash` matcher runs on *every* Bash call, so a merge-guard hook whose file is missing blocks all Bash, not merely a `git merge`.
+Nothing else runs either, since the session cannot execute a single shell command until the stale reference is cleared.
+
+Diagnose with `Read` alone, because `Bash` is down:
+
+- Read `~/.claude/settings.json` and find the `PreToolUse` command whose script path is the one named in the error.
+- Read the `~/.claude/hooks/` directory to confirm it holds other hook files but not the referenced one.
+- Read the checkout's `hooks/hooks.json` to confirm the hook is absent from the current set, so the settings.json entry is stale rather than the checkout being incomplete.
+
+An enabled `ai-config` plugin makes this likelier, not less likely.
+The plugin and `install-hooks.py --fix` are mutually exclusive on one machine (per the section above), so running both leaves settings.json carrying a reference the plugin's own `hooks.json` may no longer include.
+
+**The fix can be classifier-denied, so surface it rather than working around it.**
+Editing `~/.claude/settings.json` to drop the stale line is a hooks-config change, which Claude Code's auto-mode classifier can DENY.
+When it does, STOP and ask the user to make the edit, rather than routing around the denial.
+Two immediate unblock alternatives exist, if the user prefers: the user removes the stale line themselves, or someone recreates a no-op pass-through file at the referenced path so `python3` finds something to run.
+Prefer restoring the file for an *immediate* unblock.
+The hook *command* re-runs on every call, so a restored file unblocks at once, whereas a settings.json edit may not take effect until a Claude Code restart, because hooks load at session start.
+
+- **Do:** read a non-zero `python3: can't open file` error on every Bash call as a registered hook whose file is missing.
+- **Do:** diagnose with Read (settings.json, the hooks dir, the checkout's `hooks/hooks.json`) while Bash is blocked.
+- **Do:** surface the settings.json edit to the user when the classifier denies it, and name the restart caveat and the restore-the-file alternative.
+- **Don't:** read "a merge guard blocked my command" as meaning only merges are blocked --- a missing `PreToolUse` `Bash` hook blocks every Bash call.
+- **Don't:** work around a classifier-denied hooks-config edit yourself.
+
+(2026-08-05, Morrison-Lab/ai-config: `~/.claude/settings.json` referenced a removed `no-unauthorized-merge.py` hook, so every Bash call failed with `python3: can't open file '.../hooks/no-unauthorized-merge.py'`; the hook was absent from `main`'s `hooks/hooks.json` (which #1157 has since added, merged 2026-08-06), the `ai-config` plugin was also enabled, so the same hooks were double-registered, and the settings.json edit to remove the stale line was classifier-denied, so it was surfaced to the user.)
 
 ## A plugin ref resolves by the marketplace's *declared* name, not by its URL
 

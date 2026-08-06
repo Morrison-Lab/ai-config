@@ -3,6 +3,9 @@ When an agent claims an issue it's about to work — in `gi`, `gii`, `gip`, or
 **draft** until the implementation lands. Don't wait until the work is done to
 open it.
 
+Worked-example case records for the rules below live in
+[`pr-on-claim.cases.md`](pr-on-claim.cases.md), moved out of the auto-loaded context.
+
 **Why up front.** The claim comment on the issue is easy to miss, and it isn't
 what other sessions check. The authoritative in-flight signal is the issue's
 cross-referenced **open PRs** — the check `gi` runs before grabbing an issue.
@@ -75,15 +78,6 @@ Both keep the POST the last command.
 - **Do:** narrow the response with a flag on the POST itself rather than a downstream pipe.
 - **Don't:** pipe the POST anywhere, including to `tail`, `head`, or `jq` --- the hook cannot tell a formatting pipe from a chained verification, because the shell does not either.
 
-(Morrison-Lab/rpt#181, 2026-08-03: the POST was chained ahead of `gh pr view`/`gh pr checks` in one call across six turns, so the hook re-fired every Stop;
-running the POST bare discharged it.
-The failure was misread as the hook not recognizing a Copilot quota refusal, which it was not about.)
-
-(Morrison-Lab/ai-config#1139, 2026-08-04: the pipe variant, in a session that had already cited this rule's reasoning aloud earlier in the same hour.
-The request was written `gh api -X POST .../requested_reviewers -f 'reviewers[]=...' 2>&1 | tail -3`, and it genuinely succeeded --- the response named `Copilot` in `requested_reviewers`, and Copilot posted its quota refusal at `07:22:15Z`.
-The hook still fired at Stop, correctly, because `tail` owned the exit status.
-Re-running the POST bare discharged it and produced a second, identical refusal at `07:53:03Z`.)
-
 **Some repos schedule Copilot automatically, and this step is redundant there.**
 A repository ruleset can carry a `copilot_code_review` rule with
 `review_on_push: true` (and optionally `review_draft_pull_requests: true`),
@@ -140,10 +134,6 @@ than about the request.
 - **Do:** check for a `copilot_code_review` rule before concluding a vanished pending request means a blocked one.
 - **Don't:** re-POST the request on such a repo --- it is auto-requested on every push, so the retry changes nothing and the empty read repeats.
 
-(Morrison-Lab/ai-config#1077, 2026-08-03: two explicit requests each returned `["Copilot"]` and each left `reviewRequests` empty within a minute, and both were reported as a possible blocked/silent reviewer.
-The repo's `main` ruleset carries `copilot_code_review` with `review_on_push: true` and `review_draft_pull_requests: false`, so neither request was ever needed.
-Copilot separately did stay silent on that PR, which is the distinct third state [`fully-clean`](fully-clean.md) records --- the point here is that the empty pending-list was not the evidence for it.)
-
 This is part of opening the PR, not a follow-up task.
 A status sentence like "review owed on #N" is the anti-pattern: it names a debt that should already have been discharged, the same way an offer to file an issue names work instead of doing it.
 The sentence is the trigger to request the review now.
@@ -152,10 +142,6 @@ The sentence is the trigger to request the review now.
 - **Do:** verify the request landed from the API response plus a fresh pending-request or current-head-review read.
 - **Don't:** treat a PR's auto-triggered checks as evidence that every reviewer is engaged.
 - **Don't:** write "review owed" or "still need to request review" into a status report; go request it instead.
-
-(Morrison-Lab/ai-config #1038 and #1040, 2026-08-02: both PRs were opened around 07:00Z and then reported as still owing review requests.
-They had zero Copilot reviews until the user asked why no review had been requested about ten minutes later.
-The repo's `claude-review` workflow was failing for the same context-closure limit that made #1029's review fail on every attempt, so a PR without the explicit Copilot request had no working reviewer despite review-shaped checks.)
 
 **Don't mark ready within seconds of the final push — the two review runs race
 and the WRONG one can get cancelled.** On repos whose review workflow runs on
@@ -220,7 +206,3 @@ branch name here to trigger `git checkout -b`'s own "already exists" error).
 Run `git branch --show-current` immediately
 before the first edit for every new issue, not just the first one in the
 session, and confirm it matches the branch you just created for *this* issue.
-(ucdavis/bcs `gia` session, 2026-07-06: SLURM-hardening changes for issue #286
-were written while still on issue #281's `chore/renv-explicit-snapshot`
-branch — caught before pushing, but only by re-checking `git status`/`git
-diff --stat` against expectations, not because anything failed.)

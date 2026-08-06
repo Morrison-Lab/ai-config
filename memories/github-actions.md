@@ -1056,3 +1056,13 @@ above, and it is worth knowing in both directions.
 (`Morrison-Lab/ai-config#998`, 2026-07-31: the PR repointing `claude-review`
 from the frozen `@v1` to `@v2` showed `@v2`'s step shape on its own run before
 merging.)
+
+## Python Execution in Runner Environments
+
+- **Add `from __future__ import annotations` when a built-in generic type (`list[str]`, `dict[str, Any]`) appears in a function or variable annotation.**
+  Standard generic syntax (e.g. `def f() -> list[str]:`) in a standalone Python helper called by an action or workflow raises `TypeError: 'type' object is not subscriptable` under Python < 3.9.
+  Default runners (e.g. `ubuntu-latest`) use Python 3.10+ (as of 2026-08), but adding `from __future__ import annotations` keeps the script compatible across custom `setup-python` versions.
+  That future import defers **annotations only** (PEP 563), so a runtime use of the same syntax -- a type alias (`Rows = list[str]`), a class base (`class C(list[str])`), or a `cast()` call -- still raises the error under Python < 3.9.
+  For those runtime uses, import `List`/`Dict` from `typing`, which work in every position.
+  (Morrison-Lab/gha#412, 2026-08-05).
+

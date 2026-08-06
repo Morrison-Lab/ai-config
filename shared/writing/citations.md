@@ -122,6 +122,50 @@ by stating the review-time claim directly. Fixed at the root in
 the fragment self-sufficient rather than just softening the downstream
 citation.)
 
+**A citation generated from the cited file's *name* is the sharpest form of
+this, because the name is exactly what you did not check.**
+The bullet above catches a citation whose *phrasing* was mirrored from a
+precedent.
+This one catches a citation whose *target* was chosen from what the file's
+name evokes: you want an example of pattern X, a file's name reads like X, and
+you cite it without opening it.
+It is worse in a corpus of well-named skills and fragments, where a name
+reliably suggests a behaviour --- so "the adversarial one" resolves to
+`skills/opposition-research/SKILL.md` and "the fan-out one" to
+`skills/ardia/SKILL.md` on nominal fit alone, and the citation reads as apt
+while asserting a content claim nobody verified.
+The check is one grep against the cited file for the behaviour you are
+attributing to it, per
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s rule
+that a citation is a verifiable claim rather than a recollection.
+A zero-hit result is the tell that the name carried the citation.
+
+- **Do:** grep the cited file's own text for the behaviour you cite it as an
+  example of, before writing the citation.
+- **Do:** treat a skill's or fragment's name as a hypothesis about its
+  content, not as evidence of it.
+- **Don't:** reach for a file as an example of pattern X because its name
+  evokes X --- the name is the one thing you have not read.
+- **Don't:** let a citation's nominal aptness stand in for checking that the
+  target actually exhibits the pattern.
+
+(Morrison-Lab/ai-config#1205, 2026-08-05: a new `shared/workflow/agent-teams.md`
+cited `skills/opposition-research/SKILL.md` as the headless counterpart of
+adversarial/competing-hypothesis debate, and `skills/ardia/SKILL.md` as doing
+per-dimension review fan-out over security, performance, and coverage lenses.
+Neither holds.
+`grep -ciE "adversar|disprove|hypothes" skills/opposition-research/SKILL.md`
+returns 0 --- that skill mines community demand in blind parallel, and the
+adversarial-verify pass it was reaching for lives in
+[`when-to-orchestrate`](../workflow/when-to-orchestrate.md) --- and
+`grep -ciE "dimension|lens|security|performance|coverage" skills/ardia/SKILL.md`
+returns 0, since `ardia` fans out one worker per PR, while the per-dimension
+skill is `skills/grade-work/SKILL.md`.
+The reviewer named the mechanism exactly: "this reads as a case of the citation
+being generated from the *name* 'opposition research' rather than from the
+skill's actual content."
+Both were accepted and fixed.)
+
 **When a reviewer calls a citation hallucinated, test it before conceding ---
 the alleged correction can be the hallucination.** A reviewer asserting what
 the "known" URL patterns or the source's "typical" phrasing are is making a

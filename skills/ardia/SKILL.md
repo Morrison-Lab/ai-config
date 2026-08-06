@@ -176,7 +176,7 @@ mutates a PR stays serial.
      See [`sync-with-main`](../../shared/workflow/sync-with-main.md)'s duplicate-issue and whole-file-split cases, which already say to keep `main`'s version when a sibling published the same content.
      This is that judgment applied up front, at the whole-PR scale, with closure as the terminal action.
 
-   The first two are disjoint by construction: `Escalated` is about the *review* deadlocking, `Blocked` about everything else.
+   `Escalated` and `Blocked` are disjoint by construction: the first is about the *review* deadlocking, the second about everything else.
    A PR meeting both is `Blocked`, since the external obstacle has to clear before the review matters.
    `Superseded` takes precedence over either: once the content has landed on `main`, the findings and any conflict no longer matter.
 

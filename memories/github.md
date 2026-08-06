@@ -677,9 +677,15 @@ This is a case where the redirect holds for `git` and not for `gh`: a checkout
 whose `origin` URL still carries the old owner pushes fine and then cannot open
 a PR.
 
-`git push` is therefore useless as a control, because it succeeds.
+`git push`'s *exit status* is therefore useless as a control, because it
+succeeds.
 Git follows GitHub's transfer redirect, so the branch really does land on the
-new repo, and the failure arrives only at PR creation:
+new repo.
+The push *output* is not useless, though: pushing to the stale remote prints a
+`remote: This repository moved. Please use the new location: <new-url>` notice
+that names the canonical owner, so it is the earliest tell that `origin` is
+stale --- read it rather than the exit status.
+Miss that notice and the failure arrives only at PR creation:
 
 ```
 GraphQL: Head sha can't be blank, Base sha can't be blank, Head repository
@@ -712,6 +718,9 @@ using.
   before concluding anything about commits.
 - **Do:** pass `-R <new-owner>/<repo>` with explicit `--head` and `--base` when
   the remote still names the old owner.
+- **Do:** read `git push`'s output, not only its exit status: a `remote: This
+  repository moved` notice names the canonical owner and catches the stale
+  remote a step before `gh pr create` does.
 - **Don't:** read a successful `git push` as evidence that `gh` resolves the
   same repo --- git follows the transfer redirect here and `gh pr create` does
   not.
@@ -723,8 +732,11 @@ using.
 `https://github.com/d-morrison/wai`, while `gh api repos/Morrison-Lab/wai`
 reported `Morrison-Lab/wai` and `gh api repos/d-morrison/wai` returned that
 same `full_name`, confirming the redirect.
-The push succeeded, `gh pr create` failed with the message above, and the `-R`
-form worked.)
+The push succeeded --- with a `remote: This repository moved` notice naming
+`https://github.com/Morrison-Lab/wai.git` as the new location --- `gh pr create`
+failed with the message above, and the `-R` form worked.
+The same repo recurred at PR #41 on 2026-08-05, with the identical push
+notice.)
 
 ## `gh search code` is not a reliable way to enumerate consumers
 

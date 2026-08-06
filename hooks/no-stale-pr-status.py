@@ -48,16 +48,23 @@ RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 # A fresh reading. Covers the CLI and the MCP surfaces.
 RX_QUERY = re.compile(
     r"gh\s+pr\s+checks|statusCheckRollup|get_check_runs|"
-    r"gh\s+run\s+view|checkSuites|mergeStateStatus",
+    r"gh\s+run\s+view|checkSuites|mergeStateStatus|"
+    r"python3?\s+.*(?<!test_)\bcheck-pr-fully-clean\.py",
+    re.I,
+)
+
+RX_FAIL_QUERY = re.compile(
+    r"\\u274c|\u274c|\bNOT fully clean\b|contains findings|conclusion.*failure|status.*in_progress|No review comment has been posted",
     re.I,
 )
 
 
 def scan(path):
-    """Return (last_push_idx, last_query_idx, last_assistant_text)."""
-    last_push = last_query = -1
+    """Return (last_push_idx, last_query_idx, last_failing_query_idx, last_assistant_text)."""
+    last_push = last_query = last_failing_query = -1
     text = ""
     i = 0
+    query_tool_use_ids = set()
     with open(path, errors="ignore") as fh:
         for line in fh:
             i += 1
@@ -66,33 +73,47 @@ def scan(path):
             except Exception:
                 continue
             role = m.get("type")
-            blocks = (m.get("message") or {}).get("content") or []
+            blocks = (m.get("message") or {}).get("content")
+            if blocks is None:
+                blocks = m.get("content") or []
             if not isinstance(blocks, list):
                 continue
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
                 if b.get("type") == "tool_use":
+                    tool_name = (b.get("name") or "").lower()
+                    if tool_name in ("view_file", "read_file", "grep_search", "list_dir"):
+                        continue
                     # The name matters as much as the input: an MCP write names
                     # its verb only there (mcp__github__push_files), while the
                     # MCP read names its own in a `method` input parameter.
-                    blob = (b.get("name") or "") + " " + json.dumps(
+                    blob = tool_name + " " + json.dumps(
                         b.get("input") or {})
+                    tool_id = b.get("id") or b.get("tool_use_id") or ""
                     if RX_PUSH.search(blob):
                         last_push = i
                     if RX_QUERY.search(blob):
                         last_query = i
+                        if tool_id:
+                            query_tool_use_ids.add(tool_id)
+                elif b.get("type") == "tool_result":
+                    tool_id = b.get("tool_use_id") or b.get("id") or ""
+                    if tool_id and query_tool_use_ids and tool_id in query_tool_use_ids:
+                        content_text = json.dumps(b.get("content") or b.get("text") or "")
+                        if RX_FAIL_QUERY.search(content_text):
+                            last_failing_query = i
                 elif b.get("type") == "text" and role == "assistant":
                     if b.get("text", "").strip():
                         text = b["text"]
-    return last_push, last_query, text
+    return last_push, last_query, last_failing_query, text
 
 
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
         path = payload.get("transcript_path") or ""
-        last_push, last_query, text = scan(path)
+        last_push, last_query, last_failing_query, text = scan(path)
     except Exception:
         return 0  # fail open
 
@@ -101,6 +122,19 @@ def main() -> int:
     hit = RX_ASSERT.search(text)
     if not hit:
         return 0
+
+    # If the last status query reported a failing or not-clean state, block clean assertions.
+    if last_failing_query > last_query and last_failing_query > last_push:
+        print(json.dumps({
+            "decision": "block",
+            "reason": (
+                f"Your message asserts a PR's clean state -- \"{hit.group(0).strip()}\" -- "
+                "but the most recent status query tool result in this transcript reported a FAILING or IN-PROGRESS check state. "
+                "You cannot declare a PR fully clean when a status query returned failure or in-progress checks."
+            ),
+        }))
+        return 0
+
     # Nothing pushed this session, so no reading can have gone stale.
     if last_push < 0:
         return 0

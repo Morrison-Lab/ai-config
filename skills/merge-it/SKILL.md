@@ -50,6 +50,11 @@ standing yes (see `preferences.md`).
   `d-morrison` as reviewer (`gh pr edit <N> --add-reviewer d-morrison` —
   `EDIT_PR`) and leave a note that the PR is clean and ready. Don't attempt to
   force-merge.
+  **Except in `Lacaedemon/sparta`, which never requests `d-morrison`** — see
+  [`request-pr-review`](../request-pr-review/SKILL.md)'s Scope section. There,
+  leave the ready-for-merge note and surface the block to the user instead.
+  This step names the raw `gh pr edit` command rather than deferring to that
+  skill, so it does **not** inherit the exception on its own.
 - If any CI workflow or check run is red or still in progress/queued/pending,
   or the review still has open findings, **do not merge**. Report what's
   blocking instead. (Only merge a not-clean PR if the user explicitly says to

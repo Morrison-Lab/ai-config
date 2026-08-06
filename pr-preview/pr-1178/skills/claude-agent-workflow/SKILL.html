@@ -462,6 +462,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>        echo "::warning::Could not dispatch claude-code-review.yml"</span>
 <span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    fi</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The post-step detects whether Claude actually pushed (comparing SHA before/after), re-requests <code>d-morrison</code> as reviewer, and dispatches <code>claude-code-review.yml</code> via <code>workflow_dispatch</code>. The dispatch is needed because <code>GITHUB_TOKEN</code>-driven pushes don’t fire <code>synchronize</code> events, so the review workflow wouldn’t auto-trigger otherwise.</p>
+<p>In <code>Lacaedemon/sparta</code>, omit the <code>requested_reviewers</code> line — that repo never requests <code>d-morrison</code> as reviewer (see <a href="../../skills/request-pr-review/SKILL.html"><code>request-pr-review</code></a>’s Scope section). Keep the <code>claude-code-review.yml</code> dispatch: only the reviewer request is scoped out.</p>
 </section>
 <section id="stats-allowlist-for-webfetch" class="level3">
 <h3 class="anchored" data-anchor-id="stats-allowlist-for-webfetch">5. stats-allowlist for WebFetch</h3>

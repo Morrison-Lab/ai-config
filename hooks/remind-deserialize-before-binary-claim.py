@@ -32,14 +32,63 @@ provenance -- `git_commit`, `bcs_version`, `renv_lock_hash`, `timestamp` -- even
 when every value is unchanged. Reading that FALSE as "the contents changed"
 lands back on the original error with a command's authority behind it.
 
-Compare the VALUES, then inspect the stamp separately:
+THREE QUESTIONS, THREE INSTRUMENTS
+----------------------------------
+The three get conflated because one command seems to answer all of them. They
+are separate, and only the third is what an escalation about regeneration
+actually turns on.
 
-    git show <base>:<path> > /tmp/old.rds
-    Rscript -e 'o <- readRDS("/tmp/old.rds"); n <- readRDS("<path>");
+  Q1. Did the BYTES change?
+      `git diff`, `gh pr diff --name-only`, or a blob hash.
+      Already answered by the time this fires, and answering it is what
+      produced the escalation. It is not evidence about Q2 or Q3.
+
+  Q2. Was the artifact RE-RUN at all?
+      Read the provenance stamp -- the attributes a re-run restamps:
+
+          attributes(readRDS(f))[c("git_commit", "bcs_version", "timestamp")]
+
+      A changed stamp means a fresh run produced this file. It does NOT mean
+      any value moved, which is exactly why `identical()` is the wrong
+      instrument: it folds Q2 into Q3 and reports the union as if it were Q3.
+
+  Q3. Did the VALUES move?
+      This is the one the escalation rests on, and it needs the stamp excluded:
+
+          all.equal(unclass(o), unclass(n), check.attributes = FALSE)
+
+      TRUE for the two re-serializations, a list of per-column relative
+      differences for the one real change.
+
+TAKE BOTH SIDES FROM GIT
+------------------------
+    git cat-file blob <base>:<path> > /tmp/old.bin && \
+    git cat-file blob <head>:<path> > /tmp/new.bin && \
+    Rscript -e 'o <- readRDS("/tmp/old.bin"); n <- readRDS("/tmp/new.bin");
                 all.equal(unclass(o), unclass(n), check.attributes = FALSE)'
 
-That is what separates the two cases above: TRUE for the two re-serializations,
-a list of per-column relative differences for the one real change.
+Written as ONE chained command deliberately, for two reasons. The `&&` makes
+the comparison conditional on both extractions succeeding, so a bad revision
+spec fails loudly instead of silently comparing against an empty or stale temp
+file. And this guard's discharge reads one tool call at a time, requiring the
+deserialization and the artifact's path to appear TOGETHER (see DISCHARGE
+below) -- run as three separate calls, the `Rscript` names only the temp files,
+so it would not discharge and the reminder would repeat at someone who had
+already done the right thing. Measured, not assumed: chained is silent here,
+split fires.
+
+An earlier revision of this file recommended reading the second side from the
+WORKING TREE (`readRDS("<path>")`), which is only correct when the checkout
+contains the change being asked about. On 2026-08-05 that exact shape was run
+from a branch that did not contain the merge in question, so both sides were
+the same blob, the comparison returned "identical", and the false conclusion
+was published to a GitHub issue and used to close a second issue as invalid.
+`git merge-base --is-ancestor <commit> HEAD` returned false and the
+working-tree file hashed to the base blob.
+
+That failure is mechanized by the sibling guard
+`hooks/remind-both-sides-from-git.py` (ai-config#1186); see the boundary
+section below.
 
 WHY THIS INJECTS RATHER THAN BLOCKS
 -----------------------------------
@@ -89,6 +138,40 @@ Fires once per (path, escalation) pair, because a reminder repeated every turn
 is noise, and noise is what gets a guard ignored.
 
 Fails OPEN and SILENT: any parse trouble prints nothing at all.
+
+BOUNDARY WITH remind-both-sides-from-git.py
+-------------------------------------------
+Stated because a guard that deliberately does not fire on a case is
+indistinguishable, from the outside, from one that fails to.
+
+This guard's discharge is satisfied by a deserialization that names the path,
+INCLUDING one whose second side came from the working tree -- that is, by the
+broken comparison described above. Verified rather than assumed: a transcript
+of the 2026-08-05 incident, with the escalation and both of its commands,
+produces empty stdout and rc=0 here. The same transcript with the comparison
+removed fires, so the silence is a discharge rather than a detector that never
+ran.
+
+That is deliberate. The two guards ask different questions on either side of
+the same conclusion:
+
+  - This one asks whether the content question was settled AT ALL. A `readRDS`
+    of the path genuinely did occur, so by this guard's question it was.
+  - `remind-both-sides-from-git.py` asks whether the two operands were the two
+    things you meant to compare. That is where a working-tree second side is
+    wrong, and it fires on exactly the transcript this one is silent on.
+
+Tightening this discharge to reject a working-tree second side was considered
+and rejected. It would mean re-implementing that guard's four-clause fire
+condition here, giving one predicate two independent implementations free to
+drift apart; and on the incident both guards would then fire about one
+mistake, which is the noise this file already argues gets a guard ignored.
+A hole covered by a sibling that ships the detection is a boundary, not a gap.
+
+The composition is only sound while BOTH are registered. If
+`remind-both-sides-from-git.py` is ever removed or left inert, the
+wrong-second-side case stops being covered anywhere, and this guard's silence
+on it becomes a real gap rather than a delegated one.
 """
 import hashlib
 import json
@@ -340,16 +423,26 @@ def main() -> int:
         "that the CONTENT changed. `git diff` and `gh pr diff --name-only` "
         "report a re-serialization of identical values exactly as they report a "
         "real change.\n"
-        "Settle it before the human acts on the escalation:\n"
-        f"    git show <base>:{artifact} > /tmp/old.bin\n"
-        "    # then compare the VALUES, e.g. in R:\n"
-        f"    #   o <- readRDS('/tmp/old.bin'); n <- readRDS('{artifact}')\n"
-        "    #   all.equal(unclass(o), unclass(n), check.attributes = FALSE)\n"
+        "Settle it before the human acts on the escalation, taking BOTH sides "
+        "from git and keeping it to ONE chained command (the && fails loudly "
+        "on a bad revision spec, and this reminder clears only when the "
+        "deserialization and the path appear in the same call):\n"
+        f"    git cat-file blob <base>:{artifact} > /tmp/old.bin && \\\n"
+        f"    git cat-file blob <head>:{artifact} > /tmp/new.bin && \\\n"
+        "    Rscript -e 'o <- readRDS(\"/tmp/old.bin\"); "
+        "n <- readRDS(\"/tmp/new.bin\"); "
+        "all.equal(unclass(o), unclass(n), check.attributes = FALSE)'\n"
+        "Read the second side from git rather than from the working tree: the "
+        "working-tree copy is whatever this checkout happens to hold, so if it "
+        "does not contain the change under discussion both sides are the same "
+        "blob and the comparison returns 'identical'.\n"
         "Compare values rather than whole objects: a provenance-stamped "
         "artifact gets a fresh commit, version, and timestamp on every re-run, "
         "so bare `identical()` returns FALSE even when nothing changed -- and "
         "reading that FALSE as a real change is the original error with a "
-        "command's authority behind it.\n"
+        "command's authority behind it. Whether it was RE-RUN and whether the "
+        "VALUES moved are separate questions: read the provenance attributes "
+        "for the first, `all.equal()` above for the second.\n"
         "If the values match, retract the escalation rather than letting it buy "
         "compute that changes nothing. Check each path separately: in "
         "ucdavis/bcs#579 two of three artifacts were unchanged and the third "

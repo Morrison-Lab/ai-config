@@ -146,6 +146,23 @@ ESCALATE_ONE_FILE = txt(
     "Your call: regenerate downstream, or hold?"
 )
 
+# The remedy this guard's own reminder prints, in the single chained form it
+# prints it in. A guard whose prescribed fix does not satisfy its own discharge
+# keeps firing at someone who did exactly what it asked, which trains them to
+# ignore it. Split across three separate tool calls this does NOT discharge --
+# the Rscript would name only the temp files, not the artifact -- which is why
+# the reminder chains the commands rather than listing them.
+RECOMMENDED_REMEDY = tool(
+    "Bash",
+    {"command":
+        "git cat-file blob origin/main:"
+        "inst/extdata/ett-validation-true-effects.rds > /tmp/old.bin && "
+        "git cat-file blob HEAD:"
+        "inst/extdata/ett-validation-true-effects.rds > /tmp/new.bin && "
+        "Rscript -e 'all.equal(unclass(readRDS(\"/tmp/old.bin\")), "
+        "unclass(readRDS(\"/tmp/new.bin\")), check.attributes = FALSE)'"},
+)
+
 # Prose ASSERTING the check ran, with no tool_use behind it.
 PROSE_CLAIM = txt(
     "I compared the two versions with "
@@ -185,11 +202,15 @@ SILENT = [
     ([GREP_ONLY],
      "a grep and an echo of the path, no assistant message at all"),
     ([ESCALATE_ONE_FILE, SCOPED_CHECK],
-     "escalation discharged by a scoped readRDS of THAT path"),
+     "escalation discharged by a scoped readRDS of THAT path -- note the "
+     "second side is the WORKING TREE, which is the documented boundary "
+     "with remind-both-sides-from-git.py, pinned below"),
     ([SCOPED_CHECK, ESCALATE_ONE_FILE],
      "same, with the check running BEFORE the escalation"),
     ([ESCALATE_ONE_FILE, RELATIVE_CHECK],
      "check run from the artifact's own directory, path written bare"),
+    ([ESCALATE_ONE_FILE, RECOMMENDED_REMEDY],
+     "the remedy this guard's own reminder prints discharges it"),
     ([MENTION_AND_SIDECHAIN],
      "a subagent's own escalation is not my outgoing message"),
     ([], "empty transcript"),
@@ -258,6 +279,51 @@ try:
                     "same transcript again -- fires once per escalation"))
 finally:
     shutil.rmtree(shared, ignore_errors=True)
+
+# The BOUNDARY, pinned rather than asserted.
+#
+# This guard is deliberately silent on a comparison whose second side came
+# from the working tree (SCOPED_CHECK above), because the sibling guard
+# `remind-both-sides-from-git.py` fires on exactly that shape. A docstring
+# saying so is a claim; this makes it falsifiable, and turns the composition
+# into something that breaks loudly if the sibling is removed or stops
+# detecting the case.
+#
+# Both halves are checked, because either one alone proves nothing: silence
+# here plus silence there would be a real gap wearing a boundary's clothes.
+SIBLING = os.path.join(os.path.dirname(os.path.abspath(HOOK)),
+                       "remind-both-sides-from-git.py")
+if not os.path.isfile(SIBLING):
+    sys.exit(
+        f"FATAL: sibling guard not found at {SIBLING}. This suite asserts a "
+        "boundary rather than a gap: the wrong-second-side case is delegated "
+        "to that hook, so if it is gone the delegation is unbacked and this "
+        "guard's silence on that case is a genuine hole."
+    )
+
+boundary = tempfile.mkdtemp()
+try:
+    tp = os.path.join(boundary, "t.jsonl")
+    with open(tp, "w") as fh:
+        for r in (ESCALATE_ONE_FILE, SCOPED_CHECK):
+            fh.write(json.dumps(r) + "\n")
+    payload = json.dumps({"transcript_path": tp})
+    mine = subprocess.run(
+        ["python3", HOOK], input=payload, capture_output=True, text=True,
+        env=dict(os.environ, TMPDIR=boundary),
+    )
+    theirs = subprocess.run(
+        ["python3", SIBLING], input=payload, capture_output=True, text=True,
+        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+    )
+    results.append(("REMIND" if mine.stdout.strip() else "silent", "silent",
+                    "BOUNDARY: this guard is silent on a working-tree "
+                    "second side"))
+    results.append(("REMIND" if theirs.stdout.strip() else "silent", "REMIND",
+                    "BOUNDARY: the sibling guard FIRES on that same "
+                    "transcript, so the case is delegated, not dropped"))
+finally:
+    shutil.rmtree(boundary, ignore_errors=True)
 
 # A malformed transcript must fail open and silent, not crash.
 bad = tempfile.mkdtemp()

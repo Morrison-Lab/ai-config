@@ -442,7 +442,8 @@ def main() -> int:
     # common case. That is a correctness concern rather than tidiness: a hook
     # is killed at its 10s timeout, and a killed reminder is a SILENT one,
     # which is the dangerous direction. Measured on a synthetic worst case
-    # (10000 records, 500 extractions): 43.8s before, 0.2s after.
+    # (10000 records, 500 extractions): 43.8s before all three prunes, 2.3-2.6s
+    # after them, across repeated runs.
     cmp_blobs = [(j, b) for j, b in blobs if COMPARE.search(b)]  # clause 3
     anc_revs = ancestry_revs(blobs)
 

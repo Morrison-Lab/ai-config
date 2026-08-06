@@ -843,8 +843,9 @@ a document separator that truncates the generated script.)
 - **[scripts/check-pr-fully-clean.py](../scripts/check-pr-fully-clean.py) `<pr-number>` programmatically enforces ARDI fully-clean criteria.**
   It checks that:
   (1) all CI check runs for the PR's exact HEAD commit SHA are `completed` with conclusion `success`, `neutral`, or `skipped`,
-  (2) an automated review comment evaluating that HEAD SHA has been posted, and
-  (3) all matching review comments for that HEAD SHA contain zero findings and no formal `CHANGES_REQUESTED` or `REJECTED` state.
+  (2) an automated review comment evaluating that exact HEAD SHA has been posted by an automated bot account (`github-actions`, `github-actions[bot]`, `claude[bot]`, `claude`) or carries a bot review header (`🤖`, `### 🤖`, `code review`, `verdict:`),
+  (3) all matching review comments/objects evaluating the HEAD SHA contain zero findings (verifying multi-item SHA coverage so empty trailing formal review objects cannot hide finding-bearing comments), and
+  (4) no formal `CHANGES_REQUESTED` or `REJECTED` state exists on the PR (integrating GitHub's computed `reviewDecision` API field directly from `gh pr view --json reviewDecision` and preserving decision state across subsequent `COMMENTED` reviews).
   Returns exit code 0 only when fully clean.
-  Run before declaring any ARDI loop complete or unclaiming a PR.
+  Must be executed synchronously in the foreground turn (`WaitMsBeforeAsync: 5000`) before declaring any ARDI loop complete or unclaiming a PR.
 

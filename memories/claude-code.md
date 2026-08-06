@@ -807,7 +807,7 @@ Here there is no earlier state: the entry is seconds old, and the tool that wrot
 **The two halves of "arm these hooks" live in different scripts, and each does only its half.**
 `install-hooks.py` writes `~/.claude/settings.json` and never places a file --- its own docstring says `bootstrap.sh` "gets the *scripts* onto the machine and stops there", and that `check-install.py` "is the sibling for the other half: it decides whether the installed *files* match the repo, and knows nothing about `settings.json`."
 `check-install.py --fix` is what places them, repairing its `missing` status,
-which it defines as "the repo ships it; the consumer directory does not have it".
+which its docstring defines as a path the repo ships and the consumer directory does not have.
 So running only `install-hooks.py --fix` on a machine whose `~/.claude/hooks/` lacks the scripts does the binding half and skips the placement half, which is strictly worse than doing neither: an unregistered guard is inert, while a registered-but-absent one is an active `PreToolUse` failure.
 
 **The script already computes the fact that would have stopped it, on a branch it does not reach.**

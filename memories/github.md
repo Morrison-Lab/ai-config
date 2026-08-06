@@ -266,10 +266,44 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
 - **Regex Parsing for Automated Agent Reports (`re.VERBOSE`)**:
   - Standardize on Python's built-in `re.compile` with `re.VERBOSE` (`re.X`) instead of third-party DSL wrappers (`humre`) or dual regex fallback paths. Dual regex definitions introduce implementation drift between local unit tests and CI runners.
-  - Lookahead section delimiters should NOT terminate on bullet lists (`- `) or internal subheadings (`### Subheading`) inside finding bodies unless followed by a `Location:` header directive. Escape `#` as `\#` inside `re.VERBOSE` patterns. (Morrison-Lab/gha#412, 2026-08-05).
+  - Prefer match-boundary splitting over lookahead section delimiters.
+
+- **Avoid lookahead regexes across markdown finding bodies containing code blocks.**
+  Single-line comments in code blocks (`# comment` in Python, Bash, R, Ruby, YAML) start with `# `.
+  A lookahead like `\n\#{1,6}[ \t]+` for section headers then treats those code comments as markdown headings, cutting a code-block suggestion off mid-snippet.
+  (Morrison-Lab/gha#412, 2026-08-05).
+- **Line-anchor the fence pattern when masking code blocks.**
+  Mask fenced blocks before location matching with a line-anchored fence (`^[ \t]{0,3}```...`) under `re.MULTILINE`, and match each block's opening and closing fence as a balanced pair.
+  Do not span blocks with a single `re.DOTALL` match: an unclosed fence then swallows everything up to a *later* block's closing fence, masking the valid location headers in between.
+  (Morrison-Lab/gha#412, 2026-08-05).
+- **Use match-boundary splitting instead of single-pass lookaheads.**
+  Collect every finding's location header (`**Location:** [file.ext:L10]`) into `matches`, then slice each body between consecutive matches.
+  An interior body is `content[matches[i].end():matches[i+1].start()]`.
+  The last match has no `matches[i+1]`, so its body runs to `content[matches[-1].end():]` (end of content) rather than indexing past the list.
+  This eliminates catastrophic backtracking on nested code blocks and `#` code comments.
+  (Morrison-Lab/gha#412, 2026-08-05).
+- **Anchor a location match to its heading, not just the `Location:` line.**
+  When intro text sits between a section heading (`#### 1. Critical Bug`) and its `Location:` tag, a regex keyed only on the immediate prefix of `Location:` misses the heading, and finding bodies then absorb the adjacent heading.
+  Precompute each heading's start position preceding its location match and slice bodies from there.
+  (Morrison-Lab/gha#412, 2026-08-05).
+- **Strip backticks and leading slashes from location file paths.**
+  LLMs sometimes wrap the path in backticks (e.g. ``**Location:** [`file.py`:L12]``) or prefix a leading `/` (`/src/main.py`).
+  `POST /repos/{owner}/{repo}/pulls/{number}/reviews` rejects a leading-slash path with `HTTP 422` (`path cannot start with /`), and a stray backtick yields `HTTP 422: File path does not exist`.
+  Normalize with ``.strip("'\"` ").lstrip("/")`` so the API gets a clean relative path.
+  (Morrison-Lab/gha#412, 2026-08-05).
+- **Resolve candidate instruction paths relative to `GITHUB_WORKSPACE`.**
+  Relative lookups for root files (`CLAUDE.md`, `AGENTS.md`) depend on the working directory, so a script invoked from a subdirectory misses them.
+  Use `os.path.join(os.environ.get("GITHUB_WORKSPACE", "."), rel_path)`, and `.lstrip("/")` the `rel_path` first: `os.path.join` discards the base whenever its second argument is absolute.
+  (Morrison-Lab/gha#412, 2026-08-05).
+- **Require double newlines `\n\s*\n` (or a compound section phrase) when truncating summary headers.**
+  Trimming a summary on single newlines (`\n+#{1,6}`) or a bare keyword (`Recommendation`) can cut an inline comment body short when a finding contains a sub-heading like `### Recommendation`.
+  Requiring `\n\s*\n`, or matching a compound phrase (`Overall Summary`, `General Recommendations`) with a negative lookahead, keeps such sub-headings intact.
+  (Morrison-Lab/gha#413, 2026-08-05).
 
 - **Shell Script Fail-Closed Safety in Workflows**:
-  - Under `set -e`, use `if ! CMD; then` to safely handle non-zero exit status without `set +e`. Disabling `set +e` turns off `errexit` for subsequent pipeline steps (e.g., `jq`), risking failing open instead of closed on JSON parse errors. (Morrison-Lab/gha#412, 2026-08-05).
+  - Under `set -e`, use `if ! CMD; then` to safely handle non-zero exit status without `set +e`.
+    Using `set +e` turns off `errexit` for subsequent pipeline steps (e.g., `jq`), risking failing open instead of closed on JSON parse errors.
+    (Morrison-Lab/gha#412, 2026-08-05).
 
 - **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
   `POST /repos/<o>/<r>/pulls/<N>/requested_reviewers` with `reviewers[]=copilot-pull-request-reviewer[bot]` returned **201**, and the plain `Copilot` and `copilot` logins were accepted the same way.

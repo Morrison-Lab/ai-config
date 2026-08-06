@@ -65,11 +65,10 @@ retracting is still cheap -- in the incident, before the issue comment.
 
 RELATIONSHIP TO THE DESERIALIZE-BEFORE-BINARY-CLAIM GUARD
 ---------------------------------------------------------
-That guard is proposed in ai-config#1181 and is NOT on `main` yet; once that
-merges it lives at `hooks/remind-deserialize-before-binary-claim.py`. Nothing
-here imports or calls it, so this hook does not depend on it landing -- the
-paragraphs below are rationale, and if #1186 merges first they describe a file
-that arrives shortly afterward.
+That guard ships as `hooks/remind-deserialize-before-binary-claim.py`
+(ai-config#1181). Nothing here imports or calls it, so this hook does not
+depend on it -- the paragraphs below are rationale rather than a dependency.
+Its own docstring states the same boundary from the other side.
 
 The two are siblings on either side of the same conclusion, and this one
 covers a hole in that one.

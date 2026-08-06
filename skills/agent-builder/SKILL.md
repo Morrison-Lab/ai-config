@@ -240,6 +240,22 @@ Then, as explicit steps:
 2. **Drive to clean:** run `ardi` on the new PR until the verdict has zero
    findings.
 
+## A second consumer: agent-team teammate roles
+
+An agent definition has a use beyond the fan-out subagent it is built for: it
+also doubles as an **agent-team teammate role**.
+When a user asks a team lead to spawn a teammate "using the `<name>` agent
+type", the definition's `tools` allowlist and `model` apply and its body is
+appended to the teammate's system prompt --- but its `skills` and `mcpServers`
+frontmatter are **not** applied (a teammate loads those from project and user
+settings), and `SendMessage` plus the task-management tools are always available
+regardless of `tools`.
+So write the persona and tool boundary to stand on their own, and don't rely on
+a definition's `skills` reaching a teammate.
+See [`agent-teams`](../../shared/workflow/agent-teams.md) for when a team is the
+right primitive at all --- it is user-gated and experimental, so this is a reuse
+property of the file, never a thing this skill or its agents spawn.
+
 ## Relationship to other skills
 
 - **`skill-builder`** — the skill-authoring sibling; this is its subagent-file

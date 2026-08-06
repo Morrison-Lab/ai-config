@@ -375,6 +375,90 @@ Then look for that.
 - **Don't:** let the future tense of the claim hide that the answer is already
   in the past.
 
+## A correction inherits its instrument, so a second reading is not a check
+
+"Illusions of knowing" above concerns a **single** reading whose scope went
+unexamined.
+This concerns the **second** reading, taken to correct the first, from the same
+command.
+
+Reporting a figure that contradicts one you reported earlier feels like the
+most rigorous thing you do all day.
+That is the problem.
+The diligence is real and it attaches to the wrong object: it is spent on the
+*act of correcting*, and the replacement value inherits credibility the original
+had just lost, so nothing prompts the question the retraction should have raised
+first --- was the gauge ever right?
+
+Two readings of one instrument are not a measurement and its correction.
+They are two samples of the same thing, and if that thing is broken they are two
+wrong answers, of which the second is now published under a banner of care.
+It is worse than the original error, because a correction reaches further: it is
+addressed to everyone the first claim reached, and it teaches them the number is
+now settled.
+
+### The tell
+
+Unusually mechanical, and observable in the sentence being composed:
+
+> You are about to report a figure that contradicts one you reported earlier,
+> and the new figure comes from the same command.
+
+That is the moment to reach for a **different** instrument, not to publish.
+
+Note what does not count as different.
+Two commands that read the same underlying field are one instrument wearing two
+names, and reaching for the sibling command is the natural move precisely
+because it looks like corroboration while confirming nothing.
+"Different" means a different *source of truth*, not a different invocation ---
+the file the daemon reads rather than the daemon's cache of it, the artifact
+itself rather than the index over it.
+
+### Which contradiction fires it
+
+Not every changed number.
+A quantity that genuinely moved is the ordinary case, and a rule that fired on
+it would flag every progress report.
+
+The discriminator is whether the underlying quantity was **expected to change
+over that interval**, which is a semantic judgment rather than a decidable one.
+A job counter going from 45 to 90 is a system doing its job.
+A utilization figure going from 35% to 87% on a workload nobody changed is a
+claim that something moved, and the burden is to say what.
+
+So state the mechanism when you publish a correction.
+"It was 35%, now it is 87%" is not a correction, it is a second number.
+"It was 35% because I sampled during the serial phase, and here is a reading
+that spans both phases" is one, and writing that sentence is itself the check:
+a mechanism you cannot name is usually a gauge you did not verify.
+
+### Why no instrument decides this
+
+Worth stating plainly, per
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "Limits", so nobody builds
+the guard and then switches it off.
+
+A hook can see the two figures and the repeated command.
+It cannot see whether the quantity was supposed to change, and that is the whole
+discriminator --- so its discharge would be wrong on exactly the ordinary case,
+which is also the common one.
+A guard that misfires on the common case gets disabled, and takes the real cases
+with it.
+
+The mechanizable residue is narrower and belongs in the repo that owns the
+gauge: where a **specific** field is known cached, a note or a hook naming its
+live counterpart is decidable and cheap.
+The general rule stays judgment.
+
+- **Do:** cross-check with a different source of truth before publishing a
+  figure that contradicts one you already published.
+- **Do:** name the mechanism that explains the change, and treat being unable to
+  name one as evidence the instrument is the problem.
+- **Don't:** count a sibling command that reads the same field as a second
+  opinion.
+- **Don't:** let the act of retracting stand in for having verified the
+  replacement --- a correction is a claim, and it carries its instrument with it.
+
 ## Writing is the instrument, when the claim can be wrong
 
 The article establishes that self-assessment is unreliable and that confidence
@@ -476,6 +560,9 @@ It is the diagnostic.
 - **Don't:** read a command's output as settling a question without checking
   what that command's scope actually was.
 - **Don't:** let a recap's overall accuracy vouch for an individual cell in it.
+- **Don't:** publish a figure contradicting one you already published without
+  reading a different source of truth --- the second reading of one instrument
+  is not a check on the first.
 
 ## Relationship to neighbouring rules
 
@@ -502,3 +589,16 @@ It is the diagnostic.
   trigger, so it fires **after** a false claim has been discovered.
   This one fires **before** one goes out.
   They are the two ends of the same failure and neither replaces the other.
+- [`fail-fast`](../principles/fail-fast.md) surrounds "A correction inherits its
+  instrument" on both sides and is not it.
+  Its "test the instrument against a known positive before trusting a negative"
+  validates a gauge before believing a **null result**; this validates one
+  before publishing a **correction**.
+  Its "A zero-shaped summary can be sound" runs the opposite way, warning
+  against retracting a true result too eagerly --- so read the two together
+  rather than treating either as licence.
+- [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "treat a
+  shared origin as grounds for more care, not as corroboration" is the same
+  instinct about two **values** that agree.
+  The correction case is about two **readings over time** that disagree, where
+  the shared origin is what makes the disagreement uninformative.

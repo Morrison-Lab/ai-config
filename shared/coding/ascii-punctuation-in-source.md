@@ -6,6 +6,9 @@ own fragments). Use ASCII punctuation instead: a comma, colon, or semicolon
 where the em-dash joined clauses, a spaced run of hyphens (`---` or `--`) when
 a dash is genuinely wanted, or a plain hyphen (`-`) for a compound.
 
+Worked-example case records for the rules below live in
+[`ascii-punctuation-in-source.cases.md`](ascii-punctuation-in-source.cases.md), moved out of the auto-loaded context.
+
 **Either spaced form is fine, and `---` is what this corpus actually writes.**
 Both are ASCII, so neither can break the rule above:
 the choice is house style rather than hygiene.
@@ -139,12 +142,6 @@ between the two is a signal about your range, not about the file.
 And merging `main` first collapses the difference, since the merge base
 becomes `main`'s tip; that is the better habit anyway, per
 [`sync-with-main`](../workflow/sync-with-main.md).
-(Morrison-Lab/ai-config#816, 2026-07-29: a pre-push scan reported 88 banned
-glyphs, mostly in `memories/github-actions.md`, none of them in the diff.
-`main` had since moved 609 of that file's lines into a new
-`memories/claude-bot-workflows.md`, so the two-dot diff re-attributed every
-one of them to the branch --- `+609/-5` on a file the branch never opened.
-The same scan with `...` reported 0 over 66 added lines.)
 
 **Writing into a file that predates this rule is the likeliest way to break
 it, because the surrounding prose is the wrong model to imitate.**
@@ -162,8 +159,6 @@ wrapping and lands two sentences on one line, flagged even though every
 neighbouring line does the same.
 So when adding prose to an older-conventions file, scan your own added lines
 for both before pushing.
-(ai-config#754, 2026-07-28: four multi-sentence lines and one em-dash, each
-a faithful imitation of the paragraph it was written next to.)
 
 **Editing an existing line for an unrelated reason makes its pre-existing
 violations yours, because the diff cannot tell the two apart.**
@@ -240,26 +235,6 @@ back identical.
 - **Don't:** defer to the corpus-wide sweep for lines your own diff is
   republishing.
 
-(Morrison-Lab/ai-config#1067 -> #1069, 2026-08-02: #1067 split six worktree
-sections out of `memories/git.md` and left 26 em-dashes and 16 multi-sentence
-lines in the relocated file, reasoning that relocation is not authoring
-and that #731 covers the sweep.
-The user's correction was "fix em-dashes and semantic line breaks on any prose
-you touch", pointing at the 10 warnings the `check-new-line-breaks` job had
-already posted as annotations on that PR.
-Fixed in #1069, with the word-level comparison confirming 1910 words on both
-sides.)
-
-(Twice on 2026-07-29/30.
-`Morrison-Lab/gha#374`: retargeting an owner name inside
-`sync-upstream.yml`'s generated PR-body string re-added that line's
-long-standing em-dash, flagged on the next scan.
-`Morrison-Lab/ai-config#863`: rewording `CLAUDE.md`'s `compress-session`
-live-state list to match a new bright line re-added both an em-dash and a
-mid-line semicolon, flagged by `check-new-line-breaks` and the punctuation
-scan respectively.
-Neither glyph was authored in either session.)
-
 **Fixing one flagged glyph is a one-line edit; fixing it with a whole-file
 replace is a different, much larger change that happens to touch the same
 line.**
@@ -295,28 +270,9 @@ not as a side effect of answering one review comment.
 - **Don't:** assume a diff is clean because the check now passes --- check
   its size against what the finding actually asked for.
 
-(Morrison-Lab/ai-config#916, 2026-07-30: a review flagged one em-dash in a
-newly added heading.
-The first fix ran a file-wide replace of the banned em-dash (U+2014) with
-`---` against
-`skills/agent-builder/SKILL.md`, which also rewrote 52 pre-existing
-em-dashes elsewhere in that same file, turning a 33-line addition into a
-104-line diff.
-Caught before pushing by checking the diff's size against the single-line
-finding it was meant to answer; recovered via `git checkout -- <file>`
-against the still-staged pre-replace version, since the file had been
-`git add`-ed before the mistake.)
-
 **The mistake recurs even while actively self-reviewing for exactly this
 rule, and the scale grows with the number of files touched at once.**
 Fixing multiple flagged glyphs across several files in one pass invites
 running one `str.replace()` loop over all of them, rather than a separate
 targeted edit per occurrence --- and the same "does the diff size match the
 finding" check catches it just as cheaply here as it does for a single file.
-(Morrison-Lab/ai-config#973, 2026-08-01: a self-review found 8 flagged
-em-dashes across three memory files.
-A first pass ran a global `text.replace(em_dash, " --- ")` per file, which
-touched 663 removed lines across the three files against an expected ~50 ---
-caught by `git diff --stat` before pushing, reverted with
-`git checkout -- <files>`, and redone with anchored, uniqueness-asserted
-substitutions for only the 8 flagged lines.)

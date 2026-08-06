@@ -114,7 +114,8 @@ The hook *command* re-runs on every call, so a restored file unblocks at once, w
 - **Don't:** read "a merge guard blocked my command" as meaning only merges are blocked --- a missing `PreToolUse` `Bash` hook blocks every Bash call.
 - **Don't:** work around a classifier-denied hooks-config edit yourself.
 
-(2026-08-05, Morrison-Lab/ai-config: `~/.claude/settings.json` referenced a removed `no-unauthorized-merge.py` hook, so every Bash call failed with `python3: can't open file '.../hooks/no-unauthorized-merge.py'`; the hook was absent from `main`'s `hooks/hooks.json` (which #1157 has since added, merged 2026-08-06), the `ai-config` plugin was also enabled, so the same hooks were double-registered, and the settings.json edit to remove the stale line was classifier-denied, so it was surfaced to the user.)
+(2026-08-05, Morrison-Lab/ai-config: `~/.claude/settings.json` referenced a removed `no-unauthorized-merge.py` hook, so every Bash call failed with `python3: can't open file '.../hooks/no-unauthorized-merge.py'`.
+The hook was absent from `main`'s `hooks/hooks.json` (which #1157 has since added, merged 2026-08-06), the `ai-config` plugin was also enabled, so the same hooks were double-registered, and the settings.json edit to remove the stale line was classifier-denied, so it was surfaced to the user.)
 
 ### The same block arrives by a second route, and there `install-hooks.py --fix` is the proximate cause
 

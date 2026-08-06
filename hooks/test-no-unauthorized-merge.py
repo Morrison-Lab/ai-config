@@ -69,6 +69,8 @@ BLOCK = [
     ('echo "closes #1156, needs review" && gh pr merge 1157 --squash', "double-quoted issue reference with hash followed by double-ampersand and merge command"),
     ('gh pr merge 123 --reviewer "please --allow-merge this"', "unauthorized merge with --allow-merge forged inside unmasked flag value"),
     ('gh pr merge 123 "junk --allow-merge junk"', "unauthorized merge with --allow-merge forged inside positional argument"),
+    ('gh pr comment 999 --body "Log: `gh pr merge 123 --squash`"', "backtick subshell inside double-quoted payload"),
+    ('gh pr comment 999 --body "Log: $(gh pr merge 123 --squash)"', "dollar-subshell inside double-quoted payload"),
     ('"gh" pr merge 123', "quoted executable name gh"),
     ("'gh' pr merge 123", "single-quoted executable name gh"),
     ('gh "pr" merge 123', "quoted subcommand pr"),
@@ -106,6 +108,7 @@ ALLOW = [
     ('ALLOW_MERGE="1" gh pr merge 411 --squash', "explicit ALLOW_MERGE=\"1\" env flag with double quotes"),
     ("ALLOW_MERGE='1' gh pr merge 411 --squash", "explicit ALLOW_MERGE='1' env flag with single quotes"),
     ("echo ALLOW_MERGE=1 && gh pr view 411", "ALLOW_MERGE in benign command"),
+    ('gh pr comment 999 --body "Ran $(pwd) today. Reminder: never run gh pr merge without asking."', "double-quoted payload mixing subshell with prose mentioning gh pr merge"),
     ("echo Even though pr merge conflicts arose it is fine", "prose sentence containing though followed by pr merge"),
     ("echo high pr merge priority task", "prose sentence containing high followed by pr merge"),
 ]

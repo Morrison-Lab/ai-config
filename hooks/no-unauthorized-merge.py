@@ -135,15 +135,23 @@ def mask_trailing_comments(text: str) -> str:
     return "\n".join(masked_lines)
 
 
-def mask_payloads(text: str) -> str:
-    """Mask text payloads (comment bodies, commit messages, trailing shell comments, body files, API payload fields)
-    so trigger patterns inside prose or file paths do not cause false positives.
-    Handles escaped quotes inside multiline string literals without consuming command separators.
-    Preserves newlines inside multiline string literals so segment alignment remains 1-to-1.
+def mask_subexpressions(val: str) -> str:
+    """Mask literal prose inside payload flags with spaces, while preserving live command substitutions (`...` or $(...)) unmasked."""
+    sub_pattern = r"(`[^`]*`|\$\([^)]*\))"
+    tokens = re.split(sub_pattern, val)
+    result = []
+    for i, tok in enumerate(tokens):
+        if i % 2 == 1:
+            result.append(tok)
+        else:
+            result.append("".join("\n" if c == "\n" else " " for c in tok))
+    return "".join(result)
 
-    Unquoted values and double-quoted values containing backticks or $(...) command substitutions are NOT masked
-    because Bash expands and executes command substitutions in double-quoted or unquoted contexts.
-    Single-quoted values ('...') strictly suppress command substitution and remain safe to mask unconditionally.
+
+def mask_payloads(text: str) -> str:
+    """Mask string payload flags (--body, -m, etc.) so benign occurrences of gh pr merge inside commit/PR messages do not trigger false positives.
+
+    Leaves command substitutions (`...` or $(...)) inside payload flags unmasked so malicious execution cannot be hidden inside payload flags.
     """
     flag_pattern = (
         r"(?:--body-file\b|--body\b|--title\b|--subject\b|--comment\b|--message\b|"
@@ -155,31 +163,19 @@ def mask_payloads(text: str) -> str:
     hspace = r"[ \t]*"
 
     def repl_double(m):
-        val = m.group(2)
-        if "`" in val or "$(" in val:
-            return m.group(0)  # Do not mask if command substitution (` or $(...)) is present
-        return m.group(1) + "".join("\n" if c == "\n" else " " for c in val)
+        return m.group(1) + mask_subexpressions(m.group(2))
 
     def repl_single(m):
         val = m.group(2)
-        return m.group(1) + "".join("\n" if c == "\n" else " " for c in val)  # Single quotes strictly disable bash command expansion
-
-    def repl_unquoted(m):
-        val = m.group(2)
-        if "`" in val or "$(" in val:
-            return m.group(0)  # Do not mask unquoted values containing command substitutions
         return m.group(1) + "".join("\n" if c == "\n" else " " for c in val)
 
-    # 1. Mask quoted string payloads first (handling double-quoted and single-quoted separately for expansion safety)
+    def repl_unquoted(m):
+        return m.group(1) + mask_subexpressions(m.group(2))
+
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_double, text, flags=re.DOTALL)
     text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_single, text, flags=re.DOTALL)
-
-    # 2. Mask trailing shell comments (# ...) only when preceded by whitespace/separator outside quotes
     text = mask_trailing_comments(text)
-
-    # 3. Mask unquoted single-token flag values (e.g. --body-file /tmp/file.txt), allowing hyphens inside paths
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})([^-;\s&|\n][^;\s&|\n]*)", repl_unquoted, text)
-
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(`[^`]*`|\$\([^)]*\)|[^-;\s&|\n][^;\s&|\n]*)", repl_unquoted, text)
     return text
 
 

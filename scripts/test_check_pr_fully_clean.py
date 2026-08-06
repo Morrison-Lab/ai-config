@@ -67,6 +67,14 @@ def main() -> int:
         "commit": {"oid": "sha123"}
     }
 
+    human_approved_review = {
+        "submittedAt": "2026-08-05T18:14:14Z",
+        "body": "LGTM, thanks!",
+        "state": "APPROVED",
+        "author": {"login": "d-morrison"},
+        "commit": {"oid": "sha123"}
+    }
+
     # Test 1: Clean review comment returns True
     mock_clean_data = json.dumps({"comments": [clean_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_clean_data):
@@ -96,6 +104,12 @@ def main() -> int:
     with patch.object(checker, "run_cmd", return_value=mock_none_author_data):
         none_author_ok, none_author_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
         check("payload with None author handles safely", none_author_ok and none_author_issues == [])
+
+    # Test 6: Plain human APPROVED review without bot review fails criterion 2
+    mock_human_data = json.dumps({"comments": [], "reviews": [human_approved_review]})
+    with patch.object(checker, "run_cmd", return_value=mock_human_data):
+        human_ok, human_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        check("human APPROVED review without bot review fails criterion 2", not human_ok and any("No automated review" in i for i in human_issues))
 
     # Regression: a stale review posted AFTER the commit, carrying a marker
     # word but NOT referencing the HEAD SHA, must NOT be accepted as evaluating

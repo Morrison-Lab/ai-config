@@ -112,10 +112,16 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str, review_decisi
 
     for r in reviews:
         body = r.get("body", "")
+        body_lower = body.lower()
         commit_oid = r.get("commit", {}).get("oid", "")
         state = r.get("state", "").upper()
         submitted_at = r.get("submittedAt", "")
-        if body or commit_oid or state in ("CHANGES_REQUESTED", "REJECTED"):
+        author_login = (r.get("author") or {}).get("login", "")
+        is_bot_author = author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict:"))
+
+        # Scope review collection to automated bot reviews OR blocking CHANGES_REQUESTED/REJECTED states
+        if is_bot_author or is_review_header or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state))
 
     if not all_items:

@@ -147,7 +147,8 @@ and pinned.
 Measured on node `c2` by polling `sinfo -h -n c2 -o %O` against that node's own
 `/proc/loadavg` every 5s: it held `21.07` across 49 consecutive samples, 245
 seconds, while the live 1-minute load fell monotonically from 24.49 to 1.83,
-then stepped to `12.22` and held while the live figure reached 0.65.
+then stepped to `12.22` and held while the live figure fell to `0.81` at the
+last logged sample.
 A separate 12-sample run caught the opposite error, `17.86` against a live
 24.35-24.45.
 Errors in both directions is what rules out treating it as a biased-but-usable
@@ -155,6 +156,7 @@ gauge, and it is why two samples of it minutes apart produced contradictory
 conclusions with neither being a correction of the other.
 
 The near-miss worth recording is the cross-check that would not have helped.
+on a read taken moments after the poll stopped,
 `scontrol show node c2` reports `CPULoad=12.22` at the same moment
 `sinfo -o %O` reports `12.22` and `/proc/loadavg` reports `0.65`, so the
 obvious second command prints the same cache.

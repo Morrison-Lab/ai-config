@@ -897,10 +897,11 @@ safer/preferred choice merely because the repo has external consumers.
 
 - **Suppress low-signal, hyper-pedantic noise in AI code review prompts.**
   When building prompts for automated AI code reviewers,
-  instruct the model to assume modern target runtimes (e.g. Python 3.10+)
-  and to suppress hyper-pedantic runtime-compatibility warnings
-  (e.g. PEP 604 `A | B` unions or `list[T]` generics for EOL Python 3.8/3.9)
-  unless the repository declares explicit legacy-runtime support.
+  instruct the model to assume modern target runtimes (e.g. Python 3.10+ as of 2026-08)
+  and to down-rank hyper-pedantic runtime-compatibility warnings
+  (e.g. PEP 604 `A | B` unions on EOL Python 3.9, or PEP 585 `list[T]` generics on EOL Python 3.8).
+  Suppress such a warning only where a modern floor is positively declared -- a `requires-python` pin or a `setup-python` version.
+  Where no floor is declared, flag it at low severity rather than dropping it, so the guidance does not fail open on a repo that silently runs an older runtime (per `shared/principles/fail-fast.md`).
   (Learned on gha#412, 2026-08-05.)
 - **Demand a single, exhaustive review pass.**
   Instruct the reviewer to report every finding, recommendation, and edge case in one pass,

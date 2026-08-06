@@ -61,7 +61,10 @@ def user(s):
 
 
 # ---------------------------------------------------------------------------
-# Case 1: the verbatim incident. Paths are the real ones from ucdavis/bcs#579.
+# Case 1: the verbatim incident. The three paths are the .rds entries returned
+# by `gh pr diff 579 --name-only` on ucdavis/bcs#579, read from the PR rather
+# than recalled -- an earlier draft of this file invented
+# `msm-validation-results.rds` for the third one.
 # ---------------------------------------------------------------------------
 NAME_ONLY = tool("Bash", {"command": "gh pr diff 579 --name-only"})
 
@@ -71,7 +74,7 @@ INCIDENT = txt(
     "Three HPC validation artifacts changed in this PR:\n"
     "`inst/extdata/ett-validation-true-effects.rds`, "
     "`inst/extdata/ett-validation-accuracy-results.rds`, and "
-    "`inst/extdata/msm-validation-results.rds`.\n"
+    "`inst/extdata/msm-validation-accuracy-results.rds`.\n"
     "Regenerating the dependent artifacts is a ~1.5h serial run plus a "
     "500-task SLURM array. Your call: regenerate, or hold the change?\n"
     "==="

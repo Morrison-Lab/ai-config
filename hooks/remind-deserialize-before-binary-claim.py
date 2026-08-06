@@ -11,14 +11,35 @@ composed, which is exactly when the second gets asserted from the first.
 The cost is asymmetric. An escalation of this shape asks a human to authorize
 work: regenerate the dependent artifacts, or hold the change. In the incident
 this mechanizes (ucdavis/bcs#579, 2026-08-05) that was roughly 1.5 hours of
-serial compute plus a 500-task SLURM array, requested over three `.rds` files
-that were byte-different re-serializations of the same run -- each deserialized
-to an object `identical()` to its predecessor, provenance attribute included.
+serial compute plus a 500-task SLURM array, requested from a `--name-only`
+listing alone.
 
-The check that settles it costs two lines:
+Measured afterward against the merge's parent `d1dd05e3^`, TWO of those three
+`.rds` files carried values equal to their predecessors and differed only in a
+freshly stamped provenance attribute, while the third
+(`msm-validation-accuracy-results.rds`) had genuinely changed -- bias by 121%,
+rmse by 18%, coverage by 3%. So the escalation was not baseless; it was
+UNMEASURED, which is the defect. Two thirds of what it asked to regenerate had
+not changed, and nothing in the path list distinguished the third from the
+other two.
+
+THE OBVIOUS CHECK IS THE WRONG ONE
+----------------------------------
+    Rscript -e 'identical(readRDS(old), readRDS(new))'   # returns FALSE
+
+`identical()` returns FALSE for all three, because a re-run stamps fresh
+provenance -- `git_commit`, `bcs_version`, `renv_lock_hash`, `timestamp` -- even
+when every value is unchanged. Reading that FALSE as "the contents changed"
+lands back on the original error with a command's authority behind it.
+
+Compare the VALUES, then inspect the stamp separately:
 
     git show <base>:<path> > /tmp/old.rds
-    Rscript -e 'identical(readRDS("/tmp/old.rds"), readRDS("<path>"))'
+    Rscript -e 'o <- readRDS("/tmp/old.rds"); n <- readRDS("<path>");
+                all.equal(unclass(o), unclass(n), check.attributes = FALSE)'
+
+That is what separates the two cases above: TRUE for the two re-serializations,
+a list of per-column relative differences for the one real change.
 
 WHY THIS INJECTS RATHER THAN BLOCKS
 -----------------------------------
@@ -321,10 +342,18 @@ def main() -> int:
         "real change.\n"
         "Settle it before the human acts on the escalation:\n"
         f"    git show <base>:{artifact} > /tmp/old.bin\n"
-        f"    # then compare the two deserialized objects, e.g. in R:\n"
-        f"    #   identical(readRDS('/tmp/old.bin'), readRDS('{artifact}'))\n"
-        "If they are identical, retract the escalation rather than letting it "
-        "buy compute that changes nothing (ucdavis/bcs#579).\n"
+        "    # then compare the VALUES, e.g. in R:\n"
+        f"    #   o <- readRDS('/tmp/old.bin'); n <- readRDS('{artifact}')\n"
+        "    #   all.equal(unclass(o), unclass(n), check.attributes = FALSE)\n"
+        "Compare values rather than whole objects: a provenance-stamped "
+        "artifact gets a fresh commit, version, and timestamp on every re-run, "
+        "so bare `identical()` returns FALSE even when nothing changed -- and "
+        "reading that FALSE as a real change is the original error with a "
+        "command's authority behind it.\n"
+        "If the values match, retract the escalation rather than letting it buy "
+        "compute that changes nothing. Check each path separately: in "
+        "ucdavis/bcs#579 two of three artifacts were unchanged and the third "
+        "had genuinely moved.\n"
         "If this reminder is a false positive -- the escalation is about the "
         "file's size, path, or whether it should be tracked at all, rather than "
         "about its contents -- disregard it and carry on." + others

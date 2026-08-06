@@ -31,3 +31,8 @@ When printing a status recap or summary, include a timestamp in the user's local
 - **Workspace discovery**: `.agents/skills.json` and `.agents/plugins.json` configure workspace-level skill and plugin discovery when opening this repository directly in Antigravity.
 - **Global configuration**: Running `bootstrap.sh` symlinks `plugins/ai-config` into `~/.gemini/config/plugins/ai-config` and registers `plugins.json` for user-wide Antigravity sessions.
 
+## Strict Merge Control Policy
+
+- **NEVER merge any Pull Request or Merge Request without explicit user permission.**
+  Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
+  Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").

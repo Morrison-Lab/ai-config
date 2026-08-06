@@ -9,6 +9,9 @@ something fails and forces a look back.
 Monitoring is the one nothing prompts, so it is the one that has to be made
 procedural rather than left to attentiveness.
 
+Worked-example case records for the rules below live in
+[`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md), moved out of the auto-loaded context.
+
 ## Confidence is a warning sign, not a green light
 
 The natural stopping rule for checking is feeling sure, and the article
@@ -84,16 +87,6 @@ Often it is, and often the user can produce it in one step.
 - **Don't:** report a classification built on an unverified premise without
   saying which premise it rests on.
 
-(2026-07-30, auditing Claude token provenance: the user offered "this account
-was out of tokens since Sunday I think?" and an entire repo classification was
-built on it -- any review succeeding after that Sunday must belong to the other
-account.
-The hedge went unread.
-The user then posted their usage chart, showing continuous usage across the
-whole week and peaking the day after the supposed cutoff, which refuted the
-premise and voided the classification.
-The chart was one screenshot away the entire time.)
-
 **The source need not be the user, and a reviewer's finding is the variant this
 section's own tell cannot catch.**
 Everything above describes a premise a person hands you, and the detector it
@@ -148,43 +141,6 @@ reviewer standing on it.
   was checked -- confidence is the house style of that genre, not a signal.
 - **Don't:** count a dispatched verification as a completed one.
 
-(2026-08-01, a six-PR session in this repo: four findings were read,
-dispositioned, and reported to the user as established fact, each without the
-one cheap check that would have confirmed it, and the user re-sent the same
-link three times before one was run.
-A fifth surfaced while this entry was being drafted, so five were checked in
-the end.
-Across those five the conclusion held in five of five and the particulars were
-wrong in five of five -- a guard whose failure was broader than reported, a
-script that was not the one running, a cited line number with nothing at it, a
-hardcoded-value scope that named 2 of 6 sites, and
-a two-command failure whose first command failed with an error the finding
-never mentioned.
-The shape then recurred while this entry was being written, and took two
-further passes to settle.
-The observation recorded in
-[`fully-clean`](fully-clean.md)'s fifth case was handed over with a completion
-time of `04:08:13Z`, corrected here to `04:50:41Z`, and then retracted in that
-file as an invented particular, on the grounds that `#1008` carried no
-Copilot-attributable check run at all.
-Re-measured 2026-08-03, the retraction is the step that was wrong: check run
-`91327863807` on that head is named `copilot-pull-request-reviewer` and reads
-`completed_at: 2026-08-01T04:50:41Z`, `conclusion: success`.
-So the first correction held, and so did the conclusion drawn from it, a green
-reviewer check with no review behind it.
-It was the verification of the verification that carried a false particular
-forward.
-
-That does not rescue the pattern so much as relocate it.
-The retraction came from querying a surface that omits this check run ---
-[`fully-clean`](fully-clean.md)'s criterion 1 now names which surface, and
-records that the reason for the omission is still unestablished --- and
-nothing about the zero it returned announced that it was answering a narrower
-question than the one asked.
-A verification inherits the scope of whatever instrument it reaches for, so
-"I checked and it is not there" stays a claim about the instrument until the
-instrument's own coverage has been established.)
-
 ## An action you recommend is a claim about state
 
 The four types above fire on an assertion, and the section above extends them
@@ -222,20 +178,6 @@ That is why reciting it does not feel like recalling.
   word.
 - **Don't:** build one from the recap's own status table, however recently
   that table was assembled.
-
-(2026-08-02, this repo: a boxed RECOMMENDATION advised merging `#1058` and
-`#1064` "whenever you like", calling them independent and both carrying clean
-verdicts.
-Both had already merged, `#1064` at `2026-08-03T02:34:40Z` and `#1058` at
-`2026-08-03T02:34:49Z`, roughly four minutes earlier, by a second account
-rather than by that session.
-`gh pr view 1058 --json state` returns `MERGED` and settles it in one call.
-Because the recommendation carried no status word,
-`hooks/no-stale-pr-status.py` could not fire on it either: its `ASSERT` list
-is entirely state vocabulary and holds no imperative form, and its staleness
-condition is anchored to a push of *ours*, which a third party's merge does
-not produce.
-Both halves are tracked in ai-config#1072.)
 
 ## Question the answer that arrives without deliberation
 
@@ -334,14 +276,6 @@ script can judge the claim itself.
 - **Don't:** let a rigorously verified section lend its tone to an adjacent
   unverified one.
 
-(UCD-SERG/lab-manual#452, 2026-08-04: every claim about the cluster was
-established empirically --- a loopback `ssh -X` probe, `ldd`, `capabilities()`,
-`module avail`, `getent group sudo`.
-Every claim about the reader's own computer was written from memory, in the
-same table, and the Linux row asserted "your desktop session is already an X
-server", which is false on the many distributions now defaulting to Wayland.
-Review caught it; nothing in the verified half could have.)
-
 ## Search for the artifact instead of arguing about whether it would exist
 
 The section above concerns an instrument you ran whose scope you did not check.
@@ -382,16 +316,6 @@ Then look for that.
 - **Don't:** let the future tense of the claim hide that the answer is already
   in the past.
 
-(2026-08-01, `UCD-SERG/ucd-serg.github.io#89`: a review workflow's
-`pull-requests` permission was narrowed to `read`, justified by the argument
-that "the action posts with its own app token, so the workflow token does not
-need write".
-The argument was wrong, and two Copilot reviews restated it without objection.
-One query --- whether a `claude`-authored comment existed on any earlier PR ---
-returned zero across the workflow's entire month of operation, which settled
-both the mechanism and the fact that reviews had never once posted.
-Nobody ran it until a fourth PR was opened to fix the consequence.)
-
 ## Writing is the instrument, when the claim can be wrong
 
 The article establishes that self-assessment is unreliable and that confidence
@@ -430,18 +354,6 @@ So write the thing that **can be wrong**.
 A specification, a prediction, a precise claim about state, a stated mechanism:
 each can be contradicted by something.
 A summary of what was already concluded cannot.
-
-(Same session: writing a docstring that had to state precisely how a correction
-behaved across two study arms is what exposed the claim "relative error is
-identical across arms" as false, because the precision forced a computation
-that contradicted it.
-Tabulating the node types in a diagram is what exposed that four of them sat on
-three different scales.
-Against that, most of that hour's writing was post-hoc recaps: well organized,
-tabulated, and incapable of surfacing anything, since everything in them was
-settled before composition began.
-The user corrected roughly every three minutes throughout, several times on the
-same underlying failure, while the polished output continued.)
 
 ## Stripping is the part that tests
 
@@ -482,12 +394,6 @@ So: write it self-contained, then strip it, and treat whatever resists
 stripping as the actual problem.
 The stripping pass is not editing for length.
 It is the diagnostic.
-
-(2026-07-30, this task's own brief: long, complete, and carrying several false
-claims about this corpus that survived precisely because writing it required
-justifying nothing.
-One --- "model on the two existing `Stop` hooks" --- would have had to earn its
-place under a stripping pass, and one `ls` settles it.)
 
 ## Do and don't
 
@@ -537,18 +443,3 @@ place under a stripping pass, and one `ls` settles it.)
   trigger, so it fires **after** a false claim has been discovered.
   This one fires **before** one goes out.
   They are the two ends of the same failure and neither replaces the other.
-
-(2026-07-30, a `ucdavis/bcs` session: the five most confidently asserted claims
-were all wrong, and each was one command from being settled.
-A leaked credential was described as having gone into a *public* PR, when the
-repository is private with three direct accounts.
-This corpus was said to ship no hooks, from a grep against a checkout 27
-commits behind.
-A PR was reported green and conflict-free from a query returning 11 passing and
-4 pending, taken before three of that PR's own later pushes.
-A changelog count of ten was reported as nine, because the regex matched only
-one of two link forms.
-And a blocking `Stop` hook was called the right shape for a new rule, when it
-would have suppressed error admissions.
-The directives were "cai: use metacognition", "cai: think before you speak;
-question yourself", and "cai: question your generative intuitions".)

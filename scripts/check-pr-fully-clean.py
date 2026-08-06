@@ -10,7 +10,7 @@ Exit codes:
 0: Fully clean (safe to end ARDI loop)
 1: Not clean (in-progress checks, failing checks, missing review, or findings present)
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 import re
 import subprocess
@@ -124,11 +124,9 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str, review_decisi
 
     # Match items evaluating the target HEAD commit SHA
     sha_short = sha[:7]
-    commit_dt = parse_iso_time(commit_date)
 
     matching_items = []
     for item in all_items:
-        created_at_dt = parse_iso_time(item[1])
         body = item[2]
         body_lower = body.lower()
         oid = item[3]
@@ -138,13 +136,15 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str, review_decisi
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)
         else:
-            # Issue comments without OID match if SHA is present OR posted after commit_dt (with 60s skew tolerance)
-            is_match = is_sha_match or bool(
-                commit_dt
-                and created_at_dt
-                and created_at_dt >= (commit_dt - timedelta(seconds=60))
-                and any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict"))
-            )
+            # An issue comment counts as evaluating HEAD only if it actually
+            # references the HEAD SHA (full or short). Matching on timing alone
+            # (posted after the commit + a generic marker word) is unsafe: a slow
+            # review of an earlier commit can post AFTER a newer push and would
+            # then be accepted as a review of the new HEAD, reporting a stale
+            # verdict as "fully clean" -- the exact review-vs-push race
+            # shared/workflow/fully-clean.md documents ("a review comment's
+            # header SHA can be stale"). Fail closed: no SHA reference, no match.
+            is_match = is_sha_match
 
         if is_match:
             matching_items.append(item)

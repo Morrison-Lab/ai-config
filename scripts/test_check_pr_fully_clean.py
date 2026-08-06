@@ -39,12 +39,12 @@ def main() -> int:
 
     clean_comment = {
         "createdAt": "2026-08-05T18:14:14Z",
-        "body": "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\nEverything looks great! No issues found.\n\nVerdict: Clean / Ready for merge."
+        "body": "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\nEverything looks great! No issues found.\n\nReviewed HEAD sha123.\n\nVerdict: Clean / Ready for merge."
     }
 
     findings_comment = {
         "createdAt": "2026-08-05T18:14:37Z",
-        "body": "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n## Actionable Findings\n\n### 1. Link Syntax Error\n**Location:** memories/tools.md:L843"
+        "body": "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\nReviewed HEAD sha123.\n\n## Actionable Findings\n\n### 1. Link Syntax Error\n**Location:** memories/tools.md:L843"
     }
 
     formal_changes_requested_review = {
@@ -56,7 +56,7 @@ def main() -> int:
 
     no_major_changes_comment = {
         "createdAt": "2026-08-05T18:14:14Z",
-        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nNo major changes requested. Everything looks clean and ready for merge."
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nReviewed HEAD sha123.\n\nNo major changes requested. Everything looks clean and ready for merge."
     }
 
     none_author_review = {
@@ -96,6 +96,19 @@ def main() -> int:
     with patch.object(checker, "run_cmd", return_value=mock_none_author_data):
         none_author_ok, none_author_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
         check("payload with None author handles safely", none_author_ok and none_author_issues == [])
+
+    # Regression: a stale review posted AFTER the commit, carrying a marker
+    # word but NOT referencing the HEAD SHA, must NOT be accepted as evaluating
+    # HEAD (the fail-open timing-race guarded by fully-clean.md). It is a slow
+    # review of an earlier commit landing after a newer push.
+    stale_no_sha_comment = {
+        "createdAt": "2026-08-05T18:30:00Z",  # well after commit_date
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nAnalysis of an older commit.\n\nVerdict: Clean / Ready for merge."
+    }
+    mock_stale_data = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_stale_data):
+        stale_ok, stale_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        check("stale review not referencing HEAD SHA is rejected (fail-closed)", (not stale_ok) and len(stale_issues) > 0)
 
     # Test 6: CI check runs filtering
     mock_ci_success = json.dumps({

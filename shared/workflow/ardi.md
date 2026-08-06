@@ -653,10 +653,57 @@ version `DESCRIPTION` pins --- was unavailable, inferred from one failed
 `install.packages()` disproved it, and the regeneration landed in the same
 round the finding did.)
 
+**Attempting the base form of a command is not attempting its variants ---
+a refusal describes the invocation you ran, never the flag you did not try.**
+The rule above is discharged by one attempt, which is what makes this the
+harder miss: the attempt genuinely happened, so the instinct that rule exists
+to trigger has already fired and reported itself satisfied.
+What ships anyway is a claim about a *different* command --- the same one plus
+a flag --- for which no attempt exists at all.
+
+The error message is what makes that generalization feel safe, because it is
+usually phrased about the operation rather than about the invocation.
+A refusal reading `cannot be moved or removed` sounds like a statement about
+the whole family, and it can even be half-true: that wording really is
+unconditional for one of the two operations it names.
+A half-true message is worse than a plainly wrong one, since re-reading it
+confirms the reading you already had.
+
+So before writing that something is impossible, check whether the tool's own
+`--help` or documentation offers a flag for exactly this case, and run that
+form too.
+One `--force` is cheaper than the correction round, and it is the only thing
+that turns "the command refused" into "the operation cannot be done".
+
+- **Do:** run the flag variant the docs or the error itself name, before
+  generalizing a refusal into an impossibility.
+- **Do:** scope the published claim to the invocation actually run, naming the
+  exact command and what it exited with.
+- **Don't:** read an unconditional-sounding error as covering flags you never
+  passed.
+- **Don't:** count an attempt at the base form as discharging the rule above
+  for a variant of it.
+
+(2026-08-05, `Morrison-Lab/ai-config`: `git worktree remove <path>` on a
+worktree holding a checked-out submodule failed with `fatal: working trees
+containing submodules cannot be moved or removed`, and a memory entry was
+written asserting that `--force` "does not help" and that git "declines this
+case unconditionally".
+`--force` had never been run.
+A reviewer challenged it against git's own documentation, which says
+"Unclean worktrees or ones with submodules can be removed with `--force`".
+Measured on git 2.37.2.windows.2: the plain form exits 128, while
+`git worktree remove --force <path>` exits 0, deletes the directory, and
+deregisters the worktree.
+The wording was genuinely unconditional for `git worktree move`, which is the
+half-truth that made it survive re-reading.
+[`memories/git-worktrees.md`](../../memories/git-worktrees.md) now records the
+working form.)
+
 **Name the specific gate when you report a blocker, not a category word that
 happens to be one of several.**
-The rule above governs *whether* something is blocked, and its remedy is to
-attempt the thing once.
+The verify-a-blocker rule two sections above governs *whether* something is
+blocked, and its remedy is to attempt the thing once.
 This governs *why*, and it fires after that remedy has already succeeded: the
 call was attempted, it genuinely failed, and the blocker is real.
 Only the attribution is wrong, which is why nothing about it feels like an

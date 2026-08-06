@@ -66,6 +66,11 @@ mutates a PR stays serial.
    otherwise mutate shared forge state --- every one of those belongs to the
    serial loop below.
 
+   **Check for supersession before preparing a patch for an idle, non-clean PR.**
+   Grep `origin/main` for the PR's distinctive added phrases; if they are all
+   already there, the PR is `Superseded` (see step 3's terminal states) and its
+   patch prep is wasted work --- flag it for closure instead.
+
    **The patch has to leave the worktree as an artifact, not sit in it as a
    dirty tree.**
    A worker's worktree is not durable: `isolation: 'worktree'` has reclaimed one
@@ -165,9 +170,15 @@ mutates a PR stays serial.
      A round count is never a terminal state at all --- see [`ardi`](../ardi/SKILL.md)'s "Stopping conditions".
    - **Blocked** --- an **external or operational** obstacle rather than a review finding: an unresolvable conflict, a needed human decision outside the review, or a preflight failure your change didn't cause.
      Record what's blocking, move on.
+   - **Superseded** --- the PR's content already landed on `main` via a sibling PR, so its remaining findings and any conflict are moot and the right action is to close it, not drive it.
+     Recognize this before spending rounds: an idle, non-clean PR whose `main`-merge conflict pits its own added lines against a better-formatted copy already on `main` is the tell, and grepping `origin/main` for the PR's distinctive added phrases confirms it (all present -> superseded, and resolving toward `main` would leave an empty diff).
+     Recommend closure --- the content is preserved on `main` --- and name the superseding PR, rather than pushing an empty diff to clean.
+     See [`sync-with-main`](../../shared/workflow/sync-with-main.md)'s duplicate-issue and whole-file-split cases, which already say to keep `main`'s version when a sibling published the same content.
+     This is that judgment applied up front, at the whole-PR scale, with closure as the terminal action.
 
-   The two are disjoint by construction: `Escalated` is about the *review* deadlocking, `Blocked` about everything else.
+   The first two are disjoint by construction: `Escalated` is about the *review* deadlocking, `Blocked` about everything else.
    A PR meeting both is `Blocked`, since the external obstacle has to clear before the review matters.
+   `Superseded` takes precedence over either: once the content has landed on `main`, the findings and any conflict no longer matter.
 
    **Process PRs one at a time, not concurrently.** Each ARDI run pushes
    commits, triggers review workflows, and polls for the result; running them
@@ -181,7 +192,8 @@ mutates a PR stays serial.
    |-------|--------|--------------|
    | [#25](url) | 3 | ✅ Clean |
    | [#26](url) | 4 | ⏸️ Escalated --- awaiting human on: … |
-   | [#27](url) | 1 | ⛔ Blocked — needs human decision on … |
+   | [#27](url) | 1 | ⛔ Blocked --- needs human decision on … |
+   | [#28](url) | 0 | 🔁 Superseded --- content on `main` via [#N](url); recommend closing |
 
    For any PR not driven to clean, **list its remaining open items** so triage
    is one glance, not a re-investigation. Don't merge anything — opening merges

@@ -441,7 +441,7 @@ evidence a reviewer spoke, and nothing more.
 **`check-pr-fully-clean.py` itself has the mirror false positive: it can report
 NOT clean over a clean verdict.**
 The cases above are fail-open --- the instrument reads clean when the PR is not;
-the script named in criterion 1's verification line fails the other way.
+this script fails the other way.
 Its `finding_patterns` scan runs over the whole review body, so a clean
 `Ready for merge` verdict that merely *quotes* finding vocabulary ---
 `**Location:**`, `Needs more work`, and the like --- trips a pattern and prints

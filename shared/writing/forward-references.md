@@ -12,6 +12,9 @@ case: **any** plain-text forward-pointing phrase, about **any** kind of
 content (a section, a figure, a table, an argument, not just a formal
 definition), in any prose --- READMEs, docs, papers, PR descriptions.
 
+Worked-example case records for the rules below live in
+[`forward-references.cases.md`](forward-references.cases.md), moved out of the auto-loaded context.
+
 ## The detection heuristic
 
 The primary signal is the directional word itself --- below, later,
@@ -61,10 +64,6 @@ list at the end of the document, say --- is a back-reference and fine.
 Prefer deleting the pointer over rewording it: in a sequential procedure
 the reader reaches the target anyway, so a step that states its own
 mechanism in brief needs no cross-reference at all.
-(ai-config#691: `ums`'s step 2 said "grep before writing, per step 3";
-dropping the pointer left "grep before writing", which carries the
-mechanism on its own, while the anti-patterns entry's own `(step 3)`
-correctly stayed.)
 
 ## Confirming a hit
 
@@ -99,7 +98,6 @@ Two options, in order of preference:
    Use this only when reordering is genuinely worse, not as a default
    shortcut.
 
-
 ## Moving prose makes self-references stale
 
 The same check fires after a file split or prose migration, even when the
@@ -131,13 +129,36 @@ self-reference.
 - **Don't:** rely on link checks for this class; the broken pointer is prose,
   not a link.
 
-(Morrison-Lab/ai-config#966 split `memories/github-mcp-tools.md` out of
-`memories/github.md`.
-A moved entry at `memories/github-mcp-tools.md:45` still said
-`This is the "Postcondition gate" bullet at the top of this file made concrete:`.
-After the split, that bullet remained in `memories/github.md:10`, so the
-sentence pointed to the wrong file until the reference was rewritten.)
+**Sweep the general directional pattern, not the literal phrases you expect.**
+The self-review that verifies a move is where this check most often fails, and
+it fails by grepping for the *specific* wording the mover happens to remember
+--- `(below)`, `case below`, `per #N below` --- which is far narrower than the
+ordinary `the X above` / `Y below` / `here` phrasing the real danglers wear.
+Grep the general directional pattern instead, over both the moved content and
+the prose left behind, since a stranded reference can sit on either side of the
+split:
 
+```bash
+rg -niE '\b(above|below|here|earlier|later)\b|this (section|file)' <moved> <survivor>
+```
+
+Then classify each hit rather than trusting a zero count.
+A hit that now points **across the split** --- at content that moved to a
+different file --- is a dangling defect; fix it by naming the referent
+explicitly --- name the target rather than counting to a position --- not by
+flipping `above` to `below`.
+A hit that stays **within its own block**, is **quoted** (prose describing the
+very reference it quotes), or measures **elapsed time** ("minutes earlier", "a
+round later") is correct and must be left.
+The [`fix-forward-references`](../../skills/fix-forward-references/SKILL.md)
+skill (alias `ffr`) runs exactly this sweep and is the right tool for it.
+
+- **Do:** grep the general `\b(above|below|here|earlier|later)\b` pattern over
+  both sides of a split, and classify each hit as cross-file (fix) or
+  within-block/quoted/elapsed-time (leave).
+- **Don't:** report "no dangling references" from a literal-phrase grep --- it
+  is scoped to wording you already recalled, which is never where the misses
+  are.
 ## Inserting prose makes a downstream back-reference stale
 
 The section above covers the referrer *moving*.
@@ -176,15 +197,6 @@ so the next insertion cannot silently invalidate the reference.
 - **Don't:** rely on the directional-word grep above to catch this --- its word
   list is exclusively forward-pointing and never sees a backward reference
   like "above" in the first place.
-
-(Morrison-Lab/ai-config#1091, 2026-08-03: a new section was inserted between
-"A negative control must enter at the real input" and "A reminder guard's
-discharge condition...", whose opening "The two sections above test a guard's
-fire condition" then counted back to the new, unrelated section instead of the
-two fire-condition sections it described.
-Review caught it; the fix relocated the inserted section out of the arc so the
-count resolved again.
-CI was fully green throughout --- no mechanical check sees this.)
 
 ## The roadmap exception
 

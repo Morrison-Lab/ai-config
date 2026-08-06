@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+"""PreToolUse guard: mechanistically prohibit PR/MR merge commands.
+
+Prohibits commands attempting to merge PRs/MRs (e.g. `gh pr merge`, `glab mr merge`,
+`gh api .../merge`, `glab api .../merge`, or GraphQL `mergePullRequest` / `enablePullRequestAutoMerge`)
+unless explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
+"""
+import json
+import os
+import platform
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+LEAD = r"""(?:^|[\s;&|`()]|\$\(|\$\{IFS\}|\$IFS\b|\$[A-Za-z0-9_]+)"""
+ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
+EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
+OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
+OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
+HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
+API_WRITE_FLAG = rf"(?:-X\s*=?\s*{HTTP_METHOD}|--method\s*=?\s*{HTTP_METHOD}|-f\b|-F\b|--field\b|--raw-field\b|--input\b)"
+
+DELIM = r"(?:\s+|\$\{IFS\}|\$IFS\b|\$\([^)]*\)|\$[A-Za-z0-9_]+)+"
+GH_PROG = r"(?:[/\w.-]+/)?(?:gh|\$GH|\$\{GH\})\b"
+GLAB_PROG = r"(?:[/\w.-]+/)?(?:glab|\$GLAB|\$\{GLAB\})\b"
+
+MERGE_PATTERNS = [
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + OPT_FLAGS + DELIM + r"pr\b" + OPT_FLAGS + DELIM + r"merge\b", "gh pr merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + OPT_FLAGS + DELIM + r"mr\b" + OPT_FLAGS + DELIM + r"merge\b", "glab mr merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b", "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b", "gh api repository merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b", "glab api MR merge"),
+    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
+]
+
+ALLOW_ENV_FLAG = re.compile(
+    r"^(?:\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
+)
+SPLIT = re.compile(r"&&|\|\||;|\||\n")
+
+
+def unquote_words(text: str) -> str:
+    """Normalize bash quote-removal on individual command/subcommand word tokens.
+
+    In Bash, quoting part or all of a word token without spaces or subshells
+    (e.g. "gh", 'gh', "pr", "merge", g""h, 'glab', "mr", "/usr/bin/gh")
+    is identical to the unquoted word. This function strips inert quotes from single-word tokens
+    so MERGE_PATTERNS matches regardless of quote placement on command/subcommand names.
+    """
+    prev = None
+    while prev != text:
+        prev = text
+        text = re.sub(r'''(["'])([A-Za-z0-9_./-]+)\1''', r'\2', text)
+        text = re.sub(r'''(?<=[A-Za-z0-9_./-])(?:""|'')(?:(?=[A-Za-z0-9_./-])|$)''', '', text)
+        text = re.sub(r'''(?:^|(?<=[\s;&|`()]))(?:""|'')(?:(?=[A-Za-z0-9_./-])|$)''', '', text)
+    return text
+
+
+def has_allow_override(segment: str) -> bool:
+    """Check if command segment contains an explicit authorization override.
+
+    Matches either:
+    1. ALLOW_MERGE=1 env assignment anchored at segment start.
+    2. Standalone --allow-merge flag token occurring OUTSIDE of string quotes.
+       Tokenizing quote context ensures forged --allow-merge strings inside unmasked flag values
+       or bare positional text (e.g. --reviewer "please --allow-merge this") do not bypass authorization.
+    """
+    if ALLOW_ENV_FLAG.search(segment):
+        return True
+
+    for m in re.finditer(r"(?:^|[\s;&|`\n])(--allow-merge)\b", segment):
+        idx = m.start(1)
+        in_single = False
+        in_double = False
+        escaped = False
+        for i in range(idx):
+            c = segment[i]
+            if escaped:
+                escaped = False
+                continue
+            if c == "\\" and not in_single:
+                escaped = True
+                continue
+            if c == "'" and not in_double:
+                in_single = not in_single
+                continue
+            if c == '"' and not in_single:
+                in_double = not in_double
+                continue
+        if not in_single and not in_double:
+            return True
+    return False
+
+
+def mask_trailing_comments(text: str) -> str:
+    """Mask trailing shell comments (# ...) with spaces while respecting quote context.
+
+    In Bash, '#' inside quotes ('...' or "...") is a literal character, not a comment boundary.
+    This function tokenizes quote state line-by-line to ensure '#' inside quoted strings is NOT
+    mistaken for a shell comment, preventing quote-enclosed '#...' strings from swallowing
+    subsequent statement separators or merge commands.
+    """
+    lines = text.split("\n")
+    masked_lines = []
+    for line in lines:
+        in_single = False
+        in_double = False
+        escaped = False
+        comment_start = -1
+        for i, c in enumerate(line):
+            if escaped:
+                escaped = False
+                continue
+            if c == "\\" and not in_single:
+                escaped = True
+                continue
+            if c == "'" and not in_double:
+                in_single = not in_single
+                continue
+            if c == '"' and not in_single:
+                in_double = not in_double
+                continue
+            if c == "#" and not in_single and not in_double:
+                if i == 0 or line[i - 1] in " \t;&|`()":
+                    comment_start = i
+                    break
+        if comment_start != -1:
+            line = line[:comment_start] + " " * (len(line) - comment_start)
+        masked_lines.append(line)
+    return "\n".join(masked_lines)
+
+
+def mask_subexpressions(val: str) -> str:
+    """Mask literal prose inside payload flags with spaces, while preserving live command substitutions (`...` or $(...)) unmasked."""
+    sub_pattern = r"(`[^`]*`|\$\([^)]*\))"
+    tokens = re.split(sub_pattern, val)
+    result = []
+    for i, tok in enumerate(tokens):
+        if i % 2 == 1:
+            result.append(tok)
+        else:
+            result.append("".join("\n" if c == "\n" else " " for c in tok))
+    return "".join(result)
+
+
+def mask_payloads(text: str) -> str:
+    """Mask string payload flags (--body, -m, etc.) so benign occurrences of gh pr merge inside commit/PR messages do not trigger false positives.
+
+    Leaves command substitutions (`...` or $(...)) inside payload flags unmasked so malicious execution cannot be hidden inside payload flags.
+    """
+    flag_pattern = (
+        r"(?:--body-file\b|--body\b|--title\b|--subject\b|--comment\b|--message\b|"
+        r"--commit-title\b|--commit-message\b|--reason\b|--notes\b|--description\b|"
+        r"--summary\b|-m\b|-b\b|-d\b|-t\b|-s\b|"
+        r"(?:-f|-F|--field|--raw-field|--input)\s+"
+        r"(?:body|title|subject|comment|message|commit_title|commit_message|reason|notes|description|text|summary)\b)"
+    )
+    hspace = r"[ \t]*"
+
+    def repl_double(m):
+        return m.group(1) + mask_subexpressions(m.group(2))
+
+    def repl_single(m):
+        val = m.group(2)
+        return m.group(1) + "".join("\n" if c == "\n" else " " for c in val)
+
+    def repl_unquoted(m):
+        return m.group(1) + mask_subexpressions(m.group(2))
+
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_double, text, flags=re.DOTALL)
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_single, text, flags=re.DOTALL)
+    text = mask_trailing_comments(text)
+    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(`[^`]*`|\$\([^)]*\)|[^-;\s&|\n][^;\s&|\n]*)", repl_unquoted, text)
+    return text
+
+
+def sanitize(name: str) -> str:
+    """Sanitize session ID matching ai-session.sh: tr -c 'A-Za-z0-9._-' '_'"""
+    return re.sub(r"[^A-Za-z0-9._-]", "_", name)
+
+
+def is_session_alive(sess_file: Path) -> bool:
+    try:
+        content = sess_file.read_text(encoding="utf-8")
+        sess_data = dict(line.split("=", 1) for line in content.splitlines() if "=" in line)
+        pid = sess_data.get("pid")
+        host = sess_data.get("host")
+        local_host = platform.node()
+        if pid and pid.isdigit() and int(pid) > 0:
+            if not host or host.split(".")[0].lower() == local_host.split(".")[0].lower():
+                try:
+                    os.kill(int(pid), 0)
+                    return True
+                except OSError:
+                    return False  # PID is dead on local host
+        hb = int(sess_data.get("heartbeat") or sess_data.get("started") or 0)
+        return (time.time() - hb) < 1800
+    except Exception:
+        pass
+    return False
+
+
+def get_git_common_dirs() -> list[Path]:
+    dirs = []
+    try:
+        common_dir = subprocess.check_output(
+            ["git", "rev-parse", "--git-common-dir"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            cwd=os.getcwd(),
+        ).strip()
+        common_path = Path(common_dir)
+        if not common_path.is_absolute():
+            common_path = (Path.cwd() / common_path).resolve()
+        dirs.append(common_path)
+    except Exception:
+        pass
+
+    repo_dir = os.environ.get("CLAUDE_PROJECT_DIR") or str(Path(__file__).resolve().parents[1])
+    try:
+        common_dir = subprocess.check_output(
+            ["git", "-C", repo_dir, "rev-parse", "--git-common-dir"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        common_path = Path(common_dir)
+        if not common_path.is_absolute():
+            common_path = (Path(repo_dir) / common_path).resolve()
+        if common_path not in dirs:
+            dirs.append(common_path)
+    except Exception:
+        pass
+
+    pwd_git = Path.cwd() / ".git"
+    if pwd_git.is_dir() and pwd_git.resolve() not in dirs:
+        dirs.append(pwd_git.resolve())
+
+    return dirs
+
+
+def check_mwc_active() -> bool:
+    try:
+        current_session = os.environ.get("AI_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
+        if not current_session:
+            return False
+
+        sanitized_session = sanitize(current_session)
+        for common_dir in get_git_common_dirs():
+            reg_dir = common_dir / "ai-sessions"
+            if not reg_dir.exists():
+                continue
+            mwc_file = reg_dir / f"{sanitized_session}.mwc"
+            if mwc_file.exists():
+                sess_file = reg_dir / f"{sanitized_session}.session"
+                if sess_file.exists() and is_session_alive(sess_file):
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def offending(command: str):
+    # 1. Normalize bash backslash-newline line continuations (matching bash semantics: remove backslash and newline without inserting a space)
+    norm_command = re.sub(r"\\\n", "", command)
+    # 2. Normalize single-word token quote removal (e.g. "gh" -> gh, "pr" -> pr, "merge" -> merge, g""h -> gh)
+    unquoted_command = unquote_words(norm_command)
+    # 3. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
+    masked_command = mask_payloads(unquoted_command)
+
+    # 4. Use finditer on masked_command to derive exact character slice offsets for unquoted_command
+    matches = list(SPLIT.finditer(masked_command))
+    starts = [0] + [m.end() for m in matches]
+    ends = [m.start() for m in matches] + [len(masked_command)]
+
+    for start, end in zip(starts, ends):
+        masked_seg = masked_command[start:end]
+        orig_seg = unquoted_command[start:end]
+        if has_allow_override(orig_seg):
+            continue
+        for pattern, label in MERGE_PATTERNS:
+            if re.search(pattern, masked_seg):
+                if check_mwc_active():
+                    break  # Allowed via active MWC session grant
+                return label, orig_seg.strip()
+    return None
+
+
+def main() -> int:
+    try:
+        payload = json.load(sys.stdin)
+    except Exception as exc:
+        print(f"no-unauthorized-merge: unreadable hook input ({exc})", file=sys.stderr)
+        return 0
+
+    if payload.get("tool_name") != "Bash":
+        return 0
+
+    command = (payload.get("tool_input") or {}).get("command") or ""
+    hit = offending(command)
+    if not hit:
+        return 0
+
+    label, segment = hit
+    reason = (
+        f"MECHANISTIC PROHIBITION: `{label}` is strictly blocked without explicit permission.\n\n"
+        f"    Offending command segment: {segment}\n\n"
+        "AI agents are mechanistically forbidden from merging PRs/MRs unless explicitly instructed "
+        "by the user or executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc)."
+    )
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

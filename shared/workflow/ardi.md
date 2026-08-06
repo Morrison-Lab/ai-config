@@ -19,6 +19,8 @@ in progress; do not call the PR clean from an earlier head or from green CI
 without a current-head review verdict.
 Pushing fixes for a finding-bearing review starts a new review cycle: the ARDI loop is NOT finished when you push fixes or post an ARD summary.
 You must wait for the fresh review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it is clean before declaring the loop finished.
+NEVER use background tasks, async sleep commands, or schedule timers for ARDI status polling.
+Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn.
 This applies transitively to PR-driving
 workflows such as `gi`, `gii`, and `ardia`; only monitor PRs the session owns or
 has explicitly claimed, so the rule does not authorize changing someone else's
@@ -169,6 +171,45 @@ concluded they were "appropriate", reasoning that two restated surviving
 prose and the third was superseded.
 The third point was right and the other two were not; the bullets were
 restored, one reworded, and the deletion count fell from seven lines to two.)
+
+**When the edit is a regex or string patch rather than the Edit tool, two
+mechanisms turn that displacement into a silent over-deletion, and a self-check
+can wave both through.**
+A non-greedy `.*?` DOTALL span binds to the **first** occurrence of its start
+anchor, so when that anchor is not unique the match runs from the wrong site
+and swallows every intervening structure up to the target suffix.
+And a self-check that counts only the **changed** element passes by
+coincidental balance while its neighbours are gone: deleting one sibling append
+and adding one target append leaves the target count unmoved, so the count
+reports success over a diff that dropped whole intervening blocks.
+The assertion that actually catches it verifies that neighbouring structures
+**survive** --- the sibling loop still present, untouched element counts
+unchanged --- rather than that the changed element's count is as expected.
+
+- **Do:** anchor a string or regex patch on text unique to the intended site,
+  and prefer the Edit tool's exact-string matching over a broad `.*?` DOTALL
+  span.
+- **Do:** make a patch self-check assert that neighbouring structures survive
+  --- the sibling function or loop still present, untouched element counts
+  unchanged --- not merely that the changed element's count is as expected.
+- **Don't:** trust a `re.sub(..., flags=DOTALL, count=1)` whose non-greedy
+  `.*?` start anchor is non-unique; it binds to the first occurrence.
+- **Don't:** read "the assertions passed" as "the patch is correct"; a
+  count-based check can pass by coincidental balance, and the `git diff`
+  deletion-review is the real gate.
+
+(Morrison-Lab/ai-config#1167, round 12, 2026-08-05: a `re.sub` DOTALL patch to
+`scripts/check-pr-fully-clean.py`'s second `for r in reviews:` loop anchored on
+that same text, which also opens an earlier `author_latest_state` loop, so the
+match ran from the first occurrence and deleted both it and the intervening
+`for c in comments:` loop.
+The self-check `src.count('all_items.append(("review"') == 1` passed anyway,
+because the lost comment-append and the one added review-append balanced, and
+an `is_review_header == 0` check passed because both loops that used it were
+gone.
+Reading `git diff` before committing surfaced the deletion; the fix reverted
+and redid it with the Edit tool plus survival assertions, verified by a
+negative control.)
 
 **A clean verdict does not discharge the self-review against project
 conventions either, and the reviewer's own "not a finding" is where that

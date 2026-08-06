@@ -72,9 +72,9 @@ mentioned this skill at all, so running it on a sparta PR awaiting an
 approving review would have requested `d-morrison` outright.
 All three now carry the guard inline.
 
-The general rule is that **a raw command inherits nothing**; only a reference
-to this skill does. So when adding a repo exception here, grep for the raw
-command as well as for this skill's name:
+The general rule is that **a raw command inherits nothing**;
+only a reference to this skill does.
+So when adding a repo exception here, grep for the raw command as well as for this skill's name:
 
 ```sh
 git grep -n 'add-reviewer d-morrison' -- skills/
@@ -83,10 +83,9 @@ git grep -n 'add-reviewer d-morrison' -- skills/
 Then judge each hit rather than editing all of them: `skill-builder` and
 `agent-builder` also name the raw command, and both are **correct as they
 stand**, because the PR they open always lands in ai-config, which this
-exception does not cover. A hit needs a guard only where the PR could be a
-sparta one. That grep is how the `merge-it` gap was found, and the same run
-turned up those two, so it is worth running -- and worth reading, not
-applying blindly.
+exception does not cover.
+A hit needs a guard only where the PR could be a sparta one.
+That grep is how the `merge-it` gap was found, and the same run turned up those two, so it is worth running -- and worth reading, not applying blindly.
 
 **A review deadlock on a sparta PR escalates to the user in chat, not to a
 review request.**

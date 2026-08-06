@@ -211,9 +211,9 @@ glab api -X PUT "projects/:id/merge_requests/<N>/discussions/<discussion_id>?res
   their re-raise didn't convince you), **escalate to a human reviewer** —
   request `d-morrison` via the `request-pr-review` skill (or
   `gh pr edit <N> --add-reviewer d-morrison`, which bypasses that skill and so
-  does **not** inherit its `Lacaedemon/sparta` exception — in sparta, escalate
+  does **not** inherit its `Lacaedemon/sparta` exception --- in sparta, escalate
   to the user in chat instead of requesting a reviewer) and `@`-mention them
-  with the impasse — rather than resolving unilaterally or looping forever.
+  with the impasse --- rather than resolving unilaterally or looping forever.
   Not every re-raise is an impasse, though: if the reviewer **accepts your fact
   but objects that the claim is over-generalized** (you verified one case and
   stated a sweeping rule), **narrow the claim to what you actually observed** —

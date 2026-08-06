@@ -156,7 +156,7 @@ biased-but-usable gauge, and it is why two samples of it minutes apart produced
 contradictory conclusions with neither being a correction of the other.
 
 The near-miss worth recording is the cross-check that would not have helped.
-on a read taken moments after the poll stopped,
+On a read taken moments after the poll stopped,
 `scontrol show node c2` reports `CPULoad=12.22` at the same moment
 `sinfo -o %O` reports `12.22` and `/proc/loadavg` reports `0.65`, so the
 obvious second command prints the same cache.

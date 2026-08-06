@@ -149,6 +149,10 @@ CASES = [
          "cd inst/extdata && Rscript -e 'identical(readRDS(\"/tmp/te-old.rds\"), "
          "readRDS(\"ett-validation-true-effects.rds\"))'")], True),
 
+    ("git -C <dir> show still fires (flag with a separate value)",
+     [bash("git -C /some/repo show d1dd05e3^:" + ART + " > /tmp/te-old.rds"),
+      INCIDENT_COMPARE], True),
+
     ("a SUBAGENT's own broken comparison still fires",
      [dict(INCIDENT_EXTRACT, isSidechain=True),
       dict(INCIDENT_COMPARE, isSidechain=True)], True),

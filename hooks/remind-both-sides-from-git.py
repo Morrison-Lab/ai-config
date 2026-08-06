@@ -168,6 +168,12 @@ import tempfile
 # reads the index rather than a commit, so it is out of scope.
 EXTRACT = re.compile(
     r"""\bgit\s+
+        # Global flags before the subcommand. The flag-with-a-SEPARATE-value
+        # forms (`-C <dir>`, `-c <key>=<val>`) need naming explicitly: a
+        # pattern that only allows single-token flags matches
+        # `git --git-dir=X show ...` and silently misses `git -C /r show ...`,
+        # which is a false negative, and silence is the dangerous direction.
+        (?: (?: -[cC] \s+ \S+ | --\S+ | -[a-zA-Z] ) \s+ )*
         (?: show
           | cat-file \s+ (?: blob | -p )
         )

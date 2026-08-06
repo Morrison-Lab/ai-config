@@ -356,6 +356,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#can-an-agent-build-another-agent" id="toc-can-an-agent-build-another-agent" class="nav-link" data-scroll-target="#can-an-agent-build-another-agent">Can an agent build another agent?</a></li>
   <li><a href="#register-the-new-agent-with-its-calling-skill" id="toc-register-the-new-agent-with-its-calling-skill" class="nav-link" data-scroll-target="#register-the-new-agent-with-its-calling-skill">Register the new agent with its calling skill</a></li>
   <li><a href="#ship-it" id="toc-ship-it" class="nav-link" data-scroll-target="#ship-it">Ship it</a></li>
+  <li><a href="#a-second-consumer-agent-team-teammate-roles" id="toc-a-second-consumer-agent-team-teammate-roles" class="nav-link" data-scroll-target="#a-second-consumer-agent-team-teammate-roles">A second consumer: agent-team teammate roles</a></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
   </ul></li>
@@ -465,6 +466,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><strong>Request the reviewer:</strong> <code>gh pr edit --add-reviewer d-morrison</code> (<code>EDIT_PR</code>; see <code>request-pr-review</code>).</li>
 <li><strong>Drive to clean:</strong> run <code>ardi</code> on the new PR until the verdict has zero findings.</li>
 </ol>
+</section>
+<section id="a-second-consumer-agent-team-teammate-roles" class="level2">
+<h2 class="anchored" data-anchor-id="a-second-consumer-agent-team-teammate-roles">A second consumer: agent-team teammate roles</h2>
+<p>An agent definition has a use beyond the fan-out subagent it is built for: it also doubles as an <strong>agent-team teammate role</strong>. When a user asks a team lead to spawn a teammate “using the <code>&lt;name&gt;</code> agent type”, the definition’s <code>tools</code> allowlist and <code>model</code> apply and its body is appended to the teammate’s system prompt — but its <code>skills</code> and <code>mcpServers</code> frontmatter are <strong>not</strong> applied (a teammate loads those from project and user settings), and <code>SendMessage</code> plus the task-management tools are always available regardless of <code>tools</code>. So write the persona and tool boundary to stand on their own, and don’t rely on a definition’s <code>skills</code> reaching a teammate. See <a href="../../shared/workflow/agent-teams.md"><code>agent-teams</code></a> for when a team is the right primitive at all — it is user-gated and experimental, so this is a reuse property of the file, never a thing this skill or its agents spawn.</p>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>

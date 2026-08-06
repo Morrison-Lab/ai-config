@@ -9,6 +9,7 @@
   If state is MERGED, trigger post-merge instead of reporting CI details. (Learned on ucdavis/bcs#266.)
   Same principle for tool availability: before telling a user a capability doesn't exist in the current session (e.g. "no `subscribe_pr_activity` tool here"), run a live check (`ToolSearch`, or the equivalent discovery mechanism) rather than reciting what a memory entry or a prior session documented --- a local CLI session's tool roster isn't fixed, and reciting stale documentation as current fact is the exact failure this rule exists to prevent. (Sparta gii-ffdb93 session, 2026-07-14: initially told the user no GitHub MCP server was available in local sessions based on documented prior-session behavior, without running `ToolSearch` first.
   The user's pushback "can't you use the GitHub mcp server?" was the correct challenge, and a live check would have shown the tool was in fact reachable --- that check should have been run before stating unavailability as fact, not after being questioned.)
+- **ARDI Loop Foreground Verification**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn; see [`shared/workflow/ardi.md`](shared/workflow/ardi.md) for the mandatory foreground-only polling rule.
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
@@ -76,7 +77,8 @@
   Automated review agent reports (such as `Antigravity Agent Report` or `Claude Code Review`) post issue comments as `github-actions[bot]` or `claude[bot]`.
   To ensure 0 unhandled findings, ALWAYS fetch all comments using `gh api repos/{owner}/{repo}/issues/{number}/comments` and all review objects using `gh api repos/{owner}/{repo}/pulls/{number}/reviews`, parse every comment payload, and confirm that all findings have been addressed or rebutted. (Learned on ai-config#1157, 2026-08-05).
 - **Always verify live OS processes (`ps aux`) when checking background task state.**
-  `manage_task` lists harness-managed background tasks, but background script executions (such as async python test runners) can persist as live child OS processes. When checking task state or diagnosing running tasks, run `ps aux | grep ...` to inspect and verify live OS process state before declaring zero tasks running. (User correction, 2026-08-05).
+  `manage_task` lists harness-managed background tasks, but background script executions (such as async python test runners) can persist as live child OS processes.
+  When checking task state or diagnosing running tasks, run `ps aux | grep ...` to inspect and verify live OS process state before declaring zero tasks running. (User correction, 2026-08-05).
 - **Always create a dedicated `ums-<topic>` branch off default branch (`main`) and open a standalone PR for UMS memory passes.**
   Never fold UMS memory updates into an in-progress feature PR branch or claim UMS is finished without opening a dedicated UMS pull request. (User correction, 2026-08-05).
 - **Always fetch and merge `origin/main` into the UMS branch before opening a UMS PR.**

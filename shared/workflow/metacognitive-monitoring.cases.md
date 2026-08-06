@@ -56,6 +56,42 @@ A verification inherits the scope of whatever instrument it reaches for, so
 "I checked and it is not there" stays a claim about the instrument until the
 instrument's own coverage has been established.)
 
+## A subagent's report arrives in the same position
+
+(2026-08-05/06, a `ucdavis/bcs` session driving several parallel agents: two
+subagent particulars were relayed to the user as established fact without the
+one query that settles each.
+
+A subagent reported `claude-review` "failing repo-wide in `Morrison-Lab/ai-config`
+with `API Error: Usage credits required for 1M context`", and that was published
+to the user as a boxed FLAG.
+`gh run list -R Morrison-Lab/ai-config --workflow claude-review.yml --limit 60
+--json conclusion,status` returns **36 success, 21 cancelled, 3 in flight, and 0
+failures**, so the workflow was never failing at all.
+The report's true neighbour is what made it survive: a review workflow *was*
+failing repo-wide across the same window, but it was `Antigravity Code Review`,
+4 failures, and its log gives a Google AI Studio 429 reading "Your project has
+exceeded its monthly spending cap" -- a different workflow, a different vendor,
+and a different error from the one reported.
+So a spot check confirming that "a reviewer is down" would have confirmed the
+wrong claim.
+
+The second was flatter: an array job was described as "a 500-task array" across
+several messages, inherited from an earlier framing.
+`data-raw/msm-vs-truth.sbatch` reads `--array=1-100%3`.
+
+**Provenance of the two sides.**
+The **Don't** side came from the session itself rather than from a directive:
+no user correction was issued, and the first claim was caught only when a later
+subagent contradicted the first, forcing a retraction.
+The **Do** side -- run the deriving query before relaying, and name it -- is
+inferred, by carrying the reviewer-finding rule above onto the commissioned-report
+case.
+A search at the time found the general rule cited but never written:
+`memories/preferences.md` appeals to "the standing `verify agent reports with
+unfakeable asks` rule", and `unfakeable` occurs nowhere else in the corpus, so
+only that rule's commit-SHA instance had ever been recorded.)
+
 ## An action you recommend is a claim about state
 
 (2026-08-02, this repo: a boxed RECOMMENDATION advised merging `#1058` and
@@ -93,6 +129,44 @@ One query --- whether a `claude`-authored comment existed on any earlier PR ---
 returned zero across the workflow's entire month of operation, which settled
 both the mechanism and the fact that reviews had never once posted.
 Nobody ran it until a fourth PR was opened to fix the consequence.)
+
+## A correction inherits its instrument, so a second reading is not a check
+
+(2026-08-05/06, `ucdavis/bcs#587`: cluster CPU efficiency was reported to the
+user as "~35-40%, each task reserves 24 cores and uses a third", filed into the
+issue, and then corrected in a comment to "~87%, the nodes are well utilized".
+Both figures came from `sinfo`'s `CPU_LOAD`, and the instrument was never
+questioned in either direction.
+A mechanism was also offered for the higher figure --- that co-resident tasks
+interleave, one task's serial phase filling another's parallel phase --- which
+the partition forbids: `SelectTypeParameters = CR_CORE_MEMORY`,
+`TaskPlugin = task/affinity`, and `OverSubscribe=NO`, so cores are exclusive
+and pinned.
+
+`CPU_LOAD` is a value `slurmd` last pushed rather than a live reading.
+Measured on node `c2` by polling `sinfo -h -n c2 -o %O` against that node's own
+`/proc/loadavg` every 5s: it held `21.07` across 49 consecutive samples, 245
+seconds, while the live 1-minute load fell monotonically from 24.49 to 1.83,
+then stepped to `12.22` and held while the live figure fell to `0.81` at the
+last logged sample.
+A separate 12-sample run caught the opposite error, `17.86` against a live
+24.35-24.45.
+That the errors run in both directions is what rules out treating it as a
+biased-but-usable gauge, and it is why two samples of it minutes apart produced
+contradictory conclusions with neither being a correction of the other.
+
+The near-miss worth recording is the cross-check that would not have helped.
+On a read taken moments after the poll stopped,
+`scontrol show node c2` reports `CPULoad=12.22` at the same moment
+`sinfo -o %O` reports `12.22` and `/proc/loadavg` reports `0.65`, so the
+obvious second command prints the same cache.
+Only a different kind of source --- the file the daemon samples, rather than the
+daemon's copy of it --- settled it.
+
+Recorded for that cluster in `ucdavis/bcs#592` / `#593`; the correction to
+`#587` had to reach both the issue body and its comment thread, because by then
+the retracted figure and its retracted replacement were in different places on
+the page.)
 
 ## Writing is the instrument, when the claim can be wrong
 

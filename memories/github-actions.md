@@ -941,6 +941,73 @@ equal the file's named-step count.
 missing execution artifact --- see
 [`claude-bot-workflows.md`](claude-bot-workflows.md).)
 
+## Grepping a run log matches the echoed script, not its output
+
+`gh run view <id> --log` prints each step's **script body** as well as that
+step's output, so a grep for any string appearing in the command matches the
+command.
+The result is a false positive shaped exactly like verification: you searched
+the log for the thing, and the log contains the thing.
+
+The body is echoed **twice** for an inline shell step --- once in the
+`##[group]Run <script>` header, and once immediately after, wrapped in colour
+codes.
+
+Measured on `Morrison-Lab/ai-config` run `31069525412` (`validate`), gh 2.92.0:
+grepping that log for `check-context-closure.py` returns exactly **2** lines,
+and **both are command echoes**.
+**Zero** are output --- that step's real output reports a file and byte count
+and never names the script.
+So "I grepped the log and found it, therefore it ran" establishes only that the
+workflow *contains* that step, not that it executed or what it printed.
+
+The two echoes are not one per step: that run carries 25 `##[group]Run` headers
+against 19 colour-wrapped bodies, because a step invoking an action gets the
+header with no inline script to echo.
+
+**The colour codes are a literal `^[` two-character sequence here, not a real
+ESC byte, so the usual strip is a no-op.**
+Counted across two runs in that repo, `31069525412` and `31062830292`: real
+`0x1b` bytes number **0** in both, against **38** and **88** occurrences of a
+literal `^[[`.
+`sed 's/\x1b\[[0-9;]*m//g'` therefore removes nothing while appearing to work,
+since most greps tolerate the noise --- an anchored pattern will not.
+
+Filtering on the echo markers is sturdier than stripping colour at all:
+
+```bash
+gh run view <id> -R <owner>/<repo> --log \
+  | grep -vE '##\[group\]Run |\^\[\[36;1m' \
+  | grep -E "<pattern>"
+```
+
+On that run the filter takes the `check-context-closure.py` hit count from 2 to
+**0**, correctly reporting that the name never appears in output.
+Its negative control passes too: it removes exactly 44 of 1143 lines --- the
+25 headers plus the 19 echoes --- and genuine output lines survive, so it is
+not simply deleting everything.
+
+**Do not filter with `grep -v 'echo "'`.**
+That drops any real output line containing `echo "`, which includes a script
+printing shell examples and any tool quoting a command back at you --- trading
+a visible false positive for a silent false negative.
+Excluding the two echo markers targets the mechanism instead of a string that
+legitimately occurs in output.
+
+- **Do:** exclude the `##[group]Run` header and the colour-wrapped script echo
+  before concluding a log line is output.
+- **Do:** settle which colour-code form a log actually carries with a byte
+  count rather than by eye, before trusting any strip.
+- **Don't:** read a grep hit on a script, flag, or message name as evidence
+  that the step ran, or as evidence of what it printed.
+- **Don't:** filter on `echo "`, which keys on a string that appears in real
+  output.
+
+(Verified 2026-08-06 on gh 2.92.0, with output piped to a file rather than to a
+terminal.
+Whether another gh version or a TTY emits real ESC bytes was **not** tested,
+which is the reason to handle both forms rather than pick one.)
+
 ## Which ref a workflow runs from decides whether a trigger change takes effect before merge
 
 Editing a workflow's `on:` block has different reach depending on which event

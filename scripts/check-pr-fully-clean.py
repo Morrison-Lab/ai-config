@@ -3,8 +3,8 @@
 
 Verifies that:
 1. All GitHub Actions check runs for the PR's HEAD commit SHA are completed and passing.
-2. A review comment evaluating the exact HEAD commit SHA has been posted.
-3. The latest review comment for the HEAD commit SHA contains zero actionable findings.
+2. An automated review comment evaluating the exact HEAD commit SHA has been posted.
+3. All review comments evaluating the HEAD commit SHA contain zero findings, and no active CHANGES_REQUESTED or REJECTED state exists on the PR.
 
 Exit codes:
 0: Fully clean (safe to end ARDI loop)
@@ -24,10 +24,16 @@ def run_cmd(cmd: List[str]) -> str:
     return res.stdout.strip()
 
 
-def get_pr_info(pr_num: str) -> Tuple[str, str, str]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--json", "headRefOid,headRefName,state"])
+def get_pr_info(pr_num: str) -> Tuple[str, str, str, str, str]:
+    out = run_cmd(["gh", "pr", "view", pr_num, "--json", "headRefOid,headRefName,state,commits,reviewDecision"])
     data = json.loads(out)
-    return data["headRefOid"], data["headRefName"], data["state"]
+    head_sha = data["headRefOid"]
+    commits = data.get("commits", [])
+    commit_date = ""
+    if commits:
+        commit_date = commits[-1].get("committedDate", "")
+    review_decision = data.get("reviewDecision") or ""
+    return head_sha, data["headRefName"], data["state"], commit_date, review_decision
 
 
 def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
@@ -53,7 +59,7 @@ def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
-def check_review_comments(pr_num: str, sha: str) -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--json", "comments,reviews"])
     data = json.loads(out)
 
@@ -61,54 +67,126 @@ def check_review_comments(pr_num: str, sha: str) -> Tuple[bool, List[str]]:
     reviews = data.get("reviews", [])
 
     issues = []
-    # Collect all bot review comments/reviews
+
+    # Direct GitHub computed review decision check
+    if review_decision in ("CHANGES_REQUESTED", "REJECTED"):
+        issues.append(f"PR formal review decision is '{review_decision}'")
+
+    # Track the latest formal review decision per author chronologically across all reviews
+    author_latest_state: Dict[str, str] = {}
+    for r in reviews:
+        author = (r.get("author") or {}).get("login", "")
+        state = r.get("state", "").upper()
+        if author and state in ("CHANGES_REQUESTED", "REJECTED", "APPROVED"):
+            author_latest_state[author] = state
+
+    for author, state in author_latest_state.items():
+        if state in ("CHANGES_REQUESTED", "REJECTED"):
+            issues.append(f"PR has active formal review state '{state}' from {author}")
+
+    # Collect automated review reports only (filtering out human/author disposition comments)
     all_items = []
     for c in comments:
-        if c.get("author", {}).get("login") in ("github-actions", "github-actions[bot]", "claude[bot]"):
-            all_items.append(("comment", c["createdAt"], c["body"]))
+        body = c.get("body", "")
+        body_lower = body.lower()
+        author_login = (c.get("author") or {}).get("login", "")
+
+        if "ard review disposition summary" in body_lower:
+            continue
+
+        is_bot_author = author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict:"))
+
+        if is_bot_author or is_review_header:
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT"))
+
     for r in reviews:
-        if r.get("author", {}).get("login") in ("github-actions", "github-actions[bot]", "claude[bot]"):
-            commit_oid = r.get("commit", {}).get("oid", "")
-            all_items.append(("review", r.get("submittedAt", ""), r.get("body", ""), commit_oid))
+        body = r.get("body", "")
+        commit_oid = r.get("commit", {}).get("oid", "")
+        state = r.get("state", "").upper()
+        submitted_at = r.get("submittedAt", "")
+        author_login = (r.get("author") or {}).get("login", "")
+        # A formal review carries a real commit.oid, so admitting one attributes
+        # it to HEAD with no body-content check. Scope admission to automated bot
+        # authors only -- never sniff body text, which a human review can
+        # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
+        # from any author.
+        is_bot_author = (
+            author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+            or author_login.endswith("[bot]")
+        )
+        if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
+            all_items.append(("review", submitted_at, body, commit_oid, state))
 
     if not all_items:
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
         return False, issues
 
-    # Find items mentioning the current commit SHA or posted for the commit
+    # Match items evaluating the target HEAD commit SHA
     sha_short = sha[:7]
+
     matching_items = []
     for item in all_items:
         body = item[2]
-        oid = item[3] if len(item) > 3 else ""
-        if oid == sha or sha_short in body or sha in body:
+        body_lower = body.lower()
+        oid = item[3]
+
+        is_sha_match = bool((oid and oid == sha) or sha_short in body or sha in body)
+        if oid:
+            # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
+            is_match = (oid == sha)
+        else:
+            # An issue comment counts as evaluating HEAD only if it actually
+            # references the HEAD SHA (full or short). Matching on timing alone
+            # (posted after the commit + a generic marker word) is unsafe: a slow
+            # review of an earlier commit can post AFTER a newer push and would
+            # then be accepted as a review of the new HEAD, reporting a stale
+            # verdict as "fully clean" -- the exact review-vs-push race
+            # shared/workflow/fully-clean.md documents ("a review comment's
+            # header SHA can be stale"). Fail closed: no SHA reference, no match.
+            is_match = is_sha_match
+
+        if is_match:
             matching_items.append(item)
 
     if not matching_items:
         issues.append(f"No review comment has been posted evaluating HEAD SHA {sha[:8]} yet")
         return False, issues
 
-    # Inspect the latest matching review comment
-    latest_body = matching_items[-1][2]
-
-    # Check for finding indicators
+    # Inspect ALL matching items for HEAD SHA (not just an empty trailing formal review object)
     finding_patterns = [
-        r"### Actionable Findings",
-        r"### Detailed Findings",
-        r"Verdict:\s*Ready after addressing findings",
-        r"Verdict:\s*Needs work",
-        r"Verdict:\s*Changes requested",
-        r"#### \d+\.",
+        r"#+\s*(Actionable\s+|Detailed\s+)?Findings",
+        r"\*\*Actionable Findings\*\*",
+        r"\*\*Detailed Findings\*\*",
+        r"#+\s*Issues",
+        r"#+\s*Remaining",
+        r"\*\*Location:\*\*",
+        r"Verdict:\s*(Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings)",
+        r"\bNeeds\s+more\s+work\b",
+        r"\bNeeds\s+work\b",
+        r"changes\s+requested\b",
     ]
 
     has_findings = False
-    for pat in finding_patterns:
-        if re.search(pat, latest_body, re.IGNORECASE):
+    for item in matching_items:
+        body = item[2]
+        state = item[4]
+        if state in ("CHANGES_REQUESTED", "REJECTED"):
             has_findings = True
-            issues.append(f"Latest review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
+            issues.append(f"Matching review for SHA {sha[:8]} has state '{state}'")
 
-    if not has_findings:
-        print(f"✓ Found clean review comment evaluating HEAD SHA {sha[:8]}")
+        for pat in finding_patterns:
+            for match in re.finditer(pat, body, re.IGNORECASE | re.MULTILINE):
+                if pat == r"changes\s+requested\b":
+                    start = match.start()
+                    prefix = body[max(0, start - 25):start].lower()
+                    if re.search(r"\bno\s+(\w+\s+)?$", prefix):
+                        continue
+                has_findings = True
+                issues.append(f"Review comment for SHA {sha[:8]} contains findings (matched pattern '{pat}')")
+
+    if not has_findings and not issues:
+        print(f"\u2713 Found clean review comment evaluating HEAD SHA {sha[:8]}")
 
     return len(issues) == 0, issues
 
@@ -121,21 +199,21 @@ def main():
     pr_num = sys.argv[1]
     print(f"Checking ARDI / fully-clean status for PR #{pr_num}...")
 
-    sha, branch, state = get_pr_info(pr_num)
-    print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]}")
+    sha, branch, state, commit_date, review_decision = get_pr_info(pr_num)
+    print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha)
-    review_ok, review_issues = check_review_comments(pr_num, sha)
+    review_ok, review_issues = check_review_comments(pr_num, sha, review_decision)
 
     all_issues = ci_issues + review_issues
 
     if all_issues:
-        print("\n❌ PR is NOT fully clean:")
+        print("\n\u274c PR is NOT fully clean:")
         for issue in all_issues:
             print(f"  - {issue}")
         sys.exit(1)
 
-    print(f"\n✅ PR #{pr_num} is FULLY CLEAN on HEAD {sha[:8]}!")
+    print(f"\n\u2705 PR #{pr_num} is FULLY CLEAN on HEAD {sha[:8]}!")
     sys.exit(0)
 
 

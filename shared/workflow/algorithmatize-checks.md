@@ -87,6 +87,73 @@ and make the maintainer choose the policy.
 - **Don't:** apply a spec verbatim
   after the instrument shows it dropped real content.
 
+## A metric that cannot discriminate over its whole range may be sharp over part of it
+
+The section above assumes the measurement separates a healthy state from a
+regressed one, and asks what to do when the number moves.
+This is the case where it does not separate at all.
+The reflex then is to call the metric unusable and either loosen its bound
+until nothing can fail it, or drop the assertion outright.
+Both answers discard a working instrument.
+
+Ask instead which *part* of the measurement carries the signal.
+The candidates are a sub-window, a phase, or an aggregate over samples rather
+than any single sample, and the sub-range is frequently where the mechanism
+actually acts --- a transient that forms early and is buried by whatever the
+system does afterwards.
+
+Note what the reflex gets right, since that is what makes it convincing.
+"No bound works over the range I measured" can be true, and better supported
+than the person reporting it realizes.
+The error is one of **scope** rather than of measurement: it generalizes a fact
+about one window into a fact about the metric.
+That is a scope claim owing a check against the population, per
+[`metacognitive-monitoring`](metacognitive-monitoring.md), and the same
+overreach [`grep-is-not-coverage`](grep-is-not-coverage.md) describes for a
+null result.
+
+**The aggregate is the counter-intuitive half.**
+When individual samples overlap between the healthy and regressed populations,
+their **mean** can still separate cleanly.
+So "no per-sample threshold exists" does not establish "no threshold exists" ---
+those are different claims, and only the first was tested.
+Gate the aggregate, and keep a looser per-sample bound as a backstop so one
+blown sample cannot hide behind the good ones.
+
+This is one of a family of transformations, and the corpus already carries
+another: [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s count delta,
+where a predicate too noisy to report a *level* is sound reporting a *change*
+because taking the difference cancels the baseline.
+Sub-window, phase, aggregate, and delta are the same move --- find the
+projection of the measurement on which the signal survives.
+
+Two things keep the narrowed gate honest.
+Say plainly which range it does **not** cover and why, since bounding the noisy
+part anyway, at whatever number passes today, restores the silent pass that made
+the original guard worthless.
+And check the window is not vacuous --- that the mechanism under test genuinely
+occurs inside it --- which is this file's own negative-control rule applied to a
+window rather than to an input.
+
+Where the range came from is worth asking too.
+Measuring only over the window an existing test happened to use, then
+generalizing from it, is
+[`challenge-the-assignment`](challenge-the-assignment.md)'s failure with a
+test's own constants in place of a brief: inherited parameters that were never
+the thing under examination.
+
+- **Do:** ask which window, phase, or aggregate carries the signal before
+  concluding a metric is unusable.
+- **Do:** gate the aggregate when samples overlap, with a looser per-sample
+  bound as a backstop.
+- **Do:** state which range the gate deliberately leaves unwatched, and why.
+- **Don't:** read "no bound works over the range I measured" as "no bound
+  works".
+- **Don't:** loosen a bound until it cannot fail, or delete the assertion, as
+  the first response to a metric that does not discriminate.
+- **Don't:** treat a window inherited from an existing test as the metric's
+  natural range.
+
 ## Never predict which case will fail; enumerate the class
 
 The rule so far concerns checks you *perform*.
@@ -325,6 +392,9 @@ the intended outcome as data, assert it mechanically, and review only the
 framing). Prefer shrinking the judgment surface over automating a judgment
 badly: an instrument with a mushy threshold that misfires trains everyone to
 ignore it.
+Read that as an argument for finding the range over which the threshold is
+sharp, not as licence to abandon the instrument --- see "A metric that cannot
+discriminate over its whole range may be sharp over part of it" above.
 
 This generalizes the narrower habit of turning repeated manual verifications
 into CI checks: that is the CI-shaped instance; this rule also covers one-off

@@ -126,6 +126,11 @@ CASES = [
          "readRDS(\"scratch/copies/ett-validation-true-effects.rds\"))'")],
      False),
 
+    ("a LONGER path that merely starts with the extracted one",
+     [INCIDENT_EXTRACT, bash(
+         "Rscript -e 'identical(readRDS(\"/tmp/te-old.rds\"), "
+         "readRDS(\"" + ART + ".bak\"))'")], False),
+
     # 3. Over-broad discharge -- these MUST still fire.
     ("merge-base about an UNRELATED commit does not discharge",
      [INCIDENT_EXTRACT, ANCESTRY_OTHER, INCIDENT_COMPARE], True),

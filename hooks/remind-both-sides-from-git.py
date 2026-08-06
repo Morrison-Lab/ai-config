@@ -273,8 +273,10 @@ def occurrences(blob, path):
                 break
             start = i + 1
             end = i + len(cand)
-            if end < len(blob) and blob[end] in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" \
-                                                "abcdefghijklmnopqrstuvwxyz0123456789":
+            # Symmetric with the preceding-character test below: a path
+            # character on either side means this is part of a LONGER token,
+            # so `x.rds` matches neither `other/x.rds` nor `x.rds.bak`.
+            if end < len(blob) and blob[end] in PATH_CHAR:
                 continue
             prev = blob[i - 1] if i else ""
             if prev == ":":

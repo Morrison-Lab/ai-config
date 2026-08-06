@@ -81,6 +81,8 @@
   Never fold UMS memory updates into an in-progress feature PR branch or claim UMS is finished without opening a dedicated UMS pull request. (User correction, 2026-08-05).
 - **Always fetch and merge `origin/main` into the UMS branch before opening a UMS PR.**
   When creating a dedicated `ums-<topic>` branch or preparing a UMS memory pass, always fetch `origin/main` and merge/rebase onto the latest default branch HEAD before opening the PR, ensuring zero initial merge conflicts. (User correction, 2026-08-05).
+- **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, or missed item.**
+  The moment the user corrects your behavior, or you realize you made an incorrect claim or missed something, run UMS **IMMEDIATELY** — do not wait for the task to finish, do not wait for a wrap-up prompt, do not ask for permission. Persist the correction to memory on a dedicated `ums-<topic>` branch off `origin/main` (fetching and merging `origin/main` first) and open a standalone PR immediately before proceeding with other work. (User directive / CAI, 2026-08-05).
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --

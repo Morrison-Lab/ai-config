@@ -553,6 +553,10 @@ a PR that would conflict or show a misleading diff if the other landed first,
 a migration that must precede its consumer.
 Two PRs touching disjoint files have no constraint,
 and saying so plainly is the right answer, not an occasion for the marker.
+But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it ---
+`gh pr diff <N> --name-only` on each PR, and confirm no path appears in both ---
+rather than recalling what each PR is "about", which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
+A follow-up PR that extends into a `shared/` (or any) file a prior PR also edited is a common collision, and the two conflict at merge time.
 The rationale behind each surface lives in `memories/preferences.md`,
 alongside the rest of the taxonomy.
 

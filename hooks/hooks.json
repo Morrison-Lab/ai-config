@@ -129,6 +129,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unauthorized-merge.py\"",
+            "timeout": 10,
+            "script": "no-unauthorized-merge.py",
+            "why": "cai 2026-08-04 'I want a mechanistic prohibition, not just a guideline' -- mechanistically blocks unauthorized PR/MR merge commands (gh pr merge, glab mr merge, gh api .../merge) at the PreToolUse boundary unless an explicit ALLOW_MERGE=1 flag is provided."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-whole-file-punct-replace.py\"",
             "timeout": 10,
             "script": "no-whole-file-punct-replace.py",

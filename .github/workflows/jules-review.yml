@@ -1,7 +1,7 @@
 name: Jules PR Review
 
 # On-demand only: Jules reviews a PR when a trusted commenter asks it to, and
-# never on a push. `claude-review.yml` remains the automatic reviewer.
+# never on a push. (Automatic PR reviews for Claude and Antigravity are also disabled.)
 #
 # Deliberately NOT `on: pull_request`. Jules' automatic verdicts cost review
 # rounds without earning them -- a false-positive `VERDICT: block` on this

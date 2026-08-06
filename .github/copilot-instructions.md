@@ -11,7 +11,8 @@ Review prose with the rigor you would apply to code.
 ## Hard conventions, worth flagging on sight
 
 **ASCII punctuation only.** Never em-dashes, en-dashes, curly quotes, or the multiplication sign, anywhere in a tracked file, including code comments and Markdown prose.
-Write `--` where a dash is wanted.
+Write a spaced `---` or `--` where a dash is wanted; `---` is the corpus's prevailing form, and both are ASCII, so do not flag either one.
+The banned characters are the four named above, not a particular number of hyphens.
 This is enforced by convention rather than by CI, so review is the main line of defence.
 
 **Semantic line breaks.**
@@ -61,4 +62,5 @@ If a finding rests on a file you could not read or a command you could not run, 
 - **Long files.** Several fragments are long by design; length alone is not a finding here.
 - **An item already dispositioned as Deferred** with a linked tracking issue.
   Re-raising it each round costs a round and changes nothing.
-- **`--` sequences in prose.** That is the required dash form, not a typo.
+- **Spaced `---` or `--` sequences in prose.**
+  Both are house dash forms, not typos.

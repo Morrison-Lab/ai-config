@@ -4,6 +4,9 @@ manual workaround, "we can't check X automatically," a model or package that
 seems insufficient --- the default response is to go get the resource that
 removes the limitation, not to shrug and route around it indefinitely.
 
+Worked-example case records for the rules below live in
+[`growth-mindset.cases.md`](growth-mindset.cases.md), moved out of the auto-loaded context.
+
 Concretely, that means actively seeking out:
 
 - **Tools and integrations** --- a missing MCP server, CLI, or API access that
@@ -78,20 +81,6 @@ skips producing an artifact.
 - **Don't:** let "broken tool" become the reason a verification gets skipped
   and its unverified claim ships regardless.
 
-(2026-07-30: checking whether Quarto's `execute: echo` can be set per output
-format, `quarto` was reported broken twice, and was working both times.
-The first invocation ran the conda environment's binary without activating
-that environment, failing with
-`bin/tools/x86_64/deno: No such file or directory`; `conda activate bcs`
-fixed it.
-The second ran from a scratchpad directory outside the project, so `renv`
-never activated and the conda base R library genuinely lacked `rmarkdown`;
-`export R_LIBS=<project renv library>` fixed it.
-The user's correction was "if a tool you could use is broken, fix it, don't
-accept it as broken".
-The render then worked on the first try and settled the question, which the
-manuscript would otherwise have asserted unchecked.)
-
 ## A timeout bounds how long you wait, not what the command already did
 
 The section above tells you to attempt the thing before reporting it broken,
@@ -135,18 +124,6 @@ one whose browser opens.
   non-destructive; they bound the wait, not the first instant.
 - **Don't:** read an empty result from a bounded probe as evidence that the
   command did nothing.
-
-(2026-08-02, verifying a claim written into
-[ai-config#1056](https://github.com/Morrison-Lab/ai-config/pull/1056) that
-`claude setup-token` "needs a TTY, so an agent session cannot run it":
-`perl -e 'alarm 8; exec "claude","setup-token"' < /dev/null` was run as a
-supposedly non-destructive check, and returned exit 142 with no output.
-It had already opened a real browser window on the user's machine, on the
-wrong browser profile, which the session learned only because the user said
-so.
-The command's behaviour is recorded in
-[`memories/claude-code.md`](../../memories/claude-code.md); reading its
-`--help` would have answered the question the probe was asked to answer.)
 
 ## A refusal can name its own remedy, and that sentence is the one skipped
 
@@ -197,12 +174,6 @@ said nothing and settled nothing -- reading the body cost one glance and was
 still the right move, but it is the case where reading it does not help.
 - **Don't:** reach for installing something to get past a sandbox boundary;
   what you install inherits the boundary.
-
-(2026-07-30: a GraphQL call was refused with exactly the message above, read
-as a flat denial, and answered by searching the MCP registry and plugin
-catalog for a GitHub Discussions server to install.
-Neither could have helped -- a local server sits behind the same proxy.
-The REST route the refusal named worked on the first attempt.)
 
 ## Applies to our own metacognitive tooling, too
 

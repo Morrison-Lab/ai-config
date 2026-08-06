@@ -30,6 +30,9 @@
 #   ai-session.sh release   [--id ID]                # drop this session's record
 #   ai-session.sh prune                              # drop stale records
 #   ai-session.sh worktree  BRANCH [--base REF]      # isolate: new worktree + branch
+#   ai-session.sh enable-mwc  [--id ID]              # enable merge-when-confident permission
+#   ai-session.sh disable-mwc [--id ID]              # revoke merge-when-confident permission
+#   ai-session.sh check-mwc   [--id ID]              # check if MWC permission is active
 #
 # Identity (--id) resolves: --id flag > $AI_SESSION_ID > $CLAUDE_SESSION_ID.
 # Stale threshold: $AI_SESSION_STALE_SECONDS (default 1800 = 30 min).
@@ -134,10 +137,16 @@ prune_stale() {
     [ -e "$f" ] || continue
     load_session "$f"
     if is_stale; then
-      rm -f "$f"
+      rm -f "$f" "$REG_DIR/$(sanitize "$S_id").mwc"
       printf 'pruned stale session %s (%s on %s)\n' "$S_id" "${S_branch:-?}" "${S_host:-?}"
       removed=$((removed + 1))
     fi
+  done
+  # Sweep orphaned .mwc files whose session file is gone
+  for f in "$REG_DIR"/*.mwc; do
+    [ -e "$f" ] || continue
+    local sid; sid="$(basename "$f" .mwc)"
+    [ -f "$REG_DIR/$sid.session" ] || rm -f "$f"
   done
   # Belt-and-suspenders: sweep temp files orphaned by a SIGKILL (where the EXIT
   # trap in write_record can't fire). Only old ones, never a write in flight.
@@ -318,6 +327,7 @@ cmd_list() {
 
 cmd_release() {
   local id; id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+  rm -f "$REG_DIR/$(sanitize "$id").mwc"
   local f; f="$(session_file "$id")"
   if [ -f "$f" ]; then rm -f "$f"; printf 'released session %s\n' "$id"; else printf 'no record for session %s\n' "$id"; fi
 }
@@ -346,7 +356,7 @@ cmd_worktree() {
 # ---------------------------------------------------------------------------
 # arg parsing
 # ---------------------------------------------------------------------------
-[ $# -ge 1 ] || die "usage: ai-session.sh {register|heartbeat|check|list|release|prune|worktree} [opts]  (see header)"
+[ $# -ge 1 ] || die "usage: ai-session.sh {register|heartbeat|check|list|release|prune|worktree|enable-mwc|disable-mwc|check-mwc} [opts]  (see header)"
 CMD="$1"; shift
 
 OPT_ID=""; OPT_TASK=""; OPT_AGENT=""; OPT_ALL=""; OPT_BASE=""; OPT_WT_BRANCH=""
@@ -371,6 +381,35 @@ case "$CMD" in
   release)   cmd_release ;;
   prune)     cmd_prune ;;
   worktree)  cmd_worktree ;;
+  enable-mwc)
+    id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+    write_record "$id" "${OPT_TASK:-}" ""
+    touch "$REG_DIR/$(sanitize "$id").mwc"
+    printf 'enabled mwc (merge-when-confident) for session %s\n' "$id"
+    ;;
+  disable-mwc)
+    id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+    rm -f "$REG_DIR/$(sanitize "$id").mwc"
+    printf 'disabled mwc for session %s\n' "$id"
+    ;;
+  check-mwc)
+    prune_stale >/dev/null
+    id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+    f="$REG_DIR/$(sanitize "$id").mwc"
+    s_file="$(session_file "$id")"
+    if [ -f "$f" ]; then
+      if [ -f "$s_file" ]; then
+        load_session "$s_file"
+        if ! is_stale; then
+          printf 'mwc is active for session %s\n' "$id"
+          exit 0
+        fi
+      fi
+      rm -f "$f"
+    fi
+    printf 'mwc is not active for session %s\n' "$id"
+    exit 1
+    ;;
   -h|--help) sed -n '2,40p' "$0" ;;
   *)         die "unknown command: $CMD" ;;
 esac

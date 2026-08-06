@@ -18,7 +18,14 @@ Measured afterward against the merge's parent `d1dd05e3^`, TWO of those three
 `.rds` files carried values equal to their predecessors and differed only in a
 freshly stamped provenance attribute, while the third
 (`msm-validation-accuracy-results.rds`) had genuinely changed -- bias by 121%,
-rmse by 18%, coverage by 3%. So the escalation was not baseless; it was
+rmse by 18%, coverage by 3%.
+
+Re-verified 2026-08-05 with BOTH sides taken from git (`d1dd05e3^` against
+`d1dd05e3`), rather than from the working tree, since the working-tree form is
+the very mistake described below and the two "unchanged" rows are exactly what
+it would have produced had it been wrong here. It was not: the split
+reproduces, and `attr(x, "provenance")` is the single attribute that moved on
+all three. So the escalation was not baseless; it was
 UNMEASURED, which is the defect. Two thirds of what it asked to regenerate had
 not changed, and nothing in the path list distinguished the third from the
 other two.
@@ -44,9 +51,13 @@ actually turns on.
       produced the escalation. It is not evidence about Q2 or Q3.
 
   Q2. Was the artifact RE-RUN at all?
-      Read the provenance stamp -- the attributes a re-run restamps:
+      Read the provenance stamp. In `ucdavis/bcs` these live in a SINGLE
+      `provenance` attribute holding a 12-field list, not as top-level
+      attributes -- so index into it rather than into `attributes()`, which
+      returns NULLs for every one of these names:
 
-          attributes(readRDS(f))[c("git_commit", "bcs_version", "timestamp")]
+          attr(readRDS(f), "provenance")[c("git_commit", "bcs_version",
+                                           "timestamp")]
 
       A changed stamp means a fresh run produced this file. It does NOT mean
       any value moved, which is exactly why `identical()` is the wrong
@@ -441,8 +452,8 @@ def main() -> int:
         "so bare `identical()` returns FALSE even when nothing changed -- and "
         "reading that FALSE as a real change is the original error with a "
         "command's authority behind it. Whether it was RE-RUN and whether the "
-        "VALUES moved are separate questions: read the provenance attributes "
-        "for the first, `all.equal()` above for the second.\n"
+        "VALUES moved are separate questions: read the artifact's provenance "
+        "stamp for the first, `all.equal()` above for the second.\n"
         "If the values match, retract the escalation rather than letting it buy "
         "compute that changes nothing. Check each path separately: in "
         "ucdavis/bcs#579 two of three artifacts were unchanged and the third "

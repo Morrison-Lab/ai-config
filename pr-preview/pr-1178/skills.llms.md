@@ -109,6 +109,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`select-model`](skills/select-model/SKILL.llms.md) | `model-fit`, `assess-model-fit` | Choose the right Claude model for the task at hand |
 | [`away`](skills/away/SKILL.llms.md) |  | Grant session-scoped permission to stop asking clarifying questions, pick confident work, and consult a stronger model instead of blocking |
 | [`back`](skills/back/SKILL.llms.md) |  | Cancel the `away` grant and surface a decision log of what was resolved unattended |
+| [`daytb`](skills/daytb/SKILL.llms.md) | `do-as-you-think-best` | Decide the question at hand yourself and report the choice – scoped to that task, unlike `away`’s whole-session grant |
 | [`delegate-to-codex`](skills/delegate-to-codex/SKILL.llms.md) | `dtc` | Offload heavy read/draft/verify work to the `codex` CLI before spending Claude quota, with Claude fallback |
 | [`prompt-me`](skills/prompt-me/SKILL.llms.md) | `pm` | Surface the single most pressing open question (or top N) waiting on user input |
 | [`prompt-me-all`](skills/prompt-me-all/SKILL.llms.md) | `pma` | Restate every open question still waiting on user input, uncapped |
@@ -119,6 +120,6 @@ Most skills also respond to plain-English triggers listed in their `description`
 
 ## Full skill list
 
-All 177+ canonical skills are in [`skills/`](https://github.com/d-morrison/ai-config/tree/main/skills) on GitHub. Generated Codex wrappers live in [`codex-skills/`](https://github.com/d-morrison/ai-config/tree/main/codex-skills). Each canonical `SKILL.md` has a `description` field that lists the trigger phrases and a full procedure.
+All 181+ canonical skills are in [`skills/`](https://github.com/d-morrison/ai-config/tree/main/skills) on GitHub. Generated Codex wrappers live in [`codex-skills/`](https://github.com/d-morrison/ai-config/tree/main/codex-skills). Each canonical `SKILL.md` has a `description` field that lists the trigger phrases and a full procedure.
 
 Back to top

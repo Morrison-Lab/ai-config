@@ -32,6 +32,7 @@ Distinguish from a one-off “just proceed” on a single pending question — t
 
 ## Relationship to other skills
 
+- **`daytb`** – the per-decision sibling, and the one most easily confused with this. `away` presumes the user is *gone*, so it suppresses questions for the whole session, keeps a decision log, and is revoked by `back`. `daytb` presumes the user is *here* and simply declining to adjudicate one thing, so it expires with that task and needs no counterpart. Reading a bare “do as you think best” as `away` grants far more than was asked.
 - **`back`** — the named counterpart that revokes this grant and surfaces the decision log described in Procedure step 4, so the user has a reviewable record of what was decided (and skipped) while they were away. Any of the phrasings in Scope and limits’ revocation bullet also end the grant, but `back` is the one worth invoking by name.
 - **`mwc`** (merge-when-confident) — the sibling session-scoped grant for merge authority specifically. `away` covers decision-making latitude (don’t block on judgment calls); `mwc` covers the one destructive action (merging) `away` deliberately doesn’t extend to. Grant both together for full unattended PR throughput.
 - **`select-model` / `assess-model-fit`** — own the model-tier knowledge `away`’s step 3 leans on for “consult a stronger model.” `away` doesn’t duplicate their tier table or escalation logic; it just names the trigger (a judgment call that would otherwise block) for invoking them.

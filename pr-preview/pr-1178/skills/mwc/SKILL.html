@@ -311,14 +311,12 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#mwc-merge-when-confident-session-scoped-merge-permission" id="toc-mwc-merge-when-confident-session-scoped-merge-permission" class="nav-link active" data-scroll-target="#mwc-merge-when-confident-session-scoped-merge-permission">mwc — merge-when-confident (session-scoped merge permission)</a>
+  <li><a href="#merge-when-confident-mwc-session-grant" id="toc-merge-when-confident-mwc-session-grant" class="nav-link active" data-scroll-target="#merge-when-confident-mwc-session-grant">Merge-When-Confident (MWC) Session Grant</a>
   <ul class="collapse">
-  <li><a href="#what-this-grants" id="toc-what-this-grants" class="nav-link" data-scroll-target="#what-this-grants">What this grants</a></li>
-  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#scope-and-limits" id="toc-scope-and-limits" class="nav-link" data-scroll-target="#scope-and-limits">Scope and limits</a></li>
-  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a></li>
-  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
-  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
+  <li><a href="#standing-scope-policy" id="toc-standing-scope-policy" class="nav-link" data-scroll-target="#standing-scope-policy">Standing Scope &amp; Policy</a></li>
+  <li><a href="#session-lock-hook-integration" id="toc-session-lock-hook-integration" class="nav-link" data-scroll-target="#session-lock-hook-integration">Session Lock &amp; Hook Integration</a></li>
+  <li><a href="#procedure-for-agents-handling-mwc" id="toc-procedure-for-agents-handling-mwc" class="nav-link" data-scroll-target="#procedure-for-agents-handling-mwc">Procedure for Agents Handling <code>/mwc</code></a></li>
+  <li><a href="#quick-reference" id="toc-quick-reference" class="nav-link" data-scroll-target="#quick-reference">Quick Reference</a></li>
   </ul></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/mwc/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/mwc/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
@@ -330,59 +328,61 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="mwc-merge-when-confident-session-scoped-merge-permission" class="level1">
-<h1>mwc — merge-when-confident (session-scoped merge permission)</h1>
-<section id="what-this-grants" class="level2">
-<h2 class="anchored" data-anchor-id="what-this-grants">What this grants</h2>
-<p>Merging is normally human-gated (see <code>ardi.md</code>, <code>merge-it</code>): a PR gets driven to fully-clean and reported ready, then I wait for an explicit “merge it” per PR. <code>mwc</code> is a standing exception the user grants <strong>once per session</strong>: for the rest of <strong>this</strong> session, I may squash-merge any PR I’m driving once it reaches <strong>fully clean</strong> (<code>fully-clean.md</code>) and I’m confident in it — no separate “merge it” needed for each one.</p>
-</section>
-<section id="when-this-fires" class="level2">
-<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
+<section id="merge-when-confident-mwc-session-grant" class="level1">
+<h1>Merge-When-Confident (MWC) Session Grant</h1>
+<p><code>mwc</code> (“merge when confident”) is an explicit, session-scoped user grant that authorizes the AI assistant to merge fully-clean pull requests autonomously for the duration of the current session, without asking confirmation before every merge.</p>
+<section id="standing-scope-policy" class="level2">
+<h2 class="anchored" data-anchor-id="standing-scope-policy">Standing Scope &amp; Policy</h2>
 <ul>
-<li>“merge when confident”, “mwc”</li>
-<li>“merge at will”, “maw” (an earlier phrasing for the same grant)</li>
-<li>“you can merge PRs when you’re confident (and they’re green with all-clear reviews)”, “merge PRs on your own this session”, or any similar explicit, forward-looking grant</li>
-</ul>
-<p>Distinguish from <code>merge-it</code>: <code>merge-it</code> means “merge THIS PR now”; <code>mwc</code> means “stop asking me per PR, for the rest of the session.”</p>
-</section>
-<section id="scope-and-limits" class="level2">
-<h2 class="anchored" data-anchor-id="scope-and-limits">Scope and limits</h2>
-<ul>
-<li><strong>Session-scoped, not a standing preference.</strong> Applies only to the current conversation; a fresh session (new tab, <code>/clear</code>, container restart) starts without it. Don’t write this grant into <code>memories/preferences.md</code> — the point is that the user asks for it explicitly, session by session, not that it becomes a silent default everywhere.</li>
-<li><strong>Still requires fully-clean.</strong> Never merge a PR that isn’t fully clean (<code>fully-clean.md</code>: every CI workflow and check run is green and completed, latest review has zero outstanding findings) just because <code>mwc</code> is active — it removes the “ask first” step, not the CI-green / review-clean bar. Merging while any CI workflow or check run is still in progress, queued, or pending, or before the latest review’s verdict has actually been posted and confirmed clean, is strictly forbidden.</li>
-<li><strong>Still requires actual confidence.</strong> If a merge call is genuinely ambiguous, CI status is unclear, or <code>mergeStateStatus</code> is blocked (see <code>merge-it</code>’s branch-protection note), stop and ask even with <code>mwc</code> active — the grant covers routine, unambiguous merges, not judgment calls. Concretely: a <strong>required</strong> check reporting failure is a “stop and ask” case even when you’ve independently verified the underlying content is clean (e.g.&nbsp;a genuine “Ready for merge” review verdict that a buggy guard script misreported as a failure, per <code>fully-clean.md</code>) — self-judging a required check’s redness as a false positive and merging past it is not covered by <code>mwc</code>, and the harness’s own permission system will (correctly) block the attempt. Report the evidence and let the human decide. (Sparta#594/#598, 2026-07-02.)</li>
-<li><strong>Doesn’t override a deadlock escalation you yourself initiated.</strong> Per <code>ardi.md</code>’s deadlock rule, when a review finding can’t be resolved through rebuttal, the correct move is to request a specific human reviewer and stop looping — that request is a commitment to wait for THAT human’s actual decision, not a formality to clear before resuming self-service. Gathering stronger evidence afterward (a better rebuttal, an authoritative citation, even an independent bot re-confirmation) doesn’t retroactively substitute for the human’s sign-off you asked for — <code>mwc</code> still doesn’t cover merging past it until they weigh in, even once you’re personally confident the item is settled. The harness’s own permission system enforces this the same way it enforces the required-check case above. (Sparta#852, 2026-07-14: escalated a disputed review finding to a named human reviewer, then — after posting a stronger citation and getting the bot’s independent agreement — attempted to merge anyway; correctly blocked pending the human reviewer’s own response.)</li>
-<li><strong>Applies session-wide unless the user narrows it.</strong> If the user scopes the grant to one PR or repo (“mwc for #42 only”), honor that narrower scope instead of extending it everywhere.</li>
-<li><strong>Merge permission only.</strong> Force-push, <code>--no-verify</code>, deleting a branch outside the normal <code>post-merge</code> tidy, and every other destructive action stay gated exactly as before — <code>mwc</code> doesn’t extend to those.</li>
-<li><strong>Revocable immediately.</strong> An explicit “stop merging on your own” (or the session ending) revokes the grant right away.</li>
+<li><strong>Baseline Prohibition</strong>: AI assistants MUST NOT merge PRs/MRs without explicit user instruction for that specific PR. Pushing, building, or driving a PR to 100% clean CI DOES NOT grant permission to merge.</li>
+<li><strong>MWC Override Scope</strong>: When the user explicitly issues <code>/mwc</code>, “merge when confident”, “merge at will”, or “maw”, that baseline prohibition is suspended for the current session only.</li>
+<li><strong>Scope Limit</strong>: An MWC grant applies ONLY to PRs that are 100% clean (all CI checks passing, review verdict clean, no unresolved comments, no open block labels). It NEVER authorizes merging a PR with failing CI, unresolved findings, or pending reviews.</li>
+<li><strong>Session Duration</strong>: The grant expires automatically when the session ends or when explicitly revoked via <code>/mwc revoke</code> or <code>disable-mwc</code>.</li>
 </ul>
 </section>
-<section id="procedure" class="level2">
-<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<section id="session-lock-hook-integration" class="level2">
+<h2 class="anchored" data-anchor-id="session-lock-hook-integration">Session Lock &amp; Hook Integration</h2>
+<p><code>no-unauthorized-merge.py</code> enforces the baseline merge prohibition at the <code>PreToolUse</code> hook level, blocking <code>gh pr merge</code>, <code>glab mr merge</code>, <code>gh api .../merge</code>, and <code>glab api .../merge</code>.</p>
+<p>When MWC is enabled for a session: 1. <code>ai-session.sh enable-mwc</code> creates a <code>&lt;sanitized-session-id&gt;.mwc</code> marker file in the repository’s git common directory (<code>$(git rev-parse --git-common-dir)/ai-sessions/</code>). 2. <code>no-unauthorized-merge.py</code> checks for the active session’s <code>.mwc</code> marker file and validates that the session is alive (<code>is_session_alive()</code>). 3. If an active <code>.mwc</code> marker exists for the current session, <code>no-unauthorized-merge.py</code> allows merge tool executions. 4. <code>ai-session.sh disable-mwc</code> removes the <code>.mwc</code> marker file, restoring the strict prohibition immediately.</p>
+</section>
+<section id="procedure-for-agents-handling-mwc" class="level2">
+<h2 class="anchored" data-anchor-id="procedure-for-agents-handling-mwc">Procedure for Agents Handling <code>/mwc</code></h2>
+<p>When the user gives an MWC grant (e.g.&nbsp;<code>/mwc</code> or “merge when confident”):</p>
 <ol type="1">
-<li>Acknowledge the grant in one sentence so the user knows it’s active for the session, and what it does and doesn’t cover.</li>
-<li>For the rest of the session, when a PR I’m driving (via <code>ardi</code> or otherwise) reaches fully-clean, run <code>merge-it</code>’s merge + verify + post-merge chain directly instead of stopping to report “ready, merge it?” and waiting. <strong>The chain is not optional follow-up — it’s part of the merge action itself.</strong> The instant the merge tool call reports success, treat <code>post-merge</code> (verify → tidy → UMS) as still in flight, the same as if the merge and the wrap-up were one atomic step. Reporting “merged!” and moving on to the next thing — including responding to other things the user said in the meantime — without having run it is the exact gap this bullet exists to close. <strong>This is easiest to drop in a busy, multi-threaded conversation</strong> — the user firing off several observations/questions right as the merge lands makes it natural to context-switch to answering those and let the merge’s own follow-through quietly slide. Don’t let it: finish the chain (or at least kick off UMS) before or alongside answering the other threads, not deferred until “things calm down.” A user having to explicitly say “ums first” after a merge already happened is this failure mode, not a normal request.</li>
-<li>Because the grant is a live, explicit user instruction rather than a self-authored one, it’s safe to bake a self-merge step into a <code>ScheduleWakeup</code>/<code>/loop</code> prompt while <code>mwc</code> is active for that session — this is the one case where <code>ardi.md</code>’s “never bake a self-merge directive into a wakeup prompt” caveat doesn’t apply, because the merge authorization already came from the human, not from a prior Claude turn.</li>
+<li>Run <code>skills/session-lock/scripts/ai-session.sh enable-mwc</code> (or <code>~/.claude/skills/session-lock/scripts/ai-session.sh enable-mwc</code>) to mechanistically set the session merge permission flag for <code>no-unauthorized-merge.py</code>, and acknowledge the grant in one sentence so the user knows it’s active for the session, and what it does and doesn’t cover.</li>
+<li>Proceed with the task (e.g.&nbsp;driving PRs to clean via <code>ardi</code>).</li>
+<li>When a PR reaches 100% clean state, merge it immediately (default: squash merge via <code>gh pr merge &lt;number&gt; --squash --delete-branch</code>), verify the merge landed on GitHub/GitLab, and run the post-merge skill (<code>post-merge</code> / <code>ums</code>).</li>
+<li>If the user revokes the grant, run <code>skills/session-lock/scripts/ai-session.sh disable-mwc</code> immediately.</li>
 </ol>
 </section>
-<section id="relationship-to-other-skills" class="level2">
-<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
-<ul>
-<li><strong><code>merge-it</code></strong> — the actual merge mechanics (squash, verify, chain to <code>post-merge</code>). <code>mwc</code> just removes the per-PR “merge it” trigger requirement for the rest of the session.</li>
-<li><strong><code>ardi</code></strong> — drives a PR to fully-clean; <code>mwc</code> is what lets that loop merge on its own once it gets there, instead of stopping to report ready.</li>
-<li><strong><code>ardia</code> / <code>gia</code></strong> — multi-PR sweeps; <code>mwc</code> lets them merge each PR as it clears, instead of accumulating a batch of “ready” reports for the user to approve one by one.</li>
-</ul>
-</section>
-<section id="anti-patterns" class="level2">
-<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
-<ul>
-<li>Merging a PR that isn’t fully clean because <code>mwc</code> is active — the bar for “clean” doesn’t move.</li>
-<li>Treating <code>mwc</code> as a standing preference and writing it into <code>preferences.md</code> — it’s granted per session by the user, not banked as a default.</li>
-<li>Assuming <code>mwc</code> survives past the session it was granted in.</li>
-<li>Merging through genuine ambiguity (a branch-protection block, unclear CI, a deadlocked review) just because asking first is now optional.</li>
-<li>Merging past your own deadlock escalation once you’ve personally gathered enough evidence to feel sure — the escalation was a commitment to the human’s decision, not a placeholder you can outrun with a stronger argument. (Sparta#852, 2026-07-14.)</li>
-<li>Reporting a merge as done and stopping there — via a summary, or by moving on to other conversation threads — without having run (or at least started) the post-merge → UMS chain. (Sparta <code>#818</code>, 2026-07-13: merged via <code>mwc</code>, reported a summary, then answered a stream of concurrent follow-up questions instead of chaining into UMS — the user had to explicitly ask for it.)</li>
-</ul>
+<section id="quick-reference" class="level2">
+<h2 class="anchored" data-anchor-id="quick-reference">Quick Reference</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Command</th>
+<th style="text-align: left;">Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>skills/session-lock/scripts/ai-session.sh enable-mwc</code></td>
+<td style="text-align: left;">Enables session-wide merge grant</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>skills/session-lock/scripts/ai-session.sh disable-mwc</code></td>
+<td style="text-align: left;">Revokes session-wide merge grant</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><code>skills/session-lock/scripts/ai-session.sh check-mwc</code></td>
+<td style="text-align: left;">Checks if session-wide merge grant is active</td>
+</tr>
+</tbody>
+</table>
 
 
 </section>

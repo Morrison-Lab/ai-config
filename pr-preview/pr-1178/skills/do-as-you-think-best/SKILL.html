@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Request d-morrison as reviewer after creating a GitHub PR. Run immediately after gh pr create succeeds, in the same response. Standing rule across all repos except Lacaedemon/sparta, which never requests d-morrison (see Scope).">
+<meta name="description" content="Alias for daytb. Decide the question in front of you yourself instead of asking, then report what you chose – scoped to the task at hand, not the session. Use when asked to ‘do as you think best’, ‘do as you see fit’, ‘your call’, ‘you decide’, or ‘up to you’.">
 
 <title>skill – ai-config</title>
 <style>
@@ -26,41 +26,6 @@ ul.task-list li input[type="checkbox"] {
   width: 0.8em;
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
-}
-/* CSS for syntax highlighting */
-html { -webkit-text-size-adjust: 100%; }
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 </style>
 
@@ -346,18 +311,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#request-pr-review" id="toc-request-pr-review" class="nav-link active" data-scroll-target="#request-pr-review">request-pr-review</a>
-  <ul class="collapse">
-  <li><a href="#when-to-run" id="toc-when-to-run" class="nav-link" data-scroll-target="#when-to-run">When to run</a></li>
-  <li><a href="#command" id="toc-command" class="nav-link" data-scroll-target="#command">Command</a></li>
-  <li><a href="#edge-cases" id="toc-edge-cases" class="nav-link" data-scroll-target="#edge-cases">Edge cases</a></li>
-  <li><a href="#scope" id="toc-scope" class="nav-link" data-scroll-target="#scope">Scope</a>
-  <ul class="collapse">
-  <li><a href="#exception-lacaedemonsparta" id="toc-exception-lacaedemonsparta" class="nav-link" data-scroll-target="#exception-lacaedemonsparta">Exception: <code>Lacaedemon/sparta</code></a></li>
-  </ul></li>
-  </ul></li>
+  <li><a href="#do-as-you-think-best-alias-for-daytb" id="toc-do-as-you-think-best-alias-for-daytb" class="nav-link active" data-scroll-target="#do-as-you-think-best-alias-for-daytb">do-as-you-think-best (alias for <code>daytb</code>)</a></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/request-pr-review/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/request-pr-review/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/do-as-you-think-best/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/do-as-you-think-best/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -366,53 +322,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="request-pr-review" class="level1">
-<h1>request-pr-review</h1>
-<p>After creating any PR, request <code>d-morrison</code> as a reviewer. The user said “you should always request my review after creating PRs” on 2026-05-15 — without an explicit review request, the PR sits in their inbox without notification.</p>
-<section id="when-to-run" class="level2">
-<h2 class="anchored" data-anchor-id="when-to-run">When to run</h2>
-<ul>
-<li>Immediately after <code>gh pr create</code> succeeds, in the same response.</li>
-<li>When the user asks you to “request review” on an existing PR.</li>
-</ul>
-</section>
-<section id="command" class="level2">
-<h2 class="anchored" data-anchor-id="command">Command</h2>
-<p><code>EDIT_PR</code> (abstract operation token; resolve to your model’s tool via <a href="../../tool-mappings.md"><code>tool-mappings.md</code></a> — the GitHub MCP form is <code>mcp__github__update_pull_request</code> with <code>reviewers: ["d-morrison"]</code>):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="at">-X</span> POST repos/<span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span>/pulls/<span class="op">&lt;</span>num<span class="op">&gt;</span>/requested_reviewers <span class="dt">\</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-f</span> <span class="st">"reviewers[]=d-morrison"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>You can get <code>&lt;owner&gt;/&lt;repo&gt;</code> from <code>gh repo view --json nameWithOwner -q .nameWithOwner</code> and <code>&lt;num&gt;</code> from the PR URL returned by <code>gh pr create</code>.</p>
-</section>
-<section id="edge-cases" class="level2">
-<h2 class="anchored" data-anchor-id="edge-cases">Edge cases</h2>
-<ul>
-<li><p><strong>PR author is d-morrison.</strong> GitHub returns HTTP 422 with <code>"Review cannot be requested from pull request author"</code>. Surface this explicitly to the user — don’t silently swallow the error. They can self-assign via the UI if needed, but the review request can’t go through the API.</p></li>
-<li><p><strong>Other reviewers already requested.</strong> The endpoint adds to the existing list rather than replacing it, so this is safe to run alongside pre-configured CODEOWNERS or workflow-added reviewers.</p></li>
-</ul>
-</section>
-<section id="scope" class="level2">
-<h2 class="anchored" data-anchor-id="scope">Scope</h2>
-<p>Applies by default to all GitHub repos. If the user tells you a specific repo shouldn’t auto-request d-morrison, honor that override per-repo via a project-level memory.</p>
-<section id="exception-lacaedemonsparta" class="level3">
-<h3 class="anchored" data-anchor-id="exception-lacaedemonsparta">Exception: <code>Lacaedemon/sparta</code></h3>
-<p>Never request <code>d-morrison</code> as a reviewer on a PR in sparta.</p>
-<p>The exception is repo-scoped, not rule-wide. Requesting <code>d-morrison</code> everywhere else stays correct and unchanged, on PR creation and on deadlock alike, and that includes <code>Morrison-Lab/ai-config</code>, which is emphatically not covered. Within sparta the exception covers every path that would reach a request: the standing post-<code>gh pr create</code> request above, and the deadlock escalation below.</p>
-<p>A skill inherits this exception only where it actually routes through here. <code>st</code> does, citing this skill by name and nothing else. <code>ard</code>, <code>ardi</code>, and <code>merge-it</code> did <strong>not</strong>: each named the raw <code>gh pr edit &lt;N&gt; --add-reviewer d-morrison</code> command, which reaches GitHub without passing through this file, so the exception could not reach it. <code>merge-it</code> was the worst of the three – its <code>BLOCKED</code>-state fix step never mentioned this skill at all, so running it on a sparta PR awaiting an approving review would have requested <code>d-morrison</code> outright. All three now carry the guard inline.</p>
-<p>The general rule is that <strong>a raw command inherits nothing</strong>; only a reference to this skill does. So when adding a repo exception here, grep for the raw command as well as for this skill’s name:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> grep <span class="at">-n</span> <span class="st">'add-reviewer d-morrison'</span> <span class="at">--</span> skills/</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Then judge each hit rather than editing all of them: <code>skill-builder</code> and <code>agent-builder</code> also name the raw command, and both are <strong>correct as they stand</strong>, because the PR they open always lands in ai-config, which this exception does not cover. A hit needs a guard only where the PR could be a sparta one. That grep is how the <code>merge-it</code> gap was found, and the same run turned up those two, so it is worth running – and worth reading, not applying blindly.</p>
-<p><strong>A review deadlock on a sparta PR escalates to the user in chat, not to a review request.</strong> Escalation is re-routed, not retired: its purpose was always that a human decides, and that is unchanged. Post a boxed <code>BLOCKER</code> (per <code>CLAUDE.md</code>’s chat-output-tagging convention) naming the PR, the single disputed item, and both sides of the exchange, then stop iterating that item and wait for the user’s call.</p>
-<ul>
-<li><strong>Do:</strong> open a sparta PR with no human reviewer requested, and keep requesting <code>d-morrison</code> on every other repo’s PRs, ai-config’s included.</li>
-<li><strong>Do:</strong> take a sparta deadlock to the user in chat as a boxed <code>BLOCKER</code>.</li>
-<li><strong>Don’t:</strong> run <code>gh pr edit --add-reviewer d-morrison</code>, or POST to <code>requested_reviewers</code> with that login, against a sparta PR. Not on creation, and not as a deadlock escalation.</li>
-<li><strong>Don’t:</strong> read this as ending escalation on sparta. An unresolved deadlock still needs a human, and chat is now where it goes.</li>
-</ul>
-<p>(Directive from the user, 2026-08-05: “cai: stop requesting reviews from d-morrison in this repo”, then, correcting the scope shortly after, “cai: stop requesting reviews from d-morrison in sparta, not in ai-config”. The first reading took “this repo” to mean ai-config, since that was where the PRs under discussion sat, and shipped the exception pointed at the wrong repo in ai-config#1177 — which also reverted the reviewer request in six skills that ship to ai-config and should have kept it. Recorded because the near-miss is the transferable part: “this repo” resolves against the repo the <em>work</em> is about, which need not be the repo whose PRs happen to be in front of you. When a repo-scoped directive arrives during cross-repo work, name the repo back explicitly before encoding it. No reason for the rule was given, and none is invented here.)</p>
+<section id="do-as-you-think-best-alias-for-daytb" class="level1">
+<h1>do-as-you-think-best (alias for <code>daytb</code>)</h1>
+<p>This is a spelled-out alias. Read and follow the canonical skill:</p>
+<p>→ <strong><a href="../../skills/daytb/SKILL.html">daytb</a></strong></p>
 
 
-</section>
-</section>
 </section>
 
 <a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
@@ -839,7 +754,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/request-pr-review/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/request-pr-review/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/d-morrison/ai-config/edit/main/skills/do-as-you-think-best/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/d-morrison/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/d-morrison/ai-config/blob/main/skills/do-as-you-think-best/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

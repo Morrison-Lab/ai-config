@@ -63,10 +63,16 @@ of the cost. The expensive thing is not the comparison; it is the conclusion
 published on top of it. A reminder landing on the next prompt arrives while
 retracting is still cheap -- in the incident, before the issue comment.
 
-RELATIONSHIP TO remind-deserialize-before-binary-claim.py
+RELATIONSHIP TO THE DESERIALIZE-BEFORE-BINARY-CLAIM GUARD
 ---------------------------------------------------------
-Siblings on either side of the same conclusion, and this one covers a hole in
-that one.
+That guard is proposed in ai-config#1181 and is NOT on `main` yet; once that
+merges it lives at `hooks/remind-deserialize-before-binary-claim.py`. Nothing
+here imports or calls it, so this hook does not depend on it landing -- the
+paragraphs below are rationale, and if #1186 merges first they describe a file
+that arrives shortly afterward.
+
+The two are siblings on either side of the same conclusion, and this one
+covers a hole in that one.
 
 That guard fires when an escalation names a serialized artifact that NOTHING in
 the transcript deserialized -- a check that was never run. Its discharge is a

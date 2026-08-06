@@ -24,7 +24,7 @@ launches the agent.
 Resource overrides (env vars):
 
 ```bash
-ALLOC_CPUS=16 ALLOC_MEM=64G ALLOC_TIME=24:00:00 claude-alloc
+ALLOC_CPUS=16 ALLOC_MEM=64G ALLOC_TIME=72:00:00 claude-alloc
 claude-alloc --exclude=c1,c3        # extra salloc flags pass straight through
 ALLOC_CONDA_ENV=otherenv codex-alloc
 ```

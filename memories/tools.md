@@ -149,12 +149,19 @@ these.
     Reserve `claude-alloc` for **compute-heavy** sessions (R tests, renders, simulations start to finish), where wrapping the session once beats `srun`-ing every step.
     The agent's Bash tool can't hold its own persistent interactive `salloc` across calls anyway (each call is a fresh shell), so "the agent manages its own slice" isn't an option --- it's either a user-launched slice (`claude-alloc`) or per-command `srun`/`sbatch`.
     A login-node session's own footprint (git/gh/grep/edits/orchestration) is light and fine on the head node; only real compute must be dispatched.
-  - Defaults: 8 hwthreads (4 physical cores), `--mem=32G`, `--time=24:00:00`,
+  - Defaults: 8 hwthreads (4 physical cores), `--mem=32G`, `--time=48:00:00`,
     `--exclude=c1` (the GPU node). Override per-launch with `ALLOC_CPUS`,
-    `ALLOC_MEM`, `ALLOC_TIME`. The walltime default was 12h until 2026-07-24
-    and was too short (it expired mid-session, killing the agent and every
-    in-slice background watcher); raised to 24h. The limit is a courtesy
-    choice, not a cluster constraint (`normal` reports `MaxTime=UNLIMITED`).
+    `ALLOC_MEM`, `ALLOC_TIME`. The limit is a courtesy choice, not a cluster
+    constraint (`normal` reports `MaxTime=UNLIMITED`), and it has now been
+    raised twice for the same reason: 12h until 2026-07-24, then 24h until
+    2026-08-06, each expiring mid-session. The second expiry is the sharper
+    datum, because the slice had run **exactly** its limit --- `RunTime=1-00:00:26`
+    against `TimeLimit=1-00:00:00` --- during an overnight ARDIA pass with SLURM
+    jobs and PR watchers still in flight. What dies is the session's
+    *observability*, not its work: a detached `sbatch` job survives, while every
+    watcher polling it inside the slice does not, so the run continues with
+    nobody reading it. Now 48h, which covers an overnight run plus the
+    following working day.
   - **A running slice cannot be extended:** `scontrol update jobid=<id>
     TimeLimit=...` is denied for a normal user (only operators may raise a
     limit), so a slice keeps its launch-time walltime for its whole life ---

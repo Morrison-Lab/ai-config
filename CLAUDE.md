@@ -447,11 +447,23 @@ When telling the user I've scheduled a wakeup or check-in (`ScheduleWakeup`, or 
 The tool result already returns a clock time (e.g. "Next wakeup scheduled for 08:22:00") — surface that time in the chat reply instead of dropping it, converting to Pacific local time per the "Timestamp recaps in local time" section above if the returned time is in a different zone.
 "Scheduled a check-in to continue monitoring both" leaves the user unable to tell whether that's one minute away or twenty; "I'll check back at 08:22 PT (~4 min)" does not.
 
-## Bare queue-command keywords
+## Bare keyword directives
+
+Two families of slash skill read as directives when I write them **without** the leading slash: the **queue commands** that amend the task list, and the **judgment grants** that hand a decision back to you.
+
+### Queue commands
 
 I maintain a family of slash skills for managing the task queue and amending requests: `/also`, `/first`, `/next`, `/before`, `/last`, `/and`, `/remember`, `/always`, and `/cascade`.
 When I write one of these keywords **without the leading slash** as a directive — e.g. "also fix the test", "remember that ...", "always link PRs in tables", "and bold it", "next, run the spellcheck", "first, revert that" — interpret it using the corresponding skill's semantics rather than as ordinary prose. (`/remember` and `/always` both route to the `memorize` skill; "cascade" means merge stacked PRs' base branches into the PRs stacked on top of them — including main into unstacked PRs — never the PRs into main; see the `cascade` skill.)
 When the word is genuinely just part of a sentence (ambiguous), fall back to the plain reading.
+
+### Judgment grants
+
+The same bare-keyword reading applies to the judgment-grant keywords, which are not queue commands and differ from each other in scope.
+`daytb` ("do as you think best", and its longhand `do-as-you-think-best`) hands back **one** decision: choose what you would have recommended, act, and report the choice in the past tense -- it expires with that task.
+`away` is the session-scoped version, presuming I am not there to answer at all, and `back` revokes it.
+`mwc` is the separate grant covering merge authority, which none of the others extend to.
+Read a bare "do as you think best" as `daytb`, not as `away` -- the session-wide reading suspends clarifying questions long after I expected them back.
 
 ## Link PRs in tables
 

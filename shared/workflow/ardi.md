@@ -198,7 +198,7 @@ unchanged --- rather than that the changed element's count is as expected.
   count-based check can pass by coincidental balance, and the `git diff`
   deletion-review is the real gate.
 
-(Morrison-Lab/ai-config#1167, round 12: a `re.sub` DOTALL patch to
+(Morrison-Lab/ai-config#1167, round 12, 2026-08-05: a `re.sub` DOTALL patch to
 `scripts/check-pr-fully-clean.py`'s second `for r in reviews:` loop anchored on
 that same text, which also opens an earlier `author_latest_state` loop, so the
 match ran from the first occurrence and deleted both it and the intervening

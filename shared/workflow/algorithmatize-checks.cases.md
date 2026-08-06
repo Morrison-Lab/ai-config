@@ -23,6 +23,38 @@ made the outer closer look like a fresh unclosed opener.
 The fix was to report the ambiguous fence
 rather than silently consume the rest of the document.)
 
+## A metric that cannot discriminate over its whole range may be sharp over part of it
+
+(`Lacaedemon/sparta`#1207, 2026-08-06: a regression guard asserted that a
+regiment's facing rotates less than 28 degrees over 700 ticks of melee, pinned
+to a single seed.
+Measuring it across six seeds showed unmodified `main` itself exceeding the gate
+at two of them, 35.89 and 53.39 degrees against a 9.29-to-53.39 range, and the
+same commit reading 16.39 locally against 39.88 on CI.
+From that the issue concluded that no bound could work at all --- a wider
+absolute bound would have to clear 53 and so would stop catching the roughly
+46-degree bug the guard existed for, per-seed baselines die on the platform
+split, and a loose sanity bound has the first option's problem --- and #1211
+quarantined the assertion on that reasoning.
+
+That diagnosis was right about the 700-tick window and wrong about the metric,
+and #1211 was closed as superseded by someone else's fix in #1212, merged as
+`d8cc635b`.
+That PR first established the negative result properly, which the issue had
+asserted rather than measured: disabling the fix the guard protects made the
+700-tick number *worse* at three seeds and *better* at three, so there the
+metric carries no signal about the fix at any bound.
+Inside the first 300 ticks it separates cleanly --- a healthy build holds
+2.84 to 3.44 degrees across eight seeds while a regressed one ranges 1.94 to
+14.45 --- so the fix bounds that window instead.
+Two regressed seeds land under the healthy band, which is why the per-seed
+ceiling cannot be the discriminator: the gate is on the seed mean, 2.98 healthy
+against 6.52 regressed, with a looser per-seed backstop so one blown seed cannot
+hide behind seven good ones.
+It also declines to bound the late window at all and says why, since clean
+`main` genuinely reaches 58 degrees by tick 700 at seed 777 and pretending to
+bound that would restore the original silent pass.)
+
 ## Never predict which case will fail; enumerate the class
 
 (2026-07-31, `ucdavis/bcs#503`: a spelling check could not run locally, and the

@@ -266,7 +266,7 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
 - **Regex Parsing for Automated Agent Reports (`re.VERBOSE`)**:
   - Standardize on Python's built-in `re.compile` with `re.VERBOSE` (`re.X`) instead of third-party DSL wrappers (`humre`) or dual regex fallback paths. Dual regex definitions introduce implementation drift between local unit tests and CI runners.
-  - Prefer match-boundary splitting over lookahead section delimiters (see "## Markdown PR Review Parsing & Regex Match-Boundary Splitting
+  - Prefer match-boundary splitting over lookahead section delimiters.
 
 - **Avoid lookahead regexes across markdown finding bodies containing code blocks.**
   Single-line comments in code blocks (`# comment` in Python, Bash, R, Ruby, YAML) start with `# `.
@@ -299,3 +299,567 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   Trimming a summary on single newlines (`\n+#{1,6}`) or a bare keyword (`Recommendation`) can cut an inline comment body short when a finding contains a sub-heading like `### Recommendation`.
   Requiring `\n\s*\n`, or matching a compound phrase (`Overall Summary`, `General Recommendations`) with a negative lookahead, keeps such sub-headings intact.
   (Morrison-Lab/gha#413, 2026-08-05).
+
+- **Shell Script Fail-Closed Safety in Workflows**:
+  - Under `set -e`, use `if ! CMD; then` to safely handle non-zero exit status without `set +e`. Disabling `set +e` turns off `errexit` for subsequent pipeline steps (e.g., `jq`), risking failing open instead of closed on JSON parse errors. (Morrison-Lab/gha#412, 2026-08-05).
+
+- **The reviewer-request API is not the surface to check, and a `422` reported for it did not reproduce.**
+  `POST /repos/<o>/<r>/pulls/<N>/requested_reviewers` with `reviewers[]=copilot-pull-request-reviewer[bot]` returned **201**, and the plain `Copilot` and `copilot` logins were accepted the same way.
+  So the login spelling is not what decides the outcome, and a `422` seen elsewhere is likelier to be about whether Copilot review is enabled for that repo at all -- untested here, since bcs has it enabled.
+  The 201 body lists Copilot under `requested_reviewers`, but an immediate `GET .../requested_reviewers` returns `{"users":[],"teams":[]}` and `gh pr view --json reviewRequests` returns `[]`.
+  Neither surface therefore answers "was Copilot asked to review this", in either direction.
+  (Probed on `ucdavis/bcs#479`, 2026-07-30.)
+
+  **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
+  One session ran the POST once and got `422`; another ran it three times, across all three login spellings, and got `201` every time.
+  Neither session was lying, and the first one's real mistake was not the observation but the generalisation -- it turned a single failed attempt into a stated property of the repository, wrote that into a PR body as settled fact, and steered two later rounds with it.
+  The second session's report then invited the mirror-image error, of treating `201` as the settled answer.
+
+  The likeliest reconciliation, **untested**: GitHub answers `422` when the requested reviewer is already pending.
+  The `review_on_push: true` rule above re-requests Copilot on **every push**, so there is a window after each push in which Copilot is already a pending reviewer and a manual request is a duplicate.
+  That would make the response depend on *when* you ask rather than on how, and it fits both observations without either being wrong.
+  It stays untested on purpose: probing consumes the per-user quota that is usually the actual reason Copilot is absent, so the experiment damages the thing it would explain.
+
+  The operational advice does not depend on resolving it.
+  Don't spend a call on this endpoint either way -- the ruleset already requests the review, and neither response tells you whether one is pending.
+
+  **As of 2026-08-04, Copilot is quota-exhausted across Morrison-Lab and unavailable until September 2026, so do not request it at all until then.**
+  The user stated this directly on 2026-08-04, in the words "copilot is unavailable until september" and "stop trying to get copilot reviews".
+  Until then, skip both the `requested_reviewers` POST for `copilot-pull-request-reviewer[bot]` and the `request_copilot_review` MCP tool: either only produces a `COMMENTED` review whose whole body is *"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."*, which wastes a round and is not a verdict.
+  This is a time-bounded override of two standing instructions that otherwise say to request Copilot every round: `shared/workflow/pr-on-claim.md`'s "Request the external reviewer in the same stride" and `shared/workflow/fully-clean.md`'s fifth case ("Keep re-requesting each round anyway").
+  Until September 2026, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
+  Re-verify Copilot's quota and re-enable the per-round request after September 2026, per `shared/writing/timestamp-volatile-claims.md`.
+  A `no-unreviewed-pr.py` `Stop` hook (ai-config#1041) enforces the opposite instruction and collides with this override while the quota is out.
+  It fires every turn a PR opened or readied this session sits awaiting review, demanding a Copilot request -- the one action this override forbids -- so a session that honors the override never satisfies it and the demand repeats each turn.
+  Unregister it from `~/.claude/settings.json`'s `Stop` hooks while Copilot is out.
+  The script stays and only the local registration goes.
+  Re-add it after September 2026 alongside re-enabling the request.
+  One Morrison-Lab/gha session spent over a dozen turns in this loop before the collision was recognized.
+  That loop persisted even though each request POST succeeded, because the hook discharges only on a reviewer-request that is the **last simple command in the call** (its exit status is then unambiguous), and every turn chained a verify `gh pr view` after the POST, leaving it non-last.
+  Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids, so unregistering is the right fix while the quota is out.
+  (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
+- **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
+  when its output is not a terminal --- which is always, for an agent.**
+  A cancellation and a real failure are therefore the same word in the column
+  most people read, and they want opposite responses: a re-run versus a
+  debugging round.
+  `gh` itself distinguishes them internally and then discards the distinction
+  on the way out.
+  In `cli/cli` v2.92.0 (the installed version, checked with `gh --version`),
+  `pkg/cmd/pr/checks/aggregate.go` gives `CANCELLED` its own bucket, separate
+  from `ERROR`/`FAILURE`/`TIMED_OUT`/`ACTION_REQUIRED`:
+  ```go
+  case "CANCELLED":
+      item.Bucket = "cancel"
+  ```
+  `pkg/cmd/pr/checks/output.go` renders that bucket as a muted `-` in a TTY,
+  identically to `skipping` --- and then, for the non-TTY table:
+  ```go
+  if o.Bucket == "cancel" {
+      tp.AddField("fail")
+  } else {
+      tp.AddField(o.Bucket)
+  }
+  ```
+  So a human at a terminal sees a cancellation as a dash, and a piped or
+  captured run sees `fail`.
+  Two consequences worth keeping apart.
+  A human's report of what they saw and an agent's are not describing the same
+  output, so "it's showing as failing" from one is not corroboration for the
+  other.
+  And the fix is one flag, not a heuristic: **`--json name,state,bucket`**
+  preserves `bucket: "cancel"` and `state: "CANCELLED"` distinctly from `fail`,
+  which decides it exactly rather than by inference
+  ([`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)).
+  Duration is a decent corroborating tell --- a review job cancelled by a
+  concurrency race dies in seconds where a real one takes minutes --- but take
+  it from `completed_at` minus `started_at` on a completed run, never from
+  `status`, per [`fully-clean`](../shared/workflow/fully-clean.md) criterion 1.
+  Prefer the flag to the tell: the flag is exact and the duration is a prior.
+  For the cause of these cancellations, and why the *gate* job then reports
+  failure too, see the `cancel-in-progress` entries in
+  [`memories/debugging.md`](debugging.md) and
+  [`pr-on-claim`](../shared/workflow/pr-on-claim.md).
+  (2026-07-31: a 6-second "failing" `review / claude-review` was read as a real
+  failure and debugged as one; it was a concurrency cancellation, and needed
+  only a re-run.
+  Confirmed against a real cancelled run on Morrison-Lab/ai-config commit
+  `7b006485`, whose `review / claude-review` check run carries
+  `conclusion: cancelled` while its dependent `review / require-review` carries
+  `conclusion: failure`.)
+
+## gh — stale remote URL causes cryptic `gh pr create` failure
+- `gh pr create` fails with `Head sha can't be blank, Base sha can't be blank, No commits between <owner>:main and <other-owner>:<branch>` when `origin` points to an **old repo URL** (e.g. after a GitHub repo transfer/rename).
+- Fix: `git remote set-url origin https://github.com/<new-owner>/<repo>.git` and re-push the branch before creating the PR.
+- Diagnosis: `git remote -v` shows the stale URL; `gh repo view --json nameWithOwner` shows where `gh` thinks the canonical repo is.
+- **`gh repo view <old-slug> --json nameWithOwner` is the whole detector, and it
+  resolves the redirect for you** --- ask for the old name and read which name
+  comes back.
+  That makes the check a one-liner per repo, so run it over *every* local
+  checkout rather than over the ones you happened to notice.
+  Stale remotes accumulate from unrelated events --- an org transfer, a repo
+  rename, a move between orgs --- so the set you know about is rarely the set
+  that exists.
+  (2026-07-29: a sweep of 118 local checkouts found 5 stale, and only **one**
+  was the `d-morrison` -> `Morrison-Lab` transfer being fixed at the time
+  (`gha`; the other repo in that transfer had already been corrected by hand
+  before the sweep ran, so it was no longer stale).
+  The rest came from three unrelated events: two repos moved out of
+  `UCD-SERG` to `d-morrison` (`qbt`, `qwt`), one moved from `UCD-IDDRC` to
+  `ucdavis` (`fxtas`), and one plain rename, `snapshot.data` -> `snapr`.
+  So 1 + 2 + 1 + 1, which is the point --- four of the five had nothing to do
+  with the move that prompted the sweep.)
+- **Preserve the URL scheme when rewriting a remote.**
+  A remote on SSH (`git@github.com:<owner>/<repo>.git`) rewritten to the
+  `https://` form still works for public reads, so nothing fails immediately ---
+  but it silently moves that repo's auth from your SSH key to whatever
+  credential helper HTTPS uses, which surfaces later as an unexpected
+  credential prompt or a push denial.
+  Read the existing URL first and rebuild it in the same form.
+  A scripted sweep is where this bites, since a single hard-coded
+  `https://github.com/...` template rewrites every remote it touches into HTTPS
+  regardless of what each one was.
+  (Same sweep: 4 of the 5 were HTTPS and one, `snapr`, was SSH; the template
+  converted it before the mismatch was spotted and reverted.)
+
+## GII (Grab Issues Iteratively) — startup cleanup sweep
+
+When starting a GII loop, do a cleanup pass before diving into ARDI:
+
+1. **List all open PRs** with `mcp__github__list_pull_requests`. Look for
+   stale bot-opened PRs that target the same issues as the queue.
+2. **Close empty PRs** — bot-opened branches with no commits (e.g. a `@claude`
+   task run that posted a comment but never pushed code). Check `get_commits`
+   on each PR before closing.
+3. **Identify the canonical PR** for each in-flight issue. Superseded drafts
+   should be closed with a note pointing to the canonical one.
+4. **Collapse stacked changes** — if two open PRs address the same issue or
+   have a causal dependency (one builds on the other), merge one branch into
+   the other before starting ARDI, so the reviewer evaluates the combined diff.
+
+Skipping this sweep leads to confusion: multiple PRs for the same issue,
+closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
+(Learned from the ai-config #275 / #272 / #265 / #266 cleanup pass.)
+
+## GitLab Discussions API (inline diff comments)
+- Endpoint: `POST /projects/:id/merge_requests/:iid/discussions`
+- For inline comments, include `position` object: `position_type: "text"`, `base_sha`, `head_sha`, `start_sha`, `new_path`, `old_path`, `new_line`
+- Get SHAs from MR Versions API: `GET /projects/:id/merge_requests/:iid/versions` → `[0].base_commit_sha`, `[0].head_commit_sha`, `[0].start_commit_sha`
+- If the position is rejected (e.g., line not in diff), the API returns 400 — handle gracefully
+
+## glab (GitLab CLI)
+- Installed via Homebrew (macOS) or system package manager — verify with `which glab`.
+- Authenticated on your GitLab instance — run `glab auth status` to verify host and username
+- Use for MR comments, pipeline checks, CI job logs, etc.
+- `glab issue list --opened` is deprecated — `--opened` is the default when `--closed` is not used. Just use `glab issue list` (no flag needed).
+- No `GITLAB_TOKEN` env var — glab uses its own config at `~/Library/Application Support/glab-cli/config.yml`
+- Key commands:
+  - `glab ci list` — list pipelines
+  - `glab ci get --pipeline-id <ID>` — view pipeline details (non-interactive)
+  - `glab ci create --branch <branch>` — trigger a NEW pipeline (picks up upstream template changes)
+  - `glab ci retry --branch <branch>` — retries the EXISTING pipeline (does NOT pick up template changes)
+  - `glab ci view <id>` — requires TTY; use `glab ci get` or `glab api .../trace` instead
+  - `glab api "/projects/<ID>/jobs/<JOB_ID>/trace"` — get job log non-interactively
+  - `glab mr note create <MR_IID> --message "..."` — post MR comment
+  - `glab mr list` — list merge requests
+  - `glab mr view <MR_IID>` — view MR details
+- GitLab CI job token allowlist:
+  - When repo A's CI job needs API access to repo B, repo B must add A to its allowlist
+  - `glab api --method POST "/projects/<TARGET_ID>/job_token_scope/allowlist" -f "target_project_id=<SOURCE_ID>"`
+  - `include:` (for CI templates) works independently of the API allowlist
+  - Check existing: `glab api "/projects/<ID>/job_token_scope/allowlist"`
+
+## GitHub access from bash in remote/web sessions
+- There is no `gh`/`glab` CLI in these sessions, so `mcp__github__*` is the
+  normal path for anything the API would answer.
+  - **The REST API itself is not necessarily unreachable from bash, though ---
+    it can be scope-limited instead, so test rather than assume.**
+    This entry asserted flatly that no REST API was reachable from a
+    Bash/Monitor script until 2026-07-26, when a session found otherwise.
+    A plain `curl` to `api.github.com` went through the agent proxy and
+    answered normally for a repo in that session's GitHub scope:
+    ```
+    $ curl -sS -o /dev/null -w '%{http_code}\n' \
+        https://api.github.com/repos/d-morrison/altdoc
+    200
+    ```
+    For a repo outside the scope it returned `403`, with a body naming the
+    scope as the reason rather than a generic denial:
+    ```
+    $ curl -sS https://api.github.com/repos/actions/checkout
+    {"message":"GitHub access to this repository is not enabled for this
+     session. Use add_repo to request access. ..."}
+    ```
+    Sandbox policy varies, so the older claim may well have been true of the
+    environment it was written in --- which is the point: check the behavior
+    in the sandbox you are actually in.
+    The consequence bullet below, that a background Monitor cannot poll PR
+    state, rests on the same assumption and deserves the same re-check before
+    you rely on it either way.
+  - **For a repo outside the scope, `mcp__github__*` is not a fallback either
+    --- but git operations are.**
+    The scope limits the MCP tools to the same repo list, so switching to them
+    does not get around a `403`.
+    `git ls-remote https://github.com/<owner>/<repo>` works against any public
+    repo whatever the scope is, because it is a git operation and the proxy
+    passes those through unchanged.
+    That answers every ref question the REST API would have --- which tags and
+    branches exist, and which shas they point at --- and that is usually the
+    whole reason an out-of-scope repo came up.
+    So the ladder is: MCP tools, then `add_repo` if the repo genuinely needs
+    API or write access, then `git ls-remote` for anything that is only a ref
+    lookup.
+    See [`git.md`](git.md)'s "Resolving a tag to a COMMIT sha" for the exact
+    refspec form to ask for.
+    (d-morrison/altdoc#65, 2026-07-26: SHA-pinning seven third-party actions
+    needed tag shas from `actions/`, `r-lib/`, `r-hub/`, `quarto-dev/`, and
+    `JamesIves/`, none of them in session scope, and `add_repo` would have been
+    five pointless scope grants for five ref lookups.)
+- **The proxy allows branch creation/push but BLOCKS branch deletion.** Pushing a
+  *new* branch (even one other than the harness-assigned `claude/...`) works, but a
+  delete push — `git push origin --delete <b>` or `git push origin :<b>` — is rejected.
+  Observed verbatim: "send-pack: unexpected disconnect" / "remote end hung up", then a
+  misleading "Everything up-to-date" (the proxy returns that no-op message instead of a
+  normal `failed to push some refs` error), but the command still exits non-zero. So a
+  throwaway branch (e.g. a push-capability probe) can't be cleaned up from the session;
+  delete it via the GitHub UI/API, or just leave it if it's identical to `main` and has
+  no PR. (Seen on ai-config, 2026-06-28.)
+- **GitHub Pages sites (`<owner>.github.io`, incl. `rossjrw/pr-preview-action`
+  PR-preview links) are policy-blocked in at least some sandboxes** — both
+  WebFetch and a direct `curl`/CONNECT through the agent proxy get a `403`
+  (`gateway answered 403 to CONNECT (policy denial)`, confirmed via
+  `curl -sS "$HTTPS_PROXY/__agentproxy/status"`). Don't retry or assume it's
+  transient — treat it the same as an unavailable preview and fall back to
+  rendering the chapter locally (rme's own CLAUDE.md already names this
+  fallback for "no preview has deployed yet"; it also applies when the
+  preview exists but the sandbox can't reach it).
+  - **But try the `gh-pages` branch first --- the deployed HTML is usually
+    readable through the authenticated MCP tools even when the served site
+    isn't.** `rossjrw/pr-preview-action` commits each build to `gh-pages`
+    under `pr-preview/pr-<N>/`, so
+    `mcp__github__get_file_contents` with `ref: refs/heads/gh-pages` and
+    `path: pr-preview/pr-<N>/<page>.html` returns the exact bytes the blocked
+    URL would have served. That reaches the *real rendered artifact*, which a
+    local re-render only approximates, and it needs no Quarto toolchain.
+    Large pages exceed the tool's token cap and get spilled to a file --- grep
+    that file rather than reading it whole, and diff byte counts across two
+    fetches to confirm you're looking at a genuinely new build rather than an
+    unchanged one. Check the branch's own commit log
+    (`mcp__github__list_commits` with `sha: gh-pages` --- the `LIST_COMMITS`
+    operation in [`tool-mappings.md`](../tool-mappings.md), verified by use in
+    the session below) to see which build is actually deployed before drawing
+    conclusions; a preview comment's timestamp can precede the deploy of the
+    commit you care about.
+    (`UCD-SERG/serocalculator#392`, 2026-07-25: used this to verify six new
+    topics appeared in a rendered altdoc sidebar, counting occurrences
+    before and after the fix, after both `curl` and `WebFetch` 403'd.)
+- Consequence: you CANNOT poll PR review/CI state from a background Monitor.
+  Rely on `mcp__github__subscribe_pr_activity`, which delivers review comments
+  and CI *failures* — but NOT CI success, new pushes, or merge-conflict
+  transitions. A self-check-in scheduler may be absent: rme's instructions
+  reference `send_later` (from the `claude-code-remote` MCP server), and the
+  harness may expose its own (e.g. `ScheduleWakeup`) — but in this remote rme
+  session ToolSearch surfaced neither, so you can't arm the safety re-poll the
+  watch-guidance suggests. Say so rather than implying it's armed.
+- rme runs TWO review workflows per push: `claude-code-review.yml` (sticky
+  comment, gives the "ready to merge" verdict) and `claude.yml` agent post-step
+  (separate findings). They can DISAGREE — one says clean while the other finds
+  nits. Reconcile BOTH before calling a PR clean; the agent post-step tends to
+  drip 1-2 pre-existing cosmetic nits per round. That drip is a reason to keep
+  iterating, never a reason to stop or to ask whether to stop --- see
+  `skills/ardi/SKILL.md`, "Stopping conditions".
+
+## Stacked-PR series: a closed base PR strands the whole downstream stack silently
+
+When PRs are stacked A <- B <- C and the PR for A is closed unmerged (even
+accidentally — check `closed_by`/`closed_at` via the API rather than
+inferring a mechanism), B and C keep "working": their reviews run, they go
+clean, and they MERGE — but into A's head branch, which no longer has any
+open PR to main. Nothing errors; the reviewed content is simply stranded on
+an orphaned branch. Detection: (1) closed-unmerged PRs whose head branches
+still exist with commits not on main (`git rev-list --count
+origin/main..origin/<branch>`), (2) branches with substantial unmerged
+content and no PR at all (never-PR'd forgotten work is found the same way).
+Recovery that worked well: **re-cut the stranded reviewed content from the
+stack's tip** (it embodies every review round's refinements — taking the
+older pre-review copies from elsewhere re-litigates settled findings), layer
+any later improvements from other branches on top, and verify per function
+that the re-cut supersedes the stranded branch before deleting it
+(`git grep -E '^[\w.]+ <- function'` on both refs, set-difference the
+names). Also verify the close reason from the API record: the earlier
+"auto-closed when its base branch was deleted" explanation was disproven by
+`closed_at` predating the base's merge by 8 days — `closed_by: <user>` with
+no comment was the actual record. (ucdavis/rampp #127 closed 2026-07-05;
+PRs #128/#129 merged into the orphaned `claude/split-survival`; re-cut
+as #136–#138, 2026-07-16..17.)
+
+## A CI failure caused by a documented-but-wrong convention may already have an upstream fix -- check before re-patching the symptom
+
+When a consumer repo's CI fails because a *documented* convention (a skip
+label, a config key) doesn't actually work as described, the first instinct
+is to fix the local documentation to match the tool's real behavior. Check
+first whether a **shared/reusable workflow this repo depends on** already
+fixed the actual root cause in a newer version than the one pinned -- the
+consumer's stale pin, not the doc wording, may be the real bug.
+
+Concretely: `UCD-SERG/serocalculator`'s docs said a PR could skip its
+`news.yaml` changelog check with a `no-changelog` (hyphen) label, but
+applying that label didn't work -- the wrapped `UCD-SERG/changelog-check-action`
+hardcodes checking for `no changelog` (space), a different string. The first
+fix redocumented the label as `no changelog` (space) everywhere -- technically
+unblocked the PR, but was wrong: it was really the shared
+`d-morrison/gha` `check-news.yml` reusable workflow, pinned to the repo's
+frozen `@v1` tag, that was stale. A newer version (`@v2`) already had a
+configurable `no-changelog-label` input, added specifically for this
+convention by an earlier, already-closed upstream issue (gha#143). The
+wrapper doesn't pass the label through to the action (which still
+unconditionally hardcodes `no changelog`, space) -- instead its own job
+carries a job-level `if:` that skips the whole job, action included,
+whenever the configured label is present, so the hardcoded check inside
+the action never runs at all for a PR carrying it. Confirmed by diffing
+the reusable workflow's file content at the two tags
+directly (`git show <tag>:<path>` / a raw fetch per tag), not by trusting a
+versioning doc's blanket claim. The correct fix was reverting the
+re-documented label and bumping the stale `@v1` pin to `@v2`, which restored
+the originally-documented (and originally correct) hyphenated label.
+
+**Tell:** a review flags "this looks like the fix for an issue that's already
+closed" or the bug's exact symptom appears in a shared workflow's own inline
+comments/changelog. Before accepting a symptom-level fix (redocumenting
+behavior to match what's observed), check the shared/reusable component's
+own issue tracker and version history for a fix already covering this exact
+case, and check whether the consumer is pinned to a version that predates it.
+
+**A second-order lesson from the same investigation:** a package/repo's own
+versioning docs claiming a component is "audited, unchanged since the freeze"
+can itself be stale -- the audit can predate a later fix to that exact
+component. Verify the claim against the two tags' actual file content rather
+than trusting the doc; if wrong, fix it too (not just the one broken
+reference that surfaced the problem) via a repo-wide grep, since the same
+claim is often restated in multiple docs/pages.
+
+**A third, narrower lesson: an unassembled `changelog.d/`-style fragment is a
+pending draft, not published history -- don't treat it as immutable.** A
+fragment already merged to `main` but not yet collated into `CHANGELOG.md` by
+the release script can assert the exact stale claim being corrected. Fix it
+in place like any other stale doc; leaving it risks a self-contradictory
+`CHANGELOG.md` once both fragments are assembled together. A review caught
+this only because it explicitly checked fragments outside the current PR's
+diff -- don't assume a `changelog.d/` file is out of scope just because this
+PR didn't author it.
+
+(`UCD-SERG/serocalculator#593` / `d-morrison/gha#304`/`#143`, 2026-07-25: the
+label-name fix round-tripped through a wrong "redocument the label" patch
+before the actual `@v1`→`@v2` pin bump was found; `gha#304`'s own review then
+caught two more stale `@v1` references in sibling docs pages and the
+contradicting pending changelog fragment, all in the same repo-wide sweep.)
+
+## A repository transfer redirects `pull` paths but NOT `issues` paths
+
+When a repo moves between owners (`d-morrison/gha` -> `Morrison-Lab/gha`),
+GitHub's redirect does not cover every path shape, and the split is not
+documented anywhere obvious.
+Measured directly after one such move:
+
+| Old-owner URL | Result |
+| --- | --- |
+| `.../gha` (repo root) | 301 -> new owner |
+| `.../gha/tree/main/examples` | 301 -> new owner |
+| `.../gha/blob/main/README.md` | 301 -> new owner |
+| `.../gha/pull/34` | 301 -> new owner |
+| `.../gha/issues/325` | **404** |
+
+The issues themselves are fine --- the same numbers return 200 under the new
+owner.
+Only the redirect is missing, so every prose link of the form
+`https://github.com/<old-owner>/<repo>/issues/N` becomes a hard 404 the
+moment the transfer completes.
+
+Two consequences worth knowing before diagnosing this:
+
+- **A link checker goes red repo-wide, on `main`, with no diff to blame.**
+  lychee's usual config accepts 301, so the redirecting links pass and only
+  the issue links fail.
+  Every open PR inherits the failure, which invites blaming whichever PR you
+  happen to be looking at.
+  Confirm by checking whether the failing files appear in the PR's own
+  changed-file list at all: a file the diff never touched cannot be the
+  cause.
+  An identical count of old-owner links on `main` and on the branch
+  corroborates it.
+- **Do not infer that the issues were lost.**
+  A 404 on the old owner says nothing about the new one.
+  Request the new-owner URL before concluding anything; the fix is usually a
+  plain rewrite rather than recreating or remapping anything.
+  (This exact inference was made, published in a review, and had to be
+  retracted --- gha#351, 2026-07-28.)
+
+`uses:` resolution is a separate question from link resolution and behaves
+differently again: Actions stopped resolving
+`uses: <old-owner>/<repo>/.github/workflows/x.yml@v2` after the same
+transfer, failing affected runs with `startup_failure` and **zero jobs**.
+Note that a run started shortly before the cutover can still succeed, so two
+attempts of the *same run* can disagree --- which is the cheapest available
+proof that the cause is environmental rather than in the diff.
+
+## `gh pr create` fails on a transferred repo whose `origin` still names the old owner
+
+The section above covers which paths a transfer redirects.
+This is a case where the redirect holds for `git` and not for `gh`: a checkout
+whose `origin` URL still carries the old owner pushes fine and then cannot open
+a PR.
+
+`git push`'s *exit status* is therefore useless as a control, because it
+succeeds.
+Git follows GitHub's transfer redirect, so the branch really does land on the
+new repo.
+The push *output* is not useless, though: pushing to the stale remote prints a
+`remote: This repository moved. Please use the new location: <new-url>` notice
+that names the canonical owner, so it is the earliest tell that `origin` is
+stale --- read it rather than the exit status.
+Miss that notice and the failure arrives only at PR creation:
+
+```
+GraphQL: Head sha can't be blank, Base sha can't be blank, Head repository
+can't be blank, No commits between Morrison-Lab:main and
+d-morrison:docs/customization-surface, Head ref must be a branch, not all refs
+are readable (createPullRequest)
+```
+
+Read that error's owner names, not its most legible clause.
+"No commits between `<base>` and `<head>`" describes a base-versus-head
+relationship, which sends you to check whether the push landed any commits ---
+the one thing that is definitely fine here.
+The actual finding is that the two sides carry **different owners**:
+`Morrison-Lab` for the base, which followed the transfer redirect, and
+`d-morrison` for the head, which tracked the stale `origin` URL.
+Five of that message's six clauses are downstream noise from the head repo not
+resolving.
+
+Pass the repo explicitly, with an explicit head and base:
+
+```bash
+gh pr create -R Morrison-Lab/wai --head <branch> --base main --title ... --body ...
+```
+
+Repointing `origin` at the new owner is the durable fix and was not tested
+here; `-R` unblocks the PR without mutating a checkout other sessions may be
+using.
+
+- **Do:** compare the two owner names inside a `No commits between` error
+  before concluding anything about commits.
+- **Do:** pass `-R <new-owner>/<repo>` with explicit `--head` and `--base` when
+  the remote still names the old owner.
+- **Do:** read `git push`'s output, not only its exit status: a `remote: This
+  repository moved` notice names the canonical owner and catches the stale
+  remote a step before `gh pr create` does.
+- **Don't:** read a successful `git push` as evidence that `gh` resolves the
+  same repo --- git follows the transfer redirect here and `gh pr create` does
+  not.
+- **Don't:** re-push, re-commit, or rebuild the branch in response to `No
+  commits between`; the commits are there, under a repository name `gh` is not
+  looking at.
+
+(`Morrison-Lab/wai`, 2026-08-04: `git remote get-url origin` returned
+`https://github.com/d-morrison/wai`, while `gh api repos/Morrison-Lab/wai`
+reported `Morrison-Lab/wai` and `gh api repos/d-morrison/wai` returned that
+same `full_name`, confirming the redirect.
+The push succeeded --- with a `remote: This repository moved` notice naming
+`https://github.com/Morrison-Lab/wai.git` as the new location --- `gh pr create`
+failed with the message above, and the `-R` form worked.
+The same repo recurred at PR #41 on 2026-08-05, with the identical push
+notice.)
+
+## `gh search code` is not a reliable way to enumerate consumers
+
+When a shared repo moves or cuts a breaking release, the question is which
+repos call it.
+Code search is the obvious instrument and it is **incomplete**: it silently
+omits repos whose content it has not indexed, and nothing in the response
+says so.
+
+Measured 2026-07-28, hunting callers of a renamed `d-morrison/gha` across ten
+owners: an owner-scoped `gh search code '"d-morrison/gha" user:...'` returned
+176 hits across 23 repos, and missed `d-morrison/altdoc`, a live consumer with
+four workflow files calling it.
+An exhaustive scan of all 947 non-archived repos found it immediately.
+
+So treat code search as a fast first pass, never as the census.
+The census enumerates repos and reads their workflow files:
+
+```bash
+LIMIT=1000
+for o in <owners>; do
+  # gh repo list works for users AND orgs; `gh api /orgs/$o/repos` 404s on a
+  # user account, so don't substitute it just to get --paginate.
+  n=$(gh repo list "$o" --limit "$LIMIT" --no-archived --json nameWithOwner \
+        --jq '.[].nameWithOwner' | tee -a repos.txt | wc -l)
+  [ "$n" -ge "$LIMIT" ] && echo "TRUNCATED: $o hit --limit $LIMIT; raise it" >&2
+done
+
+while read -r r; do
+  echo "$r" >> scanned.txt          # before any early exit, per fail-fast
+  files=$(gh api "/repos/$r/contents/.github/workflows" --jq '.[].path' 2>err.txt) || {
+    # 404 = no workflows dir, expected. Anything else is an error, not a miss.
+    grep -q '"status": "404"' err.txt || echo "ERROR: $r $(tr -d '\n' < err.txt)" >&2
+    continue
+  }
+  for f in $files; do
+    gh api "/repos/$r/contents/$f" -H "Accept: application/vnd.github.raw" \
+      | grep -q "<old-owner>/<repo>" && echo "$r $f"
+  done
+done < repos.txt
+
+echo "scanned $(wc -l < scanned.txt) of $(wc -l < repos.txt)"
+```
+
+Note what the error branch is for: a blanket `2>/dev/null` on those calls
+swallows the 403 secondary-rate-limit failures the next section describes
+alongside the 404s it is meant to hide, so a rate-limited run reports fewer
+hits rather than an error.
+That is the same false-all-clear
+[`fail-fast`](../shared/principles/fail-fast.md) covers, arriving in the very
+command written to prevent it.
+
+Three things that scan still misses, so state them rather than claiming a
+clean census:
+
+- **Non-default branches.** It reads each repo's default branch only, so an
+  open PR branch carrying the old reference is invisible.
+  Those self-heal on the branch's next `main` sync when the branch does not
+  itself touch the file, but they break the branch's CI until then.
+- **Paths outside `.github/workflows/`.** A composite action under
+  `.github/actions/*/action.yml` can carry its own `uses:`, and is missed by
+  a workflows-only glob.
+  Widen the path filter, or use the git-trees API to list every blob under
+  `.github/` in one call per repo.
+- **A local checkout is not evidence about the remote.**
+  `d-morrison/methods.paper` had four gha-calling workflows on disk, all on an
+  unmerged branch; the remote default branch had no `.github/workflows`
+  directory at all.
+
+## A secondary rate limit fires while `rate_limit` still reports headroom
+
+`gh api /rate_limit` reporting `core: 4936/5000` does **not** mean the next
+call will succeed.
+GitHub enforces a separate concurrency/abuse limit, and at `xargs -P 12`
+across a few thousand `contents` reads, `/repos/{owner}/{repo}` began
+returning 403 `API rate limit exceeded for user ID <n>` while the
+`rate_limit` endpoint went on reporting nearly the full core budget unspent.
+The two counters are not the same counter, so the cheap check does not
+predict the expensive one.
+
+Two practical consequences:
+
+- **Back off rather than retry.** Re-running the same fan-out at the same
+  concurrency reproduced it immediately; the limit cleared on its own after
+  roughly fifteen minutes.
+  Lower the parallelism (`-P 3` completed the remainder without incident)
+  rather than looping.
+- **Log coverage, not just hits.** A per-repo scan that exits early on a 403
+  records nothing for that repo, so the run reports fewer findings rather
+  than an error.
+  Print `scanned N of M` and diff the two lists, or a truncated sweep reads
+  exactly like a clean one.
+  (2026-07-28: a 947-repo scan reported 910 scanned; the 37-repo shortfall
+  was the whole signal that anything had gone wrong.)

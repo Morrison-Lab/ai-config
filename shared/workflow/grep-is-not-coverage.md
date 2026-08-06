@@ -69,6 +69,55 @@ for one spelling is not evidence the concept is absent".
 Read that rather than re-deriving them; this fragment is about the inference
 drawn from the null result, not about the query that produced it.
 
+## Searching the wrong corpus is the same error with no grep in it
+
+Everything above assumes a grep ran and came back empty.
+The failure that produces the same duplicate needs no grep at all: authoring a
+**repo-local** memory in one repo, on a subject the cross-repo corpus already
+covers, without ever searching that corpus.
+
+The scoping is what hides it, and it is structural rather than careless.
+Deciding where a learning belongs is a real step ---
+[`ums`](../../skills/ums/SKILL.md) step 2 routes each item either to ai-config
+or to the owning repo's own agent docs --- and once an item is routed to a repo
+we own, every later instruction reads as relative to *that* repo.
+Step 3's "grep the whole `memories/` directory" then means the destination's
+`memories/`, so the dupe check runs to completion, finds nothing, and never
+looked at ai-config at all.
+
+The asymmetry is why this needs naming separately from the null-result case.
+A repo-local memory in some other repo is precisely the place nobody thinks to
+check ai-config from, because the ai-config corpus is not what that session is
+working on.
+So the duplicate lands where the check is least likely to be re-run, and it can
+**contradict** the corpus rather than merely repeat it --- which is worse than
+an ordinary duplicate, since a reader who later finds both has no way to tell
+which one is current.
+
+- **Do:** grep the ai-config corpus as well as the destination repo's docs,
+  whenever step 2 routes an item anywhere other than ai-config.
+- **Do:** search by topic and filename there too --- a file named for the
+  subject settles it faster than any phrase.
+- **Don't:** treat the routing decision as narrowing which corpus to search; it
+  decides where the entry *lands*, not what already exists.
+- **Don't:** author a repo-local entry that contradicts the corpus on the
+  strength of never having looked.
+
+(2026-08-05: a `git worktree remove` refusal on a worktree containing a
+submodule was written into a `Lacaedemon/sparta` repo-local memory as `--force`
+"does not help", asserting that git "declines this case unconditionally".
+ai-config's own `memories/git-worktrees.md` --- a file named for that exact
+topic --- already read "Fix: `git worktree remove --force <path>` removes it
+cleanly", and had for some time.
+No grep ran against it, because the entry was being authored in a different
+repo.
+One search would have settled the question with no measurement needed at all;
+instead a reviewer had to challenge the claim and a measurement had to be taken
+to disprove it.
+The verification half of the same incident --- attempting the base form of a
+command and generalizing to a flag never passed --- is recorded separately in
+Morrison-Lab/ai-config#1174.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

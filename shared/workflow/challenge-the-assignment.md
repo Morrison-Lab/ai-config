@@ -1,5 +1,8 @@
 Question what you are asked to **do**, not only what you are told is **true**.
 
+Worked-example case records for the rules below live in
+[`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md), moved out of the auto-loaded context.
+
 The verification rules in this corpus all point at claims.
 A claim asserts something, so writing one or repeating one is an act that a
 rule can fire on.
@@ -163,22 +166,6 @@ written and rots nothing.
   is discretionary, and your brief carries the authority that argues against
   running it.
 
-(2026-08-04, this fragment's own subject: a brief asserted that `CLAUDE.md`
-carries a review-quota carve-out phrased as "`total_cost` 0 at `num_turns` 1",
-written from recollection and never queried.
-`grep -nE "total_cost|num_turns" CLAUDE.md` returns nothing, and
-`git grep -n 'total_cost` 0 at' -- '*.md'` returns exactly one hit,
-`shared/workflow/fully-clean.md:651`, which is where that carve-out actually
-lives.
-`CLAUDE.md`'s quota material is about a bot comment stating that the review
-was skipped for an exhausted quota --- a signal the bot posts, rather than an
-inference drawn from a zero cost.
-The receiving agent checked and pushed back, which is the discretionary
-detector working rather than a mechanism.
-The brief written to record this entry then repeated the shape at smaller
-scale, saying `CLAUDE.md` had "five quota mentions" where `grep -ci quota`
-returns 6 lines and `grep -oi quota | wc -l` returns 7 occurrences.)
-
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise
@@ -210,23 +197,3 @@ returns 6 lines and `grep -oi quota | wc -l` returns 7 occurrences.)
 - A companion rule on **posing** non-exclusive options as alternatives lives in
   [`avoid-false-dichotomies`](avoid-false-dichotomies.md); read that for the asking side and
   this for the answering side.
-
-(2026-07-30, `ucdavis/bcs`: that repo's `CLAUDE.md` asserts, as a section
-heading, "the SAS source is the spec".
-The maintainer's correction was that the SAS programs are a proposal rather
-than a specification.
-By then the assertion had been treated as background fact by several agents and
-had propagated into issues and briefs, which is the convention-document shape
-above: no single reader invented it, and each one found it corroborated.)
-
-(2026-07-31, this fragment's own brief: it named four areas as likely
-uncovered.
-Two --- a premise handed down as settled, and a default nobody chose --- had
-been closed hours earlier, both of them in
-[`metacognitive-monitoring`](metacognitive-monitoring.md): the unexamined
-default by ai-config#947, merged 06:28Z, and the handed premise by
-ai-config#955, merged 07:13Z.
-The brief also pointed at a checkout that was 37 commits behind `origin/main`,
-so every search run there would have understated coverage.
-The brief asked to be questioned, which is why this was caught; the general
-case is a brief that does not.)

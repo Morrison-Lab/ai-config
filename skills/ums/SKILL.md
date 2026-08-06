@@ -97,6 +97,13 @@ committed pass.
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
+   - **When step 2 routed the item to a repo other than ai-config, grep the
+     ai-config corpus too** -- "the whole `memories/` directory" above means
+     the *destination's*, so a repo-local entry can duplicate or contradict a
+     fragment nobody thought to search from that repo.
+     See
+     [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)'s
+     "Searching the wrong corpus is the same error with no grep in it".
    - Make the edit — concise bullet points, not prose
    - If updating a skill: the change should be specific enough that following
      the skill next time would avoid the mistake

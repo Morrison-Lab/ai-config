@@ -83,6 +83,46 @@ generic Actions-authoring and reusable-workflow material.
     commit workaround above should no longer be necessary for a plain
     `@claude review`/`/review` dispatch -- verify the fix landed before
     reaching for the workaround on a repo that might already have it.
+- **Attribute a `workflow_dispatch`-triggered review run by its prompt or
+  `pr-number` input, not its head branch.**
+  A `claude-code-review` run dispatched with a `pr-number` input records
+  `head_branch: <default-branch>` (the PR is an INPUT, not the run's head), so
+  `gh run list` shows it as `Claude Code Review | head=main@<sha>` and two
+  concurrent dispatched review runs on different PRs are indistinguishable by
+  head, which defeats a `--headBranch`-filtered `gh run list` selection.
+  To pin a dispatched run to its PR, read the run's own prompt (it embeds
+  `/code-review ... /pull/NNNN`) or its `pr-number` input rather than its head
+  branch.
+  This is the same records-against-default-branch quirk
+  `shared/workflow/fully-clean.md` documents for a `--commit`-filtered lookup,
+  applied to a `--headBranch`-filtered one instead.
+- **A stalled or hung `claude-review` job posts NO comment on the PR, so a
+  stall leaves no PR-timeline breadcrumb.**
+  Only the success path posts a `Claude finished review -- View run <url>`
+  comment, so a run that hangs before reaching that step is invisible from the
+  PR's own conversation and must be found through the run list
+  (`gh run list --workflow`), not the PR timeline.
+  The fix is tracked in Morrison-Lab/gha#424 (have the workflow post an early,
+  PR-anchored comment linking the dispatched run so a stall is visible and the
+  run is attributable up front).
+- **A `claude-review` run's `updated_at` can freeze mid-run, so it is not a
+  liveness signal.**
+  A dispatched `Morrison-Lab/gha` `claude-review` run can sit
+  `status: in_progress` with its run-object `updated_at` frozen for 10+ minutes
+  while it is genuinely working --- a real review runs ~13 min, costs real money
+  (~$28 for one three-sub-agent round), and only settles at the end.
+  Reading `updated_at` (or wall-clock time since it) as a liveness/stall signal
+  therefore produces a FALSE "stalled" conclusion.
+  Judge liveness from the job LOG's own timestamps (first line to `Cleaning up
+  orphan processes`) instead, per `shared/workflow/fully-clean.md`'s
+  "`status` itself can be stale, so never infer a job's duration from it" rule
+  --- this extends that rule from the check-run `status` field to the run-object
+  `updated_at` field.
+  (Morrison-Lab/ai-config#1194, 2026-08-06: run 31063429910 held
+  `updated_at=2026-08-06T01:41:25Z` for ~13 min and was misread as stalled ---
+  a false "stalled twice" claim was even published on Morrison-Lab/gha#362 and
+  had to be corrected --- then posted a complete $28.31 "Needs minor changes"
+  verdict from three parallel verify sub-agents.)
 - **A distinct stub-review signature: `is_error: false`, real `num_turns`/cost,
   but `permission_denials_count: 1` and no `Verdict` line.** (`permission_denials_count`
   is a field in the Claude Code SDK's runtime execution-output JSON, not

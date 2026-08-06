@@ -5,6 +5,9 @@ review --- repeating until the latest review is **fully clean**. Don't stop at
 "review-clean, just needs approval" and hand triage back; keep the cycle going
 until it's genuinely clean.
 
+Worked-example case records for the rules below live in
+[`ardi.cases.md`](ardi.cases.md), moved out of the auto-loaded context.
+
 **Continuously monitor every PR/MR you are actively working until it reaches
 that terminal state.**
 At every periodic check-in, and again after any push or
@@ -161,17 +164,6 @@ a prose diff the list is normally short enough to read in full.
 - **Don't:** keep an unintended change because the reasoning offered for it
   turned out to be good.
 
-(Morrison-Lab/ai-config#922, 2026-07-30: a replacement string written to add
-one block silently dropped the three `Do`/`Don't` bullets belonging to the
-entry above it, leaving that entry with prose and a case record but no
-labelled pair --- which `CLAUDE.md`'s "Record both the pattern and the
-anti-pattern" specifically asks for.
-`claude-review` returned Ready for merge, analysed all three deletions, and
-concluded they were "appropriate", reasoning that two restated surviving
-prose and the third was superseded.
-The third point was right and the other two were not; the bullets were
-restored, one reworded, and the deletion count fell from seven lines to two.)
-
 **When the edit is a regex or string patch rather than the Edit tool, two
 mechanisms turn that displacement into a silent over-deletion, and a self-check
 can wave both through.**
@@ -197,19 +189,6 @@ unchanged --- rather than that the changed element's count is as expected.
 - **Don't:** read "the assertions passed" as "the patch is correct"; a
   count-based check can pass by coincidental balance, and the `git diff`
   deletion-review is the real gate.
-
-(Morrison-Lab/ai-config#1167, round 12, 2026-08-05: a `re.sub` DOTALL patch to
-`scripts/check-pr-fully-clean.py`'s second `for r in reviews:` loop anchored on
-that same text, which also opens an earlier `author_latest_state` loop, so the
-match ran from the first occurrence and deleted both it and the intervening
-`for c in comments:` loop.
-The self-check `src.count('all_items.append(("review"') == 1` passed anyway,
-because the lost comment-append and the one added review-append balanced, and
-an `is_review_header == 0` check passed because both loops that used it were
-gone.
-Reading `git diff` before committing surfaced the deletion; the fix reverted
-and redid it with the Edit tool plus survival assertions, verified by a
-negative control.)
 
 **A clean verdict does not discharge the self-review against project
 conventions either, and the reviewer's own "not a finding" is where that
@@ -244,23 +223,6 @@ feel finished.
 - **Don't:** treat a non-blocking label as deciding whether an item gets
   checked at all.
 
-(Morrison-Lab/ai-config#965 at `b85941c`, 2026-07-31: a diagnostic block ran
-both `git merge-base --is-ancestor HEAD origin/main` and
-`git rev-list --count origin/main..HEAD`, where `CLAUDE.md`'s `wrap-up`-sweep
-section says verbatim to "resist adding an ancestry check beside the first of
-those", since the two confirm one thing twice rather than two things once.
-`claude-review` returned Ready for merge, called the pair "logically
-equivalent (both express `HEAD <= origin/main` in ancestry)", judged that
-"presenting both is reasonable as belt-and-suspenders for a diagnostic
-block", and closed the item "Not a finding"; a second reviewer comment
-returned Ready for merge at the same head.
-The same block's `--is-ancestor ... && echo "pure upstream history"` was
-graded the same way, although `address-every-comment`'s own ai-config#868
-case record already establishes that `--is-ancestor` exits 2 or higher on a
-pruned ref and `&&` fails on any non-zero status --- measured here, a bogus
-ref gives rc=128 and the two-arm form still reports "not ancestor".
-Both verdicts were wrong; fixed in `0c19d3c`.)
-
 **Proactively self-correct a technical claim you already told a reviewer,
 the moment further testing shows it was wrong --- don't wait for the
 reviewer to catch it.** If you stated a rationale (an approach is safe, a
@@ -291,10 +253,6 @@ periodic check-in on a PR you are babysitting, since the failure is silent
 and survives each round until something explicitly looks for it. This is the
 [`algorithmatize-checks`](algorithmatize-checks.md) rule applied to your own
 claims: two SHAs decide it exactly, so never substitute recollection.
-(d-morrison/altdoc#54, 2026-07-25: two review fixes were edited locally and a
-PR comment said they were "addressed in the latest push"; the head sat at the
-pre-fix commit for over an hour, with 14 green checks validating a branch
-carrying neither fix, until a scheduled check-in compared the SHAs.)
 
 **A SHA you put in a PR body or a reply must be read, never recalled --- and
 the PR body is where an invented one survives longest.**
@@ -337,14 +295,6 @@ casually, with nothing in the repository to contradict it.
 - **Don't:** expect review to catch it --- a reviewer has no reason to suspect
   a citation, and the body is not in the diff they are reading.
 
-(ai-config#871, 2026-07-30: the PR body credited a sentence-boundary fix to
-`1f79a4a`, which existed nowhere in the branch or the repository ---
-`git cat-file -e` returned `Not a valid object name`.
-The real commit was `fcb605f`.
-Two review rounds read that body without flagging it; it surfaced only when the
-body was re-read against the diff before declaring the PR ready, which is the
-`address-every-comment` check above doing work its own rule did not anticipate.)
-
 **The read side of that comparison can lag a push by a few seconds, so test
 the two *local* refs against each other before concluding anything failed.**
 The rule above is an
@@ -382,13 +332,6 @@ the remote branch already carries the commit.
   disagrees, and re-read rather than re-push when those two agree.
 - **Don't:** amend, force-push, or re-commit on the strength of an API SHA
   alone.
-
-(Morrison-Lab/ai-config#845, 2026-07-29: `git rev-parse HEAD` and
-`git rev-parse origin/<branch>` both read `9a3e722` and `git push` said
-`Everything up-to-date`, while `gh pr view --json headRefOid` still returned
-the prior commit `4bf5063`.
-`pull_request_read` `get` returned `9a3e722` moments later, so the two
-surfaces disagreed and the git-native one was right.)
 
 **A brand-new branch can read back at the wrong commit, so the local two-ref
 comparison above is not sufficient there.**
@@ -479,22 +422,6 @@ local ref rather than at the network.
   re-checking the base branch argument before checking where the head ref
   actually points.
 
-(Morrison-Lab/ai-config#985, 2026-07-31:
-`git push -u origin ums/prose-count-adjacent-to-block`, carrying commit
-`1611ccc`, printed `* [new branch]`, set the upstream, and exited 0.
-`git ls-remote` showed that ref at `98102a2`, which was `main`'s tip.
-The local `origin/ums/prose-count-adjacent-to-block` agreed with the wrong
-value, so the two-ref comparison reported the push as landed.
-`create_pull_request` then returned a 422 reading
-`No commits between main and ums/prose-count-adjacent-to-block`.
-`git push origin HEAD:refs/heads/ums/prose-count-adjacent-to-block` reported
-`98102a2..1611ccc`.
-Neither `git rev-parse ums/prose-count-adjacent-to-block` nor a second plain
-`git ls-remote` was run, so the branch ref's own value at push time is the
-fact the record is missing.
-Describing that push as "carrying commit `1611ccc`" was an inference from the
-commit just made, not a reading of the ref that was pushed.)
-
 **The same false claim arrives as *incoming* state when you pick a PR up
 mid-flight, and there the SHA comparison usually has nothing to compare.**
 The bullet above governs a claim you are about to make.
@@ -530,17 +457,6 @@ redundant.
 - **Don't:** treat green CI as evidence that a claimed fix landed.
 - **Don't:** infer that a finding is stale because a comment says it was
   addressed.
-
-(Morrison-Lab/ai-config#804, 2026-07-29: the PR's own review workflow posted
-"Three fixes landed in two commits", naming `bootstrap.sh`, `validate.yml`,
-and `validate-skills.py`.
-The head was still the original commit plus a `main` merge, and
-`gh pr diff --name-only` returned four paths, none of them those three.
-All ten checks were green, because `validate` did not yet check out the
-submodule the fixes were about.
-This is the ownerless cousin of the parallel-session case in
-[`claim-pr`](claim-pr.md), which assumes a real commit exists to cross-check;
-here there was none.)
 
 **Run that same command before *any* readiness claim, not only against an
 inherited one --- a PR whose branch carries no implementation is green on
@@ -578,13 +494,6 @@ by an empty diff, since neither has a term about content.
   implementation, and both give the branch a plausible history.
 - **Don't:** read all-green CI plus a finding-free review as evidence a PR
   contains anything; on an empty diff that is the expected result.
-
-(2026-07-30/31, a `ucdavis/bcs` session: a PR was reported `CLEAN` with every
-check passing, on a branch holding the empty claim commit plus a `main` merge
-and nothing else.
-Nothing had gone wrong with any instrument.
-The implementation had never been pushed, and no check, no reviewer, and no
-rule in this file was asking whether there was one.)
 
 **When the change affects downstream consumers, validate it against a real
 consumer repo before reporting the PR ready --- a package's own test
@@ -646,12 +555,6 @@ single 403) is evidence the thing is not *already set up*, not evidence
 it cannot be.
 When a blocker you published turns out to be false, correct it where it
 was published, not only in the thread that surfaced it.
-(d-morrison/altdoc#76, 2026-07-27: the PR body said roxygen2 8.0.0 --- the
-version `DESCRIPTION` pins --- was unavailable, inferred from one failed
-`packageVersion()` call with no install attempted. The review built a
-"this may need a follow-up" recommendation on top of it. A single
-`install.packages()` disproved it, and the regeneration landed in the same
-round the finding did.)
 
 **Attempting the base form of a command is not attempting its variants ---
 a refusal describes the invocation you ran, never the flag you did not try.**
@@ -683,22 +586,6 @@ that turns "the command refused" into "the operation cannot be done".
   passed.
 - **Don't:** count an attempt at the base form as discharging the rule above
   for a variant of it.
-
-(2026-08-05, `Morrison-Lab/ai-config`: `git worktree remove <path>` on a
-worktree holding a checked-out submodule failed with `fatal: working trees
-containing submodules cannot be moved or removed`, and a memory entry was
-written asserting that `--force` "does not help" and that git "declines this
-case unconditionally".
-`--force` had never been run.
-A reviewer challenged it against git's own documentation, which says
-"Unclean worktrees or ones with submodules can be removed with `--force`".
-Measured on git 2.37.2.windows.2: the plain form exits 128, while
-`git worktree remove --force <path>` exits 0, deletes the directory, and
-deregisters the worktree.
-The wording was genuinely unconditional for `git worktree move`, which is the
-half-truth that made it survive re-reading.
-[`memories/git-worktrees.md`](../../memories/git-worktrees.md) now records the
-working form.)
 
 **Name the specific gate when you report a blocker, not a category word that
 happens to be one of several.**
@@ -737,12 +624,6 @@ stays correct even when your model of the platform is not.
 - **Don't:** use one mechanism's own name as a generic word for its category.
 - **Don't:** treat having verified *that* something is blocked as having
   verified *why*.
-
-(2026-08-01, `Morrison-Lab/ai-config` worked from a `d-morrison`-scoped
-session: an unresolvable review thread was reported as blocked "for scope
-reasons" across roughly six status updates, while the failure actually
-observed under that spelling was the node-versus-declared-string comparison.
-`memories/github-mcp-tools.md` records both gates and their verbatim errors.)
 
 **When the blocker is a hang, inspect the process rather than re-guessing
 what it is waiting on.**
@@ -791,19 +672,6 @@ instant, and running an interactive one to see what it does is the failure
 [`growth-mindset`](growth-mindset.md)'s "A timeout bounds how long you wait"
 section covers.
 
-(2026-08-02, `Morrison-Lab/ai-config#1056`: a claim that `claude setup-token`
-"needs a TTY" was written into a skill without measurement, then replaced
-with "it hangs when non-interactive" on the strength of a probe that returned
-exit 142 and no output.
-Both were guesses, and the second read as the correction of the first.
-`ps -o pid=,stat= -p <pid>` then reported `S` -- alive and blocked -- *after*
-the browser authorization had completed, and `lsof -p <pid> -a -d 0` showed
-fd 0 as a unix socket rather than a terminal.
-So the gate is a post-authorize read on stdin, not a startup capability
-check, and the same claim was wrong three times in one session before anyone
-measured it.
-Recorded in [`memories/claude-code.md`](../../memories/claude-code.md).)
-
 **A blocker that was true when you published it can stop being true while
 the PR is open, and withdrawing it is your job, not the reviewer's.**
 The verify-a-blocker bullet above covers a blocker that was never true, and
@@ -823,16 +691,6 @@ withdrawn rather than quietly deleting the sentence.
 A reader who saw the original needs to know it was retested, not be left
 wondering whether it was ever true.
 
-(ai-config#774, 2026-07-28: the PR body said four `adv-r.hadley.nz` anchors
-could not be verified because the host was egress-blocked, which was
-accurate when written.
-The host was unblocked mid-session, and all 16 URLs then verified 200 with
-every anchor resolving.
-The review had already absorbed the caveat --- it listed those anchors as
-"unverified per the PR body's own caveat ... not a new finding" --- so
-leaving it would have shipped a limitation that no longer existed, blessed
-by a reviewer who could not have known.)
-
 
 A `main` merge is one moment that must fire this check, because it can falsify
 one of your own hedges without producing a conflict in the file that carries it.
@@ -851,14 +709,6 @@ where the stale caveat lives.
 - **Don't:** assume a hedge survived because the file that contained it merged
   without conflicts, or because literal grep missed a phrase split across
   semantic lines.
-
-(Morrison-Lab/ai-config#981: its fragment said ai-config#959 was still open as
-of 2026-07-31 and that, once merged, the fragment would live at
-`shared/workflow/flag-practice-slippage.md`.
-PR #959 merged at 2026-07-31T16:24:34Z, and commit `df243ee9` merged `main` into
-PR #981 on 2026-08-01, pulling in that very file.
-The merge conflict was in `CLAUDE.md`, so the cleanly merged fragment was not
-re-read, and a reviewer caught the stale hedge afterward.)
 
 **Landing a fix falsifies whatever prose documented the defect, and that prose
 is never in your diff --- so grep for it rather than expecting to be reminded.**
@@ -904,18 +754,6 @@ Two shapes, and the second is worse because it was never true.
 - **Don't:** leave a doc asserting conformance to a reference standing when the
   code diverges; correct the claim in the same change that establishes the
   divergence.
-
-(`ucdavis/bcs#534`, 2026-07-30/31: standardizing a G-computation CIF over the
-observed age distribution falsified two documents at once.
-`compute_gcomp_cif_ab507bs()`'s roxygen had read "this function follows the SAS
-pipeline's plug-in-at-the-mean approach", which the SAS program does not do ---
-false before the fix, and quoted by the fix's own changelog entry as such.
-A row in `inst/docs/program_steps.qmd` described the retired behaviour and was
-refreshed in a separate commit.
-Concurrently, ai-config#951 diff-scoped `scripts/semantic-line-breaks.py`, which
-falsified `memories/tools.md`'s entry prescribing "format new prose by hand" as
-the workaround; that entry was kept and marked `**Fixed in ai-config#951.**`,
-which is the first shape handled correctly.)
 
 **An instruction's own suggested code is not exempt from the
 project-conventions self-review above.**
@@ -968,11 +806,6 @@ flag), so a reviewer skimming the diff has nothing to catch, and the
 failure surfaces only in a consumer's published site.
 Name the setting you are relying on, and check its actual default before
 writing the branch.
-(d-morrison/altdoc#78, 2026-07-27: a generator-to-extension map gave mkdocs
-`.html`, reasoning that mkdocs compiles Markdown to HTML. Its
-`use_directory_urls` default is `TRUE`, so it serves `/man/foo/` and never
-`/man/foo.html` --- every reference link the feature emitted for that
-generator would have 404'd. Caught in review, not by the 39 tests.)
 
 **A regression test written alongside a fix can lock the bug in rather than
 catch it --- assert the two paths that diverge, not the one you just
@@ -995,13 +828,6 @@ Either side alone is unfalsifiable, since the case that reveals the bug is
 the *comparison*.
 Then prove it: revert the fix and confirm the new test actually fails.
 A regression test never seen to fail is a guess about what it covers.
-(d-morrison/altdoc#78, 2026-07-27: twice.
-A `.pdf` vignette test asserted
-the entry's extension but never its label, so an extension leaking into the
-label passed; and a nested-article test built no source tree, so top-level
-and nested resolved identically and a nested-only title bug was pinned as
-expected output.
-Both were found by review reading the test, not the code.)
 
 **A systematic audit done by skimming is worse than the one-at-a-time
 version it replaces.**
@@ -1019,11 +845,6 @@ Concretely: when the thing being audited is a function, grep for the
 function, not for a pattern in its file --- a file with several functions
 will hand you the first match, which is often not the one you mean.
 Name the function in whatever you write down, so the claim stays checkable.
-(d-morrison/altdoc#78, 2026-07-27: a commit written to get ahead of a
-one-finding-per-round loop claimed mkdocs' sidebar matched only `\.md`.
-It matches `\.md$|\.pdf$`; the grep had returned a different function 120
-lines above the sidebar builder in the same file.
-Caught by the very next review round.)
 
 **Adding an explanation supersedes whatever the file already said about the
 same thing, so re-read the older passage --- your own diff is the likeliest
@@ -1049,10 +870,6 @@ When the older passage recorded a *different* session's observation, correct
 it with reasoning that stands on its own rather than restating it as though
 you had seen it --- an inference presented as an observation is the same
 defect one level up.
-(ai-config#770, 2026-07-28: an added explanation established that seven
-reported orphans were misclassifications, while the note two lines below went
-on calling them "already deleted from the repo."
-Caught by review, in the same hunk as the text that contradicted it.)
 
 **The same rule applies within a single diff, and there nothing prompts the
 check at all.**
@@ -1073,11 +890,6 @@ watch, since it pins the argument to wording the same commit may be deleting.
 Prefer stating the anti-pattern directly over citing another section as the
 thing being argued against; a self-contained sentence cannot go stale when its
 neighbour changes.
-(ai-config#801, 2026-07-28: a new UMS entry argued against the `/clear`
-section's "disclose the owed pass in the flag" line while the same PR rewrote
-that line to say the opposite.
-Review caught it before merge; the fix was to drop the cross-reference and
-state the point inline.)
 
 **And when the explanation you add is a *mechanism* claim, test the class it
 distinguishes, not just the sample in front of you.**
@@ -1131,14 +943,6 @@ one a reader can act on.
 - **Don't:** carry such a claim into an issue or a decision doc, where it
   argues against the very fix that produced the silence.
 
-(ai-config#827, 2026-07-29: the Jules AI reviewer approved a diff carrying
-both of its known false-positive triggers, and the first explanation
-drafted was that the false positives are nondeterministic.
-ai-config#817 had in fact merged an `extra_instructions` fix at
-`21:30:51Z`, between #820's block at `19:43` and #827's approve at `22:51`.
-The nondeterminism claim was about to be posted to gha#366 as evidence,
-where it would have argued against porting the fix that actually worked.)
-
 **Verify a command, path, or flag *you* write into a doc, with the same rigor
 [`address-every-comment`](address-every-comment.md) demands for one a reviewer
 suggests.**
@@ -1170,15 +974,6 @@ evidence instead of the assertion.
 - **Don't:** treat a literal as exempt because the prose around it is
   well-sourced --- the literal is the part a reader executes.
 
-(Morrison-Lab/ai-config#834, 2026-07-29: a `GET_LABEL` registry row shipped
-`gh label view <name>`, which does not exist --- cli/cli's
-`pkg/cmd/label/label.go` registers `list`, `create`, `clone`, `edit`,
-`delete`.
-Caught by review, in the same file where the previous round had declined to
-extend an untested claim from `gh issue create --label` to `gh issue edit`.
-The reviewer's own enumeration of the real subcommands also missed `clone`,
-which is why the fix cited the registration list rather than the finding.)
-
 **Run that check over your own fix, too --- the remedy for an unverified
 literal is where the next unverified literal goes.**
 The rule above fires when you notice you are writing a literal.
@@ -1205,15 +1000,6 @@ twice over.
   since that is the only place the near-miss is visible.
 - **Don't:** treat the effort of writing a correction as evidence the
   correction is verified.
-
-(Morrison-Lab/ai-config#929, 2026-07-30: a review found `--failed`
-documented from recollection.
-The fix quoted `gh run rerun --help` correctly and anchored it to "`gh`
-2.83.0" --- a version invented in the same breath, where `gh --version`
-reported `2.96.0`.
-Caught before committing only by running this rule against the fix, which is
-the entire mechanism; the round-2 review confirmed the corrected text and
-would have confirmed the wrong version just as readily.)
 
 **When regenerating a generated tree makes it most of the diff, say so in the
 PR body --- otherwise a reviewer reads it as pollution and blocks.**
@@ -1329,26 +1115,3 @@ claim, and its remedy applies: check the population --- every step of the job
 - **Don't:** substitute a production script's exit code for its test file.
 - **Don't:** infer a job's behaviour from one step's label --- "(advisory)"
   describes that step, not the job.
-
-(Morrison-Lab/ai-config#1067, 2026-08-02: a UMS pass took `memories/git.md`
-from 1172 to 1315 lines.
-`scripts/check-memory-file-size.py` exits 0 and its `validate.yml` step is
-labelled advisory, both genuinely so, and the threshold was therefore reported
-as non-blocking on #1007.
-`scripts/test_check_memory_file_size.py` asserts this repo's own `memories/`
-are under the default and hard-fails, turning `validate` red on the next push.
-The claim had to be retracted on #1007 as well as fixed in the PR.)
-
-(d-morrison/altdoc#95 and #96, 2026-07-29: twice in one session.
-On #95 a test asserting "aborts when no venv is configured" read that
-precondition from the ambient environment; the local run missed it because
-`NOT_CRAN` was unset and `skip_on_cran()` skipped that very test, and
-Windows R-CMD-check caught it.
-On #96 `test-llms_txt.R` asserted non-recursive discovery for `docsify` ---
-the exact behaviour the PR changed, with a comment stating the now-false
-rationale --- and was not among the files run locally, even though
-`.llms_txt_vignettes()` was one of the functions edited.
-Windows caught that one too.
-The subsequent full-suite run was itself misleading in the opposite
-direction: run *with* an env var CI does not set, it reported two failures
-belonging to the sibling PR.)

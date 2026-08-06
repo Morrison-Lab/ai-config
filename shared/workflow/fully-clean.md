@@ -144,7 +144,7 @@ Worked-example case records for the rules below live in
    `gh pr checks` filters by check-suite app, whether it reflects only the
    required or branch-protection set, and whether an `in_progress` app check
    is omitted until it completes.
-   The counts in the case record below happen to embarrass all three, which is
+   The counts in the #1056 case record happen to embarrass all three, which is
    a reason not to adopt any of them rather than a reason to keep looking:
    naming a mechanism that has survived one round of disconfirmation is still
    guessing, and it is the exact failure several later sections of this file

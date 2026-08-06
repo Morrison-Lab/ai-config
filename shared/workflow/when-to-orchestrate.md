@@ -70,6 +70,21 @@ So read a below-the-bar verdict as "do it here, delegating whatever does not
 block the edit in front of you", rather than as a reason to work a parallel
 track serially.
 
+## The third primitive: agent teams
+
+This fragment governs the `Workflow` tool, and the section above distinguishes
+it from a single `Agent` call.
+There is a third parallelism primitive it does not cover: an **agent team** ---
+several separate Claude Code sessions that message each other through a shared
+task list, rather than only reporting back.
+It is the right choice when the workers must *communicate with each other* or a
+human wants to steer individual workers mid-run --- neither of which a
+`Workflow` sweep can do.
+But a team is experimental, off by default, and spawned by the user
+interactively, so a session can only *recommend* one, never form one.
+See [`agent-teams`](agent-teams.md) for the three-way decision and the
+never-assume-it-is-available caveat.
+
 ## What "propose" looks like in practice
 
 Estimate the fan-out from the target count: roughly one agent per target for a

@@ -78,37 +78,42 @@ def main() -> int:
     # Test 1: Clean review comment returns True
     mock_clean_data = json.dumps({"comments": [clean_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_clean_data):
-        clean_ok, clean_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        clean_ok, clean_issues = checker.check_review_comments("1167", "sha123")
         check("clean review comment passes check_review_comments", clean_ok and clean_issues == [])
 
     # Test 2: Findings review comment returns False
     mock_findings_data = json.dumps({"comments": [findings_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_findings_data):
-        findings_ok, findings_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        findings_ok, findings_issues = checker.check_review_comments("1167", "sha123")
         check("findings review comment fails check_review_comments", not findings_ok and len(findings_issues) > 0)
 
     # Test 3: Formal review with empty comments list and CHANGES_REQUESTED state fails
     mock_formal_review_data = json.dumps({"comments": [], "reviews": [formal_changes_requested_review]})
     with patch.object(checker, "run_cmd", return_value=mock_formal_review_data):
-        formal_ok, formal_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        formal_ok, formal_issues = checker.check_review_comments("1167", "sha123")
         check("formal CHANGES_REQUESTED review with empty comments fails check_review_comments", not formal_ok and len(formal_issues) > 0)
 
     # Test 4: Review with 'No major changes requested' passes check_review_comments
     mock_no_major_data = json.dumps({"comments": [no_major_changes_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_no_major_data):
-        no_major_ok, no_major_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        no_major_ok, no_major_issues = checker.check_review_comments("1167", "sha123")
         check("review with 'No major changes requested' passes check_review_comments", no_major_ok and no_major_issues == [])
 
-    # Test 5: Payload with None author in reviews does not raise exception
+    # Test 5: Payload with None author in reviews does not raise (reaching the
+    # check at all proves no exception), and a None-author review is NOT admitted
+    # as automated -- author identity, not the bot-looking body, is what qualifies
+    # a review as automated (round 12). A deleted-account (None-author) review
+    # cannot be confirmed automated, so it fails criterion 2 (fail-closed).
     mock_none_author_data = json.dumps({"comments": [], "reviews": [none_author_review]})
     with patch.object(checker, "run_cmd", return_value=mock_none_author_data):
-        none_author_ok, none_author_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
-        check("payload with None author handles safely", none_author_ok and none_author_issues == [])
+        none_author_ok, none_author_issues = checker.check_review_comments("1167", "sha123")
+        check("None-author review handled safely and not admitted as automated",
+              (not none_author_ok) and any("No automated review" in i for i in none_author_issues))
 
     # Test 6: Plain human APPROVED review without bot review fails criterion 2
     mock_human_data = json.dumps({"comments": [], "reviews": [human_approved_review]})
     with patch.object(checker, "run_cmd", return_value=mock_human_data):
-        human_ok, human_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        human_ok, human_issues = checker.check_review_comments("1167", "sha123")
         check("human APPROVED review without bot review fails criterion 2", not human_ok and any("No automated review" in i for i in human_issues))
 
     # Regression: a stale review posted AFTER the commit, carrying a marker
@@ -116,13 +121,49 @@ def main() -> int:
     # HEAD (the fail-open timing-race guarded by fully-clean.md). It is a slow
     # review of an earlier commit landing after a newer push.
     stale_no_sha_comment = {
-        "createdAt": "2026-08-05T18:30:00Z",  # well after commit_date
+        "createdAt": "2026-08-05T18:30:00Z",  # posted after the commit, references no HEAD SHA
         "body": "### \ud83e\udd16 Antigravity Agent Report\n\nAnalysis of an older commit.\n\nVerdict: Clean / Ready for merge."
     }
     mock_stale_data = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_stale_data):
-        stale_ok, stale_issues = checker.check_review_comments("1167", "sha123", "2026-08-05T18:12:00Z")
+        stale_ok, stale_issues = checker.check_review_comments("1167", "sha123")
         check("stale review not referencing HEAD SHA is rejected (fail-closed)", (not stale_ok) and len(stale_issues) > 0)
+
+    # Regression (round 12): a plain human formal review whose body merely
+    # contains an automated-review marker phrase ("verdict:", "code review", ...)
+    # must NOT satisfy criterion 2 on its own. Reviews carry a real commit.oid, so
+    # once admitted they attribute to HEAD with no body check -- admission must
+    # therefore key on author identity, never body content. Two independent
+    # phrasings, both colliding with a marker, from a non-bot author.
+    human_marker_verdict = {
+        "submittedAt": "2026-08-05T18:14:14Z",
+        "body": "My verdict: this looks great, ship it!",
+        "state": "COMMENTED",
+        "author": {"login": "d-morrison"},
+        "commit": {"oid": "sha123"},
+    }
+    mock_hmv = json.dumps({"comments": [], "reviews": [human_marker_verdict]})
+    with patch.object(checker, "run_cmd", return_value=mock_hmv):
+        hmv_ok, hmv_issues = checker.check_review_comments("1167", "sha123")
+        check(
+            "human review whose body contains 'verdict:' does not satisfy criterion 2",
+            (not hmv_ok) and any("No automated review" in i for i in hmv_issues),
+        )
+
+    human_marker_codereview = {
+        "submittedAt": "2026-08-05T18:14:14Z",
+        "body": "Thanks for the code review process improvements here, LGTM overall.",
+        "state": "APPROVED",
+        "author": {"login": "d-morrison"},
+        "commit": {"oid": "sha123"},
+    }
+    mock_hmc = json.dumps({"comments": [], "reviews": [human_marker_codereview]})
+    with patch.object(checker, "run_cmd", return_value=mock_hmc):
+        hmc_ok, hmc_issues = checker.check_review_comments("1167", "sha123")
+        check(
+            "human APPROVED review whose body contains 'code review' does not satisfy criterion 2",
+            (not hmc_ok) and any("No automated review" in i for i in hmc_issues),
+        )
 
     # Test 6: CI check runs filtering
     mock_ci_success = json.dumps({

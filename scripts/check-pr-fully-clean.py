@@ -10,12 +10,11 @@ Exit codes:
 0: Fully clean (safe to end ARDI loop)
 1: Not clean (in-progress checks, failing checks, missing review, or findings present)
 """
-from datetime import datetime
 import json
 import re
 import subprocess
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 
 def run_cmd(cmd: List[str]) -> str:
@@ -23,15 +22,6 @@ def run_cmd(cmd: List[str]) -> str:
     if res.returncode != 0:
         raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr}")
     return res.stdout.strip()
-
-
-def parse_iso_time(ts: str) -> Optional[datetime]:
-    if not ts:
-        return None
-    try:
-        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    except ValueError:
-        return None
 
 
 def get_pr_info(pr_num: str) -> Tuple[str, str, str, str, str]:
@@ -69,7 +59,7 @@ def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
-def check_review_comments(pr_num: str, sha: str, commit_date: str, review_decision: str = "") -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--json", "comments,reviews"])
     data = json.loads(out)
 
@@ -112,16 +102,20 @@ def check_review_comments(pr_num: str, sha: str, commit_date: str, review_decisi
 
     for r in reviews:
         body = r.get("body", "")
-        body_lower = body.lower()
         commit_oid = r.get("commit", {}).get("oid", "")
         state = r.get("state", "").upper()
         submitted_at = r.get("submittedAt", "")
         author_login = (r.get("author") or {}).get("login", "")
-        is_bot_author = author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
-        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict:"))
-
-        # Scope review collection to automated bot reviews OR blocking CHANGES_REQUESTED/REJECTED states
-        if is_bot_author or is_review_header or state in ("CHANGES_REQUESTED", "REJECTED"):
+        # A formal review carries a real commit.oid, so admitting one attributes
+        # it to HEAD with no body-content check. Scope admission to automated bot
+        # authors only -- never sniff body text, which a human review can
+        # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
+        # from any author.
+        is_bot_author = (
+            author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+            or author_login.endswith("[bot]")
+        )
+        if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state))
 
     if not all_items:
@@ -209,7 +203,7 @@ def main():
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha)
-    review_ok, review_issues = check_review_comments(pr_num, sha, commit_date, review_decision)
+    review_ok, review_issues = check_review_comments(pr_num, sha, review_decision)
 
     all_issues = ci_issues + review_issues
 

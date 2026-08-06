@@ -417,11 +417,13 @@ In every session — at session start, and again periodically during long sessio
    And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
    Say so rather than reporting the guards as live.
    **Run `check-install.py --fix` first, so the scripts are on disk before anything binds to them.**
-   `install-hooks.py` only writes `settings.json`; it never places a file, and it does not check that the script it is registering exists.
+   `install-hooks.py` only writes `settings.json`.
+   It never places a file, and it does not check that the script it is registering exists.
    Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.
    `--fix` prints the note naming this division of labour only when run *without* `--fix`, so the run that causes the damage is the one that stays silent about it.
    **Point 1 governs this instrument too, and its stale run is the more dangerous of the two.**
-   A stale `check-install.py` run reports suspect numbers; a stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
+   A stale `check-install.py` run reports suspect numbers.
+   A stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
    Pull first, then measure, and treat the examined count as the thing to read: it is the manifest's size, so a number below the current hook count means the checkout is behind rather than the machine being clean.
    - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
    - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`

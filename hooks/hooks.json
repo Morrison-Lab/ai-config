@@ -67,6 +67,38 @@
               "_comment and README): the plugin loads it on enable, and",
               "install-hooks.py --fix registers it for a non-plugin install."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-both-sides-from-git.py\"",
+            "timeout": 10,
+            "script": "remind-both-sides-from-git.py",
+            "why": "ai-config#1185, an incident of 2026-08-05. A ucdavis/bcs session ran `git show d1dd05e3^:inst/extdata/ett-validation-true-effects.rds > /tmp/te-old.rds` and compared it against the WORKING TREE copy of that same path. The branch did not contain the merge in question, so both operands were the same blob, `identical()` returned TRUE, and the session concluded the opposite of the truth -- then published it to an issue, retracted a correct earlier finding on it, and closed a second issue as invalid. All three had to be corrected. Only one operand of that comparison names a revision; the other is whatever the checkout happens to hold.",
+            "_note_warns_never_blocks": [
+              "UserPromptSubmit, inject-only, for the same reason as the",
+              "reminders above: it can only ADD context, and no code path in it",
+              "suppresses, delays, or alters a message.",
+              "",
+              "Blocking was rejected on the merits rather than by analogy.",
+              "Comparing a committed blob against the working tree is",
+              "frequently CORRECT -- checking whether your own uncommitted edit",
+              "changed something is exactly that comparison. What separates the",
+              "hazard from the correct use is what the comparison is used to",
+              "CLAIM, which is not observable from the commands. A blocking",
+              "guard would therefore misfire on every legitimate",
+              "did-my-edit-change-anything check, and per README a hook that",
+              "misfires is worse than a missing one.",
+              "",
+              "Sibling of remind-deserialize-before-binary-claim.py, and it",
+              "covers a hole in that one rather than overlapping it. That guard",
+              "fires when NOTHING deserialized the artifact; its discharge is a",
+              "deserialization naming that path. The broken comparison above",
+              "SATISFIES that discharge, because a readRDS of the path did run.",
+              "Verified rather than assumed: that hook, run against a transcript",
+              "of this incident, produces no output. That one asks whether the",
+              "check happened; this one asks whether it compared the right two",
+              "things."
+            ]
           }
         ]
       }

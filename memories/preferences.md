@@ -73,7 +73,8 @@
   The review loop only reached zero new comments once every claim got the same live-query treatment, rather than being pattern-matched as "probably right" or "probably just noise" this many rounds in.)
 - When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
   **Except in `Morrison-Lab/ai-config`, which never requests `d-morrison` at all** --- not on PR creation, and not as a deadlock escalation, which goes to the user in chat as a boxed `🛑 BLOCKER` instead of to a review request.
-  The exception is scoped to that one repo; requesting `d-morrison` everywhere else is unchanged.
+  The exception is scoped to that one repo.
+  Requesting `d-morrison` everywhere else is unchanged.
   See [`request-pr-review`](../skills/request-pr-review/SKILL.md)'s Scope section for the full statement.
   (User directive, 2026-08-05: "cai: stop requesting reviews from d-morrison in this repo".)
 - Before dispatching an expensive external action from committed source -- for
@@ -119,7 +120,7 @@
   Two gotchas when checking CI state: the field names/casing for these states vary by API surface (REST's lowercase `status`/`conclusion` vs `gh pr checks`'s uppercase `state`) --- don't hard-code one casing when scripting a check; and a workflow run blocked on `action_required` before any job starts can complete with zero check runs, invisible to a check-runs-only poll (`gh pr checks`, `get_check_runs`) --- and, verified directly against a real run, GitHub records NEITHER a matching commit/branch NOR a populated PR-linkage field for comment/dispatch-triggered runs, so no single `gh run list` filter reliably narrows to "runs for this PR" --- treat any such cross-check as best-effort, not exhaustive.
   See `shared/workflow/fully-clean.md` for the full detail.
   At fully-clean, every INLINE review thread is resolved, and the only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply to it).
-- If you and the reviewer(s) can't reach consensus on an item (rebuttal exchanged, neither side budging), escalate to a HUMAN reviewer for the final decision --- request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the impasse.
+- If you and the reviewer(s) can't reach consensus on an item (rebuttal exchanged, neither side budging), escalate to a HUMAN reviewer for the final decision --- request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`; on `Morrison-Lab/ai-config` the skill requests nobody and the deadlock goes to the user in chat as a boxed `🛑 BLOCKER` instead) and `@`-mention them with the impasse.
   Don't loop forever and don't unilaterally override.
 - After creating a PR in a remote/web session (where PR-activity subscription is available), always subscribe to its CI/review activity (`subscribe_pr_activity`) and follow through --- autofix CI failures and address review comments per the ARD framework --- without asking first.
   Keep following until the PR is merged or closed (or I say stop).
@@ -664,7 +665,8 @@
 
 - When a request matches "add/build/create a skill" (skill-builder's own trigger phrases), invoke the `skill-builder` skill via the Skill tool rather than freehand-implementing the scaffold-and-ship flow.
   Skill-builder encodes steps that are easy to skip when done ad hoc: the extend-first check, running the four local validation scripts (`validate-skills.py`, `check-links.py`, `check-vendored-drift.py`, `markdownlint-cli2`) before pushing, registering any cited MCP tool in `tool-mappings.yml`, updating `skills.qmd`'s count from the actual `skills/` directory count (not a manual +1), and cross-linking related skills.
-  (Learned on ai-config#338 --- the `prompt-me`/`pm` skill was built and shipped without invoking `skill-builder`, so none of those steps ran; CI happened to catch what the scripts would have.
+  (Learned on ai-config#338 --- the `prompt-me`/`pm` skill was built and shipped without invoking `skill-builder`, so none of those steps ran.
+  CI happened to catch what the scripts would have.
   Reinforced on ai-config#347 --- `resolve-pr-threads` was hand-authored and needed a review round to catch a `tool-mappings.yml` gap `skill-builder` already documented from a near-identical miss in `push-memory` #311.)
 - Claim a PR before pushing iterative commits to it, even when you opened the PR yourself in the same session --- this repo's `@claude` review workflow can fire and interleave with an in-flight push.
   Post the "paws off" comment from `claim-pr` right after opening the PR, not just for PRs you're joining mid-flight. (Missed on ai-config#338: several commits were pushed across an ARDI-style review loop with no claim comment posted.)

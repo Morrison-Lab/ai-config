@@ -64,8 +64,15 @@ the ship step of any skill whose own PR lands in ai-config,
 and the deadlock escalation below.
 
 A skill that routes its request through this skill inherits the exception
-automatically, so nothing had to change in `ard`, `ardi`, `merge-it`, or `st`
---- each is cross-repo, and each defers here.
+automatically.
+`st` is skill-only, so it needed no change.
+`ard`, `ardi`, and `merge-it` also name a literal
+`gh pr edit --add-reviewer d-morrison` fallback beside the skill reference,
+so each fallback now carries the ai-config caveat inline --- an agent that
+follows the parenthetical instead of invoking this skill still requests nobody
+on ai-config.
+The two loaded-everywhere copies of the same escalation, in
+`CLAUDE.md` and `memories/preferences.md`, carry that caveat too.
 What did change is the skills that hardcoded the request while always shipping
 to ai-config; their ship step now requests nobody.
 Derive that set rather than trusting a list, since it grows.
@@ -73,7 +80,7 @@ This lists every site that names `d-morrison` as a reviewer; a site is covered
 whenever its PR lands in ai-config:
 
 ```sh
-git grep -nE 'add-reviewer d-morrison|request `d-morrison`' -- skills/
+git grep -nE 'add-reviewer d-morrison|request `d-morrison`' -- ':!codex-skills/'
 ```
 
 **A review deadlock on an ai-config PR escalates to the user in chat,

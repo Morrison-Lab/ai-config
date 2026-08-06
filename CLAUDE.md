@@ -913,7 +913,7 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 <!-- Shared with the lab manual; edit shared/workflow/fully-clean.md, not here. -->
 @shared/workflow/fully-clean.md
 
-Escalate a deadlock via the `request-pr-review` skill (human reviewer `d-morrison`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
+Escalate a deadlock via the `request-pr-review` skill (human reviewer `d-morrison`, or `gh pr edit <N> --add-reviewer d-morrison` --- except on `Morrison-Lab/ai-config`, which requests nobody and takes the deadlock to me in chat as a boxed `🛑 BLOCKER` instead), and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 
@@ -996,7 +996,7 @@ and a pure re-post webhook event doesn't need fresh analysis.
 <!-- Shared with the lab manual; edit shared/workflow/address-every-comment.md, not here. -->
 @shared/workflow/address-every-comment.md
 
-If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the impasse — for the final call rather than looping.
+If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** --- request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`; on `Morrison-Lab/ai-config` the skill requests nobody and the deadlock goes to me in chat as a boxed `🛑 BLOCKER` instead) and `@`-mention them with the impasse --- for the final call rather than looping.
 
 ## Keep PR branches synced with main
 

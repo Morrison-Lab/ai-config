@@ -47,8 +47,9 @@ standing yes (see `preferences.md`).
 - Check `mergeStateStatus` in addition to `mergeable`. A PR can be
   `"MERGEABLE"` but `"BLOCKED"` when branch protection requires at least one
   approving review and only bot/comment reviews exist. Fix: request
-  `d-morrison` as reviewer (`gh pr edit <N> --add-reviewer d-morrison` —
-  `EDIT_PR`) and leave a note that the PR is clean and ready. Don't attempt to
+  `d-morrison` as reviewer (`gh pr edit <N> --add-reviewer d-morrison` ---
+  `EDIT_PR`; but not on `Morrison-Lab/ai-config`, which requests nobody, so
+  surface the blocked-on-approval state to the user instead) and leave a note that the PR is clean and ready. Don't attempt to
   force-merge.
 - If any CI workflow or check run is red or still in progress/queued/pending,
   or the review still has open findings, **do not merge**. Report what's

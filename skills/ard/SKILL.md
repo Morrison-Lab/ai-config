@@ -210,8 +210,10 @@ glab api -X PUT "projects/:id/merge_requests/<N>/discussions/<discussion_id>?res
   you and the reviewer reach an impasse (your rebuttal didn't convince them,
   their re-raise didn't convince you), **escalate to a human reviewer** —
   request `d-morrison` via the `request-pr-review` skill (or
-  `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the
-  impasse — rather than resolving unilaterally or looping forever.
+  `gh pr edit <N> --add-reviewer d-morrison`; on `Morrison-Lab/ai-config` the
+  skill requests nobody and the deadlock goes to the user in chat as a boxed
+  `🛑 BLOCKER` instead) and `@`-mention them with the
+  impasse --- rather than resolving unilaterally or looping forever.
   Not every re-raise is an impasse, though: if the reviewer **accepts your fact
   but objects that the claim is over-generalized** (you verified one case and
   stated a sweeping rule), **narrow the claim to what you actually observed** —

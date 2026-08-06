@@ -163,6 +163,46 @@ RECOMMENDED_REMEDY = tool(
         "unclass(readRDS(\"/tmp/new.bin\")), check.attributes = FALSE)'"},
 )
 
+# Absolute and home/dot-relative paths. Before the ARTIFACT_PATH fix these
+# matched NOWHERE -- not in escalation text and not in a command blob -- so the
+# guard was silently blind to every one of them. That is the shape an HPC
+# escalation uses most (`/scratch/...`, `/work/...`), which is the context this
+# guard exists for, and the failure direction was silence.
+#
+# Covered on BOTH sides, because they fail independently: the fire side (is the
+# path seen in the escalation at all) and the discharge side (is it seen in the
+# command that deserializes it).
+ESCALATE_ABSOLUTE = txt(
+    "🛑 **BLOCKER**\n"
+    "`/scratch/user/run42/results.rds` changed after the SLURM job. "
+    "Your call: regenerate downstream, or hold?"
+)
+
+ESCALATE_HOME = txt(
+    "🛑 **BLOCKER** `~/out/model.parquet` changed. Your call: regenerate?"
+)
+
+ESCALATE_DOTREL = txt(
+    "🛑 **BLOCKER** `./results.rds` differs from main. Please advise."
+)
+
+ABSOLUTE_CHECK = tool(
+    "Bash",
+    {"command":
+        "git cat-file blob origin/main:/scratch/user/run42/results.rds "
+        "> /tmp/old.bin && Rscript -e "
+        "'all.equal(unclass(readRDS(\"/tmp/old.bin\")), "
+        "unclass(readRDS(\"/scratch/user/run42/results.rds\")), "
+        "check.attributes = FALSE)'"},
+)
+
+# Deserializes a DIFFERENT absolute path. Path-scoping must hold for absolute
+# paths exactly as it does for relative ones.
+OTHER_ABSOLUTE_CHECK = tool(
+    "Bash",
+    {"command": "Rscript -e 'readRDS(\"/scratch/user/run99/results.rds\")'"},
+)
+
 # Prose ASSERTING the check ran, with no tool_use behind it.
 PROSE_CLAIM = txt(
     "I compared the two versions with "
@@ -192,6 +232,15 @@ REMIND = [
      "decision-seeking phrasing naming a .sas7bdat"),
     ([ESCALATE_PARQUET, SAME_BASENAME_CHECK],
      "SAME BASENAME, different directory: must not discharge"),
+    ([ESCALATE_ABSOLUTE],
+     "ABSOLUTE path in the escalation, nothing deserialized"),
+    ([ESCALATE_HOME],
+     "HOME-relative (~/) path in the escalation, nothing deserialized"),
+    ([ESCALATE_DOTREL],
+     "DOT-relative (./) path in the escalation, nothing deserialized"),
+    ([ESCALATE_ABSOLUTE, OTHER_ABSOLUTE_CHECK],
+     "PATH-SCOPED for absolute paths: a different /scratch path must not "
+     "discharge"),
 ]
 
 SILENT = [
@@ -211,6 +260,8 @@ SILENT = [
      "check run from the artifact's own directory, path written bare"),
     ([ESCALATE_ONE_FILE, RECOMMENDED_REMEDY],
      "the remedy this guard's own reminder prints discharges it"),
+    ([ESCALATE_ABSOLUTE, ABSOLUTE_CHECK],
+     "ABSOLUTE path discharged by a two-sided check naming that same path"),
     ([MENTION_AND_SIDECHAIN],
      "a subagent's own escalation is not my outgoing message"),
     ([], "empty transcript"),

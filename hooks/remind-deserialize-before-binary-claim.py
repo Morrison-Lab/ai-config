@@ -231,8 +231,22 @@ SERIAL_EXT = (
 # A path with one of those extensions. Requires at least one path-ish or
 # word character before the dot so a bare ".rds" is not a path, and allows an
 # optional directory prefix.
+#
+# The optional `(?:(?:~|\.{1,2})?/)?` prefix admits absolute and
+# home/dot-relative paths -- `/scratch/x.rds`, `~/x.rds`, `./x.rds`,
+# `../x.rds`. Without it the pattern could not match those AT ALL: the body's
+# own leading classes exclude `/`, so a match could not start on one, and every
+# later position failed the lookbehind because the character before it was the
+# `/`. That silently excluded exactly the shapes an HPC escalation uses most
+# (`/scratch/...`, `/work/...`), and the failure direction was silence, which
+# is indistinguishable from having nothing to report.
+#
+# The lookbehind still forbids a match starting mid-token, which is what stops
+# `y.rds` matching inside `xy.rds`; `~` is in that class so a `~/`-rooted path
+# is matched whole rather than from its slash.
 ARTIFACT_PATH = re.compile(
-    r"(?<![A-Za-z0-9_./-])([A-Za-z0-9_.-]*[A-Za-z0-9_-][A-Za-z0-9_./-]*"
+    r"(?<![A-Za-z0-9_./~-])((?:(?:~|\.{1,2})?/)?"
+    r"[A-Za-z0-9_.-]*[A-Za-z0-9_-][A-Za-z0-9_./-]*"
     r"\.(?:" + SERIAL_EXT + r"))(?![A-Za-z0-9])",
     re.I,
 )

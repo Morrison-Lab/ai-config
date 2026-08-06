@@ -794,6 +794,68 @@ The hook *command* re-runs on every call, so a restored file unblocks at once, w
 
 (2026-08-05, Morrison-Lab/ai-config: `~/.claude/settings.json` referenced a removed `no-unauthorized-merge.py` hook, so every Bash call failed with `python3: can't open file '.../hooks/no-unauthorized-merge.py'`; the hook was absent from `main`'s `hooks/hooks.json` (which #1157 has since added, merged 2026-08-06), the `ai-config` plugin was also enabled, so the same hooks were double-registered, and the settings.json edit to remove the stale line was classifier-denied, so it was surfaced to the user.)
 
+### The same block arrives by a second route, and there `install-hooks.py --fix` is the proximate cause
+
+The section above reaches that state by **drift**: the registration was valid when written, and the repo later removed or renamed the script out from under it.
+The second route needs no drift and no elapsed time at all.
+The script was **never** at the target path, and `--fix` registered it anyway, in the same command that broke the shell.
+
+That inverts where to look.
+Drift invites reading the settings.json line as a leftover from some earlier state, so the diagnosis is archaeological.
+Here there is no earlier state: the entry is seconds old, and the tool that wrote it is the last thing you ran.
+
+**The two halves of "arm these hooks" live in different scripts, and each does only its half.**
+`install-hooks.py` writes `~/.claude/settings.json` and never places a file --- its own docstring says `bootstrap.sh` "gets the *scripts* onto the machine and stops there", and that `check-install.py` "is the sibling for the other half: it decides whether the installed *files* match the repo, and knows nothing about `settings.json`."
+`check-install.py --fix` is what places them, repairing its `missing` status ("the repo ships it; the consumer directory does not have it").
+So running only `install-hooks.py --fix` on a machine whose `~/.claude/hooks/` lacks the scripts does the binding half and skips the placement half, which is strictly worse than doing neither: an unregistered guard is inert, while a registered-but-absent one is an active `PreToolUse` failure.
+
+**The script already computes the fact that would have stopped it, on a branch it does not reach.**
+`classify()` returns `stale` when a settings.json entry names a script missing from the hooks dir --- `if not (hooks_dir / entry["script"]).exists()` --- and `--fix` refuses to touch a `stale` row, printing "left alone; fix the install, not settings.json".
+That existence test runs only after `find_entry` has already found the entry.
+A hook classified `missing` (declared in the manifest, absent from settings.json) is registered with no existence check at all, so `--fix` manufactures precisely the `stale` state the same run would have refused to write.
+
+**The warning exists and `--fix` does not print it.**
+The note naming the division of labour is inside the `if not args.fix:` branch:
+
+```
+Note --fix only edits settings.json. The scripts themselves are placed by bootstrap.sh; run scripts/check-install.py --fix if ~/.claude/hooks holds real copies instead of symlinks.
+```
+
+A plain run prints it; the `--fix` run that causes the damage does not.
+So the operator sees it one command before it matters and never at the moment it applies.
+
+**`--fix` registers everything missing, not the hooks you had in mind.**
+It walks the whole manifest, so a hook merged days earlier and never registered rides along with the two you just merged.
+
+**Recovery: `/reload-plugins` places the symlinks, and is better than the alternatives above.**
+The parent section prefers restoring the file to a settings.json edit, and is right, but hand-creating a no-op pass-through is not the way to do it when the scripts exist in the checkout.
+`/reload-plugins` re-runs the install and links every declared hook at once, so all the broken entries become valid together rather than one path at a time.
+It also needs no Bash, which matters because Bash is exactly what is down.
+Confirm it worked by reading `~/.claude/hooks/` and seeing symlinks into the checkout, timestamped at the reload.
+
+The transferable half is not about hooks.
+**A tool that succeeds at its own narrow job can leave the system worse than before it ran, and its success message reports the narrow job.**
+`--fix` did exactly what it promised and said so.
+The operation the operator wanted was composite, it needs two tools, and half of it is worse than none.
+That is [`fail-fast`](../shared/principles/fail-fast.md)'s "partial is worse than absent" one layer out: there the guard is partially *written*, here the guard is complete, correct, and partially *installed*.
+
+- **Do:** run `check-install.py --fix` before `install-hooks.py --fix`, so every script is on disk before anything binds to it. (Inferred from the incident; no user directive.)
+- **Do:** read a tool's success line as covering that tool's own scope, and name the other half of a composite operation yourself.
+- **Do:** reach for `/reload-plugins` when registered hooks point at absent scripts that do exist in the checkout.
+- **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
+- **Don't:** expect `--fix` to warn you about this; it prints that note only when run *without* `--fix`.
+- **Don't:** read a `PreToolUse` breakage minutes after a `--fix` as drift from an earlier state --- check whether the entry is one you just wrote.
+
+(2026-08-05 ~23:24 PDT / 2026-08-06 06:24Z, `d-morrison`'s machine, the same `settings.json` as the incident above.
+`install-hooks.py --fix` registered three hooks --- `remind-deserialize-before-binary-claim.py`, `remind-both-sides-from-git.py`, and `no-unauthorized-merge.py` --- none of which were in `~/.claude/hooks/`.
+The third is `PreToolUse` on `Bash`, so every subsequent Bash call died.
+All three were legitimately on `main` by then: `no-unauthorized-merge.py` from #1157 (merged 00:45:42Z), `remind-both-sides-from-git.py` from #1186 (03:37:06Z), and `remind-deserialize-before-binary-claim.py` from #1181 (06:18:11Z, six minutes before the incident) --- so only two were the newly-merged pair the operator had in mind, and the third rode along.
+The settings.json repair was classifier-denied, correctly: dropping a `no-unauthorized-merge.py` entry from a Bash matcher is indistinguishable from disabling a merge guard.
+With Bash also down there was no scripted way out, so the natural repair and the scripted repair were blocked at once.
+The user ran `/reload-plugins`; `ls -la ~/.claude/hooks` then showed all three as symlinks into the repo, timestamped at the reload.
+No user correction was given --- the finding is inferred from the incident.
+Verified against the scripts rather than recalled: the docstrings quoted above, `classify()`'s existence test, and the note's placement inside the non-`--fix` branch.)
+
 ## A plugin ref resolves by the marketplace's *declared* name, not by its URL
 
 The section above covers the submodule-plus-symlink path.

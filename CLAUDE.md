@@ -657,7 +657,6 @@ Re-derive it from a live query rather than trusting the earlier verdict.
 
 ## Claim a GitHub PR/issue before working on it
 
-<!-- Shared with the lab manual; edit shared/workflow/claim-pr.md, not here. -->
 @shared/workflow/claim-pr.md
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
@@ -864,7 +863,6 @@ Its last section generalizes past MCP: when a standing rule names a mechanism th
 
 ## File an issue before starting a new task
 
-<!-- Shared with the lab manual; edit shared/workflow/issue-first.md, not here. -->
 @shared/workflow/issue-first.md
 
 The `st` (Start Task) skill operationalizes this; `gi` (Grab Issue) is the path when the issue already exists.
@@ -905,7 +903,6 @@ Agreeing with a reviewer is the commoner case and the one that machinery misses 
 
 ## Tracking issues in upstream repos
 
-<!-- Shared with the lab manual; edit shared/workflow/upstream-issues.md, not here. -->
 @shared/workflow/upstream-issues.md
 
 The `sup` / `send-upstream` skill operationalizes steps 1--2 (the PR path, including fork-if-needed, and the issue path) and the link-back.
@@ -926,14 +923,12 @@ If the phrase is clearly part of ordinary prose rather than a standalone directi
 
 ## What "fully clean" means
 
-<!-- Shared with the lab manual; edit shared/workflow/fully-clean.md, not here. -->
 @shared/workflow/fully-clean.md
 
 Escalate a deadlock via the `request-pr-review` skill (human reviewer `d-morrison`, or `gh pr edit <N> --add-reviewer d-morrison`), and surface the open item to me.
 
 ## Always run ARDI on PRs you touch
 
-<!-- Shared with the lab manual; edit shared/workflow/ardi.md, not here. -->
 @shared/workflow/ardi.md
 
 The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" means* above; the mechanics for each step are in the sections around here.)
@@ -1009,14 +1004,12 @@ and a pure re-post webhook event doesn't need fresh analysis.
 
 ## Address every in-scope review comment, even non-blockers
 
-<!-- Shared with the lab manual; edit shared/workflow/address-every-comment.md, not here. -->
 @shared/workflow/address-every-comment.md
 
 If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the impasse — for the final call rather than looping.
 
 ## Keep PR branches synced with main
 
-<!-- Shared with the lab manual; edit shared/workflow/sync-with-main.md, not here. -->
 @shared/workflow/sync-with-main.md
 
 (Another instance of **never assume; always verify** — `git fetch` to check main's actual position instead of assuming the branch is current.
@@ -1056,7 +1049,6 @@ The key points, restated here because a bare pointer is invisible to a consumer 
 
 ## Prioritize internal infrastructure work slightly over feature work
 
-<!-- Shared with the lab manual; edit shared/workflow/pr-prioritization.md, not here. -->
 @shared/workflow/pr-prioritization.md
 
 A tie-breaker for `ardia`'s PR-ordering step and `gi`'s (and `gii`/`gip`'s) issue-priority table when candidates are otherwise close in priority.
@@ -1176,7 +1168,6 @@ More generally --- not just inside the named heavy skills --- always look for op
 When a task turns out to be workflow-shaped (decomposable, verification-bearing, and at a scale that earns it --- see the fragment's criteria), say so and propose a workflow even if no skill mandated one.
 The same opt-in gate still applies: propose with a cost estimate and wait unless an opt-in signal is already present.
 
-<!-- Shared with the lab manual; edit shared/workflow/when-to-orchestrate.md, not here. -->
 @shared/workflow/when-to-orchestrate.md
 
 ## Agent teams: a third parallelism primitive, human-gated and advisory
@@ -1506,7 +1497,6 @@ The `use-preferred-style` skill (alias `style`) spells out the procedure, the PS
 
 ## Writing style: semantic line breaks in prose
 
-<!-- Shared with the lab manual; edit shared/writing/semantic-line-breaks.md, not here. -->
 @shared/writing/semantic-line-breaks.md
 
 ## Quarto: link packages on first mention
@@ -1541,14 +1531,12 @@ This keeps figures consistent with tables, which already use div syntax.
 
 ## Challenge ambiguous phrasing and terminology in review
 
-<!-- Shared with the lab manual; edit shared/workflow/challenge-ambiguous-terminology.md, not here. -->
 @shared/workflow/challenge-ambiguous-terminology.md
 
 The `ard`/`ardi` skill family and `use-preferred-style`/`find-ai-tells` operationalize this in their respective review contexts.
 
 ## Challenge redundant content in review
 
-<!-- Shared with the lab manual; edit shared/workflow/challenge-redundant-content.md, not here. -->
 @shared/workflow/challenge-redundant-content.md
 
 The `ard`/`ardi` skill family and `code-review` apply this in PR/MR review; `find-overlap` (and its `consolidate-skills`/`consolidate-memory` actors) is the corpus-wide counterpart when redundancy spans more than the current diff.
@@ -1574,12 +1562,10 @@ The `find-ai-tells` skill (alias `ai-tells`) runs this same catalog on demand ag
 
 ## Writing style: cite sources thoroughly
 
-<!-- Shared with the lab manual; edit shared/writing/citations.md, not here. -->
 @shared/writing/citations.md
 
 ## Fact-check prose and internal reasoning in review
 
-<!-- Shared with the lab manual; edit shared/writing/fact-check-prose.md, not here. -->
 @shared/writing/fact-check-prose.md
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches prose, apply this policy in addition to the normal review — those skills don't name it internally, but this CLAUDE.md directive governs regardless.
@@ -1596,7 +1582,6 @@ re-verify it.
 
 ## Writing style: math derivations — include every step; flag gaps in review
 
-<!-- Shared with the lab manual; edit shared/writing/math-derivation-steps.md, not here. -->
 @shared/writing/math-derivation-steps.md
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
@@ -1667,7 +1652,6 @@ that works fine.
 
 ## Challenge unnecessary complexity in review
 
-<!-- Shared with the lab manual; edit shared/workflow/challenge-unnecessary-complexity.md, not here. -->
 @shared/workflow/challenge-unnecessary-complexity.md
 
 When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-style`, `find-ai-tells`, `fact-check-prose`), apply this alongside the normal review — those skills don't name it internally, so this CLAUDE.md directive governs regardless. It's distinct from `simplify` (a dead-code-after-refactor sweep) and `tidy` (a separate on-demand audit).

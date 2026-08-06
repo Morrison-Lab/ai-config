@@ -433,7 +433,7 @@ In every session — at session start, and again periodically during long sessio
    (2026-08-05, this machine: `install-hooks.py` run against a checkout 31 commits behind read a stale manifest and reported `registered=12 missing=0 stale=0` / `All hooks registered.`
    After `git pull --ff-only` the same command reported `examined 15 ... registered=12 missing=3`.
    Running `--fix` then bound all three to scripts absent from `~/.claude/hooks/`, one of them a `PreToolUse` `Bash` hook, which blocked every Bash call until `/reload-plugins` placed the symlinks.
-   `memories/claude-code.md` carries the mechanism and the recovery.)
+   `memories/claude-code-hooks.md` carries the mechanism and the recovery.)
 
    (2026-08-04, this machine: `check-install.py` reported 32 of 34 entries ok while `install-hooks.py` reported `registered=3 missing=8`, so 8 of 11 guards had never been bound to an event.
    Among them was `flag-unassigned-worktree.py`, and in that same session two `Agent` calls were launched with no `isolation` --- exactly what it exists to warn about --- with no warning possible.

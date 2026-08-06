@@ -333,46 +333,39 @@ string.
 **A `shared/` fragment marked `<!-- Shared with the lab manual -->` in
 `CLAUDE.md` is transcluded WHOLE by the UCD-SERG lab manual, so restructuring
 one silently damages the manual.**
-Twenty-two `@shared/...` fragments carry that comment in `CLAUDE.md`
-(`grep -c 'Shared with the lab manual' CLAUDE.md` returned 22 on 2026-08-05),
-including the three heaviest closure fragments
-`shared/workflow/fully-clean.md`, `ardi.md`, and `address-every-comment.md`,
-and the two vendored copies under `shared/vendored/**` are the same kind of
-shared-source file.
-The lab manual pulls each one in with
+Twenty-two `@shared/...` fragments carry that comment on 2026-08-05
+(`grep -c 'Shared with the lab manual' CLAUDE.md`), including the three heaviest
+closure fragments `shared/workflow/fully-clean.md`, `ardi.md`, and
+`address-every-comment.md`, and the two `shared/vendored/**` copies are the same
+kind of shared-source file.
+The manual transcludes each one with
 `{{< include .ai-config/shared/<area>/<topic>.md >}}` through its `.ai-config`
-git submodule (README, "Shared content"), so the manual renders the fragment's
-file exactly as it stands.
-Any edit that changes such a fragment's content or structure therefore reaches
-the manual too: splitting part of it into a new sibling file drops that part
-from the rendered manual, and adding a relative link to a companion the manual
-does not `include` leaves a dangling link there.
-So a corpus-restructuring pass that alters fragment content must EXCLUDE the
-lab-manual-shared and `shared/vendored/**` fragments, or be coordinated with
-the lab manual.
-This is why a 2026-08 case-record-extraction pass touched only the
-ai-config-only fragments (the ones without the marker); the lab-manual-shared
-ones are tracked separately in Morrison-Lab/ai-config#1191 (move records out,
-needs lab-manual coordination) and #1192 (condense their exposition in place).
+git submodule (README, "Shared content"), rendering the file as it stands.
+So any edit to such a fragment's content or structure reaches the manual too:
+splitting part of it into a new sibling drops that part from the rendered manual,
+and a relative link to a companion the manual does not `include` dangles there.
+A corpus-restructuring pass that alters fragment content must therefore EXCLUDE
+the lab-manual-shared and `shared/vendored/**` fragments, or coordinate with the
+manual.
+This is why a 2026-08 case-record-extraction pass touched only the ai-config-only
+fragments (those without the marker); the lab-manual-shared ones are tracked in
+Morrison-Lab/ai-config#1191 (move records out) and #1192 (condense them in place).
 
 **Content leaves the always-loaded closure when it moves into a sibling file
 referenced by a PLAIN MARKDOWN LINK, not an `@`-import.**
-The closure walk --- and `scripts/check-context-closure.py`, which implements
-it --- follows only `@path` imports: `_ANCHORED_IMPORT_RE` matches a whole-line
-`@path`, and `_INLINE_IMPORT_RE` matches a bare `@path` written in prose.
-A `[text](topic.cases.md)` markdown link matches neither, so its target is
-never followed and stays out of the closure.
-Relocating worked-example case records from a fragment into a `<name>.cases.md`
-sibling, linked with `[...](<name>.cases.md)`, thus removes them from every
-session's always-loaded set while keeping them one click away.
-Run `scripts/check-context-closure.py` before and after to confirm the drop:
-the file count is unchanged, because the sibling never joins the closure and
-the parent fragment stays imported, while the byte total falls by the
-relocated content.
+`scripts/check-context-closure.py`, which implements the closure walk, follows
+only `@path` imports (whole-line or inline in prose); a `[text](topic.cases.md)`
+markdown link matches neither, so its target is never followed into the closure.
+Relocating worked-example case records from a fragment into a
+`[...](<name>.cases.md)` sibling thus drops them from every session's
+always-loaded set while keeping them one click away.
+Run the script before and after to confirm: the file count is unchanged (the
+sibling never joins the closure, the parent stays imported) while the byte total
+falls by the relocated content.
 This is the concrete form of the section's "demoting a fragment to on-demand"
-lever, and the lab-manual constraint above bounds it: apply it only to
+lever, bounded by the lab-manual constraint above --- apply it only to
 ai-config-only fragments, since a markdown-linked sibling is invisible to the
-lab manual's whole-file `include`.
+manual's whole-file `include`.
 (Tracked in Morrison-Lab/ai-config#1193.)
 
 ## Custom subagents (`.claude/agents/*.md`) — Bash is a write-access loophole

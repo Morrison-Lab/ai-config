@@ -1,6 +1,6 @@
 ---
 name: use-preferred-style
-description: "Write or revise user-facing prose in the user's preferred style, per his Principles of Scientific Writing guide (psw, https://morrison-lab.github.io/psw/) --- limit dependent (subordinate) clauses, cut low-content filler and jargon, prefer plain Anglish words over Latin ones, prefer short declarative sentences and active voice, and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions. Apply when drafting or rewriting any prose: PR/issue/commit text, docs, READMEs, comments, release notes, emails, or chat replies. Use when asked to 'use my style', 'apply my preferred style', 'rewrite in my voice', 'tighten this', 'plain-language this', 'psw', or '/style'."
+description: "Write or revise user-facing prose in the user's preferred style, per his Principles of Scientific Writing guide (psw, https://morrison-lab.github.io/psw/) --- limit dependent (subordinate) clauses, cut low-content filler and jargon, prefer plain Anglish words over Latin ones, prefer short declarative sentences and active voice, keep relative pronouns rather than dropping them, follow a demonstrative pronoun with the noun it refers to, and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions. Apply when drafting or editing scientific prose, reviewing or redlining a manuscript or paper, or drafting/rewriting any other user-facing prose: PR/issue/commit text, docs, READMEs, comments, release notes, emails, or chat replies. Use when asked to 'use my style', 'apply my preferred style', 'rewrite in my voice', 'tighten this', 'plain-language this', 'review this manuscript', 'redline this paper', 'psw', or '/style'."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -16,10 +16,12 @@ direct. Say the point in a short sentence. Stack fewer clauses. Drop filler.
 
 The authority is the user's own guide, **Principles of Scientific Writing
 (PSW)**: https://morrison-lab.github.io/psw/.
-PSW covers word choice, conciseness,
-and active voice. This skill operationalizes PSW and adds the user's own rules
-on clause structure (limit subordinate clauses; join with coordinating
-conjunctions), which PSW does not cover. When in doubt, defer to PSW.
+PSW covers word choice, conciseness, grammar, and avoiding AI tells --- including
+the nested-dependent-clause rule below, in its own "Conciseness" chapter.
+This skill operationalizes PSW and adds the user's own rule on joining
+independent clauses with coordinating conjunctions rather than subordinate
+constructions, which PSW does not state explicitly.
+When in doubt, defer to PSW.
 
 ## When this fires
 
@@ -32,8 +34,9 @@ conjunctions), which PSW does not cover. When in doubt, defer to PSW.
 
 ## The rules
 
-The user's clause-structure rules (1–4) sit on top of PSW's word-choice and
-conciseness rules (5–6).
+The user's rule on joining clauses (4) sits alongside rules 1--3, which
+restate PSW's own "Limit complex sentence structures" section.
+Rules 5--8 come straight from PSW's word-choice and grammar chapters.
 
 1. **Limit dependent clauses.** A dependent (subordinate) clause cannot stand
    alone. It starts with a word like *because*, *although*, *which*, *while*,
@@ -61,6 +64,29 @@ conciseness rules (5–6).
    action. Prefer "The researchers ran the experiment" over "The experiment was
    run by the researchers." Passive is fine when the actor is unknown or beside
    the point.
+
+7. **Keep relative pronouns** (PSW, "Grammar").
+   English lets you drop *that*, *which*, or *who* in some sentences, but
+   dropping it forces the reader to backtrack once they realize a describing
+   clause has started.
+   Prefer "the groundwork *that* I now apply" over "the groundwork I now
+   apply."
+   Also use *that* for a restrictive clause (identifies which thing you mean,
+   no comma) and *which* for a non-restrictive one (adds a detail, set off by
+   commas): "the dataset *that* we collected in 2023" versus "our dataset,
+   *which* contains 4,000 records,".
+
+8. **Name a demonstrative's referent** (PSW, "Grammar").
+   *This*, *that*, *these*, and *those* used standalone as pronouns send the
+   reader searching backward for what they mean, often across a whole
+   preceding clause rather than one noun.
+   Follow the demonstrative with the noun it refers to.
+
+   > ❌ The model overfit the training data.
+   > **This** poses a problem for deployment.
+   >
+   > ✅ The model overfit the training data.
+   > **This overfitting** poses a problem for deployment.
 
 ## Filler and jargon to cut or swap
 
@@ -100,12 +126,21 @@ and "Word choice" chapters.
    Delete dead words. Prefer the Anglish word over the Latin one.
 4. **Flatten subordination.** Turn "Although A, B" into "A. But B." or
    "A, but B." Turn "which" relative clauses into a second sentence.
-5. **Switch passive to active** where the actor matters. Name the actor first.
-6. **Keep the meaning exact.** Style edits must not change facts, scope, hedges
-   the user meant, or technical precision. When a hedge is load-bearing, keep
-   it. Plainness is the goal, not false confidence.
-7. **Read it back.** Each sentence should make one point. The data should flow
-   top to bottom.
+5. **Restore dropped relative pronouns, and name what a demonstrative refers
+   to.**
+   Check every describing clause still has its *that*/*which*/*who*, and
+   every standalone *this*/*that*/*these*/*those* is followed by the noun it
+   means.
+6. **Switch passive to active** where the actor matters.
+   Name the actor first.
+7. **Keep the meaning exact.**
+   Style edits must not change facts, scope, hedges the user meant, or
+   technical precision.
+   When a hedge is load-bearing, keep it.
+   Plainness is the goal, not false confidence.
+8. **Read it back.**
+   Each sentence should make one point.
+   The data should flow top to bottom.
 
 ## Before / after
 
@@ -134,8 +169,10 @@ The user's guide, **Principles of Scientific Writing**, is the source of record.
 Pull the latest rules from it, not from this summary:
 
 - Guide home: https://morrison-lab.github.io/psw/
-- [Word choice](https://morrison-lab.github.io/psw/chapters/word-choice.html) --- Anglish over Latin.
-- [Conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html) --- cut redundancy; active voice; the swap list.
+- [Word choice](https://morrison-lab.github.io/psw/chapters/word-choice.html) --- Anglish over Latin; avoiding vague/metaphorical language; minimizing jargon.
+- [Conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html) --- cut redundancy; active voice; the swap list; limiting nested clauses.
+- [Grammar](https://morrison-lab.github.io/psw/chapters/grammar.html) --- rules 7--8 above: relative and demonstrative pronouns.
+- [Avoiding AI tells](https://morrison-lab.github.io/psw/chapters/avoid-ai-tells.html) --- overused vocabulary, rhetorical reflexes, formatting habits; see also the `find-ai-tells` skill below.
 - [Defining terms clearly](https://morrison-lab.github.io/psw/chapters/defining-terms.html)
 - [Paper organization](https://morrison-lab.github.io/psw/chapters/paper-organization.html)
 
@@ -144,9 +181,10 @@ the drift so this skill gets updated.
 
 ## Relationship to other skills
 
-- **`find-ai-tells`** (issue #49, in progress) — the detector counterpart. It
-  *scans* finished text for AI-authorship tells. This skill *prescribes* how to
-  write up front. Run `find-ai-tells` after; run `use-preferred-style` during.
+- **`find-ai-tells`** --- the detector counterpart.
+  It *scans* finished text for AI-authorship tells.
+  This skill *prescribes* how to write up front.
+  Run `find-ai-tells` after; run `use-preferred-style` during.
 - **`simplify` / `tidy`** — the same "cut what adds no value" instinct, applied
   to code instead of prose.
 - **`memorize` / `remember`** — for a one-off wording preference, write a memory

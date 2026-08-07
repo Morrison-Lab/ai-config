@@ -1,6 +1,6 @@
 ---
 name: use-preferred-style
-description: "Write or revise user-facing prose in the user's preferred style, per his Principles of Scientific Writing guide (psw, https://d-morrison.github.io/psw/) — limit dependent (subordinate) clauses, cut low-content filler and jargon, prefer plain Anglish words over Latin ones, prefer short declarative sentences and active voice, and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions. Apply when drafting or rewriting any prose: PR/issue/commit text, docs, READMEs, comments, release notes, emails, or chat replies. Use when asked to 'use my style', 'apply my preferred style', 'rewrite in my voice', 'tighten this', 'plain-language this', 'psw', or '/style'."
+description: "Write or revise user-facing prose in the user's preferred style, per his Principles of Scientific Writing guide (psw, https://morrison-lab.github.io/psw/) --- limit dependent (subordinate) clauses, cut low-content filler and jargon, prefer plain Anglish words over Latin ones, prefer short declarative sentences and active voice, and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions. Apply when drafting or rewriting any prose: PR/issue/commit text, docs, READMEs, comments, release notes, emails, or chat replies. Use when asked to 'use my style', 'apply my preferred style', 'rewrite in my voice', 'tighten this', 'plain-language this', 'psw', or '/style'."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -15,7 +15,8 @@ Apply the user's prose style to anything user-facing. The style is plain and
 direct. Say the point in a short sentence. Stack fewer clauses. Drop filler.
 
 The authority is the user's own guide, **Principles of Scientific Writing
-(PSW)**: https://d-morrison.github.io/psw/. PSW covers word choice, conciseness,
+(PSW)**: https://morrison-lab.github.io/psw/.
+PSW covers word choice, conciseness,
 and active voice. This skill operationalizes PSW and adds the user's own rules
 on clause structure (limit subordinate clauses; join with coordinating
 conjunctions), which PSW does not cover. When in doubt, defer to PSW.
@@ -132,11 +133,11 @@ stance in the coding-style rule.)
 The user's guide, **Principles of Scientific Writing**, is the source of record.
 Pull the latest rules from it, not from this summary:
 
-- Guide home: https://d-morrison.github.io/psw/
-- [Word choice](https://d-morrison.github.io/psw/chapters/word-choice.html) — Anglish over Latin.
-- [Conciseness](https://d-morrison.github.io/psw/chapters/conciseness.html) — cut redundancy; active voice; the swap list.
-- [Defining terms clearly](https://d-morrison.github.io/psw/chapters/defining-terms.html)
-- [Paper organization](https://d-morrison.github.io/psw/chapters/paper-organization.html)
+- Guide home: https://morrison-lab.github.io/psw/
+- [Word choice](https://morrison-lab.github.io/psw/chapters/word-choice.html) --- Anglish over Latin.
+- [Conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html) --- cut redundancy; active voice; the swap list.
+- [Defining terms clearly](https://morrison-lab.github.io/psw/chapters/defining-terms.html)
+- [Paper organization](https://morrison-lab.github.io/psw/chapters/paper-organization.html)
 
 PSW is a work in progress. When it and this skill disagree, PSW wins — and flag
 the drift so this skill gets updated.

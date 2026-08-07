@@ -6,7 +6,8 @@ generic Actions-authoring and reusable-workflow material.
 
 ## Re-triggering the @claude PR *review* (d-morrison Quarto / R-pkg repos, e.g. `psw`)
 - Filenames below are those in the **content/package repos** (verified in
-  `d-morrison/psw`): the review workflow is `.github/workflows/claude-code-review.yml`
+  `Morrison-Lab/psw`, moved there from `d-morrison/psw`): the review workflow
+  is `.github/workflows/claude-code-review.yml`
   and the comment-triggered agent workflow is `.github/workflows/claude.yml`.
   (ai-config's *own* bot uses different names — `claude-review.yml` /
   `claude-bot.yml` — so don't infer these from *this* repo's `.github/workflows/`.)

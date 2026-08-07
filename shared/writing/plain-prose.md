@@ -4,8 +4,9 @@ notes, emails, and chat replies. Apply it by default to your own drafts, not
 just when asked.
 
 The guide of record is the lab's **Principles of Scientific Writing (PSW)**:
-<https://d-morrison.github.io/psw/>. The rules below operationalize it. When PSW
-and this guidance disagree, PSW wins.
+<https://morrison-lab.github.io/psw/>.
+The rules below operationalize it.
+When PSW and this guidance disagree, PSW wins.
 
 - **Limit dependent (subordinate) clauses.** One per sentence is plenty. When
   two or more stack up, split the sentence.

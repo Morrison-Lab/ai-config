@@ -606,7 +606,7 @@
 - "dew it" means "do it".
 - After implementing a feature or fix, ALWAYS commit and push immediately --- don't wait for the user to ask "why haven't you pushed?"
   The implementation isn't done until the code is committed, pushed, and (if applicable) an MR is opened.
-- Write user-facing prose in my preferred style, per my Principles of Scientific Writing guide (https://d-morrison.github.io/psw/ --- the authority): limit dependent (subordinate) clauses; cut low-content filler and jargon ("in order to" → "to", "due to the fact that" → "because", drop "it's worth noting"); prefer plain Anglish words over Latin-derived ones ("before" not "prior to", "needed" not "necessary", "use" not "utilize"); prefer short simple declarative sentences and active voice; and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions.
+- Write user-facing prose in my preferred style, per my Principles of Scientific Writing guide (https://morrison-lab.github.io/psw/ --- the authority): limit dependent (subordinate) clauses; cut low-content filler and jargon ("in order to" → "to", "due to the fact that" → "because", drop "it's worth noting"); prefer plain Anglish words over Latin-derived ones ("before" not "prior to", "needed" not "necessary", "use" not "utilize"); prefer short simple declarative sentences and active voice; and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions.
   Apply this by default to my OWN drafts, not just on request.
   Keep meaning, scope, and load-bearing hedges exact.
   When PSW and the skill disagree, PSW wins. (see the `use-preferred-style` skill, alias `style`; the `find-ai-tells` detector, alias `ai-tells`, is the scan-after counterpart.)

@@ -217,6 +217,53 @@ That is the login-versus-body distinction
 [`fully-clean`](fully-clean.md)'s fifth case already warns about, met in the
 direction that flatters the repo.)
 
+**Requesting Copilot discharges nothing when the repo's own reviewer runs on `workflow_dispatch` alone.**
+Everything above concerns *which* reviewer to ask for, resting on this section's opening premise that opening a PR or marking it ready at least starts the repo's own review workflow.
+That premise is a property of the repo rather than of GitHub, and it is one `on:` block to check.
+
+A review workflow carrying `pull_request` fires on every push, so a review arrives without anyone asking, and a session working such a repo learns to treat reviews as something that *arrives*.
+A review workflow carrying only `workflow_dispatch` never fires by itself.
+A PR there sits at all-green CI with zero pending checks and no review at all, because nothing failed and nothing was ever queued.
+
+The near-miss is requesting Copilot and reading that as the review obligation discharged.
+It is a genuine reviewer request and it succeeds, so nothing about it looks like a shortcut.
+On a dispatch-only repo it is also the *only* reviewer that was ever going to read the diff, so Copilot refusing leaves the PR reviewed by nobody with every surface green --- which is why the preceding paragraphs' insistence on reading the refusal **body** matters twice as much here.
+
+So read the review workflow's own trigger block rather than recalling it, and dispatch when no push-based trigger exists:
+
+```bash
+sed -n '/^on:/,/^[a-z]/p' .github/workflows/<review-workflow>.yml
+gh workflow run <review-workflow>.yml -R <owner>/<repo> -f pr_number=<N>
+```
+
+Take the input's name from that same file rather than assuming it, since a wrong `-f` name fails the dispatch outright.
+It is `pr_number` both in `Morrison-Lab/ai-config`'s `claude-review.yml` and in `ucdavis/bcs`'s dispatch caller, measured 2026-08-06.
+A trigger block is exactly the kind of configuration that changes, so re-read it rather than trusting that pair.
+
+The general rule the two shapes share: **request the AI review at the moment you judge the PR ready, rather than waiting for one to arrive.**
+Waiting costs nothing where a trigger exists and costs the entire review where none does, and the PR page looks identical either way.
+
+- **Do:** read the review workflow's `on:` block, and dispatch explicitly when it carries no push-based trigger.
+- **Do:** treat "I think this is ready" as the trigger to request the review, rather than as the moment to start waiting for one.
+- **Don't:** count a successful Copilot `requested_reviewers` POST as the review obligation discharged on a repo whose primary reviewer is dispatch-only.
+- **Don't:** read all-green checks with nothing pending as a review in flight.
+  On such a repo that is the steady state rather than a transient one.
+
+**The `Stop` hook cannot catch this, and its silence is why the rule has to be stated in prose.**
+[`hooks/no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) tracks precisely this obligation --- a PR opened or readied with no successful reviewer request after it --- and discharges on any successful request, Copilot's included.
+That discharge is satisfied while the repo's actual reviewer never runs, which is the over-broad discharge condition [`algorithmatize-checks`](algorithmatize-checks.md)'s "A reminder guard's discharge condition is a second matcher, and its failure is silence" section names as the dangerous direction: the guard goes quiet, and quiet reads as compliance.
+Tightening it so a `requested_reviewers` POST cannot discharge on a dispatch-only repo is tracked in `Morrison-Lab/ai-config#1249`.
+
+The per-repo trigger table for `Morrison-Lab/ai-config` lives in [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md), which owns the repo-specific facts.
+This entry owns the cross-repo rule and the hook gap, neither of which that file states.
+
+(`Morrison-Lab/ai-config#1235`, 2026-08-06: opened by a subagent that correctly requested Copilot, which was quota-exhausted and refused.
+The PR then read 4 check runs, 0 pending and 0 failing, with zero Claude reviews, because nothing had dispatched one.
+`claude-review.yml` there carries `workflow_dispatch` and nothing else, while `ucdavis/bcs`'s `claude-code-review.yml` carries `pull_request: [opened, synchronize, ready_for_review, reopened]` --- and the session had spent the day in the second repo, where every push fired a review and no one ever had to ask.
+`hooks/no-unreviewed-pr.py` had fired correctly on #1222 earlier in that same session and stayed silent here, discharged by the Copilot POST exactly as its contract says.
+The user's correction was "you should be requesting ai bot reviews on prs when you think they're ready", followed immediately by "(if github actions isn't triggering one for you)".
+A second correction was needed before this pass ran at all: the first response was to dispatch the missing review and carry on, where `CLAUDE.md`'s "Correcting your own understanding of a technical issue is itself a trigger" puts the pass at the correction rather than after the work the correction unblocked.)
+
 This is part of opening the PR, not a follow-up task.
 A status sentence like "review owed on #N" is the anti-pattern: it names a debt that should already have been discharged, the same way an offer to file an issue names work instead of doing it.
 The sentence is the trigger to request the review now.

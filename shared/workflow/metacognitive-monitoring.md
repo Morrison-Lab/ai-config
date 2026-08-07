@@ -459,6 +459,57 @@ The general rule stays judgment.
 - **Don't:** let the act of retracting stand in for having verified the
   replacement --- a correction is a claim, and it carries its instrument with it.
 
+## "Unresolved between two sources" is a place to stop checking, not a finding
+
+The section above is one instrument read twice.
+This is two different instruments, on the same fact, disagreeing outright ---
+your own tool says X, a reviewer's tool says Y.
+The natural next move is to report the disagreement itself: state both
+readings, note neither is resolvable from here, and move on.
+That move is often wrong, because it treats "I have two conflicting values"
+as the end state rather than as evidence that a decisive third check exists
+and has not been run yet.
+
+The tell is that "unresolved" is reached for as a **conclusion**, when it is
+actually a **description of where you stopped looking**.
+A REST endpoint and a GraphQL endpoint disagreeing on one field is not, on
+its own, proof that the field is genuinely ambiguous --- it is only proof
+that two paths to it were tried.
+A third path (a different API, a permissions/role listing, the underlying
+database's own audit trail) frequently exists, costs one more call, and
+settles it outright.
+Reaching for "unresolved" before trying that third path is the same failure
+[`fail-fast`](../principles/fail-fast.md) names for a check that stops at
+"could not determine": it reports the search as exhausted when only the
+cheap half of it was tried.
+
+Declaring a disagreement unresolved also **publishes a claim of its own** ---
+that the ambiguity is real --- which a reader has no way to distinguish from
+a disagreement that actually was exhaustively checked.
+That claim can itself be wrong, and correcting it later costs a full round
+with whoever read the "unresolved" framing as settled.
+
+- **Do:** before writing "unresolved" or "disputed" between two sources,
+  name one more check that would decide it, and try it if it is cheap.
+- **Do:** treat a lopsided sample (two calls returning X, one returning Y) as
+  a reason to suspect the outlier, not as license to average the disagreement
+  away by calling it unresolved.
+- **Don't:** report a two-source disagreement as a fact about the world
+  before it is a fact about how much you looked.
+- **Don't:** let the *number* of sources you already checked stand in for
+  whether a decisive one remains unchecked.
+
+(Morrison-Lab/ai-config#1238, 2026-08-07: a reviewer's `gh pr view --json
+comments` reported a comment's `author_association` as `COLLABORATOR`; this
+session's own tool call reported `MEMBER` for the identical comment id.
+Rather than run one more check, the memory being edited was corrected to
+state both readings as an unresolved cross-surface disagreement -- which
+was itself wrong, and became the review's next finding.
+A third check, `list_repository_collaborators`, resolved it in one call: the
+account held a direct collaborator grant, matching `COLLABORATOR` and
+explaining the `MEMBER` reading as this session's own tool's outlier.
+The "unresolved" framing cost a full review round it did not need to.)
+
 ## Writing is the instrument, when the claim can be wrong
 
 The article establishes that self-assessment is unreliable and that confidence

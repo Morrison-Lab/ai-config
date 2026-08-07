@@ -505,6 +505,25 @@ verdict: prefer the API field over the prose caption.
 - **Do:** follow the job link in the comment and read that run's `head_sha`.
 - **Don't:** treat the SHA in a comment's heading as the commit reviewed.
 
+**That remedy assumes the run checked out the PR head, and a `workflow_dispatch`-triggered review run does not.**
+`claude-review.yml` dispatched with a `pr_number` input runs against `ref: main` --- its own `head_sha` is whatever `main`'s tip was at dispatch time, not the PR branch or the commit its gather-context step actually diffed.
+The job fetches the PR's diff separately, through the API, inside the run, so nothing in the run object records which PR commit that fetch saw.
+Reading `head_sha` here answers a different question than the one being asked, and it answers confidently: a real SHA, on a real branch, that happens to be irrelevant.
+
+So for a `workflow_dispatch` run, the SHA check has no target to read.
+Fall back to **timing**: compare the run's `created_at` against your own push timestamps.
+A run dispatched before your latest push cannot have reviewed it, whatever its verdict claims about "the current diff."
+Where the verdict makes a specific claim ("this wording is unchanged"), the cheapest confirmation is direct: read the file yourself and check whether the claim is still true.
+A verdict that is empirically wrong about present file content is conclusive proof it reviewed an earlier one, with no run metadata needed at all.
+
+- **Do:** check a `workflow_dispatch` review's `event` field before reaching for `head_sha` --- on that trigger type the field names the dispatch ref, not the reviewed commit.
+- **Do:** cross-check a stale-suspected verdict's specific claims against the file directly, rather than only against run metadata.
+- **Don't:** trust `head_sha` as "the commit reviewed" on a workflow-dispatch-triggered run --- that guarantee only holds for push/pull_request-triggered runs, which check out the PR head by construction.
+
+(Morrison-Lab/ai-config#1251, 2026-08-07: a `claude-review.yml` run dispatched at 18:02:03Z reported `head_sha: 7d050a36...`, `main`'s tip at that moment, on an `event: workflow_dispatch` run for PR #1251.
+Its verdict claimed a specific wording fix was "unchanged in the current diff," which `grep`ing the live file disproved --- the fix had landed in a push before the verdict posted, sometime inside the run's own 18:02-18:08 execution window.
+A second dispatch, triggered directly via `actions_run_trigger` rather than by re-posting an `@claude` mention (which risks re-triggering the credit-gated `claude-bot.yml` ack step on its own `contains(body, '@claude')` gate), produced a genuine current-head verdict.)
+
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---
 including gaining its own independent addition that collides with yours

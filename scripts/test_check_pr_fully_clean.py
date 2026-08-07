@@ -224,6 +224,26 @@ def main() -> int:
             (not locreal_ok) and len(locreal_issues) > 0,
         )
 
+    # Adversarial (#1231 review): a genuine `**Location:**` finding that happens
+    # to fall inside a double-quoted span on the same line must still be detected.
+    # The strip preserves a quoted span carrying a bold finding label, so blanking
+    # it cannot silently hide a real finding (the unsafe direction).
+    quoted_real_finding = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "He said \"hi. **Location:** foo.py:1 -- bug\" and left."
+        ),
+    }
+    mock_qrf = json.dumps({"comments": [quoted_real_finding], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_qrf):
+        qrf_ok, qrf_issues = checker.check_review_comments("1167", "sha123")
+        check(
+            "genuine **Location:** inside a double-quoted span is still detected (#1231 review)",
+            (not qrf_ok) and len(qrf_issues) > 0,
+        )
+
     # Test 6: CI check runs filtering
     mock_ci_success = json.dumps({
         "check_runs": [

@@ -68,19 +68,31 @@ def strip_cited_finding_vocab(text: str) -> str:
     *about* the review tooling -- inside code spans (`**Location:**`), fenced
     blocks, or double quotes ("Needs more work"). A real verdict or findings
     heading is never expressed that way, and the structural findings-heading and
-    formal CHANGES_REQUESTED/REJECTED checks remain as independent backstops, so
-    stripping these spans fails safe. See Morrison-Lab/ai-config#1202.
+    formal CHANGES_REQUESTED/REJECTED checks remain as independent backstops.
+    See Morrison-Lab/ai-config#1202.
+
+    Code spans and fenced blocks are unambiguous citation and are always blanked.
+    A double-quoted span is blanked only when it does NOT itself carry a bold
+    ``**...**`` finding label, so a genuine finding that happens to fall inside
+    quotes on the same line (e.g. ``"... **Location:** foo.py:1 ..."``) is
+    preserved and still detected. Blanking less can only add safe-direction
+    re-flags of a clean verdict; it never hides a real finding.
 
     Spans are replaced with a space (not deleted) so surrounding text and the
     ``changes requested`` negation-prefix lookbehind stay separated.
     """
+    def _blank_quote(m: "re.Match") -> str:
+        # Preserve a quoted span carrying a bold finding label; blanking it could
+        # hide an incidentally-quoted genuine finding -- the unsafe direction.
+        return m.group(0) if "**" in m.group(0) else " "
+
     # Fenced code blocks first (``` ... ```), spanning lines.
     text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
     # Inline code spans (`...`), within a line.
     text = re.sub(r"`[^`\n]*`", " ", text)
-    # Straight and curly double-quoted spans, within a line.
-    text = re.sub(r"\"[^\"\n]*\"", " ", text)
-    text = re.sub("\u201c[^\u201d\n]*\u201d", " ", text)
+    # Straight and curly double-quoted spans, within a line (bold-carrying spans kept).
+    text = re.sub(r"\"[^\"\n]*\"", _blank_quote, text)
+    text = re.sub("\u201c[^\u201d\n]*\u201d", _blank_quote, text)
     return text
 
 

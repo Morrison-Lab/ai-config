@@ -23,10 +23,8 @@ generic Actions-authoring and reusable-workflow material.
   does not directly fire the review workflow.
 - A new push (`synchronize`) auto-fires a fresh review --- the normal path during
   an iterate loop.
-  This is a property of *those* repos' review workflow, not a general one:
-  `ai-config`'s own `claude-review.yml` is `workflow_dispatch`-only, so a push
-  here schedules nothing.
-  See "`ai-config` never auto-reviews a PR on push" at the end of this file.
+  A property of *those* repos, not a general one --- see "`ai-config` never
+  auto-reviews a PR on push" at the end of this file.
 - To force a fresh review on an existing PR **without a new commit**:
   - **workflow_dispatch** (preferred — no extra PR timeline noise). Same
     dispatch, three ways to send it:
@@ -1138,13 +1136,12 @@ point in the preceding month.)
 
 ## `ai-config` never auto-reviews a PR on push, and the absence is silent
 
-Nothing in this repo summons a reviewer when a PR is pushed.
-`validate` and `preview` fire on a PR event; no reviewer does.
-So an ai-config PR reaches all-green CI, `mergeStateStatus: CLEAN`, and sits
-with zero reviews indefinitely, because nobody asked for one.
+Nothing here summons a reviewer when a PR is pushed: `validate` and `preview`
+fire on a PR event, and no reviewer does.
+So a PR reaches all-green CI, `mergeStateStatus: CLEAN`, and sits with zero
+reviews forever, because nobody asked.
 
-Derive the trigger set rather than recalling it, since every entry below is a
-property of one `on:` block that can change:
+Derive it rather than recalling it; every row is one `on:` block that can change:
 
 ```bash
 for f in .github/workflows/*.yml; do
@@ -1154,16 +1151,14 @@ for f in .github/workflows/*.yml; do
 done
 ```
 
-Measured 2026-08-07:
+Every reviewer workflow, measured 2026-08-07:
 
 | workflow | triggers |
 | --- | --- |
-| `claude-bot.yml` | `issue_comment`, `pull_request_review_comment`, `issues: assigned`, `pull_request_review` --- **no `pull_request` trigger at all** |
-| `claude-review.yml` | `workflow_dispatch` only, input `pr_number` (required, string) |
+| `claude-bot.yml` | `issue_comment`, `pull_request_review_comment`, `issues: assigned`, `pull_request_review` --- **no `pull_request` at all** |
+| `claude-review.yml` | `workflow_dispatch` only, input `pr_number` |
 | `antigravity-review.yml` | `issue_comment`, `workflow_dispatch` |
 | `jules-review.yml` | `issue_comment`, gated on an `@jules` mention |
-| `validate.yml` | `[push, pull_request, workflow_dispatch]` |
-| `preview.yml` | `pull_request`, path-filtered |
 
 The remedy is one command:
 
@@ -1171,57 +1166,34 @@ The remedy is one command:
 gh workflow run claude-review.yml --repo Morrison-Lab/ai-config --ref <branch> -f pr_number=<N>
 ```
 
-**The expectation this violates is written down two files over, for a
-different repo, and reads as general.**
-The "Re-triggering the @claude PR *review*" section at the top of this file
-says "A new push (`synchronize`) auto-fires a fresh review --- the normal path
-during an iterate loop", and it is correct: it describes the **content and
-package repos**, whose review workflow does carry a `pull_request` trigger.
-[`debugging.md`](debugging.md)'s ARDI polling bullet states the same thing
-unqualified.
-`Lacaedemon/sparta` behaves that way too, having re-enabled its own
-`pull_request` review trigger in sparta#1122.
+**The contrary expectation is written down, correctly, for other repos.**
+This file's "Re-triggering the @claude PR *review*" section and
+[`debugging.md`](debugging.md)'s ARDI polling bullet both say a push auto-fires
+a review, and both are right about the content and package repos --- as is
+`Lacaedemon/sparta`, which re-enabled its own trigger in sparta#1122.
+So the question is not "does review fire on push" but "what does **this** repo
+trigger on".
 
-So the correct question is not "does the review fire on push" but "what does
-**this** repo's review workflow trigger on", and the deriving command above is
-how to answer it in one call.
-
-**The failure is silent and shaped like patience.**
-A PR with green checks and no review is indistinguishable from one whose
-review has not finished yet, so the natural response is to keep waiting ---
-and waiting is exactly the wrong move, because the thing being waited for was
-never scheduled.
-[`fully-clean`](../shared/workflow/fully-clean.md)'s criterion 2 already
-separates "no findings" from "no verdict" and says to treat the latter as
-unreviewed; this is the case where the reason for "no verdict" is that nobody
-asked.
-
-Copilot is not an automatic fallback here either.
-This repo carries no `copilot_code_review` ruleset rule, so nothing
-auto-requests Copilot on push:
-
-```bash
-for id in $(gh api "repos/Morrison-Lab/ai-config/rulesets" --jq '.[].id'); do
-  gh api "repos/Morrison-Lab/ai-config/rulesets/$id" --jq '.name + ": " + ([.rules[]?.type] | join(","))'
-done
-```
-
-It returns one ruleset, `main`, with rule types `deletion,non_fast_forward,pull_request`.
+**The absence is silent and shaped like patience.**
+Green checks plus no review is indistinguishable from a review still running,
+so the natural response is to wait for something never scheduled.
+[`fully-clean`](../shared/workflow/fully-clean.md)'s criterion 2 separates "no
+findings" from "no verdict"; here nobody asked.
+Copilot is no fallback either: `repos/Morrison-Lab/ai-config/rulesets` returns
+one ruleset, `main`, carrying `deletion,non_fast_forward,pull_request` and no
+`copilot_code_review` rule.
 
 - **Do:** dispatch `claude-review.yml` explicitly after opening a PR here, and
   again after every push you want re-reviewed.
 - **Do:** derive a repo's review triggers from its own `on:` blocks before
-  concluding that a review is late rather than absent.
+  concluding a review is late rather than absent.
 - **Don't:** wait on an ai-config review you did not dispatch --- green checks
   plus an empty `reviews` array is the steady state, not a transient one.
-- **Don't:** carry a sibling repo's auto-review behaviour across; `sparta`
-  auto-reviews and this repo does not, and the two look identical from the PR
-  page.
+- **Don't:** carry a sibling repo's auto-review behaviour across; the two look
+  identical from the PR page.
 
 (2026-08-06/07: PRs #1219 and #1224 each reached all-green CI with
 `reviews: []` and stayed there until a review was dispatched by hand.
-The trigger table above was read off the `on:` blocks directly.
-Two of its rows corrected a first-pass recollection: `antigravity-review.yml`
-also carries `issue_comment: created`, not `workflow_dispatch` alone, and
-`jules-review.yml` is comment-triggered rather than absent --- neither of
-which changes the conclusion, since neither fires on a push.)
+Reading the `on:` blocks directly corrected two rows a first-pass recollection
+had wrong, neither of which changes the conclusion --- `antigravity-review.yml`
+also carries `issue_comment`, and `jules-review.yml` is comment-triggered.)

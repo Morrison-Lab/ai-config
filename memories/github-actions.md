@@ -1118,3 +1118,55 @@ That ai-config has no automatic review to race against in the first place is a s
 Detecting a live platform incident, and cleaning up the two shapes of wreckage
 it leaves behind, live in
 [`github-actions-outages.md`](github-actions-outages.md).
+
+## A listener workflow's own error is not the dispatched workflow's verdict
+
+A comment-triggered listener workflow (`claude-bot.yml` here, gated on an
+`@claude` mention via `issue_comment`) can fail its own conversational step
+and still successfully hand off to the workflow that actually produces a
+review. `claude-bot.yml` can post `API Error: Usage credits required for 1M
+context · turn on usage credits at claude.ai/settings/usage, or use --model
+to switch to standard context` as its own comment. Read without checking run
+history, that reads as "the review is broken" -- exactly the false conclusion
+issue #1197 already recorded once (a subagent reported this same string as
+evidence of a repo-wide failure; the real history showed 36 success, 21
+cancelled, 0 failures).
+
+What the error actually is: `claude-bot.yml`'s own conversational-response
+step hitting a credit gate on **its** invocation, not on the review it goes
+on to dispatch. Three `@claude review` comments on one PR each produced this
+error, and each of the three `claude-bot.yml` runs still reported workflow
+**`conclusion: success`** (`list_workflow_runs` on `claude-bot.yml`) -- the
+error is caught and posted, not a crash. Separately, each comment also
+triggered a `workflow_dispatch` run of `claude-review.yml` (visible via
+`list_workflow_runs` on `claude-review.yml`, `event: workflow_dispatch`,
+timed within seconds of the comment) -- the workflow this repo's review
+actually depends on, per
+[`claude-bot-workflows.md`](claude-bot-workflows.md)'s trigger table.
+
+That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not
+the PR branch -- the same ambiguity
+[`fully-clean`](../shared/workflow/fully-clean.md) documents for a different
+repo (#635, run 29967418653). Don't use those fields to decide whether the
+run is reviewing your PR; read what it posts, or dispatch directly with an
+explicit `pr_number` input and `ref: <PR-branch>`, which skips the
+comment-relay path entirely.
+
+- **Do:** treat a listener's own error comment as evidence about that step
+  only, and check the dispatched workflow's run history before concluding a
+  review failed.
+- **Do:** dispatch the review workflow directly rather than relying on a
+  mention comment to relay through the listener.
+- **Don't:** re-derive "the review workflow is broken repo-wide" from one
+  PR's comments without checking `list_workflow_runs` first -- #1197 already
+  found this claim false once, from the same symptom.
+- **Don't:** count a listener's own error as one of the retries in
+  [`fully-clean`](../shared/workflow/fully-clean.md)'s "retry once, then
+  treat as unreachable" rule -- it isn't the reviewer failing.
+
+(2026-08-07, `Morrison-Lab/ai-config#1238`: the same string #1197 traced to a
+false repo-wide-failure report reappeared verbatim, three times, on a PR this
+session opened. A fallback self-review was posted before checking further --
+not wrong to do, but reached for the wrong reason, since `list_workflow_runs`
+on both workflows showed the listener succeeding throughout and the review
+workflow actively re-dispatching within seconds of each comment.)

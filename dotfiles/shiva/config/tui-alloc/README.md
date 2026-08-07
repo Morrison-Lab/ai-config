@@ -16,7 +16,7 @@ cd ~/Projects/bcs-fix-nas     # a bcs checkout auto-selects the `bcs` conda env
 claude-alloc                  # or: codex-alloc
 ```
 
-This grabs a slice (defaults: 8 hwthreads / 32G / 12h, off GPU node c1), lands
+This grabs a slice (defaults: 8 hwthreads / 32G / 48h, off GPU node c1), lands
 you on the **compute node** via `srun --pty`, activates `$ALLOC_CONDA_ENV` if
 set (a `~/.zshrc` chpwd hook sets it to `bcs` inside `~/Projects/bcs*`), and
 launches the agent.

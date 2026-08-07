@@ -78,6 +78,86 @@ That principle says to search for an existing tool before building one.
 This one says to leave a tool behind when your search finds nothing, so
 the next session's search succeeds where yours failed.
 
+## A follow-up question gets a hastier instrument than the main task did
+
+The test above fires on recurrence across occasions, which leaves a gap
+inside a single one.
+An instrument built for the main task, correct and still at hand, routinely
+goes unused when a follow-up question arrives minutes later, and the
+follow-up gets a throwaway one-liner instead.
+
+Nothing about the two questions justifies the gap.
+They run over the same corpus and ask the same kind of thing, so the
+instrument would have answered the second one directly.
+What differs is only how each felt.
+The main task's tool reads as infrastructure, while the follow-up reads as a
+quick lookup, and a quick lookup does not feel like something that needs a
+tool.
+
+Perceived stakes are therefore doing the work, and they point the wrong way.
+A follow-up question is usually asked in order to settle something, so its
+answer feeds a recommendation, a disposition, or a report to a human, whereas
+the main task's output goes on to be reviewed, tested, and revised.
+The artifact built with the least care is thus the one most likely to be
+acted on unchecked, and its error arrives dressed as a measurement.
+
+The constraint face at the top of this fragment already forbids this: use the
+deterministic option where one exists.
+What it lacks is the moment at which to notice, and that moment is
+observable.
+**A question of the same shape as one an existing instrument already answers
+is a second use of that instrument**, not a new problem.
+Re-run it with different arguments rather than writing a fresh matcher for
+the same corpus.
+
+This is not the reuse
+[`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)
+warns about, and the boundary is worth stating because the two look alike:
+same session, same artifact, built minutes ago.
+That fragment governs reuse across a **purpose** boundary, and says a
+recently self-authored template gets too little scrutiny.
+This one governs reuse within a single purpose, and says a recently built
+instrument gets too little **use**.
+Run its check first, naming what the original was for and what the new
+question is for.
+Where those match, reuse is the answer rather than the risk.
+
+**Read the scope an instrument prints, and compare it against the size you
+expected.**
+A printed denominator nobody checked is worth no more than one that was never
+printed.
+[`fail-fast`](fail-fast.md) makes the producer's half of this case at length,
+in its rule that a check should report what it examined rather than only what
+it found.
+The consumer's half is the same number one step later: a range that stops
+short of the population is right there in the output and gets read past,
+because the finding beneath it is what the question was about.
+
+- **Do:** re-run the instrument already built this session when a follow-up
+  asks the same kind of question of the same corpus.
+- **Do:** compare a printed examined-range or population count against the
+  expected size before using the result beneath it.
+- **Don't:** write a fresh throwaway matcher because the new question feels
+  smaller; perceived stakes are not a property of the corpus.
+- **Don't:** publish a scope figure a truncated scan produced as though it
+  were the population's real size.
+
+(2026-08-07, `UCD-SERG/serocalculator#635`: a fence-aware Quarto heading
+scanner, written for the main task and used to drive a 15-file restructure,
+was set aside minutes later for a follow-up question about how much one part
+of the document used a concept.
+The follow-up's fresh scan matched `^# ` with no fence tracking, so it stopped
+at the first R comment inside a code chunk, covering 194 of the part's 538
+lines.
+It printed that truncated range, and the range went unread.
+On that evidence the part was reported to hold a single passing mention of
+the concept, and a proposed move was recommended against.
+A fence-aware rescan found 5 mentions, one of them a named forward reference
+in prose pointing 611 composed lines ahead, so the recommendation was the
+opposite of correct.
+`UCD-SERG/serocalculator#569` had already diagnosed the same thing, and it
+surfaced only during the dupe check before filing a new issue.)
+
 ## Limits
 
 Design, genuine judgment, and semantic work stay with a human or a model:
@@ -117,6 +197,8 @@ Flag these with the same weight as the other principle-level findings:
   settles it.
 - A new rule written into prose where a hook, a CI step, or an assertion
   could decide the same thing mechanically.
+- Two hand-written checks in one diff that ask the same question of the same
+  corpus, where the second could have re-run the first.
 - Conversely, a new instrument standing in for a judgment it cannot make,
   or built for a task with exactly one occurrence.
 

@@ -741,10 +741,74 @@ Grep for the old `<plugin>@<marketplace>` string across both layers.
 - **Don't:** read a working clone, or a successful "added marketplace" line,
   as evidence the plugin ref is right --- the redirect makes both succeed
   while the install still fails.
+- **Don't:** treat a change to the declared `name` as a safe drive-by just
+  because it looks like a stylistic nit (a casing fix, "matching
+  convention").
+  The field is a hardcoded string other repos and reusable workflows depend
+  on byte-for-byte, so any edit to it needs every consumer grepped first,
+  not just an org move.
 
 (2026-07-29: ai-config renamed its declared marketplace from `d-morrison` to
 `Morrison-Lab`.
 Both consumers broke; the gha fix shipped when `v2` was slid to `c50e847`.)
+
+(2026-08-06/07: the same failure recurred from the opposite direction.
+`Morrison-Lab/ai-config#1238` lowercased `name` from `Morrison-Lab` to
+`morrison-lab` as a one-line drive-by inside an unrelated marketplace-sync
+fix, described in its own commit message as "matching convention".
+`Morrison-Lab/gha`'s `claude-code-review.yml@v2` still hardcodes
+`ai-config@Morrison-Lab`, so every dispatched review broke again, tracked
+as `#1246` and fixed on `main` by `#1247`.
+Nothing about #1238's own CI exercised the plugin-install path, so a
+one-character casing change rode through green and merged clean.)
+
+## A marketplace-name fix pushed to the reviewed PR's own branch cannot make that PR's own review pass
+
+The natural next move once #1246 was diagnosed was to push the identical
+one-line restore directly onto the *broken* PR's own branch (PR #1244) and
+re-request review, expecting the dispatched review to go green on its own
+fix.
+It failed identically, with the same
+`Plugin "ai-config" not found in marketplace "morrison-lab"` error.
+
+The reason is a property of `claude-code-action`'s `plugin_marketplaces`
+input, not of anything wrong with the fix.
+That input is a bare git URL with no ref attached, so the marketplace is
+always cloned from ai-config's **default branch**, never from whatever ref
+the calling workflow itself is running against.
+A `pull_request`-triggered review job checks out the *reviewed* repo's PR
+branch to do its work, but the plugin it installs comes from a completely
+separate clone of ai-config's `main` --- so a fix that lives only on a PR
+branch is invisible to that PR's own CI by construction, however correct
+the fix is.
+
+This generalizes past this one input: any CI mechanism that reads a
+dependency's default branch unconditionally, rather than pinning to a ref
+or reading the consumer's own checkout, cannot be exercised by a fix
+committed to the very branch under review.
+The tell is a fix that reproduces the identical failure after being pushed
+to the affected PR, with no diagnostic difference from before the fix.
+Before assuming a re-push should have worked, check whether the failing
+step reads its input from a fixed ref rather than from the PR's own
+checkout.
+
+- **Do:** land a fix to a shared, ref-less dependency (a marketplace, a
+  pinned action's default-branch input) on `main` first, then re-dispatch
+  the review that depends on it --- don't expect a same-PR push to prove it.
+- **Do:** check an input's own ref-resolution behavior (a bare URL vs. a
+  pinned SHA/tag) before treating a same-PR retest as a valid verification
+  step.
+- **Don't:** read an unchanged failure after a same-PR push as evidence the
+  fix is wrong --- it can mean the mechanism under test never saw the fix
+  at all.
+
+(`Morrison-Lab/ai-config#1244`, 2026-08-07: the restore commit
+(`6f4dec8d`) was pushed straight to #1244's own branch first, "so this
+PR's own CI doesn't have to wait on [#1247] merging" --- and still failed,
+because the dispatched review's plugin install cloned `main`, which did not
+yet carry the fix.
+The real fix landed via `#1247` -> `main`, at which point #1244's review
+could pass.)
 
 ## Bash tool cwd persists across calls — an easy trap when juggling sibling repo checkouts
 

@@ -5,6 +5,10 @@ one topic and each is unreadable without the other: an outage presents as
 **absent** checks rather than failing ones, and after it clears the PRs it hit
 are left in states that look like ordinary failures.
 
+Detecting one also means ruling one out, so the outage's commonest lookalike
+lives here too --- a change to shared configuration, which fails across every
+repo at once exactly as an outage does.
+
 Split out of [`github-actions.md`](github-actions.md), which keeps the generic
 Actions-authoring and reusable-workflow material.
 
@@ -126,6 +130,106 @@ Eight of the ten predate 15:22:49Z, so quota was independently established and
 the original diagnosis stood; only the last two fall inside the window.
 The refusal bodies also carried quota-specific wording --- "because the user
 who requested the review has reached" --- rather than a generic error.)
+
+## A repo-wide failure need not be an outage --- a shared-config change looks the same
+
+The section above separates a platform incident from a per-PR cause, and its
+discriminator is **scope**: plural and repo-wide versus single.
+That test leaves a third category unaddressed, and the third category passes
+it.
+A change to configuration every repo consumes --- a marketplace manifest, a
+reusable workflow, a pinned action, an org secret --- fails everywhere at once,
+so it is plural and repo-wide exactly as an outage is.
+The status page then comes back clean, which reads as ruling out the only
+repo-wide explanation on offer.
+
+Two things separate it from an outage, and both are cheap.
+A config break usually produces **failing** checks with a specific message,
+where an outage produces **absent** ones --- the shape distinction the section
+above already draws.
+And the shared repo's own recent merges are a short list: `gh pr list -R
+<shared-repo> --state merged --limit 10 --json number,title,mergedAt` covers
+the window in one call.
+
+### Build the timeline from the commits that govern each transition
+
+Once a config change is the suspect, the diagnosis becomes a timing claim, and
+the misleading evidence is no longer a log.
+It is a set of timestamps and identifiers that sit *near* each transition
+without governing it, and each one reads as the fact you wanted.
+
+- **A commit's own date is not when it reached the default branch.**
+  `git log`, `gh api repos/<o>/<r>/commits/<sha>`, and the commit page all show
+  the author and committer dates, stamped when the work was written on a
+  branch.
+  The change lands when its PR merges, and the interval between those two is
+  exactly the window a propagation-delay or cache-lag story fills.
+  Read `gh pr view <N> --json mergedAt`, or the merge commit's own committer
+  date, and treat the commit's date as saying nothing about the default branch.
+- **A log line that also appears in the passing run is not evidence about the
+  failure.**
+  A tool that prints `Refreshing cache` every time it does the thing prints it
+  on success too, so quoting it from the failing run establishes only that the
+  tool ran.
+  Grep the last known-good run for the same line before citing it.
+- **A run's `head_sha` is what says which version it exercised.**
+  A success after the fix merged is the expected post-fix state rather than a
+  counterexample to the diagnosis, and a success from before the defect landed
+  ran code that never contained it.
+  Read the SHA, then place it against the merge times above.
+
+The last two fail in the direction of feeling like *extra* rigor, which is why
+they survive a careful session.
+Quoting a log line is more concrete than asserting a mechanism, and hunting for
+a case that should also have broken is the disconfirming move this corpus keeps
+asking for --- so each arrives as evidence being gathered rather than as a step
+being skipped.
+Neither discriminates until you check which population the line or the run
+belongs to.
+
+The cost is larger than a wrong sentence, because a timing explanation *is*
+triage guidance.
+"A latent break that surfaces gradually" tells the next reader that repos will
+fail at staggered times and that a recent success is not evidence against the
+diagnosis.
+Both are the opposite of true when the break is immediate, so the wrong
+mechanism spends the one check that would have settled it.
+
+- **Do:** check the shared repo's recent merges when several repos fail
+  together and the status page is clean.
+- **Do:** take every transition time from the merge that performed it ---
+  `mergedAt`, or the merge commit's committer date.
+- **Do:** grep the last passing run for any log line you are about to cite as
+  evidence of the failure.
+- **Do:** read a run's `head_sha` before reading its outcome as evidence about
+  a defect, in either direction.
+- **Don't:** read a clean status page as ruling out a repo-wide cause.
+- **Don't:** read a commit's author or committer date as when it landed on the
+  default branch.
+- **Don't:** explain a gap between a change and its first failure before
+  confirming the gap exists.
+
+(Morrison-Lab/ai-config#1248, 2026-08-07: `claude-review` failed in every
+consumer repo after #1238 lowercased the plugin marketplace's `name` while the
+shared workflow still installed `ai-config@Morrison-Lab`.
+The issue diagnosing it carried a section headed "Why it did not break
+immediately", asserting that the rename "landed at 02:53Z" while a review still
+succeeded at 03:37Z, so runners "were serving a cached manifest under the old
+name until the cache turned over".
+`02:53:17Z` is commit `6dc0cb49`'s author and committer date on its branch;
+`gh pr view 1238 --json mergedAt` returns `2026-08-07T05:32:15Z`, so the rename
+was not on `main` at 03:37 and that success needs no explaining.
+The first failure, at 05:43Z, is 11 minutes after the merge rather than three
+hours after the commit, so the break was immediate.
+The two cache lines the issue cites are in the passing run verbatim:
+`gh run view 31144863822 -R UCD-SERG/serocalculator --log` prints
+`Refreshing marketplace cache` and `Cleaning up old marketplace cache` at
+`03:37:16.549`, immediately before `Successfully added marketplace:
+Morrison-Lab`, and again a second earlier for a different marketplace.
+A later success at 06:11Z was then read as disconfirming the caching story;
+that run's `head_sha` is `1a21df1e`, the fix commit from #1247, merged at
+06:05:10Z, so it was the expected post-fix state and evidence about neither
+hypothesis.)
 
 ## After an Actions outage clears, the wreckage has two shapes and they need different recoveries
 

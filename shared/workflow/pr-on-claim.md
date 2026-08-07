@@ -182,24 +182,32 @@ The deriving queries, so a later reader re-measures rather than inheriting this:
 gh api "repos/Morrison-Lab/ai-config/rules/branches/main" \
   --jq '[.[] | select(.type=="copilot_code_review")]'
 
-# Every Copilot review is a refusal (returns 0 substantive here).
-gh api graphql -f query='{search(query:"repo:Morrison-Lab/ai-config is:pr is:merged", type:ISSUE, last:60){nodes{... on PullRequest{reviews(first:20){nodes{author{login} body}}}}}}' \
+# Every Copilot review object is a refusal (returns 0 substantive here).
+# `submittedAt` is selected so the two timestamp aggregates below derive from
+# this same call rather than from a claim the query cannot reproduce.
+gh api graphql -f query='{search(query:"repo:Morrison-Lab/ai-config is:pr is:merged", type:ISSUE, last:60){nodes{... on PullRequest{reviews(first:20){nodes{author{login} submittedAt body}}}}}}' \
   --jq '[.data.search.nodes[].reviews.nodes[]
          | select(.author.login=="copilot-pull-request-reviewer")]
         | {total: length,
-           refusals: ([.[] | select(.body | test("unable to review|quota limit"; "i"))] | length),
-           substantive: ([.[] | select(.body | test("unable to review|quota limit"; "i") | not)] | length)}'
+           refusals:    ([.[] | select(.body | test("unable to review|quota limit"; "i"))] | length),
+           substantive: ([.[] | select(.body | test("unable to review|quota limit"; "i") | not)] | length),
+           since_override:  ([.[] | select(.submittedAt >= "2026-08-04")] | length),
+           before_incident: ([.[] | select(.submittedAt <  "2026-08-06T15:22:49Z")] | length),
+           latest: ([.[].submittedAt] | max)}'
 ```
 
 (Measured 2026-08-06 on `Morrison-Lab/ai-config`.
 The repository's only ruleset is named `main` and carries rule types
 `deletion,non_fast_forward,pull_request`, and the effective-rules endpoint
 returns zero `copilot_code_review` entries, so the org scope is covered too.
-The second query returned `substantive: 0` against every Copilot review object
-in its window, with `total` and `refusals` equal to each other at around 40.
-Read `substantive: 0` as the finding and treat the total as volatile: the
-`last:60` window slides as PRs merge, so two runs minutes apart returned 40 and
-then 39 without anything about Copilot having changed.
+The second query returned
+`{"total":39,"refusals":39,"substantive":0,"since_override":39,"before_incident":39,"latest":"2026-08-06T09:14:23Z"}`.
+Read `substantive: 0` as the finding, and the two timestamp aggregates as what
+rules the 2026-08-06 Actions incident out as a rival cause for *this* set, per
+`Morrison-Lab/ai-config#1223`, which owns that discrimination.
+Treat the counts themselves as volatile: the `last:60` window slides as PRs
+merge, so two runs minutes apart returned 40 and then 39 without anything about
+Copilot having changed.
 An earlier reading of this same evidence counted reviewer *logins* rather than
 review *bodies*, saw `copilot-pull-request-reviewer` as the only reviewer, and
 concluded Copilot was active here --- which inverted the finding, since every

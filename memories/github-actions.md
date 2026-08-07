@@ -1057,6 +1057,63 @@ above, and it is worth knowing in both directions.
 from the frozen `@v1` to `@v2` showed `@v2`'s step shape on its own run before
 merging.)
 
+## This repo's own review is dispatch-only, and repeated dispatches cancel each other
+
+Two facts about `Morrison-Lab/ai-config`'s `.github/workflows/claude-review.yml`, and one attribution trap that falls out of them.
+
+**Its `on:` block carries `workflow_dispatch` and nothing else.**
+There is no `pull_request` trigger, so opening a PR or pushing to one fires no review at all.
+Every other statement in this corpus about the review workflow presumes both triggers are present and that a push auto-fires it, which is true of the Quarto and R-package repos those entries came from and is not true here.
+So a session waiting for a review to appear on a fresh ai-config PR waits forever.
+Read the `on:` block rather than assuming, and dispatch it yourself:
+
+```sh
+gh workflow run claude-review.yml --ref <pr-branch> -f pr_number=<N>
+```
+
+**Grepping that caller for `concurrency` returns nothing, and answers the wrong file.**
+The group lives in the reusable workflow the caller invokes, `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`:
+
+```yaml
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || inputs.pr-number }}
+  cancel-in-progress: true
+```
+
+It is keyed on the **PR number**, not on the branch or the ref.
+So every dispatch for a given PR lands in one group and cancels its still-running predecessor, whatever `--ref` each was given.
+Only the last dispatch survives.
+That the caller has no `concurrency:` block of its own is therefore not evidence that nothing can cancel a dispatched run --- check the reusable workflow before concluding a cancellation is unexplained.
+
+**The trap is attribution, and it is the reason this is worth writing down.**
+You retry a cancelled dispatch, you change something on the retry, and the retry succeeds.
+Whatever you changed then looks like the remedy, because it co-varied with the one thing that actually decided the outcome: being last.
+Any variable at all would look causal under this design, so the retry that worked is the weakest possible evidence about why.
+
+Measured on PR #1224, 2026-08-06, all four runs confirmed `PR_NUMBER: 1224` from their `gather-context` job logs:
+
+| run | dispatched with | dispatched | ended | outcome |
+| --- | --- | --- | --- | --- |
+| 31135612152 | no `--ref` (ran from `main`) | 00:43:10 | 00:45:06 | cancelled |
+| 31135679096 | `--ref <pr-branch>` | 00:44:20 | 00:49:39 | cancelled |
+| 31135937709 | no `--ref` (ran from `main`) | 00:48:54 | 00:54:15 | cancelled |
+| 31136199829 | `--ref <pr-branch>` | 00:53:30 | 00:59:25 | success |
+
+Each cancellation follows the next dispatch for the same PR by 46, 45, and 45 seconds --- a lag consistent enough to be mechanical rather than coincidental.
+The second row is the one that settles it: a run dispatched **with** `--ref <pr-branch>` was cancelled too, by a later run dispatched **without** it.
+So `--ref` does not predict survival in either direction, and the surviving run is simply the one nothing followed.
+Three other PRs' reviews dispatched inside the same window (`31135656213`, `31135680911`, `31135682673`) all succeeded untouched, which is what a per-PR group predicts and a global one would not.
+
+`--ref` still matters for a different reason, per the section above: `workflow_dispatch` runs the workflow file from the ref you name, defaulting to the default branch.
+Pass it so the run reads the PR branch's copy of the caller.
+Just do not read a run's survival as evidence that you passed it.
+
+- **Do:** read the `on:` block before waiting for a review, and dispatch it when `pull_request` is absent.
+- **Do:** look for `concurrency:` in the reusable workflow a caller invokes, not only in the caller.
+- **Do:** treat "the last dispatch is the one that lived" as the default explanation for a chain of cancelled review runs, and check the dispatch timestamps against the cancellation timestamps before reaching for anything else.
+- **Don't:** infer that a change made on the successful retry caused the success --- under a `cancel-in-progress` group, being last is sufficient on its own.
+- **Don't:** read an absent `concurrency:` block in the caller as meaning a dispatched run cannot be cancelled.
+
 ## Python Execution in Runner Environments
 
 - **Add `from __future__ import annotations` when a built-in generic type (`list[str]`, `dict[str, Any]`) appears in a function or variable annotation.**

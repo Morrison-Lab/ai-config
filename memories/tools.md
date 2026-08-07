@@ -312,6 +312,41 @@ again scripting a one-off text replacement after an `Edit` tool call's
 `old_string` failed to match despite `grep` showing byte-identical content
 in the file.)
 
+## Windows console encoding: a repo check can exit 1 on the line that says it passed
+
+On a Windows console defaulting to cp1252, a Python script that prints a Unicode check mark (U+2713) dies where it tries to print it:
+
+```
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2713' in position 0: character maps to <undefined>
+```
+
+Two of this repo's checks do exactly that, and `PYTHONIOENCODING=utf-8` fixes both:
+
+```sh
+PYTHONIOENCODING=utf-8 python3 scripts/check-links.py
+PYTHONIOENCODING=utf-8 python3 scripts/check-vendored-drift.py
+```
+
+**The failure lands on the success path, which is what makes it worth a note rather than a shrug.**
+Both scripts print their check mark only after finding nothing wrong, so the crash happens *because* the check passed.
+The script exits 1 with a traceback, and that red is a fact about the terminal's codepage rather than about the corpus.
+Measured 2026-08-06: `check-links.py` printed `Checked 1114 relative links across 463 markdown files.`, then died on `print("\u2713 no broken relative links")` with rc=1; under `PYTHONIOENCODING=utf-8` the same invocation printed the check mark and exited 0.
+`check-vendored-drift.py` behaves identically.
+
+The corpus already learned this once and never wrote it down: `scripts/validate-skills.py` opens `main()` with `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`, while `scripts/check-pr-fully-clean.py` prints a bare `\u2713` with no such guard.
+Setting the environment variable is the portable way to cover every script at once without touching any of them.
+
+Distinct from the `LC_ALL=C.UTF-8` material in [`fail-fast`](../shared/principles/fail-fast.md) and `memories/debugging.md`, which is an **input**-side problem --- `grep -P` failing to *match* a non-ASCII pattern under a non-UTF-8 locale.
+This one is **output**-side, in the interpreter, on a string the script already holds.
+Different layer, different fix; do not reach for one when you have the other.
+
+- **Do:** set `PYTHONIOENCODING=utf-8` when running a repo Python check from a Windows shell.
+- **Do:** read the traceback's last line before believing a red check --- a `UnicodeEncodeError` on a `print` says nothing about what the check found.
+- **Don't:** treat a nonzero exit from these scripts as a finding, or start hunting for the broken link or the drifted vendored file it never reported.
+- **Don't:** "fix" it by deleting the check mark from the script; the glyph is fine everywhere else, and the environment variable is the portable remedy.
+
+(2026-08-06, verified both ways on this machine while running the pre-push checks for `Morrison-Lab/ai-config#1224`.)
+
 ## `scripts/semantic-line-breaks.py` previews by default and scopes its writes
 
 **Fixed in ai-config#951.**
@@ -580,6 +615,35 @@ report 3.7, and `readlink -f` shows they are the same file, so even "two
 binaries" was generous.
 An unscoped version claim is not merely imprecise; it is false on some
 machine, which is why every number in this entry names where it was taken.)
+
+## A deduplicated listing counts distinct values, not occurrences
+
+`sort | uniq -c`, `sort -u`, and `grep -l` all answer **how many distinct things matched**.
+Reading the length of that output as **how many matches there were** understates whenever any value repeats, which for a grep over a prose corpus is nearly always.
+Nothing errors, no zero appears to provoke suspicion, and the number is plausible --- so the wrong figure is the one that gets published.
+
+The two questions want different commands:
+
+```sh
+grep -rl 'PATTERN' . | wc -l     # distinct FILES containing it
+grep -rc 'PATTERN' . | wc -l     # (still files --- one line per file)
+grep -roh 'PATTERN' . | wc -l    # total OCCURRENCES, the usual intent
+```
+
+State the unit alongside the count whenever you publish one.
+"9 files" and "17 occurrences" are both true of the same corpus, and a bare "9 instances" is the form that cannot be checked and turns out wrong.
+
+Note which nearby rule does **not** catch this.
+[`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md)'s **scope** claim type says to check the population rather than recall it --- and here the population *was* queried, correctly and exhaustively.
+The repair it prescribes is already satisfied, and the answer is still misread, because the failure is in the **unit** rather than in the coverage.
+
+- **Do:** name the unit ("distinct files" / "total occurrences") in any count you write into a PR body, a review reply, or a memory entry.
+- **Do:** pick `grep -o` when you mean occurrences, and treat `uniq -c`/`grep -l` output as a list of *categories* rather than of hits.
+- **Don't:** count the lines of a deduplicated listing and report the result as a total.
+- **Don't:** assume having run the right query means having read the right quantity off it.
+
+(2026-08-06, drafting `Morrison-Lab/ai-config#1224`: a citation style was reported as having "9 existing instances" from a listing showing 9 distinct paths, several of which occurred more than once.
+The real total was 17.)
 
 ## A hand-rolled verification check is worth nothing until it has caught something
 

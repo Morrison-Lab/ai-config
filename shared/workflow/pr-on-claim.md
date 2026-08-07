@@ -193,8 +193,11 @@ gh api graphql -f query='{search(query:"repo:Morrison-Lab/ai-config is:pr is:mer
 The repository's only ruleset is named `main` and carries rule types
 `deletion,non_fast_forward,pull_request`, and the effective-rules endpoint
 returns zero `copilot_code_review` entries, so the org scope is covered too.
-The second query returned
-`{"total":40,"refusals":40,"substantive":0}` over the last 60 merged PRs.
+The second query returned `substantive: 0` against every Copilot review object
+in its window, with `total` and `refusals` equal to each other at around 40.
+Read `substantive: 0` as the finding and treat the total as volatile: the
+`last:60` window slides as PRs merge, so two runs minutes apart returned 40 and
+then 39 without anything about Copilot having changed.
 An earlier reading of this same evidence counted reviewer *logins* rather than
 review *bodies*, saw `copilot-pull-request-reviewer` as the only reviewer, and
 concluded Copilot was active here --- which inverted the finding, since every

@@ -466,6 +466,15 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
 - Use for MR comments, pipeline checks, CI job logs, etc.
 - `glab issue list --opened` is deprecated — `--opened` is the default when `--closed` is not used. Just use `glab issue list` (no flag needed).
 - No `GITLAB_TOKEN` env var — glab uses its own config at `~/Library/Application Support/glab-cli/config.yml`
+- **`glab api` has no `--jq` flag**, unlike `gh api`: passing one errors with
+  `Unknown flag: --jq`. Pipe the raw JSON to `jq` separately instead:
+  `glab api "projects/<id>" | jq '.default_branch'`.
+- **A self-hosted GitLab instance on an institutional internal network may
+  only resolve while on that network's VPN.** A DNS failure (`NXDOMAIN` /
+  `no such host`) for the GitLab hostname, with ordinary internet DNS
+  resolving fine otherwise, points at needing the VPN rather than a broader
+  outage or sandbox restriction: `nslookup <host>` before and after
+  connecting confirms it.
 - Key commands:
   - `glab ci list` — list pipelines
   - `glab ci get --pipeline-id <ID>` — view pipeline details (non-interactive)

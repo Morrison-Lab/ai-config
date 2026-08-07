@@ -330,7 +330,8 @@ PYTHONIOENCODING=utf-8 python3 scripts/check-vendored-drift.py
 **The failure lands on the success path, which is what makes it worth a note rather than a shrug.**
 Both scripts print their check mark only after finding nothing wrong, so the crash happens *because* the check passed.
 The script exits 1 with a traceback, and that red is a fact about the terminal's codepage rather than about the corpus.
-Measured 2026-08-06: `check-links.py` printed `Checked 1114 relative links across 463 markdown files.`, then died on `print("\u2713 no broken relative links")` with rc=1; under `PYTHONIOENCODING=utf-8` the same invocation printed the check mark and exited 0.
+Measured 2026-08-06: `check-links.py` printed `Checked 1114 relative links across 463 markdown files.`, then died on `print("\u2713 no broken relative links")` with rc=1.
+Under `PYTHONIOENCODING=utf-8` the same invocation printed the check mark and exited 0.
 `check-vendored-drift.py` behaves identically.
 
 The corpus already learned this once and never wrote it down: `scripts/validate-skills.py` opens `main()` with `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`, while `scripts/check-pr-fully-clean.py` prints a bare `\u2713` with no such guard.
@@ -343,7 +344,8 @@ Different layer, different fix; do not reach for one when you have the other.
 - **Do:** set `PYTHONIOENCODING=utf-8` when running a repo Python check from a Windows shell.
 - **Do:** read the traceback's last line before believing a red check --- a `UnicodeEncodeError` on a `print` says nothing about what the check found.
 - **Don't:** treat a nonzero exit from these scripts as a finding, or start hunting for the broken link or the drifted vendored file it never reported.
-- **Don't:** "fix" it by deleting the check mark from the script; the glyph is fine everywhere else, and the environment variable is the portable remedy.
+- **Don't:** "fix" it by deleting the check mark from the script.
+  The glyph is fine everywhere else, and the environment variable is the portable remedy.
 
 (2026-08-06, verified both ways on this machine while running the pre-push checks for `Morrison-Lab/ai-config#1224`.)
 

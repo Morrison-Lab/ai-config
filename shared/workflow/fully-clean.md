@@ -460,17 +460,23 @@ evidence a reviewer spoke, and nothing more.
 NOT clean over a clean verdict.**
 The cases above are fail-open --- the instrument reads clean when the PR is not;
 this script fails the other way.
-Its `finding_patterns` scan runs over the whole review body, so a clean
+Its `finding_patterns` scan ran over the whole review body, so a clean
 `Ready for merge` verdict that merely *quotes* finding vocabulary ---
-`**Location:**`, `Needs more work`, and the like --- trips a pattern and prints
-`contains findings (matched pattern ...)`.
+`**Location:**`, `Needs more work`, and the like --- tripped a pattern and
+printed `contains findings (matched pattern ...)`.
 It bites hardest on PRs about the review tooling itself, whose reviews naturally
 discuss finding-indicator words, and its direction is fail-closed, so it is the
 safe one: it makes the script untrustworthy for auto-confirming clean, never for
 waving a real finding through.
-The workaround is the same remedy this section already gives --- read the
-verdict's own conclusion rather than the script's raw pattern match.
-Tracked as `Refs #1202`; the workaround stays live until that fix merges.
+The scan now blanks cited finding vocabulary --- fenced code blocks, inline code
+spans, and double-quoted spans --- before matching (Morrison-Lab/ai-config#1202),
+so the two documented instances (a `**Location:**` code span, a double-quoted
+`Needs more work`) no longer trip it, while the structural findings-heading and
+formal `CHANGES_REQUESTED`/`REJECTED` checks remain as independent backstops.
+A finding-mood phrase stated *unquoted* in prose, or in a blockquote line the
+strip does not cover, can still trip it, so when the script does flag on quoted
+vocabulary the remedy is unchanged --- read the verdict's own conclusion rather
+than the script's raw pattern match.
 
 - **Do:** read the verdict's own conclusion when the script reports findings
   against a review whose prose merely discusses finding vocabulary.

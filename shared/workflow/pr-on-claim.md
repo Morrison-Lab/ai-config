@@ -156,7 +156,8 @@ Route to the self-review fallback on a **read refusal body**, never on an empty 
 An empty pending list hands it to nobody, because it has established nothing either way.
 Note also that a refusal body is itself proof the request **arrived**, which is the cleanest available disproof of "blocked".
 
-Read the ruleset anyway --- it is one cheap call, and it settles the sparta case --- but read it for what it can actually tell you.
+Read the ruleset anyway --- it is one cheap call, and on a repo that does carry the rule it explains the disappearance outright --- but read it for what it can actually tell you.
+`ucdavis/bcs` is the known example, per [`memories/github.md`](../../memories/github.md): ruleset `19248641` returns `{"review_on_push":true,"review_draft_pull_requests":true}`.
 The effective-rules endpoint covers organization-level rulesets alongside the repository's own, in a single call, which the per-ruleset loop in [`memories/github.md`](../../memories/github.md) does not (that file's own note on org-level rulesets says why):
 
 ```bash

@@ -59,6 +59,43 @@ def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
+def strip_cited_finding_vocab(text: str) -> str:
+    """Blank out spans where finding-indicator vocabulary appears as a *citation*
+    rather than as a raised finding, so ``finding_patterns`` keys on genuine
+    findings.
+
+    A clean verdict body routinely quotes finding vocabulary -- especially on PRs
+    *about* the review tooling -- inside code spans (`**Location:**`), fenced
+    blocks, or double quotes ("Needs more work"). A real verdict or findings
+    heading is never expressed that way, and the structural findings-heading and
+    formal CHANGES_REQUESTED/REJECTED checks remain as independent backstops.
+    See Morrison-Lab/ai-config#1202.
+
+    Code spans and fenced blocks are unambiguous citation and are always blanked.
+    A double-quoted span is blanked only when it does NOT itself carry a bold
+    ``**...**`` finding label, so a genuine finding that happens to fall inside
+    quotes on the same line (e.g. ``"... **Location:** foo.py:1 ..."``) is
+    preserved and still detected. Blanking less can only add safe-direction
+    re-flags of a clean verdict; it never hides a real finding.
+
+    Spans are replaced with a space (not deleted) so surrounding text and the
+    ``changes requested`` negation-prefix lookbehind stay separated.
+    """
+    def _blank_quote(m: "re.Match") -> str:
+        # Preserve a quoted span carrying a bold finding label; blanking it could
+        # hide an incidentally-quoted genuine finding -- the unsafe direction.
+        return m.group(0) if "**" in m.group(0) else " "
+
+    # Fenced code blocks first (``` ... ```), spanning lines.
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+    # Inline code spans (`...`), within a line.
+    text = re.sub(r"`[^`\n]*`", " ", text)
+    # Straight and curly double-quoted spans, within a line (bold-carrying spans kept).
+    text = re.sub(r"\"[^\"\n]*\"", _blank_quote, text)
+    text = re.sub("\u201c[^\u201d\n]*\u201d", _blank_quote, text)
+    return text
+
+
 def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--json", "comments,reviews"])
     data = json.loads(out)
@@ -175,11 +212,15 @@ def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> T
             has_findings = True
             issues.append(f"Matching review for SHA {sha[:8]} has state '{state}'")
 
+        # Scan a copy with cited finding vocabulary (code spans, fenced blocks,
+        # double-quoted spans) blanked out, so a clean verdict that merely quotes
+        # finding vocabulary is not read as raising a finding (#1202).
+        scan_body = strip_cited_finding_vocab(body)
         for pat in finding_patterns:
-            for match in re.finditer(pat, body, re.IGNORECASE | re.MULTILINE):
+            for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
                 if pat == r"changes\s+requested\b":
                     start = match.start()
-                    prefix = body[max(0, start - 25):start].lower()
+                    prefix = scan_body[max(0, start - 25):start].lower()
                     if re.search(r"\bno\s+(\w+\s+)?$", prefix):
                         continue
                 has_findings = True

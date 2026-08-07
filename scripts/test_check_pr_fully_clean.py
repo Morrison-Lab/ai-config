@@ -165,6 +165,85 @@ def main() -> int:
             (not hmc_ok) and any("No automated review" in i for i in hmc_issues),
         )
 
+    # Regression (#1202): a CLEAN verdict that merely quotes finding vocabulary
+    # inside a code span or double-quotes must NOT be read as raising a finding.
+    # Both were live false positives on PRs about the review tooling itself.
+
+    # #1160: clean verdict quoting `**Location:**` inside an inline code span.
+    location_codespan_clean = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "Ready for merge. No new findings. The gha#412 inline tag examples "
+            "use `**Location:** [file.py:L12]`.\n\nVerdict: Clean / Ready for merge."
+        ),
+    }
+    mock_loc = json.dumps({"comments": [location_codespan_clean], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_loc):
+        loc_ok, loc_issues = checker.check_review_comments("1160", "sha123")
+        check(
+            "clean verdict quoting `**Location:**` in a code span passes (#1202)",
+            loc_ok and loc_issues == [],
+        )
+
+    # #1167: clean verdict discussing "Needs more work" in double quotes.
+    needs_work_quoted_clean = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "Ready for merge. No new findings. This PR improves the "
+            "`finding_patterns` coverage of \"Needs more work\" verdicts."
+        ),
+    }
+    mock_nwq = json.dumps({"comments": [needs_work_quoted_clean], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_nwq):
+        nwq_ok, nwq_issues = checker.check_review_comments("1167", "sha123")
+        check(
+            "clean verdict quoting \"Needs more work\" in double quotes passes (#1202)",
+            nwq_ok and nwq_issues == [],
+        )
+
+    # Positive control (#1202): a REAL bold `**Location:**` finding label, with no
+    # findings heading, must still be detected -- proving the strip removes cited
+    # vocabulary only, not genuine (unquoted, uncode-spanned) finding labels.
+    location_real_finding = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "**Location:** memories/tools.md:L843 -- broken link syntax."
+        ),
+    }
+    mock_locreal = json.dumps({"comments": [location_real_finding], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_locreal):
+        locreal_ok, locreal_issues = checker.check_review_comments("1167", "sha123")
+        check(
+            "real bold **Location:** finding (not quoted) still fails the check (#1202)",
+            (not locreal_ok) and len(locreal_issues) > 0,
+        )
+
+    # Adversarial (#1231 review): a genuine `**Location:**` finding that happens
+    # to fall inside a double-quoted span on the same line must still be detected.
+    # The strip preserves a quoted span carrying a bold finding label, so blanking
+    # it cannot silently hide a real finding (the unsafe direction).
+    quoted_real_finding = {
+        "createdAt": "2026-08-06T00:00:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "He said \"hi. **Location:** foo.py:1 -- bug\" and left."
+        ),
+    }
+    mock_qrf = json.dumps({"comments": [quoted_real_finding], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_qrf):
+        qrf_ok, qrf_issues = checker.check_review_comments("1167", "sha123")
+        check(
+            "genuine **Location:** inside a double-quoted span is still detected (#1231 review)",
+            (not qrf_ok) and len(qrf_issues) > 0,
+        )
+
     # Test 6: CI check runs filtering
     mock_ci_success = json.dumps({
         "check_runs": [

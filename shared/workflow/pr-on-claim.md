@@ -127,41 +127,95 @@ Verify the request landed: the POST response should include the requested review
 A POST response alone is not enough; if the pending request disappears and no current-head review appears after a short poll, treat the reviewer request as blocked and start the documented fallback.
 Do not leave it as "review owed".
 
-**That blocked-request test has a false positive, and it is on exactly the repos the section above describes.**
+**That blocked-request test has a false positive, and it fires on more repos than the section above describes.**
 Where a ruleset auto-requests Copilot, the POST returns success naming the reviewer and `reviewRequests` reads **empty** moments later.
-That is the literal signature the test above calls blocked --- request gone, no review yet --- so the two paragraphs contradict each other on any repo with `review_on_push: true`, and the earlier one is the one that is wrong there.
+That is the literal signature the test above calls blocked --- request gone, no review yet --- so the two paragraphs contradict each other, and the earlier one is the one that is wrong.
 
-The empty read is observed, on two repos; *why* it comes back empty is not.
-[`memories/github.md`](../../memories/github.md) records the same
-201-then-empty sequence and offers auto-requesting as the **likeliest
-reconciliation, explicitly untested** --- deliberately so, since probing it
-consumes the per-user quota that is usually the real reason Copilot is absent.
-Keep that hedge: what matters operationally is that an empty pending-list is
-uninformative on such a repo, which holds whatever the mechanism turns out to
-be.
+The auto-requesting ruleset was offered as the likeliest reconciliation, and it is now **ruled out as the general explanation**.
+`Morrison-Lab/ai-config` produces the identical signature while carrying no `copilot_code_review` rule at all, at either repository or organization scope.
+Measured 2026-08-06 on PR #1219: the POST returned `HTTP/2.0 201 Created` with a `Location` header, and a read five seconds later returned `["d-morrison"]` with Copilot absent, reproduced twice.
+A separately-issued `d-morrison` request persisted in that same list, so nothing is wiping the list structurally --- only Copilot's entry goes.
 
-Reading it as blocked costs more than a wasted call.
-It routes you to the self-review fallback while a working reviewer is queued, which [`fully-clean`](fully-clean.md) treats as a fallback for when *no* external reviewer is reachable --- so the PR ends up carrying a weaker verdict than it could have.
+*Why* the entry disappears is still unexplained, and this section deliberately declines to name a replacement mechanism.
+What is measured is the disappearance, and nothing yet accounts for it.
+Do not upgrade a guess about it into a finding, and do not probe it harder than the question deserves --- each probe consumes the per-user Copilot quota that is usually the real reason Copilot is absent, so the experiment damages the thing it would explain.
 
-Settle it by reading the ruleset rather than by polling harder.
-[`memories/github.md`](../../memories/github.md) gives the single-ruleset form;
-this loop is the same query when you do not already know the id, so keep the
-two in sync if either changes:
+**The operative point is that three surfaces fail to discriminate here, and only a fourth one does.**
+The pending-reviewer list empties whether or not a ruleset asked.
+The ruleset query comes back negative whether or not the request reached Copilot.
+The reviewer's own check run goes green whether it reviewed, refused, or stayed silent, per [`fully-clean`](fully-clean.md)'s fifth case and its silent-reviewer sibling.
+Only the posted review **body** distinguishes those outcomes.
+
+So an empty pending list after a 201 supports one conclusion and not a second.
+It is **not** evidence the request was blocked.
+It is **also not** evidence that a review is coming, which is a separate claim and an unsupported one.
+At ai-config what follows is a refusal rather than a review, so the two claims come apart there in the clearest possible way.
+Note that this point is indifferent to *why* the reviewer refused --- quota, a platform incident, anything else --- because a refusal is not a verdict whatever produced it.
+
+Route to the self-review fallback on a **read refusal body**, never on an empty pending list.
+[`fully-clean`](fully-clean.md) is explicit that a refusing reviewer is not "reachable", so a refusal legitimately hands the external-verdict requirement to whichever other reviewer is working.
+An empty pending list hands it to nobody, because it has established nothing either way.
+Note also that a refusal body is itself proof the request **arrived**, which is the cleanest available disproof of "blocked".
+
+Read the ruleset anyway --- it is one cheap call, and on a repo that does carry the rule it explains the disappearance outright --- but read it for what it can actually tell you.
+`ucdavis/bcs` is the known example, per [`memories/github.md`](../../memories/github.md): ruleset `19248641` returns `{"review_on_push":true,"review_draft_pull_requests":true}`.
+The effective-rules endpoint covers organization-level rulesets alongside the repository's own, in a single call, which the per-ruleset loop in [`memories/github.md`](../../memories/github.md) does not (that file's own note on org-level rulesets says why):
 
 ```bash
-for id in $(gh api "repos/<owner>/<repo>/rulesets" --jq '.[].id'); do
-  gh api "repos/<owner>/<repo>/rulesets/$id" \
-    --jq '.rules[]? | select(.type=="copilot_code_review") | .parameters'
-done
+gh api "repos/<owner>/<repo>/rules/branches/<branch>" \
+  --jq '[.[] | select(.type=="copilot_code_review")]'
 ```
 
-A `review_on_push: true` result means the disappearance is expected,
-and that the next push re-requests automatically.
-Only then does an absent review become a question about the reviewer rather
-than about the request.
+A `review_on_push: true` result means the disappearance is expected on that repo, and that the next push re-requests automatically.
+An empty result means only that no ruleset explains the disappearance.
 
-- **Do:** check for a `copilot_code_review` rule before concluding a vanished pending request means a blocked one.
-- **Don't:** re-POST the request on such a repo --- it is auto-requested on every push, so the retry changes nothing and the empty read repeats.
+- **Do:** decide whether a reviewer is engaged by reading its posted review body, since the pending list, the ruleset, and the check run each fail to discriminate.
+- **Do:** check for a `copilot_code_review` rule before concluding that a vanished pending request means a blocked one.
+- **Don't:** read an empty pending list as evidence the request was blocked, nor as evidence a review is on its way.
+- **Don't:** treat a negative ruleset result as establishing that the request failed --- ai-config returns exactly that while the request still reaches Copilot.
+- **Don't:** re-POST on a repo whose ruleset auto-requests --- the retry changes nothing and the empty read repeats.
+
+The deriving queries, so a later reader re-measures rather than inheriting this:
+
+```bash
+# No copilot_code_review rule, at either scope (returns an empty array here).
+gh api "repos/Morrison-Lab/ai-config/rules/branches/main" \
+  --jq '[.[] | select(.type=="copilot_code_review")]'
+
+# Every Copilot review object is a refusal (returns 0 substantive here).
+# `submittedAt` is selected so the two timestamp aggregates below derive from
+# this same call rather than from a claim the query cannot reproduce.
+gh api graphql -f query='{search(query:"repo:Morrison-Lab/ai-config is:pr is:merged", type:ISSUE, last:60){nodes{... on PullRequest{reviews(first:20){nodes{author{login} submittedAt body}}}}}}' \
+  --jq '[.data.search.nodes[].reviews.nodes[]
+         | select(.author.login=="copilot-pull-request-reviewer")]
+        | {total: length,
+           refusals:    ([.[] | select(.body | test("unable to review|quota limit"; "i"))] | length),
+           substantive: ([.[] | select(.body | test("unable to review|quota limit"; "i") | not)] | length),
+           since_override:  ([.[] | select(.submittedAt >= "2026-08-04")] | length),
+           before_incident: ([.[] | select(.submittedAt <  "2026-08-06T15:22:49Z")] | length),
+           latest: ([.[].submittedAt] | max)}'
+```
+
+(Measured 2026-08-06 on `Morrison-Lab/ai-config`.
+The repository's only ruleset is named `main` and carries rule types
+`deletion,non_fast_forward,pull_request`, and the effective-rules endpoint
+returns zero `copilot_code_review` entries, so the org scope is covered too.
+The second query returned
+`{"total":39,"refusals":39,"substantive":0,"since_override":39,"before_incident":39,"latest":"2026-08-06T09:14:23Z"}`.
+Read `substantive: 0` as the finding, and the two timestamp aggregates as what
+rules the 2026-08-06 Actions incident out as a rival cause for *this* set, per
+`Morrison-Lab/ai-config#1223`, which owns that discrimination.
+Treat the counts themselves as volatile: the `last:60` window slides as PRs
+merge, so two runs minutes apart returned 40 and then 39 without anything about
+Copilot having changed.
+An earlier reading of this same evidence counted reviewer *logins* rather than
+review *bodies*, saw `copilot-pull-request-reviewer` as the only reviewer, and
+concluded Copilot was active here --- which inverted the finding, since every
+one of those review objects is the refusal string quoted in
+[`memories/github.md`](../../memories/github.md).
+That is the login-versus-body distinction
+[`fully-clean`](fully-clean.md)'s fifth case already warns about, met in the
+direction that flatters the repo.)
 
 This is part of opening the PR, not a follow-up task.
 A status sentence like "review owed on #N" is the anti-pattern: it names a debt that should already have been discharged, the same way an offer to file an issue names work instead of doing it.

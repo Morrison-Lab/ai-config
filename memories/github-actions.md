@@ -1176,7 +1176,7 @@ The real cause was the incident "Incident with Actions", impact `critical`,
 hours later, with `Actions` and `Pages` both at `major_outage`.
 
 Its 18:46:37Z update also named "Copilot code review" as affected, which
-retroactively offered a rival explanation for eight Copilot review refusals the
+retroactively offered a rival explanation for ten Copilot review refusals the
 same session had already attributed to quota and called thoroughly established.
 Ten refusal timestamps were 2026-08-05T23:53:11Z, and on 2026-08-06 at
 00:35:07Z, 05:00:01Z, 05:07:13Z, 05:32:35Z, 05:51:48Z, 06:37:17Z, 06:42:16Z,

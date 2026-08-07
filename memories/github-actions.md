@@ -1134,29 +1134,51 @@ cancelled, 0 failures).
 
 What the error actually is: `claude-bot.yml`'s own conversational-response
 step hitting a credit gate on **its** invocation, not on the review it goes
-on to dispatch. Three `@claude review` comments on one PR each produced this
-error, and each of the three `claude-bot.yml` runs still reported workflow
+on to dispatch.
+Two genuine `@claude review` comments on one PR each produced this error,
+and both `claude-bot.yml` runs they triggered still reported workflow
 **`conclusion: success`** (`list_workflow_runs` on `claude-bot.yml`) -- the
-error is caught and posted, not a crash. Separately, each comment also
-triggered a `workflow_dispatch` run of `claude-review.yml` (visible via
-`list_workflow_runs` on `claude-review.yml`, `event: workflow_dispatch`,
-timed within seconds of the comment) -- the workflow this repo's review
-actually depends on, per
+error is caught and posted, not a crash.
+Separately, each comment also triggered a `workflow_dispatch` run of
+`claude-review.yml` (visible via `list_workflow_runs` on `claude-review.yml`,
+`event: workflow_dispatch`, timed within seconds of the comment) -- the
+workflow this repo's review actually depends on, per
 [`claude-bot-workflows.md`](claude-bot-workflows.md)'s trigger table.
+
+**A third `claude-bot.yml` run followed, and it may have been self-triggered
+rather than a new human request.**
+The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`, called by
+`claude-bot.yml`) fires on `contains(github.event.comment.body, '@claude')`
+with no regard for code-span formatting -- the exact substring-match bug
+this repo's own `claude-bot.yml` already documents having caused once
+before, on an issue body rather than a comment (#682 -> #683).
+A FALLBACK self-review posted to this PR at 03:05:10 contained the text
+`` the `@claude` review workflow `` -- a literal `@claude` substring, posted
+under a MEMBER-associated account, which is enough to satisfy the gate --
+and the third run was picked up sixteen seconds later, at 03:05:26.
+That timing is suggestive, not confirmed -- this session's tools cannot
+read which comment fired a given `issue_comment` run.
+Tracked as ai-config#1242 (needs transfer to `gha`, where the gate lives;
+this session had no write access there) for someone with webhook-delivery
+access to confirm.
 
 That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not
 the PR branch -- the same ambiguity
-[`fully-clean`](../shared/workflow/fully-clean.md) documents for a different
-repo (#635, run 29967418653). Don't use those fields to decide whether the
-run is reviewing your PR; read what it posts, or dispatch directly with an
-explicit `pr_number` input and `ref: <PR-branch>`, which skips the
-comment-relay path entirely.
+[`fully-clean`](../shared/workflow/fully-clean.md) documents for the **same**
+repo (`ai-config#635`, run 29967418653; verified directly, not assumed from
+the fragment's "this very PR" phrasing).
+Don't use those fields to decide whether the run is reviewing your PR;
+read what it posts, or dispatch directly with an explicit `pr_number` input
+and `ref: <PR-branch>`, which skips the comment-relay path entirely.
 
 - **Do:** treat a listener's own error comment as evidence about that step
   only, and check the dispatched workflow's run history before concluding a
   review failed.
 - **Do:** dispatch the review workflow directly rather than relying on a
   mention comment to relay through the listener.
+- **Do:** avoid writing an unescaped `@claude` substring into any PR comment
+  on a repo whose bot gates on a plain `contains()` check -- it can retrigger
+  the bot even from inside backticks or a quoted error message.
 - **Don't:** re-derive "the review workflow is broken repo-wide" from one
   PR's comments without checking `list_workflow_runs` first -- #1197 already
   found this claim false once, from the same symptom.
@@ -1165,8 +1187,13 @@ comment-relay path entirely.
   treat as unreachable" rule -- it isn't the reviewer failing.
 
 (2026-08-07, `Morrison-Lab/ai-config#1238`: the same string #1197 traced to a
-false repo-wide-failure report reappeared verbatim, three times, on a PR this
-session opened. A fallback self-review was posted before checking further --
-not wrong to do, but reached for the wrong reason, since `list_workflow_runs`
-on both workflows showed the listener succeeding throughout and the review
-workflow actively re-dispatching within seconds of each comment.)
+false repo-wide-failure report reappeared verbatim on a PR this session
+opened.
+A fallback self-review was posted before checking further -- not wrong to
+do, but reached for the wrong reason, since `list_workflow_runs` showed the
+listener succeeding throughout and the review workflow re-dispatching
+within seconds of each comment.
+A later review of this very entry caught a wrong claim that PR #635
+belonged to a different repo, and an overcount of "three" genuine
+review-request comments that should have read two plus a probable
+self-retrigger.)

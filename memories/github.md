@@ -667,6 +667,70 @@ before the actual `@v1`→`@v2` pin bump was found; `gha#304`'s own review then
 caught two more stale `@v1` references in sibling docs pages and the
 contradicting pending changelog fragment, all in the same repo-wide sweep.)
 
+## A repository transfer does NOT carry Actions secrets, so every secret-dependent workflow silently stops working
+
+The sections around this one are about **links** breaking on a transfer --- a
+redirect that covers `pull` and not `issues`, a `uses:` ref that stops
+resolving, an `origin` still naming the old owner.
+Each of those announces itself: a 404, a red check, a rejected push.
+
+Secrets break differently, and worse.
+They do not move with the repository, so a workflow that authenticated fine
+last week now runs with an empty credential --- and a workflow whose secret is
+declared `required: false` (the usual shape, so fork PRs skip cleanly rather
+than hard-failing at the call gate) does not fail at all.
+It skips.
+
+So the failure presents as a review bot that is configured, referenced in
+`.github/workflows/`, and simply never says anything.
+Nobody reads a missing comment as a symptom, which is why this can sit for
+months: the repo looks reviewed-by-default and is not.
+
+One call settles it, and it is worth running on **any** repo whose ownership
+has changed, not only when something looks wrong:
+
+```bash
+gh api repos/<owner>/<repo>/actions/secrets --jq '{n: .total_count, names: [.secrets[].name]}'
+```
+
+`{"n": 0, "names": []}` on a repo whose workflows reference secrets is the
+whole diagnosis.
+
+Two follow-ons worth knowing before you go looking for a cause.
+
+**Restoring the secret does not prove the workflow works.**
+Adding it back is necessary and not sufficient, and treating the two as the
+same thing is how a second, unrelated fault stays hidden behind the first ---
+so re-run the workflow and read the run's conclusion rather than the secret
+list.
+
+**A missing secret is not a `startup_failure`.**
+Because the callee declares it `required: false`, an absent secret cannot fail
+the call gate, so a `startup_failure` on a secret-passing workflow is always
+something else and the secret is a red herring.
+Establish that empirically where you can: adding the secret and re-dispatching
+is a genuine negative control, since it moves exactly one variable.
+
+- **Do:** query `actions/secrets` as a routine step whenever a repo's owner has
+  changed, before diagnosing anything downstream.
+- **Do:** re-run a secret-dependent workflow after restoring a secret, and read
+  its conclusion.
+- **Don't:** read a quiet review bot as "no findings" --- on a transferred repo
+  it is more likely to be "no credential".
+- **Don't:** attribute a `startup_failure` to a missing secret without checking
+  whether the callee declares it `required: false`.
+
+(`ucdavis/mic.sim`, 2026-08-06, transferred from `ajmichaelucd/mic.sim`:
+`actions/secrets` reported `total_count: 0`, and `Claude Code Review` had
+concluded `skipped` on all ten of its prior runs, having never once posted a
+review.
+Once `CLAUDE_CODE_OAUTH_TOKEN` was restored the workflow still ended in
+`startup_failure`, which is what proved the secret was never that failure's
+cause; filed as ucdavis/mic.sim#50.
+The same transfer also left five stale `ajmichaelucd` URLs across `DESCRIPTION`,
+`_pkgdown.yml`, and `README.md`, one of which disagreed with the live Pages URL
+reported by `gh api repos/<o>/<r>/pages` --- ucdavis/mic.sim#51.)
+
 ## A repository transfer redirects `pull` paths but NOT `issues` paths
 
 When a repo moves between owners (`d-morrison/gha` -> `Morrison-Lab/gha`),

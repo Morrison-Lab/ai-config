@@ -185,6 +185,18 @@ before its output has been read as a result.
 Pair it with a known-clean control (a ref against itself) so the detector is
 pinned in both directions.
 
+**The known-clean half cannot stand in for the known-conflicting half, and it
+is the one you will reach for**, since it needs no second branch and no prior
+knowledge of anything that conflicts.
+A ref merged against itself is clean by construction, so that control passes
+whether the detector works or not.
+That makes it the perfect impostor: it runs the real command, against real
+refs, and returns exactly the clean result a working detector would --- so
+running it alone produces the feeling of having controlled the instrument while
+establishing nothing, which is the state this section exists to prevent.
+Only a pair you know conflicts can show the detector is capable of reporting
+one at all.
+
 Report what the sweep **examined**, not only what it concluded.
 `0 conflicts` is meaningless without `of N pairs examined`, and the count is
 what distinguishes a clean queue from an empty loop.
@@ -193,8 +205,12 @@ whose pass path print the same thing is not yet a check.
 
 - **Do:** run a known-conflicting pair through the detector before believing any
   zero it produces.
+- **Do:** treat the self-merge as the optional second half of the control
+  rather than the first, and say which halves you ran.
 - **Do:** print the number of pairs examined alongside the number that
   conflicted.
+- **Don't:** count a ref-against-itself run as having validated the detector
+  --- it is the one input that cannot fail.
 - **Don't:** key a `merge-tree` sweep on exit status --- the legacy form's status
   carries no information, and a rejected flag looks the same as a clean merge.
 - **Don't:** report a zero matrix as "no collisions" when nothing established

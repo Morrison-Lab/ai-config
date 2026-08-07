@@ -81,6 +81,64 @@ that is exactly where a new request tends to arrive and preempt it -- the
 failure `CLAUDE.md`'s "A new instruction arriving at a checkpoint does not
 cancel the checkpoint" describes.
 
+### An item run before its pause point is banked, not discharged
+
+The paragraph above covers a pause point preempted from *after*, by a request
+that arrives and displaces it.
+The mirror failure comes from *before*: you run one of the list's own checks
+early, while the work is still in flight, and carry its result forward to a
+pause point that then never happens.
+
+That is worse than skipping the item outright, which is the whole reason it
+needs naming.
+A skipped item leaves you knowing it is outstanding.
+An early-run one leaves you believing it is discharged -- and the belief rests
+on a real command with real output, so nothing about it reads as a gap.
+
+Diff-scoped checks are the ones this bites, because a diff is exactly the
+input that *changes* between the moment you feel like running a check and the
+moment the checklist fires.
+A `<base>...HEAD` scan run mid-edit compares committed history against itself,
+cannot see the working tree at all, and returns a clean zero that is true of
+an empty diff and says nothing about the work.
+That the corpus already states this three times over -- narrowly in
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md), generally in
+[`address-every-comment`](address-every-comment.md), and as a checklist item
+in [`ardi`](ardi.md) naming punctuation and the three-dot range outright --
+is the evidence that restating it a fourth time is not the fix.
+Knowing the rule is not what fails here; the item is skipped at the pause
+point because it feels already done.
+
+Two things actually help.
+Put the *timing* inside the item, as `ardi`'s does ("run *after* committing
+and with the three-dot range"), so an early run reads as not-yet-done rather
+than as done.
+And prefer a check that reports its denominator, per
+[`fail-fast`](../principles/fail-fast.md)'s hand-check section: a scan
+reporting `0 findings in N added lines` cannot be banked, because a premature
+run visibly reports `N = 0`.
+
+- **Do:** re-run a pause-point check at the pause point, however recently you
+  ran it, whenever anything has been committed or edited since.
+- **Do:** write the timing into the item itself, so running it early is
+  visibly not running it.
+- **Don't:** carry a diff-scoped check's result across a commit -- the commit
+  is precisely what changes its answer.
+- **Don't:** read a zero from a check you ran early as evidence about work you
+  did afterwards.
+
+(Morrison-Lab/ai-config#1178, 2026-08-06: four skill files were edited, and a
+punctuation scan over `git diff -U0 origin/main...HEAD` reported "banned
+punctuation in added lines: 0", which was then reported as verification.
+Nothing was committed at that moment, so the scan compared committed history
+and never saw a line the edit had written.
+Commit `1edc5037` landed three em-dashes in `skills/ard/SKILL.md` and
+`skills/merge-it/SKILL.md`; a parallel session fixed them in `ebd39ade`
+(a PR-branch commit, squashed into `7a5b2ce0`).
+`ardi`'s checklist item already named banned punctuation, the after-committing
+timing, and the three-dot range, and was never run at the pause point --
+running the same scan earlier had felt like discharging it.)
+
 ## Mark the killer items
 
 The term *The Checklist Manifesto* uses for the steps that are both most often

@@ -238,6 +238,54 @@ between the incident and your memory of it.
 - **Don't:** validate a matcher by reading it -- a wrong one reads as correct.
 - **Don't:** trust a comment describing what the pattern cannot match.
 
+### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
+
+The section above governs a comment claiming *what* a matcher matches.
+Its sharper cousin is a comment claiming *which* guard blocks *which* case ---
+"the lookahead is what refuses a following lowercase word", "these two
+characters were dropped to fix an over-split".
+That is a **cause** claim in
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s sense, so its check
+is not "does this read correctly" but "what else would explain the observed
+behaviour" --- and here the answer is decidable, because you can remove the
+named guard and watch whether the case actually flips.
+
+A comment block written *to guide future edits* --- a map the next widening is
+read against --- is the worst place for such a claim to sit unverified, on two
+counts.
+It reads as documentation rather than as a claim, so
+[`fact-check-prose`](../writing/fact-check-prose.md) never fires on it.
+And its whole function is to be trusted by the next editor, so a wrong
+attribution there does not merely mislead, it *directs* the next edit at the
+wrong guard.
+
+Mutation settles it and argument does not, so run the mutation before writing
+the attribution down, and again when a review disputes it.
+Remove the clause you are crediting, re-run the case it supposedly handles, and
+confirm the behaviour changes; if it does not, the credit is wrong however
+plausible the reasoning.
+
+- **Do:** verify a "which guard handles which case" comment by removing the
+  guard and confirming the case flips, before committing the comment.
+- **Do:** re-run that mutation when a reviewer disputes the attribution, rather
+  than re-arguing it.
+- **Don't:** treat a guide-for-future-edits comment as exempt from
+  fact-checking because it is documentation --- it is a claim-bearing artifact.
+- **Don't:** settle a mechanism attribution by plausible reasoning; a
+  reasoned-but-wrong one reads exactly like a correct one.
+
+(Morrison-Lab/gha#425, 2026-08-05: a `check-new-line-breaks.py`
+sentence-boundary regex fix carried a comment block documenting which half of
+the regex --- the closing-character class or the lookahead --- refused which
+construct, kept as a map for future widenings.
+Reasoned-but-wrong attributions in that block inverted the review across three
+separate rounds (2, 4, 5), each a fresh factual inversion: an ellipsis
+exclusion credited to the wrong guard, and gha#397's own history inverted from
+"added characters to fix an under-split" to "dropped characters to fix an
+over-split".
+Each was decidable in one mutation --- remove the clause, re-run the case ---
+and none was decidable by re-reading the comment.)
+
 ## A negative control must enter at the real input
 
 The section above says to test a guard against the incident that prompted it.

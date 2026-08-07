@@ -178,6 +178,37 @@ the variable on the line and stops looking.
 - **Don't:** treat the presence of `LC_ALL=` somewhere in a command line as
   evidence that the matching stage received it.
 
+### The same vacuous zero has a second cause: an empty input
+
+Everything above assumes the check **broke** --- a rejected pattern, a wrong
+locale, a swallowed non-zero exit --- and prints its failure as a pass.
+The identical zero arrives with nothing broken at all, when a perfectly sound
+command runs over an input that is empty.
+A diff-scoped scan run before anything is committed compares committed history
+against itself, so it examines no lines and truthfully reports no findings.
+
+That defeats the guards this section prescribes, which is why it needs
+separating rather than folding in.
+No command failed, so an `rc=$?` test passes; the exit status is 1, which here
+is the *clean* answer rather than an error; and the locale was never involved.
+A reader who has internalized "make the error path distinguishable" is still
+caught, because there was no error path to distinguish.
+
+The denominator is the one remedy above that covers both causes, and this is
+the case that argues for it hardest: `0 findings in 0 lines examined` is
+unmistakable where a bare `0` is not.
+Report what a check *examined*, not only what it *found*.
+
+Deciding **when** to run such a check, as opposed to how to write it, belongs
+to [`skill-checklists`](../workflow/skill-checklists.md)'s pause-point rule ---
+a correctly written check still reports on the wrong thing if it runs at the
+wrong moment.
+
+- **Do:** print the examined count beside the finding count, so an empty input
+  is visible rather than silent.
+- **Don't:** treat an exit-status or locale guard as covering this --- both
+  pass cleanly while the check examines nothing.
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass
@@ -568,6 +599,50 @@ step to take at the moment you write the comment, not at review.
 - **Don't:** treat a considered comment about a hazard as evidence the hazard
   was handled everywhere it applies; a removal note is the artifact most likely
   to stop the search early.
+
+**One level up from a partial guard: editing state that two consumers share
+regresses the consumer you were not looking at.**
+Every case above spreads a guard across *sites* --- emitters, discharge paths,
+members of one pattern.
+This is the inverse: a single object read by two consumers, where the edit that
+satisfies one silently breaks the other, because the two place *conflicting*
+demands on it and you only had one in view.
+An allowlist, a shared regex fragment, a config map, a lookup table are all this
+shape.
+
+It is nastier than the "members of one pattern" case above, because there the
+fix is still to edit the members correctly.
+Here no single edit to the shared object can satisfy both consumers at once, so
+each round of editing it trades one regression for another --- and that is the
+tell: a fix that *moves* the failure to the other consumer rather than removing
+it.
+When that happens, stop editing the shared object and **un-share it**: give the
+second consumer its own separately-scoped copy or pass, applied after the first
+consumer has run.
+
+The discipline that avoids the whole loop is the enumerate-the-sites rule one
+level up: before editing shared state, enumerate every consumer that reads it
+and check the edit against each, not only against the one whose bug you are
+fixing.
+
+- **Do:** enumerate every consumer of a shared object before editing it, and
+  check the edit against each.
+- **Do:** un-share the state --- a separately-scoped second pass --- when two
+  consumers place conflicting demands on it, rather than re-editing it round
+  after round.
+- **Don't:** read a fix as done when it moves the failure to a different
+  consumer of the same object; that is the shared-state loop, not progress.
+- **Don't:** assume an edit that fixes one reader of shared state leaves the
+  others intact.
+
+(Morrison-Lab/gha#425, 2026-08-05: one abbreviation list (`_ABBREV_RE`) fed two
+regex branches --- a lowercase-sentence branch and an uppercase one.
+Dropping `No` from the list fixed the lowercase branch and un-protected `No.` on
+the uppercase branch; registering every lowercase form then fixed the lowercase
+branch and leaked protection onto the uppercase one.
+Each edit traded one regression for the other until the fix became
+architectural: a second, separately-scoped pass applied only after the first
+branch ran.)
 
 ## A guard's discharge fires on positive success, not the absence of failure
 

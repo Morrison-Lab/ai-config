@@ -438,6 +438,27 @@ evidence a reviewer spoke, and nothing more.
 - **Don't:** let a green review-gate check stand in for reading what the
   review said.
 
+**`check-pr-fully-clean.py` itself has the mirror false positive: it can report
+NOT clean over a clean verdict.**
+The cases above are fail-open --- the instrument reads clean when the PR is not;
+this script fails the other way.
+Its `finding_patterns` scan runs over the whole review body, so a clean
+`Ready for merge` verdict that merely *quotes* finding vocabulary ---
+`**Location:**`, `Needs more work`, and the like --- trips a pattern and prints
+`contains findings (matched pattern ...)`.
+It bites hardest on PRs about the review tooling itself, whose reviews naturally
+discuss finding-indicator words, and its direction is fail-closed, so it is the
+safe one: it makes the script untrustworthy for auto-confirming clean, never for
+waving a real finding through.
+The workaround is the same remedy this section already gives --- read the
+verdict's own conclusion rather than the script's raw pattern match.
+Tracked as `Refs #1202`; the workaround stays live until that fix merges.
+
+- **Do:** read the verdict's own conclusion when the script reports findings
+  against a review whose prose merely discusses finding vocabulary.
+- **Don't:** treat a `contains findings (matched pattern ...)` line as a real
+  finding without reading the verdict body it matched.
+
 **A review comment's header SHA can be stale, so take the reviewed commit from
 the run's own `head_sha`.**
 Criterion 2 requires the verdict to sit at the current head, and the obvious

@@ -1153,14 +1153,15 @@ with no regard for code-span formatting -- the exact substring-match bug
 this repo's own `claude-bot.yml` already documents having caused once
 before, on an issue body rather than a comment (#682 -> #683).
 A FALLBACK self-review posted to this PR at 03:05:10 contained the text
-`` the `@claude` review workflow `` -- a literal `@claude` substring, posted
-under a MEMBER-associated account, which is enough to satisfy the gate --
-and the third run was picked up sixteen seconds later, at 03:05:26.
-That timing is suggestive, not confirmed -- this session's tools cannot
-read which comment fired a given `issue_comment` run.
-Tracked as ai-config#1242 (needs transfer to `gha`, where the gate lives;
-this session had no write access there) for someone with webhook-delivery
-access to confirm.
+`` the `@claude` review workflow `` -- a literal `@claude` substring.
+Its `author_association` reads `MEMBER` via `pull_request_read` (REST) and
+`COLLABORATOR` via `gh pr view --json comments` (GraphQL) for the same
+comment id -- unresolved from this session, though both sit inside the
+gate's allowlist, so the account was eligible either way.
+The third run was picked up sixteen seconds later, at 03:05:26 -- a timing
+this session's tools cannot fully confirm as causal (no access to which
+comment fired a given `issue_comment` run).
+Tracked as ai-config#1242 (needs transfer to `gha`) for confirmation.
 
 That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not
 the PR branch -- the same ambiguity
@@ -1193,7 +1194,7 @@ A fallback self-review was posted before checking further -- not wrong to
 do, but reached for the wrong reason, since `list_workflow_runs` showed the
 listener succeeding throughout and the review workflow re-dispatching
 within seconds of each comment.
-A later review of this very entry caught a wrong claim that PR #635
-belonged to a different repo, and an overcount of "three" genuine
-review-request comments that should have read two plus a probable
-self-retrigger.)
+Two review rounds on this very entry then caught a wrong claim that PR #635
+belonged to a different repo, an overcount of "three" genuine comments that
+should have read two plus a probable self-retrigger, and a guessed
+`author_association` a second API surface contradicted.)

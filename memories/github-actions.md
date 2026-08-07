@@ -1127,9 +1127,9 @@ and still successfully hand off to the workflow that actually produces a
 review. `claude-bot.yml` can post `API Error: Usage credits required for 1M
 context · turn on usage credits at claude.ai/settings/usage, or use --model
 to switch to standard context` as its own comment. Read without checking run
-history, that reads as "the review is broken" -- the false conclusion issue
-#1197 already recorded (a subagent's repo-wide-failure report; the real
-history showed 36 success, 21 cancelled, 0 failures).
+history, that reads as "the review is broken" -- the false conclusion
+issue #1197 already recorded (a subagent's repo-wide-failure report; the
+real history showed 36 success, 21 cancelled, 0 failures).
 
 What the error actually is: `claude-bot.yml`'s own conversational-response
 step hitting a credit gate on **its** invocation, not on the review it goes

@@ -219,11 +219,11 @@ direction --- see
 [`ultracode-merge-conflicts`](ultracode-merge-conflicts.md), which owns that
 fact.
 
-## Two silent failure modes arrive through a conflict-free merge
+## Three silent failure modes arrive through a conflict-free merge
 
 The reason "no conflict" is not an all-clear.
-Both of these landed through merges that git resolved cleanly, with nothing in
-the diff to point at and no check turning red.
+All three landed through merges that git resolved cleanly, with nothing in the
+diff to point at and no check turning red.
 
 **Version parity.**
 A clean merge of `main` can leave an R package's `DESCRIPTION` `Version:` at
@@ -243,6 +243,44 @@ defect, `markdownlint`'s `blanks-around-lists` governs a list's **boundaries**
 rather than the gaps **between** its items.
 The result is a valid tight item that renders inconsistently beside its loose
 neighbours.
+
+**A threshold breach that exists only in the sum.**
+A file under a size, count, or coverage cap can take an append from two branches
+that each stay under it and land over it once both merge.
+Neither branch is at fault, and neither branch's checks can see it: each PR
+measures the file as it would exist with only its own change applied, so the
+breach is a property of the **combination** rather than of any member.
+This is also the one mode a pairwise `git merge-tree` sweep cannot find, since
+appends at different points in a file produce no textual conflict at all --- so
+the section above on pair collisions does not cover it.
+
+The instrument is arithmetic over three refs rather than a conflict scan:
+
+```bash
+lines() { git show "$1:$2" | wc -l; }
+base="$(git merge-base "$a" "$b")"
+echo $(( $(lines "$a" "$f") + $(lines "$b" "$f") - $(lines "$base" "$f") ))
+```
+
+Compare that projection against the cap **before merging either**, and note it
+survives no reordering: both orders reach the same total, so this is not a
+merge-order constraint that sequencing fixes.
+One branch has to relocate its content, or the file has to be split first.
+
+Two things make it worth checking rather than trusting CI.
+The breach lands on `main`, so it goes red for **everyone** afterwards rather
+than for whoever caused it.
+And the step that enforces a cap is not reliably the one named for it: a step
+labelled advisory may genuinely exit 0 while a self-test inside that same
+check's **test suite** asserts the real corpus complies and gates the job.
+Grepping a workflow for what enforces a threshold can therefore find the
+advisory step and conclude wrongly.
+[`fully-clean`](fully-clean.md) already owns the near half of this, in its case
+covering a check "designed to NEVER fail regardless of their own posted
+content, so their green color carries zero signal at all".
+What the capped-file case adds is that the signal is not merely absent but
+**misdirecting**: a second step enforces the same threshold, so the advisory
+label is accurate about its own step and false about the job.
 
 ### The instrument lesson, which is the transferable part
 
@@ -290,10 +328,14 @@ predicate runs on both sides.
   that git resolved without conflict.
 - **Do:** convert a noisy absolute-count check into a before/after delta rather
   than discarding it.
+- **Do:** project a capped quantity as `a + b - base` across every pair of open
+  branches that append to the same file, before merging either.
 - **Don't:** treat "no conflict" as an all-clear --- the defects in this section
   arrive *through* clean merges, not around them.
 - **Don't:** rely on an added-line-scoped check to catch a defect whose cause is
   a deleted line.
+- **Don't:** read two green PRs as evidence their merge is green, or reach for a
+  merge order to fix a breach that both orders reach.
 
 ## The batch pass
 

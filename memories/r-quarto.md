@@ -622,7 +622,7 @@ any Quarto website (rme, psw, qwt, …).
   Also: the alias path resolves relative to the **document's** directory, not
   the site root --- `sub/doc.qmd` with `aliases: [old-name.html]` puts the stub
   at `_site/sub/old-name.html`.
-- **Verify a redirect on the deployed preview, never on a local render.**
+- **Verify a redirect on a site build, not on a single-file render.**
   An alias stub is an artifact of the *site* build, so a local single-format
   `quarto render <file>.qmd` cannot surface a per-format bug in it at all ---
   there is only one format for the last one to win over.
@@ -635,6 +635,21 @@ any Quarto website (rme, psw, qwt, …).
   `pr-preview/pr-<N>/` recipe.
   (`UCD-SERG/serocalculator` #633/#635, 2026-08: shipped wrong and caught only
   on the deployed preview.)
+- **`altdoc::render_docs()` builds the site locally, so a project-config
+  artifact can be checked without waiting for CI.**
+  `quarto render <file>.qmd` does not read `altdoc/quarto_website.yml`, so
+  anything declared there --- project-level `filters:`, shortcodes, extensions
+  staged under `altdoc/_extensions/`, the sidebar and navbar --- is simply
+  absent from a single-file render.
+  That makes a single-file render the wrong instrument for those, and it fails
+  in the direction that reads as a defect in the document: a shortcode whose
+  extension is registered project-wide comes out unresolved locally and
+  resolves fine on the deployed site.
+  Reach for `altdoc::render_docs()` before concluding the deployed preview is
+  the only way to see a site-build artifact.
+  It is slower than a single-file render, so keep using
+  `quarto render <file>.qmd` for per-document work (chunk output, per-format
+  `echo`, figures) where the project config is not involved.
 
 ## renv — each git worktree gets its own (empty) project library
 

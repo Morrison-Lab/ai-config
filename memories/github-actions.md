@@ -1099,7 +1099,8 @@ That ai-config has no automatic review to race against in the first place is a s
 
 - **Do:** read the reusable workflow a caller invokes before concluding a cancellation is unexplained.
 - **Do:** check a cancelled run's end time against the next dispatch for the same key --- a consistent short lag across several runs is the signature of a `cancel-in-progress` group rather than of anything you changed.
-- **Don't:** infer that a change made on the successful retry caused the success; under such a group, being last is sufficient on its own.
+- **Don't:** infer that a change made on the successful retry caused the success.
+  Under such a group, being last is sufficient on its own.
 - **Don't:** read an absent `concurrency:` block in a caller as meaning its runs cannot be cancelled.
 
 ## Python Execution in Runner Environments

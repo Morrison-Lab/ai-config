@@ -54,12 +54,54 @@ mem_fetch <- memoise::memoise(
   Call `forget()` between tests, or a result cached by one test leaks into the next.
 - **`cachem::cache_disk()`** when the cache should outlive the R session.
 
+## Across sessions, one expression at a time: `xfun::cache_exec()`
+
+`{memoise}` caches within one process.
+`{targets}` caches a whole pipeline.
+Between them sits the case where a single expensive expression --- a simulation, a fit, a download --- should survive an R session ending, without adopting a pipeline framework.
+[`xfun::cache_exec()`](https://cran.r-project.org/package=xfun) is the packaged answer, so reach for it before hand-rolling a `saveRDS()`/`file.exists()` pair, per [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md).
+
+Prefer it over its older sibling `xfun::cache_rds()`, which now says so itself:
+
+> Please consider using `cache_exec()` instead, which is more flexible and intelligent.
+
+(Read off `cache_rds`'s own help page, xfun 0.57.
+`cache_exec()` exists from xfun 0.44.)
+
+The signature is `cache_exec(expr, path = "cache/", id = NULL, ...)`.
+
+**`path` needs a trailing slash, or nothing is cached and nothing says so.**
+Without one it is read as a file path rather than a directory, and the call silently executes every time.
+This is the [`fail-fast`](../principles/fail-fast.md) shape where the failure path and the pass path produce identical output --- the expression still returns the right value, so only a cache that never fills betrays it.
+Measured on xfun 0.57: `path = "nosl"` left 0 files after two identical calls, `path = "wsl/"` left 1 and returned an identical object the second time.
+
+What makes it worth the switch is that **it hashes the values of the expression's free variables** (via `xfun::find_globals()`), so inside a function wrapper the wrapper's own arguments become the cache key with no hand-built hash:
+
+```r
+sim_cached <- function(n, seed) {
+  xfun::cache_exec(simulate(n, seed), path = "cache/", id = "sim")
+}
+```
+
+Measured: repeating a call hits the cache, and changing an argument invalidates it.
+
+Three refinements from `?cache_exec`:
+
+- **Set `hash = "<varname>"` explicitly when the expression references a function object**, or the closure is hashed too --- and its environment may be an entire package namespace.
+- **`extra =`** folds further inputs into the key (a package version, a data file's mtime).
+- **`keep = FALSE`** forces re-execution and re-saves, which is how you refresh a cache without deleting it.
+
+The layout is `<path>/<id>/<md5>.rds`, one file per id by default, so **comparing the file list across a call is a reliable cache-hit signal** --- an instrument rather than a guess, per [`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
+
+The purity precondition above is not relaxed here, and it bites harder: a disk cache outlives the session, so an impure expression's stale value can be served days later, in a fresh process, with nothing in scope to explain it.
+
 ## When not to memoise
 
 - The function is cheap: hashing the arguments can cost more than calling it (KISS).
 - It is called once, or its arguments never repeat (YAGNI).
 - The caching wanted is pipeline-scale --- skip steps whose inputs have not changed, across sessions.
   That is [`{targets}`](https://docs.ropensci.org/targets/)' job, not `{memoise}`'s, which caches one function's results within one process or one cache directory.
+  For a single expression that merely needs to outlive the session, `xfun::cache_exec()` above is lighter than either.
 
 ## In review
 
@@ -69,6 +111,8 @@ Flag these with the same weight as the other coding rules:
 - A **memoised impure function** --- the serious one, since it yields wrong answers rather than slow ones.
 - A package that memoises at the top level instead of in `.onLoad()`.
 - An unbounded-by-construction cache with no `max_size` or `max_age`.
+- An `xfun::cache_exec()` call whose `path` lacks a trailing slash --- it caches nothing, silently.
+- A hand-rolled `saveRDS()`/`file.exists()` pair where `cache_exec()` would do, or a hand-built hash of arguments it would derive on its own.
 
 A missed memoisation is a finding too, but a mild one: raise it when the function is demonstrably hot, not on suspicion.
 The [`measure-performance`](../../skills/measure-performance/SKILL.md) skill is what demonstrates it, and its `mem_alloc` column prices the memory half of the trade.

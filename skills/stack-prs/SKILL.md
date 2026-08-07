@@ -167,12 +167,14 @@ base branch is deleted on merge, and when that happens it changes nothing
 below, because retargeting only moves a pointer and never rewrites the
 branch.
 
-**Do not rely on it.** In practice `gh pr merge <base-N> --delete-branch` can
-**close** the dependent PR instead of retargeting it, which
+**Do not rely on it.**
+In practice `gh pr merge <base-N> --delete-branch` can **close** the dependent
+PR instead of retargeting it, which
 [`memories/git.md`](../../memories/git.md) records from a separate incident a
-month earlier. So run `gh pr list --base <base-branch>` before merging, and
-omit `--delete-branch` whenever it returns anything; delete the branch by
-hand once the dependent PR has visibly retargeted.
+month earlier.
+So run `gh pr list --base <base-branch>` before merging, and omit
+`--delete-branch` whenever it returns anything.
+Delete the branch by hand once the dependent PR has visibly retargeted.
 
 If it closes anyway, the head branch survives, and restoring the base is a
 better recovery than opening a replacement PR --- it keeps the PR number, its
@@ -190,8 +192,13 @@ The order is forced: `gh pr reopen` fails while the base is missing, and
 closed pull request`).
 Expect `reviewDecision: REVIEW_REQUIRED` afterward --- retargeting resets the
 review state even though the head commit never moved.
-(UCD-SERG/serocalculator #633/#635, 2026-08-07: #635 closed two seconds after
-#633 merged, which is the timing that establishes the cause.)
+(UCD-SERG/serocalculator #633/#635, 2026-08-07.
+PR #635 closed two seconds after #633 merged, and that timing is what
+establishes the cause.)
+
+Keep an issue or PR reference off the start of a line when you break these
+sentences: markdownlint reads a leading `#` as a malformed ATX heading and
+fails `validate` with MD018.
 
 After retargeting, GitHub recomputes the diff against `main`.
 It should now show only the dependent PR's own changes, since the base PR's

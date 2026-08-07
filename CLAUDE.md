@@ -417,7 +417,7 @@ In every session — at session start, and again periodically during long sessio
    - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
 
 3. **The working repo's main checkout.**
-   Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) — it goes stale as the session's own PRs and other sessions' PRs merge.
+   Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) --- it goes stale as the session's own PRs and other sessions' PRs merge.
    **The same "diverged" failure from point 1 above can hit any repo's `main`, not just ai-config's own** --- a fresh container's checkout isn't guaranteed fresh for every repo it holds.
    Apply the same recovery: confirm the working tree is clean, then check whether the local tip's commit is actually reachable from `origin/main` (`git merge-base --is-ancestor <local-tip> origin/main`) before force-realigning with `git checkout -B main origin/main`.
    Don't rely on a commit-message grep alone to decide safety --- the same message can appear under a *different hash* after a squash-merge or rebase (so the grep matches but the underlying commits differ, the milder case in point 1), and `git log origin/main` only reflects whatever your local remote-tracking ref last fetched (so a check run before fetching in this session can miss commits that already landed).

@@ -312,6 +312,10 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   Neither surface therefore answers "was Copilot asked to review this", in either direction.
   (Probed on `ucdavis/bcs#479`, 2026-07-30.)
 
+  That disappearance is **not** explained by the `review_on_push: true` rule above, and [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)'s "blocked-request test has a false positive" section owns the argument and the deriving queries.
+  The short version: `Morrison-Lab/ai-config` reproduces the identical 201-then-empty signature while carrying no `copilot_code_review` rule at either scope, so an empty pending list is evidence neither that the request was blocked nor that a review is coming.
+  Only the posted review **body** settles which of those happened.
+
   **Both outcomes were genuinely observed on the same repo the same day, so do not flatten this into "it returns 201".**
   One session ran the POST once and got `422`; another ran it three times, across all three login spellings, and got `201` every time.
   Neither session was lying, and the first one's real mistake was not the observation but the generalisation -- it turned a single failed attempt into a stated property of the repository, wrote that into a PR body as settled fact, and steered two later rounds with it.
@@ -331,6 +335,9 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   This is a time-bounded override of two standing instructions that otherwise say to request Copilot every round: `shared/workflow/pr-on-claim.md`'s "Request the external reviewer in the same stride" and `shared/workflow/fully-clean.md`'s fifth case ("Keep re-requesting each round anyway").
   Until September 2026, rely on `claude-review` plus self-review, which is exactly the no-reachable-external-reviewer fallback that fifth case already describes.
   Re-verify Copilot's quota and re-enable the per-round request after September 2026, per `shared/writing/timestamp-volatile-claims.md`.
+  **Re-measured 2026-08-06 and still exhausted, now with a wider denominator:** across `Morrison-Lab/ai-config`'s last 60 merged PRs, all 40 Copilot review objects carry the refusal body and **zero** are substantive (query in [`shared/workflow/pr-on-claim.md`](../shared/workflow/pr-on-claim.md)).
+  Requests were still being issued on that date despite this override, which is what produced those refusals --- so the override is not merely advisory bookkeeping, and each violation spends quota on a guaranteed non-verdict.
+  That every one of those PRs merged on `claude-review` alone is the same practice slippage [`shared/workflow/flag-practice-slippage.md`](../shared/workflow/flag-practice-slippage.md) already records at eight PRs, met here at larger scale and still live; read that fragment for the argument rather than re-deriving it.
   A `no-unreviewed-pr.py` `Stop` hook (ai-config#1041) enforces the opposite instruction and collides with this override while the quota is out.
   It fires every turn a PR opened or readied this session sits awaiting review, demanding a Copilot request -- the one action this override forbids -- so a session that honors the override never satisfies it and the demand repeats each turn.
   Unregister it from `~/.claude/settings.json`'s `Stop` hooks while Copilot is out.

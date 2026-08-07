@@ -1205,6 +1205,11 @@ Deciding that a particular agent does not need one is fine.
 Leaving it unmarked is what is not.
 `hooks/flag-unassigned-worktree.py` mechanizes exactly this, and warns rather than blocks.
 
+**"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
+`isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
+Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/main`.
+Measured 2026-08-07; [`memories/git-worktrees.md`](memories/git-worktrees.md) carries the evidence, and [`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.
+
 **The general rule is the more valuable half.** When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
 A repealed decision changes no artifact, so review, tests, and hooks are all blind to it by construction, and the only detector is someone who remembers.
 It is more dangerous than ordinary drift because the incident supplies an apparent reason, so from the inside it feels like having learned something rather than like lapsing.

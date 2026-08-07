@@ -195,3 +195,67 @@ symlinks).
 In practice the drift found there can be large even in an actively-used setup: one check found `CLAUDE.md` itself missing ~10 sections, `skills/` with 56 of ~90 files differing (plus 6 new skills never copied over), `shared/` with 5 differing/missing fragments, and `memories/` with 3 of 4 files differing --- accumulated silently because the per-session refresh habit checks `CLAUDE.md` (loaded every turn, so staleness there is visible) but not the other three directories (loaded on-demand, so staleness there is invisible until a skill/memory is actually needed and reads wrong).
 Before trusting a sync is complete, `diff -rq` (or `cp -r` unconditionally, after checking for genuine un-upstreamed local edits per the existing before-overwriting caution) all four directories, not just the one that happens to render in every prompt.
 (`Lacaedemon/sparta`, 2026-07-04.)
+
+## `isolation: "worktree"` gives a worktree of the SESSION's repo, not of the repo a brief names
+
+Every section above concerns worktrees you create yourself.
+This one concerns the worktree the Claude Code harness creates for a subagent,
+which is a real `git worktree` at `<primary-repo>/.claude/worktrees/agent-<id>`
+and lands somewhere the dispatching session does not choose.
+
+The `Agent` tool's description of `isolation` says only that `"worktree"` gives
+the agent its own git worktree, auto-cleaned if unchanged.
+It does not say *which* repository, and the answer is the session's primary one
+rather than anything the brief mentions.
+
+So `isolation` does nothing for a **cross-repo** dispatch.
+Sending an agent from a session rooted in repo A to do work in repo B, with
+`isolation: "worktree"` set, hands it a worktree of **A** --- and a brief telling
+it to "work in the worktree you were given" is then unfollowable as written.
+
+Measured 2026-08-07 from a session whose primary working directory was
+`/Users/ezramorrison/Documents/GitHub/psw`.
+An `Agent` launched with `isolation: "worktree"`, whose brief named no repository
+at all, reported:
+
+```
+pwd                       -> /Users/ezramorrison/Documents/GitHub/psw/.claude/worktrees/agent-a1beebe72c1787629
+git remote get-url origin -> https://github.com/d-morrison/psw.git
+```
+
+**Checking afterwards proves nothing, which is why this stayed a hypothesis for
+a while.**
+Auto-clean is real and fast, so a `git worktree list` run once the agent has
+finished shows only the main checkout whatever happened --- an unchanged worktree
+and a worktree that never existed leave the identical trace.
+That is the [`fail-fast`](../shared/principles/fail-fast.md) shape where a
+check's failure path and its pass path print the same thing.
+
+The surviving signal is the **mtime** of `<primary-repo>/.claude/worktrees`.
+Across two probes it moved 14:38 -> 14:41:08 -> 14:41:47 in the psw checkout,
+while the ai-config checkout's stayed at 11:39.
+Reading the agent's own `pwd` is better still, and is what settled it here.
+
+The remedy is to name the target clone in the brief and have the agent build its
+own worktree there:
+
+```bash
+git -C /path/to/target-clone worktree add -b <branch> /private/tmp/wt-<slug> origin/main
+```
+
+- **Do:** name the target clone by path when dispatching an agent into a repo
+  other than the session's own, and tell it to create its own worktree there off
+  `origin/main`.
+- **Do:** settle where an agent actually landed from the agent's own `pwd`, not
+  from a `git worktree list` run after it exits.
+- **Don't:** write "the worktree you were given" into a cross-repo brief ---
+  `isolation` cannot have given it one of the target repo.
+- **Don't:** read an empty `git worktree list` in the primary repo as evidence
+  that no worktree was created there; auto-clean removes an unchanged one.
+
+(Morrison-Lab/ai-config#1268, from the UMS pass on
+[#1259](https://github.com/Morrison-Lab/ai-config/pull/1259).
+The receiving agent caught the contradiction and recovered on its own, which is
+the discretionary premise check
+[`challenge-the-assignment`](../shared/workflow/challenge-the-assignment.md) says
+not to leave as the only detector.)

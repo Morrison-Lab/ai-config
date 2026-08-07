@@ -166,6 +166,60 @@ written and rots nothing.
   is discretionary, and your brief carries the authority that argues against
   running it.
 
+**A claim about the recipient's *environment* is worse than one about corpus
+state, and the remedy above cannot reach it.**
+Everything in this section assumes the premise is derivable: its whole fix is to
+run the deriving query and paste it beside the claim.
+A claim about the agent's own environment --- the directory it starts in, the
+repository that directory belongs to, the tools it was granted --- is not
+derivable from the author's session at all.
+There is no command you can run that reports it, so "check before asserting" is
+not skipped here but *unavailable*.
+
+That inverts the remedy rather than weakening it.
+For a corpus claim the fix is to verify, then assert.
+For an environment claim the fix is to **not assert**: name the target --- the
+clone's path, the branch, the base --- and instruct the agent to establish its
+own working directory, so the premise is settled in the one session that can
+settle it.
+
+The reason such a claim gets written anyway is that it does not arrive as a
+claim.
+"Work in the worktree you were given" reads as saving the recipient a step, so
+it presents as a convenience rather than as an assertion about the world --- and
+the claim-shaped tell this section relies on, a sentence saying a file contains
+a phrase or a rule lives at a path, never fires on it.
+Grammatically it is an instruction about where to work, which is exactly the
+disguise the fragment's opening says an assignment wears.
+
+Expect it most where the task is *least* like the session it is dispatched from.
+A brief sent into another repository, another machine, or another toolchain is
+the one whose environment the author has never seen, and it is also the one
+whose environment feels safest to describe, because the description is doing the
+work of orienting the agent.
+
+- **Do:** name the repository, path, branch, or credential a dispatched agent
+  should use, and tell it to establish that state for itself.
+- **Do:** treat a convenience instruction about where or how the agent should
+  work as a premise, since it asserts the environment is already in that state.
+- **Don't:** assert anything about the recipient's environment that your own
+  session cannot query --- the derive-and-paste remedy is unavailable, so the
+  claim ships unchecked by construction.
+- **Don't:** read "I could not have derived it" as an exemption; it is the
+  reason to state a target rather than a state.
+
+(Morrison-Lab/ai-config#1268, 2026-08-07: a session rooted in one repository
+dispatched a UMS pass into a different one with `isolation: "worktree"` set, and
+told the agent to work in "the git worktree you were given".
+That worktree was a checkout of the *dispatching* session's repository, because
+`isolation` is scoped to the session's primary repo --- so the instruction named
+a state that did not exist and could not have been checked from the authoring
+side.
+The receiving agent caught it and built its own worktree in the target clone,
+which is the discretionary detector the bullets above say not to rely on.
+[`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries the
+measurement and the recovery.)
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise

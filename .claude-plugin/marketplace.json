@@ -1,5 +1,5 @@
 {
-  "name": "Morrison-Lab",
+  "name": "morrison-lab",
   "owner": {
     "name": "Morrison-Lab"
   },
@@ -9,11 +9,6 @@
       "name": "ai-config",
       "source": "./",
       "description": "Personal skills (PR/review workflow, grading, reprexes, R-package helpers) and slash commands."
-    },
-    {
-      "name": "sembr-skills",
-      "source": "./shared/sembr-skills",
-      "description": "AI agent skills for Semantic Line Breaks (SemBr)."
     }
   ]
 }

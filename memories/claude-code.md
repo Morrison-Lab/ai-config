@@ -769,18 +769,21 @@ one-line restore directly onto the *broken* PR's own branch (PR #1244) and
 re-request review, expecting the dispatched review to go green on its own
 fix.
 It failed identically, with the same
-`Plugin "ai-config" not found in marketplace "morrison-lab"` error.
+`Plugin "ai-config" not found in marketplace "Morrison-Lab"` error --- the
+diagnostic names the *requested* marketplace (from the hardcoded
+`ai-config@Morrison-Lab` reference), not the one actually registered.
 
 The reason is a property of `claude-code-action`'s `plugin_marketplaces`
 input, not of anything wrong with the fix.
 That input is a bare git URL with no ref attached, so the marketplace is
 always cloned from ai-config's **default branch**, never from whatever ref
 the calling workflow itself is running against.
-A `pull_request`-triggered review job checks out the *reviewed* repo's PR
-branch to do its work, but the plugin it installs comes from a completely
-separate clone of ai-config's `main` --- so a fix that lives only on a PR
-branch is invisible to that PR's own CI by construction, however correct
-the fix is.
+A `workflow_dispatch`-triggered review job (this repo's caller declares
+only `workflow_dispatch`; run 31151198279 records that event) still checks
+out the *reviewed* repo's selected PR to do its work, but the plugin it
+installs comes from a completely separate clone of ai-config's `main` ---
+so a fix that lives only on a PR branch is invisible to that PR's own CI by
+construction, however correct the fix is.
 
 This generalizes past this one input: any CI mechanism that reads a
 dependency's default branch unconditionally, rather than pinning to a ref

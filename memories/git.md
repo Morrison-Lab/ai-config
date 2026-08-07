@@ -283,46 +283,6 @@ its committed mode explicitly (`git ls-tree HEAD -- <path>`, compare against
 an existing sibling script) rather than trusting the code review alone to
 catch it.
 
-## Windows: a committed symlink materializes as a plain file, and one of ours fails markdownlint
-
-A tree entry committed as mode `120000` is a symlink, and a Windows checkout without symlink support cannot make one.
-Git writes a **regular file whose entire content is the target path**, with no trailing newline.
-The repo is not modified by this --- `git status` stays clean, because git compares the blob and the blob is exactly that path string --- so nothing announces the substitution.
-
-`Morrison-Lab/ai-config` has two such entries, and the query that lists them is one line:
-
-```sh
-git ls-files -s | awk '$1=="120000" {print $2, $4}'
-```
-
-Measured 2026-08-06 it returns `.claude/skills` and `AGENTS.md`.
-`AGENTS.md` points at `GEMINI.md`, so on Windows it is a 9-byte file reading `GEMINI.md`.
-
-**The consequence is a lint error that is real, mechanical, and not yours.**
-`AGENTS.md` ends in `.md`, `.markdownlint-cli2.jsonc` globs `**/*.md` and does not disable MD047, and a 9-byte file with no trailing newline violates it:
-
-```
-AGENTS.md:1:9 error MD047/single-trailing-newline Files should end with a single newline character
-```
-
-On an unmodified worktree cut straight from `origin/main` that is the **only** error markdownlint reports across 305 files.
-Reproducing it on a branch with zero edits is what establishes it as pre-existing and environmental rather than a regression the current PR introduced.
-CI never sees it, because Linux runners materialize the symlink properly.
-
-Do not "fix" it by appending a newline.
-That would replace the symlink blob with a two-line regular file and break the `AGENTS.md` -> `GEMINI.md` link for every other checkout, which is a far worse outcome than a local lint hit nobody else observes.
-
-This is the one place [`dont-incur-technical-debt`](../shared/principles/dont-incur-technical-debt.md)'s neighbouring rule --- that editing a line makes its pre-existing violations yours --- must not be generalized.
-That rule is about **content** you chose to touch, where the fix is cheap and local.
-Here you touched nothing, the violation is produced by the filesystem rather than by the file, and the "fix" is destructive.
-
-- **Do:** run `git ls-files -s | awk '$1=="120000"'` when a Windows checkout shows a puzzling tiny file or an unexplained lint hit.
-- **Do:** reproduce a suspected pre-existing lint error on a clean worktree cut from `origin/main` before attributing it to your own diff.
-- **Don't:** append a newline to `AGENTS.md`, or otherwise edit a materialized symlink, to make a local check go green.
-- **Don't:** read `git status` as clean meaning the working tree matches what Linux would have checked out.
-
-(2026-08-06, driving `Morrison-Lab/ai-config#1224` on Windows: `npx markdownlint-cli2@0.22.1` reported `Summary: 1 error(s)` over 305 files, the single hit being MD047 on `AGENTS.md`, on a worktree with no changes at all.)
-
 ## Windows Git Bash: MSYS path conversion mangles a colon-refspec that contains a slash
 
 Git Bash's MSYS layer auto-converts POSIX-looking arguments into Windows paths,

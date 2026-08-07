@@ -49,6 +49,47 @@
   failed `validate` on three `MD010` hits, after the link, memory-size, and
   line-break checks had all passed.)
 
+## On Windows a committed symlink becomes a plain file, and `AGENTS.md` then fails MD047
+
+A tree entry committed as mode `120000` is a symlink, and a Windows checkout without symlink support cannot make one.
+Git writes a **regular file whose entire content is the target path**, with no trailing newline.
+`git status` stays clean, because the blob really is that path string, so nothing announces the substitution.
+
+This repo has two such entries, and one line lists them:
+
+```sh
+git ls-files -s | awk '$1=="120000" {print $2, $4}'
+```
+
+Measured 2026-08-06 it returns `.claude/skills` and `AGENTS.md`.
+`AGENTS.md` points at `GEMINI.md`, so on Windows it is a 9-byte file reading `GEMINI.md`.
+
+**The consequence is a lint error that is real, mechanical, and not yours.**
+`AGENTS.md` ends in `.md`, `.markdownlint-cli2.jsonc` globs `**/*.md` and does not disable MD047, and a 9-byte file with no trailing newline violates it:
+
+```
+AGENTS.md:1:9 error MD047/single-trailing-newline Files should end with a single newline character
+```
+
+On a worktree cut straight from `origin/main` with no edits at all, that is the **only** error markdownlint reports across 305 files.
+Reproducing it on an unmodified branch is what establishes it as pre-existing and environmental rather than something the current PR introduced.
+CI never sees it, because Linux runners materialize the symlink properly.
+
+Do not "fix" it by appending a newline.
+That replaces the symlink blob with a two-line regular file and breaks the `AGENTS.md` -> `GEMINI.md` link for every other checkout --- far worse than a local lint hit nobody else observes.
+It is the same instinct the baseline-strategy bullet above warns against, one step further: the point there is not to flood CI with pre-existing violations, and the point here is not to "clear" one whose fix is destructive.
+
+This is also the one place [`dont-incur-technical-debt`](../shared/principles/dont-incur-technical-debt.md)'s neighbouring rule --- that editing a line makes its pre-existing violations yours --- must not be generalized.
+That rule governs **content** you chose to touch, where the fix is cheap and local.
+Here you touched nothing, the violation is produced by the filesystem rather than by the file, and the fix is destructive.
+
+- **Do:** run `git ls-files -s | awk '$1=="120000"'` when a Windows checkout shows a puzzling tiny file or an unexplained lint hit.
+- **Do:** reproduce a suspected pre-existing lint error on a clean worktree cut from `origin/main` before attributing it to your own diff.
+- **Don't:** append a newline to `AGENTS.md`, or otherwise edit a materialized symlink, to make a local check go green.
+- **Don't:** read a clean `git status` as meaning the working tree matches what a Linux checkout would have produced.
+
+(2026-08-06, driving `Morrison-Lab/ai-config#1224` on Windows: `npx markdownlint-cli2@0.22.1` reported `Summary: 1 error(s)` over 305 files, the single hit being MD047 on `AGENTS.md`, on a worktree with no changes at all.)
+
 ## A literal backtick inside a Markdown code span needs a longer delimiter, not a backslash
 
 To include a literal backtick in an inline code span, the span's delimiter

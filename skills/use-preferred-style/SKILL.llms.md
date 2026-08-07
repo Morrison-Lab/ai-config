@@ -2,7 +2,7 @@
 
 Apply the user’s prose style to anything user-facing. The style is plain and direct. Say the point in a short sentence. Stack fewer clauses. Drop filler.
 
-The authority is the user’s own guide, **Principles of Scientific Writing (PSW)**: https://d-morrison.github.io/psw/. PSW covers word choice, conciseness, and active voice. This skill operationalizes PSW and adds the user’s own rules on clause structure (limit subordinate clauses; join with coordinating conjunctions), which PSW does not cover. When in doubt, defer to PSW.
+The authority is the user’s own guide, **Principles of Scientific Writing (PSW)**: https://morrison-lab.github.io/psw/. PSW covers word choice, conciseness, and active voice. This skill operationalizes PSW and adds the user’s own rules on clause structure (limit subordinate clauses; join with coordinating conjunctions), which PSW does not cover. When in doubt, defer to PSW.
 
 ## When this fires
 
@@ -79,11 +79,11 @@ This is a default, not an absolute rule. Keep a dependent clause when splitting 
 
 The user’s guide, **Principles of Scientific Writing**, is the source of record. Pull the latest rules from it, not from this summary:
 
-- Guide home: https://d-morrison.github.io/psw/
-- [Word choice](https://d-morrison.github.io/psw/chapters/word-choice.html) — Anglish over Latin.
-- [Conciseness](https://d-morrison.github.io/psw/chapters/conciseness.html) — cut redundancy; active voice; the swap list.
-- [Defining terms clearly](https://d-morrison.github.io/psw/chapters/defining-terms.html)
-- [Paper organization](https://d-morrison.github.io/psw/chapters/paper-organization.html)
+- Guide home: https://morrison-lab.github.io/psw/
+- [Word choice](https://morrison-lab.github.io/psw/chapters/word-choice.html) — Anglish over Latin.
+- [Conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html) — cut redundancy; active voice; the swap list.
+- [Defining terms clearly](https://morrison-lab.github.io/psw/chapters/defining-terms.html)
+- [Paper organization](https://morrison-lab.github.io/psw/chapters/paper-organization.html)
 
 PSW is a work in progress. When it and this skill disagree, PSW wins — and flag the drift so this skill gets updated.
 

@@ -78,6 +78,34 @@ have not justified.
 - **Don't:** infer a convention from a sibling tool's shape without
   checking that tool's own reference for it.
 
+## A bulk copy has the same failure at the level of a whole file
+
+The check above assumes you are adapting one template you can look at.
+A "port the set of X from repo Y" task usually copies a **directory tree**
+instead, and the failure mode shifts from *purpose mismatch* to *state
+mismatch*: some files in the incoming tree are genuinely new to the
+target, and others already exist there under a different path, with their
+own history.
+A wholesale `cp -R` (or equivalent) cannot tell the two apart, so a file
+that should have been a pure rename gets silently replaced by the source
+repo's own, possibly-diverged copy.
+
+Run the same two-sentence check per file rather than once for the whole
+tree: does this path already exist in the target, and if so, is the
+source repo's version authoritative for it, or is the target's own
+history?
+When the file already exists, treat the operation as a **relocation**
+--- write the target's own current content (`git show <old-ref>:<old-path>`)
+at the new path --- not an import.
+Reserve the source repo's copy for files genuinely new to the target.
+
+- **Do:** before bulk-copying a directory tree, check each incoming path
+  against the target repo for an existing equivalent.
+- **Do:** relocate an existing file with its own content intact; import
+  only what's actually new.
+- **Don't:** let a directory-level copy operation decide, by omission,
+  that the source repo's version of a shared file wins.
+
 ## In review
 
 Flag a diff that introduces a structure closely mirroring an existing one
@@ -88,6 +116,11 @@ wrong strategy" case in
 [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s strategic
 correctness section: the wrong strategy usually got there by copying a
 working neighbour.
+
+Flag a "port/adapt from repo Y" diff that replaces an existing file's
+content with Y's version and calls it a move --- check whether the diff
+is a pure rename (no hunks) or carries an unexplained content change
+riding along with it.
 
 (Corrected 2026-07-30: "cai: never take shortcuts, never copy-paste or
 pattern match blindly; always think twice and critically about what you
@@ -103,3 +136,15 @@ An earlier instance of the same failure is already recorded narrowly in
 `memories/r-quarto.md`: a `.jarlignore` invented by analogy to other
 tools' ignore-file conventions, structurally plausible and silently
 inert, because nobody checked that tool's own config reference.)
+
+(Caught by review, 2026-08-07: `UCD-SERG/serocalculator#639` ported a set
+of Quarto extensions from `Morrison-Lab/rpt`.
+One of them, `slidebreak`, already existed in the target repo at a
+different path.
+A wholesale `cp -R` of rpt's whole extension tree overwrote it with
+rpt's own, trivially-diverged copy --- an `author:` field changed and
+two blank lines picked up trailing whitespace, neither mentioned in the
+PR description or commit message.
+The `@claude` review caught both as "unexplained side effects of a
+rename"; the fix was `git show <old-ref>:<old-path>` at the new path
+instead of the source repo's copy.)

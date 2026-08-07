@@ -355,28 +355,3 @@ The rebuttal carried the one-line grep; the underlying point was real
 anyway, since citing a section title without naming its file is what sent
 the search to the wrong directories, so the citation was fixed to name and
 link the file.)
-
-## "A note the reviewer declined to raise is still a claim"
-
-(`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: a review round
-noted, while explicitly declining to flag it, that the PR's claim "only two
-things write `position`" was loose because `Unit._separate()` also writes it.
-The session staged a caveat, checked first, and concluded the note was stale
---- `sparta#1109` is titled "Convert `Unit._separate()` regiment overlap
-resolution from position push to velocity impulse", so the write was taken to
-be gone.
-It is not.
-At `320fe3b2` that function ends
-`_separation_velocity += step_vel` / `position += step_vel * delta`, and its
-own comment says it expresses the push "as a velocity ... and integrate[s]
-that" --- the velocity is how the per-tick displacement is **capped**, not what
-replaced the write.
-So the declined note was correct and the refutation was not, and the refutation
-rested on the PR title rather than on the function.
-Holding was still the right call, and the caveat was never added, so nothing
-false shipped: a normalized search of `.claude/memories/` at `320fe3b2` finds
-neither the caveat nor the "only two things write `position`" claim it would
-have qualified.
-Re-measured here against `origin/main` at `320fe3b2` after a `git fetch` ---
-the local checkout was 1 commit behind and did not contain the merge, which
-would have made any answer read off it a claim about a different tree.)

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Write or revise user-facing prose in the user’s preferred style, per his Principles of Scientific Writing guide (psw, https://morrison-lab.github.io/psw/) — limit dependent (subordinate) clauses, cut low-content filler and jargon, prefer plain Anglish words over Latin ones, prefer short declarative sentences and active voice, and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions. Apply when drafting or rewriting any prose: PR/issue/commit text, docs, READMEs, comments, release notes, emails, or chat replies. Use when asked to ‘use my style’, ‘apply my preferred style’, ‘rewrite in my voice’, ‘tighten this’, ‘plain-language this’, ‘psw’, or ‘/style’.">
+<meta name="description" content="Write or revise user-facing prose in the user’s preferred style, per his Principles of Scientific Writing guide (psw, https://morrison-lab.github.io/psw/) — limit dependent (subordinate) clauses, cut low-content filler and jargon, prefer plain Anglish words over Latin ones, prefer short declarative sentences and active voice, keep relative pronouns rather than dropping them, follow a demonstrative pronoun with the noun it refers to, and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions. Apply when drafting or editing scientific prose, reviewing or redlining a manuscript or paper, or drafting/rewriting any other user-facing prose: PR/issue/commit text, docs, READMEs, comments, release notes, emails, or chat replies. Use when asked to ‘use my style’, ‘apply my preferred style’, ‘rewrite in my voice’, ‘tighten this’, ‘plain-language this’, ‘review this manuscript’, ‘redline this paper’, ‘psw’, or ‘/style’.">
 
 <title>skill – ai-config</title>
 <style>
@@ -48,9 +48,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-6ac2aec46ad7f46b16024ee4409aa65c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-8a591ff59271d21f6a5d1e80b3747fb5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-6ac2aec46ad7f46b16024ee4409aa65c.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-921ecb3ff3b004e91bddb2369f3a9636.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-a13a599ee22e0882143b2e40d165c63e.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-921ecb3ff3b004e91bddb2369f3a9636.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -336,7 +336,7 @@ ul.task-list li input[type="checkbox"] {
 <section id="use-preferred-style-write-the-way-the-user-prefers" class="level1">
 <h1>use-preferred-style — write the way the user prefers</h1>
 <p>Apply the user’s prose style to anything user-facing. The style is plain and direct. Say the point in a short sentence. Stack fewer clauses. Drop filler.</p>
-<p>The authority is the user’s own guide, <strong>Principles of Scientific Writing (PSW)</strong>: https://morrison-lab.github.io/psw/. PSW covers word choice, conciseness, and active voice. This skill operationalizes PSW and adds the user’s own rules on clause structure (limit subordinate clauses; join with coordinating conjunctions), which PSW does not cover. When in doubt, defer to PSW.</p>
+<p>The authority is the user’s own guide, <strong>Principles of Scientific Writing (PSW)</strong>: https://morrison-lab.github.io/psw/. PSW covers word choice, conciseness, grammar, and avoiding AI tells — including the nested-dependent-clause rule below, in its own “Conciseness” chapter. This skill operationalizes PSW and adds the user’s own rule on joining independent clauses with coordinating conjunctions rather than subordinate constructions, which PSW does not state explicitly. When in doubt, defer to PSW.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
@@ -347,7 +347,7 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="the-rules" class="level2">
 <h2 class="anchored" data-anchor-id="the-rules">The rules</h2>
-<p>The user’s clause-structure rules (1–4) sit on top of PSW’s word-choice and conciseness rules (5–6).</p>
+<p>Rule 1 restates PSW’s own “Limit complex sentence structures” section (Conciseness chapter). Rules 2–4 are the user’s own emphasis on filler and clause structure, drawing on PSW’s conciseness and word-choice material without matching one specific section. Rules 5–8 come straight from PSW’s word-choice, conciseness, and grammar chapters, cited individually below.</p>
 <ol type="1">
 <li><p><strong>Limit dependent clauses.</strong> A dependent (subordinate) clause cannot stand alone. It starts with a word like <em>because</em>, <em>although</em>, <em>which</em>, <em>while</em>, <em>since</em>, <em>when</em>, or <em>if</em>. One per sentence is plenty. Two or more stacked together is a rewrite signal. Break the sentence apart instead.</p></li>
 <li><p><strong>Cut low-content filler and jargon.</strong> Delete words that add no information. Replace jargon with the plain word. See the swap table below.</p></li>
@@ -355,6 +355,12 @@ ul.task-list li input[type="checkbox"] {
 <li><p><strong>Join independent clauses with coordinating conjunctions.</strong> Two complete thoughts read better side by side than nested. Use <em>and</em>, <em>but</em>, <em>so</em>, <em>or</em>, <em>yet</em>, <em>nor</em>, <em>for</em>. Prefer “X is fast, but Y is correct” over “While X is fast, Y is correct.”</p></li>
 <li><p><strong>Prefer plain (Anglish) words over Latin-derived ones</strong> (PSW, “Word choice”). Old-English-derived words decompose into parts a reader already knows. Latin roots must be memorized. So write <em>before</em>, not <em>prior to</em>; <em>needed</em>, not <em>necessary</em>; <em>use</em>, not <em>utilize</em>. This is a heuristic, not a purity rule — pick whatever word the reader grasps fastest.</p></li>
 <li><p><strong>Prefer active voice</strong> (PSW, “Conciseness”). Name the actor, then the action. Prefer “The researchers ran the experiment” over “The experiment was run by the researchers.” Passive is fine when the actor is unknown or beside the point.</p></li>
+<li><p><strong>Keep relative pronouns</strong> (PSW, “Grammar”). English lets you drop <em>that</em>, <em>which</em>, or <em>who</em> in some sentences, but dropping it forces the reader to backtrack once they realize a describing clause has started. Prefer “the groundwork <em>that</em> I now apply” over “the groundwork I now apply.” Also use <em>that</em> for a restrictive clause (identifies which thing you mean, no comma) and <em>which</em> for a non-restrictive one (adds a detail, set off by commas): “the dataset <em>that</em> we collected in 2023” versus “our dataset, <em>which</em> contains 4,000 records,”.</p></li>
+<li><p><strong>Name a demonstrative’s referent</strong> (PSW, “Grammar”). <em>This</em>, <em>that</em>, <em>these</em>, and <em>those</em> used standalone as pronouns send the reader searching backward for what they mean, often across a whole preceding clause rather than one noun. Follow the demonstrative with the noun it refers to.</p>
+<blockquote class="blockquote">
+<p>❌ The model overfit the training data. <strong>This</strong> poses a problem for deployment.</p>
+<p>✅ The model overfit the training data. <strong>This overfitting</strong> poses a problem for deployment.</p>
+</blockquote></li>
 </ol>
 </section>
 <section id="filler-and-jargon-to-cut-or-swap" class="level2">
@@ -458,6 +464,7 @@ ul.task-list li input[type="checkbox"] {
 <li><strong>Find the long sentences first.</strong> A sentence over ~25 words usually hides a dependent clause you can split out. Split it.</li>
 <li><strong>Strip filler and swap for plain words.</strong> Run the swap table over the text. Delete dead words. Prefer the Anglish word over the Latin one.</li>
 <li><strong>Flatten subordination.</strong> Turn “Although A, B” into “A. But B.” or “A, but B.” Turn “which” relative clauses into a second sentence.</li>
+<li><strong>Restore dropped relative pronouns, and name what a demonstrative refers to.</strong> Check every describing clause still has its <em>that</em>/<em>which</em>/<em>who</em>, and every standalone <em>this</em>/<em>that</em>/<em>these</em>/<em>those</em> is followed by the noun it means.</li>
 <li><strong>Switch passive to active</strong> where the actor matters. Name the actor first.</li>
 <li><strong>Keep the meaning exact.</strong> Style edits must not change facts, scope, hedges the user meant, or technical precision. When a hedge is load-bearing, keep it. Plainness is the goal, not false confidence.</li>
 <li><strong>Read it back.</strong> Each sentence should make one point. The data should flow top to bottom.</li>
@@ -482,8 +489,10 @@ ul.task-list li input[type="checkbox"] {
 <p>The user’s guide, <strong>Principles of Scientific Writing</strong>, is the source of record. Pull the latest rules from it, not from this summary:</p>
 <ul>
 <li>Guide home: https://morrison-lab.github.io/psw/</li>
-<li><a href="https://morrison-lab.github.io/psw/chapters/word-choice.html">Word choice</a> — Anglish over Latin.</li>
-<li><a href="https://morrison-lab.github.io/psw/chapters/conciseness.html">Conciseness</a> — cut redundancy; active voice; the swap list.</li>
+<li><a href="https://morrison-lab.github.io/psw/chapters/word-choice.html">Word choice</a> — Anglish over Latin; avoiding vague/metaphorical language; minimizing jargon.</li>
+<li><a href="https://morrison-lab.github.io/psw/chapters/conciseness.html">Conciseness</a> — cut redundancy; active voice; the swap list; limiting nested clauses.</li>
+<li><a href="https://morrison-lab.github.io/psw/chapters/grammar.html">Grammar</a> — rules 7–8 above: relative and demonstrative pronouns.</li>
+<li><a href="https://morrison-lab.github.io/psw/chapters/avoid-ai-tells.html">Avoiding AI tells</a> — overused vocabulary, rhetorical reflexes, formatting habits; see also the <code>find-ai-tells</code> skill below.</li>
 <li><a href="https://morrison-lab.github.io/psw/chapters/defining-terms.html">Defining terms clearly</a></li>
 <li><a href="https://morrison-lab.github.io/psw/chapters/paper-organization.html">Paper organization</a></li>
 </ul>
@@ -492,7 +501,7 @@ ul.task-list li input[type="checkbox"] {
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><code>find-ai-tells</code></strong> (issue #49, in progress) — the detector counterpart. It <em>scans</em> finished text for AI-authorship tells. This skill <em>prescribes</em> how to write up front. Run <code>find-ai-tells</code> after; run <code>use-preferred-style</code> during.</li>
+<li><strong><code>find-ai-tells</code></strong> — the detector counterpart. It <em>scans</em> finished text for AI-authorship tells. This skill <em>prescribes</em> how to write up front. Run <code>find-ai-tells</code> after; run <code>use-preferred-style</code> during.</li>
 <li><strong><code>simplify</code> / <code>tidy</code></strong> — the same “cut what adds no value” instinct, applied to code instead of prose.</li>
 <li><strong><code>memorize</code> / <code>remember</code></strong> — for a one-off wording preference, write a memory instead of editing this skill.</li>
 </ul>

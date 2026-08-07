@@ -173,10 +173,13 @@ Worked-example case records for the rules below live in
    The discriminator is scope: several unrelated PRs truncated at once, plus a
    repo-wide `gh run list` showing a workflow type that used to run and now
    does not.
-   `memories/github-actions.md`'s "Check the GitHub status page when workflows
-   stall across several PRs at once" carries the queries and the case record;
-   reach for it before applying any subsection above to a second PR showing the
-   same emptiness.
+   `memories/github-actions-outages.md`'s "Check the GitHub status page when
+   workflows stall across several PRs at once" carries the queries and the case
+   record; reach for it before applying any subsection above to a second PR
+   showing the same emptiness.
+   Its sibling section there covers the other half --- what the wreckage looks
+   like once the incident clears, and why a job that is `cancelled` with zero
+   recorded steps is an outage casualty rather than a failure to debug.
 
 2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
    A rebuttal the reviewer still disputes does **not** count as clean.

@@ -58,7 +58,7 @@ Git writes a **regular file whose entire content is the target path**, with no t
 This repo has two such entries, and one line lists them:
 
 ```sh
-git ls-files -s | awk '$1=="120000" {print $2, $4}'
+git ls-files -s | awk '$1=="120000" {print $4}'
 ```
 
 Measured 2026-08-06 it returns `.claude/skills` and `AGENTS.md`.

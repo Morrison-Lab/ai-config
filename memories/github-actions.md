@@ -1127,10 +1127,9 @@ and still successfully hand off to the workflow that actually produces a
 review. `claude-bot.yml` can post `API Error: Usage credits required for 1M
 context · turn on usage credits at claude.ai/settings/usage, or use --model
 to switch to standard context` as its own comment. Read without checking run
-history, that reads as "the review is broken" -- exactly the false conclusion
-issue #1197 already recorded once (a subagent reported this same string as
-evidence of a repo-wide failure; the real history showed 36 success, 21
-cancelled, 0 failures).
+history, that reads as "the review is broken" -- the false conclusion issue
+#1197 already recorded (a subagent's repo-wide-failure report; the real
+history showed 36 success, 21 cancelled, 0 failures).
 
 What the error actually is: `claude-bot.yml`'s own conversational-response
 step hitting a credit gate on **its** invocation, not on the review it goes
@@ -1153,11 +1152,13 @@ with no regard for code-span formatting -- the exact substring-match bug
 this repo's own `claude-bot.yml` already documents having caused once
 before, on an issue body rather than a comment (#682 -> #683).
 A FALLBACK self-review posted to this PR at 03:05:10 contained the text
-`` the `@claude` review workflow `` -- a literal `@claude` substring.
-Its `author_association` reads `MEMBER` via `pull_request_read` (REST) and
-`COLLABORATOR` via `gh pr view --json comments` (GraphQL) for the same
-comment id -- unresolved from this session, though both sit inside the
-gate's allowlist, so the account was eligible either way.
+`` the `@claude` review workflow `` -- a literal `@claude` substring,
+posted by a `COLLABORATOR`-associated account (a direct repo grant, role
+`maintain`) -- enough to satisfy the gate.
+One MCP-backed read (`pull_request_read`) reported `MEMBER` for this
+comment on two calls; raw REST and GraphQL both returned `COLLABORATOR`
+independently, matching the collaborator grant -- treat the lone `MEMBER`
+reading as this session's tool outlier, not a real surface disagreement.
 The third run was picked up sixteen seconds later, at 03:05:26 -- a timing
 this session's tools cannot fully confirm as causal (no access to which
 comment fired a given `issue_comment` run).
@@ -1177,9 +1178,8 @@ and `ref: <PR-branch>`, which skips the comment-relay path entirely.
   review failed.
 - **Do:** dispatch the review workflow directly rather than relying on a
   mention comment to relay through the listener.
-- **Do:** avoid writing an unescaped `@claude` substring into any PR comment
-  on a repo whose bot gates on a plain `contains()` check -- it can retrigger
-  the bot even from inside backticks or a quoted error message.
+- **Do:** avoid writing an unescaped `@claude` substring into a PR comment on
+  a repo whose bot gates on `contains()` -- it retriggers even in backticks.
 - **Don't:** re-derive "the review workflow is broken repo-wide" from one
   PR's comments without checking `list_workflow_runs` first -- #1197 already
   found this claim false once, from the same symptom.
@@ -1194,7 +1194,7 @@ A fallback self-review was posted before checking further -- not wrong to
 do, but reached for the wrong reason, since `list_workflow_runs` showed the
 listener succeeding throughout and the review workflow re-dispatching
 within seconds of each comment.
-Two review rounds on this very entry then caught a wrong claim that PR #635
-belonged to a different repo, an overcount of "three" genuine comments that
-should have read two plus a probable self-retrigger, and a guessed
-`author_association` a second API surface contradicted.)
+Three review rounds on this entry then caught: PR #635 wrongly called a
+different repo, an overcounted "three" genuine comments (really two plus a
+probable self-retrigger), and a `MEMBER` reading that was this session's own
+tool outlier against three other checks agreeing on `COLLABORATOR`.)

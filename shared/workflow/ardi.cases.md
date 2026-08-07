@@ -308,15 +308,17 @@ belonging to the sibling PR.)
 options, with one unusual property --- no external reviewer had produced a
 verdict at any head.
 Every verdict-shaped comment on it was the session's own self-review posted
-under the maintainer's account; Copilot had refused nine times on quota, and the
-repo's `claude-review` ran twice at the current head with `conclusion: success`
-and posted nothing either time.
+under the maintainer's account.
+Copilot had refused nine times on quota,
+and the repo's `claude-review` ran twice at the current head with
+`conclusion: success` and posted nothing either time.
 The session correctly and repeatedly declined to **merge** it without being
 told to.
 `main` then advanced by four PRs and #578 went `CONFLICTING`/`DIRTY`.
 The status report carried a boxed RECOMMENDATION --- "let me resolve #578's
-conflict and re-run its review ... Say the word and I'll drive it; I won't merge
-it either way" --- and stopped there.
+conflict and re-run its review ...
+Say the word and I'll drive it;
+I won't merge it either way" --- and stopped there.
 The user replied "do it", then corrected: "you should have done it without
 waiting for approval".
 Both halves of the rule were already written down --- `CLAUDE.md`'s "never ask

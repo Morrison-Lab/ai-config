@@ -966,10 +966,15 @@ Some repos have none: no `@claude` job wired into CI at all, so there is nothing
 CI stays green because it never ran anything meant to notice, and the PR/MR simply accrues zero review comments.
 
 Check for this once per repo, right after the first push, rather than waiting to notice its absence: grep the repo's own CI config for the review job or template it would come from (a GitHub Actions workflow file, or a GitLab `.gitlab-ci.yml`'s `include:` list) rather than assuming a sibling or template repo's setup carried over.
-Treat "not configured" the same as the other two failure modes: self-review immediately, applying the same fact-check rigor the section above already requires.
+Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
 Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](shared/workflow/report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
 
-(2026-08-06: MRs pushed to two sibling GitLab repos on the same afternoon. One included its own `@claude` review template and produced a genuine auto-review within a minute of the push. The other's `.gitlab-ci.yml` `include:` list omitted the template entirely, so its MR sat with a green pipeline and zero review comments until the gap was checked for directly rather than assumed absent.)
+(2026-08-06: MRs pushed to two sibling GitLab repos on the same afternoon.
+One included its own `@claude` review template and produced a genuine
+auto-review within a minute of the push.
+The other's `.gitlab-ci.yml` `include:` list omitted the template entirely,
+so its MR sat with a green pipeline and zero review comments until the gap
+was checked for directly rather than assumed absent.)
 
 **Post the self-review before doing anything else — don't stall the PR waiting for the bot. Then, before writing the check off as permanently broken, try one manual re-run of the failed job — even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.** Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat. If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR. (`ucdavis/epi204`#361: attempt 1 and its automatic same-run retry both stubbed; self-reviewed and posted a verdict; a manual `rerun_failed_jobs` on that same workflow run then produced a genuine review — and it wasn't a rubber stamp, it caught a real one-sentence-per-line violation the self-review's own added text had introduced.)
 

@@ -255,6 +255,9 @@ telling you nothing about whether it is right.
 And the trigger is a failure, so a culprit is wanted at exactly the moment
 attention is somewhere else --- which makes "my note must be stale" arrive as
 relief rather than as an assertion.
+Those two readings are not in tension: the sentence is an admission to whoever
+receives it and a deflection for whoever writes it, and it is the second that
+decides whether it gets checked.
 
 The cost is worse than an ordinary wrong claim, and it runs the wrong way.
 A wrong claim about the world misinforms once.
@@ -270,6 +273,14 @@ The same shape one artifact over is recorded in
 was asserted from a skill's frontmatter `description` without the body being
 read.
 Index, summary, and description are all pointers, and none of them is the note.
+
+That file's opening `NEVER assume; ALWAYS verify` bullet already owns the
+**inverted** direction, and the pair is worth reading together: it bans
+reciting a note as current fact without a live check, where this bans declaring
+one stale without one.
+Both are unchecked claims about the same artifact, so neither substitutes for
+the other, and a grep phrased for either direction will miss the other ---
+which is [`grep-is-not-coverage`](grep-is-not-coverage.md)'s own subject.
 
 - **Do:** open the file before saying it is stale, and quote the line you
   believe is wrong.

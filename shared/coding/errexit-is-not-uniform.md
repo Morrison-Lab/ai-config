@@ -97,9 +97,8 @@ interaction with testing, below.
 
 The second of those positions carries a separate defect that has nothing to do
 with `errexit`, so a `||` chain can be silent in two ways at once.
-This fragment governs the exit status such a chain discards; the branches also
-print indistinguishable output, so the chain cannot say which alternative
-succeeded, which
+This fragment governs the exit status such a chain suppresses; the branches can
+also print output that does not say which of them ran, which
 [`fail-fast`](../principles/fail-fast.md) owns under "A fallback chain flattens
 which alternative won".
 

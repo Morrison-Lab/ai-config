@@ -504,68 +504,65 @@ a claim about the input domain, and it is the claim that excuses the control.
 
 ### A fallback chain flattens which alternative won
 
-In every case above something about the check was wrong --- a broken pattern,
-an empty input, a label that did not follow from the data.
-A fallback chain can have none of those.
-Every branch is correct, every branch succeeds, and the only thing the output
-loses is *which* one ran:
+A `||` chain advances **only** on failure, so a later branch running is proof
+an earlier one failed.
+Making that failure invisible takes two things at once: the loser's error is
+suppressed, and the winner's output does not name itself.
 
 ```bash
 ls "$A" 2>/dev/null || ls "$B" 2>/dev/null || { echo "searching..."; find ...; }
 ```
 
-The chain answers "does one of these exist?".
-It gets read as answering "which one exists?", and those are different
-questions.
-The output is identical either way, so a reader supplies the missing half from
-whichever branch they expected to win --- usually the first, since that is the
-one they wrote first.
-A value built from that guess fails later, somewhere the chain is no longer on
-screen, and the delayed failure is what makes the misreading expensive rather
-than merely sloppy.
+The first is this fragment's own opening rule rather than anything new ---
+`2>/dev/null` is the error-swallowing the "In code" bullets ban --- and
+dropping that one token makes the loser announce itself by name.
+The second is the increment, and it is a property of the commands rather than
+of `||`: `ls DIR/` prints the directory's **contents**, so its stdout is the
+same whichever directory it read.
+`ls -d DIR/` prints the path, and `command -v` prints the resolved binary, so a
+chain over those forms identifies its own winner and has no defect to fix.
 
-What makes it survive a re-read is that the output is genuine evidence.
-Two files really were listed.
-Nothing in the transcript says they were listed from the path you had in mind,
-so looking again confirms the reading you already had instead of exposing it.
+What makes the misreading survive a re-read is that the output is genuine
+evidence.
+Two files really were listed; nothing in the transcript says they were listed
+from the path you had in mind, so looking again confirms the reading you
+already had rather than exposing it.
 
-Make the winner part of the output, or stop using the chain's control flow as
-the answer:
+Drop the suppression first.
+Where the resolved value is what you actually want, take it from a variable and
+fail loudly when nothing matched, per the canonical form at
+[`use-mcp-servers`](../workflow/use-mcp-servers.md):
 
 ```bash
 for p in "$A" "$B"; do
   [ -e "$p" ] && { GODOT="$p"; break; }
 done
-printf 'resolved: %s\n' "$GODOT"     # print it before anything consumes it
+if [ -z "${GODOT:-}" ]; then
+  echo "no Godot binary at $A or $B" >&2      # loud, and it names both candidates
+  exit 1
+fi
+printf 'resolved: %s\n' "$GODOT"
 ```
-
-Testing the candidates on separate lines does the same job with no cleverness
-at all, and is the better move when there are only two of them.
-
-Generalize past `ls`: any fallback chain whose branches are indistinguishable
-in the output has this defect, whatever the commands are --- a download failing
-over between mirrors, a config lookup walking a search path, a `command -v`
-cascade over alternative tool names.
 
 A `||` chain is also one of the errexit-suppression contexts in
 [`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), so one chain
 can be silent in two independent ways at once.
-That fragment governs the exit status a chain discards; this one governs the
-output it flattens.
+That fragment governs the exit status such a chain suppresses; this one governs
+an output that does not name its source.
 
-- **Do:** echo the branch that won, or resolve the value into a variable and
-  print it before anything consumes it.
-- **Do:** test the candidates separately when there are only a few --- the
-  chain buys brevity, and brevity is exactly what costs the answer here.
-- **Don't:** read a fallback chain's output as naming the branch that produced
-  it; every branch prints the same shape.
+- **Do:** drop `2>/dev/null` before anything else --- the loser's own error
+  message is the cheapest thing that names it.
+- **Do:** check whether the winning branch's stdout identifies itself, and
+  prefer a form that does (`ls -d` over `ls`) or print the resolved value.
+- **Don't:** read a later branch running as evidence that nothing failed; `||`
+  advances only on failure.
 - **Don't:** assume the first branch won because it is the one you expected to
   win.
 
 ## In a guard you ship: partial is worse than absent
 
-Everything above concerns a check whose own outcome is invisible **at
-runtime**, because two paths a reader needs to tell apart print the same thing.
+Everything above concerns a check whose failure is invisible **at runtime**,
+because its failure path prints what its pass path prints.
 A guard applied to only some of the paths that need it fails one level earlier,
 and in the opposite medium: it is perfectly loud wherever it runs, and it
 simply does not run on the paths that were left out.

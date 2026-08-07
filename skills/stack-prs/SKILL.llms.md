@@ -94,7 +94,22 @@ git merge origin/main            # MERGE_BRANCH -- see the ancestry test below b
 gh pr edit <dependent-N> --base main   # EDIT_PR
 ```
 
-In a remote/web session, use `mcp__github__update_pull_request` with `base: "main"`. GitHub also retargets the PR **on its own** when the base branch is deleted on merge, so this step is often already done by the time you look. That changes nothing below, because retargeting only moves a pointer and never rewrites the branch.
+In a remote/web session, use `mcp__github__update_pull_request` with `base: "main"`. GitHub’s documentation promises it retargets the PR **on its own** when the base branch is deleted on merge, and when that happens it changes nothing below, because retargeting only moves a pointer and never rewrites the branch.
+
+**Do not rely on it.** In practice `gh pr merge <base-N> --delete-branch` can **close** the dependent PR instead of retargeting it, which [`memories/git.md`](../../memories/git.md) records from a separate incident a month earlier. So run `gh pr list --base <base-branch>` before merging, and omit `--delete-branch` whenever it returns anything. Delete the branch by hand once the dependent PR has visibly retargeted.
+
+If it closes anyway, the head branch survives, and restoring the base is a better recovery than opening a replacement PR — it keeps the PR number, its comment thread, and its review verdicts:
+
+``` bash
+git push origin <merged-sha>:refs/heads/<deleted-base>   # restore the base
+gh pr reopen <dependent-N>                               # only works now
+gh pr edit <dependent-N> --base main                     # retarget
+git push origin --delete <deleted-base>                  # re-delete
+```
+
+The order is forced: `gh pr reopen` fails while the base is missing, and `gh pr edit --base` fails on a closed PR (`Cannot change the base branch of a closed pull request`). Expect `reviewDecision: REVIEW_REQUIRED` afterward — retargeting resets the review state even though the head commit never moved. (UCD-SERG/serocalculator \#633/#635, 2026-08-07. PR \#635 closed two seconds after \#633 merged, and that timing is what establishes the cause.)
+
+Keep an issue or PR reference off the start of a line when you break these sentences: markdownlint reads a leading `#` as a malformed ATX heading and fails `validate` with MD018.
 
 After retargeting, GitHub recomputes the diff against `main`. It should now show only the dependent PR’s own changes, since the base PR’s commits are already on `main`. **Check that it does, with an ancestry test rather than by eye** — the two ways it can go wrong have different causes and different fixes, and only one of them is the merge’s fault:
 

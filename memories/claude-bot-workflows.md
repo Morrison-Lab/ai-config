@@ -1198,3 +1198,57 @@ one ruleset, `main`, carrying `deletion,non_fast_forward,pull_request` and no
 Reading the `on:` blocks directly corrected two rows a first-pass recollection
 had wrong, neither of which changes the conclusion --- `antigravity-review.yml`
 also carries `issue_comment`, and `jules-review.yml` is comment-triggered.)
+
+## `claude-bot.yml`'s own "1M context" error is not a review failure
+
+`claude-bot.yml` (the `issue_comment` listener, gated on `@claude`) can post
+`API Error: Usage credits required for 1M context · turn on usage credits at
+claude.ai/settings/usage, or use --model to switch to standard context` as its
+own comment, attributed to "`@claude` post-step". Read literally, and without
+checking the `on:` table above, this reads as "the review is broken" -- which
+is precisely the false conclusion issue #1197 already recorded once (a
+subagent reported this exact string as evidence of a repo-wide failure; the
+real run history showed 36 success, 21 cancelled, 0 failures).
+
+What the error actually is: `claude-bot.yml`'s own conversational-response
+step hitting a credit gate on **its** invocation, not on the review it goes on
+to dispatch. Three `@claude review` comments on the same PR each produced this
+error, and each of the three `claude-bot.yml` runs still reported workflow
+**`conclusion: success`** (`list_workflow_runs` on `claude-bot.yml`) --- the
+error is caught and posted, not a crash. Separately, each comment also
+triggered a `workflow_dispatch` run of `claude-review.yml` itself (visible via
+`list_workflow_runs` on `claude-review.yml`, `event: workflow_dispatch`,
+timed within seconds of the comment) --- the workflow this repo's review
+actually depends on, per the table above.
+
+The `workflow_dispatch` run's `head_branch`/`head_sha` reflect **`main`**, not
+the PR branch, mirroring the exact ambiguity
+[`fully-clean`](../shared/workflow/fully-clean.md) already documents for a
+different repo (#635, run 29967418653) --- so don't use those fields to decide
+whether the run is reviewing your PR at all; read what it posts instead, or
+dispatch directly with an explicit `pr_number` input and `ref: <PR-branch>`
+(the "Do" bullet above), which sidesteps the comment-relay path entirely.
+
+- **Do:** treat a `claude-bot.yml` "usage credits" comment as evidence about
+  that step only, and check `claude-review.yml`'s own run history (or the PR's
+  own comments) before concluding the review failed.
+- **Do:** dispatch `claude-review.yml` directly (explicit `pr_number` +
+  `ref`) rather than relying on an `@claude review` comment to relay through
+  `claude-bot.yml`, which carries this failure mode and an unrelated
+  `head_branch` field.
+- **Don't:** re-derive "the review workflow is broken repo-wide" from one
+  PR's comments without checking `list_workflow_runs` first --- #1197 already
+  found this claim false once, from the same symptom.
+- **Don't:** count a `claude-bot.yml` error as one of the three tries in the
+  "retry once, then treat as unreachable" rule in
+  [`fully-clean`](../shared/workflow/fully-clean.md) --- it isn't the
+  reviewer failing, so it isn't evidence about the reviewer's reachability.
+
+(2026-08-07, PR #1238: the same "1M context" string that #1197 traced to a
+false repo-wide-failure report reappeared verbatim, three times, on a PR this
+session opened. Posted a fallback self-review before checking further, which
+was not wrong to do but was reached for the wrong reason (assumed a persistent
+account-level gate rather than checking run history) --- `list_workflow_runs`
+on both `claude-bot.yml` and `claude-review.yml` showed the former succeeding
+throughout and the latter actively re-dispatching via `workflow_dispatch`
+within seconds of each comment.)

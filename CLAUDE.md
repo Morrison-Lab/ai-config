@@ -346,7 +346,7 @@ Don't default every dispatched call to the conductor's own tier out of caution.
 
 The conductor's own tier cannot be switched from inside the conversation --- it's client-side only (`memories/preferences.md`).
 So the lever there is to **recommend** a change rather than make one.
-When the task ahead is clearly underpowered by the current tier, say so and suggest escalating via `/model` or `select-model`.
+When the current tier is clearly underpowered for the task ahead, say so and suggest escalating via `/model` or `select-model`.
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or `delegate-to-codex` before spending this session's own quota, per the standing "exhaust codex before using our own" preference --- rather than burning the conductor's tier on it.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.

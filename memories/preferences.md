@@ -915,3 +915,89 @@ safer/preferred choice merely because the repo has external consumers.
   check the current date first (e.g. via the system clock or `date`)
   so an elapsed date (like October 2025) is recognized as past rather than future.
   (Learned on gha#412, 2026-08-05.)
+
+## Verify a lever actually controls the observed behaviour before building the change
+
+- **When asked to turn something off, confirm the mechanism you are about to
+  disable is the one producing what the user actually saw --- before
+  implementing, not after merging.**
+  The check is usually seconds: grep the workflows for the vendor name, and look
+  for that bot's own comments or check runs on recent pull requests.
+  Running it afterwards is worth a fraction of running it first, and the
+  difference is in how the finding can be delivered.
+  The work is already merged, so it lands as a caveat on a change the user now
+  has to re-evaluate, rather than as a question they could have settled in one
+  reply before any code was written.
+  When the check comes back empty, say so and ask which surface they meant
+  instead of shipping against the only lever you happened to find.
+  This is `shared/workflow/challenge-the-assignment.md` applied to a disable
+  request: the load-bearing premise is that the lever you found is the one that
+  was running, and it is cheap to falsify.
+  - **Do:** run the vendor grep and the recent-PR bot scan before writing the
+    config, and report what each one returned.
+  - **Do:** treat an empty result as a question about which surface was meant.
+  - **Don't:** implement against the first plausible lever and verify afterwards,
+    since a post-merge finding is a caveat rather than a decision the user still
+    gets to make.
+  - **Don't:** read an absence of bot activity as evidence about *why* it is
+    absent; that is a second claim, and it needs its own evidence.
+  (Learned on `Lacaedemon/sparta`#1214, 2026-08-06: asked to disable Antigravity
+  pull-request reviews, I configured `.gemini/config.yaml` --- the Gemini Code
+  Assist **GitHub App** lever --- and merged it.
+  Only afterwards did I establish that no workflow in that repo mentions Gemini or
+  Antigravity, and that no such bot had posted a comment or a check run on any
+  recent pull request.
+  That absence does not say why it is absent.
+  An app whose quota is exhausted and one that was never active on the repo leave
+  exactly the same trace, so the lever I configured may govern nothing that was
+  running, while reviews driven from the Antigravity dashboard or IDE are toggled
+  there rather than in-repo.
+  The change stands as a documented statement of intent; the point is that one
+  grep and two API reads would have established all of this before any of it was
+  written.
+  Note that the answer is per-repo: `Morrison-Lab/ai-config` does have an
+  Actions-based reviewer in `.github/workflows/antigravity-review.yml`, so the
+  same request there would have had a different lever.)
+
+## A "how to restore this" note must not pin a copy of an upstream default
+
+- **When disabling a third-party feature by overriding its config, document the
+  reversal as "delete the override" --- never by writing down what the upstream
+  defaults were.**
+  A pinned copy is a second source of truth for a value you do not own, cannot
+  verify locally, and do not control, so it rots silently.
+  Deleting the overriding block instead lets whatever the product default *is at
+  that time* apply.
+  Quote today's values as context if that helps a reader, never as the
+  instruction.
+  Verify a third-party default against that vendor's own documentation before
+  writing it down at all --- and prefer not writing it down.
+  The pull-request description carries the same claim the files do, so fixing the
+  config while leaving the description asserting the old values just relocates the
+  stale copy to somewhere a reader still finds it.
+  This is `shared/coding/avoid-hardcoding-external-data.md` applied to a reversal
+  note: an upstream product default is data with an external source of truth, and
+  the note is a hand-maintained prose copy of it.
+  - **Do:** write the reversal as the deletion of your own override, so the
+    product default applies whatever it has become by then.
+  - **Do:** check a quoted third-party default against that vendor's own docs, and
+    mark it as today's value rather than as the instruction.
+  - **Don't:** transcribe upstream defaults into a comment, a README, or a
+    pull-request description as the restore step.
+  - **Don't:** answer a reviewer's correction by fixing only the number, since
+    adopting the corrected value keeps the mechanism and re-arms the same trap for
+    the next drift.
+  (Learned on `Lacaedemon/sparta`#1214, 2026-08-06: the reversal note as first
+  pushed claimed `pull_request_opened` defaults of `help: false, summary: true,
+  code_review: true`, so the copy was already wrong in the commit that introduced
+  it.
+  Google's own Gemini Code Assist documentation gives `summary` as `false`,
+  re-confirmed 2026-08-06 at a page that now 301-redirects from
+  `developers.google.com/gemini-code-assist/docs/customize-gemini-behavior-github`
+  to `docs.cloud.google.com/gemini/docs/code-review/customize-repo-review` ---
+  the vendor moved the documentation out from under the citation too, which is
+  the same not-yours-to-pin problem one level up.
+  Review caught the value, and the reviewer's own `suggestion` block corrected it
+  while leaving the pinned copy intact; the fix that shipped replaced the pinned
+  copy with a delete-the-override instruction instead, which is why only the
+  mechanism change reached `main`.)

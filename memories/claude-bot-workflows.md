@@ -21,8 +21,10 @@ generic Actions-authoring and reusable-workflow material.
   `pr_number`). Posting an `@claude review` *comment* drives the separate agent
   workflow `claude.yml` (which then re-dispatches a review after it pushes) — it
   does not directly fire the review workflow.
-- A new push (`synchronize`) auto-fires a fresh review — the normal path during
+- A new push (`synchronize`) auto-fires a fresh review --- the normal path during
   an iterate loop.
+  A property of *those* repos, not a general one --- see "`ai-config` never
+  auto-reviews a PR on push" at the end of this file.
 - To force a fresh review on an existing PR **without a new commit**:
   - **workflow_dispatch** (preferred — no extra PR timeline noise). Same
     dispatch, three ways to send it:
@@ -1131,3 +1133,67 @@ Two Copilot reviews on that PR restated the premise without objection.
 Fixed in #91.
 A single query for a `claude` comment on any earlier PR would have caught it at any
 point in the preceding month.)
+
+## `ai-config` never auto-reviews a PR on push, and the absence is silent
+
+Nothing here summons a reviewer when a PR is pushed: `validate` and `preview`
+fire on a PR event, and no reviewer does.
+So a PR reaches all-green CI, `mergeStateStatus: CLEAN`, and sits with zero
+reviews forever, because nobody asked.
+
+Derive it rather than recalling it; every row is one `on:` block that can change:
+
+```bash
+for f in .github/workflows/*.yml; do
+  printf '%-32s ' "$(basename "$f")"
+  sed -n '/^on:/,/^[a-z]/p' "$f" | grep -oE 'pull_request_review_comment|pull_request_review|pull_request|issue_comment|workflow_dispatch|schedule|issues|push' | sort -u | tr '\n' ' '
+  echo
+done
+```
+
+Every reviewer workflow, measured 2026-08-07:
+
+| workflow | triggers |
+| --- | --- |
+| `claude-bot.yml` | `issue_comment`, `pull_request_review_comment`, `issues: assigned`, `pull_request_review` --- **no `pull_request` at all** |
+| `claude-review.yml` | `workflow_dispatch` only, input `pr_number` |
+| `antigravity-review.yml` | `issue_comment`, `workflow_dispatch` |
+| `jules-review.yml` | `issue_comment`, gated on an `@jules` mention |
+
+The remedy is one command:
+
+```bash
+gh workflow run claude-review.yml --repo Morrison-Lab/ai-config --ref <branch> -f pr_number=<N>
+```
+
+**The contrary expectation is written down, correctly, for other repos.**
+This file's "Re-triggering the @claude PR *review*" section and
+[`debugging.md`](debugging.md)'s ARDI polling bullet both say a push auto-fires
+a review, and both are right about the content and package repos --- as is
+`Lacaedemon/sparta`, which re-enabled its own trigger in sparta#1122.
+So the question is not "does review fire on push" but "what does **this** repo
+trigger on".
+
+**The absence is silent and shaped like patience.**
+Green checks plus no review is indistinguishable from a review still running,
+so the natural response is to wait for something never scheduled.
+[`fully-clean`](../shared/workflow/fully-clean.md)'s criterion 2 separates "no
+findings" from "no verdict"; here nobody asked.
+Copilot is no fallback either: `repos/Morrison-Lab/ai-config/rulesets` returns
+one ruleset, `main`, carrying `deletion,non_fast_forward,pull_request` and no
+`copilot_code_review` rule.
+
+- **Do:** dispatch `claude-review.yml` explicitly after opening a PR here, and
+  again after every push you want re-reviewed.
+- **Do:** derive a repo's review triggers from its own `on:` blocks before
+  concluding a review is late rather than absent.
+- **Don't:** wait on an ai-config review you did not dispatch --- green checks
+  plus an empty `reviews` array is the steady state, not a transient one.
+- **Don't:** carry a sibling repo's auto-review behaviour across; the two look
+  identical from the PR page.
+
+(2026-08-06/07: PRs #1219 and #1224 each reached all-green CI with
+`reviews: []` and stayed there until a review was dispatched by hand.
+Reading the `on:` blocks directly corrected two rows a first-pass recollection
+had wrong, neither of which changes the conclusion --- `antigravity-review.yml`
+also carries `issue_comment`, and `jules-review.yml` is comment-triggered.)

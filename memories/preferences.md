@@ -985,13 +985,17 @@ safer/preferred choice merely because the repo has external consumers.
   - **Don't:** answer a reviewer's correction by fixing only the number, since
     adopting the corrected value keeps the mechanism and re-arms the same trap for
     the next drift.
-  (Learned on `Lacaedemon/sparta`#1214, 2026-08-06: the reversal note claimed
-  `pull_request_opened` defaults of `help: false, summary: true, code_review:
-  true`, so the copy was already wrong inside the commit that introduced it.
+  (Learned on `Lacaedemon/sparta`#1214, 2026-08-06: the reversal note as first
+  pushed claimed `pull_request_opened` defaults of `help: false, summary: true,
+  code_review: true`, so the copy was already wrong in the commit that introduced
+  it.
   Google's own Gemini Code Assist documentation gives `summary` as `false`,
-  re-confirmed 2026-08-06 at a page that has since moved from
-  `developers.google.com/gemini-code-assist` to `docs.cloud.google.com/gemini`
-  --- the vendor moved the documentation itself, which is the same
-  not-yours-to-pin problem one level up.
+  re-confirmed 2026-08-06 at a page that now 301-redirects from
+  `developers.google.com/gemini-code-assist/docs/customize-gemini-behavior-github`
+  to `docs.cloud.google.com/gemini/docs/code-review/customize-repo-review` ---
+  the vendor moved the documentation out from under the citation too, which is
+  the same not-yours-to-pin problem one level up.
   Review caught the value, and the reviewer's own `suggestion` block corrected it
-  while leaving the pinned copy intact.)
+  while leaving the pinned copy intact; the fix that shipped replaced the pinned
+  copy with a delete-the-override instruction instead, which is why only the
+  mechanism change reached `main`.)

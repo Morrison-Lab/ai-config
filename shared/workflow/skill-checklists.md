@@ -46,8 +46,15 @@ script itself.
 A merge is Read-Do for the other reason -- nothing after it is a
 confirmation, because the irreversible act already happened.
 
-A pre-push sweep is Do-Confirm: its items are independent, so running the
-test suite before or after the non-ASCII scan changes neither result.
+A pre-push sweep is mostly Do-Confirm: running the test suite before or after
+the non-ASCII scan changes neither result.
+Read that as a fact about *that pair* rather than about the sweep, because a
+pre-push list usually holds items that edit the diff as well as items that
+measure it --- and a reflow, a regeneration, or a `main` merge changes which
+lines are added, so a scan taken before one of them is answering about lines
+that no longer exist.
+Those items are Read-Do by this section's own criterion, and
+[`ardi`](ardi.md)'s checklist pins their order.
 
 - **Do:** state which kind a checklist is, in the heading or its first line,
   so a reader knows whether they may work ahead of it.

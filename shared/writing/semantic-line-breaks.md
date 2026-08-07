@@ -158,6 +158,64 @@ The check had passed on the old branch and was not re-run against the new
 head; review then flagged a two-sentence line, which the re-run reproduced on
 the first try.)
 
+**A reflow pass of your own expires it too, because the range has two ends and
+a rebase only moves one of them.**
+The section above states the mechanism generally --- a diff-scoped check
+answers a question about `<base>...HEAD` --- and then narrows its conclusion to
+the base.
+The narrowing is what lets this through.
+`HEAD` moves far more often than the base does, and it moves because of your
+own edits, so a reformatting pass expires every line-scoped result taken before
+it even when nothing rebased and every check ran at the right moment.
+
+The mechanism is that a reformat changes **which lines are added**.
+Splitting a long line at a sentence boundary retires one added line and creates
+two, and neither of the new ones was in the set an earlier scan examined.
+So the earlier answer is not merely old.
+It is an answer about lines that no longer exist.
+
+A reflow is the worst of the diff-mutating passes to run late, and the one a
+pre-push sweep most encourages running late, because its findings arrive as
+warnings to clear rather than as content to write.
+Regenerating a generated tree and merging `main` do the same thing on a larger
+scale.
+
+The failure is silent and reads as verified, which is what separates it from an
+ordinary stale result.
+The earlier check genuinely passed, so its output is a true measurement --- and
+a true measurement is exactly the kind of thing that gets quoted into a commit
+message and a PR body's verification section, where a reviewer meets a specific
+numeric claim with nothing in the diff to contradict it.
+
+The remedy is ordering rather than vigilance: run every diff-mutating pass
+first, and every line-scoped check afterwards, as one block at the end.
+Ordering is checkable, and a resolution to remember is not.
+
+- **Do:** run every diff-mutating pass --- a reflow, a rewrap, a re-sort, a
+  generator re-run, a `main` merge --- before any line-scoped check, and run
+  the checks last as one block.
+- **Do:** re-run a line-scoped check after any pass that edited the diff,
+  including one whose whole purpose was to satisfy a different check.
+- **Don't:** treat a check's result as durable because it was taken after
+  committing and with the three-dot range --- that range's `HEAD` end moves
+  with every edit you make.
+- **Don't:** quote a check's output in a commit message or PR body without
+  re-running it at the head you are about to push.
+
+(Morrison-Lab/ai-config#1259, 2026-08-07: `3c2cd225` moved 38 case records out
+of `CLAUDE.md`, then converted em-dashes on the diff's added lines, verified
+with `git diff | grep -c` for banned glyphs at 0, then reflowed long lines to
+clear `check-new-line-breaks`, verified at 0 warnings, then pushed quoting the
+punctuation result.
+The reflow split a list item, so the line carrying an em-dash was not in the
+set the punctuation pass had scanned, and that pass was never re-run.
+Review found the surviving glyph at `CLAUDE.md:420` --- the only one left in
+the whole diff --- and noted that it contradicted the commit message's own
+claim.
+Fixed in `a06aa88f`.
+Both passes ran after committing and with the three-dot range, so every remedy
+this file offered was already being followed.)
+
 **Relocating prose makes its multi-sentence lines yours, for the same
 diff-scoped reason.**
 Moving a section between files edits none of its lines and still puts every one

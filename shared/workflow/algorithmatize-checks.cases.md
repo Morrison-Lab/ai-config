@@ -96,6 +96,51 @@ The filtering step was sound --- against green `main` it separated the four
 possessives exactly, `arm's` 4 files, `manuscript's` 2, `simulation's` 6, and
 `SAS's` 0 --- which is what makes the extraction the whole of the defect.)
 
+## Widening an instrument invalidates every figure it produced, not only the one that exposed it
+
+(`ucdavis/bcs#599`, 2026-08-06: sanitizing 11 SAS programs before committing
+them, removing a credential and real participant identifiers.
+A bash pipeline found identifiers on context lines matching
+`studyid_c *(=|in) *["'(]` --- note ` *`, spaces only, not `\s*` --- and
+reported 52 occurrences and 18 distinct IDs across 3 files.
+An independent subagent sweep run in parallel also reported 18 distinct, and
+72 total, that figure being 52 quoted plus 20 identifiers in two pasted
+`proc print` output blocks.
+Two methods agreeing at 18 read as strong confirmation; both keyed on quoted
+tokens near a context word, so their agreement measured the shared blind spot.
+
+The sanitizing script written afterwards used `\s*` and asserted the expected
+count, aborting before writing anything with "expected 18 distinct IDs, found
+19".
+The 19th was a 10-digit numeric token on a tab-adjacent line that ` *` cannot
+match.
+The distinct count was corrected to 19; the **occurrence** count and the
+**file** count were not re-derived, and were carried forward from the narrow
+detector into the PR body, the `NEWS.md` entry, and a README table shipped in
+the repo, as "72 occurrences of 19 real participant StudyID_c values, across 8
+files".
+
+`claude-review` recounted against the diff and reported 9 files rather than 8
+and 64 sites rather than 72.
+The finding went unaddressed through two further commits and was re-raised in
+a later round.
+A third figure was wrong the same way: `<REDACTED-USERID>` appears 6 times,
+3 per file --- the `%let nuid` line plus **both** `%include` path forms --- not
+4.
+Derived independently from the committed files rather than accepted on trust:
+`grep -o 'STUDYID[0-9][0-9]'` over the 11 files gives 9 files, 64 occurrences,
+19 distinct, and `grep -o 'REDACTED-USERID'` gives 6.
+The reviewer was right on all three.
+
+72 was wrong twice over.
+It was 52 + 20, and the 20 pasted identifiers were **deleted**, not
+pseudonymized, so they were never placeholders --- two populations summed and
+labelled as one of them.
+And the 52 was itself the narrow detector's output, missing all six
+`model*.sas` programs, which use a tab-separated form.
+The correct accounting is 84 identifier sites redacted: 64 pseudonymized in
+place across 9 files, plus 20 deleted with the two pasted blocks.)
+
 ## A reminder guard's discharge condition is a second matcher, and its failure is silence
 
 (`Morrison-Lab/ai-config#1075`, 2026-08-03: the review of a new inject-only

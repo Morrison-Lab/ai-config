@@ -317,6 +317,89 @@ control entered.
 - **Don't:** call an instrument trustworthy on a control that skipped its
   weakest step.
 
+## Widening an instrument invalidates every figure it produced, not only the one that exposed it
+
+The section above ends where the control finally catches something.
+This is about the next five minutes, which is where the correction goes wrong.
+
+An instrument usually emits several figures at once --- a distinct count, an
+occurrence count, a file count.
+When one of them disagrees with a wider pattern, the disagreement arrives
+attached to that single number, so the repair attaches itself to that number
+too.
+The others came off the same narrow pattern, on the same pass, and are wrong
+for exactly the same reason.
+Nothing points at them, because nothing disagreed about them.
+
+What makes the partial repair feel finished is that **an assertion now
+passes**.
+Widening the pattern and updating the one figure it contradicted turns a
+failing check green, and a green check is the strongest completion signal
+available.
+It is a signal about the figure that was checked, and it is silent about the
+figures that were not.
+
+So the trigger is the **widening**, not the discrepancy.
+The moment a detector's pattern changes, every number that detector produced
+is stale --- including the ones nobody re-measured, and the ones already
+copied into a PR body, a changelog, or a table shipped in the repo.
+Re-run the widened detector for all of them, in one pass, before any of them
+are published.
+
+**Two independent methods agreeing is not corroboration when both are narrow
+in the same way.**
+Two methods keyed on the same surface feature share a blind spot, so their
+agreement measures the blind spot rather than the truth, and it arrives
+looking like the strongest evidence in the room.
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "Matching
+values is not matching roles" makes the same point about two *values* that
+agree --- "treat a shared origin as grounds for more care, not as
+corroboration" --- and it transfers to two *methods* unchanged.
+The discriminating question is not whether the second method was run
+independently, but whether it could have failed differently: a second pass
+that keys on the same token shape will confirm the first pass's misses as
+readily as its hits.
+
+**A second, independent error hides in the same figure: summing two
+quantities and labelling the total as one of them.**
+Items redacted **in place** and items **deleted outright** are different
+populations, and a total that adds them cannot be described as either.
+The label is what makes this survive review, since a plausible number under a
+plausible noun invites no arithmetic.
+State the parts, then the total: "N pseudonymized in place plus M deleted, so
+N+M sites in all" is checkable, and a single figure is not.
+
+**The remedy is already corpus doctrine and was simply not applied.**
+Publish the command that derives a count beside the count, per
+[`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md).
+A reader who inherits the deriving command re-derives when the pattern moves;
+a reader who inherits a bare number cannot tell what measured it, or whether
+anything still does.
+
+**This is not mechanizable as a general hook, and saying so is the honest
+answer** (per "Limits" below).
+"A number in prose disagrees with a number derivable from the diff" is
+decidable only once the deriving command is known, and a bare count in prose
+is precisely the artifact that does not supply one --- so a general guard
+would have to guess the derivation, and a guard that guesses is the mushy
+threshold that trains everyone to ignore it.
+What *is* mechanizable is the narrower case where the command has been
+published beside the count, which is the remedy above: at that point a check
+can re-run it and compare.
+So the enforceable rule is "publish the command", not "verify the number".
+
+- **Do:** re-derive every figure a detector produced when you widen it, in the
+  same pass, before publishing any of them.
+- **Do:** paste the deriving command beside each published count.
+- **Do:** report a total as its parts when it sums distinct populations.
+- **Don't:** re-derive only the figure whose mismatch exposed the gap --- that
+  is the near-miss, and it feels like a complete correction because an
+  assertion now passes.
+- **Don't:** read two methods agreeing as confirmation without asking whether
+  either could have failed differently.
+- **Don't:** treat a figure already copied into a PR body, a changelog, or a
+  shipped file as out of scope; those are the copies a reviewer will read.
+
 ## A reminder guard's discharge condition is a second matcher, and its failure is silence
 
 The two sections above test a guard's *fire* condition: does the matcher catch

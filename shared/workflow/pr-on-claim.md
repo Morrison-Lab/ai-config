@@ -149,7 +149,8 @@ Only the posted review **body** distinguishes those outcomes.
 So an empty pending list after a 201 supports one conclusion and not a second.
 It is **not** evidence the request was blocked.
 It is **also not** evidence that a review is coming, which is a separate claim and an unsupported one.
-At ai-config what follows is a quota refusal rather than a review, so the two claims come apart there in the clearest possible way.
+At ai-config what follows is a refusal rather than a review, so the two claims come apart there in the clearest possible way.
+Note that this point is indifferent to *why* the reviewer refused --- quota, a platform incident, anything else --- because a refusal is not a verdict whatever produced it.
 
 Route to the self-review fallback on a **read refusal body**, never on an empty pending list.
 [`fully-clean`](fully-clean.md) is explicit that a refusing reviewer is not "reachable", so a refusal legitimately hands the external-verdict requirement to whichever other reviewer is working.

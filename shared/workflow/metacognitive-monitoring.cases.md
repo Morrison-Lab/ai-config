@@ -148,6 +148,29 @@ returned zero across the workflow's entire month of operation, which settled
 both the mechanism and the fact that reviews had never once posted.
 Nobody ran it until a fourth PR was opened to fix the consequence.)
 
+## Ask whether a candidate can produce the effect at all
+
+(`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: two regiments locked
+in melee rotated about each other by 56 degrees over 700 ticks (56.14 headless
+Windows, 58.0 Linux), and the rotation was attributed to `Unit._press_into()`.
+That function is five lines, and the operative one is
+`position += (point - position).normalized() * move_speed * MELEE_PRESS_FRACTION * delta`,
+called as `_press_into(enemy.position, delta)`.
+Every displacement it produces therefore lies along the line joining the two
+regiments, so it changes the separation's length and never its bearing --- it
+cannot rotate the pair at any magnitude, and reading those five lines would
+have said so for nothing.
+Instead the candidate was instrumented, credited, published, and refuted in
+review, and the corrected attribution puts `_press_into` at 0.002 degrees of
+bearing rotation against `SoldierBodies.couple`'s -59.163 of that run's -59.16
+total.
+The confirming evidence had been that the two bodies' contributions were
+exactly anti-symmetric --- which is what a central pair looks like, and so was
+the disproof.
+Checked here against `origin/main` at `320fe3b2`, and against the identity
+`dtheta = cross(r_hat, dr) / |r|`, which returns exactly zero for a radial `dr`
+and matches the exact bearing change to five decimals for a tangential one.)
+
 ## A correction inherits its instrument, so a second reading is not a check
 
 (2026-08-05/06, `ucdavis/bcs#587`: cluster CPU efficiency was reported to the

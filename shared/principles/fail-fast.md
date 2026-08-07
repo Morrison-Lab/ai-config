@@ -517,10 +517,11 @@ The first is this fragment's own opening rule rather than anything new ---
 `2>/dev/null` is the error-swallowing the "In code" bullets ban --- and
 dropping that one token makes the loser announce itself by name.
 The second is the increment, and it is a property of the commands rather than
-of `||`: `ls DIR/` prints the directory's **contents**, so its stdout is the
-same whichever directory it read.
+of `||`: `ls DIR/` prints the directory's **contents**, so its stdout never
+names the directory it read.
 `ls -d DIR/` prints the path, and `command -v` prints the resolved binary, so a
-chain over those forms identifies its own winner and has no defect to fix.
+chain over those forms identifies its own winner and leaves only the
+suppression to fix.
 
 What makes the misreading survive a re-read is that the output is genuine
 evidence.

@@ -430,6 +430,60 @@ Then look for that.
 - **Don't:** let the future tense of the claim hide that the answer is already
   in the past.
 
+## Ask whether a candidate can produce the effect at all, before measuring how much it does
+
+The section above says to stop reasoning and go look for the artifact.
+This one points the other way in the same spirit, and the two need keeping
+apart: sometimes the decisive check is neither a search nor a measurement but a
+**structural constraint**, and that one is free.
+
+Attributing an effect to a cause is a **cause** claim, so the claim-type list
+above already asks what else explains it.
+The prior question is cheaper and is the one that gets skipped: can this
+candidate explain it at all?
+A conservation law, a symmetry, or a geometric constraint frequently rules a
+candidate out outright, and ruling it out costs a few lines of source rather
+than an instrumented run.
+
+A purely central displacement is the worked example.
+Aiming each body of a pair at the other moves both along the line joining them,
+which changes the separation's **length** and never its direction, so that term
+cannot rotate the pair at any magnitude.
+That is decidable from the function's own three lines, and no measurement of
+how much it contributes was ever needed.
+
+What makes the expensive path feel correct is that instrumenting is visibly
+rigorous where a feasibility argument is not.
+It also resembles the plausible-mechanism story the section above warns
+against, and the discriminator is whether the argument is **decidable**.
+"This token probably carries enough scope" is a story, falsifiable only by
+another story.
+"A central displacement cannot change a bearing" is a constraint, refutable by
+a single counterexample and refuted by none.
+Where you cannot tell which of the two you are holding, you are holding the
+story.
+
+**A symmetry you find striking is worth asking what it implies.**
+The same incident read exact anti-symmetry between the two bodies as evidence
+that the term was the driver.
+It is the signature of a **central pair** --- that is, of precisely the
+structure that cannot rotate anything --- so the most distinctive feature of
+the data was the disproof, mistaken for the confirmation.
+A pattern is evidence for whatever generates it, which need not be the
+hypothesis in front of you, so name the generator before crediting it.
+
+- **Do:** ask whether a candidate can produce the effect at all before building
+  anything to measure how much of it that candidate produces.
+- **Do:** state the constraint that rules a candidate out --- a conservation
+  law, a symmetry, a geometry --- so a reader can refute it with one
+  counterexample.
+- **Do:** ask what a striking regularity in the data is the signature of,
+  before reading it as support.
+- **Don't:** treat an instrumented measurement as the rigorous option when a
+  free structural check settles the same question.
+- **Don't:** confuse a decidable constraint with a plausible mechanism story;
+  the section above bans the second, not the first.
+
 ## A correction inherits its instrument, so a second reading is not a check
 
 "Illusions of knowing" above concerns a **single** reading whose scope went

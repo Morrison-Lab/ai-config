@@ -89,8 +89,16 @@ catchable this way, since each was a direct match against gha's own
 ### Pre-push checklist
 
 **Pause point: after committing, before `git push`.**
-Do-Confirm --- the items are independent, so work in whatever order suits the
-round and confirm all seven here.
+Do-Confirm --- confirm all seven here, in whatever order suits the round, with
+one exception: the items that **edit** the diff have to precede the items that
+**measure** it.
+Regenerating a generated tree and merging `main` change which lines are added,
+so an added-lines scan or a deleted-lines read taken before either is an answer
+about a diff you no longer have.
+The same holds *inside* item 3, which bundles two checks: reflowing a long line
+to clear its multi-sentence half retires the very lines its punctuation half
+scanned, so satisfying one check expires the other's result
+([`semantic-line-breaks`](../writing/semantic-line-breaks.md)).
 Per [`skill-checklists`](skill-checklists.md); every item below exists because
 the bullets in this fragment record it failing at this exact boundary.
 
@@ -102,9 +110,11 @@ the bullets in this fragment record it failing at this exact boundary.
       touched a generator's inputs, and the PR body states how many changed
       files are generated.
 - [ ] **Added lines were scanned** for banned punctuation and multi-sentence
-      lines, run *after* committing and with the three-dot range
-      (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree,
-      and a two-dot range re-attributes whatever `main` deleted to you.
+      lines, run *after* committing, *after* every pass that edited the diff
+      (your own reflow included), and with the three-dot range
+      (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree, a
+      later edit retires the lines an earlier run scanned, and a two-dot range
+      re-attributes whatever `main` deleted to you.
 - [ ] **The changelog entry and the PR description were re-read** against the
       new behavior, not just the code --- neither is in the diff, so no
       reviewer and no grep will catch a stale one.

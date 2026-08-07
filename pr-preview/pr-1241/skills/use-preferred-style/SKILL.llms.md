@@ -12,7 +12,7 @@ The authority is the user’s own guide, **Principles of Scientific Writing (PSW
 
 ## The rules
 
-The user’s rule on joining clauses (4) sits alongside rules 1–3, which restate PSW’s own “Limit complex sentence structures” section. Rules 5–8 come straight from PSW’s word-choice and grammar chapters.
+Rule 1 restates PSW’s own “Limit complex sentence structures” section (Conciseness chapter). Rules 2–4 are the user’s own emphasis on filler and clause structure, drawing on PSW’s conciseness and word-choice material without matching one specific section. Rules 5–8 come straight from PSW’s word-choice, conciseness, and grammar chapters, cited individually below.
 
 1.  **Limit dependent clauses.** A dependent (subordinate) clause cannot stand alone. It starts with a word like *because*, *although*, *which*, *while*, *since*, *when*, or *if*. One per sentence is plenty. Two or more stacked together is a rewrite signal. Break the sentence apart instead.
 

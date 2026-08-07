@@ -9,6 +9,29 @@ Each heading names the rule the record supports.
 
 (ai-config#712, 2026-07-24: the round-2 verdict posted at `04:06`, about two minutes before its own `claude-review` job completed at `04:06:56` and `require-review` at `04:07:03`.)
 
+## A routing job's own zero-cost error does not mean its dispatch step skipped
+
+(Morrison-Lab/ai-config#1234, 2026-08-07: posting `@claude review` on this
+repo triggers `claude.yml` in agent mode, not the dedicated review workflow
+directly --- see `memories/claude-bot-workflows.md`'s note that this repo's
+review has no push trigger.
+Run `31140546175`'s own agent turn reported `is_error: true`, `num_turns: 1`,
+`total_cost_usd: 0` --- the exact zero-cost signature this file's credential-
+versus-quota section treats as ambiguous and worth investigating before
+trusting.
+The same job kept going anyway: its log shows an unconditional shell step
+--- `Dispatching claude-review.yml for PR #1234 (@claude review comment)` ---
+that fires on a pattern match against the triggering comment, independent of
+whether the agent turn above it succeeded.
+That dispatch (`workflow_dispatch` run `31140580678`) completed normally about
+11 minutes later and posted a genuine, thorough "Ready for merge" verdict.
+So a zero-cost `is_error: true` on `claude.yml`'s **agent-mode** run --- as
+opposed to `claude-code-review.yml`'s own `claude-review` job --- is not
+evidence the review pipeline failed.
+Check for a `claude-review.yml` `workflow_dispatch` run triggered around the
+same time before treating the routing job's own error as a credential or
+quota problem needing a fix.)
+
 ## The check-run name collision
 
 (`ucdavis/bcs#458`, 2026-07-29: a check-in found the three jobs it was

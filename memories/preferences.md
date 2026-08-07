@@ -923,10 +923,11 @@ safer/preferred choice merely because the repo has external consumers.
   implementing, not after merging.**
   The check is usually seconds: grep the workflows for the vendor name, and look
   for that bot's own comments or check runs on recent pull requests.
-  Doing it afterwards is strictly worse than not doing it at all.
-  The work is already merged, so the finding can only be delivered as a caveat on
-  a change the user now has to re-evaluate, rather than as a question they could
-  have settled in one reply before any code was written.
+  Running it afterwards is worth a fraction of running it first, and the
+  difference is in how the finding can be delivered.
+  The work is already merged, so it lands as a caveat on a change the user now
+  has to re-evaluate, rather than as a question they could have settled in one
+  reply before any code was written.
   When the check comes back empty, say so and ask which surface they meant
   instead of shipping against the only lever you happened to find.
   This is `shared/workflow/challenge-the-assignment.md` applied to a disable
@@ -951,8 +952,9 @@ safer/preferred choice merely because the repo has external consumers.
   exactly the same trace, so the lever I configured may govern nothing that was
   running, while reviews driven from the Antigravity dashboard or IDE are toggled
   there rather than in-repo.
-  The change stands as a documented statement of intent; the point is that all of
-  this was one grep away before any of it was written.
+  The change stands as a documented statement of intent; the point is that one
+  grep and two API reads would have established all of this before any of it was
+  written.
   Note that the answer is per-repo: `Morrison-Lab/ai-config` does have an
   Actions-based reviewer in `.github/workflows/antigravity-review.yml`, so the
   same request there would have had a different lever.)

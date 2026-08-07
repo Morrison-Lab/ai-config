@@ -466,6 +466,16 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
 - Use for MR comments, pipeline checks, CI job logs, etc.
 - `glab issue list --opened` is deprecated — `--opened` is the default when `--closed` is not used. Just use `glab issue list` (no flag needed).
 - No `GITLAB_TOKEN` env var — glab uses its own config at `~/Library/Application Support/glab-cli/config.yml`
+- **`glab api` has no `--jq` flag**, unlike `gh api`: passing one errors with
+  `Unknown flag: --jq`.
+  Pipe the raw JSON to `jq` separately instead:
+  `glab api "projects/<id>" | jq '.default_branch'`.
+- **A self-hosted GitLab instance on an institutional internal network may
+  only resolve while on that network's VPN.**
+  A DNS failure (`NXDOMAIN` / `no such host`) for the GitLab hostname, with
+  ordinary internet DNS resolving fine otherwise, points at needing the VPN
+  rather than a broader outage or sandbox restriction: `nslookup <host>`
+  before and after connecting confirms it.
 - Key commands:
   - `glab ci list` — list pipelines
   - `glab ci get --pipeline-id <ID>` — view pipeline details (non-interactive)
@@ -940,3 +950,24 @@ Two practical consequences:
   exactly like a clean one.
   (2026-07-28: a 947-repo scan reported 910 scanned; the 37-repo shortfall
   was the whole signal that anything had gone wrong.)
+
+## `git push --mirror` into a freshly-created empty repo can pick the wrong default branch
+
+Pushing multiple branches with `git push --mirror` into a GitHub repo that
+was just created with `gh repo create` (no initial commit, so no branch is
+yet the "real" default) can leave GitHub's `default_branch` pointing at an
+arbitrary pushed branch instead of the source repo's actual default (e.g.
+`main`).
+Nothing errors; the mirror push reports every branch and tag landing
+successfully, and the wrong default is silent until someone opens the repo.
+
+Check and fix after any mirror push into a new repo:
+
+```bash
+gh api repos/<owner>/<repo> --jq '.default_branch'
+gh api -X PATCH repos/<owner>/<repo> -f default_branch=main
+```
+
+(2026-08-06, mirroring an internal GitLab repo whose default branch was
+`main`: the fresh GitHub repo came back with a `claude/issue-3-...`
+feature branch as `default_branch` instead.)

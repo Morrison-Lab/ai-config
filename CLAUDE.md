@@ -334,6 +334,25 @@ Use this instead of the `/clear` flag above when there's still live state worth 
 This is for continuing the same work with a lighter context.
 That middle item uses the same bright line as the section above, deliberately: the two are complements, so a PR that disqualifies the `/clear` flag is exactly what makes `compress-session` the right tool instead.
 
+## Actively manage quota usage: models and compaction
+
+Treat quota as something to manage continuously through a session, not only at a wrap-up or fan-out moment.
+Two levers, and act on both without waiting to be asked.
+
+**Model tier.**
+For dispatched work (`Agent` calls, `Workflow` `agent()` calls), route model and effort per [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md)'s "Route each agent's model/effort" section --- cheap tier for mechanical, bounded work, inherit or escalate only for judgment-heavy work.
+Don't default every dispatched call to the conductor's own tier out of caution.
+
+The conductor's own tier cannot be switched from inside the conversation --- it's client-side only (`memories/preferences.md`).
+So the lever there is to **recommend** a change rather than make one: when the task ahead is clearly underpowered by the current tier, say so and suggest escalating via `/model` or `select-model`; when a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it (to a cheaper-tier subagent, or to `delegate-to-codex` before spending this session's own quota, per the standing "exhaust codex before using our own" preference) rather than burning the conductor's tier on it.
+Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
+
+**Compaction.**
+Already covered by the two sections above --- the `/clear` flag for a clean stopping point, and the `compress-session` flag for mid-task bloat.
+Add visible quota/usage pressure itself (not just context size) as a trigger for both: a usage bar climbing faster than the task justifies is itself a reason to compress or recommend a lighter model, on the same terms those sections already set out.
+
+When both levers apply, do the self-directed one first --- compress or compact before asking the user to act on a model change, since only the second one costs them a step.
+
 ## Keep a running on-disk session lab notebook
 
 Maintain a "lab notebook" for each session — a dated, append-only file written to *as work happens*, not only when pausing — so that if the session is interrupted with no clean exit (compaction, a forced `/clear`, a crash, a SLURM walltime death), the trail is already on disk and a later session (or I) can pick it up.

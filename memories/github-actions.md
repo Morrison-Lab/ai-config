@@ -1057,6 +1057,51 @@ above, and it is worth knowing in both directions.
 from the frozen `@v1` to `@v2` showed `@v2`'s step shape on its own run before
 merging.)
 
+## A caller with no `concurrency:` block can still have its runs cancelled
+
+Grepping a caller workflow for `concurrency` and finding nothing does not mean its runs are safe from cancellation.
+The group can live in the **reusable workflow the caller invokes**, and then it governs every caller equally while appearing in none of them.
+
+`Morrison-Lab/ai-config`'s `.github/workflows/claude-review.yml` is the worked case: no `concurrency:` block of its own, calling `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`, which carries
+
+```yaml
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || inputs.pr-number }}
+  cancel-in-progress: true
+```
+
+Note what that group is keyed on: the **PR number**, not the branch, the ref, or the event.
+So repeated `workflow_dispatch` runs for one PR all land in a single group and chain-cancel, whatever `--ref` each was given, and only the last survives.
+Reviews for *other* PRs dispatched in the same window are untouched, which is the observation that distinguishes a per-PR group from a global one.
+
+**The trap is attribution rather than cancellation, and it is why this is worth recording.**
+You retry a cancelled dispatch, you change something on the retry, the retry succeeds, and whatever you changed looks like the remedy.
+It co-varied with the one thing that actually decided the outcome: being last.
+Any variable would look causal under this design, so the retry that worked is the weakest possible evidence about *why* it worked.
+
+Measured on PR #1224, 2026-08-06, with all four runs confirmed `PR_NUMBER: 1224` from their own `gather-context` job logs:
+
+| run | dispatched with | dispatched | ended | outcome |
+| --- | --- | --- | --- | --- |
+| 31135612152 | no `--ref` (ran from `main`) | 00:43:10 | 00:45:06 | cancelled |
+| 31135679096 | `--ref <pr-branch>` | 00:44:20 | 00:49:39 | cancelled |
+| 31135937709 | no `--ref` (ran from `main`) | 00:48:54 | 00:54:15 | cancelled |
+| 31136199829 | `--ref <pr-branch>` | 00:53:30 | 00:59:25 | success |
+
+Each cancellation follows the next dispatch for the same PR by 46, 45, and 45 seconds --- a lag consistent enough to be mechanical rather than coincidental.
+The second row settles it: a run dispatched **with** `--ref <pr-branch>` was cancelled too, by a later one dispatched **without** it.
+So `--ref` predicts survival in neither direction, and the surviving run is simply the one nothing followed.
+Three other PRs' reviews dispatched inside the same window (`31135656213`, `31135680911`, `31135682673`) all succeeded untouched.
+
+Pass `--ref` anyway, for the unrelated reason the section above gives --- `workflow_dispatch` reads the workflow file from the ref you name, defaulting to the default branch.
+Just do not read a run's survival as evidence that you passed it.
+That ai-config has no automatic review to race against in the first place is a separate fact, recorded in [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "`ai-config` never auto-reviews a PR on push".
+
+- **Do:** read the reusable workflow a caller invokes before concluding a cancellation is unexplained.
+- **Do:** check a cancelled run's end time against the next dispatch for the same key --- a consistent short lag across several runs is the signature of a `cancel-in-progress` group rather than of anything you changed.
+- **Don't:** infer that a change made on the successful retry caused the success; under such a group, being last is sufficient on its own.
+- **Don't:** read an absent `concurrency:` block in a caller as meaning its runs cannot be cancelled.
+
 ## Python Execution in Runner Environments
 
 - **Add `from __future__ import annotations` when a built-in generic type (`list[str]`, `dict[str, Any]`) appears in a function or variable annotation.**

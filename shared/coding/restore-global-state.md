@@ -81,6 +81,57 @@ wrong.
 In tests, `local_*()` in a `testthat` test restores at the end of that test,
 which is what keeps one test's `options()` change out of the next.
 
+## The cost lands on someone else's tests, in file-name order
+
+The rule above is easy to read as tidiness, because nothing fails in the
+function that does the mutating.
+The bill arrives in a test suite, and it arrives in a form that points at
+the wrong file.
+
+`testthat` runs test files in **alphabetical order**, in one R session.
+So a package function that switches the RNG kind and does not restore it ---
+`rngtools::RNGseq()` moves the session to `L'Ecuyer-CMRG` --- leaves every
+*later* file running under a different generator than it was written against.
+Add a new test file, and whether it breaks four unrelated snapshot tests
+depends on **what you named it**: sort before the existing files and they now
+run downstream of your mutation, sort after and nothing moves.
+
+That is what makes it expensive to attribute.
+The failures are in files your diff never touched, they are snapshot diffs
+rather than errors, and the one variable that actually explains them ---
+filename collation --- is invisible in the diff and appears in no error
+message.
+Renaming your file makes them disappear, which reads as evidence the failures
+were flaky rather than as the diagnosis it actually is.
+
+Two fixes, and they are not alternatives:
+
+- **In the package**, restore the kind, per the rule above.
+  This is the real fix, and it is the caller's protection as much as the test
+  suite's.
+- **In the test**, `withr::local_preserve_seed()` around a call that mutates
+  RNG state you do not control.
+  It restores the **kind**, not just the stream, which is the part `set.seed()`
+  in a `setup.R` cannot give you.
+  Verified on withr 3.0.2: `.Random.seed[1]` encodes the kind, and it read
+  `10403` both before and after a block that switched to `L'Ecuyer-CMRG`
+  inside the guard.
+
+- **Do:** suspect a global-state mutation when adding a test file breaks tests
+  in files it does not touch, and check whether the new file's name sorts
+  before them.
+- **Do:** file the missing restore against the package, rather than only
+  guarding the test --- a test guard protects the suite and leaves every other
+  caller exposed.
+- **Don't:** read "renaming my file fixed it" as flakiness; that is the
+  ordering dependency reporting itself.
+- **Don't:** reach for `set.seed()` in a setup file to stabilize this --- it
+  resets the stream while leaving the changed generator in place.
+
+(`UCD-SERG/serocalculator` #634, 2026-08: `sim_pop_data_multi()` switches the
+session to `L'Ecuyer-CMRG` via `rngtools::RNGseq()` and never restores it; a
+new alphabetically-earlier test file broke four unrelated snapshot tests.)
+
 ## The better option is not to need it
 
 Restoring state is the fallback, not the goal.
@@ -105,3 +156,7 @@ Flag these with the same weight as the other coding rules:
   the change, where an early `return()` or an error would skip it.
 - `set.seed()` in package code or a test, where `withr::local_seed()` would
   leave the caller's RNG stream intact.
+- A call that changes the RNG **kind** (`RNGkind()`, `rngtools::RNGseq()`,
+  anything setting up parallel streams) with no restore --- the
+  file-ordering section above is why this one is worth flagging even when the
+  package's own tests are green.

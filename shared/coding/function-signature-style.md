@@ -40,6 +40,30 @@ therefore a review-level preference, not a CI-enforced one: flag
 hanging-indent signatures in review the same way as other formatting
 findings, and convert them when touching a file for other reasons.
 
+**Copy the rule, not the neighbouring file --- a repo full of the
+double-indent form is not evidence that the form passes.**
+A `lint-changed-files` job lints only the paths a PR touches, so pre-existing
+violations everywhere else stay invisible and CI stays green over them.
+A *new* file is therefore frequently the first thing in the repo ever held to
+the rule, and the surrounding code is the worst available model precisely
+because nothing has ever checked it.
+Imitating a neighbour's 4-space signature then draws a lint failure that reads
+as arbitrary, since every file around it does the same thing.
+
+This is the general shape recorded in
+[`ascii-punctuation-in-source`](ascii-punctuation-in-source.md)'s "writing
+into a file that predates this rule" section: a diff-scoped check judges only
+added lines, so the existing ones are grandfathered rather than permitted.
+Match the linter and the written convention, not the file you are editing.
+
+- **Do:** check the style guide and run the linter on a new file, rather than
+  matching what the directory already does.
+- **Don't:** read green CI over a repo's existing files as evidence their
+  style passes --- a diff-scoped linter never looked at them.
+
 (Encoded from review feedback on `ucdavis/rampp#137`, 2026-07-17; the
 repo-wide conversion of pre-existing hanging signatures there is tracked in
-`ucdavis/rampp#139`.)
+`ucdavis/rampp#139`.
+The diff-scoped-invisibility half is from `UCD-SERG/serocalculator` #633,
+2026-08, where a 4-space signature copied from a neighbouring file drew a lint
+failure on the new file alone.)

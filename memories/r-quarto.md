@@ -601,6 +601,40 @@ any Quarto website (rme, psw, qwt, …).
   hours. (rme #1040/#1042, 2026-07-17: four identical CI OOMs across two
   PRs; not a Quarto version change — v1.9.38 predated both green and red
   runs.)
+- **`aliases:` is a per-format option, so a document-level one lets the LAST
+  format win --- on a multi-format doc the redirect can point at the slides.**
+  A `.qmd` rendering to both `html` and `revealjs` with a document-level
+  `aliases:` generates a redirect stub aimed at the *revealjs* output, not the
+  article.
+  That is silently wrong rather than broken: the stub exists, the link
+  resolves, and the reader lands on slides.
+  Scope it under `format: html:` instead.
+  Measured on quarto 1.9.36, the same doc rendered both ways, by reading the
+  `var redirects` line the stub emits (it is a JS `window.location.replace`,
+  not a `<meta http-equiv=refresh>` --- so grep for `var redirects`, not
+  `url=`):
+
+  | `aliases:` location | `var redirects` in the stub |
+  |---|---|
+  | document level | `{"":"doc-slides.html"}` |
+  | under `format: html:` | `{"":"doc.html"}` |
+
+  Also: the alias path resolves relative to the **document's** directory, not
+  the site root --- `sub/doc.qmd` with `aliases: [old-name.html]` puts the stub
+  at `_site/sub/old-name.html`.
+- **Verify a redirect on the deployed preview, never on a local render.**
+  An alias stub is an artifact of the *site* build, so a local single-format
+  `quarto render <file>.qmd` cannot surface a per-format bug in it at all ---
+  there is only one format for the last one to win over.
+  Rendering the multi-format collision locally also needs an `output-file:`
+  rename on the second format before it will build at all: without one, both
+  formats claim `doc.html` and the project render dies with a
+  `rename ... No such file or directory` Deno stack trace rather than a
+  readable message.
+  Read the built stub out of the PR preview per `r-cloud-sessions.md`'s
+  `pr-preview/pr-<N>/` recipe.
+  (`UCD-SERG/serocalculator` #633/#635, 2026-08: shipped wrong and caught only
+  on the deployed preview.)
 
 ## renv — each git worktree gets its own (empty) project library
 
@@ -680,6 +714,41 @@ repo-wide — flextable 0.10.0 hit CRAN with no macOS binary yet, forcing a
 source build that needs XQuartz libs the runner lacks; self-healed when the
 binary appeared ~7h later, so the right move was retry-later
 (`rerun_failed_jobs`), not a code change.
+
+**The decisive test is re-running the operation at unmodified base, not
+diffing logs.**
+Log-diffing localizes the drift; a clean worktree checked out at `origin/main`
+with the operation re-run there *settles attribution* --- if
+`roxygen2::roxygenise()` rewrites the same two files on untouched `main`, the
+red check is not a regression from the diff, and no amount of reading that
+diff can establish it.
+This is the R-toolchain instance of the negative-control rule in
+`shared/principles/fail-fast.md`: the control has to enter at the real input,
+which here means a separate checkout rather than a `git stash`, since stashing
+leaves you in the very tree whose contribution you are trying to rule out.
+
+**When someone cites "the last N runs on `main` are green" as proof your diff
+caused it, check those runs' DATES against the suspected cause's release
+date.**
+A wall of green is evidence only about the interval it covers.
+Ten green runs that all predate a dependency's release say nothing about a
+failure that release caused --- and the claim is persuasive precisely because
+the count is large and independently checkable, so the field that makes it
+worthless is the one nobody reads.
+`gh run list --workflow <name> --branch main --json createdAt,conclusion` puts
+the dates beside the conclusions.
+
+- **Do:** compare the green runs' timestamps against the release date of
+  whatever you suspect, before making or accepting a regression attribution.
+- **Do:** re-run the operation in a clean worktree at `origin/main` when
+  attribution is disputed --- one command outranks any amount of log reading.
+- **Don't:** treat a run count as evidence without its date range; "10/10
+  green" and "10/10 green, all before the release" are different claims.
+
+(`UCD-SERG/serocalculator` #635, 2026-08: a red `docs-check` was asserted to be
+"a regression introduced by this PR's diff" on the strength of 10/10 green
+`main` runs, every one of which predated the roxygen2 8.1.0 release;
+`roxygenise()` in a clean `origin/main` worktree changed the same two files.)
 
 ## Editing a generated `README.md` when the R toolchain is unavailable
 
@@ -852,6 +921,23 @@ failure a `source()` harness reports.
 Either way, baseline a failure against unmodified `main` (`git stash`,
 re-run, `git stash pop`) before treating it as yours: two of this session's
 apparently-new failures were pre-existing and environmental.
+
+**And hold every parameter constant except the branch, or the baseline is
+not one.**
+The tempting shortcut is to compare the full suite on your branch against a
+*filtered* run on clean `main` --- the filtered run is faster, and you already
+know which files you care about.
+The two numbers are then not comparable, and the difference reads as damage
+you did: a full-suite 8 against a filtered 1 says "I broke 7", while the
+identical filter on both sides said 4 against 1.
+Same filter, same env vars (`NOT_CRAN`), same harness, same seed --- only the
+branch differs.
+
+- **Do:** run the identical command on both sides, and say which command it
+  was when reporting the delta.
+- **Don't:** compare a full run against a filtered one, or a `devtools::test()`
+  run against a bare `Rscript` one --- per the `NOT_CRAN` trap above those two
+  do not even execute the same tests.
 
 ## `{cli}` glue-interpolates every message string, and the two brace forms fail differently
 

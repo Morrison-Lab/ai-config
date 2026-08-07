@@ -73,6 +73,11 @@ lines had accumulated — unrelated to fence state, but found in the same cycle.
 ## ARDI/iterate: must poll for new review after pushing
 - After pushing fixes during an iterate loop, DON'T declare "clean" based on
   the previous review. A new push triggers a new auto-review.
+- **In repos whose review workflow carries a `pull_request` trigger.**
+  `Morrison-Lab/ai-config` does not, so a push there schedules no review at all
+  and polling never terminates --- see
+  [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "`ai-config` never
+  auto-reviews a PR on push" for the trigger table and the dispatch command.
 - Poll until a review note appears that references your latest commit SHA.
 - Wait ~30-60s, then check. If nothing after ~2min, check pipeline status.
 - The iterate skill now has explicit polling instructions for both GitHub and GitLab.

@@ -334,6 +334,34 @@ Use this instead of the `/clear` flag above when there's still live state worth 
 This is for continuing the same work with a lighter context.
 That middle item uses the same bright line as the section above, deliberately: the two are complements, so a PR that disqualifies the `/clear` flag is exactly what makes `compress-session` the right tool instead.
 
+## Actively manage quota usage: models and compaction
+
+Treat quota as something to manage continuously through a session, not only at a wrap-up or fan-out moment.
+Two levers; when either applies, act on it without waiting to be asked.
+
+**Model tier.**
+For dispatched work (`Agent` calls, `Workflow` `agent()` calls), route model and effort per [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md)'s "Route each agent's model/effort" section.
+Cheap tier for mechanical, bounded work; inherit or escalate only for judgment-heavy work.
+Don't default every dispatched call to the conductor's own tier out of caution.
+
+The conductor's own tier cannot be switched from inside the conversation --- it's client-side only (`memories/preferences.md`).
+So the lever there is to **recommend** a change rather than make one.
+When the current tier is clearly underpowered for the task ahead, say so and suggest escalating via `/model` or `select-model`.
+When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
+That means a cheaper-tier subagent, or `delegate-to-codex` before spending this session's own quota, per the standing "exhaust codex before using our own" preference --- rather than burning the conductor's tier on it.
+Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
+
+**Compaction.**
+Already covered by the two sections above --- the `/clear` flag for a clean stopping point, and the `compress-session` flag for mid-task bloat.
+Add quota/usage pressure itself as a trigger for both, distinct from context size alone.
+The agent has no direct view into it, though --- the usage bar lives in the client's UI, not in the conversation (`memories/preferences.md`).
+So key this off what's actually visible: the user naming or showing usage pressure, or --- inside a `Workflow` run with a stated token target --- `budget.spent()`/`budget.remaining()`.
+Either is reason enough to compress or recommend a lighter model, on the same terms those sections already set out.
+
+When both levers genuinely apply at once, do the self-directed one first.
+Compress or compact before asking the user to act on a model change.
+Only the second one costs them a step.
+
 ## Keep a running on-disk session lab notebook
 
 Maintain a "lab notebook" for each session — a dated, append-only file written to *as work happens*, not only when pausing — so that if the session is interrupted with no clean exit (compaction, a forced `/clear`, a crash, a SLURM walltime death), the trail is already on disk and a later session (or I) can pick it up.
@@ -959,6 +987,22 @@ Neither failure mode is an approval — an unreviewed PR stays unreviewed regard
 Both mean no bot will respond on this run; re-running the workflow only helps once the quota actually resets.
 
 **Stub review:** the review job reports success (`is_error: false`, real cost/turns logged) but the posted comment never states a `### Verdict` — the run genuinely executed but got cut short before reaching a conclusion (e.g. by escalating permission denials on tool calls it needed). This looks superficially fine (green check, a comment exists) so it's easy to mistake for a real review — read the comment body for an actual verdict section before trusting it. Re-running the same workflow can reproduce the same stub pattern repeatedly rather than self-resolving; if a retry doesn't help within a round or two, treat it as this failure mode and self-review rather than continuing to re-trigger. (Hit repeatedly on gha#193/gha#198, where `claude-review` produced escalating permission-denial-driven stub reviews across many runs before the actual fix — a same-prompt retry composite, gha#201 — landed.)
+
+**No review workflow configured at all is a third failure mode, and the one nothing signals on its own.**
+Quota-skipped and a stub review both require a review workflow to exist and attempt to run.
+Some repos have none: no `@claude` job wired into CI at all, so there is nothing to time out, quota-skip, or stub.
+CI stays green because it never ran anything meant to notice, and the PR/MR simply accrues zero review comments.
+
+Check for this once per repo, right after the first push, rather than waiting to notice its absence: grep the repo's own CI config for the review job or template it would come from (a GitHub Actions workflow file, or a GitLab `.gitlab-ci.yml`'s `include:` list) rather than assuming a sibling or template repo's setup carried over.
+Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
+Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](shared/workflow/report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
+
+(2026-08-06: MRs pushed to two sibling GitLab repos on the same afternoon.
+One included its own `@claude` review template and produced a genuine
+auto-review within a minute of the push.
+The other's `.gitlab-ci.yml` `include:` list omitted the template entirely,
+so its MR sat with a green pipeline and zero review comments until the gap
+was checked for directly rather than assumed absent.)
 
 **Post the self-review before doing anything else — don't stall the PR waiting for the bot. Then, before writing the check off as permanently broken, try one manual re-run of the failed job — even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.** Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat. If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR. (`ucdavis/epi204`#361: attempt 1 and its automatic same-run retry both stubbed; self-reviewed and posted a verdict; a manual `rerun_failed_jobs` on that same workflow run then produced a genuine review — and it wasn't a rubber stamp, it caught a real one-sentence-per-line violation the self-review's own added text had introduced.)
 

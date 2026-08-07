@@ -453,6 +453,22 @@ Also from ettbc#13/#14:
   simultaneously with this exact NOTE; the sibling `.ai-config` submodule
   added in the same PR happened not to trigger it, for the empty-dir reason
   above.)
+- **A VISIBLE new top-level file needs the same treatment, and trips a
+  different NOTE that the entry above will not match on.** That one is scoped
+  to hidden dotfiles and to `checking for hidden files and directories`, so a
+  reader adding `CLAUDE.md`, `AGENTS.md`, `TODO.md`, or a stray `notes.qmd`
+  greps for "hidden", finds nothing that applies, and ships it. The check they
+  actually hit is `checking top-level files ... NOTE: Non-standard file/directory
+  found at top level`, which under `error_on = "note"` fails CI exactly as the
+  hidden-file NOTE does. `R CMD check` allows only a fixed set of top-level
+  names, so anything outside it needs an anchored `.Rbuildignore` entry
+  (`^CLAUDE\.md$`) in the same commit that adds the file. This is worth knowing
+  specifically because `/init` writes `CLAUDE.md` to the repo root and does not
+  touch `.Rbuildignore`, so running it in any R package leaves a build that
+  will fail on the next push unless you add the line yourself.
+  (`ucdavis/mic.sim#49`, 2026-08-06: added `^CLAUDE\.md$` alongside the
+  `^\.claude$` line the entry above calls for, and all five R-CMD-check
+  platforms passed.)
 
 
 ## altdoc keeps its reference topics in two independent hand-maintained lists

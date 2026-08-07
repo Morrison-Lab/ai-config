@@ -23,3 +23,34 @@ The negative control caught two false all-clears before any zero was trusted:
 `--write-tree` exiting 129 on git 2.34.1, and `grep '^<<<<<<<'` returning 0
 against a real conflict whose markers were diff-indented.
 Both had reported all 28 pairs clean.)
+
+## "A threshold breach that exists only in the sum"
+
+(Morrison-Lab/ai-config #1223 and #1226, 2026-08-06.
+`memories/` carries a 1200-line-per-file cap.
+`memories/github-actions.md` stood at 1068 lines on `main`; #1223 took it to
+1187 and #1226 to 1164, each comfortably under.
+Projected across both, `1187 + 1164 - 1068 = 1283`, over by 83.
+Both PRs were `CLEAN` with `Ready for merge` verdicts and full green check sets
+at the time, and the file sets were derived rather than recalled --- of the four
+PRs open, `memories/github-actions.md` was the only path appearing in more than
+one.
+No ordering avoids it, since both orders reach 1283; after #1223 merged the file
+had 13 lines of headroom against #1226's 84-line addition, so #1226 relocated
+its section to a new sibling file rather than trimming to fit a budget already
+spent.
+
+The enforcement half was measured on #1226's own first push, which failed
+`validate` at **step 12, "Run memory-file-size check tests"** --- not at the
+later step named "Check for oversized memory files (advisory)", which runs
+`scripts/check-memory-file-size.py` with no `--strict` and exits 0 by design.
+What gates is `scripts/test_check_memory_file_size.py:127-132`, whose comment
+reads "The real corpus must stay under the shipped default, or the check ships
+red", calling `cmfs.oversized_files("memories", cmfs.DEFAULT_MAX_LINES)` and
+exiting 1 on any finding.
+So the cap is hard and is enforced from the check's test suite rather than from
+the check.
+Two sibling files were already at the gate when this was found:
+`memories/git.md` at 1199, and `memories/claude-bot-workflows.md` at 1199 after
+the trim #1226 made to fit, with `memories/debugging.md` at 1169 --- tracked
+as #1228.)

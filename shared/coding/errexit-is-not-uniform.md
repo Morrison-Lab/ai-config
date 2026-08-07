@@ -95,13 +95,6 @@ the same command aborts or does not depending on whether it sits inside
 All four were confirmed directly rather than recalled, and the third has an
 interaction with testing, below.
 
-The second of those positions carries a separate defect that has nothing to do
-with `errexit`, so a `||` chain can be silent in two ways at once.
-This fragment governs the exit status such a chain suppresses; the branches can
-also print output that does not say which of them ran, which
-[`fail-fast`](../principles/fail-fast.md) owns under "A fallback chain flattens
-which alternative won".
-
 ## Testing this is where it goes wrong twice
 
 A regression test for an `errexit` bug is unusually easy to write wrongly,

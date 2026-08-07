@@ -178,6 +178,37 @@ the variable on the line and stops looking.
 - **Don't:** treat the presence of `LC_ALL=` somewhere in a command line as
   evidence that the matching stage received it.
 
+### The same vacuous zero has a second cause: an empty input
+
+Everything above assumes the check **broke** --- a rejected pattern, a wrong
+locale, a swallowed non-zero exit --- and prints its failure as a pass.
+The identical zero arrives with nothing broken at all, when a perfectly sound
+command runs over an input that is empty.
+A diff-scoped scan run before anything is committed compares committed history
+against itself, so it examines no lines and truthfully reports no findings.
+
+That defeats the guards this section prescribes, which is why it needs
+separating rather than folding in.
+No command failed, so an `rc=$?` test passes; the exit status is 1, which here
+is the *clean* answer rather than an error; and the locale was never involved.
+A reader who has internalized "make the error path distinguishable" is still
+caught, because there was no error path to distinguish.
+
+The denominator is the one remedy above that covers both causes, and this is
+the case that argues for it hardest: `0 findings in 0 lines examined` is
+unmistakable where a bare `0` is not.
+Report what a check *examined*, not only what it *found*.
+
+Deciding **when** to run such a check, as opposed to how to write it, belongs
+to [`skill-checklists`](../workflow/skill-checklists.md)'s pause-point rule ---
+a correctly written check still reports on the wrong thing if it runs at the
+wrong moment.
+
+- **Do:** print the examined count beside the finding count, so an empty input
+  is visible rather than silent.
+- **Don't:** treat an exit-status or locale guard as covering this --- both
+  pass cleanly while the check examines nothing.
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass

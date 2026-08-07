@@ -502,10 +502,70 @@ a claim about the input domain, and it is the claim that excuses the control.
 - **Don't:** let a fix inherit the scrutiny that produced it, since the repair
   is the least-reviewed code in the round.
 
+### A fallback chain flattens which alternative won
+
+In every case above something about the check was wrong --- a broken pattern,
+an empty input, a label that did not follow from the data.
+A fallback chain can have none of those.
+Every branch is correct, every branch succeeds, and the only thing the output
+loses is *which* one ran:
+
+```bash
+ls "$A" 2>/dev/null || ls "$B" 2>/dev/null || { echo "searching..."; find ...; }
+```
+
+The chain answers "does one of these exist?".
+It gets read as answering "which one exists?", and those are different
+questions.
+The output is identical either way, so a reader supplies the missing half from
+whichever branch they expected to win --- usually the first, since that is the
+one they wrote first.
+A value built from that guess fails later, somewhere the chain is no longer on
+screen, and the delayed failure is what makes the misreading expensive rather
+than merely sloppy.
+
+What makes it survive a re-read is that the output is genuine evidence.
+Two files really were listed.
+Nothing in the transcript says they were listed from the path you had in mind,
+so looking again confirms the reading you already had instead of exposing it.
+
+Make the winner part of the output, or stop using the chain's control flow as
+the answer:
+
+```bash
+for p in "$A" "$B"; do
+  [ -e "$p" ] && { GODOT="$p"; break; }
+done
+printf 'resolved: %s\n' "$GODOT"     # print it before anything consumes it
+```
+
+Testing the candidates on separate lines does the same job with no cleverness
+at all, and is the better move when there are only two of them.
+
+Generalize past `ls`: any fallback chain whose branches are indistinguishable
+in the output has this defect, whatever the commands are --- a download failing
+over between mirrors, a config lookup walking a search path, a `command -v`
+cascade over alternative tool names.
+
+A `||` chain is also one of the errexit-suppression contexts in
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), so one chain
+can be silent in two independent ways at once.
+That fragment governs the exit status a chain discards; this one governs the
+output it flattens.
+
+- **Do:** echo the branch that won, or resolve the value into a variable and
+  print it before anything consumes it.
+- **Do:** test the candidates separately when there are only a few --- the
+  chain buys brevity, and brevity is exactly what costs the answer here.
+- **Don't:** read a fallback chain's output as naming the branch that produced
+  it; every branch prints the same shape.
+- **Don't:** assume the first branch won because it is the one you expected to
+  win.
+
 ## In a guard you ship: partial is worse than absent
 
-Everything above concerns a check whose failure is invisible **at runtime**,
-because its failure path prints what its pass path prints.
+Everything above concerns a check whose own outcome is invisible **at
+runtime**, because two paths a reader needs to tell apart print the same thing.
 A guard applied to only some of the paths that need it fails one level earlier,
 and in the opposite medium: it is perfectly loud wherever it runs, and it
 simply does not run on the paths that were left out.

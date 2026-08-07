@@ -238,6 +238,50 @@ That is why reciting it does not feel like recalling.
 - **Don't:** build one from the recap's own status table, however recently
   that table was assembled.
 
+## Calling your own note stale is a state claim about that note
+
+The section above finds a state claim hidden inside a recommendation.
+This one is hidden inside a **retraction**.
+Reporting that your own memory file, note, or doc has gone out of date reads as
+housekeeping, and as an admission against your own interest, which is the last
+kind of sentence anyone thinks to verify.
+It is a claim about what that file currently says, so it owes the same re-query
+as any other **state** claim in the list above: open the file.
+
+Two things make the unverified version easy to reach.
+An index or summary line usually names a note's *topic* rather than the fact
+inside it, so skimming the index feels like having consulted the note while
+telling you nothing about whether it is right.
+And the trigger is a failure, so a culprit is wanted at exactly the moment
+attention is somewhere else --- which makes "my note must be stale" arrive as
+relief rather than as an assertion.
+
+The cost is worse than an ordinary wrong claim, and it runs the wrong way.
+A wrong claim about the world misinforms once.
+A wrong claim that a **correct** note is stale teaches the user to distrust a
+note that was working, so it damages an artifact rather than a sentence, and
+that damage outlives the session.
+Note also which note is likeliest to be blamed: one exists at all because
+somebody was burned once and wrote it down, so the note nearest a fresh failure
+is disproportionately likely to be the one that already describes it.
+
+The same shape one artifact over is recorded in
+[`memories/preferences.md`](../../memories/preferences.md), where a design gap
+was asserted from a skill's frontmatter `description` without the body being
+read.
+Index, summary, and description are all pointers, and none of them is the note.
+
+- **Do:** open the file before saying it is stale, and quote the line you
+  believe is wrong.
+- **Do:** treat an index, summary, or description line as a pointer only --- it
+  routinely omits the exact fact in dispute.
+- **Don't:** infer a stored fact from where a repo lives, from a naming
+  convention, or from anything else obvious enough to feel like it excuses the
+  read.
+- **Don't:** offer "my note is stale" as the explanation for a failure you have
+  not diagnosed yet; that is a second unchecked claim, invented to account for
+  the first.
+
 ## Question the answer that arrives without deliberation
 
 This is distinct from the confidence point above, and harder to catch.

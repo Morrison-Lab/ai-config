@@ -108,6 +108,24 @@ condition is anchored to a push of *ours*, which a third party's merge does
 not produce.
 Both halves are tracked in ai-config#1072.)
 
+## Calling your own note stale is a state claim about that note
+
+(2026-08-07, a `Lacaedemon/sparta` session: a Godot binary path failed, and the
+session told the user that its memory note on that path was stale.
+The note --- `reference-godot-binary-path-windows.md`, under this machine's
+`~/.claude/projects/C--Users-dougm-Documents-Github-sparta/memory/` --- was
+correct.
+It gives the `Downloads` path that the failure had just shown to be the right
+one, and it documents the very trap the session had fallen into one command
+earlier: that `ls` on the folder path "succeeds" and prints the two exe names
+while running the binary fails.
+It had never been opened.
+The path had been inferred from where the repo lives, and that note's
+`MEMORY.md` index line carries only a topic summary rather than the path, so
+the index alone could not have settled it either.
+The file was accurate as written and needed no edit; only the claim about it
+did.)
+
 ## Verification of the reachable half does not transfer to the unreachable half
 
 (UCD-SERG/lab-manual#452, 2026-08-04: every claim about the cluster was

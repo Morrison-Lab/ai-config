@@ -122,6 +122,27 @@ BLOCK = [
     ("until gh pr merge 411; do echo ok; done", "an `until` condition"),
     ("! time gh pr merge 411", "stacked keywords"),
     ("time ${EMPTY} gh pr merge 411", "a keyword followed by an empty expansion"),
+    # Pass 2. The first two below were the SECOND round of reported bypasses,
+    # and the rest are the same class unreported -- which is the point: pass 2
+    # stops enumerating what may precede a command word and blanks what cannot
+    # run instead, so a construct nobody thought of blocks rather than slipping.
+    ("case $x in merge) gh pr merge 411 ;; esac", "a one-line case arm"),
+    ("f() { gh pr merge 411; }; f", "a function defined and then called"),
+    ("case $x in\n  a) gh pr merge 411 ;;\nesac", "a multi-line case arm"),
+    ("for i in 1 2; do gh pr merge 411; done", "a for-loop body"),
+    ("f() {\n  gh pr merge 411\n}\nf", "a multi-line function body"),
+    ("coproc gh pr merge 411", "coproc"),
+    ("nice -n 5 gh pr merge 411", "a wrapper carrying a flag"),
+    ("timeout 30 gh pr merge 411", "a wrapper carrying a positional argument"),
+    ("setsid gh pr merge 411", "a wrapper in no keyword list"),
+    ("xargs gh pr merge", "xargs"),
+    ("[[ -f x ]] && gh pr merge 411", "after a conditional expression"),
+    ("case $x in *) command gh pr merge 411 ;; esac", "a case arm plus an exec wrapper"),
+    # Quoted, but bash evaluates it later -- so pass 2's "a quoted span is
+    # inert" is WRONG here and pass 1 has to carry it. This is why the narrow
+    # pass is kept alongside the permissive one rather than replaced by it.
+    ("trap 'gh pr merge 411' EXIT", "a trap handler runs its single-quoted operand"),
+    ("watch 'gh pr merge 411'", "watch runs its quoted operand"),
 ]
 
 ALLOW = [

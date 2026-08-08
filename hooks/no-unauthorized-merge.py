@@ -53,7 +53,11 @@ KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until
 VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*){0,4}"""
 LEAD = CMD_POS + KEYWORD_PREFIX + VAR_PREFIX
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
-EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
+# Programs that take a command as a QUOTED operand and run it later. Quoting is
+# what makes these different from the KEYWORD_PREFIX family: pass 2 blanks a
+# quoted span as inert, which is right for prose and wrong here, so these must
+# be recognised on the raw text in pass 1.
+EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval|trap|watch|su)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
 HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
@@ -63,17 +67,48 @@ DELIM = r"(?:\s+|\$\{IFS\}|\$IFS\b|\$\([^)]*\)|\$[A-Za-z0-9_]+)+"
 GH_PROG = r"(?:[/\w.-]+/)?(?:gh|\$GH|\$\{GH\})\b"
 GLAB_PROG = r"(?:[/\w.-]+/)?(?:glab|\$GLAB|\$\{GLAB\})\b"
 
-MERGE_PATTERNS = [
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + OPT_FLAGS + DELIM + r"pr\b" + OPT_FLAGS + DELIM + r"merge\b", "gh pr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + OPT_FLAGS + DELIM + r"mr\b" + OPT_FLAGS + DELIM + r"merge\b", "glab mr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b", "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b", "gh api repository merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b", "glab api MR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
-]
+def _merge_patterns(lead: str) -> list:
+    """Build the merge-command patterns against a given command-position LEAD.
+
+    Parameterized so the same nine patterns can run twice: once with the narrow
+    LEAD over raw text, and once with PERMISSIVE_LEAD over quote-masked text.
+    See the two-pass note on `offending`.
+    """
+    return [
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + OPT_FLAGS + DELIM + r"pr\b" + OPT_FLAGS + DELIM + r"merge\b", "gh pr merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + OPT_FLAGS + DELIM + r"mr\b" + OPT_FLAGS + DELIM + r"merge\b", "glab mr merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b", "gh api PR merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b", "gh api repository merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b", "glab api MR merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
+    ]
+
+
+MERGE_PATTERNS = _merge_patterns(LEAD)
+
+# Pass 2's command position: ANY whitespace, plus a closing `)`.
+#
+# Enumerating what may precede a command word cannot be finished. Two rounds of
+# review found five constructs and then two more (`case $x in p) <merge>`, and
+# `f() { <merge>; }; f`), each a real bypass, each a member of a class with no
+# closed definition -- and every miss fails OPEN, which is the direction that
+# matters for a guard whose stated purpose is to be unbypassable.
+#
+# So pass 2 stops enumerating. It treats every position as a command position
+# and instead removes the text that cannot execute. That inverts the failure:
+# an unforeseen construct is now blocked rather than allowed, and the cost of
+# being wrong is an over-block, which ALLOW_MERGE=1 clears.
+#
+# The measurement that chose this: making the narrow LEAD permissive changed
+# exactly seven of 141 cases, and all seven were prose inside quotes. Nothing
+# else in the suite depends on the narrowness -- so masking quotes buys back
+# every one of them, and keeps defect 2 (ai-config#1279) fixed by construction
+# rather than by enumeration.
+PERMISSIVE_LEAD = r"""(?:^|[;&`()\n\s]|\$\()\s*""" + KEYWORD_PREFIX + VAR_PREFIX
+PERMISSIVE_MERGE_PATTERNS = _merge_patterns(PERMISSIVE_LEAD)
 
 # The leading-whitespace allowance is OUTSIDE the repeated env-assignment group,
 # not inside it. Inside, it only ever applied to assignments AFTER the first, so
@@ -193,6 +228,35 @@ def mask_subexpressions(val: str) -> str:
         else:
             result.append("".join("\n" if c == "\n" else " " for c in tok))
     return "".join(result)
+
+
+def mask_inert_quotes(text: str) -> str:
+    """Blank quoted spans that bash cannot execute, preserving length.
+
+    Length-preserving because `offending` derives segment offsets from one
+    string and slices another with them; a shorter result would misalign the
+    segment reported in the refusal message.
+
+    A single-quoted span is wholly inert. A double-quoted span is inert EXCEPT
+    for `$(...)` and backtick substitutions, which bash still expands inside
+    double quotes -- those are preserved verbatim, so hiding a merge in one
+    still blocks.
+
+    This is only ever applied for the PERMISSIVE pass. An executor's own quoted
+    operand (`bash -c "<merge>"`, `eval "<merge>"`) IS live, and blanking it
+    here would lose it -- pass 1 catches those on unmasked text via EXEC_WRAP,
+    which is why the narrow pass is kept rather than replaced.
+    """
+    def blank(s: str) -> str:
+        return "".join("\n" if c == "\n" else " " for c in s)
+
+    def repl_double(m: "re.Match") -> str:
+        inner = m.group(0)[1:-1]
+        return " " + mask_subexpressions(inner) + " "
+
+    text = re.sub(r"\"(?:\\.|[^\"\\])*\"", repl_double, text, flags=re.DOTALL)
+    text = re.sub(r"'[^']*'", lambda m: blank(m.group(0)), text, flags=re.DOTALL)
+    return text
 
 
 HEREDOC_START = re.compile(
@@ -428,16 +492,35 @@ def offending(command: str, payload: dict | None = None):
     starts = [0] + [m.end() for m in matches]
     ends = [m.start() for m in matches] + [len(masked_command)]
 
+    # 6. Two passes, both length-preserving so the same offsets slice both.
+    #    Pass 1 (narrow LEAD, raw text) keeps every behaviour the suite pins,
+    #    including an executor's live quoted operand (`bash -c "<merge>"`).
+    #    Pass 2 (permissive LEAD, quote-masked text) is strictly ADDITIVE: it
+    #    stops asking which constructs may precede a command word -- an
+    #    enumeration two review rounds showed cannot be finished -- and instead
+    #    removes the text that cannot execute. See PERMISSIVE_LEAD.
+    inert_command = mask_inert_quotes(masked_command)
+
     for start, end in zip(starts, ends):
-        masked_seg = masked_command[start:end]
         orig_seg = unquoted_command[start:end]
         if has_allow_override(orig_seg):
             continue
-        for pattern, label in MERGE_PATTERNS:
-            if re.search(pattern, masked_seg):
-                if check_mwc_active(payload):
-                    break  # Allowed via active MWC session grant
-                return label, orig_seg.strip()
+        hit = None
+        for seg, patterns in (
+            (masked_command[start:end], MERGE_PATTERNS),
+            (inert_command[start:end], PERMISSIVE_MERGE_PATTERNS),
+        ):
+            for pattern, label in patterns:
+                if re.search(pattern, seg):
+                    hit = label
+                    break
+            if hit is not None:
+                break
+        if hit is None:
+            continue
+        if check_mwc_active(payload):
+            continue  # Allowed via active MWC session grant
+        return hit, orig_seg.strip()
     return None
 
 

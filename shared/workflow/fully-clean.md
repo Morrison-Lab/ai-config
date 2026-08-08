@@ -1489,6 +1489,30 @@ section's own subject recurring one level up: a check whose scope is narrower
 than the claim made for it, with the shortfall on the side that reads as an
 all-clear.
 
+The pre-check is also **racy**, which is a separate limit from the scope one
+above and is not fixed by widening what the check can see.
+Checking and dispatching are two calls, so a run created between them is
+invisible to a check that was correct when it ran.
+
+That is not hypothetical.
+Writing the paragraph above, the pre-check ran and returned three in-flight
+runs, attributed to three other PRs.
+Six seconds later a dispatch went out, and it cancelled a fourth run created
+in between --- a mention-driven one, for this very PR, belonging to a human.
+The listing had been right: that run did not exist yet when it was taken.
+
+So a pre-check narrows the window and cannot close it, and no amount of
+instrument quality changes that --- the gap is between the two calls rather
+than inside either.
+Two things follow.
+Treat the pre-check as reducing the odds rather than as establishing safety,
+and say which it did when reporting.
+And note that the durable fix is upstream rather than procedural: either the
+mention path carries a ref, so its runs are visible where you are looking, or
+the concurrency group stops cancelling across dispatch sources.
+Until one of those lands, a dispatch is a small bet that nobody mentioned the
+bot in the last few seconds.
+
 - **Do:** confirm the class of run you are looking for can appear at the PR
   head at all, before reading its absence there as an all-clear.
 - **Do:** validate that with a completed run you know belonged to the PR, which
@@ -1503,6 +1527,9 @@ all-clear.
   `claude-bot.yml` pins `claude.yml@v1` --- a mention-driven run remains
   invisible at the PR head, and it is the one a colliding dispatch would
   cancel out from under a human.
+- **Don't:** report a pre-check as having established that nothing was in
+  flight --- it establishes that nothing was in flight *when it ran*, and a
+  dispatch is a later event.
 - **Don't:** read "query the artifact, not the actors" as unconditional; it
   presupposes the actor writes to the index you are querying.
 

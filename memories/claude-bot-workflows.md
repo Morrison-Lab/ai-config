@@ -571,7 +571,7 @@ generic Actions-authoring and reusable-workflow material.
   ```
 
   Pair that with evidence the disputed call actually succeeded -- for a
-  comment-posting action, the comment's own `created_at`/`updated_at` from
+  comment-posting action, the comment's own `created_at` (never `updated_at`) from
   `gh api repos/{o}/{r}/issues/{n}/comments`, matched against the run's step
   timestamps -- and a green run under the disputed permission set is
   conclusive.

@@ -1061,8 +1061,6 @@ merging.)
 
 Grepping a caller workflow for `concurrency` and finding nothing does not mean its runs are safe from cancellation.
 The group can live in the **reusable workflow the caller invokes**, and then it governs every caller equally while appearing in none of them.
-The same holds for any property a callee may declare --- `permissions`, `timeout-minutes`, job-level `if` gates --- so read the chain rather than the caller whenever a workflow's behaviour is the question.
-[`fully-clean.md`](../shared/workflow/fully-clean.md) applies it once more, to `max_turns`.
 
 `Morrison-Lab/ai-config`'s `.github/workflows/claude-review.yml` is the worked case: no `concurrency:` block of its own, calling `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`, which carries
 
@@ -1099,28 +1097,11 @@ Pass `--ref` anyway, for the unrelated reason the section above gives --- `workf
 Just do not read a run's survival as evidence that you passed it.
 That ai-config has no automatic review to race against in the first place is a separate fact, recorded in [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "`ai-config` never auto-reviews a PR on push".
 
-**`gh run list` cannot say which PR a dispatched run belongs to, so the run list is the wrong instrument for spotting a collision.**
-A `workflow_dispatch` review run records `headBranch: main`, so the list interleaves every PR's reviews with nothing to separate them.
-Counting adjacent rows there therefore attributes other PRs' reviews to yours --- and since the group is keyed on the PR number, a run for another PR cannot have collided with yours however close in time it sits.
-That is the same observation the paragraph above makes from the other side: the three untouched runs are evidence about the group's key, not a coincidence.
-
-The PR number is in the run's own `gather-context` log, which is what the table above was built from:
-
-```bash
-jid=$(gh api "repos/<owner>/<repo>/actions/runs/<run-id>/jobs" \
-  --jq '.jobs[] | select(.name=="gather-context") | .id')
-gh api "repos/<owner>/<repo>/actions/jobs/$jid/logs" | grep -oE 'PR_NUMBER: [0-9]+' | head -1
-```
-
-[`fully-clean.md`](../shared/workflow/fully-clean.md)'s "a review `cancelled` with no verdict" case is the operational consequence: what to do when you find a newer run for your PR already in flight.
-
 - **Do:** read the reusable workflow a caller invokes before concluding a cancellation is unexplained.
 - **Do:** check a cancelled run's end time against the next dispatch for the same key --- a consistent short lag across several runs is the signature of a `cancel-in-progress` group rather than of anything you changed.
-- **Do:** read each run's `PR_NUMBER` from its own `gather-context` log before calling two runs a collision.
 - **Don't:** infer that a change made on the successful retry caused the success.
   Under such a group, being last is sufficient on its own.
 - **Don't:** read an absent `concurrency:` block in a caller as meaning its runs cannot be cancelled.
-- **Don't:** count a dispatch for a different PR in the same window as part of your PR's chain --- `gh run list` reports `main` for all of them alike.
 
 ## Python Execution in Runner Environments
 

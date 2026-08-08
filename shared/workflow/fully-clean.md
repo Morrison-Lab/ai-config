@@ -1338,11 +1338,29 @@ the branch.
 [`push`](../../skills/push/SKILL.md)'s in-flight check filters
 `gh run list --branch`, which is sound for a push-triggered run and unsound
 here: a dispatched review records `headBranch: main`, so a branch filter finds
-none of them.
+none of them --- and the run list therefore cannot say which PR any dispatched
+run belongs to.
+Counting adjacent rows there attributes other PRs' reviews to yours, and since
+the group is keyed on the PR number, a run for another PR cannot have collided
+with yours however close in time it sits.
+Attribute each in-flight run from its own `gather-context` log instead:
+
+```bash
+jid=$(gh api "repos/<owner>/<repo>/actions/runs/<run-id>/jobs" \
+  --jq '.jobs[] | select(.name=="gather-context") | .id')
+gh api "repos/<owner>/<repo>/actions/jobs/$jid/logs" |
+  grep -oE 'PR_NUMBER: [0-9]+' | head -1
+```
+
 [`memories/github-actions.md`](../../memories/github-actions.md)'s "A caller
 with no `concurrency:` block can still have its runs cancelled" carries the
-mechanism and the attributing query --- read each in-flight run's `PR_NUMBER`
-from its own `gather-context` log.
+mechanism.
+It generalizes past this one property, too: `permissions`, `timeout-minutes`,
+and job-level `if` gates can equally be declared in a callee, so read the chain
+rather than the caller whenever a workflow's behaviour is the question.
+That file sits at exactly its 1200-line advisory threshold, which is why this
+paragraph lives here rather than beside the section it extends; splitting it is
+tracked in ai-config#811.
 
 - **Do:** read a review run's `conclusion` before retrying, and treat
   `cancelled` as "something newer is running" rather than as a failure to

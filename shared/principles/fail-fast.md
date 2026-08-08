@@ -968,6 +968,52 @@ guard, per the mutation discipline in
 - **Don't:** reach for the members-of-one-pattern rule here --- enumerating an
   alternation's members leaves both sides of every member unguarded.
 
+**Getting both sides covered is not the end of it: one side's own BOUNDARY can
+encode the negation of the assumption the other side rests on.**
+The block above ends with a guard that scans before the phrase and after it.
+This is what can still go wrong once both exist.
+The two sides are separate scans, each with its own notion of where the
+statement it is reading stops, and a boundary is a claim about the text with
+the same standing as the scan it bounds.
+
+The assumption is usually a property of the corpus.
+A corpus written in semantic line breaks puts one clause per line, so a
+qualifier routinely sits at the end of the PREVIOUS line --- which is precisely
+why a before-side scan has to look backward across a line break, and is worth
+arguing for explicitly and pinning with cases.
+The mirror of that same property is that a qualifier just as routinely STARTS
+the next line.
+An after-side scan that treats a bare newline as a terminator therefore cannot
+see it, and the guard's two halves now disagree about whether a line break ends
+a statement.
+
+What lets this survive is that each half is separately defensible and they are
+written apart.
+The backward scan's reasoning is explicit, argued, and tested; the forward
+scan's boundary is a one-token definition that reads as ordinary sentence
+splitting.
+Nobody compares them, because the property was settled rounds earlier, and a
+settled question is not re-opened --- so the author most likely to write the
+contradiction is the one who just argued the point.
+
+So when a change relies on a property of the corpus, search your own diff for
+the mirrored direction before pushing.
+The search is mechanical rather than a matter of insight: the property names a
+direction, so a backward assumption means checking every forward boundary the
+same change introduces, and the reverse.
+Keep the distinction the property actually supports --- a paragraph break really
+does end a statement where a wrapped clause does not --- rather than dropping
+the terminator altogether.
+
+- **Do:** name the corpus property a guard depends on, and check the same diff
+  for a boundary assuming its mirror.
+- **Do:** distinguish a paragraph break from a wrapped line when defining a
+  terminator, since only one of them ends a statement.
+- **Don't:** treat a property you argued for two rounds ago as settled for the
+  whole guard --- it was settled for the side you were writing then.
+- **Don't:** let a boundary definition ride in as an implementation detail; it
+  is a claim about the corpus, and it can contradict one you already made.
+
 **One level up from a partial guard: editing state that two consumers share
 regresses the consumer you were not looking at.**
 Every case above spreads a guard across *sites* --- emitters, discharge paths,

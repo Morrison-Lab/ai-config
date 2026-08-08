@@ -278,3 +278,43 @@ failing only its own cases when mutated.
 Adding the position guard is what made the two older components look redundant,
 so the moment their score dropped to zero was the moment the missing case was
 findable.)
+
+## Scale that from one reported input to a corpus of real ones
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, rounds 4 to 6: `classify_verdict()`
+in `scripts/check-pr-fully-clean.py` had taken four rounds of authored cases,
+each round's reviewer supplying counter-examples the previous fix missed.
+Instead of inventing more, the author ran the classifier over the real verdict
+bodies on the six PRs open that night, where ground truth was known
+independently.
+Two findings followed that no synthetic case had produced.
+
+The first is an under-block on the side nobody was editing.
+Three rounds of "Needs **minor** work" on `Morrison-Lab/ai-config#1293`
+classified as no verdict at all, because the not-clean pattern required
+`Needs\s+work` adjacency --- a genuine not-clean verdict that neither blocked
+nor superseded anything, which is the mirror of the bug the PR existed to fix.
+The author's note is the argument for the method: "no synthetic case would have
+produced the phrasing", and the corpus "is now better evidence than the unit
+suite, because I did not choose its wording".
+
+The second is the over-block, and it appeared only on re-running the corpus
+after a later widening.
+With `\n` no longer terminating a sentence, that same PR's genuinely clean
+verdict began classifying as not clean, on an ordinary `but` roughly 120
+characters downstream in one long sentence.
+That direction makes criterion 4 unsatisfiable for a clean PR, which is worse
+than the under-block being fixed, so the scan was bounded to 60 characters as
+well as to the sentence --- a qualifier retracts only when it sits close.
+Post-fix the classifier reproduced ground truth across 20 verdict bodies on six
+PRs.
+
+The harness itself is the third instrument failure recorded that session, after
+a mutation harness that silently no-opped and a `grep`-based keyword count that
+returned 8 for 7.
+The first comparison run reported all six PRs as MISMATCH.
+The classifier was right; the harness derived the PR number with `split('c12')`,
+turning `c1257.json` into `57`, so every ground-truth lookup missed.
+A uniform verdict across a corpus whose members vary is the tell --- and the
+author's own framing of why it still deserved recording is that failing loudly
+is the safe direction for a broken instrument, not a correct one.)

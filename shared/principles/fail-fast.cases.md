@@ -249,3 +249,36 @@ as|contingent`, applied only to the two bare phrases --- the `Verdict:`-anchored
 patterns need no guard, since they require adjacency to the label.
 The after-side form is the likelier one in a real review, because it is how a
 reviewer signs off on nearly-done work.)
+
+## "One side's own BOUNDARY can encode the negation of the other side's assumption"
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, rounds 2 to 6, on the same
+`classify_verdict()` guard as the case above.
+Rounds 2 and 3 built the before-side negation scan so that it deliberately looks
+backward across a line break, and the reasoning was stated outright: this corpus
+writes semantic line breaks, so a negation routinely sits at the end of the
+previous line.
+Two tests pin it.
+Round 4's redesign then replaced a fixed-offset check with a sentence-scoped
+one, defining `SENTENCE_END` as `[.!?\n]` --- a bare newline weighted equally
+with a full stop.
+`_sentence_remainder` therefore returned the empty string whenever a clean
+pattern was followed immediately by a newline, so a qualifier opening the next
+line was never searched, and the verdict classified as clean.
+Round 5's review reproduced it against the extracted classifier and named the
+split as "a very natural split under this corpus's own semantic-line-break
+convention".
+The author's own reply is the entry: "Same corpus property, mirrored side,
+opposite conclusion, one round apart", adding "this is the same corpus property
+the negation guard is built around" and "the part I should not have gotten
+wrong".
+Fixed in `7acb6bdd` by dropping `\n` as a terminator while keeping a blank line
+as one, "since that is a paragraph break rather than a wrapped clause".
+Widening it immediately surfaced the opposite failure, recorded against
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.cases.md): a
+genuinely clean verdict began classifying as not-clean on an ordinary `but`
+about 120 characters downstream, so the scan is now bounded to 60 characters or
+the sentence, whichever ends first.
+Note the four rounds' own progression, which the author summarised before the
+last one: vocabulary, then scope, then position --- "each fix was correct about
+the case in front of it and wrong about one level up".)

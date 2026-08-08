@@ -106,6 +106,57 @@ Reserve the source repo's copy for files genuinely new to the target.
 - **Don't:** let a directory-level copy operation decide, by omission,
   that the source repo's version of a shared file wins.
 
+## When two variants of one helper exist, the error asymmetry picks between them
+
+The check above asks what the original was for and what the new one is for, and
+for most structures that comparison is about behaviour.
+For a **guard** helper it is about direction: what such a helper is *for* is
+which way its mistakes fall, and two helpers can compute the same thing and
+differ only there.
+
+A codebase that has already learned this lesson once tends to carry two
+variants of one anchor --- a narrow one enumerating what it accepts, and a
+permissive one accepting everything it cannot rule out.
+Both are live, both are right for their own consumer, and neither is a stale
+copy of the other.
+So a new consumer poses a real choice, and "which one is the real one" is not a
+question with an answer.
+
+**Reusing the narrow one is the default, and it is a decision nobody notices
+making.**
+It is usually older, usually named as though it were canonical, and composing
+it reads as consistency rather than as picking a failure direction.
+[`fail-fast`](../principles/fail-fast.md)'s safe-direction rule already says to
+ask which way an unforeseen case falls --- but that rule fires while you are
+*designing* a guard's shape, and reusing an existing helper does not feel like
+shaping anything.
+
+**A masking decision inverts the asymmetry relative to the matching passes it
+feeds.**
+A matching pass errs safely by over-matching: a false positive is a spurious
+block that a documented override clears.
+A pass deciding whether to **skip** text errs safely by over-detecting, which
+is the opposite arithmetic --- judging some text worth scanning costs a scan,
+while judging it inert deletes the evidence before any matcher runs.
+So the narrow variant is the safe reuse in one and the dangerous reuse in the
+other, and the two sit in the same file.
+
+Derive the direction rather than recalling it.
+Name what a false positive costs this consumer and what a false negative costs
+it, one sentence each, and take the variant whose likelier error is the cheaper
+one.
+Where the helper runs upstream of the thing that would have caught the miss,
+the false negative is usually unrecoverable, which settles it.
+
+- **Do:** state what a false positive and a false negative each cost the NEW
+  consumer, and choose the variant from that comparison.
+- **Do:** treat a helper running upstream of a matcher, deciding what the
+  matcher gets to see, as having inverted asymmetry relative to that matcher.
+- **Don't:** pick between two live variants by which looks canonical, or by
+  which the neighbouring code happens to use.
+- **Don't:** read composing an existing helper as exempt from this check ---
+  reuse is where the direction gets chosen without being decided.
+
 ## In review
 
 Flag a diff that introduces a structure closely mirroring an existing one
@@ -121,6 +172,11 @@ Flag a "port/adapt from repo Y" diff that replaces an existing file's
 content with Y's version and calls it a move --- check whether the diff
 is a pure rename (no hunks) or carries an unexplained content change
 riding along with it.
+
+Flag a new consumer composing one of two live variants of the same guard
+helper with no statement of why that variant, and ask for the two-sentence
+cost comparison rather than for the composition to be re-tested --- the
+mechanism works either way, which is exactly why it passes review.
 
 (Corrected 2026-07-30: "cai: never take shortcuts, never copy-paste or
 pattern match blindly; always think twice and critically about what you
@@ -148,3 +204,31 @@ PR description or commit message.
 The `@claude` review caught both as "unexplained side effects of a
 rename"; the fix was `git show <old-ref>:<old-path>` at the new path
 instead of the source repo's copy.)
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08, rounds 5 and 6:
+`hooks/no-unauthorized-merge.py` carries two command-position anchors by
+design.
+`LEAD` enumerates what may precede a command word; `PERMISSIVE_LEAD` treats
+every position as a command position and instead blanks text that provably
+cannot execute, and the file's own comment states why --- "enumerating what may
+precede a command word cannot be finished".
+Round 4's fix composed `LEAD` into `HEREDOC_EXECUTOR`, which reads as the
+correct move and is the one the previous round's finding asked for.
+But `HEREDOC_EXECUTOR` decides whether `mask_heredocs` blanks a heredoc body as
+inert prose, and it runs at step 2 of `offending()`, before either matching pass
+sees the text.
+Round 5's review states the asymmetry directly: "getting it wrong doesn't just
+miss a match in one pass, it destroys the evidence before either pass runs",
+and demonstrated `f() { bash <<EOF ... EOF; }; f` and a `case`-arm equivalent
+allowing at the PR head while `main` blocked both.
+Round 6 then found the same variant choice costing the guard again, over a
+wider class and a second path: `KEYWORD_PREFIX`'s closed enumeration misses any
+unenumerated wrapper (`timeout`, `nice`, `setsid`, `xargs`, `builtin`) and any
+flag after an enumerated one (`sudo -u user`, `sudo -E`), for both the heredoc
+path and the executor's quoted operand (`bash -c "..."`, `eval "..."`), with a
+14-row table showing every one allowing at the head and blocking on `main`.
+Both rounds trace to composing the narrow variant into a consumer whose false
+negative is unrecoverable, and neither is a defect in `LEAD` itself.
+Round 5's suggested direction is this rule's remedy stated as a design change:
+"invert the default the way pass 2 already did --- treat a heredoc as executing
+unless its introducing line is provably fed to a non-executing consumer".)

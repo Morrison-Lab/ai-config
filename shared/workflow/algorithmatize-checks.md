@@ -400,6 +400,56 @@ So the enforceable rule is "publish the command", not "verify the number".
 - **Don't:** treat a figure already copied into a PR body, a changelog, or a
   shipped file as out of scope; those are the copies a reviewer will read.
 
+## Publishing a command is not enough; it has to be the command you ran
+
+The section above closes on "publish the command", and that rule is right.
+Its failure mode sits one step inside it.
+A diff can publish a command, satisfy the rule exactly as written, and publish
+a **different** command from the one that produced the number.
+
+The two copies are usually written minutes apart by the same author, and they
+diverge because each is tuned for a different job.
+The command you **run** is tuned against real data until it works, so a pattern
+that over-matches gets tightened the first time it returns a wrong hit.
+The command you **publish** is tuned to read well, so the same pattern gets
+simplified for exposition, and nothing ever runs the simplified form.
+One is tested against reality and the other is tested against nothing.
+
+That inverts the usual reason a published command is wrong.
+It is not that nobody checked it.
+Somebody checked a near neighbour of it, carefully, and shipped the neighbour's
+weaker sibling, so the diligence is real and lands one artifact away from where
+it was needed.
+
+The cost is worse than an ordinary unverified literal, which
+[`ardi`](ardi.md) already covers under the rule that a literal is the part a
+reader executes.
+A published command carries the authority of whatever it illustrates, so a
+reader inherits it as the prescribed form and reruns it indefinitely.
+It also defeats the mechanizable check the section above proposes: re-running
+the published command and comparing re-runs the weaker one, confirming the
+published number with the published pattern, and never meeting the pattern that
+actually produced it.
+
+The check is a string comparison and costs nothing.
+Before pushing, diff the command in your prose against the one in your shell
+history or your own verification table.
+Where they differ, the one you ran is the authority, because it is the only one
+with evidence behind it.
+
+This is also a DRY finding, per
+[`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md):
+two copies of one command, only one of them owned by anything that tests it.
+
+- **Do:** paste the command you actually ran, verbatim, rather than a tidied
+  restatement of it.
+- **Do:** diff a prescribed command against your own verification command
+  before pushing, and treat any difference as the prose being wrong.
+- **Don't:** simplify a published command for readability without re-running
+  the simplified form and confirming it still gives the same answer.
+- **Don't:** read "I published a command" as discharging the rule above; that
+  rule is discharged by publishing *that* command.
+
 ## A reference frame chosen from the initial condition expires as the system moves
 
 The section above is about an instrument that **changed**, leaving every figure

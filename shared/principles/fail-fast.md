@@ -565,6 +565,61 @@ an output that does not name its source.
 - **Don't:** assume the first branch won because it is the one you expected to
   win.
 
+### A read-only question does not license a state-mutating answer
+
+Every subsection above asks whether a hand-run check's **answer** can be
+trusted.
+This one asks what asking it **cost**, which is a property the answer never
+reports: the check can return the right result and still have destroyed the
+state you were checking against.
+
+The shape is a diagnostic whose question is plainly read-only --- "does this
+also fail on `main`?", "what did this file look like before?" --- answered by a
+command that puts the working tree into the state being asked about.
+Chained into one call it reads as a single act of looking:
+
+```sh
+# looks like one lookup; is a lookup plus two mutations
+<run the failing check>; git stash -q; git checkout -q origin/main -- hooks/
+```
+
+Nothing in that line is wrong as a command.
+`git stash` and `git checkout <ref> -- <path>` both do exactly what they say,
+which is why the composition passes a read-through: the scrutiny lands on
+whether each piece is correct rather than on whether a diagnostic should be
+doing this at all.
+The result is that uncommitted work is stashed and a whole directory in the
+working tree **and index** is replaced by another ref's version, discarding the
+branch's own committed changes from the tree, in service of a question that
+only ever needed to read.
+
+Materialize the other ref somewhere else instead.
+Extraction to a scratch directory touches neither the tree nor the index:
+
+```sh
+scratch="$(mktemp -d)"
+git archive <ref> <path> | tar -x -C "$scratch"   # nothing in the tree moves
+```
+
+A throwaway `git worktree add --detach <ref>` does the same for a whole tree,
+and both leave `git status` unchanged --- which is the property to check after
+running a diagnostic, not before.
+
+The generalizable test is a sentence, not a command list: **say what the
+question needs to read, and confirm the answer writes nothing outside a scratch
+path.** A diagnostic that fails that test is not a diagnostic, whatever it
+returns.
+
+- **Do:** materialize another ref with `git archive | tar -x` into a scratch
+  directory, or a detached throwaway worktree, when a question spans refs.
+- **Do:** run `git status` after a diagnostic you composed on the spot, and
+  treat any change as the diagnostic having done something it was not asked to.
+- **Don't:** chain a mutating command onto a read-only question because the
+  mutation is the shortest route to the answer.
+- **Don't:** let each command being individually correct stand in for the
+  composition being appropriate --- that check passes on every instance of
+  this.
+
 ## In a guard you ship: partial is worse than absent
 
 Everything above concerns a check whose failure is invisible **at runtime**,
@@ -662,6 +717,74 @@ step to take at the moment you write the comment, not at review.
 - **Don't:** treat a considered comment about a hazard as evidence the hazard
   was handled everywhere it applies; a removal note is the artifact most likely
   to stop the search early.
+
+**Widen that last bullet's trigger: any sentence naming a hazard is a
+predicate, and the first code it applies to is the code directly beneath it.**
+The block above needs a *removal* note --- members taken out of an alternation,
+with a stated reason that can be re-run over the survivors.
+The commoner artifact states the hazard and removes nothing, so there is no
+survivor set to sweep and that remedy has nothing to operate on.
+It still supplies a predicate.
+A comment reading "an over-broad pattern here would let X through" names the
+exact test the lines under it have to pass, and applying it to them costs one
+reading.
+
+The reason it goes unapplied is that describing the hazard has already
+discharged the feeling of having handled it.
+Naming a risk in prose is the part that *feels* like diligence, and it is
+finished the moment the sentence is, so nothing prompts the second step.
+That is why same-author and same-commit are the diagnostic rather than a
+mitigating detail: this is not a stale note somebody else left behind, and the
+comment and the violation are minutes apart in one edit.
+
+It is worse than silence, on the terms this section already prices.
+An unguarded pattern with no comment invites the next reader to ask.
+The same pattern under a sentence explaining why over-broad matching would be
+dangerous reads as surveyed, so the comment spends the one signal that would
+have surfaced it, and keeps spending it for every later reader.
+
+Distinguish this from a comment that asserts a property of the code beneath it
+("only matches at the start of a command"), which
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md) already covers
+under treating a comment claiming the matcher's scope as an untested assertion.
+There the comment and the code agree and are both wrong, so only a test
+separates them.
+Here they disagree, and a reading separates them.
+
+- **Do:** re-read the lines under a hazard comment against the hazard it names,
+  in the edit that writes the comment.
+- **Don't:** count naming a risk as handling it --- the sentence is a
+  specification, and nothing has yet met it.
+
+**When the hazard is a phrase a qualifier can reverse, enumerate the qualifier
+classes by which SIDE of the phrase they sit on.**
+The "members of one pattern" block above enumerates along the alternation's own
+members, and a reader who applies it correctly still ships this bug, because
+these classes are not members of the pattern at all --- they are positions
+relative to it.
+
+A negation sits **before** ("this is not ready for merge").
+A condition sits **after** ("ready for merge once the findings are fixed").
+"Add a negation guard" is the natural reading of the problem, it produces a
+lookbehind, and a lookbehind closes only the first of those.
+The after-side form is the likelier one in practice, since it is how a reviewer
+signs off on work that is nearly done, so the guard that feels complete misses
+the commoner case.
+
+Enumerate the positions before writing the guard: a prefix that negates, a
+suffix that conditions, and a mid-phrase qualifier that narrows scope.
+Then write a case per side and confirm each fails without its own half of the
+guard, per the mutation discipline in
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
+
+- **Do:** list the qualifier classes by position --- before, after, within ---
+  and cover each with its own case.
+- **Do:** treat the after-side conditional as the likely form when the guarded
+  phrase is an approval, not as the exotic one.
+- **Don't:** read "add a negation guard" as the whole requirement; negation is
+  one side, and it is the side that comes to mind first.
+- **Don't:** reach for the members-of-one-pattern rule here --- enumerating an
+  alternation's members leaves both sides of every member unguarded.
 
 **One level up from a partial guard: editing state that two consumers share
 regresses the consumer you were not looking at.**

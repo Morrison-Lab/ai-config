@@ -253,3 +253,34 @@ And a blocking `Stop` hook was called the right shape for a new rule, when it
 would have suppressed error admissions.
 The directives were "cai: use metacognition", "cai: think before you speak;
 question yourself", and "cai: question your generative intuitions".)
+
+## Key on claim type --- a "blocked" assertion is a state claim
+
+(2026-08-07/08, this repo: a status report called
+`Morrison-Lab/ai-config#1278` blocked, on the grounds that it appends to
+`shared/workflow/fully-clean.md`, "already 1304 lines against a 1200-line gate".
+No part of that was checked.
+`scripts/check-memory-file-size.py` defaults to `--directory memories`, so run
+plain it prints "No memory file exceeds 1200 lines." and exits 0; issue #1236,
+cited as the gate, describes it as "the advisory 1200-line gate" and had to pass
+`--directory shared/workflow` explicitly to produce a number at all.
+`validate` passes on that branch with the file at 1453 lines.
+The line count was wrong in both directions too --- 1397 on `main`, 1453 on the
+branch, 1279 when #1236 was filed --- so the figure matched nothing.
+A blocker is a claim about a gate's current state, and one command settles it:
+run the checker, then read the check's own result on the PR.
+
+Drafting the correction produced the mirror error, which is the more useful
+half.
+Reading the size gate's test with a truncated `grep ... | head -20` returned
+only lines from its synthetic-fixture helper, which supported concluding that
+the test never touches the real corpus and that issue #1221's "the next addition
+will fail `validate`" was itself false.
+It is not false.
+`scripts/test_check_memory_file_size.py` asserts at module level that "this
+repo's own memories/ is under the 1200-line default", `validate.yml` runs it,
+and that is why `memories/git.md` sitting at 1199 lines has headroom of exactly
+one.
+The first claim came from never running the query; the second from running one
+whose scope `head` had cut off --- the same failure with an instrument in front
+of it, per "Illusions of knowing have an exact software form" below.)

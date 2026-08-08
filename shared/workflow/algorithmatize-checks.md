@@ -559,6 +559,44 @@ outcome.
 Then mutation-check each clause separately, per [`ardi`](ardi.md)'s "seen to
 fail" rule applied clause by clause rather than once for the whole condition.
 
+**The harness that performs those mutations needs the same scrutiny, because a
+mutation it could not apply looks exactly like one the tests caught.**
+The rule above assumes each clause can actually be removed.
+When the clauses are alternatives inside one regex and the harness drops one by
+deleting a delimiter-joined token, the token is present for the interior
+alternatives and absent at one end, so that end is never mutated at all --- and
+a harness that scores "no failure observed" as a pass reports the unmutated
+clause as verified.
+
+Which end depends on which side of the token the delimiter sits, and either
+single-sided form leaves exactly one alternative unreachable.
+Measured on this corpus's own
+`\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't)\s+` prefix guard, dropping
+`<alt>|` mutated seven of eight and silently no-opped on the last (`can't`,
+followed by `)`), while dropping `|<alt>` mutated seven of eight and no-opped
+on the first (`not`, preceded by `(?:`).
+A naive string replacement is the wrong instrument for this regardless, since
+one alternative can be a substring of another; split the alternation and rebuild
+it without the member instead.
+
+The transferable half is not the regex detail.
+It is that a mutation harness has three outcomes, not two --- caught, missed,
+and **inapplicable** --- and collapsing the third into the first is the
+[`fail-fast`](../principles/fail-fast.md) figure where a check's failure path
+and its pass path print the same thing.
+Make the harness assert that the mutated artifact actually differs from the
+original before it runs anything, and report the case as inapplicable when it
+does not.
+
+- **Do:** verify each mutation changed the artifact before scoring its result,
+  and surface an inapplicable mutation as its own outcome.
+- **Do:** rebuild an alternation from its parsed members when mutating one, so
+  position and substring overlap cannot silently no-op the edit.
+- **Don't:** score "the tests still passed" as a pass without knowing the
+  mutation applied --- an unmutated clause passes for the wrong reason.
+- **Don't:** trust a single-sided delimiter token to reach every alternative;
+  it reaches every one but the end the delimiter is missing from.
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

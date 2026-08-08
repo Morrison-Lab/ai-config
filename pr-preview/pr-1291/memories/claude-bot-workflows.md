@@ -1061,9 +1061,8 @@ Morrison-Lab/ai-config#994's earlier 5m26s stub looked similar in the queue, but
 it ran before #998 merged and was a different bug.)
 
 This is a fourth distinct cause in the short-duration band that
-[`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)
-already records three for, under "That duration signature does not run
-backwards".
+[`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md) already
+records three for, under "That duration signature does not run backwards".
 Three of the four run 25 seconds or less, and none of them is about credentials,
 which is that section's point: a short run corroborates a credential hypothesis
 you already hold on other grounds, and never produces one.

@@ -21,6 +21,30 @@ a hook rather than a rule to remember:
     a PR was created or marked ready this session
     AND no reviewer request came after it
 
+A reviewer request is per-HEAD, not per-PR, so the same obligation re-arms on
+every push that re-heads a tracked PR. Without that the guard is armed once and
+PERMANENTLY discharged by the first request: round 2 pushes a new head, nothing
+re-arms, and the PR carries a review of a commit that is no longer its head
+(ai-config#1274, where round 1's Copilot request at 6a4101e5 was never renewed
+at 76e619aa and nothing warned).
+
+Attribution is the hard part, and it is answered by EXCLUSION rather than by
+guessing. A push almost never names the PR it re-heads. Measured over this
+machine's transcript corpus (204 transcripts, 20102 tool_use records): 718
+`git push` commands, against 51 tool results anywhere carrying a PR's
+`headRefName`. So branch-matching a push to a PR is unavailable for most
+pushes, and a guard built on it would rarely fire.
+So a push re-arms only when the session has exactly ONE live tracked PR, which
+is the case where the push has only one PR it COULD re-head. With two or more
+the push is genuinely unattributable and nothing is re-armed: arming all of
+them would demand N requests for one push and wedge the session, which costs
+more than the gap it closes.
+
+Arming is the SAFE direction (an over-warn), so unlike every discharge path it
+does not wait for a result and does not read `is_error`. Only releasing changes
+need positive evidence of success -- see shared/principles/fail-fast.md, "A
+guard's discharge fires on positive success".
+
 Correlation is by tool_use identity, not by position or by a scalar
 timestamp. Three facts make that necessary, each an independently-reproduced
 bug in the position/timestamp model this replaces:
@@ -330,6 +354,86 @@ def draft_ident(cmd):
     return False, None, None, False
 
 
+def _argv_push(argv):
+    """True if argv is a `git push` that genuinely re-heads a branch.
+
+    Structural, exactly like _argv_request/_argv_draft: `git push` counts only
+    as the argv of an actual `git` invocation, never as a quoted example inside
+    another command's string argument (this hook's own docs and tests are full
+    of literal `git push` text, which must not arm anything).
+
+    Global options are skipped so `git -C <dir> push` and `git -c k=v push`
+    are recognised. Two push forms are excluded because they do NOT re-head the
+    branch, so no new head exists to review: `--dry-run`/`-n` performs no push
+    at all, and `--delete`/`-d` removes a ref rather than advancing one.
+    """
+    if not argv or argv[0] != "git":
+        return False
+    i = 1
+    while i < len(argv):                 # skip git's own global options
+        a = argv[i]
+        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+            i += 2
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        break
+    if i >= len(argv) or argv[i] != "push":
+        return False
+    return not _has_flag(argv[i + 1:], "--dry-run", "-n", "--delete", "-d")
+
+
+def push_ident(cmd):
+    """True if `cmd` contains a genuine `git push` simple command.
+
+    Deliberately returns no `last` flag, unlike request_ident/draft_ident/
+    gone_ident. Those three all decide a RELEASING change, which may fire only
+    on positive evidence of its own success, so each needs to know whether the
+    call's is_error belongs to it. Arming is the safe over-warn direction, so a
+    push arms whether it succeeded or not -- a failed push that arms costs one
+    warning, while waiting for proof would silently skip a real new head
+    whenever the push shared a call with anything else (which, measured on this
+    corpus, is nearly every push).
+
+    Fails toward NOT-a-push on a parse error, so a malformed command never arms.
+    """
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False
+    return any(_argv_push(a) for a in cmds)
+
+
+def _argv_gone(argv):
+    """(is_gone, num, repo): a `gh pr merge`/`gh pr close` -- the PR is done.
+
+    A merged or closed PR can never gain another reviewable head, so it leaves
+    the live set and stops re-arming. This deliberately does NOT clear an
+    outstanding obligation: merging an unreviewed PR is exactly the thing this
+    guard exists to have prevented, so a merge must not retroactively excuse it.
+    It only stops FUTURE pushes in the same session -- typically to the next
+    branch -- from re-arming a PR that is no longer open.
+    """
+    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+        return False, None, None
+    if argv[2] in ("merge", "close"):
+        num, repo = _verb_ident(argv)
+        return True, num, repo
+    return False, None, None
+
+
+def gone_ident(cmd):
+    """(is_gone, num, repo, last): mirrors draft_ident for merge/close."""
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False, None, None, False
+    for i, argv in enumerate(cmds):
+        ok, num, repo = _argv_gone(argv)
+        if ok:
+            return True, num, repo, (i == len(cmds) - 1)
+    return False, None, None, False
+
+
 def _argv_open(argv):
     """(is_open, num, repo) for one simple command's argv: a create/ready open.
 
@@ -384,6 +488,11 @@ SHELL_TOOLS = {"Bash", "bash", "run_command"}
 OPEN_TOOLS = {"create_pull_request", "mcp__github__create_pull_request"}
 EDIT_TOOLS = {"update_pull_request", "mcp__github__update_pull_request"}
 REQ_TOOLS = {"request_copilot_review", "mcp__github__request_copilot_review"}
+# Structured tools that commit to a branch, re-heading whatever PR it backs.
+PUSH_TOOLS = {"push_files", "mcp__github__push_files",
+              "create_or_update_file", "mcp__github__create_or_update_file"}
+# Structured merge: the PR can gain no further reviewable head.
+GONE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
 
 # A PR API path (`repos/o/r/pulls/1038`) inside a shell command, used by
 # _url_ident to read identity from a request command's own `gh api` URL. Open,
@@ -460,7 +569,7 @@ def result_ident(body):
     return None, None
 
 
-def _new_obl(num, repo, tid, self_, slast, srnum, srrepo):
+def _new_obl(num, repo, tid, self_, slast, srnum, srrepo, push=False):
     """One outstanding-open record.
 
     `self_` marks an open whose SAME action also requested a reviewer, so the
@@ -468,9 +577,51 @@ def _new_obl(num, repo, tid, self_, slast, srnum, srrepo):
     carry that request's ordering and target so the `self` discharge can apply the
     same fail-safe guard as pending[tid] (discharge only on a last/atomic,
     same-PR, non-failed request). They are unread when `self_` is False.
+
+    `push` marks an obligation re-armed by a push rather than by an open, so the
+    warning can say the head moved instead of claiming the PR was never
+    reviewed at all.
     """
     return {"num": num, "repo": repo, "tid": tid, "self": self_,
-            "slast": slast, "srnum": srnum, "srrepo": srrepo}
+            "slast": slast, "srnum": srnum, "srrepo": srrepo, "push": push}
+
+
+def _note_live(live, num, repo):
+    """Record a PR this session opened or readied, once its number is known."""
+    if num is not None:
+        live[num] = repo or live.get(num)
+
+
+def _rearm(obligations, live, tid):
+    """Re-arm the reviewer obligation for the sole live PR, if a push earns it.
+
+    Three gates, each of which alone withholds the arm:
+
+      * EXACTLY ONE live PR. With none the push belongs to no tracked PR at all
+        (the overwhelming majority of pushes -- a session that opened no PR must
+        never be nagged). With two or more the push is unattributable, and
+        arming every candidate would demand N requests for one push and wedge
+        the session.
+      * NO obligation already outstanding for that PR. Without this, N pushes
+        between two requests stack N obligations that one request cannot clear,
+        so the guard would nag forever after the user did exactly what it asked.
+      * A number is known. An obligation with num=None can never be cleared by
+        _clear(), so arming one would wedge the session.
+
+    The synthetic `tid` can never equal a real tool_use_id, so a re-armed
+    obligation is never mistaken for the open that a tool_result resolves.
+    """
+    if len(live) != 1:
+        return
+    num, repo = next(iter(live.items()))
+    if num is None:
+        return
+    for ob in obligations:
+        if ob["num"] == num and _repo_ok(ob["repo"], repo):
+            return
+    obligations.append(
+        _new_obl(num, repo, "rearm:%s" % (tid,), False, False, None, None,
+                 push=True))
 
 
 def _repo_ok(a, b):
@@ -510,7 +661,13 @@ def scan(path):
     """
     obligations = []
     pending = {}        # tool_use_id -> (num, repo) for reviewer requests
-    pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
+    # tool_use_id -> (num, repo, last, kind) for a deferred state transition.
+    # kind "draft": the PR went back to draft, so it needs no reviewer now --
+    # clears the obligation AND leaves the live set. kind "gone": the PR merged
+    # or closed, so it can gain no further head -- leaves the live set ONLY,
+    # deliberately never clearing an outstanding obligation (see _argv_gone).
+    pending_clear = {}
+    live = {}           # num -> repo for PRs opened/readied and still open
     text = ""
     with open(path, errors="ignore") as fh:
         for line in fh:
@@ -582,6 +739,9 @@ def scan(path):
                             ob["num"] = rnum
                         if ob["repo"] is None and rrepo:
                             ob["repo"] = rrepo
+                        # A create's number is knowable only here, so this is
+                        # where most PRs enter the live set.
+                        _note_live(live, ob["num"], ob["repo"])
                         # A `self` obligation (an open whose SAME action also
                         # requested a reviewer -- `gh pr create --reviewer`,
                         # `create_pull_request(reviewers=[...])`, or a create
@@ -662,10 +822,18 @@ def scan(path):
                     # shared/principles/fail-fast.md, prefer keeping the over-warn
                     # rather than narrowing it to cut nags.
                     if rid in pending_clear:
-                        cnum, crepo, clast = pending_clear.pop(rid)
+                        cnum, crepo, clast, ckind = pending_clear.pop(rid)
                         clear_failed = (not clast) or failed
                         if not clear_failed:
-                            _clear(obligations, cnum, crepo)
+                            # A merge/close carries no number when it acts on
+                            # the current branch's PR, so fall back to one the
+                            # result reports (`Merged pull request o/r#N`).
+                            if ckind == "gone" and cnum is None:
+                                cnum, crepo = cnum or rnum, crepo or rrepo
+                            if ckind == "draft":
+                                _clear(obligations, cnum, crepo)
+                            if cnum is not None:
+                                live.pop(cnum, None)
                     continue
 
                 if kind != "tool_use":
@@ -688,9 +856,24 @@ def scan(path):
                         obligations.append(_new_obl(
                             num, repo, tid, bool(inp.get("reviewers")),
                             True, num, repo))
+                        _note_live(live, num, repo)
+                    continue
+                if name in GONE_TOOLS:
+                    gnum, grepo = input_ident(inp)
+                    # Atomic structured tool, so is_error reflects THIS merge.
+                    pending_clear[tid] = (gnum, grepo, True, "gone")
+                    continue
+                if name in PUSH_TOOLS:
+                    # These commit to a named branch, which re-heads whatever PR
+                    # that branch backs. A write to the default branch is not a
+                    # PR head, so it never arms.
+                    if str(inp.get("branch") or "") not in ("", "main", "master"):
+                        _rearm(obligations, live, tid)
                     continue
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
+                    if inp.get("draft") is False:
+                        _note_live(live, num, repo)
                     if inp.get("draft") is True:
                         # Converting a ready PR back to draft defers review, but
                         # only if it SUCCEEDS. Clearing at tool_use time would
@@ -698,7 +881,7 @@ def scan(path):
                         # defer the clear to this call's own non-failed result.
                         # A structured tool is atomic -- one tool_use, one result
                         # -- so is_error reflects THIS transition: last=True.
-                        pending_clear[tid] = (num, repo, True)
+                        pending_clear[tid] = (num, repo, True, "draft")
                     elif inp.get("draft") is False:
                         # Structured, atomic: slast=True, reviewers target num.
                         obligations.append(_new_obl(
@@ -748,11 +931,13 @@ def scan(path):
                 onum, orepo = open_ident(cmd_raw)
                 requested, rnum, rrepo, rlast = request_ident(cmd_raw)
                 _dok, dnum, drepo, dlast = draft_ident(cmd_raw)
+                pushed = push_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
                 # too, and it is the draft action that decides. The clear is
                 # deferred to the command's own non-failed result: a `gh pr
                 # ready --undo` that fails leaves the PR ready, so clearing at
                 # tool_use time would silently forget it.
+                _gok, gnum, grepo, glast = gone_ident(cmd_raw)
                 if draft:
                     # Identity and `last` come from the draft command ITSELF
                     # (draft_ident): a decoy PR verb earlier in the line cannot
@@ -761,7 +946,12 @@ def scan(path):
                     # so the clear is withheld (is_error ambiguous). A draft form
                     # draft_ident does not resolve leaves dnum=None/dlast=False,
                     # which never clears -- the safe over-warn direction.
-                    pending_clear[tid] = (dnum, drepo, dlast)
+                    pending_clear[tid] = (dnum, drepo, dlast, "draft")
+                elif _gok:
+                    # Deferred like a draft transition, and for the same reason:
+                    # leaving the live set is a releasing change, so it waits for
+                    # positive evidence the merge/close itself succeeded.
+                    pending_clear[tid] = (gnum, grepo, glast, "gone")
                 elif opened:
                     # `self` carries the matched request's ordering (rlast) and
                     # target PR (rnum/rrepo) so the discharge can require the
@@ -770,11 +960,20 @@ def scan(path):
                     # must not silently discharge this open.
                     obligations.append(_new_obl(
                         onum, orepo, tid, requested, rlast, rnum, rrepo))
+                    _note_live(live, onum, orepo)
                 # A create --reviewer both opens and requests; its `self` flag
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.
                 if requested and not opened:
                     pending[tid] = (rnum, rrepo, rlast)
+                # A push re-heads the PR, so the per-head reviewer request is
+                # owed again. Checked last and independently of the branches
+                # above: a call that both pushes and requests (`git push && gh
+                # api ... -X POST`) arms here and is discharged by that same
+                # call's result, which is correct -- the request came after the
+                # push. Arming needs no result, per push_ident.
+                if pushed:
+                    _rearm(obligations, live, tid)
     return obligations, text
 
 
@@ -792,10 +991,33 @@ def main() -> int:
     named = sorted({o["num"] for o in obligations if o["num"]}, key=int)
     which = ", ".join("#" + n for n in named) if named else "a PR"
 
+    # An obligation re-armed by a push states a different fact from one armed by
+    # an open -- the PR was reviewed, at a commit that is no longer its head --
+    # so it gets its own lead paragraph. Both can be outstanding at once.
+    pushed_only = all(o["push"] for o in obligations)
+    lead = (
+        "You pushed a new head to {w} in this session and no SUCCESSFUL "
+        "reviewer request follows that push.\n\n"
+        "A reviewer request is per-HEAD, not per-PR: an earlier round's "
+        "request was answered at a commit that is no longer this PR's head, so "
+        "nothing has read the code you just pushed. Nothing re-requests a "
+        "reviewer on your behalf."
+    ) if pushed_only else (
+        "You opened or readied {w} in this session and no SUCCESSFUL "
+        "reviewer request follows for it.\n\n"
+        "Opening a PR auto-triggers the repo's own review workflow but does "
+        "NOT summon Copilot, which reviews only when explicitly requested. The "
+        "auto-triggered half is what disguises this: the PR shows "
+        "review-shaped activity while nothing has read the diff."
+    )
+
     # Sentinel scoped to this transcript AND this message, so a later session
-    # ending with the same recap text does not silently skip the guard.
+    # ending with the same recap text does not silently skip the guard. The
+    # mode is part of the key so a push re-arm is not suppressed by an earlier
+    # open-block that happened to name the same PR from the same message.
     key = hashlib.sha256(
-        (transcript + "\0" + text + "\0" + which).encode()).hexdigest()[:16]
+        (transcript + "\0" + text + "\0" + which + "\0" + str(pushed_only))
+        .encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-unreviewed-pr-{key}")
     if os.path.exists(sentinel):
         return 0
@@ -807,13 +1029,7 @@ def main() -> int:
     print(json.dumps({
         "decision": "block",
         "reason": (
-            f"You opened or readied {which} in this session and no SUCCESSFUL "
-            "reviewer request follows for it.\n\n"
-            "Opening a PR auto-triggers the repo's own review workflow but "
-            "does NOT summon Copilot, which reviews only when explicitly "
-            "requested. The auto-triggered half is what disguises this: the "
-            "PR shows review-shaped activity while nothing has read the "
-            "diff.\n\n"
+            lead.format(w=which) + "\n\n"
             "Request it now, in this same message. Quote every placeholder -- "
             "an unquoted `<` is a shell redirect:\n\n"
             "    gh api \"repos/<owner>/<repo>/pulls/<N>/requested_reviewers\" "

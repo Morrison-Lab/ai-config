@@ -725,6 +725,130 @@ case(create("c") + [bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}")],
      "ordering", "RX_DRAFT must be checked before RX_OPEN")
 
 
+# --- a push re-heads the PR, so the per-head request is owed again ---------
+# Case #1 is the incident itself (ai-config#1274), with its commands pasted in
+# the shape the corpus actually carries -- a `cd`, a `git push ... | tail`, and
+# a separate `gh workflow run` dispatch -- rather than a tidied one-liner. The
+# guard is designed against a SUMMARY of the incident, so the literal text is
+# what tests whether the design survives contact with it.
+PUSH_CMD = ('cd /home/demorrison/Projects/ai-config\n'
+            'git push -q origin HEAD 2>&1 | tail -3\n'
+            'echo "local:  $(git rev-parse HEAD)"')
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p"), res("p", "local:  76e619aa"),
+                    bash("gh workflow run claude-review.yml -f pr_number=1038",
+                         tid="w"), res("w", ""),
+                    say("Round 2 pushed and dispatched claude-review.")], True,
+     "ai-config#1274 verbatim: round 2 pushes, only claude-review dispatched")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p"), res("p", ""),
+                    bash(REQ_CMD_Q, tid="q2"), res("q2", OK),
+                    say("Pushed and re-requested at the new head.")], False,
+     "a request AFTER the push discharges the re-armed obligation")
+# Ordering is the whole point: the same two actions in the other order leave
+# the push unanswered, which is exactly the per-head gap.
+case(create("c") + [bash(PUSH_CMD, tid="p"), res("p", ""),
+                    bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p2"), res("p2", ""),
+                    say("Requested, then pushed again.")], True,
+     "a request BEFORE the last push does not discharge it")
+
+# Gate: exactly one live PR. Two open PRs make a push unattributable, and
+# arming both would demand two requests for one push and wedge the session.
+case([bash("gh pr create --title a", tid="c1"), res("c1", URL),
+      bash(REQ_CMD_Q, tid="q1"), res("q1", OK),
+      bash("gh pr create --title b", tid="c2"),
+      res("c2", "https://github.com/o/r/pull/1039\n"),
+      bash('gh api "repos/o/r/pulls/1039/requested_reviewers" -X POST',
+           tid="q2"), res("q2", OK),
+      bash(PUSH_CMD, tid="p"), res("p", ""),
+      say("Pushed with two PRs open.")], False,
+     "a push with TWO live PRs is unattributable and arms nothing")
+
+# Gate: no duplicate obligation. Several pushes between two requests must
+# collapse to ONE obligation, or the request the guard asks for cannot clear it.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p1"), res("p1", ""),
+                    bash(PUSH_CMD, tid="p2"), res("p2", ""),
+                    bash(PUSH_CMD, tid="p3"), res("p3", ""),
+                    bash(REQ_CMD_Q, tid="q2"), res("q2", OK),
+                    say("Three pushes, then one request.")], False,
+     "three pushes arm ONE obligation, cleared by one request")
+
+# Gate: a drafted PR needs no reviewer, so a push to it must not re-arm.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}"),
+                    bash(PUSH_CMD, tid="p"), res("p", ""),
+                    say("Back to draft, then pushed.")], False,
+     "a push to a PR converted back to draft does not re-arm")
+
+# Gate: a merged PR can gain no further reviewable head. Without this, the
+# ordinary post-merge shape (merge, branch, push) nags about the merged PR.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr merge 1038 --squash", tid="m"),
+                    res("m", "Merged pull request o/r#1038"),
+                    bash(PUSH_CMD, tid="p"), res("p", ""),
+                    say("Merged, then pushed the next branch.")], False,
+     "a push after the PR merged does not re-arm it")
+# But a merge must NOT retroactively excuse a PR that was never reviewed.
+case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"),
+                    res("m", "Merged pull request o/r#1038"),
+                    say("Merged it.")], True,
+     "merging an unreviewed PR does not clear its outstanding obligation")
+
+# Push detection is structural and scoped, exactly like the other detectors.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash('gh pr comment 1038 --body "then run git push"',
+                         tid="p"), res("p", ""),
+                    say("Commented about pushing.")], False,
+     "a quoted `git push` inside another command's argument does not re-arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push --dry-run origin HEAD", tid="p"),
+                    res("p", ""), say("Dry run only.")], False,
+     "`git push --dry-run` re-heads nothing, so it does not re-arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push origin --delete old-branch", tid="p"),
+                    res("p", ""), say("Deleted a stale branch.")], False,
+     "`git push --delete` removes a ref rather than advancing one")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git -C /tmp/wt push origin HEAD", tid="p"),
+                    res("p", ""), say("Pushed from a worktree.")], True,
+     "`git -C <dir> push` is recognised past git's global options")
+# A failed push still arms: arming is the safe over-warn direction, and a push
+# is nearly always chained, so waiting for an attributable exit status would
+# skip real new heads.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p"), res("p", "rejected", err=True),
+                    say("Push was rejected.")], True,
+     "a failed push still arms (over-warn is the safe direction)")
+
+# A session that opened no PR must never be nagged, however much it pushes --
+# this is the bulk of all pushes and the whole reason the guard stays usable.
+case([bash(PUSH_CMD, tid="p"), res("p", ""),
+      bash(PUSH_CMD, tid="p2"), res("p2", ""),
+      say("Pushed to a branch with no PR.")], False,
+     "pushes in a session that opened no PR arm nothing")
+
+# The push wording must be distinguishable from the open wording: it states a
+# different fact (the PR WAS reviewed, at a commit that is no longer its head).
+def _push_wording():
+    ev = create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                        bash(PUSH_CMD, tid="p"), res("p", ""),
+                        say("Pushed round 2.")]
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in ev:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        out = subprocess.run(
+            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
+        return "per-HEAD" in out and "pushed a new head" in out
+    finally:
+        os.unlink(path)
+
+
 def block_of(events):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
@@ -838,6 +962,14 @@ def main():
     else:
         print(f"FAIL: sentinel scope wrong "
               f"(first={first} repeat={repeat} other={other})")
+        failures += 1
+
+    if _push_wording():
+        print("PASS: a push re-arm says the head moved, not that the PR is "
+              "unreviewed")
+        passes += 1
+    else:
+        print("FAIL: push re-arm reuses the open wording")
         failures += 1
 
     print(f"\n{passes} passed, {failures} failed")

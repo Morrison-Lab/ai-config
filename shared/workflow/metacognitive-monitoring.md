@@ -448,14 +448,16 @@ than an instrumented run.
 A purely central displacement is the worked example.
 Aiming each body of a pair at the other moves both along the line joining them,
 which changes the separation's **length** and never its direction, so that term
-cannot rotate the pair at any magnitude.
+cannot rotate the pair however large it is.
 That is decidable from the function's own six lines, and no measurement of
 how much it contributes was ever needed.
 Read all six rather than the operative one.
 The same function ends by clamping each coordinate against the field bounds
 separately, which is the one thing in it that can make a displacement
-non-central, and a reader who stopped at the line that obviously matters would
-have missed the one qualification the constraint has.
+non-central: at a boundary one coordinate truncates and the other does not.
+So the constraint holds away from the edge and has to be re-derived at one,
+and a reader who stopped at the line that obviously matters would have missed
+the qualification rather than the rule.
 
 What makes the expensive path feel correct is that instrumenting is visibly
 rigorous where a feasibility argument is not.
@@ -463,8 +465,10 @@ It also resembles the plausible-mechanism story the section above warns
 against, and the discriminator is whether the argument is **decidable**.
 "This token probably carries enough scope" is a story, falsifiable only by
 another story.
-"A central displacement cannot change a bearing" is a constraint, refutable by
-a single counterexample and refuted by none.
+"A central displacement cannot change a bearing" is a constraint: it names what
+would refute it, and you can go and check.
+Checking is what found the clamp above, which bounds where the constraint
+applies rather than overturning it --- a story has no such edge to find.
 Where you cannot tell which of the two you are holding, you are holding the
 story.
 

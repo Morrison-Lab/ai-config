@@ -159,8 +159,9 @@ That function is six lines, and the operative one is
 over `var to: Vector2 = point - position`, called from its one call site as
 `_press_into(enemy.position, delta)`.
 That displacement lies along the line joining the two regiments, so it changes
-the separation's length and never its bearing --- it cannot rotate the pair at
-any magnitude, and reading those six lines would have said so for nothing.
+the separation's length and never its bearing --- it cannot rotate the pair
+however large it is, and reading those six lines would have said so for
+nothing.
 The one qualification is the two `clampf` lines that close the function, which
 bound `position.x` and `position.y` against `field_bounds` independently and so
 can truncate one component at a field edge; the measured pair was mid-field,

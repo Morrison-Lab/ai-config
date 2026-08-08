@@ -166,6 +166,17 @@ BLOCK = [
     ("nohup ssh h <<EOF\ngh pr merge 411\nEOF", "a wrapper before ssh"),
     ("{ bash <<EOF\ngh pr merge 411\nEOF\n}", "a brace-group executor"),
     ("FOO=1 bash <<EOF\ngh pr merge 411\nEOF", "an env assignment before the executor"),
+    # A wrapper carrying its OWN argument. The keyword list has no way to
+    # express `sudo -u x` or `timeout 30`, so the masking anchor uses the
+    # permissive lead: over-detecting an executor only declines to mask, which
+    # scans more text rather than less.
+    ("sudo -u x bash <<EOF\ngh pr merge 411\nEOF", "a wrapper with a flag and its value"),
+    ("timeout 30 bash <<EOF\ngh pr merge 411\nEOF", "a wrapper with a positional argument"),
+    ("nice bash <<EOF\ngh pr merge 411\nEOF", "a wrapper in no keyword list"),
+    ("xargs bash <<EOF\ngh pr merge 411\nEOF", "xargs before the executor"),
+    ("setsid sh <<EOF\ngh pr merge 411\nEOF", "setsid before the executor"),
+    ("ssh -o X=y host <<EOF\ngh pr merge 411\nEOF", "ssh with an option and a host"),
+    ("echo a | sudo -u x bash <<EOF\ngh pr merge 411\nEOF", "after a pipe"),
 ]
 
 ALLOW = [

@@ -52,6 +52,13 @@ KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until
 # constant.
 VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*){0,4}"""
 LEAD = CMD_POS + KEYWORD_PREFIX + VAR_PREFIX
+# The permissive counterpart: ANY whitespace is a command position, plus a
+# closing `)`. Defined here beside LEAD because three separate places need a
+# command-position anchor and each one that rolled its own has since had to be
+# fixed. See the note above PERMISSIVE_MERGE_PATTERNS for why the permissive
+# form exists at all, and HEREDOC_EXECUTOR for why the masking decision wants
+# this one rather than the narrow one.
+PERMISSIVE_LEAD = r"""(?:^|[;&`()\n\s]|\$\()\s*""" + KEYWORD_PREFIX + VAR_PREFIX
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 # Programs that RUN text handed to them, rather than consuming it as data.
 #
@@ -86,8 +93,21 @@ EXEC_WRAP = (
 # from round 1, reproduced in a fourth place by the very commit that
 # consolidated EXEC_PROGS into one list. Consolidating one duplicated concept
 # is no protection against forking a different one in the same edit.
+# PERMISSIVE_LEAD, not LEAD. The narrow one still carries a closed enumeration
+# of what may precede a command word, so `sudo -u x bash <<EOF`, `timeout 30
+# bash <<EOF`, `nice bash <<EOF` and `xargs bash <<EOF` all failed the anchor
+# and had their bodies masked as prose. Building it from LEAD fixed the
+# keyword forms and left every wrapper-with-an-argument form open, which is the
+# same enumeration failing in the same place a round later.
+#
+# The permissive one is not merely wider, it is the CORRECT direction here.
+# This anchor decides whether to MASK, and over-detecting an executor means
+# declining to mask -- so the body is scanned rather than skipped. A false
+# positive costs a scan; a false negative hides a merge. That asymmetry is the
+# reverse of pass 1's, which is why the two anchors genuinely differ rather
+# than one being a stale copy.
 HEREDOC_EXECUTOR = re.compile(
-    LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b[^\n]*?<<",
+    PERMISSIVE_LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b[^\n]*?<<",
 )
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
@@ -138,7 +158,6 @@ MERGE_PATTERNS = _merge_patterns(LEAD)
 # else in the suite depends on the narrowness -- so masking quotes buys back
 # every one of them, and keeps defect 2 (ai-config#1279) fixed by construction
 # rather than by enumeration.
-PERMISSIVE_LEAD = r"""(?:^|[;&`()\n\s]|\$\()\s*""" + KEYWORD_PREFIX + VAR_PREFIX
 PERMISSIVE_MERGE_PATTERNS = _merge_patterns(PERMISSIVE_LEAD)
 
 # The leading-whitespace allowance is OUTSIDE the repeated env-assignment group,

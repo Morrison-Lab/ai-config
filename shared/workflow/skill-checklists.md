@@ -215,8 +215,8 @@ remedies reach it and the stated sentence is the whole instrument.
   clause is usually written down already, and rewriting it changes nothing
   about whether anyone reaches it.
 
-(`Morrison-Lab/ai-config`, 2026-08-07/08: seven PRs merged in one session ---
-#1255, #1240, #1260, #1271, #1273, #1281, and #1285, from `18:01:52Z` to
+(`Morrison-Lab/ai-config`, 2026-08-07/08: seven PRs merged in one session
+--- #1255, #1240, #1260, #1271, #1273, #1281, and #1285, from `18:01:52Z` to
 `05:47:31Z` --- and every one was a learnings PR, so the recursion guard's
 first clause held for all seven.
 Steps 1 to 3 of `post-merge` ran each time: branches deleted, worktrees

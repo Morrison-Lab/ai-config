@@ -158,3 +158,55 @@ They converged only when the ad-hoc patches were replaced by the single
 `req_failed = (not last) or err or RX_REQ_FAILED(body)` invariant (discharge iff
 `not req_failed`) plus result-gated `pending`/`pending_clear` maps, every term
 mutation-checked.)
+
+## "A read-only question does not license a state-mutating answer"
+
+(2026-08-08, `Morrison-Lab/ai-config#1287`: a hook test was failing and the
+question was whether it also failed on `main`.
+The diagnostic issued as one Bash call ended
+`git stash -q 2>/dev/null; git checkout -q origin/main -- hooks/`.
+Both commands did exactly what they say, which is why the composition read as a
+single act of looking: the uncommitted work went to the stash and the whole
+`hooks/` directory in the working tree and index was replaced by `main`'s
+version, discarding the PR branch's own committed hook changes from the tree.
+Recovered in full with `git checkout HEAD -- hooks/` and `git stash pop`, so the
+cost was time rather than work.
+The retry used `git archive origin/main hooks/ | tar -x -C "$(mktemp -d)"`,
+which answered the same question with `git status` unchanged --- verified on
+this corpus by extracting `hooks/` from `origin/main` into a scratch directory
+and confirming the worktree stayed clean.
+The path argument is load-bearing rather than incidental: omitting it archives
+the whole tree instead of the one directory the question was about.)
+
+## "Widen that last bullet's trigger" --- a hazard named and then committed
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-07/08: `scripts/check-pr-fully-clean.py`
+carried, directly above its CLEAN verdict patterns, a comment opening
+"Deliberately narrow."
+and continuing "An over-broad CLEAN pattern is the dangerous direction: it would
+let an incidental 'looks ready' in a later chatty comment discharge a standing
+'Needs more work'."
+The two patterns immediately beneath it were `\bReady\s+for\s+merge\b` and
+`\bApproved\s+for\s+merge\b`, unanchored and unqualified, so
+"This PR is not ready for merge until the two remaining findings are fixed."
+classified as a CLEAN verdict --- the precise hazard the comment had just
+named, one line down, in the same commit by the same author.
+Unlike the `grep` word-boundary case above, nothing had been removed, so there
+was no exclusion reason to re-run over survivors; the comment's own statement of
+the hazard was the predicate, and reading the patterns against it would have
+caught them.)
+
+## "Enumerate the qualifier classes by which SIDE of the phrase they sit on"
+
+(Same PR, the round that fixed the case above: review supplied three
+counterexamples, and a negation lookbehind --- the natural reading of "guard the
+phrase against qualifiers" --- closed the first two and left the third.
+"not ready for merge" and "never ready for merge" put the qualifier BEFORE the
+phrase; "ready for merge once the findings are fixed" puts a condition AFTER it,
+where a lookbehind cannot see.
+The shipped fix pairs `CLEAN_NEGATION_PREFIX` with a `CLEAN_CONDITIONAL_SUFFIX`
+matching `once|after|when|if|unless|pending|provided|assuming|subject to|as soon
+as|contingent`, applied only to the two bare phrases --- the `Verdict:`-anchored
+patterns need no guard, since they require adjacency to the label.
+The after-side form is the likelier one in a real review, because it is how a
+reviewer signs off on nearly-done work.)

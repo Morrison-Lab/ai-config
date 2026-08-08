@@ -709,6 +709,43 @@ Don't retry the 403 --- it's a policy denial, not a transient error.
 **Prefer stacking the fix, not superseding the PR.** When the work is an incremental fix to an existing, still-open PR (a review finding, a small addition) rather than a full rebuild, push the fix to the assigned branch and open it as a PR **stacked on** the original --- `base` set to the original PR's own branch, per the [`stack-prs`](skills/stack-prs/SKILL.md) skill --- rather than superseding it. Comment on the original PR pointing to the stacked one, and note the dependency ("stacked on this branch — either merge #N into this branch first, or merge this PR and #N will retarget to `main`"). This keeps the diff to just the incremental change instead of re-litigating the whole original PR's content, and it composes correctly regardless of how the maintainer merges it: they can merge the stacked PR straight into the original's branch (folding the fix in before the original PR itself merges) or merge the original first and let the stacked PR retarget to `main` per that skill's step 4.
 Reserve the supersede path (below) for when stacking doesn't fit --- the original branch/PR is abandoned, or the fix amounts to a full rebuild rather than an incremental addition.
 
+**A plain `git merge --ff-only` plus push is a second way to fold a stacked PR
+into its base, alongside GitHub's own merge button --- and GitHub notices
+either way.**
+When the stacked PR's branch is a strict superset of its base
+(confirm with `git merge-base --is-ancestor <base-tip> <stacked-tip>`),
+merging the stacked branch into the base branch locally with `--ff-only` and
+pushing moves only a ref, with no new commit created.
+GitHub still detects that the stacked PR's head commit is now reachable from
+its base, and closes that PR as **merged** on its own, deleting its head
+branch if the repo auto-deletes on merge.
+This is the same outcome the paragraph above describes for GitHub's merge
+button, reached by a different door.
+
+**This is still a merge, bound by the Strict Merge Control Policy below** ---
+the same explicit-permission requirement that gates clicking the merge button
+applies here too, since the effect on the stacked PR is identical.
+Never run this to close a PR on your own initiative.
+It also only applies when the base genuinely is another open PR's branch, not
+`main` --- the adjacent fact above, that a squash-merged base PR makes GitHub
+auto-retarget the stacked PR to `main`, means "its base" can silently become
+`main` once the original PR merges.
+Fast-forwarding straight into `main` this way would push unreviewed commits
+to the default branch, bypassing PR review and required checks entirely.
+
+Verify the superset relationship before relying on this, and prefer
+`--ff-only` specifically --- it refuses outright, rather than silently
+creating a new, unreviewed merge commit on the base branch, if the two
+branches have actually diverged.
+Confirm the auto-close afterward with `gh pr view <stacked-N> --json
+state,mergeCommit`; a `state: MERGED` with `mergeCommit.oid` equal to the
+commit you just pushed confirms the fast-forward was picked up.
+(`UCD-SERG/serocalculator#547` -> `#545`, 2026-08-08: `git merge
+origin/claude/pr-545-fix-h4gclq --ff-only` in `#545`'s worktree, followed by a
+push, left both branches at commit `6a6f83c0d`; GitHub closed `#547` as merged
+and deleted its head branch within the same push --- done with the user's
+explicit go-ahead on the underlying architectural decision.)
+
 **Supersede fallback, when stacking doesn't apply:** push the fix to the assigned branch, open a **new** PR off `main` that supersedes the original (say "Supersedes #N" in the body and rebuild as a single clean commit so no sensitive history leaks through), comment on the original PR pointing to the replacement, and close the original once the new PR merges.
 
 **Rebuilding the single clean commit: diff against `main`, don't cherry-pick from the write-protected branch.** `main` usually doesn't yet contain the original PR's changes, so cherry-picking just your incremental fix commit conflicts --- it was written against the PR branch's state, not `main`'s.
@@ -1151,6 +1188,13 @@ Two rules, one incident, and the second is the general form of the first.
 Deciding that a particular agent does not need one is fine.
 Leaving it unmarked is what is not.
 `hooks/flag-unassigned-worktree.py` mechanizes exactly this, and warns rather than blocks.
+
+**"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
+`isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
+Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/preferences.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
+Measured 2026-08-07.
+[`memories/git-worktrees.md`](memories/git-worktrees.md) carries the evidence.
+[`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.
 
 **The general rule is the more valuable half.** When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
 A repealed decision changes no artifact, so review, tests, and hooks are all blind to it by construction, and the only detector is someone who remembers.

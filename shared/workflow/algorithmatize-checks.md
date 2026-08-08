@@ -559,6 +559,69 @@ outcome.
 Then mutation-check each clause separately, per [`ardi`](ardi.md)'s "seen to
 fail" rule applied clause by clause rather than once for the whole condition.
 
+**The harness that performs those mutations needs the same scrutiny, because a
+mutation it could not apply looks exactly like one the tests caught.**
+The rule above assumes each clause can actually be removed.
+When the clauses are alternatives inside one regex and the harness drops one by
+deleting a delimiter-joined token, the token is present for the interior
+alternatives and absent at one end, so that end is never mutated at all --- and
+a harness that scores "no failure observed" as a pass reports the unmutated
+clause as verified.
+
+Which end depends on which side of the token the delimiter sits, and either
+single-sided form leaves exactly one alternative unreachable --- measured on
+this corpus's own negation-prefix guard, each form mutated seven of eight and
+silently no-opped on the opposite end.
+A naive string replacement is the wrong instrument for this regardless, since
+one alternative can be a substring of another; split the alternation and rebuild
+it without the member instead.
+
+The transferable half is not the regex detail.
+It is that a mutation harness has three outcomes, not two --- caught, missed,
+and **inapplicable** --- and collapsing the third into the first is the
+[`fail-fast`](../principles/fail-fast.md) figure where a check's failure path
+and its pass path print the same thing.
+Make the harness assert that the mutated artifact actually differs from the
+original before it runs anything, and report the case as inapplicable when it
+does not.
+
+- **Do:** verify each mutation changed the artifact before scoring its result,
+  and surface an inapplicable mutation as its own outcome.
+- **Do:** rebuild an alternation from its parsed members when mutating one, so
+  position and substring overlap cannot silently no-op the edit.
+- **Don't:** score "the tests still passed" as a pass without knowing the
+  mutation applied --- an unmutated clause passes for the wrong reason.
+- **Don't:** trust a single-sided delimiter token to reach every alternative;
+  it reaches every one but the end the delimiter is missing from.
+
+**A component that stops failing under mutation is a question, not a cleanup.**
+Adding a new, stronger guard alongside older ones routinely leaves one of the
+old components **dead** against the suite: mutate it away and nothing fails,
+because the new guard already catches every case the suite holds for it.
+The reading that suggests itself is that the old component is now redundant, and
+deleting it is the tidy move.
+
+That is wrong, and wrong in the fail-open direction, because what the suite just
+reported is a fact about **its own coverage** rather than about the component's
+necessity.
+So invert the question.
+Ask where the dead component is *still* load-bearing, looking specifically for
+an input the newer guard cannot see.
+The search either finds a real case --- in which case the component stays and
+the suite gains the case it was missing --- or it comes back empty and you
+delete on evidence instead of by inference.
+
+Sequence is the part that is easy to miss: adding the new guard is what *creates*
+the dead component, so the moment a mutation score drops to zero is the moment to
+look, not a later tidying pass.
+
+- **Do:** treat a zero mutation score on an existing component as a missing test
+  case, until a search for its remaining role comes back empty.
+- **Do:** run that search at the moment the score drops, since the guard you
+  just added is what made the component look redundant.
+- **Don't:** delete a component because mutating it no longer fails the suite
+  --- that is the suite describing itself, not the component.
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

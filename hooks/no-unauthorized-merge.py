@@ -5,6 +5,7 @@ Prohibits commands attempting to merge PRs/MRs (e.g. `gh pr merge`, `glab mr mer
 `gh api .../merge`, `glab api .../merge`, or GraphQL `mergePullRequest` / `enablePullRequestAutoMerge`)
 unless explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
 """
+import bisect
 import json
 import os
 import platform
@@ -14,9 +15,128 @@ import sys
 import time
 from pathlib import Path
 
-LEAD = r"""(?:^|[\s;&|`()]|\$\(|\$\{IFS\}|\$IFS\b|\$[A-Za-z0-9_]+)"""
+# A command word begins only at a *command position*. Segments reaching
+# MERGE_PATTERNS are already split on `;`, `&&`, `||`, `|` and newlines, so
+# within a segment the command positions are: its start, after a background
+# `&`, and after a subshell / command-substitution opener (`(`, `` ` ``, `$(`).
+#
+# Plain whitespace is deliberately NOT one. It used to be, and that is what made
+# the guard fire on any prose, grep pattern, or string literal that merely NAMED
+# the command -- including its own refusal text, so it blocked writing
+# documentation, filing a bug report, or debugging itself (ai-config#1279,
+# defect 2). shared/principles/fail-fast.md states the bar this restores:
+# "test that mentions, greps, and quotes of the gated command pass".
+CMD_POS = r"""(?:^|[;&`(\n]|\$\()\s*"""
+# Keywords and wrappers whose OPERAND is itself a command word, so the word
+# after one is still at a command position. Dropping bare whitespace from
+# CMD_POS also dropped every one of these, because each is separated from its
+# operand by a space rather than by punctuation: `! gh pr merge`, `time gh pr
+# merge`, `nohup gh pr merge`, `{ gh pr merge; }` and `if true; then gh pr
+# merge; fi` are all executable bash that ran the merge while the guard
+# returned allow (ai-config#1287 review, reproduced end to end).
+#
+# This does NOT re-admit bare whitespace, because a keyword only counts when a
+# CMD_POS precedes it: prose like `you can gh pr merge later` still has no
+# command position before `gh` and stays allowed. Bounded for the same reason
+# VAR_PREFIX is -- see its note below.
+KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until)\s+){0,4}"""
+# Expansions that may expand to nothing and so leave the NEXT word as the
+# command: `$FOO gh pr merge` runs the merge when $FOO is empty. Matched only
+# after a command position, so a mid-command `echo $FOO gh pr merge` does not.
+#
+# The repetition is BOUNDED rather than `*`. Unbounded, each of the N command
+# positions in a long run of substitutions rescans the rest of the run before
+# failing, which is quadratic: measured 610ms on 800 chained backtick pairs
+# against 2.8ms for the pre-anchor matcher, on a hook that runs before every
+# Bash call. Four consecutive empty-expansion prefixes is already well past
+# anything a real command does, and capping makes the work per position
+# constant.
+VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*){0,4}"""
+LEAD = CMD_POS + KEYWORD_PREFIX + VAR_PREFIX
+# The permissive counterpart: ANY whitespace is a command position, plus a
+# closing `)`. Defined here beside LEAD because three separate places need a
+# command-position anchor and each one that rolled its own has since had to be
+# fixed. See the note above PERMISSIVE_MERGE_PATTERNS for why the permissive
+# form exists at all, and HEREDOC_EXECUTOR for why the masking decision wants
+# this one rather than the narrow one.
+PERMISSIVE_LEAD = r"""(?:^|[;&`()\n\s]|\$\()\s*""" + KEYWORD_PREFIX + VAR_PREFIX
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
-EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
+# Programs that RUN text handed to them, rather than consuming it as data.
+#
+# One list, three consumers, because getting it wrong in any of them fails open
+# in the same way and each door was found separately: a quoted operand
+# (`bash -c "<merge>"`), pass 2's quote masking, and a heredoc body fed to a
+# shell (`bash <<EOF`). Three rounds of review found one door each. Keeping the
+# membership in one place is what makes the residual a single reviewable list
+# rather than three lists that drift.
+#
+# Both masking consumers now share ONE anchor (EXEC_AT_CMD_POS below). The
+# third, EXEC_WRAP, is pattern-side and is measured DEAD against the suite --
+# see its own note.
+EXEC_PROGS = r"env|exec|command|bash|sh|zsh|ksh|dash|eval|trap|watch|su|ssh"
+
+# Lets a matching pattern step over an executor between the command position
+# and `gh`, e.g. `bash -c gh pr merge`. The optional non-flag word is `ssh`'s
+# hostname.
+#
+# MEASURED DEAD, and kept deliberately. Since mask_inert_quotes stopped
+# blanking an executor's live operand, the permissive pass anchors on the
+# whitespace left where the quote was and matches the operand directly, so
+# dropping EXEC_WRAP from all nine patterns fails ZERO of the suite's cases --
+# including every one it was originally added for. Retained because this is a
+# guard: a redundant path costs a few characters of regex, while removing one
+# on suite evidence alone fails OPEN if the suite is the thing that is
+# incomplete. Its removal is a reviewable simplification, not a bug fix.
+#
+# Pass 1 itself is NOT dead: removing it fails two cases, both `gh api graphql`
+# mutations whose payload the permissive pass has already masked.
+EXEC_WRAP = (
+    r"""(?:[/\w.-]+/)?(?:""" + EXEC_PROGS + r""")"""
+    r"""(?:\s+-[a-zA-Z0-9]+)*(?:\s+[A-Za-z0-9_.@-]+)?(?:\s+-[a-zA-Z0-9]+)*"""
+    r"""(?:\s+["'])?\s*"""
+)
+
+# A heredoc whose consumer is one of the above is a SCRIPT, not data: `bash
+# <<EOF` and `ssh host <<EOF` execute the body line by line. The quoted-delimiter
+# form is not an exception -- `<<'EOF'` only suppresses expansion, and bash still
+# runs what it reads.
+# Built from the SAME LEAD machinery the matching passes use, not a hand-rolled
+# anchor. The first version rolled its own and accepted only an env assignment
+# before the executor, so `sudo bash <<EOF`, `time bash <<EOF`, `! bash <<EOF`
+# and `if true; then bash <<EOF` all walked through -- the keyword-prefix gap
+# from round 1, reproduced in a fourth place by the very commit that
+# consolidated EXEC_PROGS into one list. Consolidating one duplicated concept
+# is no protection against forking a different one in the same edit.
+# PERMISSIVE_LEAD, not LEAD. The narrow one still carries a closed enumeration
+# of what may precede a command word, so `sudo -u x bash <<EOF`, `timeout 30
+# bash <<EOF`, `nice bash <<EOF` and `xargs bash <<EOF` all failed the anchor
+# and had their bodies masked as prose. Building it from LEAD fixed the
+# keyword forms and left every wrapper-with-an-argument form open, which is the
+# same enumeration failing in the same place a round later.
+#
+# The permissive one is not merely wider, it is the CORRECT direction here.
+# This anchor decides whether to MASK, and over-detecting an executor means
+# declining to mask -- so the body is scanned rather than skipped. A false
+# positive costs a scan; a false negative hides a merge. That asymmetry is the
+# reverse of pass 1's, which is why the two anchors genuinely differ rather
+# than one being a stale copy.
+# One anchor for "an executor is invoked here", shared by both masking
+# decisions. Rolling a second one is what produced round 5's gap and round 6's,
+# so the two consumers now differ only in what they require AFTER the executor.
+EXEC_AT_CMD_POS = (
+    PERMISSIVE_LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b"
+)
+HEREDOC_EXECUTOR = re.compile(EXEC_AT_CMD_POS + r"[^\n]*?<<")
+# The quote-masking counterpart. A quoted span is inert only when nothing
+# before it in the same simple command can run it; `bash -c "<merge>"`,
+# `eval "<merge>"` and `ssh host "<merge>"` are the executor's own operand and
+# are LIVE. Same asymmetry as the heredoc anchor above: over-detecting means
+# declining to mask, which costs a scan, while under-detecting hides a merge.
+EXEC_BEFORE_QUOTE = re.compile(EXEC_AT_CMD_POS)
+# Where the current simple command begins. An operand cannot be separated from
+# its executor by a command separator, so scanning back only this far keeps
+# `bash -c "x"; echo "prose"` from treating the second quote as live.
+COMMAND_SEPARATOR = re.compile(r"[;&|\n`()]")
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
 HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
@@ -26,20 +146,60 @@ DELIM = r"(?:\s+|\$\{IFS\}|\$IFS\b|\$\([^)]*\)|\$[A-Za-z0-9_]+)+"
 GH_PROG = r"(?:[/\w.-]+/)?(?:gh|\$GH|\$\{GH\})\b"
 GLAB_PROG = r"(?:[/\w.-]+/)?(?:glab|\$GLAB|\$\{GLAB\})\b"
 
-MERGE_PATTERNS = [
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + OPT_FLAGS + DELIM + r"pr\b" + OPT_FLAGS + DELIM + r"merge\b", "gh pr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + OPT_FLAGS + DELIM + r"mr\b" + OPT_FLAGS + DELIM + r"merge\b", "glab mr merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b", "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b", "gh api repository merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b", "glab api MR merge"),
-    (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
-]
+def _merge_patterns(lead: str) -> list:
+    """Build the merge-command patterns against a given command-position LEAD.
 
+    Parameterized so the same nine patterns can run twice: once with the narrow
+    LEAD over raw text, and once with PERMISSIVE_LEAD over quote-masked text.
+    See the two-pass note on `offending`.
+    """
+    return [
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + OPT_FLAGS + DELIM + r"pr\b" + OPT_FLAGS + DELIM + r"merge\b", "gh pr merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + OPT_FLAGS + DELIM + r"mr\b" + OPT_FLAGS + DELIM + r"merge\b", "glab mr merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b", "gh api PR merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])pulls/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "gh api PR merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b", "gh api repository merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])repos/[^\n]+/merges\b[^\n]*" + API_WRITE_FLAG, "gh api repository merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GH_PROG + r"(?:\s+[^\n]+)?\s+api\b[^\n]*graphql\b[^\n]*(?:mergePullRequest|enablePullRequestAutoMerge|disablePullRequestAutoMerge)", "gh api GraphQL PR merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*" + API_WRITE_FLAG + r"[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b", "glab api MR merge"),
+        (lead + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
+    ]
+
+
+MERGE_PATTERNS = _merge_patterns(LEAD)
+
+# Pass 2's command position: ANY whitespace, plus a closing `)`.
+#
+# Enumerating what may precede a command word cannot be finished. Two rounds of
+# review found five constructs and then two more (`case $x in p) <merge>`, and
+# `f() { <merge>; }; f`), each a real bypass, each a member of a class with no
+# closed definition -- and every miss fails OPEN, which is the direction that
+# matters for a guard whose stated purpose is to be unbypassable.
+#
+# So pass 2 stops enumerating. It treats every position as a command position
+# and instead removes the text that cannot execute. That inverts the failure:
+# an unforeseen construct is now blocked rather than allowed, and the cost of
+# being wrong is an over-block, which ALLOW_MERGE=1 clears.
+#
+# The measurement that chose this: making the narrow LEAD permissive changed
+# exactly seven of 141 cases, and all seven were prose inside quotes. Nothing
+# else in the suite depends on the narrowness -- so masking quotes buys back
+# every one of them, and keeps defect 2 (ai-config#1279) fixed by construction
+# rather than by enumeration.
+PERMISSIVE_MERGE_PATTERNS = _merge_patterns(PERMISSIVE_LEAD)
+
+# The leading-whitespace allowance is OUTSIDE the repeated env-assignment group,
+# not inside it. Inside, it only ever applied to assignments AFTER the first, so
+# a segment whose first token was the override itself failed the `^` anchor the
+# moment it carried any leading whitespace -- which every segment after a `&&`,
+# `;` or `|` does, because SPLIT leaves the separator's trailing space on the
+# next segment. `ALLOW_MERGE=1 <merge>` was accepted while
+# `cd /repo && ALLOW_MERGE=1 <merge>` was not (ai-config#1279, defect 4), and the
+# refusal message printed the segment `.strip()`ed, removing the very character
+# that caused the mismatch. Leading whitespace in a segment is inert in bash, so
+# accepting it authorizes nothing a bare `ALLOW_MERGE=1 ...` did not already.
 ALLOW_ENV_FLAG = re.compile(
-    r"^(?:\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
+    r"^\s*(?:(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
 )
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
@@ -148,6 +308,159 @@ def mask_subexpressions(val: str) -> str:
     return "".join(result)
 
 
+def mask_inert_quotes(text: str) -> str:
+    """Blank quoted spans that bash cannot execute, preserving length.
+
+    Length-preserving because `offending` derives segment offsets from one
+    string and slices another with them; a shorter result would misalign the
+    segment reported in the refusal message.
+
+    A single-quoted span is wholly inert. A double-quoted span is inert EXCEPT
+    for `$(...)` and backtick substitutions, which bash still expands inside
+    double quotes -- those are preserved verbatim, so hiding a merge in one
+    still blocks.
+
+    An executor's own quoted operand (`bash -c "<merge>"`, `eval "<merge>"`,
+    `ssh host "<merge>"`) is NOT inert -- bash runs it -- so it is kept
+    verbatim and only its delimiters are blanked. Blanking the delimiters
+    rather than skipping the span is what leaves a whitespace command position
+    in front of the operand for the permissive pass to anchor on.
+
+    An earlier version masked every quoted span and relied on the narrow pass
+    to catch these on raw text via EXEC_WRAP. That worked only while the
+    wrapper before the executor was one of KEYWORD_PREFIX's six literals: any
+    flag or unlisted wrapper (`sudo -u x bash -c`, `timeout 5 bash -c`,
+    `xargs -0 bash -c`) broke the narrow anchor, the span was masked as prose,
+    and the merge ran. The enumeration failing in a third place is what moved
+    the decision here, where the safe direction is to mask LESS.
+    """
+    def blank(s: str) -> str:
+        return "".join("\n" if c == "\n" else " " for c in s)
+
+    def live_operand_test(subject: str):
+        """A `quote_start -> bool` test over one fixed subject string.
+
+        BOTH the separator offsets and the executor offsets are computed once
+        per pass, and each quote then answers by binary search. Scanning for an
+        executor per quote is quadratic in the number of quoted spans -- and
+        bounding the scan by the nearest separator does not fix it, because a
+        long command line with no separators at all leaves every scan starting
+        from zero. Measured on 2000 quoted spans: 1787ms rescanning, 305ms
+        precomputed, against a hook that runs before every Bash call. Same trap
+        VAR_PREFIX's bound was added for, reached by a different route.
+        """
+        seps = [m.end() for m in COMMAND_SEPARATOR.finditer(subject)]
+        exec_ends = [m.end() for m in EXEC_BEFORE_QUOTE.finditer(subject)]
+
+        def test(quote_start: int) -> bool:
+            j = bisect.bisect_right(exec_ends, quote_start)
+            if j == 0:
+                return False
+            i = bisect.bisect_left(seps, quote_start)
+            seg_start = seps[i - 1] if i else 0
+            return exec_ends[j - 1] >= seg_start
+
+        return test
+
+    live = live_operand_test(text)
+
+    def repl_double(m: "re.Match") -> str:
+        inner = m.group(0)[1:-1]
+        if live(m.start()):
+            return " " + inner + " "
+        return " " + mask_subexpressions(inner) + " "
+
+    text = re.sub(r"\"(?:\\.|[^\"\\])*\"", repl_double, text, flags=re.DOTALL)
+
+    live = live_operand_test(text)
+
+    def repl_single(m: "re.Match") -> str:
+        if live(m.start()):
+            return " " + m.group(0)[1:-1] + " "
+        return blank(m.group(0))
+
+    return re.sub(r"'[^']*'", repl_single, text, flags=re.DOTALL)
+
+
+HEREDOC_START = re.compile(
+    r"""<<-?[ \t]*(?:(['"])([A-Za-z_][A-Za-z0-9_]*)\1|([A-Za-z_][A-Za-z0-9_]*))"""
+)
+
+
+def _heredoc_intro(line: str):
+    """The first `<<DELIM` on `line` that is a REAL heredoc introducer, or None.
+
+    Quote context decides it, and getting this wrong fails OPEN rather than
+    noisily: `echo "see <<EOF for details"` introduces no heredoc, but treating
+    it as one masks every following line until a lone `EOF` that never comes --
+    hiding any real merge command underneath it. Same for a `grep "<<PATTERN"`.
+
+    `<<<` is a herestring, not a heredoc, and is skipped whole: scanning it
+    character by character would otherwise match `<<` at its second `<` and read
+    the rest as a delimiter.
+    """
+    in_single = in_double = escaped = False
+    i, n = 0, len(line)
+    while i < n:
+        c = line[i]
+        if escaped:
+            escaped = False
+        elif c == "\\" and not in_single:
+            escaped = True
+        elif c == "'" and not in_double:
+            in_single = not in_single
+        elif c == '"' and not in_single:
+            in_double = not in_double
+        elif c == "<" and not in_single and not in_double:
+            if line.startswith("<<<", i):
+                i += 3
+                continue
+            m = HEREDOC_START.match(line, i)
+            if m:
+                return m
+        i += 1
+    return None
+
+
+def mask_heredocs(text: str) -> str:
+    """Mask heredoc bodies, preserving length and line structure.
+
+    A QUOTED delimiter (`<<'EOF'`, `<<"EOF"`) tells bash to perform no expansion
+    at all in the body, so nothing in it can execute: it is inert text and is
+    masked in full. An UNQUOTED delimiter (`<<EOF`) does expand, so only the
+    literal prose is masked and `$(...)` / backtick substitutions are left live,
+    exactly as mask_subexpressions does for payload flags.
+
+    Without this a heredoc carrying prose ABOUT a merge command was matched as
+    one -- which is how filing ai-config#1279 was itself blocked, by the guard
+    matching its own refusal text quoted inside a `gh issue create` heredoc.
+
+    But "inert text" is a claim about the CONSUMER, not about the heredoc. A
+    body fed to a shell (`bash <<EOF`, `ssh host <<EOF`) is a script, and
+    masking it hid a real merge from both later passes -- the quoted-delimiter
+    form included, since `<<'EOF'` suppresses expansion and bash still runs
+    what it reads. Those are left untouched; see HEREDOC_EXECUTOR.
+    """
+    lines = text.split("\n")
+    out = list(lines)
+    i = 0
+    while i < len(lines):
+        m = _heredoc_intro(lines[i])
+        if not m:
+            i += 1
+            continue
+        quoted = bool(m.group(2))
+        delim = m.group(2) or m.group(3)
+        executes = bool(HEREDOC_EXECUTOR.search(lines[i]))
+        j = i + 1
+        while j < len(lines) and lines[j].strip() != delim:
+            if not executes:
+                out[j] = " " * len(lines[j]) if quoted else mask_subexpressions(lines[j])
+            j += 1
+        i = j + 1
+    return "\n".join(out)
+
+
 def mask_payloads(text: str) -> str:
     """Mask string payload flags (--body, -m, etc.) so benign occurrences of gh pr merge inside commit/PR messages do not trigger false positives.
 
@@ -243,9 +556,38 @@ def get_git_common_dirs() -> list[Path]:
     return dirs
 
 
-def check_mwc_active() -> bool:
+def resolve_session_id(payload: dict | None = None) -> str | None:
+    """The id of the session this hook is running under, or None.
+
+    The harness supplies its own session id in the hook payload, alongside
+    `transcript_path`; that is the SAME id `/mwc` passes to
+    `ai-session.sh enable-mwc --id`, so it is the authoritative one. Reading it
+    is what makes a granted MWC visible to the guard at all: the hook process
+    inherits neither AI_SESSION_ID nor CLAUDE_SESSION_ID (both measured unset on
+    a machine where the grant was live), so the env-only lookup this replaces
+    returned None unconditionally and no legitimate grant ever reached the guard
+    (ai-config#1279, defect 1).
+
+    Order: the payload's own id, then the transcript filename stem (the same id,
+    for a harness that omits the field), then the environment forms. Each is a
+    way to learn WHICH session is running -- none of them grants anything, since
+    the caller still requires a marker for exactly that id plus a live session.
+    """
+    if payload:
+        sid = payload.get("session_id")
+        if isinstance(sid, str) and sid.strip():
+            return sid.strip()
+        tpath = payload.get("transcript_path")
+        if isinstance(tpath, str) and tpath.strip():
+            stem = Path(tpath.strip()).stem
+            if stem:
+                return stem
+    return os.environ.get("AI_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
+
+
+def check_mwc_active(payload: dict | None = None) -> bool:
     try:
-        current_session = os.environ.get("AI_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
+        current_session = resolve_session_id(payload)
         if not current_session:
             return False
 
@@ -264,29 +606,53 @@ def check_mwc_active() -> bool:
     return False
 
 
-def offending(command: str):
+def offending(command: str, payload: dict | None = None):
     # 1. Normalize bash backslash-newline line continuations (matching bash semantics: remove backslash and newline without inserting a space)
     norm_command = re.sub(r"\\\n", "", command)
-    # 2. Normalize single-word token quote removal (e.g. "gh" -> gh, "pr" -> pr, "merge" -> merge, g""h -> gh)
-    unquoted_command = unquote_words(norm_command)
-    # 3. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
+    # 2. Mask heredoc bodies BEFORE unquote_words, which would otherwise strip
+    #    the quotes off a `<<'EOF'` delimiter and make an inert body look live.
+    #    Length-preserving, so later slice offsets stay aligned.
+    heredoc_masked = mask_heredocs(norm_command)
+    # 3. Normalize single-word token quote removal (e.g. "gh" -> gh, "pr" -> pr, "merge" -> merge, g""h -> gh)
+    unquoted_command = unquote_words(heredoc_masked)
+    # 4. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
     masked_command = mask_payloads(unquoted_command)
 
-    # 4. Use finditer on masked_command to derive exact character slice offsets for unquoted_command
+    # 5. Use finditer on masked_command to derive exact character slice offsets for unquoted_command
     matches = list(SPLIT.finditer(masked_command))
     starts = [0] + [m.end() for m in matches]
     ends = [m.start() for m in matches] + [len(masked_command)]
 
+    # 6. Two passes, both length-preserving so the same offsets slice both.
+    #    Pass 1 (narrow LEAD, raw text) is what still sees a `gh api graphql`
+    #    mutation, whose payload pass 2 has masked. It no longer carries the
+    #    executor's quoted operand -- mask_inert_quotes keeps that live now.
+    #    Pass 2 (permissive LEAD, quote-masked text) is strictly ADDITIVE: it
+    #    stops asking which constructs may precede a command word -- an
+    #    enumeration two review rounds showed cannot be finished -- and instead
+    #    removes the text that cannot execute. See PERMISSIVE_LEAD.
+    inert_command = mask_inert_quotes(masked_command)
+
     for start, end in zip(starts, ends):
-        masked_seg = masked_command[start:end]
         orig_seg = unquoted_command[start:end]
         if has_allow_override(orig_seg):
             continue
-        for pattern, label in MERGE_PATTERNS:
-            if re.search(pattern, masked_seg):
-                if check_mwc_active():
-                    break  # Allowed via active MWC session grant
-                return label, orig_seg.strip()
+        hit = None
+        for seg, patterns in (
+            (masked_command[start:end], MERGE_PATTERNS),
+            (inert_command[start:end], PERMISSIVE_MERGE_PATTERNS),
+        ):
+            for pattern, label in patterns:
+                if re.search(pattern, seg):
+                    hit = label
+                    break
+            if hit is not None:
+                break
+        if hit is None:
+            continue
+        if check_mwc_active(payload):
+            continue  # Allowed via active MWC session grant
+        return hit, orig_seg.strip()
     return None
 
 
@@ -301,7 +667,7 @@ def main() -> int:
         return 0
 
     command = (payload.get("tool_input") or {}).get("command") or ""
-    hit = offending(command)
+    hit = offending(command, payload)
     if not hit:
         return 0
 

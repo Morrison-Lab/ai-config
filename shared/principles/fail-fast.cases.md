@@ -171,10 +171,12 @@ single act of looking: the uncommitted work went to the stash and the whole
 version, discarding the PR branch's own committed hook changes from the tree.
 Recovered in full with `git checkout HEAD -- hooks/` and `git stash pop`, so the
 cost was time rather than work.
-The retry used `git archive <ref> | tar -x -C "$(mktemp -d)"`, which answered
-the same question with `git status` unchanged --- verified on this corpus by
-extracting `hooks/` from `origin/main` into a scratch directory and confirming
-the worktree stayed clean.)
+The retry used `git archive origin/main hooks/ | tar -x -C "$(mktemp -d)"`,
+which answered the same question with `git status` unchanged --- verified on
+this corpus by extracting `hooks/` from `origin/main` into a scratch directory
+and confirming the worktree stayed clean.
+The path argument is load-bearing rather than incidental: omitting it archives
+the whole tree instead of the one directory the question was about.)
 
 ## "Widen that last bullet's trigger" --- a hazard named and then committed
 

@@ -283,4 +283,35 @@ and that is why `memories/git.md` sitting at 1199 lines has headroom of exactly
 one.
 The first claim came from never running the query; the second from running one
 whose scope `head` had cut off --- the same failure with an instrument in front
-of it, per "Illusions of knowing have an exact software form" below.)
+of it, per "Illusions of knowing have an exact software form" in
+[`metacognitive-monitoring.md`](metacognitive-monitoring.md).)
+
+## The asymmetry inverts for a reviewer's incidental all-clear
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, cost two rounds.
+Round 1's review was reporting a different finding when it noted in passing that
+"the `Verdict:\s*(?:Clean|Approved|Ready)\b` pattern is safe because it requires
+immediate adjacency after `Verdict:`", with the evidence attached: "verified:
+`classify_verdict("Verdict: Not Ready")` correctly returns `''`, not
+`'clean'`".
+Both halves are true.
+The measurement is reproducible, and it varies the qualifier on one side only ---
+`Not` precedes the phrase, and adjacency to a label does constrain what precedes
+it.
+
+The round-2 comment repeated the conclusion as though it covered trailing
+qualifiers too, and a code exemption was written around it, `if pat in
+BARE_CLEAN_PATTERNS`, so the labelled pattern skipped the position, negation, and
+conditional checks the same rounds had just built.
+Round 3 reproduced `Verdict: Ready for merge, but not until it addresses the
+following` and `Verdict: Ready for merge once the following items are addressed`
+as clean --- the one path in the function that had been declared safe in
+writing, and, as the review put it, the one "surviving through the one code path
+that was assumed safe without evidence".
+
+The test suite reproduced the same scope error rather than catching it: the only
+case touching that pattern was named "'Verdict: Ready' needs no guard (adjacency
+already binds it)" and asserted the bare label with nothing following it.
+Note the shape is the two-sided qualifier error from `fail-fast.md` one level up:
+there a guard covered the before-side and missed the after-side, here a
+*premise* did, and the premise then licensed skipping the guard entirely.)

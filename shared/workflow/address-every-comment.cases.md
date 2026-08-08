@@ -435,3 +435,39 @@ carrying no qualifier at all.
 The growth rate was available at round 2 in both cases and was not read: five
 reported becoming twelve enumerated and then fourteen, three becoming two lists
 and then seven.)
+
+## The class is right, and it is enumerated in more than one place
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08, three rounds: every finding was the
+same concept --- text handed to something that runs it --- reached through a
+different construct, and each round closed one door rather than the room.
+The guard ended up encoding that concept at three separate sites: `EXEC_WRAP`,
+which pass 1 uses for programs whose quoted argument is live (`bash -c "..."`,
+`eval "..."`); pass 2's blanking of spans judged inert; and `mask_heredocs`,
+added in round 1 so prose about the command inside a heredoc body would stop
+matching.
+Round 3 reported six executable forms that all blocked before the PR and allowed
+after it --- `bash <<EOF`, `sh <<EOF`, `bash -s <<EOF`, `ssh myhost <<EOF`,
+`ssh -T user@host <<EOF`, and `bash <<'EOF'` --- because `mask_heredocs` blanked
+the body before any matching pass could see it.
+
+The review named the duplication itself, in the paragraph explaining why the
+existing mechanism did not save the new site: `EXEC_WRAP` "already enumerates
+programs whose quoted argument is live ... the same reasoning applies here, but
+`mask_heredocs` runs earlier in the pipeline and unconditionally, with no
+analogous carve-out".
+The resolution was DRY rather than a fourth list: one `EXEC_PROGS` definition
+consumed by all three sites, leaving a single reviewable list instead of three
+that drift.
+
+The round's premise error is worth keeping beside it, because it explains why
+the third door was invisible.
+`mask_heredocs` reasoned about the **heredoc** --- its docstring held that a
+quoted delimiter "means bash performs no expansion at all in the body, so it is
+inert" --- when the question was about the **consumer**.
+`<<'EOF'` stops bash expanding a body without stopping bash running it, so a
+property of the container had been read as a property of whatever the container
+is handed to.
+The suite did not catch it for the reason its siblings did not: every heredoc
+case in it fed `cat`, `grep`, `echo`, or `gh issue create --body-file -`, and
+none fed a shell.)

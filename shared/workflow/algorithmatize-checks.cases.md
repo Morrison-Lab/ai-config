@@ -202,6 +202,25 @@ same-PR-scoping clauses all held, and a single regression case that two of the
 three clauses each kept correct made reverting any one of them still pass; each
 clause needed its own isolating case before the mutation test meant anything.)
 
+## The harness that performs those mutations needs the same scrutiny
+
+(`Morrison-Lab/ai-config#1293`, 2026-08-08, measured while drafting the rule:
+the first harness dropped one alternative from a regex alternation by deleting
+the token `<alt>|`, which is present for every interior member and absent at the
+end of the list.
+Run against this corpus's own negation-prefix guard,
+`\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't)\s+`, that form mutated
+seven of eight and silently no-opped on `can't`, which is followed by `)` rather
+than `|`.
+The mirror form `|<alt>` mutated seven of eight and no-opped on `not`, preceded
+by `(?:`.
+So each single-sided token leaves exactly one end unreachable, and a harness
+scoring "no failure observed" as a pass would have reported that end verified.
+The brief this was recorded from asserted that one form was vacuous at BOTH
+ends; running it is what showed each form fails at one, which changes the fix ---
+adding the opposite delimiter does not help, because substring overlap between
+alternatives makes string replacement the wrong instrument regardless.)
+
 ## A component that stops failing under mutation is a question
 
 (`Morrison-Lab/ai-config#1278`, 2026-08-08: after a positional guard replaced two

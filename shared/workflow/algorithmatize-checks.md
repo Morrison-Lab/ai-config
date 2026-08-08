@@ -569,12 +569,9 @@ a harness that scores "no failure observed" as a pass reports the unmutated
 clause as verified.
 
 Which end depends on which side of the token the delimiter sits, and either
-single-sided form leaves exactly one alternative unreachable.
-Measured on this corpus's own
-`\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't)\s+` prefix guard, dropping
-`<alt>|` mutated seven of eight and silently no-opped on the last (`can't`,
-followed by `)`), while dropping `|<alt>` mutated seven of eight and no-opped
-on the first (`not`, preceded by `(?:`).
+single-sided form leaves exactly one alternative unreachable --- measured on
+this corpus's own negation-prefix guard, each form mutated seven of eight and
+silently no-opped on the opposite end.
 A naive string replacement is the wrong instrument for this regardless, since
 one alternative can be a substring of another; split the alternation and rebuild
 it without the member instead.

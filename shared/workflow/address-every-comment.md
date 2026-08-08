@@ -190,6 +190,42 @@ is that most of the resulting test cases were never reported by anyone.
 - **Don't:** prefer the actionable half of a review to the diagnostic half
   merely because it is the half you can start on.
 
+**A narrower version of the same failure: the class is right, and it is
+enumerated in more than one place.**
+The block above governs deriving the wrong class.
+This is what happens once the class is right --- you fix the site the round
+reported, the concept turns out to live at two or three sites, and the next
+round arrives through one of the others.
+Each round then feels like a new finding while being the same room entered by a
+different door.
+
+The tell is that consecutive findings paraphrase to one sentence.
+When three rounds all reduce to "text handed to something that runs it", the
+recurrence is not about a class's members but about the number of **places that
+class is written down**.
+So the quantity to derive is the site count: grep for the concept rather than
+for the construct that exposed it, and expect the review's own prose to have
+named the sibling site already --- ours did, observing that one list "already
+enumerates programs whose quoted argument is live" while the site that failed
+had "no analogous carve-out".
+
+The fix is DRY rather than another member: define the concept once and have
+every site consume it, so the residual is a single reviewable list instead of
+several that drift apart.
+That converts an unbounded sequence of rounds into one artifact a reviewer can
+check, which is the only form of "this is closed now" worth claiming.
+See [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)
+for why the second copy was the defect rather than the newest gap in it.
+
+- **Do:** paraphrase the last two or three findings into a single sentence, and
+  read a match as evidence that a concept is duplicated rather than incomplete.
+- **Do:** derive how many sites encode the concept, then consolidate them into
+  one definition every site consumes.
+- **Don't:** answer a third instance by extending a third list --- that is the
+  same round again with a new door.
+- **Don't:** skip the review's own prose naming a sibling site; it is frequently
+  there, in the paragraph explaining why some other mechanism did not save you.
+
 **The mirror case: the enumeration was complete and the fix was not.**
 The rule above governs a reviewer's list that was too short.
 This governs the one that was exactly right, and a reply that closed it anyway.

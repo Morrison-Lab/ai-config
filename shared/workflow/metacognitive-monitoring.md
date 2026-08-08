@@ -126,6 +126,44 @@ That is also why this failure survives a clean outcome.
 The fix lands, the reviewer is satisfied, and the only thing left wrong is the
 account you gave of it.
 
+**The asymmetry inverts for a reviewer's incidental all-clear, which is the
+shape that reaches code.**
+The rule above says to trust the conclusion and re-derive the particulars.
+An aside works the other way: its particular is a real command with a real
+result, reproducible on demand, and the **conclusion drawn from it is wider than
+the evidence supports.**
+"This pattern is safe because the label binds it, verified: the negated form
+returns no verdict" is one true measurement beside one over-reaching claim,
+since a label binds what **precedes** the phrase and says nothing about what
+follows.
+A scope error hiding inside a true sentence is not caught by re-running the
+evidence, because the evidence passes.
+
+Three things make an aside worse than a finding, and they compound.
+It arrives with evidence attached, so it reads as already-verified rather than
+as something owed a check.
+It asks for nothing, so no disposition step forces engagement --- a finding gets
+Addressed, Rebutted, or Deferred, while an all-clear simply gets adopted.
+And a reviewer's asides are usually about the code you are editing, so the claim
+does not stop at your prose: it becomes an **exemption in a code path**, which is
+how a sentence in a review thread turns into the one branch nobody tests.
+
+The check is to read the evidence's scope against the claim's scope, rather than
+to re-run the evidence.
+Ask what the cited command actually varied, and whether the conclusion
+quantifies over anything it did not.
+Where an aside is about to become a carve-out, write the case its evidence did
+not cover before writing the carve-out.
+
+- **Do:** compare an aside's evidence scope against its claim scope, since
+  re-running true evidence confirms nothing about the wider claim.
+- **Do:** write the case the evidence skipped before exempting a code path on
+  the strength of the aside.
+- **Don't:** treat attached evidence as making a claim checked --- it makes the
+  narrow half checked and the general half more persuasive.
+- **Don't:** read the conclusion-sound, particulars-unreliable rule above as
+  covering this; here the particular is impeccable and the conclusion is not.
+
 [`address-every-comment`](address-every-comment.md) already carries the
 per-component versions of this check: verify a suggestion block's literals,
 read a cited source, test a negative result's search scope.

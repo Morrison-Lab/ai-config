@@ -118,21 +118,33 @@ EXEC_WRAP = (
 # This anchor decides whether to MASK, and over-detecting an executor means
 # declining to mask -- so the body is scanned rather than skipped. A false
 # positive costs a scan; a false negative hides a merge. That asymmetry is the
-# reverse of pass 1's, which is why the two anchors genuinely differ rather
-# than one being a stale copy.
+# reverse of pass 1's, which is why the MASKING side is permissive while the
+# MATCHING side keeps the narrow lead.
 # One anchor for "an executor is invoked here", shared by both masking
-# decisions. Rolling a second one is what produced round 5's gap and round 6's,
-# so the two consumers now differ only in what they require AFTER the executor.
-EXEC_AT_CMD_POS = (
+# decisions -- now literally the same compiled object, not two built from a
+# common part. Rolling a second one produced round 5's gap and round 6's; the
+# leftover DIFFERENCE between them produced round 7's.
+#
+# The heredoc consumer used to require the executor to come BEFORE the `<<`
+# token (`EXEC_AT_CMD_POS + r"[^\n]*?<<"`). A redirection may appear anywhere in
+# a simple command, so `<<EOF bash`, `<<'EOF' sh` and `<<EOF ssh host` are all
+# ordinary bash that run the body -- and all of them failed a forward-only scan,
+# so the body was masked as prose and the merge ran.
+#
+# What the decision actually needs is CO-OCCURRENCE: this line introduces a
+# heredoc (that is why the caller is asking), and an executor is invoked
+# somewhere on it. Order was never part of the question, and assuming it was is
+# the same shape as enumerating what may precede a command word.
+EXEC_AT_CMD_POS = re.compile(
     PERMISSIVE_LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b"
 )
-HEREDOC_EXECUTOR = re.compile(EXEC_AT_CMD_POS + r"[^\n]*?<<")
+HEREDOC_EXECUTOR = EXEC_AT_CMD_POS
 # The quote-masking counterpart. A quoted span is inert only when nothing
 # before it in the same simple command can run it; `bash -c "<merge>"`,
 # `eval "<merge>"` and `ssh host "<merge>"` are the executor's own operand and
 # are LIVE. Same asymmetry as the heredoc anchor above: over-detecting means
 # declining to mask, which costs a scan, while under-detecting hides a merge.
-EXEC_BEFORE_QUOTE = re.compile(EXEC_AT_CMD_POS)
+EXEC_BEFORE_QUOTE = EXEC_AT_CMD_POS
 # Where the current simple command begins. An operand cannot be separated from
 # its executor by a command separator, so scanning back only this far keeps
 # `bash -c "x"; echo "prose"` from treating the second quote as live.

@@ -197,6 +197,17 @@ BLOCK = [
     ("sudo -u x sh -c 'glab mr merge 411'", "a single-quoted glab operand"),
     ('cd /r && timeout 5 bash -c "gh pr merge 411"', "a live operand in a later segment"),
     ('echo hi; nice bash -c "gh pr merge 411"', "a live operand after an inert one"),
+    # A redirection may appear ANYWHERE in a simple command, so the executor
+    # can follow the heredoc token. The masking anchor scanned forward from the
+    # executor to the `<<`, which made every one of these read as data.
+    ("<<EOF bash\ngh pr merge 411\nEOF", "the heredoc token before its executor"),
+    ("<<EOF sh\ngh pr merge 411\nEOF", "the same for sh"),
+    ("<<'EOF' sh\ngh pr merge 411\nEOF", "a quoted delimiter before its executor"),
+    ("<<-EOF bash\ngh pr merge 411\nEOF", "a tab-stripping heredoc before its executor"),
+    ("<<EOF ssh host\ngh pr merge 411\nEOF", "a hostname after the heredoc token"),
+    ("<<EOF sudo -u x bash\ngh pr merge 411\nEOF", "a wrapper after the heredoc token"),
+    ("cd /r && <<EOF bash\ngh pr merge 411\nEOF", "the reordered form in a later segment"),
+    ("bash <<EOF 2>/dev/null\ngh pr merge 411\nEOF", "a redirection after the heredoc token"),
 ]
 
 ALLOW = [

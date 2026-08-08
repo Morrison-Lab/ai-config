@@ -209,6 +209,69 @@ wrong moment.
 - **Don't:** treat an exit-status or locale guard as covering this --- both
   pass cleanly while the check examines nothing.
 
+### A sound command can still examine almost nothing, when the selection stage collapses
+
+The two cases above are the check **breaking** and the input being **empty**.
+This is the one where neither holds: the command is well-formed, the file is
+right there with the content in it, and an intermediate **selection** stage
+quietly hands the matcher one line instead of forty.
+
+The worked instance is an `awk` range whose closing pattern also matches its
+own opening line:
+
+```bash
+# scripts/Unit.gd really does contain `func _separate(delta: float) -> void:`
+awk '/^func _separate/,/^func [a-z_]+\(.*\) -> (void|bool)/' scripts/Unit.gd |
+  grep "position +="        # returns nothing --- the range was ONE line
+```
+
+The start anchor matches the function header, and so does the end anchor, so
+the range opens and closes on the same line.
+`grep` then reports honestly on a single line, and the empty result reads as
+"this function never writes `position`" --- which was published as a claim, and
+was false.
+
+**The existing awk-range caution does not cover this, and its check passes
+here.**
+[`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md)
+warns that "a repeated start anchor makes an `awk` range restart and silently
+widen", and prescribes confirming each anchor matches exactly once.
+That is the **opposite** direction --- widening, not collapsing --- and both
+anchors clear its test: the start matches once, and the end is a general pattern
+that legitimately matches many lines.
+Its *second* habit is the one that would have caught this, and it generalizes
+past `awk`: run the selection once **without** the counting stage, and look at
+what it selected.
+
+That is the same point [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
+makes in "A negative control must enter at the real input", where extraction is
+named as the usual culprit "precisely because it looks like plumbing rather than
+logic".
+A denominator states it as a number: `0 hits in 1 line selected` is obviously
+wrong, where a bare `0` is not.
+
+- **Do:** print how much the selection stage returned, not only what the matcher
+  found in it.
+- **Do:** run a range or extraction on its own once, and read what it selected,
+  before piping it anywhere.
+- **Don't:** treat a well-formed command over a non-empty file as evidence that
+  anything was examined.
+- **Don't:** rely on the anchors-match-once check to catch a collapsed range ---
+  it is aimed at the widening case and passes cleanly on this one.
+
+(2026-08-07: five instruments in one session each returned an empty or zero
+result that was read as absence --- a cumulative delta over a per-tick-cleared
+array, a `gh pr diff --name-only` empty from API lag that returned 2 files on
+re-query, an `ls A || ls B` fallback that did not say which branch answered, a
+diff-scoped grep blind to a defect caused by a *deleted* line, and this one.
+The last was published as a false claim by a session that had, earlier that same
+day, written the vacuous-zero trap into this very file.
+Read that as the argument for the denominator being a property of the
+instrument rather than something recalled at the call site ---
+[`skill-checklists`](../workflow/skill-checklists.md) already draws exactly that
+conclusion, in its "knowing the rule is not what fails here" passage, and is the
+place to read rather than restate it.)
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass

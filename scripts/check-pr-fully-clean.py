@@ -5,16 +5,33 @@ Verifies that:
 1. All GitHub Actions check runs for the PR's HEAD commit SHA are completed and passing.
 2. An automated review comment evaluating the exact HEAD commit SHA has been posted.
 3. All review comments evaluating the HEAD commit SHA contain zero findings, and no active CHANGES_REQUESTED or REJECTED state exists on the PR.
+4. The LATEST verdict-bearing statement across the whole review history is clean.
+
+Criterion 4 is deliberately scoped wider than criteria 2 and 3, which look only
+at items evaluating the current HEAD SHA. An explicit "Needs more work" posted
+against an EARLIER commit falls outside them entirely, and a later comment that
+states no verdict raises no finding either -- so the PR reads clean while its
+last actual verdict was "Needs more work". Absence of a verdict is not a
+clearing: only a later CLEAN verdict supersedes an earlier not-clean one.
+See shared/workflow/fully-clean.md and Morrison-Lab/ai-config#1275.
 
 Exit codes:
 0: Fully clean (safe to end ARDI loop)
-1: Not clean (in-progress checks, failing checks, missing review, or findings present)
+1: Not clean (in-progress checks, failing checks, missing review, findings present,
+   or a standing not-clean verdict that nothing later superseded)
 """
 import json
 import re
 import subprocess
 import sys
 from typing import Dict, List, Tuple
+
+# The status glyphs below are non-ASCII, and a Windows console defaults to
+# cp1252, which cannot encode them -- so every run raised UnicodeEncodeError
+# before reaching its verdict, including the test suite. Degrade the glyph
+# rather than the run; on a UTF-8 console this changes nothing.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
 
 
 def run_cmd(cmd: List[str]) -> str:
@@ -96,6 +113,217 @@ def strip_cited_finding_vocab(text: str) -> str:
     return text
 
 
+VERDICT_NOT_CLEAN_PATTERNS = [
+    # Intervening words allowed, because the adjacent forms are not the only
+    # ones a reviewer writes. Found by running this classifier over the real
+    # verdict bodies on ai-config#1293, whose three "Needs MINOR work" rounds
+    # each classified as no verdict at all -- so a genuine not-clean verdict
+    # neither blocked nor superseded anything. Missing a not-clean signal is
+    # the dangerous direction here, the mirror of an over-broad clean one.
+    r"\bNeeds\s+(?:\w+\s+){0,3}work\b",
+    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?)",
+    r"changes\s+requested\b",
+]
+
+# Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
+# it would let an incidental "looks ready" in a later chatty comment discharge a
+# standing "Needs more work". An over-narrow one only costs a safe-direction
+# re-flag. This is fail-fast.md's "a guard's discharge fires on positive
+# success, not the absence of failure" applied to a verdict.
+VERDICT_CLEAN_PATTERNS = [
+    r"\bReady\s+for\s+merge\b",
+    r"Verdict:\s*(?:Clean|Approved|Ready)\b",
+    r"\bApproved\s+for\s+merge\b",
+]
+
+# The two BARE patterns above carry no verdict on their own: the phrase survives
+# intact inside a sentence that says the opposite. `Verdict:\s*...` is safe
+# without a guard because it requires immediate adjacency after the label.
+#
+# Both directions have to be checked, and only one of them is a negation. A
+# negation sits BEFORE the phrase ("this is not ready for merge") while a
+# CONDITION sits AFTER it ("ready for merge once the findings are fixed"), so a
+# lookbehind alone leaves the conditional form classified clean. That form is
+# the likelier one in a real review, since it is how a reviewer signs off on
+# work that is nearly done.
+BARE_CLEAN_PATTERNS = {
+    r"\bReady\s+for\s+merge\b",
+    r"\bApproved\s+for\s+merge\b",
+}
+
+# The primary guard is POSITION, not vocabulary. A qualifier list cannot be
+# finished against free-form English -- the first version covered `not` and
+# `once` and review immediately produced `but not`, `almost`, `however` and
+# `except`, which is a class with no closed definition. So a bare phrase counts
+# only where the comment MARKS it as the verdict: on its own line, behind a
+# heading, a bold span, a list bullet, a blockquote, or a `Verdict` label. A
+# reviewer stating a verdict marks it; a sentence merely containing the words
+# does not, and every unmarked occurrence is now a mention rather than a
+# sign-off, whatever words surround it.
+#
+# That is what makes the vocabulary below a SECOND line rather than the only
+# one. It has to exist because a marked verdict can still carry a caveat
+# ("**Ready for merge** -- however, two items remain"), but it now only has to
+# cover qualifiers attached to an already-marked phrase, which is a far smaller
+# job than parsing arbitrary prose.
+BARE_CLEAN_MARKED = re.compile(
+    r"(?:^|\n)[ \t]*(?:[#>*_+-]+[ \t]*)*"
+    r"(?:verdict[ \t]*[:.\-]*[ \t]*)?(?:[#>*_]+[ \t]*)*$",
+    re.IGNORECASE,
+)
+CLEAN_NEGATION_PREFIX = re.compile(
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|almost|nearly"
+    r"|nowhere\s+near|close\s+to)\s+(?:\w+\s+){0,2}$",
+    re.IGNORECASE,
+)
+# Searched within the rest of the SENTENCE rather than anchored at the match's
+# end, because where a match ends is an artifact of which pattern matched. Two
+# patterns can match the same text at the same position with different lengths
+# --- `Verdict: Ready for merge once ...` matches both `Ready for merge` and the
+# shorter `Verdict: Ready` --- and an anchored check on the shorter one lands on
+# ` for merge once ...`, sees no qualifier at position zero, and passes.
+#
+# So the guard stopped depending on match length. Sentence scope is what keeps
+# that from over-reaching: a qualifier in the NEXT sentence ("Ready for merge.
+# The tests pass, but coverage is unchanged.") is a separate statement and does
+# not retract the verdict.
+CLEAN_QUALIFIER = re.compile(
+    r"\b(?:once|after|when|if|unless|pending|provided|assuming"
+    r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
+    r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
+    re.IGNORECASE,
+)
+# A BARE newline does not end a sentence in this corpus, which writes semantic
+# line breaks -- one clause per line. Treating `\n` as a terminator hid every
+# qualifier that happened to start the next line, so `**Ready for merge**\nonce
+# the findings are fixed` read as clean.
+#
+# This is the same corpus property the NEGATION guard is built around, mirrored:
+# there a qualifier at the end of the PREVIOUS line is why the prefix scan has
+# to cross a break, and here one at the start of the NEXT line is why the suffix
+# scan must not stop at one. Reasoned about correctly on the prefix side and
+# then contradicted on the suffix side a round later.
+#
+# A blank line is a real terminator -- that is a paragraph break, not a wrapped
+# clause.
+SENTENCE_END = re.compile(r"[.!?]|\n[ \t]*\n")
+
+
+# Bounded as well as sentence-scoped, because a qualifier RETRACTS only when it
+# sits close to the phrase. A real sign-off reads "Ready for merge -- three nits
+# fixed, the additions are correctly sourced ..., but I noted X", where the
+# `but` is ordinary continuation 100+ characters later; retracting on that makes
+# criterion 4 unsatisfiable for a clean PR, which is the failure this whole
+# check exists to avoid, arriving from the other side.
+#
+# A window is still immune to the pattern-length artifact that motivated
+# dropping the anchored match: the shorter `Verdict: Ready` overlap puts its
+# qualifier ~15 characters out, well inside. Only an anchored check at exactly
+# position zero was brittle.
+QUALIFIER_WINDOW = 60
+
+
+def _sentence_remainder(text: str, start: int) -> str:
+    """The rest of the sentence after `start`, for a trailing-qualifier scan.
+
+    Bounded by QUALIFIER_WINDOW, and by the sentence, whichever comes first.
+    """
+    end = SENTENCE_END.search(text, start)
+    stop = min(end.start() if end else len(text), start + QUALIFIER_WINDOW)
+    return text[start:stop]
+
+
+def classify_verdict(body: str, state: str = "") -> str:
+    """Classify one automated review item as 'not-clean', 'clean', or '' (none).
+
+    Returns '' when the item states no verdict at all. That case is the whole
+    point of the function: a long, evidence-dense comment that never concludes
+    is NOT an approval, and must not supersede an earlier verdict. Its very
+    thoroughness is what makes it read as a sign-off.
+
+    A not-clean signal wins over a clean one within a single body, matching
+    fully-clean.md's rule that when a verdict line and the findings beneath it
+    disagree, the findings win.
+
+    Cited finding vocabulary is blanked first (see strip_cited_finding_vocab),
+    so a clean verdict that merely quotes "Needs more work" is not misread as
+    stating it -- the #1202 false positive, one surface over.
+    """
+    if state in ("CHANGES_REQUESTED", "REJECTED"):
+        return "not-clean"
+
+    scan = strip_cited_finding_vocab(body)
+
+    for pat in VERDICT_NOT_CLEAN_PATTERNS:
+        for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            if pat == r"changes\s+requested\b":
+                prefix = scan[max(0, match.start() - 25):match.start()].lower()
+                if re.search(r"\bno\s+(\w+\s+)?$", prefix):
+                    continue
+            return "not-clean"
+
+    for pat in VERDICT_CLEAN_PATTERNS:
+        for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            # Position and negation are about how the phrase is INTRODUCED, so
+            # they apply only to a bare phrase -- a `Verdict:` label is itself
+            # the marking, and it already excludes a preceding negation by
+            # adjacency.
+            if pat in BARE_CLEAN_PATTERNS:
+                line_start = scan.rfind("\n", 0, match.start()) + 1
+                if not BARE_CLEAN_MARKED.search(scan[line_start:match.start()]):
+                    continue
+                prefix = scan[max(0, match.start() - 40):match.start()]
+                if CLEAN_NEGATION_PREFIX.search(prefix):
+                    continue
+            # A trailing qualifier is about what FOLLOWS, and nothing about a
+            # label stops one: `Verdict: Ready, but two items remain` reads as
+            # clean to any prefix-anchored check. So this guard applies to every
+            # clean pattern. It was scoped to the bare ones on the reasoning
+            # that adjacency after the label "already binds it" -- which is true
+            # of what precedes the phrase and says nothing about what follows.
+            if CLEAN_QUALIFIER.search(_sentence_remainder(scan, match.end())):
+                continue
+            return "clean"
+
+    return ""
+
+
+def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
+    """Fail when the latest verdict-bearing statement is not clean.
+
+    Walks every automated review item chronologically -- not just those
+    evaluating HEAD -- and keeps the last one that states a verdict at all.
+    Items stating no verdict are skipped rather than treated as clearing,
+    which is the distinction this check exists to enforce.
+
+    Prints what it examined alongside what it found, so a zero here cannot be
+    read as an all-clear when the real cause is that nothing was examined
+    (fail-fast.md, "report what a check *examined*, not only what it *found*").
+    """
+    dated = sorted((it for it in all_items if it[1]), key=lambda it: it[1])
+
+    latest_verdict = ""
+    latest_when = ""
+    n_with_verdict = 0
+    for _kind, when, body, _oid, state in dated:
+        verdict = classify_verdict(body, state)
+        if verdict:
+            n_with_verdict += 1
+            latest_verdict, latest_when = verdict, when
+
+    print(
+        f"  verdict scan: examined {len(dated)} dated automated review item(s), "
+        f"{n_with_verdict} bore a verdict, latest = {latest_verdict or 'NONE'}"
+    )
+
+    if latest_verdict == "not-clean":
+        return False, [
+            f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
+            "and no later comment supersedes it with a clean verdict"
+        ]
+    return True, []
+
+
 def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--json", "comments,reviews"])
     data = json.loads(out)
@@ -132,7 +360,16 @@ def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> T
             continue
 
         is_bot_author = author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
-        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict:"))
+        # "**claude finished" and "### verdict" are the canonical review markers
+        # CLAUDE.md prescribes ("Completed runs start the body with
+        # `**Claude finished`"). The older "claude finished review" marker was a
+        # near-miss: the real body reads "**Claude finished** -- adversarial
+        # review", so "review" never follows "finished" directly and the marker
+        # matched nothing. Measured on Morrison-Lab/ai-config#1267, where all four
+        # review comments were posted under a human login and both verdict-bearing
+        # ones carried "### Verdict" -- so admission failed, all_items was empty,
+        # and every body-content criterion below was evaluated over nothing.
+        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "**claude finished", "### verdict", "verdict:"))
 
         if is_bot_author or is_review_header:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT"))
@@ -158,6 +395,12 @@ def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> T
     if not all_items:
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
         return False, issues
+
+    # Criterion 4, evaluated over the WHOLE review history rather than only the
+    # items matching HEAD: a not-clean verdict at an earlier commit stands until
+    # a later CLEAN verdict supersedes it.
+    _verdict_ok, verdict_issues = check_latest_verdict(all_items)
+    issues.extend(verdict_issues)
 
     # Match items evaluating the target HEAD commit SHA
     sha_short = sha[:7]

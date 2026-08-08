@@ -329,23 +329,28 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
     (ucdavis/bcs#375: four tokens flagged from one NEWS entry, fixed with zero
     WORDLIST additions.)
   - **A Quarto `{{< include >}}` path is a spellable-token source too, and the
-    backtick remedy above cannot be applied to it.** The two bullets above are
-    both tokens someone typed as prose; an include path is machinery, so the
-    natural assumption is that the checker skips it. It does not. Hunspell
-    splits on hyphens, so every dash-separated segment of a kebab-case filename
-    becomes a word: `{{< include methodology/_checking-nlm-convergence.qmd >}}`
-    flags `nlm`. Backticking the shortcode would disable the transclusion, so
-    where a repo's convention is underscore-prefixed kebab-case subfiles (as in
-    UCD-SERG repos and the lab manual's "Using Includes for Modular Content"),
-    the **filename itself** has to be composed of dictionary words. Prefer
-    renaming the subfile over adding the token to `inst/WORDLIST`, which puts a
-    path artifact into a word list and then silently permits that bare token
-    everywhere else in the prose.
-    (UCD-SERG/serocalculator#635, 2026-08-07: `nlm` failed Spellcheck at
-    `methodology.qmd:1014`. Every other `nlm` in that article sat inside
-    backticks or a code chunk, so the only bare occurrence came from a filename
-    rather than from anything the prose said. Renamed to
-    `_checking-convergence-codes.qmd`, with no WORDLIST addition.)
+    backtick remedy above cannot be applied to it.**
+    The two bullets above are both tokens someone typed as prose;
+    an include path is machinery,
+    so the natural assumption is that the checker skips it.
+    It does not.
+    Hunspell splits on hyphens,
+    so every dash-separated segment of a kebab-case filename becomes a word:
+    `{{< include methodology/_checking-nlm-convergence.qmd >}}` flags `nlm`.
+    Backticking the shortcode would disable the transclusion,
+    so where a repo's convention is underscore-prefixed kebab-case subfiles
+    (as in UCD-SERG repos and the lab manual's
+    "Using Includes for Modular Content"),
+    the **filename itself** has to be composed of dictionary words.
+    Prefer renaming the subfile over adding the token to `inst/WORDLIST`,
+    which puts a path artifact into a word list
+    and then silently permits that bare token everywhere else in the prose.
+    (UCD-SERG/serocalculator#635, 2026-08-07:
+    `nlm` failed Spellcheck at `methodology.qmd:1014`.
+    Every other `nlm` in that article sat inside backticks or a code chunk,
+    so the only bare occurrence came from a filename
+    rather than from anything the prose said.
+    Renamed to `_checking-convergence-codes.qmd`, with no WORDLIST addition.)
 - **Regenerating `man/*.Rd`: run `devtools::document()` (or
   `roxygen2::roxygenise()`) --- never hand-edit the `.Rd`.** A `docs-check` /
   `R-check-docs` job runs `roxygenize()` then `git diff --exit-code man/`, so a

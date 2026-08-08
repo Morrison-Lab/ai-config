@@ -277,23 +277,27 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    origin/main origin/<branch>` gives ground truth without a worktree
    (git ≥ 2.38). Skip if it comes back clean.
 2. **Attribute before claiming --- a conflict this sweep found is not
-   necessarily one your merge caused.** On a repo with an old PR backlog most
-   surviving conflicts are ordinary drift (`DESCRIPTION`, a word list, a
-   directory deleted months ago) and were conflicting before you arrived;
-   claiming them means resolving other people's branches for no reason.
-   Derive the merge's own deleted and renamed paths and intersect them with
-   each conflict's paths:
+   necessarily one your merge caused.**
+   On a repo with an old PR backlog most surviving conflicts are ordinary drift
+   (`DESCRIPTION`, a word list, a directory deleted months ago)
+   and were conflicting before you arrived.
+   Claiming them means resolving other people's branches for no reason.
+   Derive the merge's own deleted and renamed paths
+   and intersect them with each conflict's paths:
    ```bash
    merge=$(git rev-parse HEAD)   # the squash-merge you just confirmed
    git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'
    ```
-   A conflicting path in neither set is drift --- skip it. Note `git show
-   --name-status "$merge"` prints **no** file list for a merge commit and so
-   silently yields an empty attribution set; use the `git diff` form above.
+   A conflicting path in neither set is drift --- skip it.
+   Note `git show --name-status "$merge"` prints **no** file list for a merge
+   commit, so it silently yields an empty attribution set;
+   use the `git diff` form above.
    See [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md),
    "A conflict your sweep found is not a conflict your merge caused".
-3. **Check claim status.** Read the most recent comment. If it says "Working on
-   this — paws off" (or equivalent), skip it — another session owns it.
+3. **Check claim status.**
+   Read the most recent comment.
+   If it says "Working on this — paws off" (or equivalent),
+   skip it — another session owns it.
 4. **Claim it.**
    ```bash
    gh pr comment <N> --body "Working on this — paws off until I'm done."   # COMMENT_PR
@@ -338,14 +342,16 @@ actively working a PR between your claim and your push. One-at-a-time keeps
 the blast radius small. Skip any PR whose conflict is in a file you can't
 understand without more context — comment asking for clarification instead.
 
-**Match the response to standing, not only to cause.** Step 2 says whether a
-conflict is yours; it does not say the branch is. A conflict you genuinely
-caused, on a branch you do not own --- a colleague's in-flight work, and most
-sharply a release branch carrying an out-of-band process --- is an explanatory
-comment naming the deletion or rename and where the content went, rather than a
-push to their branch. `sync-with-main` does prescribe re-applying the change on
-the sibling branch and pushing it, and that fits a workflow or CI file in a repo
-you drive; it is not the default for someone else's release branch.
+**Match the response to standing, not only to cause.**
+Step 2 says whether a conflict is yours; it does not say the branch is.
+A conflict you genuinely caused, on a branch you do not own
+--- a colleague's in-flight work,
+and most sharply a release branch carrying an out-of-band process ---
+is an explanatory comment naming the deletion or rename
+and where the content went, rather than a push to their branch.
+`sync-with-main` does prescribe re-applying the change on the sibling branch
+and pushing it, and that fits a workflow or CI file in a repo you drive.
+It is not the default for someone else's release branch.
 
 ### 2. Tidy the local branch
 

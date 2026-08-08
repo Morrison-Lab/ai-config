@@ -158,7 +158,9 @@ How depends on the repo's review trigger first, and on whether this round pushed
      The push fires **nothing**, so you must dispatch explicitly, **after every push** rather than once when the PR opened: `gh workflow run <review-workflow>.yml -R <owner>/<repo> -f pr_number=<N>`, taking the input's name from that workflow's own file.
      There is no cancel-in-progress race to avoid here, because there is no competing run.
      This is the branch that fails silently: CI still goes green on each push, so watching CI to green feels like watching the PR, and a verdict from an earlier head stands unchallenged for as long as you keep pushing.
-     (UCD-SERG/serocalculator, 2026-08-07: `claude-code-review.yml` has its `pull_request:` trigger commented out with the note "reviews are on request only". Six pushes across several hours were each followed by watching CI to green; no review was ever dispatched, and a verdict from roughly 20 hours earlier stood until the user asked whether the PR had a clean review.)
+     (UCD-SERG/serocalculator, 2026-08-07: `claude-code-review.yml` has its `pull_request:` trigger commented out with the note "reviews are on request only".
+     Six pushes across several hours were each followed by watching CI to green.
+     No review was ever dispatched, and a verdict from roughly 20 hours earlier stood until the user asked whether the PR had a clean review.)
    - **No code pushed** (all Rebut/Defer): no push occurred, so nothing
      auto-triggers --- you **must** explicitly re-request (post `@claude review`,
      or the forge's equivalent). This is the only case where you post the

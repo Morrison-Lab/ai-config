@@ -85,19 +85,31 @@ The reusable workflow ends each review with a step named
 `Collapse previous Claude review comments`, and its own source says the run
 that wins the per-PR concurrency race must fold the earlier pushes' review
 comments "or they linger".
-So every round after the first **edits** every earlier round's verdict
+So every round after the first **minimizes** every earlier round's verdict
 comment, and `updated_at` advances to whenever the newest round finished.
 Only the newest comment on a PR still satisfies a bracket keyed on it.
 Every earlier one reports `updated_at` outside its own producing run and
 reads as though no run produced it.
-`created_at` does not move, because folding edits a comment rather than
-creating one.
 
-Nothing in the comment's text reveals the edit, which is why this is worth
-stating rather than leaving to observation.
-The fold adds no `<details>` wrapper and no supersession note: measured on the
+The mechanism is worth stating precisely, because it makes the warning
+sharper rather than weaker.
+That step's only mutation is the GraphQL `minimizeComment` mutation with
+`classifier: OUTDATED`, which marks a comment collapsed and outdated.
+It issues no REST `PATCH` and rewrites no text, so **nothing about the
+comment's content changes at all** and `updated_at` still moves.
+A reader who expected the timestamp to track edits has no surviving reason
+to trust it: it advances on a bookkeeping action that leaves the body byte
+for byte identical.
+`created_at` is the only field the fold cannot touch.
+
+Nothing in the comment's text reveals the fold, which follows from the
+mutation rather than being a separate mercy.
+It adds no `<details>` wrapper and no supersession note: measured on the
 comment below, a `grep -cE '<details|<summary'` over the folded body returns
 `0`.
+Confirm the same from the API rather than from the rendered page, since
+GraphQL exposes both halves of the claim on one object and REST exposes
+neither.
 
 The same drift defeats the cheaper check a reader reaches for first, comparing
 a verdict comment's timestamp against a commit's.
@@ -105,8 +117,11 @@ An `updated_at` later than a push is **not** evidence the review saw that
 push, because the fold that advanced it can postdate the push by any amount.
 
 ```bash
-gh api repos/Morrison-Lab/ai-config/issues/comments/5227428537 \
-  --jq '{created_at, updated_at}'
+NODE=$(gh api repos/Morrison-Lab/ai-config/issues/comments/5227428537 \
+  --jq '.node_id')
+gh api graphql -f id="$NODE" -f query='query($id: ID!) {
+  node(id: $id) { ... on IssueComment {
+    isMinimized minimizedReason lastEditedAt createdAt updatedAt } } }'
 gh api repos/Morrison-Lab/ai-config/actions/runs/31270501058/jobs \
   --jq '.jobs[] | select(.name == "review / claude-review")
         | {started_at, completed_at}'
@@ -125,9 +140,23 @@ The two commits round 2 never saw, `a60d967f` and `d426bf83`, landed at
 `18:10:48Z` and `18:11:44Z`, so they fall after that `created_at` and before
 that `updated_at`: the two fields answer the did-it-see-this-push question
 oppositely, and only `created_at` answers it correctly.
+That same comment reports `isMinimized true`, `minimizedReason outdated`, and
+`lastEditedAt null`, so its body was never edited at any point while
+`updated_at` moved 18 minutes.
 [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)'s
 permissions-argument bullet cited the same pair as evidence and was narrowed
 to `created_at` in the same change.
+
+The step's source is `Morrison-Lab/gha`'s
+`.github/workflows/claude-code-review.yml` at `origin/main`, where
+`Collapse previous Claude review comments` begins on line 914 and its only
+mutation is the `minimizeComment` call on line 941.
+The one `PATCH` in that file, on line 975, belongs to a different step,
+`Explain and fold tracking comment when canceled` on line 954, which runs only
+`if: cancelled()` and prepends a warning to the **current** run's own tracking
+comment.
+It never touches an earlier round's verdict, so it is not the mechanism behind
+the drift measured above.
 
 - **Do:** read the PR's own comments before accepting that a failed review run
   produced no verdict.
@@ -136,8 +165,10 @@ to `created_at` in the same change.
   remember.
 - **Do:** bracket a verdict comment's `created_at`, never its `updated_at`,
   inside the producing review step's window.
-- **Do:** read an older review comment that renders as edited as expected
-  housekeeping, rather than as a tampered or refreshed verdict.
+- **Do:** read an older review comment that renders as collapsed or outdated as
+  expected housekeeping, rather than as a tampered or refreshed verdict.
+- **Don't:** read a moved `updated_at` as evidence that anything in the comment
+  changed; `minimizeComment` moves it while editing nothing.
 - **Don't:** infer that a run produced nothing from a true report that it ended
   in an error.
 - **Don't:** treat "the guard did not misfire" as establishing that its red is

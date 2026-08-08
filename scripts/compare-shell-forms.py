@@ -62,11 +62,6 @@ HARNESS_FAILURE = "HARNESS FAILURE"
 CANNOT_EXECUTE = 126
 NOT_FOUND = 127
 
-NOT_FOUND_MARKERS = (
-    "command not found",
-    "No such file or directory",
-    "cannot execute",
-)
 
 # Where Git for Windows puts bash when it is not already on PATH.
 WINDOWS_BASH_FALLBACKS = (
@@ -103,10 +98,22 @@ def interpreter_env():
 
 
 def looks_like_harness_failure(returncode, stderr):
-    """True when the shell could not RUN the form, not when the form failed."""
-    if returncode in (CANNOT_EXECUTE, NOT_FOUND):
-        return True
-    return any(marker in stderr for marker in NOT_FOUND_MARKERS)
+    """True when the shell could not RUN the form, not when the form failed.
+
+    The exit status decides it alone. An earlier version also matched
+    not-found strings anywhere in stderr, which reintroduced the exact thing
+    narrowing the exit-code rule was for: `grep pat missing.txt` prints "No
+    such file or directory" and exits 2, which is the command failing on its
+    own terms and a perfectly good thing to compare between two spellings.
+    Calling that a harness failure says "this is not a result about the forms"
+    about the most ordinary command there is -- the fail-closed direction, and
+    still wrong.
+
+    The markers bought nothing in exchange. Measured on this bash: an unknown
+    command exits 127, and a missing script exits 127, so every genuine case
+    the markers were meant to catch already carries a code.
+    """
+    return returncode in (CANNOT_EXECUTE, NOT_FOUND)
 
 
 def run_form(command, bash, env, workdir, index):

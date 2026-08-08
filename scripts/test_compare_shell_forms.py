@@ -162,9 +162,22 @@ check("classify: any harness failure dominates", csf.classify([OK, BROKEN]) == c
 check("classify: no results is HARNESS FAILURE", csf.classify([]) == csf.HARNESS_FAILURE)
 check("127 is a harness failure", csf.looks_like_harness_failure(127, ""))
 check("126 is a harness failure", csf.looks_like_harness_failure(126, ""))
+# A command's OWN failure is a result, not a broken harness. `grep pat
+# missing.txt` prints a not-found message and exits 2; reporting that as
+# "not a result about the forms" hides a real difference between two
+# spellings, which is what narrowing the exit-code rule was for in the first
+# place. The marker must not fire on its own.
 check(
-    "a not-found message is a harness failure whatever the status",
-    csf.looks_like_harness_failure(0, "bash: foo: command not found"),
+    "a not-found message alone is NOT a harness failure",
+    not csf.looks_like_harness_failure(2, "grep: missing.txt: No such file or directory"),
+)
+check(
+    "a command's own non-zero exit is NOT a harness failure",
+    not csf.looks_like_harness_failure(1, ""),
+)
+check(
+    "bash's own not-found still is, via 127",
+    csf.looks_like_harness_failure(127, "bash: foo: command not found"),
 )
 
 # The report must state what it examined, not only what it found.

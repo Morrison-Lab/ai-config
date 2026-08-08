@@ -5,16 +5,33 @@ Verifies that:
 1. All GitHub Actions check runs for the PR's HEAD commit SHA are completed and passing.
 2. An automated review comment evaluating the exact HEAD commit SHA has been posted.
 3. All review comments evaluating the HEAD commit SHA contain zero findings, and no active CHANGES_REQUESTED or REJECTED state exists on the PR.
+4. The LATEST verdict-bearing statement across the whole review history is clean.
+
+Criterion 4 is deliberately scoped wider than criteria 2 and 3, which look only
+at items evaluating the current HEAD SHA. An explicit "Needs more work" posted
+against an EARLIER commit falls outside them entirely, and a later comment that
+states no verdict raises no finding either -- so the PR reads clean while its
+last actual verdict was "Needs more work". Absence of a verdict is not a
+clearing: only a later CLEAN verdict supersedes an earlier not-clean one.
+See shared/workflow/fully-clean.md and Morrison-Lab/ai-config#1275.
 
 Exit codes:
 0: Fully clean (safe to end ARDI loop)
-1: Not clean (in-progress checks, failing checks, missing review, or findings present)
+1: Not clean (in-progress checks, failing checks, missing review, findings present,
+   or a standing not-clean verdict that nothing later superseded)
 """
 import json
 import re
 import subprocess
 import sys
 from typing import Dict, List, Tuple
+
+# The status glyphs below are non-ASCII, and a Windows console defaults to
+# cp1252, which cannot encode them -- so every run raised UnicodeEncodeError
+# before reaching its verdict, including the test suite. Degrade the glyph
+# rather than the run; on a UTF-8 console this changes nothing.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")
 
 
 def run_cmd(cmd: List[str]) -> str:
@@ -96,6 +113,97 @@ def strip_cited_finding_vocab(text: str) -> str:
     return text
 
 
+VERDICT_NOT_CLEAN_PATTERNS = [
+    r"\bNeeds\s+more\s+work\b",
+    r"\bNeeds\s+work\b",
+    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?)",
+    r"changes\s+requested\b",
+]
+
+# Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
+# it would let an incidental "looks ready" in a later chatty comment discharge a
+# standing "Needs more work". An over-narrow one only costs a safe-direction
+# re-flag. This is fail-fast.md's "a guard's discharge fires on positive
+# success, not the absence of failure" applied to a verdict.
+VERDICT_CLEAN_PATTERNS = [
+    r"\bReady\s+for\s+merge\b",
+    r"Verdict:\s*(?:Clean|Approved|Ready)\b",
+    r"\bApproved\s+for\s+merge\b",
+]
+
+
+def classify_verdict(body: str, state: str = "") -> str:
+    """Classify one automated review item as 'not-clean', 'clean', or '' (none).
+
+    Returns '' when the item states no verdict at all. That case is the whole
+    point of the function: a long, evidence-dense comment that never concludes
+    is NOT an approval, and must not supersede an earlier verdict. Its very
+    thoroughness is what makes it read as a sign-off.
+
+    A not-clean signal wins over a clean one within a single body, matching
+    fully-clean.md's rule that when a verdict line and the findings beneath it
+    disagree, the findings win.
+
+    Cited finding vocabulary is blanked first (see strip_cited_finding_vocab),
+    so a clean verdict that merely quotes "Needs more work" is not misread as
+    stating it -- the #1202 false positive, one surface over.
+    """
+    if state in ("CHANGES_REQUESTED", "REJECTED"):
+        return "not-clean"
+
+    scan = strip_cited_finding_vocab(body)
+
+    for pat in VERDICT_NOT_CLEAN_PATTERNS:
+        for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            if pat == r"changes\s+requested\b":
+                prefix = scan[max(0, match.start() - 25):match.start()].lower()
+                if re.search(r"\bno\s+(\w+\s+)?$", prefix):
+                    continue
+            return "not-clean"
+
+    for pat in VERDICT_CLEAN_PATTERNS:
+        if re.search(pat, scan, re.IGNORECASE | re.MULTILINE):
+            return "clean"
+
+    return ""
+
+
+def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
+    """Fail when the latest verdict-bearing statement is not clean.
+
+    Walks every automated review item chronologically -- not just those
+    evaluating HEAD -- and keeps the last one that states a verdict at all.
+    Items stating no verdict are skipped rather than treated as clearing,
+    which is the distinction this check exists to enforce.
+
+    Prints what it examined alongside what it found, so a zero here cannot be
+    read as an all-clear when the real cause is that nothing was examined
+    (fail-fast.md, "report what a check *examined*, not only what it *found*").
+    """
+    dated = sorted((it for it in all_items if it[1]), key=lambda it: it[1])
+
+    latest_verdict = ""
+    latest_when = ""
+    n_with_verdict = 0
+    for _kind, when, body, _oid, state in dated:
+        verdict = classify_verdict(body, state)
+        if verdict:
+            n_with_verdict += 1
+            latest_verdict, latest_when = verdict, when
+
+    print(
+        f"  verdict scan: examined {len(dated)} dated automated review item(s), "
+        f"{n_with_verdict} bore a verdict, latest = {latest_verdict or 'NONE'}"
+    )
+
+    if latest_verdict == "not-clean":
+        return False, [
+            f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
+            "and no later comment supersedes it with a clean verdict"
+        ]
+    return True, []
+
+
 def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--json", "comments,reviews"])
     data = json.loads(out)
@@ -132,7 +240,16 @@ def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> T
             continue
 
         is_bot_author = author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
-        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "claude finished review", "verdict:"))
+        # "**claude finished" and "### verdict" are the canonical review markers
+        # CLAUDE.md prescribes ("Completed runs start the body with
+        # `**Claude finished`"). The older "claude finished review" marker was a
+        # near-miss: the real body reads "**Claude finished** -- adversarial
+        # review", so "review" never follows "finished" directly and the marker
+        # matched nothing. Measured on Morrison-Lab/ai-config#1267, where all four
+        # review comments were posted under a human login and both verdict-bearing
+        # ones carried "### Verdict" -- so admission failed, all_items was empty,
+        # and every body-content criterion below was evaluated over nothing.
+        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "**claude finished", "### verdict", "verdict:"))
 
         if is_bot_author or is_review_header:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT"))
@@ -158,6 +275,12 @@ def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> T
     if not all_items:
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
         return False, issues
+
+    # Criterion 4, evaluated over the WHOLE review history rather than only the
+    # items matching HEAD: a not-clean verdict at an earlier commit stands until
+    # a later CLEAN verdict supersedes it.
+    _verdict_ok, verdict_issues = check_latest_verdict(all_items)
+    issues.extend(verdict_issues)
 
     # Match items evaluating the target HEAD commit SHA
     sha_short = sha[:7]

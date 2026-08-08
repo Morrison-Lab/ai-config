@@ -244,6 +244,157 @@ def main() -> int:
             (not qrf_ok) and len(qrf_issues) > 0,
         )
 
+    # --- Criterion 4: the latest verdict-bearing statement (#1275) ---------
+    # Unit-level classification first, so a failure below is attributable.
+    check(
+        "classify_verdict: 'Needs more work' is not-clean",
+        checker.classify_verdict("Round 2: **Needs more work** -- 8 findings.") == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Ready for merge' is clean",
+        checker.classify_verdict("Verdict: Clean / Ready for merge.") == "clean",
+    )
+    check(
+        "classify_verdict: a long verification section with no verdict is NEITHER",
+        checker.classify_verdict(
+            "### Verification\n\nI re-derived every figure. The counts agree. "
+            "Every one of the eight items checks out.\n\nNot merging."
+        ) == "",
+    )
+    check(
+        "classify_verdict: a QUOTED 'Needs more work' is not a verdict (#1202 strip)",
+        checker.classify_verdict(
+            "Ready for merge. This PR widens coverage of \"Needs more work\" verdicts."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: findings win over a clean line in the same body",
+        checker.classify_verdict("Ready for merge. But: Needs more work on the tests.") == "not-clean",
+    )
+
+    # POSITIVE CONTROL -- the exact #1267 shape that bypassed the gate.
+    # An explicit "Needs more work" at an EARLIER commit (so it never enters
+    # matching_items), followed by a rich, evidence-dense comment at HEAD that
+    # states no verdict at all. Every pre-existing criterion passes on this
+    # payload; only criterion 4 catches it. The test asserts BOTH halves, so it
+    # cannot go vacuous if a future edit makes some other check fail instead.
+    needs_work_earlier_sha = {
+        "createdAt": "2026-08-07T21:56:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD oldsha0.\n\n"
+            "Verdict: Needs more work -- 8 findings below."
+        ),
+    }
+    verification_no_verdict_at_head = {
+        "createdAt": "2026-08-07T23:05:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "### Verification\n\nI re-derived each figure against the source. "
+            "The line counts agree, the citations resolve, and the reflow "
+            "preserved every word.\n\nNot merging."
+        ),
+    }
+    mock_1267 = json.dumps({
+        "comments": [needs_work_earlier_sha, verification_no_verdict_at_head],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_1267):
+        v_ok, v_issues = checker.check_review_comments("1267", "sha123")
+        check(
+            "POSITIVE CONTROL: verdict-less comment at HEAD does not clear an earlier "
+            "'Needs more work' (#1267/#1275)",
+            (not v_ok) and any("Latest verdict-bearing" in i for i in v_issues),
+        )
+        check(
+            "POSITIVE CONTROL is non-vacuous: criterion 4 is the ONLY thing that fires",
+            len(v_issues) == 1,
+        )
+
+    # NEGATIVE CONTROL -- the ordinary ARDI flow the check must not break:
+    # the same earlier "Needs more work", superseded by a real clean verdict
+    # at HEAD. If this fails, the check is over-blocking every iterated PR.
+    clean_verdict_at_head = {
+        "createdAt": "2026-08-07T23:05:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "All eight findings are addressed.\n\nVerdict: Clean / Ready for merge."
+        ),
+    }
+    mock_superseded = json.dumps({
+        "comments": [needs_work_earlier_sha, clean_verdict_at_head],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_superseded):
+        s_ok, s_issues = checker.check_review_comments("1267", "sha123")
+        check(
+            "NEGATIVE CONTROL: a later clean verdict DOES supersede an earlier 'Needs more work'",
+            s_ok and s_issues == [],
+        )
+
+    # Ordering, not payload order: the chronology must come from the timestamps,
+    # so a clean verdict listed first but dated EARLIER still loses to a later
+    # not-clean one.
+    mock_out_of_order = json.dumps({
+        "comments": [clean_verdict_at_head, {
+            "createdAt": "2026-08-07T23:30:00Z",
+            "body": "### \ud83e\udd16 Report\n\nReviewed HEAD sha123.\n\nVerdict: Needs more work.",
+        }],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_out_of_order):
+        o_ok, o_issues = checker.check_review_comments("1267", "sha123")
+        check(
+            "latest verdict is chosen by timestamp, not by payload order",
+            (not o_ok) and any("Latest verdict-bearing" in i for i in o_issues),
+        )
+
+    # REAL-INPUT CONTROL -- the fixtures above all carry a "\ud83e\udd16" marker, which
+    # enters the pipeline downstream of the admission gate and so proves nothing
+    # about it. These reproduce #1267's ACTUAL comment shapes: posted under a
+    # human login, no robot glyph, the verdict carried under a "### Verdict"
+    # heading. Against the pre-fix marker list all four were rejected, all_items
+    # was empty, and criterion 4 could never fire on the very PR it was built
+    # for. See algorithmatize-checks.md, "A negative control must enter at the
+    # real input".
+    real_round1 = {
+        "createdAt": "2026-08-07T21:56:09Z",
+        "body": (
+            "**Claude finished** --- adversarial review of the whole diff.\n\n"
+            "### Verdict\n\n**Needs more work** --- 8 findings below."
+        ),
+    }
+    real_round2 = {
+        "createdAt": "2026-08-07T22:49:12Z",
+        "body": (
+            "**Round-2 verification** --- adversarial re-check of all eight findings.\n\n"
+            "### Verdict\n\n**Needs more work** --- the two items above are the only "
+            "outstanding ones. I am correcting both in the next push."
+        ),
+    }
+    real_round3_no_verdict = {
+        "createdAt": "2026-08-07T23:05:32Z",
+        "body": (
+            "## Round 3 --- two corrections, three new learnings\n\n"
+            "Head is now sha123.\n\n"
+            "### Verification\n\nEvery figure re-derived against the source; the "
+            "counts agree.\n\nNot merging."
+        ),
+    }
+    mock_real = json.dumps({
+        "comments": [real_round1, real_round2, real_round3_no_verdict],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_real):
+        r_ok, r_issues = checker.check_review_comments("1267", "sha123")
+        check(
+            "REAL-INPUT CONTROL: #1267's actual comment shapes are admitted and "
+            "criterion 4 fires on them",
+            (not r_ok) and any("Latest verdict-bearing" in i for i in r_issues),
+        )
+
     # Test 6: CI check runs filtering
     mock_ci_success = json.dumps({
         "check_runs": [

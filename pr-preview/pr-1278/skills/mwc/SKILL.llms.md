@@ -1,0 +1,59 @@
+# Merge-When-Confident (MWC) Session Grant
+
+`mwc` (“merge when confident”) is an explicit, session-scoped user grant that authorizes the AI assistant to merge fully-clean pull requests autonomously for the duration of the current session, without asking confirmation before every merge.
+
+## Standing Scope & Policy
+
+- **Baseline Prohibition**: AI assistants MUST NOT merge PRs/MRs without explicit user instruction for that specific PR. Pushing, building, or driving a PR to 100% clean CI DOES NOT grant permission to merge.
+- **MWC Override Scope**: When the user explicitly issues `/mwc`, “merge when confident”, “merge at will”, or “maw”, that baseline prohibition is suspended for the current session only.
+- **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean (all CI checks passing, review verdict clean, no unresolved comments, no open block labels). It NEVER authorizes merging a PR with failing CI, unresolved findings, or pending reviews.
+- **Session Duration**: The grant expires automatically when the session ends or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
+
+## Session Lock & Hook Integration
+
+`no-unauthorized-merge.py` enforces the baseline merge prohibition at the `PreToolUse` hook level, blocking `gh pr merge`, `glab mr merge`, `gh api .../merge`, and `glab api .../merge`.
+
+When MWC is enabled for a session: 1. `ai-session.sh enable-mwc` creates a `<sanitized-session-id>.mwc` marker file in the repository’s git common directory (`$(git rev-parse --git-common-dir)/ai-sessions/`). 2. `no-unauthorized-merge.py` checks for the active session’s `.mwc` marker file and validates that the session is alive (`is_session_alive()`). 3. If an active `.mwc` marker exists for the current session, `no-unauthorized-merge.py` allows merge tool executions. 4. `ai-session.sh disable-mwc` removes the `.mwc` marker file, restoring the strict prohibition immediately.
+
+## Procedure for Agents Handling `/mwc`
+
+When the user gives an MWC grant (e.g. `/mwc` or “merge when confident”):
+
+1.  **Run the enabling step first, and confirm it took.** `skills/session-lock/scripts/ai-session.sh enable-mwc`, then `skills/session-lock/scripts/ai-session.sh check-mwc` to verify. This step is what makes the grant real: without the `.mwc` marker it creates, `no-unauthorized-merge.py` cannot see the grant and correctly keeps blocking. **A grant acknowledged only in prose is not a grant the machinery can see**, so skipping this step leaves you believing you hold a permission that does not exist — and then reading the resulting block as an obstacle rather than as the accurate answer it is. Only then acknowledge the grant in one sentence, so the user knows it’s active for the session, and what it does and doesn’t cover.
+2.  Proceed with the task (e.g. driving PRs to clean via `ardi`).
+3.  When a PR reaches 100% clean state, merge it immediately (default: squash merge via `gh pr merge <number> --squash --delete-branch`), verify the merge landed on GitHub/GitLab, and run the post-merge skill (`post-merge` / `ums`).
+4.  If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.
+
+## What a re-grant does NOT mean
+
+The grant is **conditional**, and the condition is the Scope Limit above. Re-issuing a conditional permission does not make its condition true. That distinction collapses in one specific situation, so it is worth naming mechanically rather than trusting judgment in the moment: a merge command is blocked, you ask whether to retry, and the user answers with the keyword.
+
+Read as an answer to “should I retry?”, the keyword looks like “yes, merge that PR.” It is not. It re-states a standing, conditional policy, and the PR in front of you is precisely the one that failed the condition — otherwise nothing would have blocked. The framing of your own question is what makes the keyword look like an instruction about one specific PR.
+
+Three rules follow, and they hold whatever the block turned out to be:
+
+- **A conditional grant re-issued in response to a blocked action is not authorization for that action.** Re-check the condition before acting, and say which specific PR you are claiming the grant for and why it qualifies — naming it forces the check that the keyword bypassed.
+- **A permission whose enforcement is mechanized has an enabling step.** Run it when the grant is given. If you did not, a block is evidence the grant is **not active** — not an obstacle to retry.
+- **Never retry a denied merge on the strength of a keyword.** The denial and the grant are about different things: one is a guard’s state, the other is the user’s intent, and only the guard’s state gates the action.
+
+## Two properties of the guard worth knowing before you trust it
+
+**The denial you hit may not be this guard.** `no-unauthorized-merge.py` is a `PreToolUse` hook, and a hook only runs if it is **registered** — which is a separate question from whether its file exists. Claude Code’s own auto-mode permission classifier blocks merge commands too, and the two are independent mechanisms. They differ in exactly the way that matters here: the hook reads a **marker file**, so re-asking cannot move it, while the classifier reads the **conversation**, so re-stating intent can. So a denial that clears on a retry was, by that fact, probably not this guard. Check registration rather than assuming, per `CLAUDE.md`’s “Keep ai-config and repo checkouts fresh”:
+
+``` bash
+python3 <ai-config-checkout>/scripts/install-hooks.py   # report only; --fix binds
+```
+
+Measured on one machine, 2026-08-07: `registered=0 missing=15`, with `enabledPlugins` unset in `~/.claude/settings.json` — so every guard in `hooks/hooks.json`, this one included, was placed but unbound. The guard’s own logic was fine: fed a `gh pr merge` payload directly it returned `permissionDecision: deny`, and with a valid marker it allowed. It simply never ran.
+
+**The marker is per-repository, so a grant in one repo authorizes nothing in another.** `check_mwc_active()` looks for `<git-common-dir>/ai-sessions/<session>.mwc`, resolved from the current working directory and `CLAUDE_PROJECT_DIR`. Enabling MWC while working in repo A therefore leaves a merge in repo B blocked, which is correct and easy to misread as the guard malfunctioning. It also requires `AI_SESSION_ID` or `CLAUDE_SESSION_ID` to be set; with neither set the function returns `False` and the guard denies even with a valid marker. Run `check-mwc` from the repo you intend to merge in, not merely once per session.
+
+## Quick Reference
+
+| Command | Effect |
+|:---|:---|
+| `skills/session-lock/scripts/ai-session.sh enable-mwc` | Enables session-wide merge grant |
+| `skills/session-lock/scripts/ai-session.sh disable-mwc` | Revokes session-wide merge grant |
+| `skills/session-lock/scripts/ai-session.sh check-mwc` | Checks if session-wide merge grant is active |
+
+Back to top

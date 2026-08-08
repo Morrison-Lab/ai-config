@@ -35,7 +35,9 @@ The branch behind #511 was a CRAN release branch this session did not own, so
 the response was an explanatory comment naming the rename and where the content
 went, not a push.
 `git show --name-status "$merge"` was the first command reached for and printed
-no file list at all; re-measured against this corpus's own merge `f6be2ab3`, it
+no file list at all --- both merges here are two-parent merges, which is the
+case that behaves this way; re-measured against this corpus's own merge
+`f6be2ab3`, it
 prints only the commit header while `git diff --name-status -M f6be2ab3^1
 f6be2ab3` returns `M skills/stack-prs/SKILL.md`, and
 `git show --name-status f6be2ab3 | grep -cE '^[ADMR]'` returns 3 for the

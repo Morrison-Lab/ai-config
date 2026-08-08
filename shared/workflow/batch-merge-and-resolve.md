@@ -115,12 +115,18 @@ Settle that with `git log --diff-filter=D -- <path>`, noting that a shallow
 clone answers "never deleted" for anything removed before its window
 ([`memories/claude-code.md`](../../memories/claude-code.md)).
 
-**`git show --name-status <merge>` prints no file list at all**, and it is the
-natural command to reach for here.
-It defaults to the combined (`--cc`) diff, which omits any path matching some
-parent, so an ordinary merge yields an empty attribution set --- and grepping
-that output for `^[ADMR]` returns 3, because `Merge:`, `Author:` and `Date:`
-each begin with one of those letters.
+**`git show --name-status <merge>` prints no file list at all on a true
+merge**, and it is the natural command to reach for here.
+A true merge has two parents, and `git show` defaults to the combined (`--cc`)
+diff, which omits any path matching some parent --- on a clean merge that is
+every path, so it yields an empty attribution set.
+Grepping that output for `^[ADMR]` then returns 3, because `Merge:`, `Author:`
+and `Date:` each begin with one of those letters.
+A squash merge is an ordinary single-parent commit and is diffed normally, so
+`git show` would serve there.
+That is the reason to standardize on the `git diff` form: it is correct under
+both merge styles, and which style produced the commit in front of you is a
+property of the repo's settings rather than of the commit.
 So its empty answer and its broken answer look alike, per
 [`fail-fast`](../principles/fail-fast.md).
 Use the `git diff <merge>^1 <merge>` form above.
@@ -142,7 +148,9 @@ disrupt.
 - **Don't:** read a post-merge sweep's hit list as your work queue; on an old
   backlog most of it predates your merge.
 - **Don't:** derive that path set with `git show` --- it reports nothing for a
-  merge commit, and a naive grep of its header reports three phantom paths.
+  true merge, and a naive grep of its header reports three phantom paths.
+  It happens to work on a squash merge, which is what makes reaching for it
+  unreliable rather than simply wrong.
 
 ## Independent per-PR checking cannot see pair collisions
 

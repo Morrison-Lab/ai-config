@@ -94,6 +94,17 @@ BLOCK = [
     ("cd /tmp && echo ALLOW_MERGE=1 && gh pr merge 411", "override in a DIFFERENT segment does not authorize the merge segment"),
     ("cat <<EOF\n$(gh pr merge 411)\nEOF", "live subshell inside an UNQUOTED heredoc still executes"),
     ("cat <<EOF\n`gh pr merge 411`\nEOF", "live backtick inside an UNQUOTED heredoc still executes"),
+    # Heredoc masking must not become a hiding place. A `<<WORD` that is only
+    # TEXT introduces no heredoc, so it must not blank the lines beneath it --
+    # that would fail OPEN, masking a real merge rather than merely over-warning.
+    ('echo "see <<EOF for details"\ngh pr merge 411',
+     "a quoted <<EOF is not a heredoc, so the next line is still scanned"),
+    ("echo 'mentions <<BODY somewhere'\ngh pr merge 411",
+     "a single-quoted <<BODY is not a heredoc either"),
+    ('grep -n "<<HEREDOC" notes.txt\ngh pr merge 411',
+     "a grep pattern containing << does not mask what follows"),
+    ("grep foo <<<PAYLOAD\ngh pr merge 411",
+     "a bare-word <<< herestring is not a heredoc introducer"),
 ]
 
 ALLOW = [

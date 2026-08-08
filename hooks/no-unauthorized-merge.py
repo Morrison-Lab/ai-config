@@ -179,6 +179,41 @@ HEREDOC_START = re.compile(
 )
 
 
+def _heredoc_intro(line: str):
+    """The first `<<DELIM` on `line` that is a REAL heredoc introducer, or None.
+
+    Quote context decides it, and getting this wrong fails OPEN rather than
+    noisily: `echo "see <<EOF for details"` introduces no heredoc, but treating
+    it as one masks every following line until a lone `EOF` that never comes --
+    hiding any real merge command underneath it. Same for a `grep "<<PATTERN"`.
+
+    `<<<` is a herestring, not a heredoc, and is skipped whole: scanning it
+    character by character would otherwise match `<<` at its second `<` and read
+    the rest as a delimiter.
+    """
+    in_single = in_double = escaped = False
+    i, n = 0, len(line)
+    while i < n:
+        c = line[i]
+        if escaped:
+            escaped = False
+        elif c == "\\" and not in_single:
+            escaped = True
+        elif c == "'" and not in_double:
+            in_single = not in_single
+        elif c == '"' and not in_single:
+            in_double = not in_double
+        elif c == "<" and not in_single and not in_double:
+            if line.startswith("<<<", i):
+                i += 3
+                continue
+            m = HEREDOC_START.match(line, i)
+            if m:
+                return m
+        i += 1
+    return None
+
+
 def mask_heredocs(text: str) -> str:
     """Mask heredoc bodies, preserving length and line structure.
 
@@ -196,7 +231,7 @@ def mask_heredocs(text: str) -> str:
     out = list(lines)
     i = 0
     while i < len(lines):
-        m = HEREDOC_START.search(lines[i])
+        m = _heredoc_intro(lines[i])
         if not m:
             i += 1
             continue

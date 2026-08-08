@@ -627,6 +627,20 @@ already banked. Concretely: a reviewer approving with no comments means nothing
 new, so skip; a reviewer flagging a missing anti-pattern that isn't already in
 the UMS diff is a new lesson worth a follow-up.)
 
+**The second clause is the operative one, and it is the one that goes
+unevaluated.**
+The first clause holds for every learnings PR, which is the only kind of PR
+this guard ever fires on, so it is satisfied before you have read the rest of
+the sentence.
+Evaluate the second clause explicitly, by an actual pass over the merged PR's
+own review rounds, and emit the guard's outcome as a sentence either way.
+"Skipped under the recursion guard; the review loop raised nothing that is not
+already in the diff" is a report.
+Silence is the failure, because it is indistinguishable from step 4 never
+having been reached.
+See [`skill-checklists`](../../shared/workflow/skill-checklists.md)'s "An item
+a guard exempts is neither run nor skipped".
+
 ### 5. Report
 
 **Pause point: before reporting the merge wrapped up.**

@@ -75,6 +75,63 @@ clean-but-unmerged PR is not a stop; move to the next item, and stack it when it
 isn't naturally independent of that PR. See
 [`stack-dont-pause`](stack-dont-pause.md).
 
+**The same gate does not pause the loop *within* a single PR either, and that
+is the harder half to see.**
+The paragraph above says the merge gate does not stop you moving to the *next*
+PR.
+This says it does not stop you working *this* one.
+An authorization gate attaches to a specific **action** --- the merge, a
+force-push, a destructive one-off --- never to the PR as a whole.
+Everything else the loop already mandates stays pre-authorized on that PR:
+syncing with `main`, resolving a conflict, pushing a fix, re-dispatching a
+review, resolving threads, reporting the result.
+`CLAUDE.md`'s "Watch and ARDI every PR you touch --- don't ask first" states
+the standing yes; this names the boundary it stops at.
+
+Conflict resolution in particular is not merely permitted but **owed**, per the
+continuous-monitoring paragraph at the top of this fragment: a conflict "is ARDI
+work immediately --- sync and resolve the conflict ... not merely a status item
+to hand back to the user".
+Handing it back is the named anti-pattern rather than a cautious reading of the
+merge gate.
+
+What makes this hard to catch from the inside is that it is not laziness or
+evasion.
+The gate being over-applied is a **real** gate, correctly identified, and
+usually one you have already invoked several times on that same PR for the
+action it genuinely covers.
+Having rightly refused to merge, refusing to touch it at all reads as
+consistency rather than as a second and different refusal.
+So the lesson is not "be more proactive" --- diligence was never the missing
+input.
+It is that a gate has a scope, and the scope is the action.
+
+**The tell is lexical, and it sits in your own outgoing message: a
+RECOMMENDATION or question whose proposed action is ordinary ARDI work.**
+If the sentence you are about to write asks permission to do something the loop
+already requires, that is the error.
+Do it, and report in the past tense.
+
+This bites hardest on a PR that **cannot** reach a clean verdict --- no external
+reviewer will answer at any head, so nothing about it feels routine and the
+whole PR starts to read as gated.
+Drive it to whatever state it *can* reach: merged with current `main`, green on
+every check that runs, threads resolved, self-review posted.
+Then report it as blocked on the specific thing it is actually blocked on,
+rather than leaving it dirty because the terminal step is unavailable.
+
+- **Do:** resolve conflicts, sync, push fixes, and re-dispatch reviews on a PR
+  whose merge you are correctly withholding, and report those in the past
+  tense.
+- **Do:** name the one action that is gated, so "blocked" stays a claim about a
+  step rather than about the PR.
+- **Don't:** generalize a withheld merge into withholding the rest of the loop
+  as though one authorization covered both.
+- **Don't:** write a recommendation proposing work ARDI already mandates --- a
+  request to do the required thing is the error, not a courtesy.
+
+See [`ardi.cases.md`](ardi.cases.md), "A merge gate is not a work gate".
+
 **Self-review against the project's own stated conventions before every
 push, not just the first --- and don't just re-read the criteria, actually
 run the applicable review skills against your own diff and iterate on
@@ -1141,3 +1198,55 @@ claim, and its remedy applies: check the population --- every step of the job
 - **Don't:** substitute a production script's exit code for its test file.
 - **Don't:** infer a job's behaviour from one step's label --- "(advisory)"
   describes that step, not the job.
+
+**A third failure mode of the whole-suite rule above: the suite holds no case
+that could have failed.**
+The two hazards that rule names both assume a test aimed at the behaviour you
+changed exists --- one you skipped by scoping the run, or one a conditional
+turned into a pass.
+Widening the run and un-gating every skip fixes those two and does nothing for
+this one, where the case simply is not there, because the defect class had not
+been conceived when the suite was written.
+
+Provenance is the whole argument.
+A suite's case population was fixed before your change existed, so its green is
+**logically independent** of whether that change is correct.
+Red still carries information, since a suite that fails has found something.
+Green is not its mirror, and reading the two symmetrically is what turns a
+routine run into a verification claim.
+
+That asymmetry is what makes such a report persuasive rather than obviously
+thin.
+Running the whole suite is real work and the diligent thing to do, and a line
+like `15/15 suites passed` is specific, checkable, and true.
+It is just an answer about the cases somebody wrote earlier.
+
+So when the change is a **guard** --- a matcher, a validator, a filter, anything
+whose job is to refuse a class of input --- the verifying step is to construct
+that class yourself and run it against the pre-change and the post-change code,
+reporting the two behaviours side by side.
+Two columns over inputs you chose is a comparison; a suite total is not.
+This is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "an
+instrument's answer is only as wide as its input" with a test suite as the
+instrument, and the construction step is
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "never predict which case
+will fail; enumerate the class" applied to inputs rather than to a report.
+
+Distinguish it from the neighbours it resembles, since all of them concern a
+test that was aimed at the question and fell short.
+[`fixtures-are-not-evidence`](fixtures-are-not-evidence.md) governs a fixture
+that cannot discriminate; the regression-test rule earlier in this file governs
+a case you wrote in this pass and never saw fail;
+[`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)
+governs a test that reimplements its own subject.
+Here nothing is defective.
+The suite is sound, and it was pointed somewhere else.
+
+- **Do:** construct the input class the change is supposed to handle and diff
+  its behaviour against the pre-change code, before calling a guard verified.
+- **Do:** name which cases could have exercised the defect class, rather than
+  quoting a suite total --- the total is a fact about the suite, not the diff.
+- **Don't:** offer a pre-existing suite's green as verification of a change it
+  holds no case for; those cases predate the defect and cannot speak to it.
+- **Don't:** read the tests/failed/skipped triple above as covering this --- it
+  makes the report more precise without making it any more relevant.

@@ -517,10 +517,11 @@
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
   On workflows with `concurrency: cancel-in-progress` (d-morrison/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
-  If a review ends up canceled with no comment, check first whether a newer run for the **same PR** is already in flight --- a retry cancels it, and it may be a review a human just requested --- and dispatch only when nothing is running: `gh workflow run claude-review.yml -f pr_number=<N>`.
+  If a review ends up canceled with no comment, check first whether a newer run for the **same PR** is already in flight --- a retry cancels it, and it may be a review a human just requested --- and dispatch only when nothing is running: `gh workflow run claude-review.yml --ref <PR-branch> -f pr_number=<N>`.
   Attribute in-flight runs to a PR from each run's own `gather-context` log.
   `gh run list` reports `main` as the branch for every dispatched review.
-  See [`fully-clean`](../shared/workflow/fully-clean.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy".
+  Always pass `--ref`: a dispatch without it runs against the default branch, so the run's check runs land on `main`'s tip rather than the PR head --- which leaves the PR's own review check stale and makes a check-runs query at that head a vacuous all-clear about whether a review is in flight.
+  See [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy".
 - During ARDI loops: always ANTICIPATE what the reviewer will flag next and fix those issues preemptively in the same commit.
   Don't wait for each round to surface issues one at a time --- read the code holistically, think about what patterns the reviewer has flagged in prior rounds (documentation gaps, coupling without cross-references, missing edge-case guards, inconsistent accounting), and fix analogous issues elsewhere in the same file before pushing.
   The goal is to minimize back-and-forth rounds.
@@ -733,7 +734,7 @@
   The issue-close action itself may still be right, but check the specific instruction's actual scope before taking an adjacent action on the strength of it, rather than let a true, narrow statement license everything downstream that logically follows from it. (Learned on `Lacaedemon/sparta`, 2026-07-04.)
 - **"You can merge X" authorizes the merge, not the branch-protection *bypass* (`gh pr merge --admin`) needed to merge past a required approving review --- the auto-mode classifier treats those as two separate grants.** When the user said "you can merge 317," a plain `gh pr merge --squash` was rejected by GitHub itself ("base branch policy prohibits the merge" --- protection requires an approving review, which the `@claude` bot comment doesn't satisfy), and the follow-up `--admin` was then denied by the classifier: the merge was authorized but the review/protection override was not.
   Recovery is to surface it as a blocker --- get a human approving review, or ask the user to *explicitly* authorize the `--admin` bypass --- not to keep retrying `--admin`.
-  A concrete instance of `shared/workflow/fully-clean.md`'s rule that a required check/review failing is a stop-and-ask even under a merge grant. (Learned on ucdavis/bcs#317, 2026-07-09.)
+  A concrete instance of `shared/workflow/review-verdict-pitfalls.md`'s rule that a required check/review failing is a stop-and-ask even under a merge grant. (Learned on ucdavis/bcs#317, 2026-07-09.)
 - When subscribed to two or more PRs at once (`subscribe_pr_activity` on several in the same session, or a stacked-PR chain), track each as a task with `TaskCreate`/`TaskUpdate` instead of holding their status only in chat prose. The harness already nudges toward this ("task tools haven't been used recently") whenever a session sits on unlogged concurrent work; use them rather than juggling several scheduled check-ins and webhook threads from memory alone. (Learned on ai-config#493/#498/#499, 2026-07-05: three concurrent PR watches were tracked only in chat text, exactly the case these tools are for.)
 
 ## Output-highlighting taxonomy

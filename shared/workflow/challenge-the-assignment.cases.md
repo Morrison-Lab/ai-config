@@ -12,7 +12,8 @@ carries a review-quota carve-out phrased as "`total_cost` 0 at `num_turns` 1",
 written from recollection and never queried.
 `grep -nE "total_cost|num_turns" CLAUDE.md` returns nothing, and
 `git grep -n 'total_cost` 0 at' -- '*.md'` returns exactly one hit,
-`shared/workflow/fully-clean.md:651`, which is where that carve-out actually
+`shared/workflow/review-verdict-pitfalls.md:29` (moved there from
+`fully-clean.md` per ai-config#1236), which is where that carve-out actually
 lives.
 `CLAUDE.md`'s quota material is about a bot comment stating that the review
 was skipped for an exhausted quota --- a signal the bot posts, rather than an

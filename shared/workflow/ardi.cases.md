@@ -301,3 +301,53 @@ Windows caught that one too.
 The subsequent full-suite run was itself misleading in the opposite
 direction: run *with* an env var CI does not set, it reported two failures
 belonging to the sibling PR.)
+
+## A third failure mode: the suite holds no case that could have failed
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08: the PR narrowed
+`hooks/no-unauthorized-merge.py`'s command-position anchor, and its "Checks run"
+section offered `test_hooks` (15/15 suites) and every `scripts/test_*.py` as the
+verification, all run after committing so the diff-scoped ones read `HEAD`.
+Both statements were true.
+Review then found a high-severity fail-open: five executable bash forms ---
+a leading `!`, a `time` wrapper, a `nohup` wrapper, a brace-group body, and a
+`then` branch body --- reached the blocked merge command while the guard
+returned allow, all five having blocked before the change.
+No case in the suite covered a keyword-prefixed command, so no amount of running
+it could have failed, and un-gating skips or widening the run would have changed
+nothing.
+The reviewer's method is the remedy this rule prescribes: it loaded the PR's own
+hook at `552cd0a`, called `offending()` on the five constructed inputs, and
+tabulated the results against `main`'s pre-change version --- two columns over
+an input class, rather than a suite total.
+Reproduced independently before fixing, on `769ac87c`, with the same five
+allowing and the bare baseline blocking.
+The PR body had even noted that "the merge guard's only scoped authorization
+path had no test at all, which is how these went unnoticed", so the absence was
+observed and never generalized into distrust of the suite total quoted beside
+it.)
+
+## A merge gate is not a work gate
+
+(`ucdavis/bcs#578`, 2026-08-07: a CI change adding Gemini/Antigravity as review
+options, with one unusual property --- no external reviewer had produced a
+verdict at any head.
+Every verdict-shaped comment on it was the session's own self-review posted
+under the maintainer's account.
+Copilot had refused nine times on quota,
+and the repo's `claude-review` ran twice at the current head with
+`conclusion: success` and posted nothing either time.
+The session correctly and repeatedly declined to **merge** it without being
+told to.
+`main` then advanced by four PRs and #578 went `CONFLICTING`/`DIRTY`.
+The status report carried a boxed RECOMMENDATION --- "let me resolve #578's
+conflict and re-run its review ...
+Say the word and I'll drive it;
+I won't merge it either way" --- and stopped there.
+The user replied "do it", then corrected: "you should have done it without
+waiting for approval".
+Both halves of the rule were already written down --- `CLAUDE.md`'s "never ask
+'should I watch this?' or 'should I iterate it?' first", and this fragment's own
+"a conflict ... is ARDI work immediately".
+The failure was conflating a correct gate on one action with a gate on the whole
+PR.)

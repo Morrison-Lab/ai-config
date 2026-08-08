@@ -61,8 +61,8 @@ sentence/clause` summary, then exits successfully, so the job it runs in
 reports success either way.
 Read its output rather than its color --- this is the same
 green-check-does-not-mean-clean-content pattern
-[`fully-clean`](../workflow/fully-clean.md) documents for review jobs, and it
-is easy to miss precisely because nothing turns red.
+[`review-verdict-pitfalls`](../workflow/review-verdict-pitfalls.md) documents
+for review jobs, and it is easy to miss precisely because nothing turns red.
 Run it locally before pushing and fix what it names --- the script lives in a
 [`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, at
 `check-new-line-breaks/check-new-line-breaks.py` relative to that repo's root:
@@ -255,3 +255,65 @@ reformat is that only line wrapping changed.
 (ai-config#779, 2026-07-28: a demo reformat of one of gha's changelog
 fragments dropped its leading `- ` and rewrote an em dash as `---`.
 The check reported the result clean; the word diff found both.)
+
+**Breaking a line just before an issue reference turns it into a malformed
+heading.**
+This corpus writes `#NNNN` references constantly and mandates one clause per
+line, so the two conventions eventually collide: a clause beginning with an
+issue number puts `#` in column 1, markdownlint reads it as an ATX heading with
+no space after the hash, and `validate` fails MD018.
+
+It is worth knowing because of *where* it surfaces.
+The banned-punctuation and multi-sentence scans both pass, since neither looks
+at column 1, and the line reads perfectly as prose --- so the first report comes
+from CI, on a file whose content is entirely correct.
+Nothing about writing the sentence suggests a formatting problem.
+
+Reword so the clause opens with a word rather than the reference:
+prefer "Round 2 on #1287 sharpens why" over the possessive form that leads with
+the number.
+Note that quoting the bad form in prose reproduces the fault whenever the quote
+wraps onto a fresh line, which is how this very paragraph first failed.
+Derive the class rather than fixing the reported line, since one collision
+usually means others: `git diff <base>...HEAD | grep "^+" | sed 's/^+//' |
+grep -nE '^#[^ #]'` returns every added line that opens with a bare `#`.
+
+- **Do:** scan added lines for a column-1 `#` before pushing, with the same
+  after-committing, three-dot discipline the other diff-scoped scans use.
+- **Do:** reword the clause to open with a word, keeping the reference inline.
+- **Don't:** rely on the punctuation or sentence-count scans to catch it ---
+  neither reads column 1.
+- **Don't:** fix only the line CI named; the same phrasing habit produces the
+  collision wherever a clause happens to start with a reference.
+
+**Repointing a citation to a longer filename can push an untouched
+`memories/` file over its hard-gated size ceiling, with zero content added.**
+The "Relocating prose" section above is about the *moved* content's own
+lines growing.
+The citing side has its own version, and it fires on a file you never meant
+to touch beyond a one-word swap.
+`memories/` files sit under a hard-gated ceiling --- the checker script
+calls itself advisory, but `test_check_memory_file_size.py`'s own
+regression test asserts the *live corpus* stays under it, which is a
+different, non-advisory guarantee --- so a file already sitting exactly at
+1200 lines has zero headroom.
+Repointing one citation inside it to a longer replacement name rewraps the
+sentence carrying it, and in this semantic-line-break corpus that rewrap can
+add a whole line, pushing the file to 1201 and failing CI though not one
+word of content changed.
+
+- **Do:** after repointing a citation, `wc -l` any touched `memories/` file
+  that was near 1200 lines, and re-wrap the sentence to recover the line if
+  it crossed.
+- **Do:** read `test_check_memory_file_size.py` itself, not just the
+  checker script's docstring --- the docstring calls the check advisory,
+  and the test suite hard-gates the live corpus anyway.
+- **Don't:** assume a citation swap with no other content change cannot
+  move a file's line count.
+
+(Morrison-Lab/ai-config#1291, 2026-08-08: repointing citations from
+`fully-clean.md` to the longer `review-verdict-pitfalls.md` inside
+`memories/claude-bot-workflows.md` and `memories/github-actions.md` tipped
+each from exactly 1200 to 1201 lines, failing `validate` with no content
+change; fixed by re-wrapping the same sentences at a different clause
+boundary, restoring both to 1200.)

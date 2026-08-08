@@ -65,7 +65,8 @@ regression before the pattern was re-read.)
 ## "A third direction" --- the diff header that rode into ported prose
 
 (Morrison-Lab/ai-config#1290 -> #1296, 2026-08-08.
-#1291 merged at 14:41:26Z, splitting `shared/workflow/fully-clean.md` and
+Sibling PR #1291 merged at 14:41:26Z, splitting
+`shared/workflow/fully-clean.md` and
 moving #1290's target section into the new
 `shared/workflow/review-verdict-pitfalls.md`, so #1290 had to *port* its prose
 rather than merge it.

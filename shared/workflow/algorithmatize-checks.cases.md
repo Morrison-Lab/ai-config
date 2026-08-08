@@ -201,3 +201,40 @@ discharge fired only when structural-identity, "last simple command", and
 same-PR-scoping clauses all held, and a single regression case that two of the
 three clauses each kept correct made reverting any one of them still pass; each
 clause needed its own isolating case before the mutation test meant anything.)
+
+## The harness that performs those mutations needs the same scrutiny
+
+(`Morrison-Lab/ai-config#1293`, 2026-08-08, measured while drafting the rule:
+the first harness dropped one alternative from a regex alternation by deleting
+the token `<alt>|`, which is present for every interior member and absent at the
+end of the list.
+Run against this corpus's own negation-prefix guard,
+`\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't)\s+`, that form mutated
+seven of eight and silently no-opped on `can't`, which is followed by `)` rather
+than `|`.
+The mirror form `|<alt>` mutated seven of eight and no-opped on `not`, preceded
+by `(?:`.
+So each single-sided token leaves exactly one end unreachable, and a harness
+scoring "no failure observed" as a pass would have reported that end verified.
+The brief this was recorded from asserted that one form was vacuous at BOTH
+ends; running it is what showed each form fails at one, which changes the fix ---
+adding the opposite delimiter does not help, because substring overlap between
+alternatives makes string replacement the wrong instrument regardless.)
+
+## A component that stops failing under mutation is a question
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08: after a positional guard replaced two
+word lists as the primary classifier, mutation testing showed the negation and
+hedge lists had gone dead --- removing either failed nothing, because position
+already caught every case the suite held for them, a negation never being markup.
+Searching for where they remained load-bearing rather than deleting them found a
+case the corpus guarantees: this repository writes semantic line breaks, so a
+qualifier routinely sits at the end of the PREVIOUS line, as in "The PR is not"
+followed by "ready for merge until the findings are fixed."
+The phrase is then line-initial, so the positional guard calls it marked, and
+only the prefix scan sees across the break.
+Two cases now pin it, and the suite went to 44 from 34 with every component
+failing only its own cases when mutated.
+Adding the position guard is what made the two older components look redundant,
+so the moment their score dropped to zero was the moment the missing case was
+findable.)

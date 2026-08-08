@@ -806,3 +806,181 @@ tracked in ai-config#811.
 - **Don't:** assume the run you are about to cancel is your own.
 - **Don't:** filter in-flight review runs by branch; a dispatched run reports
   the default branch whatever `--ref` it was given.
+
+++ b/shared/workflow/fully-clean.md
+
+**The cheap version of that pre-check asks the PR instead of the runs, and it
+is sound only when the dispatch attached the run to the PR.**
+The check above is actor-indexed: it lists the review workflow's runs and then
+has to attribute each one, which is the step `gh run list` cannot do and which
+the `gather-context` walk buys back at two API calls per run, each needing the
+job to have started.
+Asking the artifact looks strictly better, because a check run attached to the
+PR's head commit belongs to that PR by construction and needs no attribution at
+all:
+
+```bash
+head=$(gh pr view <N> --repo <owner>/<repo> --json headRefOid --jq .headRefOid)
+gh api --paginate "repos/<owner>/<repo>/commits/$head/check-runs?per_page=100" \
+  --jq '.check_runs[] | "\(.status)/\(.conclusion // "-")  \(.name)"'
+```
+
+That reasoning is sound, and this file and
+[`metacognitive-monitoring`](metacognitive-monitoring.md) both already
+recommend the move --- go read the artifact, since the distinguishing fact is
+on the PR rather than in the run data.
+It carries a precondition none of those statements state, and this case fails
+it: **an artifact-indexed query sees only actors that write to that index.**
+
+A `workflow_dispatch` run invoked without `--ref` runs against the default
+branch, so its `head_sha` is `main`'s tip and every check run it produces
+attaches there --- never to the PR head, at any status, at any time.
+The query above then returns the PR's own push-triggered checks and nothing
+else, which reads as "no review in flight" and is what it returns whether or
+not one is.
+That is the dangerous direction: a vacuous all-clear on the one question the
+pre-check exists to answer.
+Reading check runs at the dispatch ref instead does not rescue it, since that
+is where every PR's reviews pool, which is the attribution problem the
+artifact-indexed query was reached for to escape.
+
+The test that catches it is already written down, one direction over.
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A retraction is
+only as good as the instrument's reach" is aimed at withdrawing a true claim on
+a null result, and its question is direction-neutral: could this check have
+returned anything else, if the thing I am looking for were there?
+Run it against a **completed** review you know belonged to the PR, and where
+that review does not appear either, the null is silent rather than reassuring.
+
+**`--ref` is what decides it.**
+[`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)
+records that gha#286 root-caused exactly this and fixed it upstream by passing
+`--ref <PR-branch>` explicitly, so a re-dispatched review's check runs do
+attach to the PR's head commit.
+
+Two paths reach that dispatch, and only one of them now carries the flag.
+The manual command in [`ardi`](../../skills/ardi/SKILL.md)'s step 6 and
+[`preferences.md`](../../memories/preferences.md) omitted it until this entry
+was written, so the instrument was vacuous on the very command the corpus told
+people to run --- the worst place for a precondition to go unstated.
+Both are fixed alongside this section, so an agent following either now
+dispatches with the ref.
+
+The mention-driven path is not fixed and is not ours to fix from here.
+A repo pinning `claude.yml@v1` does not carry gha#286, so `@claude review`
+still dispatches without a ref and still lands on the default branch.
+That asymmetry is what the rest of this section turns on: your own dispatches
+became visible at the PR head, and a human's did not.
+
+Dispatch with the ref, and the one-call pre-check becomes available --- for
+the runs you dispatch:
+
+```bash
+gh workflow run claude-review.yml --ref <PR-branch> -f pr_number=<N>
+```
+
+Some mechanical caveats before relying on it.
+`--paginate` is load-bearing, for the reason criterion 1 in
+[`fully-clean.md`](fully-clean.md) already gives about page-2 runs.
+Read `status` before `conclusion`, since an in-flight run has no conclusion to
+be misled by.
+And the workflow file must exist on that ref, because it is the ref's copy that
+runs --- so a PR editing `claude-review.yml` dispatches its own modified
+version.
+
+One further caveat decides how far the pre-check can be trusted, and this
+passage's earlier paragraph already supplies it without drawing the
+conclusion.
+`--ref` is yours to pass, so it fixes only the dispatches you control.
+A human's `@claude review again` routes through `claude-bot.yml`, which pins
+`claude.yml@v1` and passes no ref, so that run still lands on the default
+branch and is still invisible at the PR head.
+The pre-check is therefore sound against your own dispatches and silent about
+a concurrent mention-driven one --- which is the worse half, because that run
+is the one whose cancellation costs somebody else their review.
+Until `claude-bot.yml` carries the fix, keep the `gather-context` attribution
+as the check before dispatching, and read the PR-head query as confirming your
+own run rather than as clearing the field.
+
+That residual is worth naming rather than filing away, since it is this
+section's own subject recurring one level up: a check whose scope is narrower
+than the claim made for it, with the shortfall on the side that reads as an
+all-clear.
+
+The pre-check is also **racy**, which is a separate limit from the scope one
+above and is not fixed by widening what the check can see.
+Checking and dispatching are two calls, so a run created between them is
+invisible to a check that was correct when it ran.
+
+That is not hypothetical.
+Writing the paragraph above, the pre-check ran and returned three in-flight
+runs, attributed to three other PRs.
+Six seconds later a dispatch went out, and it cancelled a fourth run created
+in between --- a mention-driven one, for this very PR, belonging to a human.
+The listing had been right: that run did not exist yet when it was taken.
+
+So a pre-check narrows the window and cannot close it, and no amount of
+instrument quality changes that --- the gap is between the two calls rather
+than inside either.
+Two things follow.
+Treat the pre-check as reducing the odds rather than as establishing safety,
+and say which it did when reporting.
+And note that the durable fix is upstream rather than procedural: either the
+mention path carries a ref, so its runs are visible where you are looking, or
+the concurrency group stops cancelling across dispatch sources.
+Until one of those lands, a dispatch is a small bet that nobody mentioned the
+bot in the last few seconds.
+
+- **Do:** confirm the class of run you are looking for can appear at the PR
+  head at all, before reading its absence there as an all-clear.
+- **Do:** validate that with a completed run you know belonged to the PR, which
+  is the positive control the null result needs.
+- **Do:** pass `--ref <PR-branch>` when dispatching a PR-scoped review, which
+  both supersedes the PR's own stale review check and makes the one-call
+  pre-check sound **for the runs you dispatch**.
+- **Don't:** substitute a check-runs query at the PR head for the
+  `gather-context` attribution above while the dispatch omits `--ref` --- it
+  answers a narrower question and answers it reassuringly.
+- **Don't:** read your own `--ref` discipline as clearing the field, while
+  `claude-bot.yml` pins `claude.yml@v1` --- a mention-driven run remains
+  invisible at the PR head, and it is the one a colliding dispatch would
+  cancel out from under a human.
+- **Don't:** report a pre-check as having established that nothing was in
+  flight --- it establishes that nothing was in flight *when it ran*, and a
+  dispatch is a later event.
+- **Don't:** read "query the artifact, not the actors" as unconditional; it
+  presupposes the actor writes to the index you are querying.
+
+(`Morrison-Lab/ai-config#1281`, measured 2026-08-08 against the same five
+dispatches tabulated above.
+The PR's head is `edc9cb8c`, and all three of its review runs --- `31232187007`,
+`31232771312`, and `31232853975`, the last of which succeeded and posted the
+verdict --- report `head_sha: 27bbe9be`, which is `main`'s tip at dispatch time
+(`hooks: warn when a branch switch and a later mutating git command are
+unchained (#1274)`).
+Every job on the successful run carries that same SHA.
+`commits/edc9cb8c/check-runs` returns 6 check runs, of which 0 match
+`review|claude` --- so the run that reviewed #1281 to completion never appeared
+at #1281's head, which is the positive control the bullets above ask for.
+`commits/27bbe9be/check-runs` holds 9 `review / claude-review` entries, 6
+successful and 3 cancelled, pooled across several PRs.
+The run object offers no attribution either: `pull_requests` is empty,
+`head_branch` is `main`, and `display_title` is the workflow name.
+This repo's `claude-bot.yml` pins `Morrison-Lab/gha/.github/workflows/claude.yml@v1`
+while `claude-review.yml` pins `claude-code-review.yml@v2`, so the gha#286 fix
+is present on one leg of the chain and not the other.
+
+The `--ref` half is measured rather than inherited, against the neighbouring
+PR whose review happened to be dispatched with one:
+
+| PR | head | dispatch | run's `head_sha` | review check runs at the PR head |
+| --- | --- | --- | --- | --- |
+| #1281 | `edc9cb8c` | no `--ref` | `27bbe9be`, `main`'s tip | 0 of 6 |
+| #1285 | `fd02b494` | `--ref ums/reusable-workflow-concurrency` | `fd02b494`, the PR head | 3 of 10 |
+
+Same repo, same workflow, adjacent PRs, one variable.
+Run `31234176429` is the second row, and its `head_branch` reads
+`ums/reusable-workflow-concurrency` rather than `main`, which is the one case
+where `gh run list`'s branch column does attribute a dispatched run --- so
+passing the ref repairs the actor-indexed view and the artifact-indexed one
+together.)

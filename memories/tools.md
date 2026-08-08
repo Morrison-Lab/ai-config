@@ -1,5 +1,24 @@
 # Local tools & CLIs
 
+## Codex plugin marketplace renames require a remove/re-add migration
+
+`codex plugin marketplace upgrade <old-name>` refuses to refresh a Git marketplace when the repository's manifest now declares a different marketplace name.
+Re-running `marketplace add <owner/repo>` is not a repair: Codex recognizes the old source as already registered and leaves the stale snapshot in place.
+
+Migrate the same plugin deliberately:
+
+```text
+codex plugin remove <plugin>@<old-name> --json
+codex plugin marketplace remove <old-name> --json
+codex plugin marketplace add <owner/repo> --json
+codex plugin add <plugin>@<new-name> --json
+```
+
+Read `marketplaceName` from the add result instead of guessing the renamed selector, then verify both `codex plugin list` and `codex plugin marketplace list`.
+This sequence preserves the source repository while replacing only its stale local registration.
+
+(2026-08-08: `d-morrison/ai-config` changed its manifest marketplace name from `d-morrison` to `Morrison-Lab`; `upgrade` failed on the mismatch and `add` reported `alreadyAdded: true` until the old registration was removed.)
+
 ## Julia in Claude Code cloud / web sessions
 - To install Julia, prefer downloading the official binary tarball from
   `julialang-s3.julialang.org` via `curl` (system CA store) over `juliaup`:
@@ -962,4 +981,3 @@ a document separator that truncates the generated script.)
   (4) no formal `CHANGES_REQUESTED` or `REJECTED` state exists on the PR (integrating GitHub's computed `reviewDecision` API field directly from `gh pr view --json reviewDecision` and preserving decision state across subsequent `COMMENTED` reviews).
   Returns exit code 0 only when fully clean.
   Must be executed synchronously in the foreground turn before declaring any ARDI loop complete or unclaiming a PR.
-

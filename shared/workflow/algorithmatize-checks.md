@@ -400,6 +400,51 @@ So the enforceable rule is "publish the command", not "verify the number".
 - **Don't:** treat a figure already copied into a PR body, a changelog, or a
   shipped file as out of scope; those are the copies a reviewer will read.
 
+## A reference frame chosen from the initial condition expires as the system moves
+
+The section above is about an instrument that **changed**, leaving every figure
+it had already produced stale with nothing pointing at them.
+This is the mirror: the instrument never changes, and the **system** moves out
+from under it.
+
+The shape is a projection.
+Measuring how much each of several candidates contributes to some effect, you
+pick an axis to project onto, and you justify the choice from the state at the
+start --- "the separation begins along +Y, so world X is the tangential
+direction".
+That justification is true at the first sample and at no later one.
+Once the system has rotated 56 degrees, the axis chosen to isolate the
+tangential channel is 83% **radial**, so the projection now reports mostly the
+channel it was picked to exclude.
+
+Nothing announces the change.
+The projection keeps returning finite, confident, per-candidate numbers at
+every sample, and a figure that has quietly changed meaning looks exactly like
+one that has not.
+The failure also runs the wrong way rather than merely adding noise.
+The axis drifts into alignment with the radial channel, and a purely radial
+candidate is precisely the kind that dominates a radial projection while
+contributing nothing to the effect --- so the wrong candidate is
+**amplified**, and the instrument returns a large, stable, wrong attribution.
+
+Two remedies, and prefer the second.
+Re-derive the frame at each sample rather than once at the start, so the axis
+tracks the system it describes.
+Better, attribute the **target quantity itself** instead of a projection
+standing in for it: the effect under investigation was a change in bearing, and
+`cross(r_hat, dr) / |r|` yields that directly, with no axis left to go stale.
+A quantity computed directly cannot drift out of alignment with the question,
+because it is the question.
+
+- **Do:** state what a chosen frame, axis, or baseline is valid *at*, and
+  re-derive it per sample when the system it describes moves.
+- **Do:** prefer computing the target quantity directly over projecting onto a
+  proxy axis, wherever a direct expression exists.
+- **Don't:** justify a fixed axis from the initial condition and then read
+  late-run figures off it.
+- **Don't:** read a large, stable per-candidate figure as a strong attribution;
+  a stale frame produces exactly that.
+
 ## A reminder guard's discharge condition is a second matcher, and its failure is silence
 
 The two sections above test a guard's *fire* condition: does the matcher catch

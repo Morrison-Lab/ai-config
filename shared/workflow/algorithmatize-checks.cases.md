@@ -274,18 +274,26 @@ It reported 4 failures where the faithful mutation reports 1, and that 4 was
 about to be published in a review reply as evidence for a claim about which
 component carried which case.
 Reproducible in one line:
-`python -c "print(repr('            if pat == r\"changes\\\\s+requested\\\\b\":'))"`
+`python -c "print(repr('            if pat == r\"changes\\s+requested\\b\":'))"`
 prints a string ending `requested\x08":`, while the same literal's `\\s` survives
 as a literal backslash-s.
-Writing that command with two backslashes instead of four prints exactly the
-same thing, because the SHELL collapses them before Python is reached: bash
-turns `\\\\` into `\\` and `\\` into `\`, and Python receives a single backslash
-either way.
-That is worth stating rather than leaving for a reader to trip over, since it is
-the same layering the case is about --- a review of this very entry read the
-four-backslash form as a typo and proposed the two-backslash one as a fix, on
-the assumption the two differ.
-Checked at the argv level: both forms hand Python the identical string.
+
+The backslash count in that line is load-bearing, and getting it wrong is this
+case's own failure a third time.
+The line first shipped with `\\s`/`\\b`, which does NOT reproduce: one shell
+layer collapses the doubled pair to a single backslash, Python then reads `\\b`
+as an escaped backslash rather than a backspace, and the reader gets a clean
+result while the prose promises corruption.
+A review caught it and was rebutted, on a measurement showing both forms
+printing `\x08` --- taken through a harness that wrapped the command in a
+SECOND shell, which collapsed the pair twice and silently turned the
+four-backslash form into the two-backslash one.
+Running each form from a file, so exactly one shell layer applies, separates
+them: the doubled form prints `requested\\b":` with no warning, and the single
+form prints `requested\x08":` with one.
+So a command measured through a tool that adds a layer is not the command a
+reader runs, and the way to compare them is to write each to a file and run the
+file.
 Python's only diagnostic is `SyntaxWarning: invalid escape sequence '\s'`, which
 names the escape that SURVIVED rather than the one that broke.
 The differs-from-original assert recorded in the section above passes on this

@@ -61,8 +61,8 @@ sentence/clause` summary, then exits successfully, so the job it runs in
 reports success either way.
 Read its output rather than its color --- this is the same
 green-check-does-not-mean-clean-content pattern
-[`fully-clean`](../workflow/fully-clean.md) documents for review jobs, and it
-is easy to miss precisely because nothing turns red.
+[`review-verdict-pitfalls`](../workflow/review-verdict-pitfalls.md) documents
+for review jobs, and it is easy to miss precisely because nothing turns red.
 Run it locally before pushing and fix what it names --- the script lives in a
 [`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, at
 `check-new-line-breaks/check-new-line-breaks.py` relative to that repo's root:

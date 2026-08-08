@@ -211,7 +211,8 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   This is another green-check-does-not-mean-clean-content case, alongside
   `check-new-line-breaks` in
   [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md) and the
-  review-job cases in [`fully-clean`](../shared/workflow/fully-clean.md).
+  review-job cases in
+  [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md).
   Note that `lintr`'s `line_length_linter` DOES catch these, so a repo
   running air without lintr (d-morrison/altdoc) has no gate at all.
   (d-morrison/altdoc#78, 2026-07-27: two `cli` strings in new code ran to 93

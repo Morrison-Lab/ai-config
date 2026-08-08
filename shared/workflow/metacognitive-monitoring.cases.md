@@ -34,7 +34,8 @@ never mentioned.
 The shape then recurred while this entry was being written, and took two
 further passes to settle.
 The observation recorded in
-[`fully-clean`](fully-clean.md)'s fifth case was handed over with a completion
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case was
+handed over with a completion
 time of `04:08:13Z`, corrected here to `04:50:41Z`, and then retracted in that
 file as an invented particular, on the grounds that `#1008` carried no
 Copilot-attributable check run at all.

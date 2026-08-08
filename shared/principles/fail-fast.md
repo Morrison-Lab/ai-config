@@ -900,6 +900,31 @@ step to take at the moment you write the comment, not at review.
   was handled everywhere it applies; a removal note is the artifact most likely
   to stop the search early.
 
+**The same defect arrives with the members in a LIST and the branch inside the
+loop, which this block's "same expression, on the same screen" tell misses.**
+An alternation hides its members in one string.
+A list consumed by a loop spreads them across lines, so there *is* a second site
+to find --- and the enumeration still does not fire, because the guard is not
+written as an enumeration.
+`if pat == r"changes\s+requested\b":` inside
+`for pat in VERDICT_NOT_CLEAN_PATTERNS` reads as handling a special case rather
+than as a list of one, so a sibling pattern added to that list later gets no
+guard at all, and nothing about adding it prompts a look.
+
+The tell is syntactic, which makes it greppable: **an equality test against a
+single literal member, inside a loop over the collection that member belongs
+to.**
+The remedy is this block's own, applied to the branch rather than to the
+pattern.
+Guard every member --- or, where the guard genuinely applies to some and not
+others, name the subset (`if pat in BARE_CLEAN_PATTERNS:`) so the excluded
+members are a list a reader can check rather than a literal nobody revisits.
+
+- **Do:** grep a guarded loop for `== <literal>`, and turn each hit into a
+  whole-collection rule or a named subset.
+- **Don't:** read a per-member equality branch as a special case; it is an
+  enumeration of one, and the collection it enumerates can grow.
+
 **Widen that last bullet's trigger: any sentence naming a hazard is a
 predicate, and the first code it applies to is the code directly beneath it.**
 The block above needs a *removal* note --- members taken out of an alternation,

@@ -285,13 +285,21 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    Derive the merge's own deleted and renamed paths
    and intersect them with each conflict's paths:
    ```bash
-   merge=$(git rev-parse HEAD)   # the squash-merge you just confirmed
+   merge=$(git rev-parse HEAD)   # the merge commit you just confirmed
    git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'
    ```
    A conflicting path in neither set is drift --- skip it.
-   Note `git show --name-status "$merge"` prints **no** file list for a merge
-   commit, so it silently yields an empty attribution set;
-   use the `git diff` form above.
+   The `git diff` form is used because it is correct for **both** merge
+   styles, which `git show` is not.
+   A squash merge is an ordinary single-parent commit, so
+   `git show --name-status "$merge"` diffs it normally and would do.
+   A **true** merge commit has two parents, and `git show` defaults to a
+   combined diff that omits every path changed in only one parent ---
+   on a clean merge that is all of them, so it prints no file list at all
+   and silently yields an empty attribution set.
+   Reaching for `git show` therefore works or fails depending on how the
+   repo merges, which is not a property of the commit in front of you;
+   naming `^1` explicitly removes the question.
    See [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md),
    "A conflict your sweep found is not a conflict your merge caused".
 3. **Check claim status.**
@@ -674,7 +682,7 @@ PT on a machine set to any other zone).
   consumers cannot resolve until a human slides the tag.
 - ❌ Reporting "all cleaned up" while a stacked sibling branch dangles unmentioned.
 - ❌ Treating the whole cascade-scan hit list as work caused by this merge, without
-  intersecting it against the merge's own deleted and renamed paths (step 2) --- on
+  intersecting it against the merge's own deleted and renamed paths (step 1.5's own step 2) --- on
   an old backlog that claims other people's stale PRs for no reason.
 - ❌ Pushing a resolution to a branch you don't own when a comment would do ---
   sharpest on a release branch, where a push can disrupt an out-of-band process.

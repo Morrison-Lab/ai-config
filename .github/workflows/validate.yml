@@ -62,6 +62,10 @@ jobs:
         run: python3 scripts/test_pr_sweep.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
+      - name: Run shell-form comparison tests
+        # Spawns a real bash, deliberately: the tool's whole value is that it
+        # applies exactly ONE shell layer, and only a real run can show that.
+        run: python3 scripts/test_compare_shell_forms.py
       - name: Run enforcement-hook tests
         # The hooks/ guards enforce corpus rules but their test-<name>.py files
         # ran nowhere until now (ai-config#1065). This runner pairs each test

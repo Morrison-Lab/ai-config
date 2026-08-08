@@ -277,6 +277,15 @@ Reproducible in one line:
 `python -c "print(repr('            if pat == r\"changes\\\\s+requested\\\\b\":'))"`
 prints a string ending `requested\x08":`, while the same literal's `\\s` survives
 as a literal backslash-s.
+Writing that command with two backslashes instead of four prints exactly the
+same thing, because the SHELL collapses them before Python is reached: bash
+turns `\\\\` into `\\` and `\\` into `\`, and Python receives a single backslash
+either way.
+That is worth stating rather than leaving for a reader to trip over, since it is
+the same layering the case is about --- a review of this very entry read the
+four-backslash form as a typo and proposed the two-backslash one as a fix, on
+the assumption the two differ.
+Checked at the argv level: both forms hand Python the identical string.
 Python's only diagnostic is `SyntaxWarning: invalid escape sequence '\s'`, which
 names the escape that SURVIVED rather than the one that broke.
 The differs-from-original assert recorded in the section above passes on this

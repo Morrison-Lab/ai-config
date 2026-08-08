@@ -807,8 +807,6 @@ tracked in ai-config#811.
 - **Don't:** filter in-flight review runs by branch; a dispatched run reports
   the default branch whatever `--ref` it was given.
 
-++ b/shared/workflow/fully-clean.md
-
 **The cheap version of that pre-check asks the PR instead of the runs, and it
 is sound only when the dispatch attached the run to the PR.**
 The check above is actor-indexed: it lists the review workflow's runs and then

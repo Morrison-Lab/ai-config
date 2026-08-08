@@ -184,6 +184,27 @@ The stated reason covers both forms, so applying it as a predicate would have
 caught them when the comment was written.
 Fixed in `dcd7eb0c` by giving every command name a `(?![-\w])` suffix.)
 
+## The members in a LIST, with the branch inside the loop
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, round 6: `classify_verdict()` in
+`scripts/check-pr-fully-clean.py` iterates
+`for pat in VERDICT_NOT_CLEAN_PATTERNS`, and applied its negation-prefix guard
+under `if pat == r"changes\s+requested\b":` --- the single member the guard had
+originally been written for.
+A sibling pattern added to that list in an earlier round therefore received no
+negation handling at all, which is the defect round 6's reviewer found.
+The members were not hidden inside one expression the way this section's
+alternation case describes: the list literal spells them out, one per line, so
+the "same expression, on the same screen" tell did not apply.
+What suppressed the enumeration was the branch's own shape --- an equality test
+against one literal reads as a special case rather than as an enumeration of
+one, so adding a member to the list prompts no look at it.
+The fix applies the guard to every member.
+The same function's clean-side loop already showed the correct shape for a
+genuine exception: `if pat in BARE_CLEAN_PATTERNS:` names the subset, so the
+members it excludes are a list a reader can check rather than a literal nobody
+revisits.)
+
 ## "A combined result cannot attribute a per-step outcome"
 
 (Morrison-Lab/ai-config#1042, 2026-08-02/03: the `no-unreviewed-pr.py` Stop

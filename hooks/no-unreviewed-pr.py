@@ -330,6 +330,81 @@ def draft_ident(cmd):
     return False, None, None, False
 
 
+def _argv_close(argv):
+    """(is_close, num, repo) for one simple command's argv: a terminal action.
+
+    Merging or closing a PR takes it past the point where requesting a reviewer
+    means anything: GitHub ACCEPTS `POST /pulls/{n}/requested_reviewers` on a
+    merged PR with HTTP 200 and adds nobody, so the obligation this guard
+    reports becomes literally unsatisfiable and it re-fires forever
+    (ai-config#1279, defect 3). A guard that cannot be satisfied trains everyone
+    to narrate around it, which is how a guard stops being read at all.
+
+    Structural and gh-SCOPED exactly like _argv_draft: the verb must be the argv
+    of a real `gh pr` invocation, never a token inside some other command's
+    string argument, so a `--body "gh pr merge"` cannot forge a discharge.
+    Identity comes from the terminal command ITSELF, so a decoy PR number
+    earlier in a chain cannot misdirect the clear onto a different PR.
+    """
+    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+        return False, None, None
+    if argv[2] in ("merge", "close"):
+        num, repo = _verb_ident(argv)
+        return True, num, repo
+    return False, None, None
+
+
+def close_ident(cmd):
+    """(is_close, num, repo, last): does `cmd` merge or close a PR, and is that
+    the LAST simple command?
+
+    Mirrors draft_ident, including its fail-safe: `last` is what makes the
+    harness `is_error` (the WHOLE call's exit status) authoritative for this
+    command's own outcome, so a terminal action chained AHEAD of something else
+    is treated as ambiguous and does NOT discharge. Fails toward
+    not-a-close on a parse error, so it never fabricates a clear.
+    """
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False, None, None, False
+    for i, argv in enumerate(cmds):
+        ok, num, repo = _argv_close(argv)
+        if ok:
+            return True, num, repo, (i == len(cmds) - 1)
+    return False, None, None, False
+
+
+def _argv_probe(argv):
+    """(is_probe, num, repo) for a read-only single-PR status read.
+
+    `gh pr view <N>` / `gh pr checks <N>`. These discharge nothing by
+    themselves -- they are only the CHANNEL through which a PR merged OUTSIDE
+    this session (by a human, or by the merge queue) becomes visible in the
+    transcript. The discharge additionally requires the result body to report a
+    terminal state, and the probe must name a PR number, so a repo-wide
+    `gh pr list` -- whose body mentions many PRs and whose first match need not
+    be the obligation's -- is deliberately NOT a probe.
+    """
+    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+        return False, None, None
+    if argv[2] in ("view", "checks"):
+        num, repo = _verb_ident(argv)
+        return (num is not None), num, repo
+    return False, None, None
+
+
+def probe_ident(cmd):
+    """(is_probe, num, repo, last): mirrors close_ident, for a status read."""
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False, None, None, False
+    for i, argv in enumerate(cmds):
+        ok, num, repo = _argv_probe(argv)
+        if ok:
+            return True, num, repo, (i == len(cmds) - 1)
+    return False, None, None, False
+
+
 def _argv_open(argv):
     """(is_open, num, repo) for one simple command's argv: a create/ready open.
 
@@ -384,6 +459,19 @@ SHELL_TOOLS = {"Bash", "bash", "run_command"}
 OPEN_TOOLS = {"create_pull_request", "mcp__github__create_pull_request"}
 EDIT_TOOLS = {"update_pull_request", "mcp__github__update_pull_request"}
 REQ_TOOLS = {"request_copilot_review", "mcp__github__request_copilot_review"}
+CLOSE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
+
+# A result body reporting that a PR has reached a terminal state -- merged or
+# closed. Tolerates the escaped quotes of a json.dumps'd tool_result, exactly as
+# RX_RES_NUM does. Only ever consulted for a result whose own command named a
+# single PR (see _argv_probe), so a body listing many PRs cannot discharge an
+# obligation for one of them.
+RX_TERMINAL_STATE = re.compile(
+    r"\\?\"state\\?\"\s*:\s*\\?\"(?:MERGED|CLOSED)\\?\""
+    r"|\\?\"merged\\?\"\s*:\s*true"
+    r"|\\?\"mergedAt\\?\"\s*:\s*\\?\"\d",
+    re.I,
+)
 
 # A PR API path (`repos/o/r/pulls/1038`) inside a shell command, used by
 # _url_ident to read identity from a request command's own `gh api` URL. Open,
@@ -511,6 +599,8 @@ def scan(path):
     obligations = []
     pending = {}        # tool_use_id -> (num, repo) for reviewer requests
     pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
+    pending_close = {}  # tool_use_id -> (num, repo) for merge/close actions
+    pending_probe = {}  # tool_use_id -> (num, repo) for single-PR status reads
     text = ""
     with open(path, errors="ignore") as fh:
         for line in fh:
@@ -666,6 +756,31 @@ def scan(path):
                         clear_failed = (not clast) or failed
                         if not clear_failed:
                             _clear(obligations, cnum, crepo)
+                    # A PR that MERGED or CLOSED is past the point where a
+                    # reviewer request does anything: the POST this guard
+                    # prescribes returns HTTP 200 on a merged PR and adds
+                    # nobody, so the obligation cannot be discharged by
+                    # complying with it (ai-config#1279, defect 3). Same
+                    # fail-safe rule as the draft clear above -- the terminal
+                    # action must be last/atomic and non-failed -- so a merge
+                    # that failed, or one chained ahead of another command whose
+                    # exit status is what `failed` really reflects, keeps the PR
+                    # tracked. A bare `gh pr merge` names no number, so identity
+                    # falls back to the result's own, exactly as the request
+                    # discharge above does.
+                    if rid in pending_close:
+                        xnum, xrepo, xlast = pending_close.pop(rid)
+                        if xlast and not failed:
+                            _clear(obligations, xnum or rnum, xrepo or rrepo)
+                    # A PR merged OUTSIDE this session (by a human, or by the
+                    # merge queue) leaves no action in the transcript -- only an
+                    # observation. Discharged on POSITIVE evidence only: the
+                    # probe named one PR, the read did not fail, and the body
+                    # actually reports a terminal state.
+                    if rid in pending_probe:
+                        pnum, prepo, plast = pending_probe.pop(rid)
+                        if plast and not failed and RX_TERMINAL_STATE.search(body):
+                            _clear(obligations, pnum, prepo)
                     continue
 
                 if kind != "tool_use":
@@ -691,6 +806,11 @@ def scan(path):
                     continue
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
+                    if str(inp.get("state") or "").lower() == "closed":
+                        # Closing is terminal for review purposes, same as a
+                        # merge. Atomic tool, so is_error reflects THIS change.
+                        pending_close[tid] = (num, repo, True)
+                        continue
                     if inp.get("draft") is True:
                         # Converting a ready PR back to draft defers review, but
                         # only if it SUCCEEDS. Clearing at tool_use time would
@@ -730,6 +850,11 @@ def scan(path):
                 if name in REQ_TOOLS:
                     rn, rr = input_ident(inp)
                     pending[tid] = (rn, rr, True)  # atomic; is_error is trusted
+                    continue
+                if name in CLOSE_TOOLS:
+                    # Structured tool: atomic, so is_error reflects THIS merge.
+                    cn, cr = input_ident(inp)
+                    pending_close[tid] = (cn, cr, True)
                     continue
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
@@ -775,6 +900,16 @@ def scan(path):
                 # separate pending request here.
                 if requested and not opened:
                     pending[tid] = (rnum, rrepo, rlast)
+                # Terminal actions and status reads are registered regardless of
+                # the branches above: `gh pr merge` is neither an open nor a
+                # draft transition, and a `gh pr view` chained after a create
+                # must still be able to report that PR merged later.
+                cok, cnum, crepo, clast2 = close_ident(cmd_raw)
+                if cok:
+                    pending_close[tid] = (cnum, crepo, clast2)
+                pok, pnum, prepo, plast = probe_ident(cmd_raw)
+                if pok:
+                    pending_probe[tid] = (pnum, prepo, plast)
     return obligations, text
 
 

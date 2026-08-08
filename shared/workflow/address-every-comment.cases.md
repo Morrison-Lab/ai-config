@@ -497,10 +497,11 @@ Re-measured 2026-08-08, each form written to its own file and run as
 | --- | --- | --- |
 | four backslashes | `requested\\b`, no warning | `requested\x08`, warning |
 | two backslashes | `requested\x08`, warning | `requested\x08`, warning |
+| one backslash | `requested\x08`, warning | `requested\x08`, warning |
 
-The one-backslash spelling behaves as the two-backslash one does.
-Through the tool the four- and two-backslash forms are identical; from a file
-they differ, which is the entire disagreement.
+Through the tool all three collapse to the same output; from a file the
+four-backslash form separates from the other two, and that separation is the
+entire disagreement.
 Corrected on that PR's branch in commit `fd109db7`.
 
 Two details are worth keeping.

@@ -90,12 +90,26 @@ resolve_id() {
 
 session_file() { printf '%s/%s.session' "$REG_DIR" "$(sanitize "$1")"; }
 
+# The merge-when-confident grant marker for a session. Composed in ONE place
+# because two readers must agree on it exactly: this script and
+# hooks/no-unauthorized-merge.py. A marker written at one path and looked for at
+# another is indistinguishable from no grant at all -- the failure ai-config#1279
+# reported, where a grant read active one way and inactive another.
+mwc_file() { printf '%s/%s.mwc' "$REG_DIR" "$(sanitize "$1")"; }
+
 # Load a session file into S_* globals (bash 3.2 compatible — no assoc arrays).
 load_session() {
   S_id=; S_agent=; S_host=; S_pid=; S_worktree=; S_branch=
   S_started=; S_heartbeat=; S_status=; S_task=
   local k v
   while IFS='=' read -r k v; do
+    # Strip a trailing CR so a record that reached the registry with CRLF line
+    # endings still parses. Without it `heartbeat=<n>\r` reaches is_stale's
+    # `$(( NOW - ... ))` and raises "invalid arithmetic operator", which under
+    # `set -e` kills the whole command mid-check -- so check-mwc exited 1, the
+    # code meaning "no grant recorded", for a grant that was sitting right
+    # there. A crash must not be reported as an absent grant.
+    v="${v%$'\r'}"
     case "$k" in
       id) S_id=$v ;; agent) S_agent=$v ;; host) S_host=$v ;; pid) S_pid=$v ;;
       worktree) S_worktree=$v ;; branch) S_branch=$v ;; started) S_started=$v ;;
@@ -137,7 +151,7 @@ prune_stale() {
     [ -e "$f" ] || continue
     load_session "$f"
     if is_stale; then
-      rm -f "$f" "$REG_DIR/$(sanitize "$S_id").mwc"
+      rm -f "$f" "$(mwc_file "$S_id")"
       printf 'pruned stale session %s (%s on %s)\n' "$S_id" "${S_branch:-?}" "${S_host:-?}"
       removed=$((removed + 1))
     fi
@@ -327,7 +341,7 @@ cmd_list() {
 
 cmd_release() {
   local id; id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
-  rm -f "$REG_DIR/$(sanitize "$id").mwc"
+  rm -f "$(mwc_file "$id")"
   local f; f="$(session_file "$id")"
   if [ -f "$f" ]; then rm -f "$f"; printf 'released session %s\n' "$id"; else printf 'no record for session %s\n' "$id"; fi
 }
@@ -384,31 +398,57 @@ case "$CMD" in
   enable-mwc)
     id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
     write_record "$id" "${OPT_TASK:-}" ""
-    touch "$REG_DIR/$(sanitize "$id").mwc"
+    touch "$(mwc_file "$id")"
     printf 'enabled mwc (merge-when-confident) for session %s\n' "$id"
     ;;
   disable-mwc)
     id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
-    rm -f "$REG_DIR/$(sanitize "$id").mwc"
+    rm -f "$(mwc_file "$id")"
     printf 'disabled mwc for session %s\n' "$id"
     ;;
   check-mwc)
-    prune_stale >/dev/null
+    # A QUERY, and only a query. It deliberately does not prune, and does not
+    # delete the marker on a stale read, because both make asking destructive:
+    # one liveness false negative permanently revokes a grant a human made, and
+    # the report is then identical to "never granted". The marker alone
+    # authorizes nothing -- the guard requires a marker AND a live session --
+    # so leaving a stale one in place is inert, and a later heartbeat restores
+    # the grant instead of it having to be re-issued. `disable-mwc`, `release`
+    # and `prune` remain the ways to actually remove a marker.
+    #
+    # The three outcomes are reported distinctly, per
+    # shared/principles/fail-fast.md: "no grant" and "a grant whose session
+    # reads dead" want opposite responses, and printing one sentence for both
+    # is the pass-path-and-failure-path-look-alike shape that rule bans.
+    #   0  active
+    #   1  no grant recorded
+    #   2  grant recorded but not currently honourable (say why, and how to fix)
     id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
-    f="$REG_DIR/$(sanitize "$id").mwc"
+    f="$(mwc_file "$id")"
     s_file="$(session_file "$id")"
-    if [ -f "$f" ]; then
-      if [ -f "$s_file" ]; then
-        load_session "$s_file"
-        if ! is_stale; then
-          printf 'mwc is active for session %s\n' "$id"
-          exit 0
-        fi
-      fi
-      rm -f "$f"
+    if [ ! -f "$f" ]; then
+      printf 'mwc is NOT active for session %s: no grant recorded.\n' "$id"
+      printf "  Grant it with:  ai-session.sh enable-mwc --id '%s'\n" "$id"
+      exit 1
     fi
-    printf 'mwc is not active for session %s\n' "$id"
-    exit 1
+    if [ ! -f "$s_file" ]; then
+      printf 'mwc is NOT active for session %s: grant recorded, but no session record.\n' "$id"
+      printf '  Marker: %s\n' "$f"
+      printf "  Fix with:  ai-session.sh register --id '%s' && ai-session.sh enable-mwc --id '%s'\n" "$id" "$id"
+      exit 2
+    fi
+    load_session "$s_file"
+    if is_stale; then
+      printf 'mwc is NOT active for session %s: grant recorded, but the session reads %s.\n' \
+        "$id" "$(session_liveness)"
+      printf '  Marker: %s\n' "$f"
+      printf '  Last heartbeat %s; a session goes stale after %ss.\n' \
+        "$(fmt_epoch "${S_heartbeat:-0}")" "$STALE_SECONDS"
+      printf "  If the session IS live:  ai-session.sh heartbeat --id '%s'\n" "$id"
+      exit 2
+    fi
+    printf 'mwc is active for session %s\n' "$id"
+    exit 0
     ;;
   -h|--help) sed -n '2,40p' "$0" ;;
   *)         die "unknown command: $CMD" ;;

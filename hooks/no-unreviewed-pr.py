@@ -683,6 +683,11 @@ def _note_drafted(live, num):
     """
     if num is not None:
         live.pop(num, None)
+    elif len(live) == 1:
+        live.clear()
+    else:
+        for key in live:
+            live[key] = _AMBIGUOUS
 
 
 def _rearm(obligations, live, tid):
@@ -1109,7 +1114,7 @@ def scan(path):
                 # ambiguous, so the arm it raced would stand unsatisfiable. One
                 # call cannot both retire a PR and owe review on it, so the arm
                 # yields to the transition.
-                if pushed:
+                if pushed and not (draft or cok):
                     _rearm(obligations, live, tid)
     return obligations, text
 

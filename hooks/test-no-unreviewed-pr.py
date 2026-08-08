@@ -782,6 +782,37 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     say("Back to draft, then pushed.")], False,
      "a push to a PR converted back to draft does not re-arm")
 
+# Review finding 1 (#1283). The case above uses the NUMBERED undo. A bare
+# `gh pr ready --undo` is the ordinary way to draft the current branch's PR --
+# the file's own comment says exactly that about bare `gh pr ready` -- so
+# draft_ident yields num=None. Popping `live` only on a known number left the
+# entry behind and re-armed review for a legitimately drafted PR.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready --undo", tid="u"), res("u", "{}"),
+                    bash(PUSH_CMD, tid="p"), res("p", ""),
+                    say("Drafted the current branch's PR, then pushed.")], False,
+     "a numberless `gh pr ready --undo` leaves the live set, so a push "
+     "does not re-arm")
+
+# Review finding 2 (#1283). The arm fires synchronously at tool_use while the
+# terminal/draft transition is DEFERRED to this same call's result, so a push
+# chained with either one saw a `live` set the call was about to empty. The
+# merge form is the severe one: chained ahead of the push it is not `last`, so
+# its own discharge is withheld as ambiguous and the raced arm would stand
+# against a merged PR that can never take a reviewer.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr merge 1038 --squash && "
+                         "git push -u origin next-branch", tid="mp"),
+                    res("mp", "Merged pull request o/r#1038"),
+                    say("Merged and pushed the next branch in one call.")],
+     False,
+     "a push chained with a merge in ONE call does not arm the merged PR")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo && "
+                         "git push -u origin next-branch", tid="up"),
+                    res("up", "{}"),
+                    say("Drafted and pushed in one call.")], False,
+     "a push chained with a draft transition in ONE call does not re-arm")
 
 # Gate: a merged PR can gain no further reviewable head. Without this, the
 # ordinary post-merge shape (merge, branch, push) nags about the merged PR.

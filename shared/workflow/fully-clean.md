@@ -1439,20 +1439,25 @@ returned anything else, if the thing I am looking for were there?
 Run it against a **completed** review you know belonged to the PR, and where
 that review does not appear either, the null is silent rather than reassuring.
 
-**`--ref` is what decides it, and the command this corpus prescribes omits it.**
+**`--ref` is what decides it.**
 [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)
 records that gha#286 root-caused exactly this and fixed it upstream by passing
 `--ref <PR-branch>` explicitly, so a re-dispatched review's check runs do
 attach to the PR's head commit.
-Two things keep that fix out of reach.
-A repo pinning `claude.yml@v1` does not carry it, so the mention-driven
-re-dispatch still lands on the default branch.
-And the manual command [`ardi`](../../skills/ardi/SKILL.md)'s step 6 and
-[`preferences.md`](../../memories/preferences.md) both prescribe is
-`gh workflow run claude-review.yml -f pr_number=<N>`, with no `--ref` at all.
-So the instrument is not wrong in principle; it is vacuous on the command we
-actually tell people to run, which is the worst place for a precondition to go
-unstated.
+
+Two paths reach that dispatch, and only one of them now carries the flag.
+The manual command in [`ardi`](../../skills/ardi/SKILL.md)'s step 6 and
+[`preferences.md`](../../memories/preferences.md) omitted it until this entry
+was written, so the instrument was vacuous on the very command the corpus told
+people to run --- the worst place for a precondition to go unstated.
+Both are fixed alongside this section, so an agent following either now
+dispatches with the ref.
+
+The mention-driven path is not fixed and is not ours to fix from here.
+A repo pinning `claude.yml@v1` does not carry gha#286, so `@claude review`
+still dispatches without a ref and still lands on the default branch.
+That asymmetry is what the rest of this section turns on: your own dispatches
+became visible at the PR head, and a human's did not.
 
 Dispatch with the ref, and the one-call pre-check becomes available --- for
 the runs you dispatch:

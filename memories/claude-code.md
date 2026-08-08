@@ -71,17 +71,18 @@
   always needs a manual toggle. A true default would require a feature
   request via `/feedback`.
 - **No tool on the agent's side can toggle this itself.**
-  Checked the full available toolset (Bash, every loaded MCP tool
-  including `github`, `update-config`) for a client-side settings lever
-  and found none: the panel is client-UI-only state, not something
-  `update-config`'s `settings.json` surface reaches.
+  Checked the full available toolset (Bash, every loaded MCP tool, and
+  `update-config`, a skill rather than an MCP tool) for a client-side
+  settings lever and found none: the panel is client-UI-only state, not
+  something `update-config`'s `settings.json` surface reaches.
   If the user reports the checkbox changed, that's their action, not
   something to claim credit or responsibility for.
 - **What actually fires once "Auto-fix CI & address comments" is on:**
   the harness starts pushing `<ci-monitor-event>` messages mid-turn
   (arriving alongside the next tool result, same delivery mechanism as a
-  background task notification) whenever the PR gets a new review
-  comment.
+  background task notification) whenever the PR gets new activity ---
+  a formal review (via the reviews API) or a plain issue/PR comment,
+  observed firing on both.
   Each event quotes the comment(s) verbatim and appends a **fixed
   instruction template**: "address the feedback and push a fix... post
   a one-line reply on the thread... end with

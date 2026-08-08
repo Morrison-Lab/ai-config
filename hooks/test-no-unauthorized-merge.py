@@ -6,6 +6,7 @@ can invoke it directly with sys.argv[1].
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -83,6 +84,17 @@ BLOCK = [
     ('gh$IFS pr$IFS merge 123', "short IFS word-split gh pr merge"),
     ('gh$(true) pr merge 123', "subshell expansion inside executable name gh"),
     ('GH=gh; $GH pr merge 123', "variable indirection for gh executable name"),
+    # --- ai-config#1279 defect 2: anchoring must not UNDER-block ------------
+    # Every command position within a segment still counts. Splitting happens on
+    # `;`, `&&`, `||`, `|` and newlines, so what remains inside a segment is a
+    # background `&`, a subshell/command-substitution opener, and the start.
+    ("sleep 1 & gh pr merge 411", "background & is still a command position"),
+    ("$EMPTY gh pr merge 411", "empty variable expansion before the command word"),
+    ("${EMPTY} gh pr merge 411", "braced empty variable expansion before the command word"),
+    ("cd /tmp && ALLOW_MERGE=0 gh pr merge 411", "ALLOW_MERGE=0 is not an override"),
+    ("cd /tmp && echo ALLOW_MERGE=1 && gh pr merge 411", "override in a DIFFERENT segment does not authorize the merge segment"),
+    ("cat <<EOF\n$(gh pr merge 411)\nEOF", "live subshell inside an UNQUOTED heredoc still executes"),
+    ("cat <<EOF\n`gh pr merge 411`\nEOF", "live backtick inside an UNQUOTED heredoc still executes"),
 ]
 
 ALLOW = [
@@ -111,13 +123,44 @@ ALLOW = [
     ('gh pr comment 999 --body "Ran $(pwd) today. Reminder: never run gh pr merge without asking."', "double-quoted payload mixing subshell with prose mentioning gh pr merge"),
     ("echo Even though pr merge conflicts arose it is fine", "prose sentence containing though followed by pr merge"),
     ("echo high pr merge priority task", "prose sentence containing high followed by pr merge"),
+    # --- ai-config#1279 defect 4: the documented override must authorize ----
+    # SPLIT leaves the separator's trailing space on the NEXT segment, so every
+    # override after a `cd &&` used to fail the `^`-anchored ALLOW_MERGE regex.
+    ("cd /tmp && ALLOW_MERGE=1 gh pr merge 411 --squash",
+     "ALLOW_MERGE=1 after cd && (leading whitespace in segment)"),
+    ("cd /repo && ALLOW_MERGE=1 gh pr merge 1226 -R o/r --squash --delete-branch 2>&1",
+     "the exact reported override form: cd && override + 2>&1 redirect"),
+    (" ALLOW_MERGE=1 gh pr merge 411", "ALLOW_MERGE=1 with plain leading whitespace"),
+    ("\tALLOW_MERGE=1 gh pr merge 411", "ALLOW_MERGE=1 with a leading tab"),
+    ("echo start; ALLOW_MERGE=1 gh pr merge 411", "ALLOW_MERGE=1 after a semicolon separator"),
+    ('cd /tmp && ALLOW_MERGE="1" gh pr merge 411', "quoted ALLOW_MERGE after cd &&"),
+    # --- ai-config#1279 defect 2: prose, quotes, greps and literals ---------
+    # fail-fast.md: "test that mentions, greps, and quotes of the gated command
+    # pass". Blocking these is what stopped the guard being documented, bug-
+    # reported, or debugged from an agent session at all.
+    ('echo "This hook blocks gh pr merge without an override"',
+     "prose MENTION of the command inside a double-quoted string"),
+    ("echo 'the gh pr merge guard fired again'",
+     "prose mention inside a single-QUOTED string"),
+    ('grep -rn "blocked: gh pr merge" hooks/',
+     "GREP pattern with the command name not at the quote boundary"),
+    ("""python3 -c "seg = 'ALLOW_MERGE=1 gh pr merge 1226 -R o/r'; print(seg)\"""",
+     "Python STRING LITERAL holding the failing segment (the blocked diagnostic)"),
+    ('printf "%s\\n" "MECHANISTIC PROHIBITION: gh pr merge is strictly blocked"',
+     "the guard's own refusal text quoted back"),
+    ("cat <<'EOF'\nMECHANISTIC PROHIBITION: `gh pr merge` is strictly blocked.\nEOF",
+     "quoted heredoc carrying the guard's own refusal text (the blocked bug report)"),
+    ("gh issue create --body-file - <<'BODY'\nRunning `gh pr merge` is blocked.\nBODY",
+     "quoted heredoc body for gh issue create (the ai-config#1279 filing shape)"),
 ]
 
 
-def verdict(cmd: str, env: dict = None) -> str:
+def verdict(cmd: str, env: dict = None, extra: dict = None) -> str:
+    payload = {"tool_name": "Bash", "tool_input": {"command": cmd}}
+    payload.update(extra or {})
     p = subprocess.run(
         [sys.executable, HOOK],
-        input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
+        input=json.dumps(payload),
         capture_output=True,
         text=True,
         env=env,
@@ -140,14 +183,61 @@ for cmd, desc in ALLOW:
     wrong += (v != "allow")
     print(f"  {v:<6} {desc}")
 
-# Test active MWC grant integration and session isolation with sanitized session IDs
+# Test active MWC grant integration and session isolation with sanitized session IDs.
+# Invoked through `bash` rather than executed directly: on Windows a .sh file is
+# not a valid executable image, so the direct form raised WinError 193 and every
+# MWC case below -- including the cross-session isolation one -- never ran at all.
 script_path = Path(__file__).parent.parent / "skills" / "session-lock" / "scripts" / "ai-session.sh"
 session_a = f"session:mwc-a/{os.getpid()}"
 session_b = f"session:mwc-b/{os.getpid()}"
+# Filename-shaped, like a real harness session id, so a transcript path can
+# round-trip it. Session A's id cannot -- that is the point of A's shape.
+session_c = f"mwc-c-{os.getpid()}"
 
-subprocess.run([str(script_path), "register", "--id", session_a], check=True, capture_output=True)
-subprocess.run([str(script_path), "register", "--id", session_b], check=True, capture_output=True)
-subprocess.run([str(script_path), "enable-mwc", "--id", session_a], check=True, capture_output=True)
+
+def find_bash():
+    """A bash that can actually run this script in this repo, or None.
+
+    Probed rather than named. On Windows the first `bash` on PATH is often the
+    WSL launcher, which sees the checkout as `/mnt/c/...` and reports "not
+    inside a git repository" -- so `shutil.which("bash")` finding *a* bash
+    proves nothing. The probe IS the requirement: run the script's own
+    read-only `list` and keep the first shell that exits 0.
+    """
+    seen = []
+    for cand in (os.environ.get("AI_SESSION_BASH"),
+                 shutil.which("bash"),
+                 r"C:\Program Files\Git\bin\bash.exe",
+                 "/bin/bash"):
+        if not cand or cand in seen:
+            continue
+        seen.append(cand)
+        try:
+            probe = subprocess.run([cand, str(script_path), "list"],
+                                   capture_output=True, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if probe.returncode == 0:
+            return cand
+    return None
+
+
+BASH = find_bash()
+if BASH is None:
+    sys.exit("FATAL: no bash able to run ai-session.sh; set AI_SESSION_BASH. "
+             "The MWC authorization cases cannot be verified without it.")
+
+
+def ai_session(*args):
+    return subprocess.run([BASH, str(script_path), *args],
+                          check=True, capture_output=True)
+
+
+ai_session("register", "--id", session_a)
+ai_session("register", "--id", session_b)
+ai_session("register", "--id", session_c)
+ai_session("enable-mwc", "--id", session_a)
+ai_session("enable-mwc", "--id", session_c)
 
 try:
     # Session A (sanitized) has MWC enabled -> allowed
@@ -162,15 +252,49 @@ try:
     wrong += (v_b != "BLOCK")
     print(f"  {v_b:<6} cross-session isolation for sanitized session B")
 
+    # ai-config#1279 defect 1: the hook process inherits NEITHER AI_SESSION_ID
+    # nor CLAUDE_SESSION_ID, so an env-only lookup could never see a grant made
+    # the sanctioned way (`/mwc` -> `ai-session.sh enable-mwc --id <harness id>`).
+    # The harness's own `session_id` payload field is that same id, so the grant
+    # must be honoured from the payload with no session env var set at all.
+    env_bare = {k: v for k, v in os.environ.items()
+                if k not in ("AI_SESSION_ID", "CLAUDE_SESSION_ID")}
+    v_pay = verdict("gh pr merge 411 --squash", env=env_bare,
+                    extra={"session_id": session_a})
+    wrong += (v_pay != "allow")
+    print(f"  {v_pay:<6} MWC grant honoured from the payload session_id (no env var)")
+
+    # Same, via the transcript filename stem, for a harness that omits the
+    # field. Uses session C, whose id is filename-shaped like a real harness
+    # UUID -- session A's id deliberately contains `/` and `:` to exercise
+    # sanitize(), and no filename can carry those back.
+    v_tr = verdict("gh pr merge 411 --squash", env=env_bare,
+                   extra={"transcript_path": f"/tmp/projects/x/{session_c}.jsonl"})
+    wrong += (v_tr != "allow")
+    print(f"  {v_tr:<6} MWC grant honoured from the transcript_path stem")
+
+    # Cross-session isolation must survive the new resolution path: session B
+    # holds no grant, so a payload naming B is still blocked.
+    v_pay_b = verdict("gh pr merge 411 --squash", env=env_bare,
+                      extra={"session_id": session_b})
+    wrong += (v_pay_b != "BLOCK")
+    print(f"  {v_pay_b:<6} payload session_id for ungranted session B still blocks")
+
+    # No identity at all -> no grant can be resolved -> block (fails closed).
+    v_none = verdict("gh pr merge 411 --squash", env=env_bare)
+    wrong += (v_none != "BLOCK")
+    print(f"  {v_none:<6} no session identity anywhere still blocks")
+
     # Disable MWC for Session A -> must block immediately
-    subprocess.run([str(script_path), "disable-mwc", "--id", session_a], check=True, capture_output=True)
+    ai_session("disable-mwc", "--id", session_a)
     v_a_revoked = verdict("gh pr merge 411 --squash", env=env_a)
     wrong += (v_a_revoked != "BLOCK")
     print(f"  {v_a_revoked:<6} revoked MWC grant blocks for session A")
 finally:
-    subprocess.run([str(script_path), "release", "--id", session_a], check=True, capture_output=True)
-    subprocess.run([str(script_path), "release", "--id", session_b], check=True, capture_output=True)
+    ai_session("release", "--id", session_a)
+    ai_session("release", "--id", session_b)
+    ai_session("release", "--id", session_c)
 
-total = len(BLOCK) + len(ALLOW) + 3
+total = len(BLOCK) + len(ALLOW) + 7
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

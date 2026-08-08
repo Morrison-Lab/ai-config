@@ -14,7 +14,23 @@ import sys
 import time
 from pathlib import Path
 
-LEAD = r"""(?:^|[\s;&|`()]|\$\(|\$\{IFS\}|\$IFS\b|\$[A-Za-z0-9_]+)"""
+# A command word begins only at a *command position*. Segments reaching
+# MERGE_PATTERNS are already split on `;`, `&&`, `||`, `|` and newlines, so
+# within a segment the command positions are: its start, after a background
+# `&`, and after a subshell / command-substitution opener (`(`, `` ` ``, `$(`).
+#
+# Plain whitespace is deliberately NOT one. It used to be, and that is what made
+# the guard fire on any prose, grep pattern, or string literal that merely NAMED
+# the command -- including its own refusal text, so it blocked writing
+# documentation, filing a bug report, or debugging itself (ai-config#1279,
+# defect 2). shared/principles/fail-fast.md states the bar this restores:
+# "test that mentions, greps, and quotes of the gated command pass".
+CMD_POS = r"""(?:^|[;&`(\n]|\$\()\s*"""
+# Expansions that may expand to nothing and so leave the NEXT word as the
+# command: `$FOO gh pr merge` runs the merge when $FOO is empty. Matched only
+# after a command position, so a mid-command `echo $FOO gh pr merge` does not.
+VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*)*"""
+LEAD = CMD_POS + VAR_PREFIX
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
@@ -38,8 +54,18 @@ MERGE_PATTERNS = [
     (LEAD + ENV_WRAP + r"(?:" + EXEC_WRAP + r")?" + GLAB_PROG + r"[^\n]*\s+api\b[^\n]*(?:^|[\s/])merge_requests/[^\n]+/merge\b[^\n]*" + API_WRITE_FLAG, "glab api MR merge"),
 ]
 
+# The leading-whitespace allowance is OUTSIDE the repeated env-assignment group,
+# not inside it. Inside, it only ever applied to assignments AFTER the first, so
+# a segment whose first token was the override itself failed the `^` anchor the
+# moment it carried any leading whitespace -- which every segment after a `&&`,
+# `;` or `|` does, because SPLIT leaves the separator's trailing space on the
+# next segment. `ALLOW_MERGE=1 <merge>` was accepted while
+# `cd /repo && ALLOW_MERGE=1 <merge>` was not (ai-config#1279, defect 4), and the
+# refusal message printed the segment `.strip()`ed, removing the very character
+# that caused the mismatch. Leading whitespace in a segment is inert in bash, so
+# accepting it authorizes nothing a bare `ALLOW_MERGE=1 ...` did not already.
 ALLOW_ENV_FLAG = re.compile(
-    r"^(?:\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
+    r"^\s*(?:(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
 )
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
@@ -148,6 +174,42 @@ def mask_subexpressions(val: str) -> str:
     return "".join(result)
 
 
+HEREDOC_START = re.compile(
+    r"""<<-?[ \t]*(?:(['"])([A-Za-z_][A-Za-z0-9_]*)\1|([A-Za-z_][A-Za-z0-9_]*))"""
+)
+
+
+def mask_heredocs(text: str) -> str:
+    """Mask heredoc bodies, preserving length and line structure.
+
+    A QUOTED delimiter (`<<'EOF'`, `<<"EOF"`) tells bash to perform no expansion
+    at all in the body, so nothing in it can execute: it is inert text and is
+    masked in full. An UNQUOTED delimiter (`<<EOF`) does expand, so only the
+    literal prose is masked and `$(...)` / backtick substitutions are left live,
+    exactly as mask_subexpressions does for payload flags.
+
+    Without this a heredoc carrying prose ABOUT a merge command was matched as
+    one -- which is how filing ai-config#1279 was itself blocked, by the guard
+    matching its own refusal text quoted inside a `gh issue create` heredoc.
+    """
+    lines = text.split("\n")
+    out = list(lines)
+    i = 0
+    while i < len(lines):
+        m = HEREDOC_START.search(lines[i])
+        if not m:
+            i += 1
+            continue
+        quoted = bool(m.group(2))
+        delim = m.group(2) or m.group(3)
+        j = i + 1
+        while j < len(lines) and lines[j].strip() != delim:
+            out[j] = " " * len(lines[j]) if quoted else mask_subexpressions(lines[j])
+            j += 1
+        i = j + 1
+    return "\n".join(out)
+
+
 def mask_payloads(text: str) -> str:
     """Mask string payload flags (--body, -m, etc.) so benign occurrences of gh pr merge inside commit/PR messages do not trigger false positives.
 
@@ -243,9 +305,38 @@ def get_git_common_dirs() -> list[Path]:
     return dirs
 
 
-def check_mwc_active() -> bool:
+def resolve_session_id(payload: dict | None = None) -> str | None:
+    """The id of the session this hook is running under, or None.
+
+    The harness supplies its own session id in the hook payload, alongside
+    `transcript_path`; that is the SAME id `/mwc` passes to
+    `ai-session.sh enable-mwc --id`, so it is the authoritative one. Reading it
+    is what makes a granted MWC visible to the guard at all: the hook process
+    inherits neither AI_SESSION_ID nor CLAUDE_SESSION_ID (both measured unset on
+    a machine where the grant was live), so the env-only lookup this replaces
+    returned None unconditionally and no legitimate grant ever reached the guard
+    (ai-config#1279, defect 1).
+
+    Order: the payload's own id, then the transcript filename stem (the same id,
+    for a harness that omits the field), then the environment forms. Each is a
+    way to learn WHICH session is running -- none of them grants anything, since
+    the caller still requires a marker for exactly that id plus a live session.
+    """
+    if payload:
+        sid = payload.get("session_id")
+        if isinstance(sid, str) and sid.strip():
+            return sid.strip()
+        tpath = payload.get("transcript_path")
+        if isinstance(tpath, str) and tpath.strip():
+            stem = Path(tpath.strip()).stem
+            if stem:
+                return stem
+    return os.environ.get("AI_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
+
+
+def check_mwc_active(payload: dict | None = None) -> bool:
     try:
-        current_session = os.environ.get("AI_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
+        current_session = resolve_session_id(payload)
         if not current_session:
             return False
 
@@ -264,15 +355,19 @@ def check_mwc_active() -> bool:
     return False
 
 
-def offending(command: str):
+def offending(command: str, payload: dict | None = None):
     # 1. Normalize bash backslash-newline line continuations (matching bash semantics: remove backslash and newline without inserting a space)
     norm_command = re.sub(r"\\\n", "", command)
-    # 2. Normalize single-word token quote removal (e.g. "gh" -> gh, "pr" -> pr, "merge" -> merge, g""h -> gh)
-    unquoted_command = unquote_words(norm_command)
-    # 3. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
+    # 2. Mask heredoc bodies BEFORE unquote_words, which would otherwise strip
+    #    the quotes off a `<<'EOF'` delimiter and make an inert body look live.
+    #    Length-preserving, so later slice offsets stay aligned.
+    heredoc_masked = mask_heredocs(norm_command)
+    # 3. Normalize single-word token quote removal (e.g. "gh" -> gh, "pr" -> pr, "merge" -> merge, g""h -> gh)
+    unquoted_command = unquote_words(heredoc_masked)
+    # 4. Mask prose payloads across the entire command BEFORE splitting on separators/newlines
     masked_command = mask_payloads(unquoted_command)
 
-    # 4. Use finditer on masked_command to derive exact character slice offsets for unquoted_command
+    # 5. Use finditer on masked_command to derive exact character slice offsets for unquoted_command
     matches = list(SPLIT.finditer(masked_command))
     starts = [0] + [m.end() for m in matches]
     ends = [m.start() for m in matches] + [len(masked_command)]
@@ -284,7 +379,7 @@ def offending(command: str):
             continue
         for pattern, label in MERGE_PATTERNS:
             if re.search(pattern, masked_seg):
-                if check_mwc_active():
+                if check_mwc_active(payload):
                     break  # Allowed via active MWC session grant
                 return label, orig_seg.strip()
     return None
@@ -301,7 +396,7 @@ def main() -> int:
         return 0
 
     command = (payload.get("tool_input") or {}).get("command") or ""
-    hit = offending(command)
+    hit = offending(command, payload)
     if not hit:
         return 0
 

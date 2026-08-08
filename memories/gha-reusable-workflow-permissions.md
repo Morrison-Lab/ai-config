@@ -9,53 +9,40 @@ file for two new findings rather than an addition there -- the same reason
 `claude.yml`/`claude-code-review.yml` in a consumer repo to thin callers of
 `Morrison-Lab/gha`'s reusable versions (`d-morrison/qwt#135`).
 
-## A permissions mismatch against a nested job fails with ZERO jobs and ZERO check runs
+## A permissions-mismatch startup_failure is invisible outside a browser
 
-A `uses: <owner>/<repo>/.github/workflows/<file>.yml@<ref>` caller must grant,
-at the calling job's `permissions:` block, everything every job **inside**
-the called workflow requests -- not just what the top-level docs mention in
-passing. Getting one wrong (`issues: read` where the nested job needs
-`issues: write`, say) produces:
+`github-actions.md`'s "GitHub Actions workflow authoring gotchas" section
+already covers the mechanism and the remedy for a caller under-granting a
+permission a nested job requests: the graph-build-time check that fails the
+whole call with `startup_failure` and zero jobs created even when the
+under-permissioned job is `if:`-skipped, and the sibling trap where an
+**omitted** key in an explicit `permissions:` block defaults to `none`
+rather than inheriting anything -- both ending in the same "copy the
+`permissions:` block from the matching `examples/<name>.yml` verbatim"
+remedy this file would otherwise just repeat. Hit the identical shape again
+migrating `d-morrison/qwt`'s `claude-code-review.yml` caller (`issues: read`
+where the nested `claude-review` job needs `issues: write`; `d-morrison/qwt#135`),
+and confirmed a gap that section doesn't cover: **how you actually see the
+error.**
 
-```
-Invalid workflow file: .github/workflows/<caller>.yml#L37
-The workflow is not valid. ... Error calling workflow '<owner>/<repo>/.github/workflows/<file>.yml@<ref>'.
-The nested job '<job-id>' is requesting 'issues: write', but is only allowed 'issues: read'.
-```
-
-as a `startup_failure` conclusion with **zero jobs recorded** --
+`gh run view` prints only `This run likely failed because of a workflow file
+issue`, with no detail. The REST API has no endpoint for it either --
 `gh api repos/<owner>/<repo>/actions/runs/<id>/jobs` returns
-`{"jobs":[],"total_count":0}`. That is the same shape
-[`fully-clean.md`](fully-clean.md) already documents for
-`action_required`-blocked runs: a workflow run that fails before any job
-starts produces no check run at all, so `gh pr checks` shows nothing wrong
-and the failure is invisible to any check-runs-only poll.
-
-The error text names the exact fix (which permission, which value), but
-nothing surfaces it except opening the run in a browser -- `gh run view`
-prints only `This run likely failed because of a workflow file issue`, with
-no detail, and the REST API has no endpoint for it since there's no check
-run to attach an annotation to. Fetch the rendered Actions run page and grep
-its `Annotations` section (`get_page_text` in a browser tool, or scrape the
-HTML) when a `pull_request`-triggered run of a reusable-workflow caller
+`{"jobs":[],"total_count":0}`, and there's no check run to attach an
+annotation to, so nothing shows up in `gh pr checks` (the same shape
+[`fully-clean`](../shared/workflow/fully-clean.md) documents for
+`action_required`-blocked runs). The actual error text -- naming the exact
+job, permission, and value -- only exists in the rendered Actions run page's
+`Annotations` panel. Fetch it there (`get_page_text` in a browser tool, or
+scrape the HTML) when a `pull_request`-triggered reusable-workflow caller
 completes with `startup_failure` and an empty `jobs` array.
 
-Before trusting a hand-transcribed `permissions:` block against an example
-caller, diff it line-by-line rather than eyeballing it -- a one-word slip
-(`read` for `write`) parses as valid YAML, passes `actionlint` (it doesn't
-resolve remote reusable-workflow schemas), and only fails at real dispatch
-time, against the live PR, invisibly.
-
-- **Do:** grant, in the caller's `permissions:` block, the union of every
-  permission any job inside the called workflow requests -- read the called
-  workflow's own source rather than inferring from its `secrets:`/`inputs:`
-  contract or an example that might be stale.
-- **Do:** check a reusable-workflow caller's actual run (not just `gh pr
-  checks`) after the first push, since a `startup_failure` with zero jobs is
-  invisible to a check-runs-only view.
-- **Don't:** trust a hand-copied `permissions:` block without diffing it
-  against the example byte-for-byte -- a single wrong verb parses fine and
-  fails silently until a real `pull_request` event fires it.
+- **Do:** read the rendered Actions run page's `Annotations` panel when a
+  reusable-workflow caller fails with `startup_failure` and zero jobs --
+  `gh run view` and the REST API surface nothing.
+- **Do:** see `github-actions.md`'s "GitHub Actions workflow authoring
+  gotchas" for the permission-grant mechanism and remedy; this only adds
+  where to find the error text once you've hit it.
 
 ## A caller-level `concurrency:` group with the same name as a nested job's own group deadlocks the run
 

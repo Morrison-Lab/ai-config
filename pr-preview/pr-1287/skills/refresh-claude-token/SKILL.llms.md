@@ -151,7 +151,7 @@ Worth stating plainly, because the script’s own verification is good and that 
 
 `rotate()` compares `updated_at` before and after, which answers “did GitHub store something different”. The question a user actually cares about is “will the reviewer be able to authenticate”, and no property of the secrets API can answer that: the endpoint returns only name, `created_at`, and `updated_at`, and the action’s logs mask the value as `***`.
 
-So the only instrument is behavioural, and the only positive evidence is a run that reached the model. This is the failure recorded in [`fully-clean`](../../shared/workflow/fully-clean.md)’s eighth case and its cross-repo variant: seven `claude-review` runs on `d-morrison/altdoc` \#95 and \#96 failing in the 26-to-35-second band with `is_error: true`, `total_cost_usd: 0`, and no permission denials, while the same reviewer returned a full verdict on another owner’s repo minutes later. No number of re-runs would have shown that; only a working control on a different credential did.
+So the only instrument is behavioural, and the only positive evidence is a run that reached the model. This is the failure recorded in [`review-verdict-pitfalls`](../../shared/workflow/review-verdict-pitfalls.md)’s eighth case and its cross-repo variant: seven `claude-review` runs on `d-morrison/altdoc` \#95 and \#96 failing in the 26-to-35-second band with `is_error: true`, `total_cost_usd: 0`, and no permission denials, while the same reviewer returned a full verdict on another owner’s repo minutes later. No number of re-runs would have shown that; only a working control on a different credential did.
 
 ## Edge cases
 

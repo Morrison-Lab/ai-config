@@ -146,6 +146,88 @@ Commit `1edc5037` landed three em-dashes in `skills/ard/SKILL.md` and
 timing, and the three-dot range, and was never run at the pause point --
 running the same scan earlier had felt like discharging it.)
 
+### An item a guard exempts is neither run nor skipped
+
+The section above names two states an item can be in: skipped, where you know
+it is outstanding, and run early, where you believe it is discharged on real
+output.
+A third sits between them and is commoner than either.
+The item is never run and never skipped.
+It is **exempted** --- a guard inside the procedure says the item does not
+apply in this case --- and the belief that it is settled rests on the guard
+rather than on any command.
+
+That defeats the earlier section's own consolation.
+"A skipped item leaves you knowing it is outstanding" is true of a skip and
+false of an exemption, because an exemption is not experienced as omitting
+anything.
+It is experienced as the checklist not applying.
+
+**A guard with two clauses is read by whichever clause is cheaper to satisfy.**
+The failure needs no carelessness, only an asymmetry: one clause is a property
+of the situation you can see at a glance, and the other takes work.
+[`post-merge`](../../skills/post-merge/SKILL.md)'s recursion guard is the
+worked example.
+It skips the UMS step when the merged PR *was itself a UMS or learnings PR*
+**and** *no new lessons emerged from its own review loop*.
+The first clause is trivially true of every learnings PR, which is the only
+kind of PR the guard ever fires on, so it is satisfied before you have read the
+second.
+Once a guard reads as satisfied, nothing prompts evaluating the rest of it, and
+the conjunction quietly becomes its first conjunct.
+
+Diagnosing this as an under-specified guard is the wrong repair, and it is the
+repair that suggests itself.
+That guard already spells its second clause out in as many words, and the
+skill's own pause-point checklist already demands the skip be stated.
+Both went unperformed together, which is the finding rather than a coincidence:
+a guard that reads as satisfied suppresses the check written to catch it.
+
+**So the guard's output is a sentence, and silence is the failure.**
+An exemption that genuinely fires produces something like "skipped under the
+recursion guard; the review loop raised nothing that is not already in the
+diff", which names both clauses and is checkable by someone else.
+An exemption nobody writes down is indistinguishable from an item nobody
+reached, and only one of those is legitimate.
+Write the sentence at the pause point, and treat being unable to write the
+second clause's half of it as the guard not having fired.
+
+The two rules this most resembles are scoped elsewhere, and the difference
+decides the remedy.
+[`fail-fast`](../principles/fail-fast.md)'s "A guard's discharge fires on
+positive success, not the absence of failure" and
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "A reminder guard's
+discharge condition is a second matcher" both govern a guard you **ship** ---
+code, a hook, a matcher --- where the fix is to narrow the condition or gate it
+on attributable evidence.
+That file's AND-clause rule is nearer still, and its remedy is a mutation test,
+which needs something executable to mutate.
+Here the guard is prose and the reader is the runtime, so none of those
+remedies reach it and the stated sentence is the whole instrument.
+
+- **Do:** state a guard's outcome as a sentence naming every clause, at the
+  pause point, whether it fired or not.
+- **Do:** treat a clause you have not evaluated as the guard not having fired,
+  rather than as a clause to assume.
+- **Don't:** read a multi-clause exemption as satisfied by the clause that was
+  already true before you looked at it.
+- **Don't:** repair this by sharpening the guard's wording --- the operative
+  clause is usually written down already, and rewriting it changes nothing
+  about whether anyone reaches it.
+
+(`Morrison-Lab/ai-config`, 2026-08-07/08: seven PRs merged in one session
+--- #1255, #1240, #1260, #1271, #1273, #1281, and #1285, from `18:01:52Z` to
+`05:47:31Z` --- and every one was a learnings PR, so the recursion guard's
+first clause held for all seven.
+Steps 1 to 3 of `post-merge` ran each time: branches deleted, worktrees
+removed, the main checkout restored on `main` and clean.
+Step 4 was never performed and never reported, and step 5's killer item, which
+exists for exactly this and requires a skip to be stated, was not run either.
+The second clause did not hold: #1281's own review cycle had produced a further
+lesson about dispatch pre-checks, surfaced in conversation and left unrecorded
+by the UMS PR that cycle did produce.
+The user had to ask "did you run ums?".)
+
 ## Mark the killer items
 
 The term *The Checklist Manifesto* uses for the steps that are both most often

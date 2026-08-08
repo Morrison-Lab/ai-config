@@ -360,9 +360,10 @@ labelled advisory may genuinely exit 0 while a self-test inside that same
 check's **test suite** asserts the real corpus complies and gates the job.
 Grepping a workflow for what enforces a threshold can therefore find the
 advisory step and conclude wrongly.
-[`fully-clean`](fully-clean.md) already owns the near half of this, in its case
-covering a check "designed to NEVER fail regardless of their own posted
-content, so their green color carries zero signal at all".
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md) already owns the near
+half of this, in its case covering a check "designed to NEVER fail regardless
+of their own posted content, so their green color carries zero signal at
+all".
 What the capped-file case adds is that the signal is not merely absent but
 **misdirecting**: a second step enforces the same threshold, so the advisory
 label is accurate about its own step and false about the job.

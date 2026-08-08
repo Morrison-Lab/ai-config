@@ -32,7 +32,8 @@ Both 2026-08-04, one session, both verified after the fact.
   1. A brief asserted that `CLAUDE.md` carries a quota carve-out phrased
      "`total_cost` 0 at `num_turns` 1".
      It does not: `grep -n "total_cost\\|num_turns" CLAUDE.md` returns nothing,
-     and the sentence lives only at `shared/workflow/fully-clean.md:651`.
+     and the sentence lives only at
+     `shared/workflow/review-verdict-pitfalls.md:29`.
      The receiving agent caught it, which is luck rather than a mechanism.
   2. A later brief said `CLAUDE.md` has "five quota mentions".
      `grep -ci quota CLAUDE.md` returns 6 and `grep -oi quota CLAUDE.md | wc -l`

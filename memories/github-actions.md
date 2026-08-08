@@ -1184,8 +1184,8 @@ and `ref: <PR-branch>`, which skips the comment-relay path entirely.
   PR's comments without checking `list_workflow_runs` first -- #1197 already
   found this claim false once, from the same symptom.
 - **Don't:** count a listener's own error as one of the retries in
-  [`fully-clean`](../shared/workflow/fully-clean.md)'s "retry once, then
-  treat as unreachable" rule -- it isn't the reviewer failing.
+  [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s
+  "retry once, then treat as unreachable" rule -- it isn't the reviewer failing.
 
 (2026-08-07, `Morrison-Lab/ai-config#1238`: the same string #1197 traced to a
 false repo-wide-failure report reappeared verbatim on a PR this session

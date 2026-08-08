@@ -725,6 +725,53 @@ case(create("c") + [bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}")],
      "ordering", "RX_DRAFT must be checked before RX_OPEN")
 
 
+# --- a PR that reached a terminal state cannot be discharged by complying ---
+# ai-config#1279 defect 3. GitHub ACCEPTS
+# `POST /pulls/{n}/requested_reviewers` on a merged PR -- HTTP 200,
+# `"requested_reviewers":[]`, nobody added. So the obligation is unsatisfiable
+# and the guard re-fires forever, which is how a guard stops being read.
+MERGED = ('{"state":"MERGED","merged":true,'
+          '"url":"https://github.com/o/r/pull/1038"}')
+
+case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"), res("m", "{}"),
+                    say("Merged.")], False,
+     "a merged PR no longer demands a reviewer request")
+case(create("c") + [bash("gh pr close 1038", tid="m"), res("m", "{}"),
+                    say("Closed it.")], False,
+     "a closed PR no longer demands a reviewer request")
+case(create("c") + [use("merge_pull_request", tid="m", owner="o", repo="r",
+                        pullNumber=1038), res("m", "{}"), say("Merged.")], False,
+     "the structured merge tool discharges too")
+case(create("c") + [use("update_pull_request", tid="m", owner="o", repo="r",
+                        pullNumber=1038, state="closed"), res("m", "{}"),
+                    say("Closed.")], False,
+     "update_pull_request(state=closed) discharges too")
+# Merged OUTSIDE the session: no action in the transcript, only an observation.
+case(create("c") + [bash("gh pr view 1038 --json state,merged", tid="v"),
+                    res("v", MERGED), say("Someone merged it.")], False,
+     "observing a terminal state on a single-PR probe discharges")
+
+# ... and the fail-safe direction, which must survive all of the above.
+case(create("c") + [bash("gh pr merge 1038 --squash", tid="m"),
+                    res("m", FAIL, err=True), say("Merge failed.")], True,
+     "a FAILED merge keeps the PR tracked")
+case(create("c") + [bash("gh pr merge 1038 --squash; echo done", tid="m"),
+                    res("m", "done"), say("Tried.")], True,
+     "a merge chained AHEAD of another command is ambiguous, so it does not discharge")
+case(create("c") + [bash("gh pr view 1038 --json state", tid="v"),
+                    res("v", '{"state":"OPEN"}'), say("Still open.")], True,
+     "a probe reporting OPEN does not discharge")
+case(create("c") + [bash("gh pr list --state merged", tid="v"),
+                    res("v", MERGED), say("Listed.")], True,
+     "a repo-wide list naming no single PR is not a probe")
+case(create("c") + [bash("gh pr merge 9999 --squash", tid="m"), res("m", "{}"),
+                    say("Merged a different PR.")], True,
+     "merging a DIFFERENT PR does not discharge this one")
+case(create("c") + [bash('gh pr comment 1038 --body "next step: gh pr merge"',
+                         tid="m"), res("m", "{}"), say("Commented.")], True,
+     "the verb quoted inside a --body value is not a merge")
+
+
 def block_of(events):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:

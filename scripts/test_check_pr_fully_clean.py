@@ -271,6 +271,56 @@ def main() -> int:
         "classify_verdict: findings win over a clean line in the same body",
         checker.classify_verdict("Ready for merge. But: Needs more work on the tests.") == "not-clean",
     )
+    # A bare clean phrase survives intact inside a sentence that says the
+    # opposite. Classifying one of these as clean would let it supersede a
+    # standing "Needs more work" -- the exact failure criterion 4 exists to
+    # stop, arriving through the check meant to stop it (#1287 review of
+    # this PR). Negations sit BEFORE the phrase, conditions AFTER it, so both
+    # sides are exercised.
+    check(
+        "classify_verdict: 'not ready for merge' states NO clean verdict",
+        checker.classify_verdict(
+            "This PR is not ready for merge until the two remaining findings are fixed."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'still not approved for merge' states NO clean verdict",
+        checker.classify_verdict("Still not approved for merge; two findings remain.") == "",
+    )
+    check(
+        "classify_verdict: 'not yet ready for merge' (two words between) is NOT clean",
+        checker.classify_verdict("It is not yet ready for merge.") == "",
+    )
+    check(
+        "classify_verdict: a CONDITIONAL 'ready for merge once ...' is NOT clean",
+        checker.classify_verdict(
+            "Ready for merge once the following items are addressed: the two nits above."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'approved for merge pending CI' is NOT clean",
+        checker.classify_verdict("Approved for merge pending a green CI run.") == "",
+    )
+    # NEGATIVE CONTROLS -- the guard must not swallow a genuine sign-off, or
+    # criterion 4 never passes and the gate becomes unusable.
+    check(
+        "classify_verdict: a plain 'Ready for merge' is still clean",
+        checker.classify_verdict("### Verdict\n\n**Ready for merge** -- all findings fixed.") == "clean",
+    )
+    check(
+        "classify_verdict: a negated mention does not veto a genuine verdict elsewhere",
+        checker.classify_verdict(
+            "Round 1 said it was not ready for merge.\n\n### Verdict\n\n**Ready for merge**"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Ready' needs no guard (adjacency already binds it)",
+        checker.classify_verdict("Verdict: Ready") == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Not Ready' is not clean",
+        checker.classify_verdict("Verdict: Not Ready") == "",
+    )
 
     # POSITIVE CONTROL -- the exact #1267 shape that bypassed the gate.
     # An explicit "Needs more work" at an EARLIER commit (so it never enters

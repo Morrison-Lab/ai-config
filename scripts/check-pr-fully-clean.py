@@ -131,6 +131,30 @@ VERDICT_CLEAN_PATTERNS = [
     r"\bApproved\s+for\s+merge\b",
 ]
 
+# The two BARE patterns above carry no verdict on their own: the phrase survives
+# intact inside a sentence that says the opposite. `Verdict:\s*...` is safe
+# without a guard because it requires immediate adjacency after the label.
+#
+# Both directions have to be checked, and only one of them is a negation. A
+# negation sits BEFORE the phrase ("this is not ready for merge") while a
+# CONDITION sits AFTER it ("ready for merge once the findings are fixed"), so a
+# lookbehind alone leaves the conditional form classified clean. That form is
+# the likelier one in a real review, since it is how a reviewer signs off on
+# work that is nearly done.
+BARE_CLEAN_PATTERNS = {
+    r"\bReady\s+for\s+merge\b",
+    r"\bApproved\s+for\s+merge\b",
+}
+CLEAN_NEGATION_PREFIX = re.compile(
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't)\s+(?:\w+\s+){0,2}$",
+    re.IGNORECASE,
+)
+CLEAN_CONDITIONAL_SUFFIX = re.compile(
+    r"^\s*(?:once|after|when|if|unless|pending|provided|assuming"
+    r"|subject\s+to|as\s+soon\s+as|contingent)\b",
+    re.IGNORECASE,
+)
+
 
 def classify_verdict(body: str, state: str = "") -> str:
     """Classify one automated review item as 'not-clean', 'clean', or '' (none).
@@ -162,7 +186,13 @@ def classify_verdict(body: str, state: str = "") -> str:
             return "not-clean"
 
     for pat in VERDICT_CLEAN_PATTERNS:
-        if re.search(pat, scan, re.IGNORECASE | re.MULTILINE):
+        for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            if pat in BARE_CLEAN_PATTERNS:
+                prefix = scan[max(0, match.start() - 40):match.start()]
+                if CLEAN_NEGATION_PREFIX.search(prefix):
+                    continue
+                if CLEAN_CONDITIONAL_SUFFIX.match(scan[match.end():match.end() + 40]):
+                    continue
             return "clean"
 
     return ""

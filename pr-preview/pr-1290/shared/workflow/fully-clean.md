@@ -1454,13 +1454,14 @@ So the instrument is not wrong in principle; it is vacuous on the command we
 actually tell people to run, which is the worst place for a precondition to go
 unstated.
 
-Dispatch with the ref, and the one-call pre-check becomes available:
+Dispatch with the ref, and the one-call pre-check becomes available --- for
+the runs you dispatch:
 
 ```bash
 gh workflow run claude-review.yml --ref <PR-branch> -f pr_number=<N>
 ```
 
-Three caveats before relying on it.
+Some mechanical caveats before relying on it.
 `--paginate` is load-bearing, for the reason criterion 1 above already gives
 about page-2 runs.
 Read `status` before `conclusion`, since an in-flight run has no conclusion to
@@ -1469,16 +1470,39 @@ And the workflow file must exist on that ref, because it is the ref's copy that
 runs --- so a PR editing `claude-review.yml` dispatches its own modified
 version.
 
+One further caveat decides how far the pre-check can be trusted, and this
+passage's earlier paragraph already supplies it without drawing the
+conclusion.
+`--ref` is yours to pass, so it fixes only the dispatches you control.
+A human's `@claude review again` routes through `claude-bot.yml`, which pins
+`claude.yml@v1` and passes no ref, so that run still lands on the default
+branch and is still invisible at the PR head.
+The pre-check is therefore sound against your own dispatches and silent about
+a concurrent mention-driven one --- which is the worse half, because that run
+is the one whose cancellation costs somebody else their review.
+Until `claude-bot.yml` carries the fix, keep the `gather-context` attribution
+as the check before dispatching, and read the PR-head query as confirming your
+own run rather than as clearing the field.
+
+That residual is worth naming rather than filing away, since it is this
+section's own subject recurring one level up: a check whose scope is narrower
+than the claim made for it, with the shortfall on the side that reads as an
+all-clear.
+
 - **Do:** confirm the class of run you are looking for can appear at the PR
   head at all, before reading its absence there as an all-clear.
 - **Do:** validate that with a completed run you know belonged to the PR, which
   is the positive control the null result needs.
 - **Do:** pass `--ref <PR-branch>` when dispatching a PR-scoped review, which
   both supersedes the PR's own stale review check and makes the one-call
-  pre-check sound.
+  pre-check sound **for the runs you dispatch**.
 - **Don't:** substitute a check-runs query at the PR head for the
   `gather-context` attribution above while the dispatch omits `--ref` --- it
   answers a narrower question and answers it reassuringly.
+- **Don't:** read your own `--ref` discipline as clearing the field, while
+  `claude-bot.yml` pins `claude.yml@v1` --- a mention-driven run remains
+  invisible at the PR head, and it is the one a colliding dispatch would
+  cancel out from under a human.
 - **Don't:** read "query the artifact, not the actors" as unconditional; it
   presupposes the actor writes to the index you are querying.
 

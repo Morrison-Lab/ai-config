@@ -387,7 +387,7 @@ generic Actions-authoring and reusable-workflow material.
     `gh api repos/<owner>/<repo>/actions/secrets --jq '.secrets[] | "\(.name) \(.updated_at)"'`
     to pick which repo to rewrite --- a token written long before a working repo's is a rotation
     that plausibly missed it --- but treat that as triage, not evidence.
-    See [`fully-clean`](../shared/workflow/fully-clean.md) for the full statement.
+    See [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md) for the full statement.
   - **Intermittent upstream bug** (`total_cost_usd > 0`, `duration_ms` ~192 s): the
     `claude-code-action` completes a real review but exits with `is_error=true` anyway.
     The guard step fails the check ❌. The prior clean review on the same diff is still
@@ -401,7 +401,7 @@ generic Actions-authoring and reusable-workflow material.
     The no-op re-run is also the better evidence, because nothing changed between
     the two attempts.
     A pass therefore proves the failure was transient by construction, which is the
-    negative control `shared/workflow/fully-clean.md`'s eighth case prizes.
+    negative control `shared/workflow/review-verdict-pitfalls.md`'s eighth case prizes.
     A push cannot show that, since it changes the code.
     Fall back to a trivial commit only if the re-run fails too.
     Observed on gha#92 run #28034977099.
@@ -1050,7 +1050,7 @@ The message is what separates them:
   **Don't:** treat the message's "new repository" / "workflow changes" text as
   exhaustive, or spend `rerun_failed_jobs` before bringing the branch current.
   See the self-mod skip bullet above for gha's own guard against the green form,
-  and `fully-clean.md` for the stale-branch red form.
+  and `review-verdict-pitfalls.md` for the stale-branch red form.
 
 (Morrison-Lab/ai-config#981, 2026-07-31/2026-08-01: a non-workflow PR
 was 30 commits behind `main` after #998 changed `claude-review.yml`.
@@ -1061,8 +1061,9 @@ Morrison-Lab/ai-config#994's earlier 5m26s stub looked similar in the queue, but
 it ran before #998 merged and was a different bug.)
 
 This is a fourth distinct cause in the short-duration band that
-[`fully-clean`](../shared/workflow/fully-clean.md) already records three for,
-under "That duration signature does not run backwards".
+[`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)
+already records three for, under "That duration signature does not run
+backwards".
 Three of the four run 25 seconds or less, and none of them is about credentials,
 which is that section's point: a short run corroborates a credential hypothesis
 you already hold on other grounds, and never produces one.

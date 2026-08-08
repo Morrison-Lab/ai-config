@@ -194,6 +194,20 @@ Both facts came from `get_workflow_run`; the caption was never rewritten, and
 the cancelled prior run `30614715159` is the one that actually ran at
 `de72464`.)
 
+## A `workflow_dispatch` run's `head_sha` names the dispatch ref, not the reviewed commit
+
+(Morrison-Lab/ai-config#1251, 2026-08-07: a `claude-review.yml` run dispatched
+at 18:02:03Z reported `head_sha: 7d050a36...`, `main`'s tip at that moment, on
+an `event: workflow_dispatch` run for PR #1251.
+Its verdict claimed a specific wording fix was "unchanged in the current
+diff," which `grep`ing the live file disproved --- the fix had landed in a
+push before the verdict posted, sometime inside the run's own 18:02-18:08
+execution window.
+A second dispatch, triggered directly via `actions_run_trigger` rather than
+by re-posting an `@claude` mention (which risks re-triggering the
+credit-gated `claude-bot.yml` ack step on its own `contains(body, '@claude')`
+gate), produced a genuine current-head verdict.)
+
 ## Re-check version parity, not only conflict-freedom
 
 (`UCD-SERG/serocalculator#392`, 2026-07-25: the final pre-declaration check
@@ -472,3 +486,27 @@ verdict, at `$7.43`.
 Same duration band, more spend, and it finished --- which rules out a budget
 or wall-clock ceiling and leaves what the diff makes the reviewer read as the
 live candidate.)
+
+## A cancelled review can be the casualty of someone else's dispatch
+
+(`Morrison-Lab/ai-config#1281`, 2026-08-08: five `claude-review.yml` dispatches
+ran within twenty minutes and only three were for #1281, each run's PR
+confirmed from its own `gather-context` log.
+
+| run | PR | dispatched by | created | ended | outcome |
+| --- | --- | --- | --- | --- | --- |
+| `31232187007` | 1281 | agent | 01:14:45 | 01:30:38 | cancelled |
+| `31232684036` | 1276 | --- | 01:27:27 | 01:37:18 | success |
+| `31232771312` | 1281 | human mention, via `claude-bot.yml` | 01:29:48 | 01:32:29 | cancelled |
+| `31232853975` | 1281 | agent, retrying the cancelled first run | 01:31:40 | 01:50:52 | success |
+| `31232973624` | 1283 | --- | 01:34:36 | --- | --- |
+
+Each cancellation follows the next **same-PR** dispatch by 50 and 49 seconds,
+matching the 45-to-46-second signature measured on #1224.
+The human's mention killed a run 15m53s into its work, and the agent's retry
+then killed the human's.
+The survivor is simply the one nothing followed; it posted a genuine verdict at
+01:50:37, so the window discarded two runs' work and produced one verdict.
+The session's own reading of `gh run list` counted four colliding dispatches,
+because that list reports `headBranch: main` for every one of them --- two of
+the four were other PRs' reviews and were never in #1281's group at all.)

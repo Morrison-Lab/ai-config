@@ -366,11 +366,18 @@ string.
 **A `shared/` fragment marked `<!-- Shared with the lab manual -->` in
 `CLAUDE.md` is transcluded WHOLE by the UCD-SERG lab manual, so restructuring
 one silently damages the manual.**
-Twenty-two `@shared/...` fragments carry that comment on 2026-08-05
-(`grep -c 'Shared with the lab manual' CLAUDE.md`), including the three heaviest
-closure fragments `shared/workflow/fully-clean.md`, `ardi.md`, and
-`address-every-comment.md`, and the two `shared/vendored/**` copies are the same
-kind of shared-source file.
+Six `@shared/...` fragments carry that comment as of 2026-08-08
+(`grep -c 'Shared with the lab manual' CLAUDE.md`): `shared/coding/avoid-nesting.md`,
+`prefer-packaged-functions.md`, `per-operation-grouping.md`,
+`avoid-hardcoding-external-data.md`, `shared/writing/plain-prose.md`, and
+`ai-tells.md` --- all small (17-209 lines), not the corpus's heaviest closure
+fragments. `shared/workflow/fully-clean.md`, `ardi.md`, and
+`address-every-comment.md` do NOT carry the marker, despite an earlier version
+of this entry claiming otherwise; they are large but ai-config-only, so
+restructuring them (e.g. ai-config#1236's `fully-clean.md` split) needs no
+manual coordination.
+The two `shared/vendored/**` copies are the same kind of shared-source file
+as the six marked fragments.
 The manual transcludes each one with
 `{{< include .ai-config/shared/<area>/<topic>.md >}}` through its `.ai-config`
 git submodule (README, "Shared content"), rendering the file as it stands.

@@ -14,7 +14,7 @@ Acting on it anyway costs a full round (CI plus a re-review), and the fix can it
 Default to holding, and spend a round on an optional improvement only when it clearly justifies the cost.
 
 Keep the Copilot observation separate, and do not attribute it to your own pushes.
-Copilot posts no formal review when it finds nothing, so `copilot-pull-request-reviewer` can complete `success` with `get_reviews` empty even on a stable, single-push head -- the silent-reviewer state [`fully-clean`](fully-clean.md) owns.
+Copilot posts no formal review when it finds nothing, so `copilot-pull-request-reviewer` can complete `success` with `get_reviews` empty even on a stable, single-push head -- the silent-reviewer state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) owns.
 A green Copilot check is therefore not a verdict; read `get_reviews`, and treat its emptiness as "no findings posted", not as approval and not as something a trickled push caused.
 
 - **Do:** report ready when a clean verdict stands over only a note the reviewer declined to raise as a finding.

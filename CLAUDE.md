@@ -1154,7 +1154,7 @@ Leaving it unmarked is what is not.
 
 **"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
 `isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
-Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/main`.
+Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/preferences.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
 Measured 2026-08-07.
 [`memories/git-worktrees.md`](memories/git-worktrees.md) carries the evidence.
 [`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.

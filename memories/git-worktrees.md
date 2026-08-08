@@ -240,12 +240,27 @@ The remedy is to name the target clone in the brief and have the agent build its
 own worktree there:
 
 ```bash
-git -C /path/to/target-clone worktree add -b <branch> /private/tmp/wt-<slug> origin/main
+default=$(git -C /path/to/target-clone symbolic-ref --short refs/remotes/origin/HEAD)
+git -C /path/to/target-clone worktree add -b <branch> /private/tmp/wt-<slug> "$default"
 ```
+
+`refs/remotes/origin/HEAD` is unset in some clones, and
+`git remote set-head origin -a` populates it (verified idempotent: it prints
+`'origin/HEAD' is unchanged` when already correct).
+
+Resolve the default branch rather than writing `origin/main`, per the
+"Resolve `<default-branch>` from the repo rather than assuming `main`" rule in
+[`preferences.md`](preferences.md), which measures the hard-coded form dying
+with `fatal: invalid reference: origin/main` against a repo whose default is
+`develop`.
+That rule prefers `--detach` for a worktree the *dispatcher* creates and hands
+over, to avoid a `.git/config` lock race under concurrent creation.
+Here the agent creates its own and needs a branch to commit to, so `-b` is
+right --- but use `--detach` if you ever fan several of these out at once.
 
 - **Do:** name the target clone by path when dispatching an agent into a repo
   other than the session's own, and tell it to create its own worktree there off
-  `origin/main`.
+  that repo's resolved `origin/<default-branch>`.
 - **Do:** settle where an agent actually landed from the agent's own `pwd`, not
   from a `git worktree list` run after it exits.
 - **Don't:** write "the worktree you were given" into a cross-repo brief ---

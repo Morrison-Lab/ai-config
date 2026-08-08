@@ -79,9 +79,15 @@ EXEC_WRAP = (
 # <<EOF` and `ssh host <<EOF` execute the body line by line. The quoted-delimiter
 # form is not an exception -- `<<'EOF'` only suppresses expansion, and bash still
 # runs what it reads.
+# Built from the SAME LEAD machinery the matching passes use, not a hand-rolled
+# anchor. The first version rolled its own and accepted only an env assignment
+# before the executor, so `sudo bash <<EOF`, `time bash <<EOF`, `! bash <<EOF`
+# and `if true; then bash <<EOF` all walked through -- the keyword-prefix gap
+# from round 1, reproduced in a fourth place by the very commit that
+# consolidated EXEC_PROGS into one list. Consolidating one duplicated concept
+# is no protection against forking a different one in the same edit.
 HEREDOC_EXECUTOR = re.compile(
-    r"(?:^|[;&|`(\n]|\$\()\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b[^\n]*?<<",
+    LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b[^\n]*?<<",
 )
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"

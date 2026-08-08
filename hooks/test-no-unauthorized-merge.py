@@ -156,6 +156,16 @@ BLOCK = [
     ("cd /r && bash <<EOF\ngh pr merge 411\nEOF", "the executor in a later segment"),
     ("/usr/bin/bash <<EOF\ngh pr merge 411\nEOF", "an absolute-path executor"),
     ("ssh host 'gh pr merge 411'", "a positional hostname between executor and operand"),
+    # The heredoc anchor gets the SAME keyword/wrapper prefixes the matching
+    # passes do, because it is built from the same LEAD. Hand-rolling a second
+    # anchor is what let these through.
+    ("sudo bash <<EOF\ngh pr merge 411\nEOF", "a wrapper before the heredoc's executor"),
+    ("time bash <<EOF\ngh pr merge 411\nEOF", "a keyword before the executor"),
+    ("! bash <<EOF\ngh pr merge 411\nEOF", "a negation before the executor"),
+    ("if true; then bash <<EOF\ngh pr merge 411\nEOF\nfi", "a then-body executor"),
+    ("nohup ssh h <<EOF\ngh pr merge 411\nEOF", "a wrapper before ssh"),
+    ("{ bash <<EOF\ngh pr merge 411\nEOF\n}", "a brace-group executor"),
+    ("FOO=1 bash <<EOF\ngh pr merge 411\nEOF", "an env assignment before the executor"),
 ]
 
 ALLOW = [

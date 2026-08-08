@@ -375,6 +375,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><code>R/*.R</code> roxygen comments (<code>#'</code>)</li>
 <li><code>man/*.Rd</code></li>
 <li><code>vignettes/*.Rmd</code></li>
+<li><code>vignettes/**/*.qmd</code> — including a change that only <strong>renames or repoints a Quarto <code>{{&lt; include &gt;}}</code></strong>, since the include path is itself scanned as prose (see step 3)</li>
 <li><code>README.Rmd</code> / <code>README.md</code></li>
 <li><code>DESCRIPTION</code> <code>Title:</code> / <code>Description:</code> fields</li>
 </ul>
@@ -395,6 +396,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Real misspelling → fix it in the source file.</li>
 <li>Legitimate technical term, proper noun, acronym, or domain word → add to <code>inst/WORDLIST</code>.</li>
 <li>Possessive of an existing word (e.g., <code>PR's</code>) → usually rewrite as <code>PR</code> or <code>the PR's foo</code>; only WORDLIST it if rewriting hurts clarity.</li>
+<li>Token came from a Quarto <code>{{&lt; include &gt;}}</code> <strong>path</strong> rather than from the prose -&gt; rename the subfile so its name is made of dictionary words. Don’t backtick the shortcode (that disables the transclusion), and prefer renaming over a WORDLIST add, which puts a path artifact into a word list. Check <code>FOUND IN</code> before assuming a token is prose: a hit whose only occurrence is an include line is this case, not a misspelling.</li>
 </ul></li>
 <li><p><strong>Add to <code>inst/WORDLIST</code> correctly.</strong> This is the easy place to break CI.</p>
 <ul>

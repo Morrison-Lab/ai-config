@@ -5,6 +5,44 @@ Worked-example case records for the rules in
 auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
+## "A conflict your sweep found is not a conflict your merge caused" --- 20 conflicts, 2 of them mine
+
+(UCD-SERG/serocalculator#635, 2026-08-07.
+The PR consolidated the methodology and simulation vignettes, deleting one and
+renaming four out of `vignettes/articles/` into `vignettes/methodology/`.
+After it merged, 26 open PRs reported `mergeable: UNKNOWN`, and a
+`git merge-tree --write-tree` sweep found 20 genuinely conflicting.
+Attribution ran on the merge commit itself:
+
+```bash
+git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'
+```
+
+which returned exactly `man/figures/sim-recovery.png` (D),
+`vignettes/articles/simulate_xsectionalData.qmd` (D), and four `R099`/`R100`
+renames.
+Intersecting that set with the 20 isolated **2** as caused --- #511, whose
+include pointed at a renamed path, and #510, which edited the deleted vignette.
+The other 18 collided on `DESCRIPTION`, `inst/WORDLIST`, a `pkgdown/`
+directory removed long ago, and workflow files: ordinary drift in a repo whose
+PRs had been open for months.
+The subtraction mattered as much as the addition.
+PR #555 looked caused, because its conflict was on
+`simulate_xsectionalData.**Rmd**` --- a different file, deleted long before by
+`19ab811d`, confirmed with `git log --diff-filter=D`.
+Without attribution the sweep prescribes claiming and resolving all 20.
+The branch behind #511 was a CRAN release branch this session did not own, so
+the response was an explanatory comment naming the rename and where the content
+went, not a push.
+`git show --name-status "$merge"` was the first command reached for and printed
+no file list at all --- both merges here are two-parent merges, which is the
+case that behaves this way; re-measured against this corpus's own merge
+`f6be2ab3`, it
+prints only the commit header while `git diff --name-status -M f6be2ab3^1
+f6be2ab3` returns `M skills/stack-prs/SKILL.md`, and
+`git show --name-status f6be2ab3 | grep -cE '^[ADMR]'` returns 3 for the
+`Merge:`, `Author:` and `Date:` header lines.)
+
 ## "The batch pass" --- a squash-merge queue that serial chasing could not converge
 
 (Morrison-Lab/ai-config, 2026-07-30/31.

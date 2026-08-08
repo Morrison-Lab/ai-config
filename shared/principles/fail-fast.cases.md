@@ -80,6 +80,23 @@ The worked commands live in
 that PR merged on 2026-08-03.
 This entry is the general rule.)
 
+## "A fallback chain flattens which alternative won" --- the Godot binary path
+
+(2026-08-07, a `Lacaedemon/sparta` session: locating the Godot 4.7 binary ran
+`ls "C:/Users/dougm/Documents/Github/Godot_v4.7-stable_win64.exe/" 2>/dev/null`,
+falling back with `||` to the same `ls` under `C:/Users/dougm/Downloads/`, and
+then to a `find` sweep.
+The first `ls` **failed** --- that path does not exist, which is why `||`
+advanced at all --- and `2>/dev/null` ate the message saying so.
+Two exe filenames then printed from the Downloads branch, were read as
+confirming the first path, and a `GODOT` variable built from it failed with
+"No such file or directory".
+Both `ls` invocations would have printed those same two filenames, since `ls`
+on a directory prints its contents rather than its path, so nothing in the
+output distinguished them and re-reading the transcript could not have either.
+Dropping the two `2>/dev/null` tokens would have prevented the whole thing;
+`ls -d` on each candidate would also have been self-identifying.)
+
 ## "In a guard you ship: partial is worse than absent"
 
 (ai-config#950/#951, 2026-07-30/31: `scripts/semantic-line-breaks.py` has three

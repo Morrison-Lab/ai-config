@@ -885,3 +885,55 @@ under-specified one.
   more confidently than a positive finding would be.
 - **Don't:** discard the finding once its negative result is disproved -- the
   thing it tripped over is often a real ambiguity.
+
+**A note the reviewer declined to raise is still a claim, and so is your
+refutation of it.**
+Every bullet above checks a finding the reviewer actually **raised** --- the
+suggested literal, the proposed fix, the cited source, the negative result.
+A note dropped in passing, marked out of scope, or explicitly declined is
+checked by nobody, precisely because nobody is asking you to act on it.
+
+It can be right, and it can be wrong, and both directions cost something.
+[`ardi`](ardi.md)'s "not a finding" section owns the right-and-ignored
+direction: a reviewer can analyse a real convention violation correctly and
+still grade it acceptable, so the part of a review most likely to be skimmed is
+where a genuine violation sits.
+This bullet is the other half --- what happens once you do go and check.
+
+The trap is that **checking a declined note feels like the end of the
+verification when it is the start of a second unverified claim.**
+Overturning something reads as more rigorous than accepting it, so a refutation
+draws less scrutiny than the note it overturns rather than more.
+And a refutation is unusually cheap to get wrong here, because the artifact
+nearest to hand is not evidence about the code: a PR title, a commit subject,
+or a changelog line describing a refactor is a claim about **intent**, and the
+code is whatever that intent left behind.
+"Converted from a position push to a velocity impulse" and a function that
+computes a velocity and then still writes the position on the next line are
+entirely compatible, and only one of the two is the code.
+
+So read the function rather than the sentence describing the change to it, and
+read it at the current tip --- a checkout that predates the merge answers a
+different question, and answers it confidently.
+
+Holding is usually still right, and
+[`efficient-pr-babysitting`](efficient-pr-babysitting.md) already gives one
+reason: a declined note is not an open item, and a clean verdict standing over
+it is a stop.
+Verifying supplies a second and better one, because that rule's argument is
+about **cost** --- a round of CI and re-review spent on something that was
+never blocking --- which argues for holding whether the note is right or wrong.
+Checking tells you which of those you are in, it is usually one command, and
+the two compose: verify the note, then hold anyway unless it named a real
+defect.
+
+- **Do:** verify a declined, out-of-scope, or passing note against the code
+  before either acting on it or writing it off.
+- **Do:** hold the change regardless when the note turns out correct but
+  genuinely optional --- verifying decides what is true, not what ships.
+- **Don't:** treat a PR title, commit subject, or changelog line as evidence
+  about what the code does; each states an intent, and a refactor can keep the
+  very thing it says it replaced.
+- **Don't:** let your own refutation past the check you would have applied to
+  the reviewer's finding --- it is a fresh claim, and overturning something
+  feels like having verified it.

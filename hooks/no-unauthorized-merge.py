@@ -29,7 +29,15 @@ CMD_POS = r"""(?:^|[;&`(\n]|\$\()\s*"""
 # Expansions that may expand to nothing and so leave the NEXT word as the
 # command: `$FOO gh pr merge` runs the merge when $FOO is empty. Matched only
 # after a command position, so a mid-command `echo $FOO gh pr merge` does not.
-VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*)*"""
+#
+# The repetition is BOUNDED rather than `*`. Unbounded, each of the N command
+# positions in a long run of substitutions rescans the rest of the run before
+# failing, which is quadratic: measured 610ms on 800 chained backtick pairs
+# against 2.8ms for the pre-anchor matcher, on a hook that runs before every
+# Bash call. Four consecutive empty-expansion prefixes is already well past
+# anything a real command does, and capping makes the work per position
+# constant.
+VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*){0,4}"""
 LEAD = CMD_POS + VAR_PREFIX
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""

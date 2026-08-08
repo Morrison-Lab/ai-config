@@ -281,6 +281,30 @@ finally:
     ai_session("release", "--id", session_b)
     ai_session("release", "--id", session_c)
 
-total = len(BLOCK) + len(ALLOW) + 7
+# The command-position anchor makes every `;`, `&`, backtick and `$(` a place
+# the matcher restarts. With an UNBOUNDED expansion prefix each of those N
+# restarts rescanned the rest of a long substitution run before failing, which
+# is quadratic: 610ms on 800 chained backtick pairs, against 2.8ms for the
+# pre-anchor matcher, on a hook that runs before EVERY Bash call. Bounding the
+# repetition restores linear behaviour (~19ms at 1600).
+#
+# The threshold is deliberately loose -- this asserts the SHAPE of the growth,
+# not a runtime budget, so it survives a slow or loaded runner. A reintroduced
+# quadratic lands near 2.4s here, over an order of magnitude past the bound.
+import importlib.util  # noqa: E402
+import time  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("_guard", HOOK)
+_guard = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_guard)
+_adversarial = "`x` " * 1600 + "echo hi"
+_t0 = time.perf_counter()
+_guard.offending(_adversarial)
+_elapsed = time.perf_counter() - _t0
+wrong += (_elapsed > 1.0)
+print(f"  {'allow' if _elapsed <= 1.0 else 'SLOW ':<6} "
+      f"1600 chained substitutions scanned in {_elapsed * 1000:.0f}ms (bound 1000ms)")
+
+total = len(BLOCK) + len(ALLOW) + 8
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

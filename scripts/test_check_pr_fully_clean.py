@@ -446,6 +446,29 @@ def main() -> int:
         "classify_verdict: 'Needs a little more work' is not-clean",
         checker.classify_verdict("Needs a little more work") == "not-clean",
     )
+    # A bare newline does not end a sentence in a semantic-line-break corpus,
+    # so a qualifier starting the next line still retracts. Same corpus
+    # property the negation guard is built around, mirrored to the other side.
+    check(
+        "classify_verdict: a qualifier on the NEXT line still retracts",
+        checker.classify_verdict("**Ready for merge**\nonce the two findings are fixed.") == "",
+    )
+    check(
+        "classify_verdict: an adversative on the next line still retracts",
+        checker.classify_verdict("Ready for merge,\nbut two items remain.") == "",
+    )
+    # ...bounded, because a qualifier only RETRACTS when it sits close. A real
+    # sign-off continues past the verdict with ordinary prose that may contain
+    # `but` far downstream; retracting on that makes criterion 4 unsatisfiable
+    # for a clean PR. Taken from an actual verdict body on ai-config#1293.
+    check(
+        "classify_verdict: a distant 'but' in a long sign-off does NOT retract",
+        checker.classify_verdict(
+            "**Ready for merge** -- all three carried-over nits are fixed, the two new "
+            "worked-example additions are correctly sourced against the live threads, "
+            "but I noted one wording nit for later."
+        ) == "clean",
+    )
 
     # POSITIVE CONTROL -- the exact #1267 shape that bypassed the gate.
     # An explicit "Needs more work" at an EARLIER commit (so it never enters

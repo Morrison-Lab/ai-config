@@ -193,13 +193,44 @@ CLEAN_QUALIFIER = re.compile(
     r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
     re.IGNORECASE,
 )
-SENTENCE_END = re.compile(r"[.!?\n]")
+# A BARE newline does not end a sentence in this corpus, which writes semantic
+# line breaks -- one clause per line. Treating `\n` as a terminator hid every
+# qualifier that happened to start the next line, so `**Ready for merge**\nonce
+# the findings are fixed` read as clean.
+#
+# This is the same corpus property the NEGATION guard is built around, mirrored:
+# there a qualifier at the end of the PREVIOUS line is why the prefix scan has
+# to cross a break, and here one at the start of the NEXT line is why the suffix
+# scan must not stop at one. Reasoned about correctly on the prefix side and
+# then contradicted on the suffix side a round later.
+#
+# A blank line is a real terminator -- that is a paragraph break, not a wrapped
+# clause.
+SENTENCE_END = re.compile(r"[.!?]|\n[ \t]*\n")
+
+
+# Bounded as well as sentence-scoped, because a qualifier RETRACTS only when it
+# sits close to the phrase. A real sign-off reads "Ready for merge -- three nits
+# fixed, the additions are correctly sourced ..., but I noted X", where the
+# `but` is ordinary continuation 100+ characters later; retracting on that makes
+# criterion 4 unsatisfiable for a clean PR, which is the failure this whole
+# check exists to avoid, arriving from the other side.
+#
+# A window is still immune to the pattern-length artifact that motivated
+# dropping the anchored match: the shorter `Verdict: Ready` overlap puts its
+# qualifier ~15 characters out, well inside. Only an anchored check at exactly
+# position zero was brittle.
+QUALIFIER_WINDOW = 60
 
 
 def _sentence_remainder(text: str, start: int) -> str:
-    """The rest of the sentence after `start`, for a trailing-qualifier scan."""
+    """The rest of the sentence after `start`, for a trailing-qualifier scan.
+
+    Bounded by QUALIFIER_WINDOW, and by the sentence, whichever comes first.
+    """
     end = SENTENCE_END.search(text, start)
-    return text[start:end.start() if end else len(text)]
+    stop = min(end.start() if end else len(text), start + QUALIFIER_WINDOW)
+    return text[start:stop]
 
 
 def classify_verdict(body: str, state: str = "") -> str:

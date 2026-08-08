@@ -175,7 +175,7 @@ How depends on the repo's review trigger first, and on whether this round pushed
      Under `concurrency: cancel-in-progress` a fresh dispatch is what cancelled the old run, so a retry cancels the new one --- possibly a review a human just asked for, since `claude-bot.yml`'s `review-workflow-file` re-dispatches this very workflow into the same per-PR group.
      Attribute each in-flight run to a PR from its own `gather-context` log, since `gh run list`'s branch column reads `main` for all of them, and **wait** rather than retry if one is running.
      Only when nothing is running, trigger one cleanly via `gh workflow run claude-review.yml -f pr_number=<N>` (input is `pr_number`) and don't push/comment again until it posts.
-     See [`fully-clean`](../../shared/workflow/fully-clean.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy".
+     See [`review-verdict-pitfalls`](../../shared/workflow/review-verdict-pitfalls.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy".
      Note: a review run on a **bot-pushed** commit may show as `action_required` (gated) and never run --- the explicit `workflow_dispatch` bypasses that.
 
    **Don't let the trigger phrase leak into prose.**

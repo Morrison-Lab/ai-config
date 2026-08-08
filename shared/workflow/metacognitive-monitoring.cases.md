@@ -34,7 +34,8 @@ never mentioned.
 The shape then recurred while this entry was being written, and took two
 further passes to settle.
 The observation recorded in
-[`fully-clean`](fully-clean.md)'s fifth case was handed over with a completion
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case was
+handed over with a completion
 time of `04:08:13Z`, corrected here to `04:50:41Z`, and then retracted in that
 file as an invented particular, on the grounds that `#1008` carried no
 Copilot-attributable check run at all.
@@ -108,6 +109,25 @@ condition is anchored to a push of *ours*, which a third party's merge does
 not produce.
 Both halves are tracked in ai-config#1072.)
 
+## Calling your own note stale is a state claim about that note
+
+(2026-08-07, a `Lacaedemon/sparta` session: a Godot binary path failed, and the
+session told the user that its memory note on that path was stale.
+The note --- `reference-godot-binary-path-windows.md`, under this machine's
+`~/.claude/projects/C--Users-dougm-Documents-Github-sparta/memory/` --- was
+correct.
+It gives the `Downloads` path that the failure had just shown to be the right
+one, and it documents the very trap the session had fallen into one command
+earlier: that `ls` on the folder path "succeeds" and prints the two exe names
+while running the binary fails.
+It had never been opened.
+The path had been inferred from where the repo lives, and that note's
+`MEMORY.md` index line names the folder-shaped exe name, the `_console`
+variant, and the `C:/` form, but not the directory the note is about, so the
+index alone could not have settled it either.
+The file was accurate as written and needed no edit; only the claim about it
+did.)
+
 ## Verification of the reachable half does not transfer to the unreachable half
 
 (UCD-SERG/lab-manual#452, 2026-08-04: every claim about the cluster was
@@ -129,6 +149,34 @@ One query --- whether a `claude`-authored comment existed on any earlier PR ---
 returned zero across the workflow's entire month of operation, which settled
 both the mechanism and the fact that reviews had never once posted.
 Nobody ran it until a fourth PR was opened to fix the consequence.)
+
+## Ask whether a candidate can produce the effect at all
+
+(`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: two regiments locked
+in melee rotated about each other by 56 degrees over 700 ticks (56.14 headless
+Windows, 58.0 Linux), and the rotation was attributed to `Unit._press_into()`.
+That function is six lines, and the operative one is
+`position += to.normalized() * move_speed * MELEE_PRESS_FRACTION * delta`,
+over `var to: Vector2 = point - position`, called from its one call site as
+`_press_into(enemy.position, delta)`.
+That displacement lies along the line joining the two regiments, so it changes
+the separation's length and never its bearing --- it cannot rotate the pair
+however large it is, and reading those six lines would have said so for
+nothing.
+The one qualification is the two `clampf` lines that close the function, which
+bound `position.x` and `position.y` against `field_bounds` independently and so
+can truncate one component at a field edge; the measured pair was mid-field,
+where they never fire.
+Instead the candidate was instrumented, credited, published, and refuted in
+review, and the corrected attribution puts `_press_into` at 0.002 degrees of
+bearing rotation against `SoldierBodies.couple`'s -59.163 of that run's -59.16
+total.
+The confirming evidence had been that the two bodies' contributions were
+exactly anti-symmetric --- which is what a central pair looks like, and so was
+the disproof.
+Checked here against `origin/main` at `320fe3b2`, and against the identity
+`dtheta = cross(r_hat, dr) / |r|`, which returns exactly zero for a radial `dr`
+and matches the exact bearing change to five decimals for a tangential one.)
 
 ## A correction inherits its instrument, so a second reading is not a check
 
@@ -206,3 +254,65 @@ And a blocking `Stop` hook was called the right shape for a new rule, when it
 would have suppressed error admissions.
 The directives were "cai: use metacognition", "cai: think before you speak;
 question yourself", and "cai: question your generative intuitions".)
+
+## Key on claim type --- a "blocked" assertion is a state claim
+
+(2026-08-07/08, this repo: a status report called
+`Morrison-Lab/ai-config#1278` blocked, on the grounds that it appends to
+`shared/workflow/fully-clean.md`, "already 1304 lines against a 1200-line gate".
+No part of that was checked.
+`scripts/check-memory-file-size.py` defaults to `--directory memories`, so run
+plain it prints "No memory file exceeds 1200 lines." and exits 0; issue #1236,
+cited as the gate, describes it as "the advisory 1200-line gate" and had to pass
+`--directory shared/workflow` explicitly to produce a number at all.
+`validate` passes on that branch with the file at 1453 lines.
+The line count was wrong in both directions too --- 1397 on `main`, 1453 on the
+branch, 1279 when #1236 was filed --- so the figure matched nothing.
+A blocker is a claim about a gate's current state, and one command settles it:
+run the checker, then read the check's own result on the PR.
+
+Drafting the correction produced the mirror error, which is the more useful
+half.
+Reading the size gate's test with a truncated `grep ... | head -20` returned
+only lines from its synthetic-fixture helper, which supported concluding that
+the test never touches the real corpus and that issue #1221's "the next addition
+will fail `validate`" was itself false.
+It is not false.
+`scripts/test_check_memory_file_size.py` asserts at module level that "this
+repo's own memories/ is under the 1200-line default", `validate.yml` runs it,
+and that is why `memories/git.md` sitting at 1199 lines has headroom of exactly
+one.
+The first claim came from never running the query; the second from running one
+whose scope `head` had cut off --- the same failure with an instrument in front
+of it, per "Illusions of knowing have an exact software form" in
+[`metacognitive-monitoring.md`](metacognitive-monitoring.md).)
+
+## The asymmetry inverts for a reviewer's incidental all-clear
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, cost two rounds.
+Round 1's review was reporting a different finding when it noted in passing that
+"the `Verdict:\s*(?:Clean|Approved|Ready)\b` pattern is safe because it requires
+immediate adjacency after `Verdict:`", with the evidence attached: "verified:
+`classify_verdict("Verdict: Not Ready")` correctly returns `''`, not
+`'clean'`".
+Both halves are true.
+The measurement is reproducible, and it varies the qualifier on one side only ---
+`Not` precedes the phrase, and adjacency to a label does constrain what precedes
+it.
+
+The round-2 comment repeated the conclusion as though it covered trailing
+qualifiers too, and a code exemption was written around it, `if pat in
+BARE_CLEAN_PATTERNS`, so the labelled pattern skipped the position, negation, and
+conditional checks the same rounds had just built.
+Round 3 reproduced `Verdict: Ready for merge, but not until it addresses the
+following` and `Verdict: Ready for merge once the following items are addressed`
+as clean --- the one path in the function that had been declared safe in
+writing, and, as the review put it, the one "surviving through the one code path
+that was assumed safe without evidence".
+
+The test suite reproduced the same scope error rather than catching it: the only
+case touching that pattern was named "'Verdict: Ready' needs no guard (adjacency
+already binds it)" and asserted the bare label with nothing following it.
+Note the shape is the two-sided qualifier error from `fail-fast.md` one level up:
+there a guard covered the before-side and missed the after-side, here a
+*premise* did, and the premise then licensed skipping the guard entirely.)

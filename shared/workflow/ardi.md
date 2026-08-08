@@ -1141,3 +1141,55 @@ claim, and its remedy applies: check the population --- every step of the job
 - **Don't:** substitute a production script's exit code for its test file.
 - **Don't:** infer a job's behaviour from one step's label --- "(advisory)"
   describes that step, not the job.
+
+**A third failure mode of the whole-suite rule above: the suite holds no case
+that could have failed.**
+The two hazards that rule names both assume a test aimed at the behaviour you
+changed exists --- one you skipped by scoping the run, or one a conditional
+turned into a pass.
+Widening the run and un-gating every skip fixes those two and does nothing for
+this one, where the case simply is not there, because the defect class had not
+been conceived when the suite was written.
+
+Provenance is the whole argument.
+A suite's case population was fixed before your change existed, so its green is
+**logically independent** of whether that change is correct.
+Red still carries information, since a suite that fails has found something.
+Green is not its mirror, and reading the two symmetrically is what turns a
+routine run into a verification claim.
+
+That asymmetry is what makes such a report persuasive rather than obviously
+thin.
+Running the whole suite is real work and the diligent thing to do, and a line
+like `15/15 suites passed` is specific, checkable, and true.
+It is just an answer about the cases somebody wrote earlier.
+
+So when the change is a **guard** --- a matcher, a validator, a filter, anything
+whose job is to refuse a class of input --- the verifying step is to construct
+that class yourself and run it against the pre-change and the post-change code,
+reporting the two behaviours side by side.
+Two columns over inputs you chose is a comparison; a suite total is not.
+This is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "an
+instrument's answer is only as wide as its input" with a test suite as the
+instrument, and the construction step is
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "never predict which case
+will fail; enumerate the class" applied to inputs rather than to a report.
+
+Distinguish it from the neighbours it resembles, since all of them concern a
+test that was aimed at the question and fell short.
+[`fixtures-are-not-evidence`](fixtures-are-not-evidence.md) governs a fixture
+that cannot discriminate; the regression-test rule earlier in this file governs
+a case you wrote in this pass and never saw fail;
+[`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)
+governs a test that reimplements its own subject.
+Here nothing is defective.
+The suite is sound, and it was pointed somewhere else.
+
+- **Do:** construct the input class the change is supposed to handle and diff
+  its behaviour against the pre-change code, before calling a guard verified.
+- **Do:** name which cases could have exercised the defect class, rather than
+  quoting a suite total --- the total is a fact about the suite, not the diff.
+- **Don't:** offer a pre-existing suite's green as verification of a change it
+  holds no case for; those cases predate the defect and cannot speak to it.
+- **Don't:** read the tests/failed/skipped triple above as covering this --- it
+  makes the report more precise without making it any more relevant.

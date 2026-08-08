@@ -287,14 +287,18 @@ the number.
 Note that quoting the bad form in prose reproduces the fault whenever the quote
 wraps onto a fresh line, which is how this very paragraph first failed.
 Derive the class rather than fixing the reported line, since one collision
-usually means others: `git diff <base>...HEAD | grep '^+' | grep -v '^+++' |
+usually means others: `git diff <base>...HEAD | grep '^+' | tail -n +2 |
 sed 's/^+//' | grep -nE '^#[^ #]'` returns every added line that opens with a
 bare `#`.
-The `grep -v '^+++'` is load-bearing whenever such a pipeline's output is
-*kept* rather than filtered again --- the diff's own `+++ b/<path>` header
-starts with `+` too, so it survives the first grep and the `sed` mangles it
-into `++ b/<path>` instead of removing it.
-It is harmless here only because the trailing `^#` filter discards it.
+The `tail -n +2` is load-bearing whenever such a pipeline's output is *kept*
+rather than filtered again --- the diff's own `+++ b/<path>` header starts with
+`+` too, so it survives the first grep and the `sed` mangles it into
+`++ b/<path>` instead of removing it.
+Dropping it by position rather than by pattern is deliberate: no prefix
+separates the header from an added line that itself begins with `++`, per
+[`fail-fast`](../principles/fail-fast.md)'s third direction.
+It is harmless in this particular pipeline only because the trailing `^#`
+filter discards the mangled header anyway.
 
 - **Do:** scan added lines for a column-1 `#` before pushing, with the same
   after-committing, three-dot discipline the other diff-scoped scans use.

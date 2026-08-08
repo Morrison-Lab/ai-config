@@ -479,12 +479,32 @@ Testing the instrument against a known positive **passes**, since the pattern
 does match the content, correctly, and merely takes one line more.
 Anchoring to structure does not help either, because here the header *is* the
 structure.
-What separates them is length rather than prefix, so exclude the delimiter by
-its full length:
+No prefix pattern separates them, which is worth stating plainly because the
+obvious repair looks like it does.
+`grep -v '^+++'` drops the header, and it also drops any added line whose own
+text starts with `++`, since git prepends its marker to produce `+++i;`.
+Anchoring the trailing space, `grep -v '^+++ '`, narrows that and does not
+close it: an added line reading `++ foo` arrives as `+++ foo` and matches too.
+Measured on git 2.50.1, against a commit adding `++i;`, `++ foo` and `plain`:
+
+| guard | survives |
+|---|---|
+| `grep -v '^+++'` | `plain` |
+| `grep -v '^+++ '` | `++i;`, `plain` |
+| positional | `++i;`, `++ foo`, `plain` |
+
+The exact separator is **position**, not shape.
+In a single-file diff the header is the first `+`-matching line and nothing
+else can be, so drop it by ordinal:
 
 ```bash
-git diff <base> <head> -- <path> | grep '^+' | grep -v '^+++' | sed 's/^+//'
+git diff <base> <head> -- <path> | grep '^+' | tail -n +2 | sed 's/^+//'
 ```
+
+That is a general move rather than a trick for this case.
+When a delimiter cannot be told from its data by content, tell it by where it
+sits --- and if position is not fixed either, stop parsing the stream and ask
+the tool for the data directly (`git show <rev>:<path>`).
 
 **What the pattern feeds decides how much this costs.**
 A too-loose pattern in a **detector** surfaces as a phantom finding, which is
@@ -502,8 +522,8 @@ noise.
 Reuse it on prose and it silently drops every added **blank** line, collapsing
 paragraph boundaries.
 Measured on git 2.50.1 against a two-paragraph addition: `^+[^+]` returned the
-two lines of text and not the blank between them, while
-`grep '^+' | grep -v '^+++'` returned all three.
+two lines of text and not the blank between them, while the positional form
+returned all three.
 
 Carry that pair together, because a whitespace-normalizing word-level
 comparison --- the content-preservation check
@@ -516,8 +536,11 @@ whitespace away before comparing.
 So the two candidate guards fail in precisely the two directions that check is
 blind in.
 
-- **Do:** exclude a delimiter by its full length (`grep -v '^+++'`) when it is
-  prefix-compatible with the data's own marker.
+- **Do:** separate a prefix-compatible delimiter by **position**
+  (`grep '^+' | tail -n +2`) rather than by a longer prefix, since a longer
+  prefix is still a prefix and still collides.
+- **Don't:** read a narrowed pattern as a fixed one --- `^+++ ` collides with
+  an added `++ foo` exactly as `^+++` collides with an added `++i;`.
 - **Do:** ask what a pattern *feeds* --- a detector's extra match gets
   investigated, an extractor's becomes content.
 - **Do:** compare a moved block in both directions, so an added line is as

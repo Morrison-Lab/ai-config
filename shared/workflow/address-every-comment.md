@@ -302,6 +302,57 @@ around.
 - **Don't:** accept a search for the visible contradiction as proof that the
   retired claim itself is gone.
 
+**When the wrong thing is a figure, the unit of repair is the figure --- across
+every artifact carrying the twin, not just the diff.**
+The rules above all scope the search to the diff, or to the same file.
+That is the right scope when the duplicate was created *by* this change.
+It is the wrong one when two artifacts have carried near-duplicate prose for a
+while --- a test file's explanatory header and a memory file, a docstring and a
+design doc --- and only one of them is in your diff at all.
+The other copy is outside every instrument above by construction, so a clean
+whole-diff grep is not evidence about it.
+
+So when a finding names a wrong number, treat the **value** as the search term
+and the **set of artifacts known to carry the twin** as the search space.
+`scripts/find-near-duplicates.py` already exists for locating that twin; reach
+for it rather than recalling which files pair up.
+Reporting the sweep the way the rule above asks --- the term searched and the
+hit count, per artifact --- is what makes the coverage checkable rather than
+asserted.
+
+**And a reflow puts its neighbouring sentences into your change, for
+fact-checking and not only for lint.**
+[`ascii-punctuation-in-source`](../coding/ascii-punctuation-in-source.md) already
+establishes the diff-attribution half: editing a line for an unrelated reason
+makes its pre-existing violations yours, "because the check reads added lines,
+and a modified line is an added line."
+Its scope is mechanical --- banned glyphs, multi-sentence lines --- and its
+remedy is to bring the line into compliance.
+The same argument reaches further than that section claims.
+If reflowing a paragraph makes its em-dash yours, it makes its **wrong figure**
+yours too: the sentence is in your diff, and a sentence in your diff is a claim
+you are asserting.
+Re-read every sentence a reflow touched against
+[`fact-check-prose`](../writing/fact-check-prose.md), not only against the
+punctuation checks.
+
+- **Do:** grep for the figure's value across every artifact carrying the twin,
+  before replying that the finding is closed.
+- **Do:** fact-check the sentences a reflow pulled into your diff, exactly as
+  you would the ones you wrote.
+- **Don't:** treat the named occurrence as the unit of repair when the same
+  value appears elsewhere.
+- **Don't:** read a clean whole-diff grep as covering a twin the diff never
+  touched.
+
+(`Lacaedemon/sparta#1222` and `#1225`, both 2026-08-07, both touching exactly
+`.claude/memories/sparta.md` and `test/unit/test_residual_melee_swirl_battle.gd`
+--- the twin pair.
+Three misses in one PR lineage: #1222 round 2 fixed a reconciliation in one file
+only; #1225 round 1 fixed the test header and left the memory copy; and within
+that same PR a second wrong figure one sentence away kept its wrong attribution,
+in a paragraph that edit had itself reflowed.)
+
 **The PR description is on that list and is the one copy grepping the diff
 cannot find, so check it separately.**
 A PR body is not a file, so it appears in no diff and no reviewer reads it as

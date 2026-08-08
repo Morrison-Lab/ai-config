@@ -141,6 +141,46 @@ And the 52 was itself the narrow detector's output, missing all six
 The correct accounting is 84 identifier sites redacted: 64 pseudonymized in
 place across 9 files, plus 20 deleted with the two pasted blocks.)
 
+## Publishing a command is not enough; it has to be the command you ran
+
+(`Morrison-Lab/ai-config#1299`, 2026-08-08: a UMS PR recording that a unified
+diff's `+++ b/<path>` header is prefix-compatible with the `+` markers beside
+it, so `git diff | grep '^+' | sed 's/^+//'` leaks a mangled `++ b/<path>` line
+into extracted content.
+
+The PR verified its own diff with trailing-space-anchored patterns, listed in
+its description: `^++ `, `^+++ `, `^-- [ab]/`, `^--- [ab]/`, and `^@@ `, over
+147 added lines, with a 5-of-5 synthetic-positive control.
+Into the corpus it wrote `grep -v '^+++'` as the prescribed guard, described as
+excluding the delimiter by full length.
+So the precise pattern and the loose one were authored minutes apart, by the
+same author, in the same PR, and only the precise one was ever run.
+
+Round 2's review found it, and named the gap in exactly those terms: the
+dogfooding table "already used the more precise trailing-space-anchored
+patterns ... so a more accurate pattern was already in hand and simply wasn't
+the one written into the prescribed fix".
+
+The same PR carries the control that makes the point rather than merely
+illustrating it.
+A third pattern, `^--- `, was suggested to the author and *was* run, whereupon
+it collided with this corpus's own spaced dash line starts and produced many
+false positives across 491 tracked Markdown files; the author tightened it to
+`^--- [ab]/` before shipping.
+Same author, same PR, same class of over-loose prefix: caught in the pattern
+that was executed, missed in the pattern that was only published.
+
+The reviewer's own suggested fix was a further instance.
+Commit `a60d967f` measured all three on git 2.50.1, against a commit adding
+`++i;`, `++ foo`, and `plain`, and reported that `grep -v '^+++'` keeps only
+`plain`, the suggested `grep -v '^+++ '` keeps `++i;` and `plain`, and only a
+positional guard keeps all three.
+No prefix separates the header from its data, which is the PR's own thesis
+turned on its own remedy.
+The shipped fix is positional, `grep '^+' | tail -n +2`, and `d426bf83` added
+its per-file precondition after the dogfooding scan violated it and returned
+three hits that read as defects in the files rather than in the scan.)
+
 ## A reference frame chosen from the initial condition expires as the system moves
 
 (`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: an instrument
@@ -238,3 +278,43 @@ failing only its own cases when mutated.
 Adding the position guard is what made the two older components look redundant,
 so the moment their score dropped to zero was the moment the missing case was
 findable.)
+
+## Scale that from one reported input to a corpus of real ones
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, rounds 4 to 6: `classify_verdict()`
+in `scripts/check-pr-fully-clean.py` had taken four rounds of authored cases,
+each round's reviewer supplying counter-examples the previous fix missed.
+Instead of inventing more, the author ran the classifier over the real verdict
+bodies on the six PRs open that night, where ground truth was known
+independently.
+Two findings followed that no synthetic case had produced.
+
+The first is an under-block on the side nobody was editing.
+Three rounds of "Needs **minor** work" on `Morrison-Lab/ai-config#1293`
+classified as no verdict at all, because the not-clean pattern required
+`Needs\s+work` adjacency --- a genuine not-clean verdict that neither blocked
+nor superseded anything, which is the mirror of the bug the PR existed to fix.
+The author's note is the argument for the method: "no synthetic case would have
+produced the phrasing", and the corpus "is now better evidence than the unit
+suite, because I did not choose its wording".
+
+The second is the over-block, and it appeared only on re-running the corpus
+after a later widening.
+With `\n` no longer terminating a sentence, that same PR's genuinely clean
+verdict began classifying as not clean, on an ordinary `but` roughly 120
+characters downstream in one long sentence.
+That direction makes criterion 4 unsatisfiable for a clean PR, which is worse
+than the under-block being fixed, so the scan was bounded to 60 characters as
+well as to the sentence --- a qualifier retracts only when it sits close.
+Post-fix the classifier reproduced ground truth across 20 verdict bodies on six
+PRs.
+
+The harness itself is the third instrument failure recorded that session, after
+a mutation harness that silently no-opped and a `grep`-based keyword count that
+returned 8 for 7.
+The first comparison run reported all six PRs as MISMATCH.
+The classifier was right; the harness derived the PR number with `split('c12')`,
+turning `c1257.json` into `57`, so every ground-truth lookup missed.
+A uniform verdict across a corpus whose members vary is the tell --- and the
+author's own framing of why it still deserved recording is that failing loudly
+is the safe direction for a broken instrument, not a correct one.)

@@ -82,6 +82,62 @@ build-vs-use decision criteria);
 [`prefer-packaged-functions`](../coding/prefer-packaged-functions.md)
 is the R-function special case of this principle.
 
+## A stale, un-migrated local copy is the least reliable place to fix a bug
+
+Before patching a bug in a repo's own CI/workflow file --- or any other
+piece of shared-shaped infrastructure: a lint script, a review harness,
+a build pipeline --- ask whether that file duplicates a canonical shared
+implementation the repo just never migrated to.
+This is a sharper case than the ordinary DRW search above: the duplicate
+is not a candidate you might build, it is one you are about to spend
+real diagnostic effort fixing *in place*, one file over from where the
+close-the-loop paragraph above already warns you to look.
+
+Distinguish it from "Check the upstream's CURRENT state" below: that
+section is about a bug in code we do **not** own, read through a stale
+pinned snapshot.
+This is about a bug in code we **do** own, that duplicates something we
+also own elsewhere and never migrated to consume.
+
+The tell is structural, not something you have to search for.
+Check `.github/workflows/` (or the equivalent) for other files that
+already `uses: .../gha/.github/workflows/...@v2` --- a repo that has
+migrated *some* capabilities to a shared reusable workflow and left
+others standalone is the strongest signal, because the standalone ones
+are exactly the ones nobody has revisited since the shared version
+absorbed that capability.
+
+Read the candidate canonical version's own comments before writing a
+fix.
+A mature reusable workflow accumulates its hard-won incident history
+directly in its source --- issue numbers, root causes, mechanisms tried
+and rejected --- and reading it is usually faster than re-diagnosing
+from the symptom.
+It can also reveal that your first-guess mechanism is wrong before you
+commit to it.
+
+- **Do:** before patching a bug in a repo's own CI/workflow file, check
+  whether the repo pins a shared-workflow repo and whether that repo has
+  a same-purpose reusable workflow.
+- **Do:** read the canonical version's own comments for a prior incident
+  matching your symptom before diagnosing from scratch.
+- **Don't:** patch a stale local copy in place without first checking
+  whether it should be migrated to the canonical version instead.
+- **Don't:** trust your own plausible-sounding first-guess mechanism over
+  a canonical version's documented, tested history of the same failure.
+
+(Morrison-Lab/wai#49/#50, 2026-08-08: diagnosed and patched a
+`claude-review` stub bug in wai's own hand-rolled `claude-code-review.yml`
+--- adding `Task` to its allowedTools --- before checking whether wai
+even used `Morrison-Lab/gha`.
+It does, for four other workflows.
+gha's own canonical `claude-code-review.yml` turned out to be a direct
+port FROM this exact file, one of three source repos its own header
+names, with 15+ documented incidents fixing the same stub-review problem
+through a different, more robust mechanism.
+The `Task` fix was verified empirically to be a no-op; the actual fix
+was migrating to the canonical version.)
+
 ## Prefer forking or contributing over re-building
 
 When an existing external source is close but not exact — it does most

@@ -1084,6 +1084,50 @@ twice over.
 - **Don't:** treat the effort of writing a correction as evidence the
   correction is verified.
 
+**The same rule reaches past a literal, to the defect CLASS a code fix just
+closed.**
+The block above governs a correction to prose, where the artifact is a citation
+and the risk is one more guessable literal.
+A fix to code carries the same exposure at a larger unit: the change that
+closes an instance of a defect class is itself new code, so it can instantiate
+that class again, one layer down, in the very edit that removes it.
+
+Nothing about writing the fix surfaces this.
+The finding names a site, the fix closes that site, and the diff reads as a
+strict improvement, so the question "does what I just wrote have the property I
+just removed" is never posed.
+The next round then reports the original class at a new address, and it reads
+as a fresh gap rather than as the previous fix's own residue.
+
+**A consolidation commit is the highest-risk host for it, and the likeliest to
+be trusted.**
+Merging several drifted copies of a concept into one shared definition is a
+textbook DRY repair, and it makes the commit *feel* like the opposite of
+forking.
+That feeling is what carries a newly hand-rolled helper past your own review: a
+second concept can be duplicated in the same edit, and the de-duplication of
+the first supplies the whole commit's framing.
+Consolidating one duplicated concept is no protection against forking a
+different one beside it.
+
+So after fixing an instance of a class, ask what the fix **added**, not only
+what it removed, and check the addition against the class.
+For a new helper the mechanical form is cheap: whatever shared definition the
+neighbouring code already composes for the same job, compose that instead of
+writing a fresh equivalent, so the new site inherits every property the old
+sites have and whatever they gain next.
+
+- **Do:** ask whether the fix's own new code instantiates the class it closed,
+  before committing it.
+- **Do:** treat a commit that consolidates one duplicated concept as owing a
+  check that it forked none, since its framing argues the other way.
+- **Do:** compose an existing shared anchor or helper into a new site rather
+  than hand-rolling an equivalent, so the site inherits later fixes too.
+- **Don't:** read a diff that removes a duplicate as evidence that it added
+  none.
+- **Don't:** treat the next round's finding at a new address as a fresh gap
+  without first checking whether your own previous fix created that address.
+
 **When regenerating a generated tree makes it most of the diff, say so in the
 PR body --- otherwise a reviewer reads it as pollution and blocks.**
 Two failures share one root here, and both cost a round.

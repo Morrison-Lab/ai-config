@@ -252,6 +252,18 @@ whitespace normalized away --- a dropped marker shows up as a missing token,
 and so does any punctuation the reformat rewrote in passing.
 Treat both as real findings rather than noise, since the whole premise of a
 reformat is that only line wrapping changed.
+
+Run that diff in **both** directions, though, and not only in the
+did-anything-go-missing direction its wording invites.
+A token the move *added* is as much a violation of that premise as one it
+dropped, and a one-sided comparison passes over it --- which is how a
+`grep '^+'` extraction's own `++ b/<path>` diff header rode into merged prose
+in ai-config#1290.
+Note also what the normalization costs: a dropped blank line contributes no
+words, so this instrument cannot see a paragraph boundary the move collapsed
+either.
+[`fail-fast`](../principles/fail-fast.md)'s third pattern direction owns both
+halves.
 (ai-config#779, 2026-07-28: a demo reformat of one of gha's changelog
 fragments dropped its leading `- ` and rewrote an em dash as `---`.
 The check reported the result clean; the word diff found both.)
@@ -275,8 +287,18 @@ the number.
 Note that quoting the bad form in prose reproduces the fault whenever the quote
 wraps onto a fresh line, which is how this very paragraph first failed.
 Derive the class rather than fixing the reported line, since one collision
-usually means others: `git diff <base>...HEAD | grep "^+" | sed 's/^+//' |
-grep -nE '^#[^ #]'` returns every added line that opens with a bare `#`.
+usually means others: `git diff <base>...HEAD | grep '^+' | tail -n +2 |
+sed 's/^+//' | grep -nE '^#[^ #]'` returns every added line that opens with a
+bare `#`.
+The `tail -n +2` is load-bearing whenever such a pipeline's output is *kept*
+rather than filtered again --- the diff's own `+++ b/<path>` header starts with
+`+` too, so it survives the first grep and the `sed` mangles it into
+`++ b/<path>` instead of removing it.
+Dropping it by position rather than by pattern is deliberate: no prefix
+separates the header from an added line that itself begins with `++`, per
+[`fail-fast`](../principles/fail-fast.md)'s third direction.
+It is harmless in this particular pipeline only because the trailing `^#`
+filter discards the mangled header anyway.
 
 - **Do:** scan added lines for a column-1 `#` before pushing, with the same
   after-committing, three-dot discipline the other diff-scoped scans use.

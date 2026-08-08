@@ -351,3 +351,31 @@ Both halves of the rule were already written down --- `CLAUDE.md`'s "never ask
 "a conflict ... is ARDI work immediately".
 The failure was conflating a correct gate on one action with a gate on the whole
 PR.)
+
+## A fix that reinstantiates the class it just closed
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08, rounds 3 and 4: the guard in
+`hooks/no-unauthorized-merge.py` has a command-position anchor, `LEAD`, whose
+narrowness had already produced one fail-open in round 1.
+Round 3's fix consolidated three drifted copies of the executor list into a
+single `EXEC_PROGS` consumed by all three sites --- a real DRY repair, reported
+as such --- and in the same commit, `28cb5366`, hand-rolled a new anchor,
+`HEREDOC_EXECUTOR`, instead of composing `LEAD`.
+Round 4 duly found the round-1 keyword gap reproduced in that new anchor:
+`sudo bash <<EOF`, `time bash <<EOF`, `! bash <<EOF`, a `then` branch body, and
+a brace group all reached a blocked merge command while the guard returned
+allow.
+The author's own reply names the mechanism:
+"I fixed one duplicated concept and forked a different one in the same breath,
+which is why the round-1 keyword gap reappeared in a fourth place."
+The same reply records that the review had already said so --- its paragraph
+explaining why `EXEC_WRAP` did not save `mask_heredocs` is a statement that one
+idea lived in two places --- and that it was read as context for the heredoc bug
+rather than as the finding it was.
+Round 4's fix, `500204d3`, rebuilt the anchor as `LEAD + ENV_WRAP + executor`,
+which is the compose-the-shared-definition remedy this rule prescribes.
+The two later rounds are a different failure, recorded against
+[`check-purpose-before-reusing`](check-purpose-before-reusing.md): round
+4's fix was strictly wider than the hand-rolled anchor it replaced, so it
+introduced no gap --- it composed the narrow variant of an anchor that also had
+a permissive one, which rounds 5 and 6 then found insufficient.)

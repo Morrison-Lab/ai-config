@@ -238,6 +238,68 @@ between the incident and your memory of it.
 - **Don't:** validate a matcher by reading it -- a wrong one reads as correct.
 - **Don't:** trust a comment describing what the pattern cannot match.
 
+### Scale that from one reported input to a corpus of real ones
+
+The rule above fixes the exact input that prompted the guard, and asks for
+negative cases in the same pass so an over-blocking guard does not get switched
+off.
+Both halves run on your own imagination, which is the faculty already known to
+be the problem here: you write the negative case for the over-block you can
+foresee, and the over-block you cannot foresee gets no case at all.
+
+Where the instrument's input is text that people actually write, that gap
+closes cheaply.
+Collect the real inputs it will meet --- the review bodies, the commit
+messages, the log lines --- for a set whose right answer you independently know,
+and run the instrument over all of them.
+The corpus beats any number of authored cases for one reason: **you did not
+choose its wording**, so it cannot share the blind spot that a case written by
+whoever already understands the rule necessarily does.
+
+Expect it to find failures in **both** directions, which is what an authored
+suite does not.
+An under-block it finds is a phrasing you would not have written --- a real
+verdict worded a way the pattern does not reach, so it neither blocks nor
+supersedes anything.
+An over-block it finds is the more valuable of the two, because that direction
+makes the gate unsatisfiable for a legitimate input and is therefore worse than
+the under-block being fixed --- and it is the direction authored cases almost
+never reach, since a case is written from the bug you already know about.
+So re-run the corpus after every widening, not only once at the end.
+
+The corpus also changes what you can report.
+"Reproduces ground truth on N real inputs I did not author" is a claim a reader
+can re-run; a suite total is a claim about cases you chose, which is the
+provenance problem [`ardi`](ardi.md)'s whole-suite rule describes.
+
+**A uniform result across the whole corpus is a fact about the harness, not
+about the subject.**
+The corpus earns its value from its members varying, so a verdict that does not
+vary with them did not come from them.
+All-mismatch is the easy version to catch, since it fails loudly --- but
+failing loudly is only the safe direction, not a correct one, and the loudness
+invites reading it as a real finding about the thing under test.
+Check the comparison harness's own plumbing first: a ground-truth lookup keyed
+by an identifier the harness derives from a filename is the usual culprit, and
+a derivation that silently yields a wrong key produces exactly this signature.
+
+Note the base rate while you are there.
+Instrument bugs cluster in the checking code precisely because the checking
+code is what nobody checks --- the subject under test has a suite, a reviewer,
+and a guard, while the throwaway harness written to evaluate it has none of the
+three, and is written fastest.
+
+- **Do:** run a text-consuming classifier over a corpus of real inputs whose
+  ground truth you know independently, before reporting it correct.
+- **Do:** re-run that corpus after every widening, and treat a newly
+  over-blocked legitimate input as the more urgent of the two directions.
+- **Do:** read a corpus-wide uniform verdict as a harness bug until the
+  harness's own plumbing has been checked.
+- **Don't:** substitute more authored cases for real ones --- they inherit the
+  understanding that produced the bug.
+- **Don't:** treat a harness's loud failure as evidence that it works; the safe
+  direction is still the wrong answer.
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 The section above governs a comment claiming *what* a matcher matches.

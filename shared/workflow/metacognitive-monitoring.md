@@ -449,8 +449,13 @@ A purely central displacement is the worked example.
 Aiming each body of a pair at the other moves both along the line joining them,
 which changes the separation's **length** and never its direction, so that term
 cannot rotate the pair at any magnitude.
-That is decidable from the function's own three lines, and no measurement of
+That is decidable from the function's own six lines, and no measurement of
 how much it contributes was ever needed.
+Read all six rather than the operative one.
+The same function ends by clamping each coordinate against the field bounds
+separately, which is the one thing in it that can make a displacement
+non-central, and a reader who stopped at the line that obviously matters would
+have missed the one qualification the constraint has.
 
 What makes the expensive path feel correct is that instrumenting is visibly
 rigorous where a feasibility argument is not.

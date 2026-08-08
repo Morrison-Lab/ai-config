@@ -121,8 +121,9 @@ earlier: that `ls` on the folder path "succeeds" and prints the two exe names
 while running the binary fails.
 It had never been opened.
 The path had been inferred from where the repo lives, and that note's
-`MEMORY.md` index line carries only a topic summary rather than the path, so
-the index alone could not have settled it either.
+`MEMORY.md` index line names the folder-shaped exe name, the `_console`
+variant, and the `C:/` form, but not the directory the note is about, so the
+index alone could not have settled it either.
 The file was accurate as written and needed no edit; only the claim about it
 did.)
 
@@ -153,13 +154,17 @@ Nobody ran it until a fourth PR was opened to fix the consequence.)
 (`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: two regiments locked
 in melee rotated about each other by 56 degrees over 700 ticks (56.14 headless
 Windows, 58.0 Linux), and the rotation was attributed to `Unit._press_into()`.
-That function is five lines, and the operative one is
-`position += (point - position).normalized() * move_speed * MELEE_PRESS_FRACTION * delta`,
-called as `_press_into(enemy.position, delta)`.
-Every displacement it produces therefore lies along the line joining the two
-regiments, so it changes the separation's length and never its bearing --- it
-cannot rotate the pair at any magnitude, and reading those five lines would
-have said so for nothing.
+That function is six lines, and the operative one is
+`position += to.normalized() * move_speed * MELEE_PRESS_FRACTION * delta`,
+over `var to: Vector2 = point - position`, called from its one call site as
+`_press_into(enemy.position, delta)`.
+That displacement lies along the line joining the two regiments, so it changes
+the separation's length and never its bearing --- it cannot rotate the pair at
+any magnitude, and reading those six lines would have said so for nothing.
+The one qualification is the two `clampf` lines that close the function, which
+bound `position.x` and `position.y` against `field_bounds` independently and so
+can truncate one component at a field edge; the measured pair was mid-field,
+where they never fire.
 Instead the candidate was instrumented, credited, published, and refuted in
 review, and the corrected attribution puts `_press_into` at 0.002 degrees of
 bearing rotation against `SoldierBodies.couple`'s -59.163 of that run's -59.16

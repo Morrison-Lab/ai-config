@@ -513,9 +513,14 @@ suppressed, and the winner's output does not name itself.
 ls "$A" 2>/dev/null || ls "$B" 2>/dev/null || { echo "searching..."; find ...; }
 ```
 
-The first is this fragment's own opening rule rather than anything new ---
-`2>/dev/null` is the error-swallowing the "In code" bullets ban --- and
-dropping that one token makes the loser announce itself by name.
+The first is this fragment's own opening principle rather than anything new ---
+no silent failures, the same discarded stderr the fan-out section above marks
+`>/dev/null 2>&1   # every failure discarded` --- and dropping that one token
+makes the loser announce itself by name.
+Be exact about which half is lost, though, because the "In code" bullets ban a
+different mechanism: `|| true` and a bare `except:` swallow the **failure**,
+while `2>/dev/null` suppresses only the **message** and leaves the exit status
+intact, which is precisely what `||` then reads.
 The second is the increment, and it is a property of the commands rather than
 of `||`: `ls DIR/` prints the directory's **contents**, so its stdout never
 names the directory it read.

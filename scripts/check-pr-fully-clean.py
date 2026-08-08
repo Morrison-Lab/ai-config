@@ -145,13 +145,39 @@ BARE_CLEAN_PATTERNS = {
     r"\bReady\s+for\s+merge\b",
     r"\bApproved\s+for\s+merge\b",
 }
-CLEAN_NEGATION_PREFIX = re.compile(
-    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't)\s+(?:\w+\s+){0,2}$",
+
+# The primary guard is POSITION, not vocabulary. A qualifier list cannot be
+# finished against free-form English -- the first version covered `not` and
+# `once` and review immediately produced `but not`, `almost`, `however` and
+# `except`, which is a class with no closed definition. So a bare phrase counts
+# only where the comment MARKS it as the verdict: on its own line, behind a
+# heading, a bold span, a list bullet, a blockquote, or a `Verdict` label. A
+# reviewer stating a verdict marks it; a sentence merely containing the words
+# does not, and every unmarked occurrence is now a mention rather than a
+# sign-off, whatever words surround it.
+#
+# That is what makes the vocabulary below a SECOND line rather than the only
+# one. It has to exist because a marked verdict can still carry a caveat
+# ("**Ready for merge** -- however, two items remain"), but it now only has to
+# cover qualifiers attached to an already-marked phrase, which is a far smaller
+# job than parsing arbitrary prose.
+BARE_CLEAN_MARKED = re.compile(
+    r"(?:^|\n)[ \t]*(?:[#>*_+-]+[ \t]*)*"
+    r"(?:verdict[ \t]*[:.\-]*[ \t]*)?(?:[#>*_]+[ \t]*)*$",
     re.IGNORECASE,
 )
+CLEAN_NEGATION_PREFIX = re.compile(
+    r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|almost|nearly"
+    r"|nowhere\s+near|close\s+to)\s+(?:\w+\s+){0,2}$",
+    re.IGNORECASE,
+)
+# Leading punctuation is part of it: "Ready for merge, but not ..." and
+# "Ready for merge -- however, ..." separate the qualifier with a comma or a
+# dash rather than a space, so a `\s*`-only anchor misses both.
 CLEAN_CONDITIONAL_SUFFIX = re.compile(
-    r"^\s*(?:once|after|when|if|unless|pending|provided|assuming"
-    r"|subject\s+to|as\s+soon\s+as|contingent)\b",
+    r"^[ \t]*[,;:.\-]*[ \t]*(?:once|after|when|if|unless|pending|provided|assuming"
+    r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
+    r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
     re.IGNORECASE,
 )
 
@@ -188,6 +214,9 @@ def classify_verdict(body: str, state: str = "") -> str:
     for pat in VERDICT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
             if pat in BARE_CLEAN_PATTERNS:
+                line_start = scan.rfind("\n", 0, match.start()) + 1
+                if not BARE_CLEAN_MARKED.search(scan[line_start:match.start()]):
+                    continue
                 prefix = scan[max(0, match.start() - 40):match.start()]
                 if CLEAN_NEGATION_PREFIX.search(prefix):
                     continue

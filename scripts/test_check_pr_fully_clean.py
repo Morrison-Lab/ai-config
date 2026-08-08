@@ -274,9 +274,14 @@ def main() -> int:
     # A bare clean phrase survives intact inside a sentence that says the
     # opposite. Classifying one of these as clean would let it supersede a
     # standing "Needs more work" -- the exact failure criterion 4 exists to
-    # stop, arriving through the check meant to stop it (#1287 review of
-    # this PR). Negations sit BEFORE the phrase, conditions AFTER it, so both
-    # sides are exercised.
+    # stop, arriving through the check meant to stop it (found by the round-1
+    # review of this PR, #1278). Negations sit BEFORE the phrase, conditions
+    # AFTER it, so both sides are exercised.
+    #
+    # The primary guard is POSITION though, not this vocabulary: a bare phrase
+    # counts only where the comment marks it as the verdict. The unmarked
+    # cases below pin that, and they are what makes the word lists a second
+    # line rather than the only one.
     check(
         "classify_verdict: 'not ready for merge' states NO clean verdict",
         checker.classify_verdict(
@@ -320,6 +325,67 @@ def main() -> int:
     check(
         "classify_verdict: 'Verdict: Not Ready' is not clean",
         checker.classify_verdict("Verdict: Not Ready") == "",
+    )
+    # Adversative connectors, which the round-1 word lists missed entirely.
+    # Note two of them separate the qualifier with a comma or a dash rather
+    # than a space, so a whitespace-only anchor does not see it.
+    check(
+        "classify_verdict: 'Ready for merge, but not until ...' is NOT clean",
+        checker.classify_verdict(
+            "Ready for merge, but not until it addresses the following: item A, item B."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'Ready for merge -- however, ...' is NOT clean",
+        checker.classify_verdict(
+            "Ready for merge -- however, two items still need attention first."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'Ready for merge except for ...' is NOT clean",
+        checker.classify_verdict("Ready for merge except for the two remaining items below.") == "",
+    )
+    check(
+        "classify_verdict: a hedged 'Almost ready for merge' is NOT clean",
+        checker.classify_verdict(
+            "Almost ready for merge; still needs the following two items addressed."
+        ) == "",
+    )
+    # POSITION, the primary guard. An unmarked mention mid-sentence is not a
+    # verdict however friendly its wording, and this is the case no vocabulary
+    # list would ever have reached.
+    check(
+        "classify_verdict: an unmarked mid-sentence mention is NOT a verdict",
+        checker.classify_verdict(
+            "I mentioned it was ready for merge in passing, mid-sentence."
+        ) == "",
+    )
+    check(
+        "classify_verdict: a heading-marked verdict IS clean",
+        checker.classify_verdict("### Ready for merge") == "clean",
+    )
+    check(
+        "classify_verdict: a bullet-marked verdict IS clean",
+        checker.classify_verdict("- **Approved for merge**") == "clean",
+    )
+    check(
+        "classify_verdict: a line-initial verdict IS clean",
+        checker.classify_verdict("Ready for merge.") == "clean",
+    )
+    # Where the vocabulary guards are still load-bearing after the position
+    # guard: this corpus writes semantic line breaks, so a negation or hedge
+    # routinely sits at the END of the PREVIOUS line, leaving the phrase itself
+    # line-initial and therefore "marked". Position cannot see across the
+    # break; the prefix scan can.
+    check(
+        "classify_verdict: a negation on the PREVIOUS line still blocks",
+        checker.classify_verdict(
+            "The PR is not\nready for merge until the findings are fixed."
+        ) == "",
+    )
+    check(
+        "classify_verdict: a hedge on the previous line still blocks",
+        checker.classify_verdict("It is almost\nready for merge.") == "",
     )
 
     # POSITIVE CONTROL -- the exact #1267 shape that bypassed the gate.

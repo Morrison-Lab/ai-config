@@ -154,7 +154,12 @@ diff-scoped: prose added to a fill-column-wrapped paragraph inherits that
 wrapping and lands two sentences on one line, flagged even though every
 neighbouring line does the same.
 So when adding prose to an older-conventions file, scan your own added lines
-for both before pushing.
+for both before pushing --- and scan for punctuation **after** fixing the line
+breaks, never before.
+Splitting a long line retires it and creates two new ones, so a punctuation
+scan run first is reporting on lines the reflow has since deleted.
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md)'s section on a
+reflow expiring a check owns that ordering.
 
 **Editing an existing line for an unrelated reason makes its pre-existing
 violations yours, because the diff cannot tell the two apart.**

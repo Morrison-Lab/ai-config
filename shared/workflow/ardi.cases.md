@@ -302,6 +302,31 @@ The subsequent full-suite run was itself misleading in the opposite
 direction: run *with* an env var CI does not set, it reported two failures
 belonging to the sibling PR.)
 
+## A third failure mode: the suite holds no case that could have failed
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08: the PR narrowed
+`hooks/no-unauthorized-merge.py`'s command-position anchor, and its "Checks run"
+section offered `test_hooks` (15/15 suites) and every `scripts/test_*.py` as the
+verification, all run after committing so the diff-scoped ones read `HEAD`.
+Both statements were true.
+Review then found a high-severity fail-open: five executable bash forms ---
+a leading `!`, a `time` wrapper, a `nohup` wrapper, a brace-group body, and a
+`then` branch body --- reached the blocked merge command while the guard
+returned allow, all five having blocked before the change.
+No case in the suite covered a keyword-prefixed command, so no amount of running
+it could have failed, and un-gating skips or widening the run would have changed
+nothing.
+The reviewer's method is the remedy this rule prescribes: it loaded the PR's own
+hook at `552cd0a`, called `offending()` on the five constructed inputs, and
+tabulated the results against `main`'s pre-change version --- two columns over
+an input class, rather than a suite total.
+Reproduced independently before fixing, on `769ac87c`, with the same five
+allowing and the bare baseline blocking.
+The PR body had even noted that "the merge guard's only scoped authorization
+path had no test at all, which is how these went unnoticed", so the absence was
+observed and never generalized into distrust of the suite total quoted beside
+it.)
+
 ## A merge gate is not a work gate
 
 (`ucdavis/bcs#578`, 2026-08-07: a CI change adding Gemini/Antigravity as review

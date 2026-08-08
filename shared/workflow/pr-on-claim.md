@@ -143,7 +143,7 @@ Do not upgrade a guess about it into a finding, and do not probe it harder than 
 **The operative point is that three surfaces fail to discriminate here, and only a fourth one does.**
 The pending-reviewer list empties whether or not a ruleset asked.
 The ruleset query comes back negative whether or not the request reached Copilot.
-The reviewer's own check run goes green whether it reviewed, refused, or stayed silent, per [`fully-clean`](fully-clean.md)'s fifth case and its silent-reviewer sibling.
+The reviewer's own check run goes green whether it reviewed, refused, or stayed silent, per [`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case and its silent-reviewer sibling.
 Only the posted review **body** distinguishes those outcomes.
 
 So an empty pending list after a 201 supports one conclusion and not a second.
@@ -153,7 +153,7 @@ At ai-config what follows is a refusal rather than a review, so the two claims c
 Note that this point is indifferent to *why* the reviewer refused --- quota, a platform incident, anything else --- because a refusal is not a verdict whatever produced it.
 
 Route to the self-review fallback on a **read refusal body**, never on an empty pending list.
-[`fully-clean`](fully-clean.md) is explicit that a refusing reviewer is not "reachable", so a refusal legitimately hands the external-verdict requirement to whichever other reviewer is working.
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md) is explicit that a refusing reviewer is not "reachable", so a refusal legitimately hands the external-verdict requirement to whichever other reviewer is working.
 An empty pending list hands it to nobody, because it has established nothing either way.
 Note also that a refusal body is itself proof the request **arrived**, which is the cleanest available disproof of "blocked".
 
@@ -214,8 +214,8 @@ concluded Copilot was active here --- which inverted the finding, since every
 one of those review objects is the refusal string quoted in
 [`memories/github.md`](../../memories/github.md).
 That is the login-versus-body distinction
-[`fully-clean`](fully-clean.md)'s fifth case already warns about, met in the
-direction that flatters the repo.)
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case already
+warns about, met in the direction that flatters the repo.)
 
 **Requesting Copilot discharges nothing when the repo's own reviewer runs on `workflow_dispatch` alone.**
 Everything above concerns *which* reviewer to ask for, resting on this section's opening premise that opening a PR or marking it ready at least starts the repo's own review workflow.

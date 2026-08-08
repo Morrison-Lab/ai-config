@@ -22,6 +22,22 @@ in progress; do not call the PR clean from an earlier head or from green CI
 without a current-head review verdict.
 Pushing fixes for a finding-bearing review starts a new review cycle: the ARDI loop is NOT finished when you push fixes or post an ARD summary.
 You must wait for the fresh review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it is clean before declaring the loop finished.
+
+**That wait is conditional on a run having been scheduled, and on some repos a push schedules nothing.**
+A review workflow whose `on:` block carries no push-based trigger --- `workflow_dispatch` and `issue_comment` only, which is how a repo disables automatic review on PR activity --- fires nothing when you push, so the run you are told to wait for will never exist and the poll cannot terminate.
+The obligation is then discharged by **dispatching**, not by waiting, and it recurs on **every** push rather than once at PR-open time: `gh workflow run <review-workflow>.yml -R <owner>/<repo> -f pr_number=<N>`, taking the input's name from that workflow's own file.
+Read the `on:` block once per repo, the first time you push to a PR there, and record which class it is.
+This is the shape most likely to be missed while everything looks healthy, because CI still goes green on each push, and watching CI to green feels like watching the PR --- so the loop closes on "checks passed" while the last verdict on file dates from an earlier head.
+`check-pr-fully-clean.py` returning non-zero for "no review at this HEAD SHA" on such a repo means *dispatch now*, not *poll longer*.
+[`pr-on-claim`](pr-on-claim.md) covers the PR-open and draft-to-ready end of this.
+The increment here is that each subsequent push owes its own dispatch.
+
+- **Do:** read the review workflow's `on:` block before the first push to a PR in an unfamiliar repo, and dispatch explicitly after every push when it carries no push-based trigger.
+- **Do:** treat a non-zero `check-pr-fully-clean.py` on a dispatch-only repo as a prompt to dispatch.
+- **Don't:** read green CI at the current head as evidence a review is in flight --- on a dispatch-only repo that is the steady state, not a transient one.
+- **Don't:** let a verdict from an earlier head stand because the repo's trigger class was already known.
+  Knowing it is not the same as acting on it each round.
+
 NEVER use background tasks, async sleep commands, or schedule timers for ARDI status polling.
 Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn.
 This applies transitively to PR-driving
@@ -146,8 +162,16 @@ catchable this way, since each was a direct match against gha's own
 ### Pre-push checklist
 
 **Pause point: after committing, before `git push`.**
-Do-Confirm --- the items are independent, so work in whatever order suits the
-round and confirm all seven here.
+Do-Confirm --- confirm all seven here, in whatever order suits the round, with
+one exception: the items that **edit** the diff have to precede the items that
+**measure** it.
+Regenerating a generated tree and merging `main` change which lines are added,
+so an added-lines scan or a deleted-lines read taken before either is an answer
+about a diff you no longer have.
+The same holds *inside* item 3, which bundles two checks: reflowing a long line
+to clear its multi-sentence half retires the very lines its punctuation half
+scanned, so satisfying one check expires the other's result
+([`semantic-line-breaks`](../writing/semantic-line-breaks.md)).
 Per [`skill-checklists`](skill-checklists.md); every item below exists because
 the bullets in this fragment record it failing at this exact boundary.
 
@@ -159,9 +183,11 @@ the bullets in this fragment record it failing at this exact boundary.
       touched a generator's inputs, and the PR body states how many changed
       files are generated.
 - [ ] **Added lines were scanned** for banned punctuation and multi-sentence
-      lines, run *after* committing and with the three-dot range
-      (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree,
-      and a two-dot range re-attributes whatever `main` deleted to you.
+      lines, run *after* committing, *after* every pass that edited the diff
+      (your own reflow included), and with the three-dot range
+      (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree, a
+      later edit retires the lines an earlier run scanned, and a two-dot range
+      re-attributes whatever `main` deleted to you.
 - [ ] **The changelog entry and the PR description were re-read** against the
       new behavior, not just the code --- neither is in the diff, so no
       reviewer and no grep will catch a stale one.
@@ -1172,3 +1198,55 @@ claim, and its remedy applies: check the population --- every step of the job
 - **Don't:** substitute a production script's exit code for its test file.
 - **Don't:** infer a job's behaviour from one step's label --- "(advisory)"
   describes that step, not the job.
+
+**A third failure mode of the whole-suite rule above: the suite holds no case
+that could have failed.**
+The two hazards that rule names both assume a test aimed at the behaviour you
+changed exists --- one you skipped by scoping the run, or one a conditional
+turned into a pass.
+Widening the run and un-gating every skip fixes those two and does nothing for
+this one, where the case simply is not there, because the defect class had not
+been conceived when the suite was written.
+
+Provenance is the whole argument.
+A suite's case population was fixed before your change existed, so its green is
+**logically independent** of whether that change is correct.
+Red still carries information, since a suite that fails has found something.
+Green is not its mirror, and reading the two symmetrically is what turns a
+routine run into a verification claim.
+
+That asymmetry is what makes such a report persuasive rather than obviously
+thin.
+Running the whole suite is real work and the diligent thing to do, and a line
+like `15/15 suites passed` is specific, checkable, and true.
+It is just an answer about the cases somebody wrote earlier.
+
+So when the change is a **guard** --- a matcher, a validator, a filter, anything
+whose job is to refuse a class of input --- the verifying step is to construct
+that class yourself and run it against the pre-change and the post-change code,
+reporting the two behaviours side by side.
+Two columns over inputs you chose is a comparison; a suite total is not.
+This is [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "an
+instrument's answer is only as wide as its input" with a test suite as the
+instrument, and the construction step is
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "never predict which case
+will fail; enumerate the class" applied to inputs rather than to a report.
+
+Distinguish it from the neighbours it resembles, since all of them concern a
+test that was aimed at the question and fell short.
+[`fixtures-are-not-evidence`](fixtures-are-not-evidence.md) governs a fixture
+that cannot discriminate; the regression-test rule earlier in this file governs
+a case you wrote in this pass and never saw fail;
+[`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)
+governs a test that reimplements its own subject.
+Here nothing is defective.
+The suite is sound, and it was pointed somewhere else.
+
+- **Do:** construct the input class the change is supposed to handle and diff
+  its behaviour against the pre-change code, before calling a guard verified.
+- **Do:** name which cases could have exercised the defect class, rather than
+  quoting a suite total --- the total is a fact about the suite, not the diff.
+- **Don't:** offer a pre-existing suite's green as verification of a change it
+  holds no case for; those cases predate the defect and cannot speak to it.
+- **Don't:** read the tests/failed/skipped triple above as covering this --- it
+  makes the report more precise without making it any more relevant.

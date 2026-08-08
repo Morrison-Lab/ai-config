@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Regression tests for validate-skills.py's marketplace plugin-source check.
+"""Regression tests for validate-skills.py.
 
-The interesting behaviour is the split between the two failure modes: an
-uninitialized submodule warns (so a fresh clone can still commit), while any
-other missing or empty source path is a hard error.
+Covers the marketplace plugin-source check -- the interesting behaviour is
+the split between the two failure modes: an uninitialized submodule warns
+(so a fresh clone can still commit), while any other missing or empty
+source path is a hard error -- and the skill-description length guard
+added for ai-config#1263 (a description over the cloud marketplace's
+1024-char limit passes locally but fails marketplace sync with no useful
+error).
 """
 import importlib.util
 import json
@@ -59,6 +63,28 @@ def run_check(tmpdir: Path, plugins: list, gitmodules: str | None = None):
 
 
 GITMODULES = '[submodule "shared/sub"]\n\tpath = shared/sub\n\turl = https://example.invalid/x.git\n'
+
+
+def run_check_skill(tmpdir: Path, name: str, description: str):
+    """Point validate-skills.py's check_skill() at a single fake skill dir.
+
+    Returns the errors collected for that run.
+    """
+    skill_dir = tmpdir / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(
+        f'---\nname: {name}\ndescription: "{description}"\n---\n\nbody\n',
+        encoding="utf-8",
+    )
+    original_root = vs.ROOT
+    vs.ROOT = tmpdir
+    vs.errors.clear()
+    try:
+        vs.check_skill(skill_dir)
+        return list(vs.errors)
+    finally:
+        vs.ROOT = original_root
+        vs.errors.clear()
 
 
 def main() -> int:
@@ -145,6 +171,31 @@ def main() -> int:
 
         # Allowlisted non-operation tokens (e.g. GEMINI_API_KEY) are recognized.
         check("NON_OPERATION_TOKENS contains GEMINI_API_KEY", "GEMINI_API_KEY" in vs.NON_OPERATION_TOKENS)
+
+        # ai-config#1263: a description matching the real incident's length
+        # (1524 chars) must error, naming the marketplace limit.
+        length_dir = tmp / "length"
+        errs = run_check_skill(length_dir, "detect-hypothetical-examples", "x" * 1524)
+        check(
+            "1524-char description (the real #1263 incident length) errors",
+            len(errs) == 1 and "over the marketplace" in errs[0],
+        )
+
+        # A normal short description must not trip the new check at all --
+        # the existing empty-description check must still be the only one
+        # that can fire on ordinary content.
+        errs = run_check_skill(length_dir, "ok-skill", "A short, fine description.")
+        check("short description does not trip the length guard", errs == [])
+
+        # Boundary: exactly the limit passes, one character over fails --
+        # proves the guard fires on ">", not ">=", the real limit.
+        errs = run_check_skill(length_dir, "boundary-at-limit", "x" * vs.MARKETPLACE_DESCRIPTION_LIMIT)
+        check("description at exactly the limit is clean", errs == [])
+        errs = run_check_skill(length_dir, "boundary-over-limit", "x" * (vs.MARKETPLACE_DESCRIPTION_LIMIT + 1))
+        check(
+            "description one char over the limit errors",
+            len(errs) == 1 and "over the marketplace" in errs[0],
+        )
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

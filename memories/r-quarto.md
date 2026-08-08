@@ -211,7 +211,8 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
   This is another green-check-does-not-mean-clean-content case, alongside
   `check-new-line-breaks` in
   [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md) and the
-  review-job cases in [`fully-clean`](../shared/workflow/fully-clean.md).
+  review-job cases in
+  [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md).
   Note that `lintr`'s `line_length_linter` DOES catch these, so a repo
   running air without lintr (d-morrison/altdoc) has no gate at all.
   (d-morrison/altdoc#78, 2026-07-27: two `cli` strings in new code ran to 93
@@ -328,6 +329,29 @@ Needs `lintr (>= 3.1.2)` for the `linter_level` argument. (Landed as
     words instead of listing them (`undiscoverable` → "cannot discover").
     (ucdavis/bcs#375: four tokens flagged from one NEWS entry, fixed with zero
     WORDLIST additions.)
+  - **A Quarto `{{< include >}}` path is a spellable-token source too, and the
+    backtick remedy above cannot be applied to it.**
+    The two bullets above are both tokens someone typed as prose;
+    an include path is machinery,
+    so the natural assumption is that the checker skips it.
+    It does not.
+    Hunspell splits on hyphens,
+    so every dash-separated segment of a kebab-case filename becomes a word:
+    `{{< include methodology/_checking-nlm-convergence.qmd >}}` flags `nlm`.
+    Backticking the shortcode would disable the transclusion,
+    so where a repo's convention is underscore-prefixed kebab-case subfiles
+    (as in UCD-SERG repos and the lab manual's
+    "Using Includes for Modular Content"),
+    the **filename itself** has to be composed of dictionary words.
+    Prefer renaming the subfile over adding the token to `inst/WORDLIST`,
+    which puts a path artifact into a word list
+    and then silently permits that bare token everywhere else in the prose.
+    (UCD-SERG/serocalculator#635, 2026-08-07:
+    `nlm` failed Spellcheck at `methodology.qmd:1014`.
+    Every other `nlm` in that article sat inside backticks or a code chunk,
+    so the only bare occurrence came from a filename
+    rather than from anything the prose said.
+    Renamed to `_checking-convergence-codes.qmd`, with no WORDLIST addition.)
 - **Regenerating `man/*.Rd`: run `devtools::document()` (or
   `roxygen2::roxygenise()`) --- never hand-edit the `.Rd`.** A `docs-check` /
   `R-check-docs` job runs `roxygenize()` then `git diff --exit-code man/`, so a
@@ -622,7 +646,7 @@ any Quarto website (rme, psw, qwt, …).
   Also: the alias path resolves relative to the **document's** directory, not
   the site root --- `sub/doc.qmd` with `aliases: [old-name.html]` puts the stub
   at `_site/sub/old-name.html`.
-- **Verify a redirect on the deployed preview, never on a local render.**
+- **Verify a redirect on a site build, not on a single-file render.**
   An alias stub is an artifact of the *site* build, so a local single-format
   `quarto render <file>.qmd` cannot surface a per-format bug in it at all ---
   there is only one format for the last one to win over.
@@ -635,6 +659,21 @@ any Quarto website (rme, psw, qwt, …).
   `pr-preview/pr-<N>/` recipe.
   (`UCD-SERG/serocalculator` #633/#635, 2026-08: shipped wrong and caught only
   on the deployed preview.)
+- **`altdoc::render_docs()` builds the site locally, so a project-config
+  artifact can be checked without waiting for CI.**
+  `quarto render <file>.qmd` does not read `altdoc/quarto_website.yml`, so
+  anything declared there --- project-level `filters:`, shortcodes, extensions
+  staged under `altdoc/_extensions/`, the sidebar and navbar --- is simply
+  absent from a single-file render.
+  That makes a single-file render the wrong instrument for those, and it fails
+  in the direction that reads as a defect in the document: a shortcode whose
+  extension is registered project-wide comes out unresolved locally and
+  resolves fine on the deployed site.
+  Reach for `altdoc::render_docs()` before concluding the deployed preview is
+  the only way to see a site-build artifact.
+  It is slower than a single-file render, so keep using
+  `quarto render <file>.qmd` for per-document work (chunk output, per-format
+  `echo`, figures) where the project config is not involved.
 
 ## renv — each git worktree gets its own (empty) project library
 

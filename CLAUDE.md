@@ -1,5 +1,8 @@
 # User-wide Claude Code instructions
 
+Worked-example case records for the rules below live in
+[`CLAUDE.cases.md`](CLAUDE.cases.md), moved out of this auto-loaded context.
+
 <!--
 Some sections below pull their body from a fragment in `shared/` via Claude
 Code's `@path` import (e.g. `@shared/writing/plain-prose.md`). Those fragments
@@ -16,7 +19,8 @@ As soon as a learning worth saving shows up during a session — a corrected mis
 
 Still run UMS before `/clear` too, as a final catch-all for anything accumulated since the last proactive pass — but treat that as a backstop, not the trigger to wait for.
 
-**In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."** "As learnings accumulate" is easy to defer indefinitely during heads-down execution across several PRs, since no single moment feels like the obvious trigger — a merge is a natural, unmissable boundary to pause at instead. (Corrected in a sparta `gii-mwc` session, 2026-07-19: three PRs merged back-to-back with real, worth-saving learnings at each one — a subagent-resume/restart pattern, a diff-scoped-check no-op, a stale benchmark baseline — and UMS never ran until the user asked why `/clear` was suggested with UMS still outstanding, which is exactly the failure mode this fragment exists to prevent.)
+**In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."**
+"As learnings accumulate" is easy to defer indefinitely during heads-down execution across several PRs, since no single moment feels like the obvious trigger --- a merge is a natural, unmissable boundary to pause at instead.
 
 **A PR's clean review verdict is a proactive-UMS checkpoint in its own right, and it fires strictly earlier than the merge -- run the pass there rather than holding it until the PR lands.**
 The bullet above picked the merge because it is unmissable, and it is; the problem is that it may never arrive on this session's clock.
@@ -36,7 +40,6 @@ The pattern is identical, and only the artifact differs.
 
 What stays genuinely worth asking is **where** a learning belongs when the destination is unclear, never **whether** to record it --- the same split that fragment draws around its own dupe-check step.
 Write it down first, then ask.
-(Corrected 2026-07-28: a flag reading "worth running `ums` before this session ends" named a real, specific learning and still produced no pass, until the user said "you should have run ums already.")
 
 **The offer also survives being phrased as a decision, and that form is harder to see.**
 The bullet above rules out the question.
@@ -56,10 +59,6 @@ Run the pass, then report it in the past tense, and put any genuine sequencing q
 - **Don't:** attach a user-conditional to a stated intention to run it.
 - **Don't:** read "I will" as sufficient --- the trailing clause is what decides it.
 
-(Corrected 2026-07-30, a bcs session.
-After a day of findings, a recap closed "I owe a UMS pass ... I'll run it now unless you'd rather I do something else first."
-The correction was "cai: stop asking for approval for ums passes; just run them.")
-
 **A new instruction arriving at a checkpoint does not cancel the checkpoint.**
 The bullet above covers the pass you *announce* and never run; this is the one you never announce at all, because something else arrived first.
 A merge or clean verdict is usually the exact moment I report back, so it is also the moment the next request lands.
@@ -72,7 +71,6 @@ When a request arrives at a checkpoint, either run UMS first and then start the 
 
 The same skip has a second route worth checking, since several skills end in a UMS step ([`post-merge`](skills/post-merge/SKILL.md), [`ardi`](shared/workflow/ardi.md), [`wrap-up`](skills/wrap-up/SKILL.md)).
 Reporting one of those skills complete asserts that its final step ran, so before calling a merge wrapped up, confirm the UMS pass actually happened rather than only the steps before it.
-(Same 2026-07-28 session as the correction above: three checkpoints passed -- two merges and a clean verdict -- each immediately followed by a new user request, plus a `post-merge` run reported done whose UMS step never executed.)
 
 **A merge you discover rather than perform is still a checkpoint, and it is the one that never feels like a moment.**
 Every bullet above describes a checkpoint that *happens* while you are watching: you push, the verdict lands, the PR merges, you report back.
@@ -92,9 +90,6 @@ The cheap check is the poll you are already running: if a PR you were driving re
 - **Don't:** require that you witnessed the merge for it to count.
 - **Don't:** let a poll that reports several merges roll straight into the next task because no single row felt like an event.
 
-(Corrected 2026-07-29: eight PRs from a multi-repo migration merged overnight and were discovered in a morning status check.
-The session read the table, reported 14 of 22 done, and continued driving the remaining PRs for several more turns before the user said "you should have done the ums pass already.")
-
 **Recommending that the session end is itself a UMS trigger, and it is the one route where skipping the pass destroys the learnings rather than merely delaying them.**
 The three bullets above all describe a pass that is *postponed*: no moment felt like the trigger, or a moment fired and was announced, or a moment fired and was preempted.
 In each of those the material survives in the conversation, so a later pass can still recover it.
@@ -112,9 +107,6 @@ It is the one blocker that is never tested, because it feels like introspection 
 The asymmetry also runs the wrong way for caution.
 A pass that records the top three learnings in a few edits is worth far more than a thorough one that never runs, so shrink the pass rather than deferring it, and say what got left out.
 If context genuinely runs out mid-pass, the entries already written are durable and the session ends having banked most of the value.
-(Corrected 2026-07-28, this session: a `gia` run flagged the owed pass three times, then recommended starting a fresh session to run it, citing exhausted context.
-The correction was "you should have run ums before telling me to start a fresh session".
-The pass then ran to completion in the same session, which is the evidence that the blocker was never real.)
 
 - **Do:** run the pass, then flag the stopping point, then let the user decide how to end the session.
 - **Do:** shrink a pass you genuinely cannot finish, record the top items first, and say what was left out.
@@ -140,10 +132,6 @@ Not wanting another PR is a preference, and a preference does not license the an
 - **Don't:** defer a pass to keep the open-PR count down, or until an unrelated PR merges.
 - **Don't:** treat "I will write it once #N lands" as a commitment --- it is the announced-and-never-run failure with a due date attached.
 
-(Corrected 2026-07-30: a status report identified the zsh word-splitting learning, said it was owed, and closed with "I'll write it once #917 lands rather than opening a fourth PR mid-flight."
-The user's correction was "no; do it right away."
-This entry and its `memories/tools.md` sibling were then written immediately, in one short pass, against a `main` that #917 had not yet touched --- which is the evidence that nothing was blocking it.)
-
 **Correcting your own understanding of a technical issue is itself a trigger, and it fires immediately rather than at the next checkpoint.**
 Every trigger above is an event in the *work*: a verdict lands, a PR merges, a poll reports a merge, a stopping point gets proposed.
 This one is an event in what you *believe*, and it leaves no artifact behind.
@@ -162,9 +150,6 @@ The task will still be there; what you believed ten minutes ago will not.
 - **Do:** record the belief that was wrong alongside the fact that replaced it, not just the fact.
 - **Don't:** wait for the unblocked task to reach a checkpoint of its own -- that checkpoint carries the task's learnings, not the correction's.
 - **Don't:** treat "I know the right answer now" as the pass having happened.
-
-(Directive from the user, 2026-07-30: "when you correct your understanding of a technical issue like you just did, run ums immediately."
-The correction was a Quarto binary reported broken twice that turned out to be environment misuse both times, recorded in [`growth-mindset`](shared/workflow/growth-mindset.md)'s "First check the limitation is real" section.)
 
 **A false claim about *state* is the same trigger, and it is the one you can be wrong about without ever holding a wrong belief.**
 The bullet above covers a corrected *understanding* --- a model of how something works, which you held, and which turned out to be false.
@@ -192,16 +177,6 @@ Building such an instrument is itself delegable sidecar work, not a reason to po
 - **Do:** delegate the pass, and delegate the instrument, rather than queueing either.
 - **Don't:** treat a factual correction as too small to record because no belief changed.
 - **Don't:** wait for the task the correction interrupted to reach a checkpoint of its own.
-
-(Directive from the user, 2026-07-30: "cai: every time you find out you were wrong about something, run ums immediately (you should give this to a subagent, as always, and algorithmatize it, in addition to editing memories and skills)."
-From a `ucdavis/bcs` session carrying six such discoveries, none of which triggered a pass:
-
-- a private repo described as publicly exposed for a day, when `gh api repos/<r> --jq .private` settles it in one call
-- a claim that this corpus ships no hooks, from a grep against a checkout 27 commits behind
-- a PR reported green from a query predating three of its own pushes
-- a changelog count of 9 that was 10, from a regex matching only one of two link forms
-- a review suggestion applied without checking it resolved the same path
-- a duplicate issue filed because a dupe-check and a create ran in one command.)
 
 ## Record both the pattern and the anti-pattern
 
@@ -251,15 +226,10 @@ Open PRs belonging to *other* sessions do not trigger this --- `wrap-up`'s sweep
 - **Don't:** treat "green checks, just awaiting review" as not-live --- it is the archetypal live PR.
 - **Don't:** flag a stopping point and disclose the open PR in the same breath, which is the same too-early flag the UMS rule above rejects.
 
-(Corrected 2026-07-29: a session flagged a clean stopping point while its own `ums` PR sat open awaiting review, having reasoned that the PR was "just awaiting review" and therefore not live.
-The correction was "don't flag stopping points when you still have PRs open".)
-
 **Run `wrap-up`'s state sweep *before* flagging a stopping point, not after the user asks for one.**
 The paragraph above says not to flag while live state remains; it doesn't say how to know.
 Answering that from memory only covers the PRs and branches *this conversation* created, which is exactly the blind spot: a bot-opened PR, a leftover branch from the harness or an earlier session in the same container, or another session's PR in the same repo never entered the conversation, so nothing about them feels outstanding.
 Run the sweep --- open PRs and issues per repo, `git status`, local branches, worktrees --- and let its output decide, the same way [`fully-clean`](shared/workflow/fully-clean.md) insists a PR's readiness comes from a fresh query rather than a cached verdict.
-(gha#318/ai-config#733/#736, 2026-07-26: a clean stopping point was flagged twice on the strength of "my three PRs are merged."
-The `wrap-up` sweep the user then asked for found a stale draft PR (`gha#316`, a bot claim-commit for an issue closed hours earlier) and an unused harness-assigned branch still sitting in the `gha` checkout.)
 
 **Two mechanical details about that leftover-branch case, one of which reads as the opposite of what it is.**
 The harness assigns its branch name in *every* scoped repo and leaves each one checked out on it, including repos the session never opens.
@@ -283,11 +253,6 @@ Once liveness is settled, switch that repo to `main` --- which is what the refus
 - **Do:** settle liveness first, then `git checkout main` in that repo, then `git branch -D`.
 - **Don't:** read `used by worktree` as evidence that a separate live worktree exists.
 - **Don't:** assume a repo the session never opened is on `main`.
-
-(2026-07-29/30, this session: after gha#376 and ai-config#849 merged, the sweep found the assigned branch `claude/gha-pr-374-cf7138` checked out in the `altdoc` and `rpt` clones, neither of which the session ever touched.
-Both carried 0 unique commits, were ancestors of `origin/main`, and were absent from the remote.
-`altdoc`'s pointed two merged PRs behind its own `origin/main`.
-The first `git branch -D` failed with the worktree message, and `git worktree list` showed one entry --- the main checkout itself.)
 
 **When flagging a good moment to `/clear`, offer archiving as the default alternative.** Whenever there's a meaningful chance I'd want to come back to this conversation later, recommend leaving the session alone and starting a fresh one for the next task, instead of `/clear`ing it -- the old session stays fully retrievable (nothing to lose), at the cost of a small navigation step to reopen it. Reserve a bare `/clear` recommendation for when nothing in the session is worth revisiting; when in doubt, default to the archive-and-start-new option since it's strictly safer.
 
@@ -320,8 +285,6 @@ Run UMS first if it is owed, per "Recommending that the session end is itself a 
 - **Do:** keep monitoring an unmerged PR in the session that owns it -- send only the *new* PR to a fresh session, rather than resetting the one that owes monitoring.
 - **Don't:** barrel into a new PR carrying a long, unrelated session by reflex, just because opening a PR feels like forward motion rather than a stopping point.
 - **Don't:** `/clear` or abandon a session while a PR it opened is still unmerged -- that drops the monitoring loop the bright line protects.
-
-(Directive from the user, 2026-08-04: "cai: before starting a new pr, consider whether we should compact/clear/start a new session.")
 
 ## Flag good moments to run `compress-session`, too
 
@@ -415,8 +378,6 @@ In every session — at session start, and again periodically during long sessio
    **Point 1 is a precondition for this one, not merely an earlier item in a list.**
    The instrument compares installed copies against the checkout, so a checkout that has not been pulled makes every report suspect -- both by measuring drift against stale reference content, and by hiding the script itself when it landed in a commit you do not have yet.
    Pull first, then measure, and re-read any figure taken before the pull as unreliable rather than merely approximate.
-   (2026-07-28, an altdoc `gii` session: `~/.claude` held one real-copy `skills/` and nothing else, and the local checkout was 13 commits behind -- so `scripts/check-install.py` did not exist on disk at either path and a hand sweep against the stale checkout was run instead, reporting counts that changed once the pull landed.
-   That hand sweep was also the approach this very entry had already retired, which is the failure mode the staleness causes rather than a separate mistake.)
    **`foreign` is reported but never removed, and is not a synonym for "deleted from the repo".**
    The category mixes skills we deleted with Anthropic-provided built-ins that were never ours (`docx`, `pdf`, `pptx`, `xlsx`, `skill-creator`), and deleting those would remove working harness functionality.
    Git history cannot separate the two, because remote containers check the repo out **shallow** -- `git log --diff-filter=D -- skills/<name>` returns nothing for either case -- so the call stays human.
@@ -425,9 +386,6 @@ In every session — at session start, and again periodically during long sessio
    Measured in one container: at `07:25:00.084` bootstrap reported 527 `already linked` and zero skips, so every skill was still a symlink; `~/.claude/skills` was then modified at `07:25:01.608`, leaving 53 real directories.
    The upstream cause is `upload_skills.sh`, which is idempotent by **skipping** any skill already in the workspace (`skip (exists)`) rather than adding a version, so the workspace copy the harness syncs down stays frozen at whatever revision was first uploaded.
    That is why a repair wired into `SessionStart` would run before the damage and report a clean install every time.
-   (ai-config#755, 2026-07-28: 42 of 172 skills were stale in a web session, most at under half their real length -- `ardi` 80 lines vs 403, `ums` 94 vs 365, `ard` 134 vs 308 -- plus 3 latent unlinked copies the old `SKILL.md`-only sweep counted as identical.
-   Caught only because a `ums` step contradicted a change known to have merged.
-   The damage stayed small because `CLAUDE.md` itself was symlinked and restates most operative rules inline, which is the concrete argument for keeping local restatements alongside citations rather than trimming to bare pointers.)
    **`check-install.py` says nothing about whether the hooks are *registered*, so run `install-hooks.py` as a separate freshness check.**
    The two answer different questions and are easy to conflate, because both concern `~/.claude` and both report a tidy count.
    `check-install.py` compares **files**: it asks whether `~/.claude/hooks/<script>` tracks the checkout.
@@ -458,22 +416,25 @@ In every session — at session start, and again periodically during long sessio
    - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.
    - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
 
-   (2026-08-05, this machine: `install-hooks.py` run against a checkout 31 commits behind read a stale manifest and reported `registered=12 missing=0 stale=0` / `All hooks registered.`
-   After `git pull --ff-only` the same command reported `examined 15 ... registered=12 missing=3`.
-   Running `--fix` then bound all three to scripts absent from `~/.claude/hooks/`, one of them a `PreToolUse` `Bash` hook, which blocked every Bash call until `/reload-plugins` placed the symlinks.
-   `memories/claude-code-hooks.md` carries the mechanism and the recovery.)
-
-   (2026-08-04, this machine: `check-install.py` reported 32 of 34 entries ok while `install-hooks.py` reported `registered=3 missing=8`, so 8 of 11 guards had never been bound to an event.
-   Among them was `flag-unassigned-worktree.py`, and in that same session two `Agent` calls were launched with no `isolation` --- exactly what it exists to warn about --- with no warning possible.
-   The lapse was first self-attributed to ignoring the hook, which was wrong in a way worth recording: the guard was never installed, so there was nothing to ignore.
-   `install-hooks.py --fix` took it to `registered=11 missing=0`, and merging the then-open #1139 made it 12.)
-3. **The working repo's main checkout.** Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) — it goes stale as the session's own PRs and other sessions' PRs merge.
-   **The same "diverged" failure from point 1 above can hit any repo's `main`, not just ai-config's own** — a fresh container's checkout isn't guaranteed fresh for every repo it holds. Apply the same recovery: confirm the working tree is clean, then check whether the local tip's commit is actually reachable from `origin/main` (`git merge-base --is-ancestor <local-tip> origin/main`) before force-realigning with `git checkout -B main origin/main`. Don't rely on a commit-message grep alone to decide safety — the same message can appear under a *different hash* after a squash-merge or rebase (so the grep matches but the underlying commits differ, the milder case in point 1), and `git log origin/main` only reflects whatever your local remote-tracking ref last fetched (so a check run before fetching in this session can miss commits that already landed). Re-run `git fetch origin main` immediately beforehand and use the hash-based ancestry check as the authoritative signal. A clean working tree plus a non-ancestor local `main` tip is still safe to realign in the common case (the checkout is stale, not carrying real work), since realigning only moves a local branch ref — the discarded commits stay recoverable via `git reflog` regardless. (Hit in both `ai-config` and `gha` checkouts in the same session, 2026-07-06: `gha`'s local `main` tip commit didn't match `origin/main` by hash *or* message at all — unlike the milder "same content, rewritten hash" case documented in point 1 — but was still just a stale checkout snapshot with nothing of value, confirmed once the working tree was verified clean.)
+3. **The working repo's main checkout.**
+   Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) --- it goes stale as the session's own PRs and other sessions' PRs merge.
+   **The same "diverged" failure from point 1 above can hit any repo's `main`, not just ai-config's own** --- a fresh container's checkout isn't guaranteed fresh for every repo it holds.
+   Apply the same recovery: confirm the working tree is clean, then check whether the local tip's commit is actually reachable from `origin/main` (`git merge-base --is-ancestor <local-tip> origin/main`) before force-realigning with `git checkout -B main origin/main`.
+   Don't rely on a commit-message grep alone to decide safety --- the same message can appear under a *different hash* after a squash-merge or rebase (so the grep matches but the underlying commits differ, the milder case in point 1), and `git log origin/main` only reflects whatever your local remote-tracking ref last fetched (so a check run before fetching in this session can miss commits that already landed).
+   Re-run `git fetch origin main` immediately beforehand and use the hash-based ancestry check as the authoritative signal.
+   A clean working tree plus a non-ancestor local `main` tip is still safe to realign in the common case (the checkout is stale, not carrying real work), since realigning only moves a local branch ref --- the discarded commits stay recoverable via `git reflog` regardless.
 4. **The `.ai-config` submodule pin, in any repo that vendors ai-config as a git submodule** (check `.gitmodules` for a `.ai-config` entry — not every repo has one; most consume ai-config only via the Plugin Marketplace, which doesn't need this). Compare the pinned commit against ai-config's current `origin/main`: `git rev-parse HEAD:.ai-config` for the pin's SHA, then `git -C <path-to-a-local-ai-config-clone> rev-list --count <pin>..origin/main` for how far behind it is.
    A pin more than a few weeks or dozens of commits stale is worth refreshing: file a tracking issue, bump it (`git submodule update --init --remote .ai-config` from the parent repo handles both init and fetch in one step; or, if already checked out, `git fetch origin` inside the submodule before `git checkout origin/main`), then `git add .ai-config` in the parent repo to record the new gitlink, verify the parent repo's own checks still pass, and open a PR.
-   Before assuming this is risk-free, check whether the parent repo's CI actually reads the submodule's checked-out content (vs. treating it as inert until a dev runs `git submodule update --init` locally) — a pin bump is a pure pointer change with no functional surface only when nothing reads it. (First done on `Lacaedemon/sparta` [PR #651](https://github.com/Lacaedemon/sparta/pull/651): the pin was 325 commits (~9 days) stale, unreferenced by CI, and not checked out by default.)
-   **When the current checkout isn't `main` itself** (a feature branch or a worktree), `HEAD:.ai-config` only reflects that branch's own pin — it can look badly stale purely because the branch was cut before a bump PR merged into `main`, not because the project's actual pin needs refreshing. Also check `origin/main:.ai-config` (the pin as recorded on the base branch) against ai-config's `origin/main`; if that one is already fresh, no bump PR is needed — the branch's own pin resolves itself on its next merge/rebase. On Windows Git Bash, that comparison command hits an MSYS gotcha — see `memories/git.md`. (Re-discovered on `Lacaedemon/sparta`'s `claude/infallible-lewin-5841e9` branch, 2026-07-04: the branch's own pin read 344 commits stale while `main`'s was only 19 commits behind.)
-   **When *adding a new citation* to an ai-config shared fragment inside a submodule-consuming repo's own `CLAUDE.md`, verify — don't assume — that the citation already resolves.** It only does once BOTH (a) the source PR has merged into ai-config's `main`, and (b) that repo's own `.ai-config` pin has been bumped to a commit containing the path — the pin doesn't auto-follow `main`. Check with `git show <pin>:<path>` (or `ls` inside the checked-out submodule) before writing the citation in present tense; if either gate hasn't cleared, hedge to future/conditional tense instead of asserting settled fact — mirroring the "proposed in ai-config#N — once merged, the fragment lives at ..." convention `gha`'s own `CLAUDE.md` already uses for citing its still-open companion PRs. Once the citation does resolve, keep the local **restatement** of the rule's key points alongside the citation rather than trimming to a bare pointer — unlike a skill distributed via the Plugin Marketplace (point 4's own preamble), `.ai-config`'s `shared/`/`memories/` fragments aren't auto-loaded into agent context — they only enter it when a `CLAUDE.md` explicitly restates or `@`-references them — so a bare citation is invisible to an agent that doesn't take the extra step of reading the fragment on demand. (`rme`#988/`epi204`#362: both cited `shared/writing/math-derivation-steps.md` in present tense while `ai-config`#502 was still open and each repo's `.ai-config` pin predated it — flagged as a dangling reference by review in both, fixed by bumping the pin once #502 merged and hedging the still-open `gha`#228 half of the same citation.)
+   Before assuming this is risk-free, check whether the parent repo's CI actually reads the submodule's checked-out content (vs. treating it as inert until a dev runs `git submodule update --init` locally) --- a pin bump is a pure pointer change with no functional surface only when nothing reads it.
+   **When the current checkout isn't `main` itself** (a feature branch or a worktree), `HEAD:.ai-config` only reflects that branch's own pin --- it can look badly stale purely because the branch was cut before a bump PR merged into `main`, not because the project's actual pin needs refreshing.
+   Also check `origin/main:.ai-config` (the pin as recorded on the base branch) against ai-config's `origin/main`;
+   if that one is already fresh, no bump PR is needed --- the branch's own pin resolves itself on its next merge/rebase.
+   On Windows Git Bash, that comparison command hits an MSYS gotcha --- see `memories/git.md`.
+   **When *adding a new citation* to an ai-config shared fragment inside a submodule-consuming repo's own `CLAUDE.md`, verify --- don't assume --- that the citation already resolves.**
+   It only does once BOTH (a) the source PR has merged into ai-config's `main`, and (b) that repo's own `.ai-config` pin has been bumped to a commit containing the path --- the pin doesn't auto-follow `main`.
+   Check with `git show <pin>:<path>` (or `ls` inside the checked-out submodule) before writing the citation in present tense;
+   if either gate hasn't cleared, hedge to future/conditional tense instead of asserting settled fact --- mirroring the "proposed in ai-config#N --- once merged, the fragment lives at ..." convention `gha`'s own `CLAUDE.md` already uses for citing its still-open companion PRs.
+   Once the citation does resolve, keep the local **restatement** of the rule's key points alongside the citation rather than trimming to a bare pointer --- unlike a skill distributed via the Plugin Marketplace (point 4's own preamble), `.ai-config`'s `shared/`/`memories/` fragments aren't auto-loaded into agent context --- they only enter it when a `CLAUDE.md` explicitly restates or `@`-references them --- so a bare citation is invisible to an agent that doesn't take the extra step of reading the fragment on demand.
 
 ## Timestamp recaps in local time
 
@@ -649,8 +610,6 @@ gh api repos/<owner>/<repo>/issues/<N>/comments --paginate \
 ```
 
 `memories/github.md` carries the full statement, including the placeholder-wording trap when polling a run still in flight.
-(Morrison-Lab/ai-config#1054, 2026-08-03: the round-3 verdict --- **Ready for merge**, all four findings independently re-verified --- posted as `github-actions[bot]` at `03:04:19Z`.
-The login-filtered query returned the round-2 comment from `02:12:52Z` instead, so a clean PR read as unreviewed.)
 
 **Also check formal GitHub reviews, not just issue-style comments — a human's `CHANGES_REQUESTED` can be invisible to a comments-only scan.** A review submitted via GitHub's review UI (as opposed to a plain PR comment) shows up in `gh pr view N --json reviews`, and its top-level `body` is frequently **empty** — the actual finding lives entirely in a per-line inline comment, which only appears via `gh api repos/<owner>/<repo>/pulls/N/comments` (a different endpoint from issue comments). Checking `--json comments` alone can miss the review's existence entirely. Before declaring a PR ready, also run:
 ```
@@ -749,7 +708,6 @@ Don't retry the 403 --- it's a policy denial, not a transient error.
 
 **Prefer stacking the fix, not superseding the PR.** When the work is an incremental fix to an existing, still-open PR (a review finding, a small addition) rather than a full rebuild, push the fix to the assigned branch and open it as a PR **stacked on** the original --- `base` set to the original PR's own branch, per the [`stack-prs`](skills/stack-prs/SKILL.md) skill --- rather than superseding it. Comment on the original PR pointing to the stacked one, and note the dependency ("stacked on this branch — either merge #N into this branch first, or merge this PR and #N will retarget to `main`"). This keeps the diff to just the incremental change instead of re-litigating the whole original PR's content, and it composes correctly regardless of how the maintainer merges it: they can merge the stacked PR straight into the original's branch (folding the fix in before the original PR itself merges) or merge the original first and let the stacked PR retarget to `main` per that skill's step 4.
 Reserve the supersede path (below) for when stacking doesn't fit --- the original branch/PR is abandoned, or the fix amounts to a full rebuild rather than an incremental addition.
-(Corrected on ai-config#493 → #498, 2026-07-05: first reflex was to supersede per the fallback below; the user redirected to stacking, and the maintainer then merged the stacked PR directly into #493's branch, folding the fix in before #493 itself merged --- exactly the outcome stacking was meant to produce.)
 
 **Supersede fallback, when stacking doesn't apply:** push the fix to the assigned branch, open a **new** PR off `main` that supersedes the original (say "Supersedes #N" in the body and rebuild as a single clean commit so no sensitive history leaks through), comment on the original PR pointing to the replacement, and close the original once the new PR merges.
 
@@ -790,10 +748,19 @@ So when a stacked PR goes dirty, check ancestry before touching the conflicts.
 `git merge-base --is-ancestor <base-PR-commit> origin/main` returning false means the base squash-merged, and the fix is the rebuild above rather than a merge.
 Confirm the base PR's content is genuinely on `main` first, since that is what makes discarding those commits safe.
 Normalize whitespace and backticks when you check (`git show origin/main:<path>`), because this corpus breaks lines mid-phrase.
-(Morrison-Lab/ai-config#957 → #974, 2026-07-31: #974 sat untouched while #957 squash-merged as `3893dd51`.
-The rebuild restored `+82/-0` over 2 commits and `mergeable_state: clean`, and both cherry-picks applied without conflict.)
 
-**A live variant of the same check: the human can merge the branch's PR out from under an in-flight push, not just leave a stale branch to discover later.** Pushing a commit right as its own PR merges lands in a race in repos that auto-delete head branches on merge: GitHub deletes the head branch, and the in-flight push silently recreates it under the same name --- but now as a brand-new, orphaned branch with no PR, built on top of commits that (for a real merge commit, unlike the squash case above) *are* ancestors of `main`'s new tip. `git status`/`git push` report success --- but the push is not quite silent, and its one tell is worth knowing, because it fires at the moment of the race rather than hours later. A push onto a branch that still exists prints a SHA range (`f7bf71f..899e5de  <branch> -> <branch>`); a push that *recreates* a deleted branch prints `* [new branch]      <branch> -> <branch>` instead. Seeing `* [new branch]` for a branch you have already been pushing to means the remote branch was deleted underneath you, which on a PR branch means the PR merged. Read the push output rather than only its exit status, and run the ancestry check immediately when that line appears. Recovery is the same ancestry check as above (`git merge-base --is-ancestor <branch-tip> origin/main`), then cherry-pick the orphaned commit onto a fresh branch off the new `origin/main`; note that this check's *answer* depends on the repo's merge strategy and so is not itself the signal --- it comes back true where the PR merged as a real merge commit (the serocalculator case below) and false in a squash-merge repo, where `main` carries a new single commit your branch never saw. Either answer leaves the recovery the same, and in the squash case the orphaned commit is genuinely absent from `main`, so check whether its content actually landed (`git show origin/main:<path> | grep`) rather than inferring it from the merge notification; delete the stray local and (if push-permitted) remote branch. If the orphaned commit is genuinely new work --- not a fix that belongs in the now-merged PR --- treat this as the natural start of a new, stacked issue + PR rather than trying to reopen or append to the merged one. (`UCD-SERG/serocalculator#568` → `#572`, 2026-07-20: pushed a `Var(y_obs | y_true)` derivation commit just as #568 merged; recovered by cherry-picking it onto a new branch off `main`, filing #571 to track the follow-on `Var(y_obs | T=t)` derivation it was a prerequisite for, and opening #572 stacked on nothing but current `main`.) (`ai-config#778` → `#783`, 2026-07-28: the squash-merge counterpart. A commit fixing a review nit was mid-push when #778 merged; `git push` printed `* [new branch]`, `git merge-base --is-ancestor` returned false, and `git show origin/main:<path>` confirmed the fix was absent from `main` --- so a PR comment claiming the nit was addressed would have been false. Recovered by cherry-picking onto a fresh branch off current `main` and opening #783, with a comment on #778 saying which of its findings did not ship in that merge.)
+**A live variant of the same check: the human can merge the branch's PR out from under an in-flight push, not just leave a stale branch to discover later.**
+Pushing a commit right as its own PR merges lands in a race in repos that auto-delete head branches on merge: GitHub deletes the head branch, and the in-flight push silently recreates it under the same name --- but now as a brand-new, orphaned branch with no PR, built on top of commits that (for a real merge commit, unlike the squash case above) *are* ancestors of `main`'s new tip.
+`git status`/`git push` report success --- but the push is not quite silent, and its one tell is worth knowing, because it fires at the moment of the race rather than hours later.
+A push onto a branch that still exists prints a SHA range (`f7bf71f..899e5de <branch> -> <branch>`);
+a push that *recreates* a deleted branch prints `* [new branch] <branch> -> <branch>` instead.
+Seeing `* [new branch]` for a branch you have already been pushing to means the remote branch was deleted underneath you, which on a PR branch means the PR merged.
+Read the push output rather than only its exit status, and run the ancestry check immediately when that line appears.
+Recovery is the same ancestry check as above (`git merge-base --is-ancestor <branch-tip> origin/main`), then cherry-pick the orphaned commit onto a fresh branch off the new `origin/main`;
+note that this check's *answer* depends on the repo's merge strategy and so is not itself the signal --- it comes back true where the PR merged as a real merge commit (the serocalculator case in [`CLAUDE.cases.md`](CLAUDE.cases.md)) and false in a squash-merge repo, where `main` carries a new single commit your branch never saw.
+Either answer leaves the recovery the same, and in the squash case the orphaned commit is genuinely absent from `main`, so check whether its content actually landed (`git show origin/main:<path> | grep`) rather than inferring it from the merge notification;
+delete the stray local and (if push-permitted) remote branch.
+If the orphaned commit is genuinely new work --- not a fix that belongs in the now-merged PR --- treat this as the natural start of a new, stacked issue + PR rather than trying to reopen or append to the merged one.
 
 **That tell's precondition is a repo setting, so check the setting rather than
 assuming it in either direction --- and a branch that still resolves after your
@@ -866,29 +833,15 @@ was no longer attached to a PR.
 - **Don't:** report a finding as Addressed on the strength of a pushed commit
   without checking which ref that commit is reachable from.
 
-(`Morrison-Lab/ai-config#986`, 2026-07-31: the review posted a verdict plus a
-non-blocking inline finding at head `147ee69` at `23:08:35Z`, the PR merged at
-`23:27:15Z`, and the fix for that finding was pushed as `7416b16` at
-`23:32:46Z`, five minutes later.
-`git merge-base --is-ancestor 7416b16 origin/main` returns non-ancestor, and a
-whitespace- and backtick-normalized comparison found 25 of the commit's 26
-prose additions absent from `main`, so the finding shipped unaddressed.
-The PR's timeline records "deleted the ums/push-reported-success-wrong-ref
-branch" at `23:27`, so the branch was already gone when that push ran and the
-push recreated it, which is the `* [new branch]` case.
-Three head branches merged around the same time
-(`chore/claude-review-v2-pin`, `docs/fully-clean-verdict-measurement`,
-`ums/prose-count-adjacent-to-block`) no longer resolve; this one does, at
-`7416b16` rather than at the merged head `147ee69`, which is the recreation.
-The push's own output is not in the record, so whether it was read and
-misjudged or never read at all cannot be established.
-What is in the record is a later comment on that thread asserting the tell was
-unavailable here, which each of these checks refutes.
-Recovered as #1003.)
+**The harness-assigned branch name itself can already exist locally, pointing at unrelated stale content from an earlier session in the same container.**
+A fresh container doesn't guarantee a fresh local branch state --- `git checkout -b <harness-branch> origin/<existing-PR-branch>` can fail with "a branch named `<harness-branch>` already exists" if a prior session in this container created one under that same name and left it pointing at old work.
+Don't assume it's safe to reuse or that it reflects the actual PR: check `git merge-base --is-ancestor <local-tip> origin/main` first --- if the local tip is already an ancestor of `main` (i.e. it was old, already-merged content, not in-flight work), it's safe to discard by force-checking out the real PR branch under that same name with `git checkout -B <harness-branch> origin/<existing-PR-branch>` (uppercase `-B` resets the branch in place instead of erroring).
 
-**The harness-assigned branch name itself can already exist locally, pointing at unrelated stale content from an earlier session in the same container.** A fresh container doesn't guarantee a fresh local branch state --- `git checkout -b <harness-branch> origin/<existing-PR-branch>` can fail with "a branch named `<harness-branch>` already exists" if a prior session in this container created one under that same name and left it pointing at old work. Don't assume it's safe to reuse or that it reflects the actual PR: check `git merge-base --is-ancestor <local-tip> origin/main` first --- if the local tip is already an ancestor of `main` (i.e. it was old, already-merged content, not in-flight work), it's safe to discard by force-checking out the real PR branch under that same name with `git checkout -B <harness-branch> origin/<existing-PR-branch>` (uppercase `-B` resets the branch in place instead of erroring). (ai-config#481: the assigned branch name `claude/resolve-pr-481-conflicts-dz9v4w` already existed locally, pointing at a commit that turned out to be an ancestor of `main` from an earlier session --- switched to the actual PR branch instead, per this section's own primary rule.)
-
-**A PR whose head branch lives in a different repo entirely (not just a scope-restricted push) always needs the supersede path --- there's no fix-in-place option to prefer over it.** A cross-fork "sync upstream into main" PR --- opened by comparing `<upstream-owner>/<repo>:main` against `<fork-owner>/<repo>:main` --- has its head ref owned by the upstream repo, not the fork. When that PR shows a real conflict (`mergeable_state: dirty`), the fork has no push access to the head branch at all, regardless of what the harness's own push-scope policy allows elsewhere in the session --- so the stacking preference above doesn't apply here; go straight to superseding. Fetch both remotes, merge upstream's branch into a fork-local branch off the fork's own `main`, resolve conflicts there, open a same-repo PR ("Supersedes #N" in the body), and close the original once the replacement merges. (`d-morrison/altdoc#20` → `#22`, 2026-07-14: `#20` compared `etiennebacher/altdoc:main` against the fork's `main` and hit a real `NEWS.md`/`tests/testthat/helper.R` conflict with no push access to fix it on that PR; `#22` redid the sync from a fork-local branch and merged clean.)
+**A PR whose head branch lives in a different repo entirely (not just a scope-restricted push) always needs the supersede path --- there's no fix-in-place option to prefer over it.**
+A cross-fork "sync upstream into main" PR --- opened by comparing `<upstream-owner>/<repo>:main` against `<fork-owner>/<repo>:main` --- has its head ref owned by the upstream repo, not the fork.
+When that PR shows a real conflict (`mergeable_state: dirty`), the fork has no push access to the head branch at all, regardless of what the harness's own push-scope policy allows elsewhere in the session --- so the stacking preference above doesn't apply here;
+go straight to superseding.
+Fetch both remotes, merge upstream's branch into a fork-local branch off the fork's own `main`, resolve conflicts there, open a same-repo PR ("Supersedes #N" in the body), and close the original once the replacement merges.
 
 ## Skills that call gh/glab: fall back to tool-mappings.md in remote sessions
 
@@ -986,7 +939,10 @@ Neither failure mode is an approval — an unreviewed PR stays unreviewed regard
 **Quota-skipped:** surfaces as a bot comment — either `Claude review skipped — API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the `@claude` agent workflow).
 Both mean no bot will respond on this run; re-running the workflow only helps once the quota actually resets.
 
-**Stub review:** the review job reports success (`is_error: false`, real cost/turns logged) but the posted comment never states a `### Verdict` — the run genuinely executed but got cut short before reaching a conclusion (e.g. by escalating permission denials on tool calls it needed). This looks superficially fine (green check, a comment exists) so it's easy to mistake for a real review — read the comment body for an actual verdict section before trusting it. Re-running the same workflow can reproduce the same stub pattern repeatedly rather than self-resolving; if a retry doesn't help within a round or two, treat it as this failure mode and self-review rather than continuing to re-trigger. (Hit repeatedly on gha#193/gha#198, where `claude-review` produced escalating permission-denial-driven stub reviews across many runs before the actual fix — a same-prompt retry composite, gha#201 — landed.)
+**Stub review:** the review job reports success (`is_error: false`, real cost/turns logged) but the posted comment never states a `### Verdict` --- the run genuinely executed but got cut short before reaching a conclusion (e.g. by escalating permission denials on tool calls it needed).
+This looks superficially fine (green check, a comment exists) so it's easy to mistake for a real review --- read the comment body for an actual verdict section before trusting it.
+Re-running the same workflow can reproduce the same stub pattern repeatedly rather than self-resolving;
+if a retry doesn't help within a round or two, treat it as this failure mode and self-review rather than continuing to re-trigger.
 
 **No review workflow configured at all is a third failure mode, and the one nothing signals on its own.**
 Quota-skipped and a stub review both require a review workflow to exist and attempt to run.
@@ -997,14 +953,10 @@ Check for this once per repo, right after the first push, rather than waiting to
 Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
 Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](shared/workflow/report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
 
-(2026-08-06: MRs pushed to two sibling GitLab repos on the same afternoon.
-One included its own `@claude` review template and produced a genuine
-auto-review within a minute of the push.
-The other's `.gitlab-ci.yml` `include:` list omitted the template entirely,
-so its MR sat with a green pipeline and zero review comments until the gap
-was checked for directly rather than assumed absent.)
-
-**Post the self-review before doing anything else — don't stall the PR waiting for the bot. Then, before writing the check off as permanently broken, try one manual re-run of the failed job — even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.** Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat. If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR. (`ucdavis/epi204`#361: attempt 1 and its automatic same-run retry both stubbed; self-reviewed and posted a verdict; a manual `rerun_failed_jobs` on that same workflow run then produced a genuine review — and it wasn't a rubber stamp, it caught a real one-sentence-per-line violation the self-review's own added text had introduced.)
+**Post the self-review before doing anything else --- don't stall the PR waiting for the bot.
+Then, before writing the check off as permanently broken, try one manual re-run of the failed job --- even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.**
+Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.
+If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR.
 
 Either way: don't wait on the bot indefinitely — do the review yourself and keep driving to fully-clean.
 
@@ -1035,11 +987,6 @@ This is the fallback-specific sharpening of "Apply the same review standards the
 - **Don't:** let a fallback self-review stop at structural checks (dogfood, ASCII, line breaks) and report "no findings".
 - **Don't:** read "the bot was down" as permission for a lighter review than the bot itself would have given.
 
-(Morrison-Lab/ai-config#1092, 2026-08-03: a FALLBACK self-review was posted while `claude-review` was erroring on infra failures, and it reported "no findings / ready" while missing two content bugs the recovered bot then caught.
-One was a false mechanism claim --- the prose said a directional-word grep "passes because the direction ('above') stays right", when that grep's word list is exclusively forward-pointing and never evaluates "above" at all.
-The other was a misattributed citation --- prose credited a "name the target, don't count to it" preference to `shared/writing/definition-crossrefs.md`, which is about formal Quarto crossref-div ordering and says no such thing.
-Both are semantic errors that escape mechanical checks, which is the very subject the reviewed section was about; the self-review had run the structural checks and not `fact-check-prose`.)
-
 ## Watch and ARDI every PR you touch — don't ask first
 
 When you open (or are handed) a PR/MR in **any** repo, subscribe to its activity and run the ARDI loop to clean **automatically** — never ask "should I watch this?" or "should I iterate it?" first.
@@ -1048,7 +995,7 @@ Subscribe with the `subscribe_pr_activity` tool (provided by the GitHub MCP serv
 
 This webhook-driven loop never formally invokes the `ardi` skill, so read `skills/ardi/SKILL.md` step 6 for the re-request-review mechanics before pushing a fix: after a push, the push itself already triggers the review — don't also post "@claude review again" in the same round.
 On workflows with `concurrency: cancel-in-progress`, the two triggers race and cancel each other, leaving the latest commit's review canceled and `require-review` red for no code reason.
-Only post the mention when a round pushed no code (all Rebut/Defer). (Hit on ai-config#406: posting the mention right after a push canceled the review and cost three extra polling rounds to recover.)
+Only post the mention when a round pushed no code (all Rebut/Defer).
 
 Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the escalation rule above still applies), or when the PR is clean.
 Stop watching only when the PR merges or closes, or I tell you to back off.
@@ -1091,6 +1038,11 @@ The key points, restated here because a bare pointer is invisible to a consumer 
 - **A `DIRTY` flag means stale or defective, and only the second is a defect.**
   A PR whose content is clean but whose base moved is stale rather than broken.
   Staleness resolves once, at merge time, so re-syncing it eagerly spends a CI cycle and a review round on a state that expires within one merge interval.
+- **A conflict your sweep found is not a conflict your merge caused.**
+  Attribution is a second axis, and it runs before the claim: intersect the merge's own deleted and renamed paths (`git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'`) with each conflict, and report conflicts caused alongside conflicts found.
+  `git show --name-status <merge>` cannot supply that set for a **true** (two-parent) merge --- it prints no file list at all there, and grepping its header for `^[ADMR]` returns three phantom paths.
+  It does diff a squash merge normally, so whether it works depends on how the repo merges rather than on the commit in front of you.
+  A conflict you caused on a branch you do not own is an explanatory comment, not a push.
 - **Independent per-PR checking cannot see pair collisions.**
   Every PR can be clean against `main` while two of them conflict with each other.
   Only a pairwise `git merge-tree` between PR heads finds that.
@@ -1172,11 +1124,6 @@ Only asking why the work was routed that way surfaces it.
 - **Don't:** report an owed item as a status --- describing it that well is proof the brief already exists.
 - **Don't:** apply a "cheaper to do than to brief" test to the fetch when the reading is the actual work.
 
-(2026-07-30, a `ucdavis/bcs` session: recaps repeatedly closed with "I still owe you a PR for X" and "I owe a UMS pass", carried across many turns, with the user having to ask again before several of them started.
-Each was independent of the critical path.
-The directive was "when you think you 'owe me' something, ask yourself, should I have dispatched it to a subagent already?"
-The reading half surfaced separately, when the user asked why fetching and digesting a Wikipedia article had not been dispatched --- a question no output could have prompted, since the article had been read correctly.)
-
 Distinct from [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md), which governs the heavier `Workflow` tool.
 That rule is a **gate**: a fan-out across four or more verification-bearing targets is a real spend, so it has to be opted into or proposed with a cost estimate.
 This one is a **grant**: a single `Agent` call covering one sidecar task is cheap, needs no opt-in, and the cost it prevents is an idle parallel track rather than an overspend.
@@ -1204,6 +1151,13 @@ Two rules, one incident, and the second is the general form of the first.
 Deciding that a particular agent does not need one is fine.
 Leaving it unmarked is what is not.
 `hooks/flag-unassigned-worktree.py` mechanizes exactly this, and warns rather than blocks.
+
+**"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
+`isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
+Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/preferences.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
+Measured 2026-08-07.
+[`memories/git-worktrees.md`](memories/git-worktrees.md) carries the evidence.
+[`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.
 
 **The general rule is the more valuable half.** When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
 A repealed decision changes no artifact, so review, tests, and hooks are all blind to it by construction, and the only detector is someone who remembers.
@@ -1635,7 +1589,8 @@ When running `code-review` or the `ard`/`ardi` loop on a diff that touches prose
 The complement to the fact-check above: a claim can be *true* yet still decay
 into a confident falsehood if it's stated as timeless present-tense fact when
 its truth is time-dependent (a package's CRAN status, a "current" version, a
-count). Attach the time the claim was true so a later reader knows to
+count).
+Attach the time the claim was true so a later reader knows to
 re-verify it.
 
 @shared/writing/timestamp-volatile-claims.md
@@ -1671,7 +1626,7 @@ A distinct, easy-to-miss gap: a concept stated with full definitional precision 
 @shared/writing/informal-definitions.md
 
 Like `forward-references.md`, this has a dedicated actionable skill: `detect-informal-definitions`.
-Run it — or apply its check inline — wherever `ard`/`ardi` reviews a diff that introduces new technical content, alongside the other prose-review rules in this file. (Found by hand on `d-morrison/rme#706`: a "conditional predicted risk" quantity introduced only as plain prose right before two definitions that depended on it, and a "collapsibility bias" concept defined in one sentence crammed inside a *different* concept's definition div.)
+Run it --- or apply its check inline --- wherever `ard`/`ardi` reviews a diff that introduces new technical content, alongside the other prose-review rules in this file.
 
 ## Detect hypothetical examples where real data is already available
 
@@ -1681,7 +1636,8 @@ That's a distinct gap from the informal-definitions check above: it isn't a miss
 @shared/writing/hypothetical-examples.md
 
 This has a dedicated actionable skill: `detect-hypothetical-examples`.
-Run it — or apply its check inline — wherever `ard`/`ardi` reviews a diff that introduces or edits a worked example, alongside the other prose-review rules in this file. Fixing isn't mechanical substitution: a real dataset's effect size is often much less dramatic than an invented one, so weigh whether the real numbers still make the teaching point before publishing them. (Found by hand on `d-morrison/rme#706`: a logistic-regression chapter's worked examples used invented covariate-specific risks and made-up exposure proportions throughout, even though the chapter already loads and fits models on its real running WCGS dataset elsewhere.)
+Run it --- or apply its check inline --- wherever `ard`/`ardi` reviews a diff that introduces or edits a worked example, alongside the other prose-review rules in this file.
+Fixing isn't mechanical substitution: a real dataset's effect size is often much less dramatic than an invented one, so weigh whether the real numbers still make the teaching point before publishing them.
 
 ## Fact-check code logic and math in review
 
@@ -1757,10 +1713,6 @@ Open the PR.
   the specific repo's own docs for a repo-specific one.
 - **Don't:** leave a reusable learning in session-local auto-memory as a substitute for committing it.
 - **Don't:** offer to upstream it, or ask which repo --- decide and do it, surfacing the choice only when it is genuinely ambiguous or architecturally significant.
-
-(Corrected 2026-08-03: after an rpt workflow migration, two reusable learnings were saved to session-local auto-memory and then *offered* for upstreaming rather than committed.
-The directive was "always put memories in the repos where they belong;
-don't wait for confirmation.")
 
 ## PowerShell CLI Command Safety
 

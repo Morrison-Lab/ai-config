@@ -70,6 +70,39 @@
   that PR. There's no CLI shortcut for **Auto-merge when ready**; that one
   always needs a manual toggle. A true default would require a feature
   request via `/feedback`.
+- **No tool on the agent's side can toggle this itself.**
+  Checked the full available toolset (Bash, every loaded MCP tool, and
+  `update-config`, a skill rather than an MCP tool) for a client-side
+  settings lever and found none: the panel is client-UI-only state, not
+  something `update-config`'s `settings.json` surface reaches.
+  If the user reports the checkbox changed, that's their action, not
+  something to claim credit or responsibility for.
+- **What actually fires once "Auto-fix CI & address comments" is on:**
+  the harness starts pushing `<ci-monitor-event>` messages mid-turn
+  (arriving alongside the next tool result, same delivery mechanism as a
+  background task notification) whenever the PR gets new activity ---
+  a formal review (via the reviews API) or a plain issue/PR comment,
+  observed firing on both.
+  Each event quotes the comment(s) verbatim and appends a **fixed
+  instruction template**: "address the feedback and push a fix... post
+  a one-line reply on the thread... end with
+  `_🤖 Addressed by Claude Code_`... resolve the thread... skip replies
+  for comments you didn't act on."
+- **That template is boilerplate applied to every new comment, not
+  gated on whether the comment is a real finding.**
+  Observed firing on: a Copilot quota-refusal ("unable to review...
+  reached their quota limit"), a Copilot "wasn't able to review any
+  files" refusal, and a sticky PR-preview-deploy comment
+  (`rossjrw/pr-preview-action`) that just posts a preview URL and
+  updates in place on every push.
+  None of those carry an actionable finding.
+  Treat every `<ci-monitor-event>` as a prompt to go verify the PR's
+  actual state via the API (`gh api .../issues/.../comments`,
+  `gh pr checks`) rather than complying with "push a fix" reflexively:
+  the template's own trailing clause ("skip replies for comments you
+  didn't act on") is the license to do nothing when there's nothing to
+  do, and it's worth reading, not just the imperative sentence before
+  it.
 
 ## AskUserQuestion (Claude Code harness tool)
 - Each entry in `questions[]` **requires a `question` field** (the full question
@@ -333,11 +366,18 @@ string.
 **A `shared/` fragment marked `<!-- Shared with the lab manual -->` in
 `CLAUDE.md` is transcluded WHOLE by the UCD-SERG lab manual, so restructuring
 one silently damages the manual.**
-Twenty-two `@shared/...` fragments carry that comment on 2026-08-05
-(`grep -c 'Shared with the lab manual' CLAUDE.md`), including the three heaviest
-closure fragments `shared/workflow/fully-clean.md`, `ardi.md`, and
-`address-every-comment.md`, and the two `shared/vendored/**` copies are the same
-kind of shared-source file.
+Six `@shared/...` fragments carry that comment as of 2026-08-08
+(`grep -c 'Shared with the lab manual' CLAUDE.md`): `shared/coding/avoid-nesting.md`,
+`prefer-packaged-functions.md`, `per-operation-grouping.md`,
+`avoid-hardcoding-external-data.md`, `shared/writing/plain-prose.md`, and
+`ai-tells.md` --- all small (17-209 lines), not the corpus's heaviest closure
+fragments. `shared/workflow/fully-clean.md`, `ardi.md`, and
+`address-every-comment.md` do NOT carry the marker, despite an earlier version
+of this entry claiming otherwise; they are large but ai-config-only, so
+restructuring them (e.g. ai-config#1236's `fully-clean.md` split) needs no
+manual coordination.
+The two `shared/vendored/**` copies are the same kind of shared-source file
+as the six marked fragments.
 The manual transcludes each one with
 `{{< include .ai-config/shared/<area>/<topic>.md >}}` through its `.ai-config`
 git submodule (README, "Shared content"), rendering the file as it stands.

@@ -64,13 +64,30 @@ All of these must hold, and each is mutation-tested separately in
   C7  a newline directly after `&&`, `||`, or `|` is not a separator, because
       bash continues the list onto the next line there
   C8  a switch used as a conditional TEST (`if git checkout ...; then`) is
-      already checked before anything depends on it, so it opens no hazard
+      already checked before anything depends on it, so it opens no hazard for
+      a mutation INSIDE the block it governs
+  C8b that exemption stops at the closing `fi`/`done`. For a mutation OUTSIDE
+      the block, the same conditional switch is an ordinary unchained switch
   C9  only the NEAREST preceding switch is weighed, since a later switch
       supersedes an earlier one
 
 C4 is stated over separators rather than over line numbers on purpose. A
 newline is one such separator, which is the incident; `;` is another, and
 `git checkout foo; git merge main` is the identical hazard written on one line.
+
+C8b exists because the first version of C8 did not have it, and the gap was
+found in review. C8 removed a guarded switch from consideration entirely, so
+this went silent:
+
+    if git checkout main 2>/dev/null; then git pull; fi
+    git merge --no-ff feature-branch
+
+The exemption is right inside the block and wrong after it. Note the sharp
+edge, which is why the false negative mattered more than its rarity suggests:
+wrapping a checkout in `if` is a MORE likely pattern after an incident like
+this one, so the un-scoped C8 silenced the hook precisely where someone was
+being careful.
+
 
 Fails OPEN on any parse trouble. A guard that breaks every Bash call when its
 input is malformed costs more than the omission it reports.
@@ -92,8 +109,10 @@ GLOBAL_OPTS_WITH_ARG = {
 }
 
 # Words that can precede a real command without changing which command it is.
+# `!` is here rather than below on purpose: it inverts an exit status without
+# making the command conditional, so `! git checkout foo` still switches.
 LEAD_WORDS = {
-    "then", "do", "else",
+    "then", "do", "else", "!",
     "time", "sudo", "command", "exec", "nohup", "env",
 }
 
@@ -101,7 +120,18 @@ LEAD_WORDS = {
 # `if git checkout foo; then git merge ...; fi` is genuinely guarded, so the
 # switch there does not open the hazard -- warning on it would be the misfire
 # README calls worse than a missing hook.
-CONDITION_WORDS = {"if", "elif", "while", "until", "!"}
+CONDITION_WORDS = {"if", "elif", "while", "until"}
+
+# Compound-command boundaries. The guard a conditional switch provides reaches
+# exactly as far as the block it governs, so the block has to be tracked; see
+# C8b in the module docstring for what goes wrong without it.
+OPENERS = {"if", "while", "until", "for"}
+CLOSERS = {"fi", "done"}
+
+# Returned in place of an index when the nearest switch is a conditional test
+# whose block ENCLOSES the mutation: the mutation runs only if that switch
+# succeeded, so there is nothing to warn about.
+PROTECTED = object()
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
@@ -259,39 +289,71 @@ def _subcommand(text):
 
 
 def _classify(text):
-    """"switch", "mutate", or None."""
+    """("switch" | "mutate" | None, whether it sits in a conditional test)."""
     subcommand, args, guarded = _subcommand(text)
     if subcommand is None:
-        return None
-    # C8: a switch inside a conditional test is checked before anything depends
-    # on it, so it does not open the hazard. A MUTATION inside a test still
-    # mutates, so this exempts only the switching subcommands.
-    if guarded and subcommand in ("switch", "checkout"):
-        return None
+        return None, guarded
     if subcommand == "switch":
-        return "switch"
+        return "switch", guarded
     if subcommand == "checkout":
         # C2a: `git checkout -- <path>` (or `git checkout <ref> -- <path>`)
         # restores files and never moves HEAD.
         if "--" in args:
-            return None
-        return "switch"
+            return None, guarded
+        return "switch", guarded
     if subcommand in MUTATING:
-        return "mutate"
-    return None
+        # A MUTATION inside a test still mutates, so `guarded` never exempts one.
+        return "mutate", guarded
+    return None, guarded
 
 
-def _separators_between(kinds, i, j):
+def _records(segments):
+    """Annotate each segment with the conditional blocks enclosing it.
+
+    Returns (kind, separators_before, guard_block, scope, text) per segment.
+    `scope` is the tuple of block ids enclosing that segment; `guard_block` is
+    the block a conditional switch GOVERNS, and is None for every other segment.
+    """
+    out = []
+    stack = []
+    blocks = 0
+    for text, seps in segments:
+        tokens = text.split()
+        first = tokens[0] if tokens else ""
+
+        if first in CLOSERS and stack:
+            stack.pop()
+        scope = tuple(stack)
+
+        opened = None
+        if first in OPENERS:
+            blocks += 1
+            opened = blocks
+            stack.append(opened)
+
+        kind, guarded = _classify(text)
+        guard_block = None
+        if guarded and kind == "switch":
+            # `if`/`while`/`until` govern the block they open; `elif` continues
+            # the block already open around it.
+            guard_block = opened if opened is not None else (
+                scope[-1] if scope else None)
+
+        out.append((kind, seps, guard_block, scope, text))
+    return out
+
+
+def _separators_between(records, i, j):
     """Every separator crossed going from segment i to segment j."""
     low, high = (i, j) if i < j else (j, i)
     crossed = []
     for k in range(low + 1, high + 1):
-        crossed.extend(kinds[k][1])
+        crossed.extend(records[k][1])
     return crossed
 
 
-def _nearest_switch(kinds, j):
-    """Index of the switch that decides which branch segment j runs on.
+def _nearest_switch(records, j):
+    """The switch that decides which branch segment j runs on.
 
     C3: only a switch BEFORE the mutation can decide its branch.
     C9: only the NEAREST one. A later switch supersedes an earlier one, so in
@@ -299,10 +361,21 @@ def _nearest_switch(kinds, j):
         second merge's branch is set by the second checkout, which is chained
         to it -- warning there on the strength of the FIRST checkout would
         misfire on an ordinary cascade.
+    C8: a conditional switch whose block ENCLOSES j protects it -- the mutation
+        runs only if that switch succeeded. Returns PROTECTED.
+    C8b: the same conditional switch is an ORDINARY unchained switch for a
+        mutation OUTSIDE its block. Once `fi` closes, whether the switch
+        happened is exactly the open question, so an unconditional mutation
+        after it is the original incident wearing a defensive wrapper.
     """
+    scope_j = records[j][3]
     for i in range(j - 1, -1, -1):
-        if kinds[i][0] == "switch":
-            return i
+        if records[i][0] != "switch":
+            continue
+        guard_block = records[i][2]
+        if guard_block is not None and guard_block in scope_j:
+            return PROTECTED
+        return i
     return None
 
 
@@ -320,19 +393,18 @@ def unchained(payload):
     if not isinstance(command, str) or not command.strip():
         return None
 
-    segments = _segments(_strip_heredocs(command))
-    kinds = [(_classify(text), seps) for text, seps in segments]
+    records = _records(_segments(_strip_heredocs(command)))
 
-    for j, (kind_j, _) in enumerate(kinds):
-        if kind_j != "mutate":
+    for j, record in enumerate(records):
+        if record[0] != "mutate":
             continue
-        # C2 (with C2a and C8 inside _classify), C3, C9
-        i = _nearest_switch(kinds, j)
-        if i is None:
+        # C2 (with C2a inside _classify), C3, C9, C8, C8b
+        i = _nearest_switch(records, j)
+        if i is None or i is PROTECTED:
             continue
         # C4
-        if any(sep != "&&" for sep in _separators_between(kinds, i, j)):
-            return segments[i][0], segments[j][0]
+        if any(sep != "&&" for sep in _separators_between(records, i, j)):
+            return records[i][4], records[j][4]
     return None
 
 

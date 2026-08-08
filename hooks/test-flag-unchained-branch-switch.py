@@ -58,6 +58,22 @@ SHOULD_WARN = [
      "`git switch` is a branch switch as much as `git checkout`"),
     ("W4", bash("git checkout -b feat/x\ngit push -u origin HEAD"),
      "`-b` creates AND switches; the push is still unchained"),
+    # Round-1 review finding, reproduced verbatim before it was fixed. The
+    # first version of C8 dropped a guarded switch from consideration entirely,
+    # so the merge AFTER `fi` -- which runs unconditionally -- went unseen.
+    ("W5", bash("if git checkout main 2>/dev/null; then git pull; fi\n"
+                "git merge --no-ff feature-branch"),
+     "guarded switch, mutation AFTER `fi`: the incident in a defensive wrapper"),
+    ("W6", bash("while git checkout main; do git pull; done\n"
+                "git commit -m 'wip'"),
+     "a `while` block closes at `done`; the commit after it is unguarded"),
+    ("W7", bash("if git checkout main; then\n"
+                "  if git status --short; then git pull; fi\n"
+                "fi\n"
+                "git merge --no-ff feature-branch"),
+     "nested blocks: the mutation is outside BOTH, so the outer guard is spent"),
+    ("W8", bash("! git checkout main\ngit merge x"),
+     "`!` inverts an exit status without making the switch conditional"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -99,6 +115,22 @@ SHOULD_STAY_SILENT = [
     ("S16", bash("git checkout branch-a && git merge --no-edit origin/main\n"
                  "git checkout branch-b && git merge --no-edit branch-a"),
      "a cascade: each merge is chained to the switch that decides ITS branch"),
+    ("S17", bash("if git checkout a; then\n"
+                 "  git merge x\n"
+                 "elif git checkout b; then\n"
+                 "  git merge y\n"
+                 "else\n"
+                 "  git merge z\n"
+                 "fi"),
+     "`elif` continues the block it sits in; `else` runs only when both failed"),
+    ("S18", bash("if git checkout main; then\n"
+                 "  if [ -f x ]; then git merge origin/main; fi\n"
+                 "fi"),
+     "a mutation NESTED deeper still sits inside the guarded block"),
+    ("S19", bash("while git checkout main; do\n  git merge origin/main\ndone"),
+     "a `while` guard reaches its whole `do`/`done` body"),
+    ("S20", bash("for b in a b; do git checkout $b && git merge origin/main; done"),
+     "`for` opens a block too, so its `done` cannot underflow the stack"),
 ]
 
 if not os.path.isfile(HOOK):
@@ -171,29 +203,24 @@ MUTATIONS = {
     ),
     "C2": (
         "only a SWITCHING subcommand opens the hazard",
-        [('    if subcommand in MUTATING:\n        return "mutate"\n    return None',
-          '    if subcommand in MUTATING:\n        return "mutate"\n    return "switch"')],
+        [('        return "mutate", guarded\n    return None, guarded',
+          '        return "mutate", guarded\n    return "switch", guarded')],
         {"S11"},
     ),
     "C2a": (
         "`git checkout -- <path>` is a file restore, not a switch",
-        [('        if "--" in args:\n            return None',
-          '        if False:\n            return None')],
+        [('        if "--" in args:\n            return None, guarded',
+          '        if False:\n            return None, guarded')],
         {"S3"},
     ),
     "C3": (
         "only a switch BEFORE the mutation decides its branch",
         # The forward fallback fires only when no PRECEDING switch exists, so
         # this isolates C3 from C9's cascade case.
-        [('    for i in range(j - 1, -1, -1):\n'
-          '        if kinds[i][0] == "switch":\n'
-          "            return i\n"
-          "    return None",
-          '    for i in range(j - 1, -1, -1):\n'
-          '        if kinds[i][0] == "switch":\n'
-          "            return i\n"
-          "    for i in range(j + 1, len(kinds)):\n"
-          '        if kinds[i][0] == "switch":\n'
+        [("        return i\n    return None",
+          "        return i\n"
+          "    for i in range(j + 1, len(records)):\n"
+          '        if records[i][0] == "switch":\n'
           "            return i\n"
           "    return None")],
         {"S9"},
@@ -205,12 +232,12 @@ MUTATIONS = {
     ),
     "C4": (
         "the separators between them are not all `&&`",
-        [('        if any(sep != "&&" for sep in _separators_between(kinds, i, j)):',
+        [('        if any(sep != "&&" for sep in _separators_between(records, i, j)):',
           "        if True:")],
         # C7's and C9's cases are included by construction: with C4 gone, no
         # separator matters, so every case that is silent BECAUSE its commands
         # are chained flips. See the module docstring.
-        {"S1", "S2", "S13", "S16"},
+        {"S1", "S2", "S13", "S16", "S20"},
     ),
     "C5": (
         "heredoc bodies are stripped",
@@ -231,10 +258,16 @@ MUTATIONS = {
         {"S5"},
     ),
     "C8": (
-        "a switch inside a conditional TEST does not open the hazard",
-        [('    if guarded and subcommand in ("switch", "checkout"):\n        return None',
-          "    if False:\n        return None")],
-        {"S15"},
+        "a conditional switch protects mutations INSIDE the block it governs",
+        [("        if guard_block is not None and guard_block in scope_j:",
+          "        if False:")],
+        {"S15", "S17", "S18", "S19"},
+    ),
+    "C8b": (
+        "that protection STOPS at the closing `fi`/`done`",
+        [("        if guard_block is not None and guard_block in scope_j:",
+          "        if guard_block is not None:")],
+        {"W5", "W6", "W7"},
     ),
     "C7": (
         "a newline after `&&`/`||`/`|` separates nothing",

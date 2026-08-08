@@ -6,7 +6,6 @@ can invoke it directly with sys.argv[1].
 """
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -195,34 +194,10 @@ session_b = f"session:mwc-b/{os.getpid()}"
 session_c = f"mwc-c-{os.getpid()}"
 
 
-def find_bash():
-    """A bash that can actually run this script in this repo, or None.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
+from findbash import find_bash  # noqa: E402
 
-    Probed rather than named. On Windows the first `bash` on PATH is often the
-    WSL launcher, which sees the checkout as `/mnt/c/...` and reports "not
-    inside a git repository" -- so `shutil.which("bash")` finding *a* bash
-    proves nothing. The probe IS the requirement: run the script's own
-    read-only `list` and keep the first shell that exits 0.
-    """
-    seen = []
-    for cand in (os.environ.get("AI_SESSION_BASH"),
-                 shutil.which("bash"),
-                 r"C:\Program Files\Git\bin\bash.exe",
-                 "/bin/bash"):
-        if not cand or cand in seen:
-            continue
-        seen.append(cand)
-        try:
-            probe = subprocess.run([cand, str(script_path), "list"],
-                                   capture_output=True, timeout=60)
-        except (OSError, subprocess.SubprocessError):
-            continue
-        if probe.returncode == 0:
-            return cand
-    return None
-
-
-BASH = find_bash()
+BASH = find_bash(script_path)
 if BASH is None:
     sys.exit("FATAL: no bash able to run ai-session.sh; set AI_SESSION_BASH. "
              "The MWC authorization cases cannot be verified without it.")

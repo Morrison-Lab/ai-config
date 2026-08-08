@@ -238,6 +238,39 @@ own.
 - **Don't:** generalize this into distrusting subagents; the rule picks which
   **half** of a report to re-derive, not whether to use one.
 
+**A hedge you attach for one audience is owed to the other, and writing it
+once is the tell.**
+The section above governs a claim arriving *from* a subagent.
+This governs one going *to* a subagent, at the same moment it goes to the
+user.
+A finding you have just measured is routinely stated twice in close
+succession: flatly in chat, and in a brief that says to verify it.
+
+That brief's hedge is correct, and it is
+[`challenge-the-assignment`](challenge-the-assignment.md)'s authoring-side rule
+working as written.
+What nothing currently reads it as is **your own doubt in writing**.
+The "premise you were handed" tell above keys on a hedge someone else wrote;
+this is the same signal with the authorship reversed, so it fires on nothing --
+and it is the easier of the two to see, since you typed it.
+
+The two audiences are not symmetric, which is why the hedge belongs to the one
+that does not get it.
+An agent told to verify can re-derive the claim and reports back when it fails.
+The user cannot re-derive it, is the one who acts on it, and hears nothing
+further unless you go back.
+So the qualified copy goes to the reader who needs it least, and the artifact
+ends up protected while the person does not.
+
+- **Do:** treat writing "verify this" into a brief as a trigger to qualify the
+  same claim wherever else you have just stated it.
+- **Do:** name the field or query a state claim rests on, so the reader can
+  fail it the way the agent would.
+- **Don't:** let a claim reach the user unqualified because the copy sent to an
+  agent carried the hedge.
+- **Don't:** read having delegated the check as having qualified the claim;
+  that is the dispatched-verification bullet above, one audience over.
+
 ## An action you recommend is a claim about state
 
 The four types above fire on an assertion, and the section above extends them

@@ -452,6 +452,125 @@ That fragment governs a **sound** command whose conclusion overreaches --- the
 null result is a real fact about the pattern, and only the step to "the corpus
 lacks this" is wrong.
 Here the command itself is unsound, so the result is not a fact about anything.
+
+**A third direction, and the one the remedy above passes: the pattern is right
+about the data and admits the stream's own metadata, because that metadata is
+written in the data's alphabet.**
+Both directions above are a pattern matching the wrong *things*.
+Here it matches the right things and one more, because the stream it reads is
+not pure data.
+A unified diff marks added content with `+` and names the file that content
+came from with `+++ b/<path>`, so a filter for added lines cannot separate the
+two by prefix:
+
+```bash
+git diff <base> <head> -- <path> | grep '^+' | sed 's/^+//'   # leaks the header
+```
+
+`sed` then strips one character rather than the whole marker, so the header
+does not leave --- it is *disguised*, arriving in the output as `++ b/<path>`.
+The deletion side does the same, leaving `-- a/<path>`.
+Neither `--no-prefix` nor `-U0` helps: the first shortens the header to
+`+++ <path>` and the second changes only the context, so both still open with
+the marker character.
+
+Note that this defeats the remedy this section prescribes.
+Testing the instrument against a known positive **passes**, since the pattern
+does match the content, correctly, and merely takes one line more.
+Anchoring to structure does not help either, because here the header *is* the
+structure.
+No prefix pattern separates them, which is worth stating plainly because the
+obvious repair looks like it does.
+`grep -v '^+++'` drops the header, and it also drops any added line whose own
+text starts with `++`, since git prepends its marker to produce `+++i;`.
+Anchoring the trailing space, `grep -v '^+++ '`, narrows that and does not
+close it: an added line reading `++ foo` arrives as `+++ foo` and matches too.
+Measured on git 2.50.1, against a commit adding `++i;`, `++ foo` and `plain`:
+
+| guard | survives |
+|---|---|
+| `grep -v '^+++'` | `plain` |
+| `grep -v '^+++ '` | `++i;`, `plain` |
+| positional | `++i;`, `++ foo`, `plain` |
+
+The exact separator is **position**, not shape.
+In a single-file diff the header is the first `+`-matching line and nothing
+else can be, so drop it by ordinal:
+
+```bash
+git diff <base> <head> -- <path> | grep '^+' | tail -n +2 | sed 's/^+//'
+```
+
+That is a general move rather than a trick for this case.
+When a delimiter cannot be told from its data by content, tell it by where it
+sits --- and if position is not fixed either, stop parsing the stream and ask
+the tool for the data directly (`git show <rev>:<path>`).
+
+**Mind the precondition, because it is easy to lose.**
+"First `+`-matching line" holds per **file**, so a multi-file diff carries one
+header per file and `tail -n +2` drops only the first.
+Scope the diff to one path, or loop over `git diff --name-only` and scan each
+file separately.
+This is not a hypothetical: the pass that wrote this entry ran the guard over
+its own three-file diff as a dogfooding check, and got three hits --- its own
+two undropped headers plus one --- which read at first like defects in the
+files rather than in the scan.
+Per-file scanning returned 0 for every file, as did grepping the files
+directly.
+
+**What the pattern feeds decides how much this costs.**
+A too-loose pattern in a **detector** surfaces as a phantom finding, which is
+the first direction above: somebody investigates it and finds nothing.
+The same looseness in an **extractor** turns the extra match into *content*,
+and nothing investigates content.
+So one flaw is self-reporting in the first role and silent in the second.
+
+**The tighter guard over-corrects, and what it loses is invisible to the check
+that would look for it.**
+`grep '^+[^+]'` drops the header in a single pass, and
+[`memories/git.md`](../../memories/git.md)'s stash-supersession bullet uses it
+correctly --- there each added line is grepped for in `main`, so a blank line is
+noise.
+Reuse it on prose and it silently drops every added **blank** line, collapsing
+paragraph boundaries.
+Measured on git 2.50.1 against a two-paragraph addition: `^+[^+]` returned the
+two lines of text and not the blank between them, while the positional form
+returned all three.
+
+Carry that pair together, because a whitespace-normalizing word-level
+comparison --- the content-preservation check
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) prescribes for
+exactly this kind of move --- cannot see either failure.
+The leaked header is an **addition**, and a check phrased as "did anything go
+missing" is one-sided.
+The dropped blank line contributes no words, and the check normalizes
+whitespace away before comparing.
+So the two candidate guards fail in precisely the two directions that check is
+blind in.
+
+- **Do:** separate a prefix-compatible delimiter by **position**
+  (`grep '^+' | tail -n +2`) rather than by a longer prefix, since a longer
+  prefix is still a prefix and still collides.
+- **Don't:** read a narrowed pattern as a fixed one --- `^+++ ` collides with
+  an added `++ foo` exactly as `^+++` collides with an added `++i;`.
+- **Do:** ask what a pattern *feeds* --- a detector's extra match gets
+  investigated, an extractor's becomes content.
+- **Do:** compare a moved block in both directions, so an added line is as
+  visible as a dropped one.
+- **Don't:** read a passing known-positive test as clearing this; the pattern
+  matches the content correctly and takes one line more.
+- **Don't:** reuse `^+[^+]` on prose --- it eats added blank lines, and the
+  whitespace-normalized check will not report that either.
+
+The class is wider than diffs.
+Any delimiter carried **in band**, in the data's own alphabet, has this
+property: a fence marker inside fenced content, a heredoc terminator the
+heredoc's own text can contain, a comment character that also opens a
+directive.
+[`batch-merge-and-resolve`](../workflow/batch-merge-and-resolve.md) records the
+mirror failure, where `grep -c '^<<<<<<<'` returns 0 on a real conflict because
+`merge-tree` indents every line by the diff's own leading character.
+There the collision hides a true positive; here it manufactures a false one.
 Read that one before concluding a concept is absent; read this one before
 trusting any grep as an instrument.
 

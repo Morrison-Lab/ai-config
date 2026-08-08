@@ -114,8 +114,13 @@ def strip_cited_finding_vocab(text: str) -> str:
 
 
 VERDICT_NOT_CLEAN_PATTERNS = [
-    r"\bNeeds\s+more\s+work\b",
-    r"\bNeeds\s+work\b",
+    # Intervening words allowed, because the adjacent forms are not the only
+    # ones a reviewer writes. Found by running this classifier over the real
+    # verdict bodies on ai-config#1293, whose three "Needs MINOR work" rounds
+    # each classified as no verdict at all -- so a genuine not-clean verdict
+    # neither blocked nor superseded anything. Missing a not-clean signal is
+    # the dangerous direction here, the mirror of an over-broad clean one.
+    r"\bNeeds\s+(?:\w+\s+){0,3}work\b",
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?)",
     r"changes\s+requested\b",
 ]
@@ -171,15 +176,30 @@ CLEAN_NEGATION_PREFIX = re.compile(
     r"|nowhere\s+near|close\s+to)\s+(?:\w+\s+){0,2}$",
     re.IGNORECASE,
 )
-# Leading punctuation is part of it: "Ready for merge, but not ..." and
-# "Ready for merge -- however, ..." separate the qualifier with a comma or a
-# dash rather than a space, so a `\s*`-only anchor misses both.
-CLEAN_CONDITIONAL_SUFFIX = re.compile(
-    r"^[ \t]*[,;:.\-]*[ \t]*(?:once|after|when|if|unless|pending|provided|assuming"
+# Searched within the rest of the SENTENCE rather than anchored at the match's
+# end, because where a match ends is an artifact of which pattern matched. Two
+# patterns can match the same text at the same position with different lengths
+# --- `Verdict: Ready for merge once ...` matches both `Ready for merge` and the
+# shorter `Verdict: Ready` --- and an anchored check on the shorter one lands on
+# ` for merge once ...`, sees no qualifier at position zero, and passes.
+#
+# So the guard stopped depending on match length. Sentence scope is what keeps
+# that from over-reaching: a qualifier in the NEXT sentence ("Ready for merge.
+# The tests pass, but coverage is unchanged.") is a separate statement and does
+# not retract the verdict.
+CLEAN_QUALIFIER = re.compile(
+    r"\b(?:once|after|when|if|unless|pending|provided|assuming"
     r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
     r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
     re.IGNORECASE,
 )
+SENTENCE_END = re.compile(r"[.!?\n]")
+
+
+def _sentence_remainder(text: str, start: int) -> str:
+    """The rest of the sentence after `start`, for a trailing-qualifier scan."""
+    end = SENTENCE_END.search(text, start)
+    return text[start:end.start() if end else len(text)]
 
 
 def classify_verdict(body: str, state: str = "") -> str:
@@ -230,7 +250,7 @@ def classify_verdict(body: str, state: str = "") -> str:
             # clean pattern. It was scoped to the bare ones on the reasoning
             # that adjacency after the label "already binds it" -- which is true
             # of what precedes the phrase and says nothing about what follows.
-            if CLEAN_CONDITIONAL_SUFFIX.match(scan[match.end():match.end() + 40]):
+            if CLEAN_QUALIFIER.search(_sentence_remainder(scan, match.end())):
                 continue
             return "clean"
 

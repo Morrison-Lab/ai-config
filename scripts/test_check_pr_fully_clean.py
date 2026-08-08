@@ -411,6 +411,41 @@ def main() -> int:
         "classify_verdict: a bare 'Verdict: Ready' IS still clean",
         checker.classify_verdict("Verdict: Ready") == "clean",
     )
+    # Where a match ENDS is an artifact of which pattern matched: two patterns
+    # hit the same text at the same position with different lengths, so an
+    # anchored suffix check on the shorter one lands past the qualifier and
+    # sees nothing. Scanning the rest of the sentence does not depend on the
+    # match length.
+    check(
+        "classify_verdict: 'Verdict: Ready for merge once ...' is NOT clean",
+        checker.classify_verdict(
+            "Verdict: Ready for merge once the following items are addressed: item A."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: Approved for merge, but ...' is NOT clean",
+        checker.classify_verdict("Verdict: Approved for merge, but two items remain.") == "",
+    )
+    # ...and sentence scope is what stops that from over-reaching: a qualifier
+    # in the NEXT sentence is a separate statement, not a retraction.
+    check(
+        "classify_verdict: a qualifier in the NEXT sentence does not retract",
+        checker.classify_verdict(
+            "Ready for merge. The tests pass, but coverage is unchanged."
+        ) == "clean",
+    )
+    # The not-clean side had the mirror gap, found by running this classifier
+    # over real verdict bodies rather than over invented ones: three rounds of
+    # "Needs MINOR work" on ai-config#1293 each classified as NO verdict, so a
+    # genuine not-clean verdict neither blocked nor superseded anything.
+    check(
+        "classify_verdict: 'Needs minor work' is not-clean",
+        checker.classify_verdict("Needs minor work") == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Needs a little more work' is not-clean",
+        checker.classify_verdict("Needs a little more work") == "not-clean",
+    )
 
     # POSITIVE CONTROL -- the exact #1267 shape that bypassed the gate.
     # An explicit "Needs more work" at an EARLIER commit (so it never enters

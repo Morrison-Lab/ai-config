@@ -296,8 +296,8 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    "A conflict your sweep found is not a conflict your merge caused".
 3. **Check claim status.**
    Read the most recent comment.
-   If it says "Working on this — paws off" (or equivalent),
-   skip it — another session owns it.
+   If it says "Working on this --- paws off" (or equivalent),
+   skip it --- another session owns it.
 4. **Claim it.**
    ```bash
    gh pr comment <N> --body "Working on this — paws off until I'm done."   # COMMENT_PR

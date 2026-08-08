@@ -26,6 +26,19 @@ from pathlib import Path
 # defect 2). shared/principles/fail-fast.md states the bar this restores:
 # "test that mentions, greps, and quotes of the gated command pass".
 CMD_POS = r"""(?:^|[;&`(\n]|\$\()\s*"""
+# Keywords and wrappers whose OPERAND is itself a command word, so the word
+# after one is still at a command position. Dropping bare whitespace from
+# CMD_POS also dropped every one of these, because each is separated from its
+# operand by a space rather than by punctuation: `! gh pr merge`, `time gh pr
+# merge`, `nohup gh pr merge`, `{ gh pr merge; }` and `if true; then gh pr
+# merge; fi` are all executable bash that ran the merge while the guard
+# returned allow (ai-config#1287 review, reproduced end to end).
+#
+# This does NOT re-admit bare whitespace, because a keyword only counts when a
+# CMD_POS precedes it: prose like `you can gh pr merge later` still has no
+# command position before `gh` and stays allowed. Bounded for the same reason
+# VAR_PREFIX is -- see its note below.
+KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until)\s+){0,4}"""
 # Expansions that may expand to nothing and so leave the NEXT word as the
 # command: `$FOO gh pr merge` runs the merge when $FOO is empty. Matched only
 # after a command position, so a mid-command `echo $FOO gh pr merge` does not.
@@ -38,7 +51,7 @@ CMD_POS = r"""(?:^|[;&`(\n]|\$\()\s*"""
 # anything a real command does, and capping makes the work per position
 # constant.
 VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*){0,4}"""
-LEAD = CMD_POS + VAR_PREFIX
+LEAD = CMD_POS + KEYWORD_PREFIX + VAR_PREFIX
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""

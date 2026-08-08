@@ -105,9 +105,32 @@ BLOCK = [
      "a grep pattern containing << does not mask what follows"),
     ("grep foo <<<PAYLOAD\ngh pr merge 411",
      "a bare-word <<< herestring is not a heredoc introducer"),
+    # A shell keyword's operand is still a command word. Narrowing CMD_POS to
+    # punctuation-only dropped these, which fail OPEN: each is executable bash
+    # that runs the merge (ai-config#1287 review).
+    ("! gh pr merge 411", "`!` only inverts the exit status; the merge still runs"),
+    ("time gh pr merge 411", "`time` wraps and runs its operand"),
+    ("nohup gh pr merge 411", "`nohup` wraps and runs its operand"),
+    ("sudo gh pr merge 411", "`sudo` wraps and runs its operand"),
+    ("{ gh pr merge 411; }", "a brace group's body is at a command position"),
+    ("if true; then gh pr merge 411; fi", "a `then` branch body is at a command position"),
+    ("while true; do gh pr merge 411; done", "a `do` body is at a command position"),
+    ("if gh pr merge 411; then echo ok; fi", "an `if` CONDITION runs too"),
+    ("if false; then echo no; else gh pr merge 411; fi", "an `else` branch body"),
+    ("if false; then echo no; elif gh pr merge 411; then echo ok; fi", "an `elif` condition"),
+    ("while gh pr merge 411; do echo ok; done", "a `while` condition"),
+    ("until gh pr merge 411; do echo ok; done", "an `until` condition"),
+    ("! time gh pr merge 411", "stacked keywords"),
+    ("time ${EMPTY} gh pr merge 411", "a keyword followed by an empty expansion"),
 ]
 
 ALLOW = [
+    # The keyword prefix above must not become bare whitespace by another name:
+    # a keyword only counts at a command position, so a keyword-shaped word
+    # sitting mid-sentence or mid-command still leaves the mention allowed.
+    ('echo "you can time gh pr merge later"', "a keyword inside quoted prose is not a command position"),
+    ('grep -rn "then gh pr merge" docs/', "a keyword inside a grep pattern is not a command position"),
+    ("gh issue comment 1 --body 'run time gh pr merge to time it'", "a keyword inside a comment body"),
     ("gh pr view 411", "read-only gh pr view"),
     ("gh api /repos/owner/repo/pulls/123/merge", "read-only REST GET PR merge status check"),
     ("gh pr checkout merge", "checking out branch named merge"),

@@ -143,6 +143,19 @@ BLOCK = [
     # pass is kept alongside the permissive one rather than replaced by it.
     ("trap 'gh pr merge 411' EXIT", "a trap handler runs its single-quoted operand"),
     ("watch 'gh pr merge 411'", "watch runs its quoted operand"),
+    # A heredoc body is inert only where its CONSUMER treats it as data. Fed to
+    # a shell it is a script, and masking it hid the merge from both passes.
+    # The quoted-delimiter form is no exception: `<<'EOF'` suppresses expansion,
+    # and bash still runs what it reads.
+    ("bash <<EOF\ngh pr merge 411\nEOF", "a heredoc fed to bash is a script"),
+    ("sh <<EOF\ngh pr merge 411\nEOF", "a heredoc fed to sh"),
+    ("bash -s <<EOF\ngh pr merge 411\nEOF", "bash -s reads the body as a script"),
+    ("ssh myhost <<EOF\ngh pr merge 411\nEOF", "ssh sends the body to a remote shell"),
+    ("ssh -T user@host <<EOF\ngh pr merge 411\nEOF", "ssh with a flag and a host"),
+    ("bash <<'EOF'\ngh pr merge 411\nEOF", "a QUOTED delimiter still executes under bash"),
+    ("cd /r && bash <<EOF\ngh pr merge 411\nEOF", "the executor in a later segment"),
+    ("/usr/bin/bash <<EOF\ngh pr merge 411\nEOF", "an absolute-path executor"),
+    ("ssh host 'gh pr merge 411'", "a positional hostname between executor and operand"),
 ]
 
 ALLOW = [

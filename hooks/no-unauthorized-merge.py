@@ -53,11 +53,36 @@ KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until
 VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*){0,4}"""
 LEAD = CMD_POS + KEYWORD_PREFIX + VAR_PREFIX
 ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
-# Programs that take a command as a QUOTED operand and run it later. Quoting is
-# what makes these different from the KEYWORD_PREFIX family: pass 2 blanks a
-# quoted span as inert, which is right for prose and wrong here, so these must
-# be recognised on the raw text in pass 1.
-EXEC_WRAP = r"""(?:[/\w.-]+/)?(?:env|exec|command|bash|sh|zsh|eval|trap|watch|su)(?:\s+-[a-zA-Z0-9]+)*(?:\s+["'])?\s*"""
+# Programs that RUN text handed to them, rather than consuming it as data.
+#
+# One list, three consumers, because getting it wrong in any of them fails open
+# in the same way and each door was found separately: a quoted operand
+# (`bash -c "<merge>"`), pass 2's quote masking, and a heredoc body fed to a
+# shell (`bash <<EOF`). Three rounds of review found one door each. Keeping the
+# membership in one place is what makes the residual a single reviewable list
+# rather than three lists that drift.
+EXEC_PROGS = r"env|exec|command|bash|sh|zsh|ksh|dash|eval|trap|watch|su|ssh"
+
+# Quoting is what makes these different from the KEYWORD_PREFIX family: pass 2
+# blanks a quoted span as inert, which is right for prose and wrong here, so
+# these must be recognised on the raw text in pass 1.
+# The optional non-flag word is `ssh`'s hostname: `ssh host '<merge>'` puts a
+# positional between the executor and its operand, which a flags-only wrapper
+# never reached. This was round 2's stated residual, closed rather than left.
+EXEC_WRAP = (
+    r"""(?:[/\w.-]+/)?(?:""" + EXEC_PROGS + r""")"""
+    r"""(?:\s+-[a-zA-Z0-9]+)*(?:\s+[A-Za-z0-9_.@-]+)?(?:\s+-[a-zA-Z0-9]+)*"""
+    r"""(?:\s+["'])?\s*"""
+)
+
+# A heredoc whose consumer is one of the above is a SCRIPT, not data: `bash
+# <<EOF` and `ssh host <<EOF` execute the body line by line. The quoted-delimiter
+# form is not an exception -- `<<'EOF'` only suppresses expansion, and bash still
+# runs what it reads.
+HEREDOC_EXECUTOR = re.compile(
+    r"(?:^|[;&|`(\n]|\$\()\s*(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b[^\n]*?<<",
+)
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
 HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
@@ -311,6 +336,12 @@ def mask_heredocs(text: str) -> str:
     Without this a heredoc carrying prose ABOUT a merge command was matched as
     one -- which is how filing ai-config#1279 was itself blocked, by the guard
     matching its own refusal text quoted inside a `gh issue create` heredoc.
+
+    But "inert text" is a claim about the CONSUMER, not about the heredoc. A
+    body fed to a shell (`bash <<EOF`, `ssh host <<EOF`) is a script, and
+    masking it hid a real merge from both later passes -- the quoted-delimiter
+    form included, since `<<'EOF'` suppresses expansion and bash still runs
+    what it reads. Those are left untouched; see HEREDOC_EXECUTOR.
     """
     lines = text.split("\n")
     out = list(lines)
@@ -322,9 +353,11 @@ def mask_heredocs(text: str) -> str:
             continue
         quoted = bool(m.group(2))
         delim = m.group(2) or m.group(3)
+        executes = bool(HEREDOC_EXECUTOR.search(lines[i]))
         j = i + 1
         while j < len(lines) and lines[j].strip() != delim:
-            out[j] = " " * len(lines[j]) if quoted else mask_subexpressions(lines[j])
+            if not executes:
+                out[j] = " " * len(lines[j]) if quoted else mask_subexpressions(lines[j])
             j += 1
         i = j + 1
     return "\n".join(out)

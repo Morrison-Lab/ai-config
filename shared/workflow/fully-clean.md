@@ -485,6 +485,67 @@ than the script's raw pattern match.
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
 
+**A verdict comment quotes verdict phrases, so a phrase search identifies
+nothing --- and it misreads in both directions at once.**
+Every case above concerns *reading* a verdict correctly.
+This one is about the instrument a multi-PR status sweep reaches for, where the
+tempting shortcut is a one-line `jq` `capture` of the first verdict phrase
+appearing anywhere in the body.
+
+The premise under that shortcut is that a verdict comment states verdict
+vocabulary only when stating its own verdict.
+It does the opposite.
+Quoting is part of the genre: a comment cites the previous round's verdict to
+say what it is confirming, pastes a repro block showing what a classifier
+returned, and discusses what a phrase *should* classify as --- all before
+reaching its own `### Verdict` section.
+So the first match is usually somebody else's verdict.
+
+The bidirectionality is what makes this worth its own entry rather than a note
+on the section above.
+That one is fail-closed by construction, which is why it is called the safe
+direction.
+A first-match phrase search has no direction at all, so it cannot be corrected
+by an offset or by assuming the reviewer errs one way.
+Measured on one sweep, 2026-08-08, taking the latest verdict-bearing comment on
+each PR:
+
+| PR | first phrase match | real verdict, at the last `### Verdict` | direction |
+|---|---|---|---|
+| [#1278](https://github.com/Morrison-Lab/ai-config/pull/1278) | `Ready for merge`, inside a fenced block quoting a classifier call | **Needs more work** | false-clean |
+| [#1257](https://github.com/Morrison-Lab/ai-config/pull/1257) | `Needs more work`, inside a parenthetical citing the prior round | **Ready for merge** | false-blocked |
+
+The false-clean direction is the expensive one: it produced a **merge
+recommendation** on a PR whose verdict was blocking.
+
+So call the instrument.
+`scripts/check-pr-fully-clean.py` is this corpus's verdict authority, and
+[`ardi`](ardi.md) already requires it for the single-PR loop --- the gap is that
+nothing said so for a **sweep**, which is where the hand-rolled parser goes in.
+That is [`deterministic-tools`](../principles/deterministic-tools.md)'s
+constraint violated in the presence of the instrument, which is the shape worth
+recognizing: the tool existed, was documented, and was mandated one workflow
+over.
+
+Where a body genuinely must be parsed by hand, anchor on the **last**
+`### Verdict` heading and take the first non-empty line after it, which returns
+the right answer on both rows above.
+Two hazards survive even then, and both were observed on #1278.
+A `### Verdict:` heading can itself appear quoted inside prose, so the *last*
+heading rather than the first is load-bearing.
+And a **human** comment can carry a backticked `### Verdict` while stating no
+verdict at all, so select candidates on the `**Claude finished` body marker
+above rather than on the presence of a heading.
+
+- **Do:** call `check-pr-fully-clean.py` for a sweep's verdict column, exactly
+  as [`ardi`](ardi.md) requires for one PR.
+- **Do:** anchor on the last `### Verdict` heading when parsing by hand, after
+  selecting candidates on the `**Claude finished` marker.
+- **Don't:** take the first verdict phrase in a body as that body's verdict ---
+  quoting other verdicts is part of what a review comment does.
+- **Don't:** assume such a misread has a safe direction; one sweep produced a
+  false-clean and a false-blocked.
+
 **A review comment's header SHA can be stale, so take the reviewed commit from
 the run's own `head_sha`.**
 Criterion 2 requires the verdict to sit at the current head, and the obvious

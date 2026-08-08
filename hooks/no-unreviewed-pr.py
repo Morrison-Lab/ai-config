@@ -29,9 +29,11 @@ re-arms, and the PR carries a review of a commit that is no longer its head
 at 76e619aa and nothing warned).
 
 Attribution is the hard part, and it is answered by EXCLUSION rather than by
-guessing. A push almost never names the PR it re-heads -- measured over this
-machine's transcript corpus, only 9 tool results anywhere carry a PR's
-`headRefName`, so branch-matching a push to a PR is not available in practice.
+guessing. A push almost never names the PR it re-heads. Measured over this
+machine's transcript corpus (204 transcripts, 20102 tool_use records): 718
+`git push` commands, against 51 tool results anywhere carrying a PR's
+`headRefName`. So branch-matching a push to a PR is unavailable for most
+pushes, and a guard built on it would rarely fire.
 So a push re-arms only when the session has exactly ONE live tracked PR, which
 is the case where the push has only one PR it COULD re-head. With two or more
 the push is genuinely unattributable and nothing is re-armed: arming all of

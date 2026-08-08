@@ -244,6 +244,386 @@ def main() -> int:
             (not qrf_ok) and len(qrf_issues) > 0,
         )
 
+    # --- Criterion 4: the latest verdict-bearing statement (#1275) ---------
+    # Unit-level classification first, so a failure below is attributable.
+    check(
+        "classify_verdict: 'Needs more work' is not-clean",
+        checker.classify_verdict("Round 2: **Needs more work** -- 8 findings.") == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Ready for merge' is clean",
+        checker.classify_verdict("Verdict: Clean / Ready for merge.") == "clean",
+    )
+    check(
+        "classify_verdict: a long verification section with no verdict is NEITHER",
+        checker.classify_verdict(
+            "### Verification\n\nI re-derived every figure. The counts agree. "
+            "Every one of the eight items checks out.\n\nNot merging."
+        ) == "",
+    )
+    check(
+        "classify_verdict: a QUOTED 'Needs more work' is not a verdict (#1202 strip)",
+        checker.classify_verdict(
+            "Ready for merge. This PR widens coverage of \"Needs more work\" verdicts."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: findings win over a clean line in the same body",
+        checker.classify_verdict("Ready for merge. But: Needs more work on the tests.") == "not-clean",
+    )
+    # A bare clean phrase survives intact inside a sentence that says the
+    # opposite. Classifying one of these as clean would let it supersede a
+    # standing "Needs more work" -- the exact failure criterion 4 exists to
+    # stop, arriving through the check meant to stop it (found by the round-1
+    # review of this PR, #1278). Negations sit BEFORE the phrase, conditions
+    # AFTER it, so both sides are exercised.
+    #
+    # The primary guard is POSITION though, not this vocabulary: a bare phrase
+    # counts only where the comment marks it as the verdict. The unmarked
+    # cases below pin that, and they are what makes the word lists a second
+    # line rather than the only one.
+    check(
+        "classify_verdict: 'not ready for merge' states NO clean verdict",
+        checker.classify_verdict(
+            "This PR is not ready for merge until the two remaining findings are fixed."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'still not approved for merge' states NO clean verdict",
+        checker.classify_verdict("Still not approved for merge; two findings remain.") == "",
+    )
+    check(
+        "classify_verdict: 'not yet ready for merge' (two words between) is NOT clean",
+        checker.classify_verdict("It is not yet ready for merge.") == "",
+    )
+    check(
+        "classify_verdict: a CONDITIONAL 'ready for merge once ...' is NOT clean",
+        checker.classify_verdict(
+            "Ready for merge once the following items are addressed: the two nits above."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'approved for merge pending CI' is NOT clean",
+        checker.classify_verdict("Approved for merge pending a green CI run.") == "",
+    )
+    # NEGATIVE CONTROLS -- the guard must not swallow a genuine sign-off, or
+    # criterion 4 never passes and the gate becomes unusable.
+    check(
+        "classify_verdict: a plain 'Ready for merge' is still clean",
+        checker.classify_verdict("### Verdict\n\n**Ready for merge** -- all findings fixed.") == "clean",
+    )
+    check(
+        "classify_verdict: a negated mention does not veto a genuine verdict elsewhere",
+        checker.classify_verdict(
+            "Round 1 said it was not ready for merge.\n\n### Verdict\n\n**Ready for merge**"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Ready' needs no guard (adjacency already binds it)",
+        checker.classify_verdict("Verdict: Ready") == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Not Ready' is not clean",
+        checker.classify_verdict("Verdict: Not Ready") == "",
+    )
+    # Adversative connectors, which the round-1 word lists missed entirely.
+    # Note two of them separate the qualifier with a comma or a dash rather
+    # than a space, so a whitespace-only anchor does not see it.
+    check(
+        "classify_verdict: 'Ready for merge, but not until ...' is NOT clean",
+        checker.classify_verdict(
+            "Ready for merge, but not until it addresses the following: item A, item B."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'Ready for merge -- however, ...' is NOT clean",
+        checker.classify_verdict(
+            "Ready for merge -- however, two items still need attention first."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'Ready for merge except for ...' is NOT clean",
+        checker.classify_verdict("Ready for merge except for the two remaining items below.") == "",
+    )
+    check(
+        "classify_verdict: a hedged 'Almost ready for merge' is NOT clean",
+        checker.classify_verdict(
+            "Almost ready for merge; still needs the following two items addressed."
+        ) == "",
+    )
+    # POSITION, the primary guard. An unmarked mention mid-sentence is not a
+    # verdict however friendly its wording, and this is the case no vocabulary
+    # list would ever have reached.
+    check(
+        "classify_verdict: an unmarked mid-sentence mention is NOT a verdict",
+        checker.classify_verdict(
+            "I mentioned it was ready for merge in passing, mid-sentence."
+        ) == "",
+    )
+    check(
+        "classify_verdict: a heading-marked verdict IS clean",
+        checker.classify_verdict("### Ready for merge") == "clean",
+    )
+    # The NOT-CLEAN list needs the same negation handling the clean list has,
+    # and it needs it per-list rather than per-pattern. Widening the `Needs
+    # ... work` filler to admit intervening words also admitted the words that
+    # INVERT the phrase, so a positive per-section remark anywhere in a long
+    # review forced the whole comment to not-clean and could suppress a genuine
+    # clean verdict indefinitely.
+    for phrase in (
+        "This section needs no work.",
+        "The implementation is solid and needs no more work before merging.",
+        "Nothing here needs any further work.",
+        "No changes requested.",
+        "There are no changes requested on this round.",
+    ):
+        check(
+            f"classify_verdict: a NEGATED not-clean phrase is not a verdict -- {phrase!r}",
+            checker.classify_verdict(phrase) == "",
+        )
+    # The other direction, which is the dangerous one: a negator belonging to
+    # an EARLIER clause must not discharge the signal. Punctuation is what
+    # separates them, and the guard's filler cannot cross it.
+    for phrase, why in (
+        ("This is not done. Needs work.", "a negator in the previous sentence"),
+        ("It is not ready; needs more work.", "a negator before a semicolon"),
+        ("Needs minor work", "the bare widened form still matches"),
+        ("Needs a little more work", "multi-word filler still matches"),
+        ("Verdict: Changes requested", "a labelled not-clean verdict"),
+    ):
+        check(
+            f"classify_verdict: still not-clean -- {why}",
+            checker.classify_verdict(phrase) == "not-clean",
+        )
+    check(
+        "classify_verdict: a bullet-marked verdict IS clean",
+        checker.classify_verdict("- **Approved for merge**") == "clean",
+    )
+    check(
+        "classify_verdict: a line-initial verdict IS clean",
+        checker.classify_verdict("Ready for merge.") == "clean",
+    )
+    # Where the vocabulary guards are still load-bearing after the position
+    # guard: this corpus writes semantic line breaks, so a negation or hedge
+    # routinely sits at the END of the PREVIOUS line, leaving the phrase itself
+    # line-initial and therefore "marked". Position cannot see across the
+    # break; the prefix scan can.
+    check(
+        "classify_verdict: a negation on the PREVIOUS line still blocks",
+        checker.classify_verdict(
+            "The PR is not\nready for merge until the findings are fixed."
+        ) == "",
+    )
+    check(
+        "classify_verdict: a hedge on the previous line still blocks",
+        checker.classify_verdict("It is almost\nready for merge.") == "",
+    )
+    # A `Verdict:` label was exempted from every guard on the reasoning that
+    # adjacency after the label already binds the phrase. That is true of what
+    # PRECEDES it and says nothing about what FOLLOWS, so the labelled form was
+    # the one path a trailing qualifier still walked straight through.
+    check(
+        "classify_verdict: 'Verdict: Ready, but ...' is NOT clean",
+        checker.classify_verdict("Verdict: Ready, but two items remain.") == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: Clean once ...' is NOT clean",
+        checker.classify_verdict("Verdict: Clean once the findings are fixed.") == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: Approved except for ...' is NOT clean",
+        checker.classify_verdict("Verdict: Approved except for the nit below.") == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: Ready -- however, ...' is NOT clean",
+        checker.classify_verdict("Verdict: Ready -- however, one item stands.") == "",
+    )
+    check(
+        "classify_verdict: a bare 'Verdict: Ready' IS still clean",
+        checker.classify_verdict("Verdict: Ready") == "clean",
+    )
+    # Where a match ENDS is an artifact of which pattern matched: two patterns
+    # hit the same text at the same position with different lengths, so an
+    # anchored suffix check on the shorter one lands past the qualifier and
+    # sees nothing. Scanning the rest of the sentence does not depend on the
+    # match length.
+    check(
+        "classify_verdict: 'Verdict: Ready for merge once ...' is NOT clean",
+        checker.classify_verdict(
+            "Verdict: Ready for merge once the following items are addressed: item A."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: Approved for merge, but ...' is NOT clean",
+        checker.classify_verdict("Verdict: Approved for merge, but two items remain.") == "",
+    )
+    # ...and sentence scope is what stops that from over-reaching: a qualifier
+    # in the NEXT sentence is a separate statement, not a retraction.
+    check(
+        "classify_verdict: a qualifier in the NEXT sentence does not retract",
+        checker.classify_verdict(
+            "Ready for merge. The tests pass, but coverage is unchanged."
+        ) == "clean",
+    )
+    # The not-clean side had the mirror gap, found by running this classifier
+    # over real verdict bodies rather than over invented ones: three rounds of
+    # "Needs MINOR work" on ai-config#1293 each classified as NO verdict, so a
+    # genuine not-clean verdict neither blocked nor superseded anything.
+    check(
+        "classify_verdict: 'Needs minor work' is not-clean",
+        checker.classify_verdict("Needs minor work") == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Needs a little more work' is not-clean",
+        checker.classify_verdict("Needs a little more work") == "not-clean",
+    )
+    # A bare newline does not end a sentence in a semantic-line-break corpus,
+    # so a qualifier starting the next line still retracts. Same corpus
+    # property the negation guard is built around, mirrored to the other side.
+    check(
+        "classify_verdict: a qualifier on the NEXT line still retracts",
+        checker.classify_verdict("**Ready for merge**\nonce the two findings are fixed.") == "",
+    )
+    check(
+        "classify_verdict: an adversative on the next line still retracts",
+        checker.classify_verdict("Ready for merge,\nbut two items remain.") == "",
+    )
+    # ...bounded, because a qualifier only RETRACTS when it sits close. A real
+    # sign-off continues past the verdict with ordinary prose that may contain
+    # `but` far downstream; retracting on that makes criterion 4 unsatisfiable
+    # for a clean PR. Taken from an actual verdict body on ai-config#1293.
+    check(
+        "classify_verdict: a distant 'but' in a long sign-off does NOT retract",
+        checker.classify_verdict(
+            "**Ready for merge** -- all three carried-over nits are fixed, the two new "
+            "worked-example additions are correctly sourced against the live threads, "
+            "but I noted one wording nit for later."
+        ) == "clean",
+    )
+
+    # POSITIVE CONTROL -- the exact #1267 shape that bypassed the gate.
+    # An explicit "Needs more work" at an EARLIER commit (so it never enters
+    # matching_items), followed by a rich, evidence-dense comment at HEAD that
+    # states no verdict at all. Every pre-existing criterion passes on this
+    # payload; only criterion 4 catches it. The test asserts BOTH halves, so it
+    # cannot go vacuous if a future edit makes some other check fail instead.
+    needs_work_earlier_sha = {
+        "createdAt": "2026-08-07T21:56:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD oldsha0.\n\n"
+            "Verdict: Needs more work -- 8 findings below."
+        ),
+    }
+    verification_no_verdict_at_head = {
+        "createdAt": "2026-08-07T23:05:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "### Verification\n\nI re-derived each figure against the source. "
+            "The line counts agree, the citations resolve, and the reflow "
+            "preserved every word.\n\nNot merging."
+        ),
+    }
+    mock_1267 = json.dumps({
+        "comments": [needs_work_earlier_sha, verification_no_verdict_at_head],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_1267):
+        v_ok, v_issues = checker.check_review_comments("1267", "sha123")
+        check(
+            "POSITIVE CONTROL: verdict-less comment at HEAD does not clear an earlier "
+            "'Needs more work' (#1267/#1275)",
+            (not v_ok) and any("Latest verdict-bearing" in i for i in v_issues),
+        )
+        check(
+            "POSITIVE CONTROL is non-vacuous: criterion 4 is the ONLY thing that fires",
+            len(v_issues) == 1,
+        )
+
+    # NEGATIVE CONTROL -- the ordinary ARDI flow the check must not break:
+    # the same earlier "Needs more work", superseded by a real clean verdict
+    # at HEAD. If this fails, the check is over-blocking every iterated PR.
+    clean_verdict_at_head = {
+        "createdAt": "2026-08-07T23:05:00Z",
+        "body": (
+            "### \ud83e\udd16 Antigravity Agent Report (Code-Review)\n\n"
+            "Reviewed HEAD sha123.\n\n"
+            "All eight findings are addressed.\n\nVerdict: Clean / Ready for merge."
+        ),
+    }
+    mock_superseded = json.dumps({
+        "comments": [needs_work_earlier_sha, clean_verdict_at_head],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_superseded):
+        s_ok, s_issues = checker.check_review_comments("1267", "sha123")
+        check(
+            "NEGATIVE CONTROL: a later clean verdict DOES supersede an earlier 'Needs more work'",
+            s_ok and s_issues == [],
+        )
+
+    # Ordering, not payload order: the chronology must come from the timestamps,
+    # so a clean verdict listed first but dated EARLIER still loses to a later
+    # not-clean one.
+    mock_out_of_order = json.dumps({
+        "comments": [clean_verdict_at_head, {
+            "createdAt": "2026-08-07T23:30:00Z",
+            "body": "### \ud83e\udd16 Report\n\nReviewed HEAD sha123.\n\nVerdict: Needs more work.",
+        }],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_out_of_order):
+        o_ok, o_issues = checker.check_review_comments("1267", "sha123")
+        check(
+            "latest verdict is chosen by timestamp, not by payload order",
+            (not o_ok) and any("Latest verdict-bearing" in i for i in o_issues),
+        )
+
+    # REAL-INPUT CONTROL -- the fixtures above all carry a "\ud83e\udd16" marker, which
+    # enters the pipeline downstream of the admission gate and so proves nothing
+    # about it. These reproduce #1267's ACTUAL comment shapes: posted under a
+    # human login, no robot glyph, the verdict carried under a "### Verdict"
+    # heading. Against the pre-fix marker list all four were rejected, all_items
+    # was empty, and criterion 4 could never fire on the very PR it was built
+    # for. See algorithmatize-checks.md, "A negative control must enter at the
+    # real input".
+    real_round1 = {
+        "createdAt": "2026-08-07T21:56:09Z",
+        "body": (
+            "**Claude finished** --- adversarial review of the whole diff.\n\n"
+            "### Verdict\n\n**Needs more work** --- 8 findings below."
+        ),
+    }
+    real_round2 = {
+        "createdAt": "2026-08-07T22:49:12Z",
+        "body": (
+            "**Round-2 verification** --- adversarial re-check of all eight findings.\n\n"
+            "### Verdict\n\n**Needs more work** --- the two items above are the only "
+            "outstanding ones. I am correcting both in the next push."
+        ),
+    }
+    real_round3_no_verdict = {
+        "createdAt": "2026-08-07T23:05:32Z",
+        "body": (
+            "## Round 3 --- two corrections, three new learnings\n\n"
+            "Head is now sha123.\n\n"
+            "### Verification\n\nEvery figure re-derived against the source; the "
+            "counts agree.\n\nNot merging."
+        ),
+    }
+    mock_real = json.dumps({
+        "comments": [real_round1, real_round2, real_round3_no_verdict],
+        "reviews": [],
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_real):
+        r_ok, r_issues = checker.check_review_comments("1267", "sha123")
+        check(
+            "REAL-INPUT CONTROL: #1267's actual comment shapes are admitted and "
+            "criterion 4 fires on them",
+            (not r_ok) and any("Latest verdict-bearing" in i for i in r_issues),
+        )
+
     # Test 6: CI check runs filtering
     mock_ci_success = json.dumps({
         "check_runs": [

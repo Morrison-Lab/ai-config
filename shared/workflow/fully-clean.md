@@ -422,6 +422,62 @@ rather than substituting the nearest available count.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 
+**A comment can be evidence-dense, correct throughout, and state no verdict at
+all --- and its density is what gets read as the conclusion.**
+The "no verdict is its own state" bullet above covers a job that posted
+*nothing*, and the instrument it prescribes is to read the job's own step
+outcomes.
+Neither half reaches this case.
+The job succeeded, the comment is long and rigorous, and there is no failed step
+to inspect --- so that remedy points at a surface reporting success.
+
+It is not the "reviewer's own verification block can be wrong" case either,
+which is a *wrong* verification under a *right* verdict.
+Here the verification is correct and there is no verdict at all, which inverts
+which part deserves suspicion.
+That section already notes a block labelled "verification" is the part least
+likely to be re-checked, because it presents as the checking having been done.
+When such a block is the last thing on the thread it does something further:
+it reads as the sign-off, and the more rigorous it is the more it reads that way.
+So thoroughness is not evidence of a conclusion --- it is what disguises the
+absence of one.
+
+**A later comment stating no verdict does not supersede an earlier one.**
+This refines the latest-wins rules rather than contradicting them.
+Those rules (`CLAUDE.md`'s "re-read the **most recent** review comment", and
+criterion 2's "latest review") assume the most recent artifact *is* a verdict,
+and say to prefer it over a cached one.
+They do not say what happens when the most recent artifact concludes nothing.
+Absence is not a clearing: the standing verdict is the last one anyone actually
+stated, however much has been posted since.
+Read "latest" as ranging over verdict-bearing statements, not over comments.
+
+Note this is wider than the HEAD-SHA scope the rest of criterion 2 uses.
+A "Needs more work" posted against an *earlier* commit is outside every
+HEAD-matching check, and a later verdict-less comment raises no finding either,
+so a PR reads clean on both while its last real verdict was not.
+`scripts/check-pr-fully-clean.py` decides this as its criterion 4, scanning the
+whole review history chronologically for the last verdict-bearing statement.
+
+- **Do:** identify the last statement that actually states a verdict, and treat
+  that as the standing one.
+- **Do:** scan the whole review history for it, not only items matching HEAD.
+- **Don't:** read a verification section, however rigorous, as an approval ---
+  it is evidence, and a verdict is a conclusion about evidence.
+- **Don't:** treat a later comment's silence on the verdict as superseding an
+  earlier "Needs more work".
+
+(Morrison-Lab/ai-config#1267, 2026-08-07, reverted by #1275.
+Verified from the API rather than from the revert's own account: the PR carried
+`reviews | length` of 0, and its four comments ran
+`21:56:09Z` **Needs more work**, `22:12:47Z` no verdict, `22:49:12Z` **Needs more
+work**, `23:05:32Z` no verdict --- a long `### Verification` section ending
+"Not merging."
+It was merged at `23:38:12Z`, 49 minutes after the last stated verdict, and
+reverted at `23:47:50Z`.
+All four comments were posted under the author's own login, so "the PR has been
+reviewed" was true while "an independent reviewer approved it" was not.)
+
 **Another surface,
 and the one that defeats the gate itself:
 the review check can pass on a blocking verdict.**

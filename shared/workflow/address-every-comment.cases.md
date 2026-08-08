@@ -355,3 +355,119 @@ The rebuttal carried the one-line grep; the underlying point was real
 anyway, since citing a section title without naming its file is what sent
 the search to the wrong directories, so the citation was fixed to name and
 link the file.)
+
+## "A note the reviewer declined to raise is still a claim"
+
+(`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: a review round
+noted, while explicitly declining to flag it, that the PR's claim "only two
+things write `position`" was loose because `Unit._separate()` also writes it.
+The session staged a caveat, checked first, and concluded the note was stale
+--- `sparta#1109` is titled "Convert `Unit._separate()` regiment overlap
+resolution from position push to velocity impulse", so the write was taken to
+be gone.
+It is not.
+At `320fe3b2` that function ends
+`_separation_velocity += step_vel` / `position += step_vel * delta`, and its
+own comment says it expresses the push "as a velocity ... and integrate[s]
+that" --- the velocity is how the per-tick displacement is **capped**, not what
+replaced the write.
+So the declined note was correct and the refutation was not, and the refutation
+rested on the PR title rather than on the function.
+Holding was still the right call, and the caveat was never added, so nothing
+false shipped: a normalized search of `.claude/memories/` at `320fe3b2` finds
+neither the caveat nor the "only two things write `position`" claim it would
+have qualified.
+Re-measured here against `origin/main` at `320fe3b2` after a `git fetch` ---
+the local checkout was 1 commit behind and did not contain the merge, which
+would have made any answer read off it a claim about a different tree.)
+
+## Deriving the class is necessary and not sufficient
+
+(2026-08-08, `Morrison-Lab/ai-config#1287` and `#1278`, both round 1 to round 2
+inside one hour.
+
+On #1287 a review reported five executable bypasses of the merge guard --- a
+leading `!`, `time`, `nohup`, a brace-group body, and a `then` branch body.
+The fix widened the keyword enumeration to twelve members, adding `sudo`,
+`else`, `do`, `if`, `elif`, `while`, and `until` beyond the reported five, with
+fourteen new BLOCK cases and three new ALLOW cases taking the suite to 141 from
+124, and the reply said in as many words: "I derived the class rather than
+fixing the five reported instances".
+Round 2 returned two more, `case`-arm one-liners and function-definition-and-call
+one-liners, and named the lever outright --- "the enumeration is still
+demonstrably incomplete".
+
+On #1278 a review reported three phrasings misclassified as a clean verdict
+(`not ready`, `not approved`, `ready ... once`).
+The fix added two word lists, an eight-word negation prefix and an eleven-entry
+conditional suffix.
+Round 2 produced four more, none of which either list reached: "Ready for merge,
+but not until...", "Almost ready for merge...", "Ready for merge -- however...",
+and "Ready for merge except for...".
+It too named the lever --- "I recognize a regex-based classifier can't achieve
+completeness against free-form English".
+
+In both rounds the redirect arrived beside example cases, and in both the
+examples were worked while the sentence was read past.
+Round 2 on #1287 sharpens why: it quoted this corpus's own "never predict which
+case will fail; enumerate the class" and then suggested adding `)` to the
+character class --- so its actionable half proposed one more enumeration step
+against the lever its diagnostic half had just called incomplete.
+Following that review faithfully would have reproduced the bug a third time.
+
+What resolved both was a different axis, chosen by measurement.
+On #1287, relaxing the narrow anchor entirely changed exactly seven of 141
+cases and all seven were prose inside quotes, which showed the defect was a
+**quoting** problem being solved with a **command-position** lever.
+The fix keeps the narrow raw-text pass and adds a strictly additive second pass
+that blanks inert quoted spans and then treats every position as a command
+position --- narrow pass retained because a quoted span is not inert for a
+deferred evaluator, since `bash -c`, `eval`, and `trap` all run their quoted
+operand.
+Twelve of the fourteen resulting cases had never been reported by anyone, which
+is the signal that the class closed rather than the members being patched.
+On #1278 the lever became positional: require the phrase to be marked as a
+verdict by a heading, bold, a bullet, line-initial position, or a `Verdict`
+label, which reaches the case no vocabulary can --- a friendly aside mid-sentence
+carrying no qualifier at all.
+44 passed, up from 34.
+
+The growth rate was available at round 2 in both cases and was not read: five
+reported becoming twelve enumerated and then fourteen, three becoming two lists
+and then seven.)
+
+## The class is right, and it is enumerated in more than one place
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08, three rounds: every finding was the
+same concept --- text handed to something that runs it --- reached through a
+different construct, and each round closed one door rather than the room.
+The guard ended up encoding that concept at three separate sites: `EXEC_WRAP`,
+which pass 1 uses for programs whose quoted argument is live (`bash -c "..."`,
+`eval "..."`); pass 2's blanking of spans judged inert; and `mask_heredocs`,
+added in round 1 so prose about the command inside a heredoc body would stop
+matching.
+Round 3 reported six executable forms that all blocked before the PR and allowed
+after it --- `bash <<EOF`, `sh <<EOF`, `bash -s <<EOF`, `ssh myhost <<EOF`,
+`ssh -T user@host <<EOF`, and `bash <<'EOF'` --- because `mask_heredocs` blanked
+the body before any matching pass could see it.
+
+The review named the duplication itself, in the paragraph explaining why the
+existing mechanism did not save the new site: `EXEC_WRAP` "already enumerates
+programs whose quoted argument is live ... the same reasoning applies here, but
+`mask_heredocs` runs earlier in the pipeline and unconditionally, with no
+analogous carve-out".
+The resolution was DRY rather than a fourth list: one `EXEC_PROGS` definition
+consumed by all three sites, leaving a single reviewable list instead of three
+that drift.
+
+The round's premise error is worth keeping beside it, because it explains why
+the third door was invisible.
+`mask_heredocs` reasoned about the **heredoc** --- its docstring held that a
+quoted delimiter "means bash performs no expansion at all in the body, so it is
+inert" --- when the question was about the **consumer**.
+`<<'EOF'` stops bash expanding a body without stopping bash running it, so a
+property of the container had been read as a property of whatever the container
+is handed to.
+The suite did not catch it for the reason its siblings did not: every heredoc
+case in it fed `cat`, `grep`, `echo`, or `gh issue create --body-file -`, and
+none fed a shell.)

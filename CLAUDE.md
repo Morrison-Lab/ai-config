@@ -1038,6 +1038,11 @@ The key points, restated here because a bare pointer is invisible to a consumer 
 - **A `DIRTY` flag means stale or defective, and only the second is a defect.**
   A PR whose content is clean but whose base moved is stale rather than broken.
   Staleness resolves once, at merge time, so re-syncing it eagerly spends a CI cycle and a review round on a state that expires within one merge interval.
+- **A conflict your sweep found is not a conflict your merge caused.**
+  Attribution is a second axis, and it runs before the claim: intersect the merge's own deleted and renamed paths (`git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'`) with each conflict, and report conflicts caused alongside conflicts found.
+  `git show --name-status <merge>` cannot supply that set for a **true** (two-parent) merge --- it prints no file list at all there, and grepping its header for `^[ADMR]` returns three phantom paths.
+  It does diff a squash merge normally, so whether it works depends on how the repo merges rather than on the commit in front of you.
+  A conflict you caused on a branch you do not own is an explanatory comment, not a push.
 - **Independent per-PR checking cannot see pair collisions.**
   Every PR can be clean against `main` while two of them conflict with each other.
   Only a pairwise `git merge-tree` between PR heads finds that.
@@ -1146,6 +1151,13 @@ Two rules, one incident, and the second is the general form of the first.
 Deciding that a particular agent does not need one is fine.
 Leaving it unmarked is what is not.
 `hooks/flag-unassigned-worktree.py` mechanizes exactly this, and warns rather than blocks.
+
+**"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
+`isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
+Name the target clone by path instead, and tell the agent to create its own worktree there off `origin/<default-branch>` --- resolved from that repo, never hard-coded, per `memories/preferences.md`'s measured `fatal: invalid reference: origin/main` failure on a repo whose default is named otherwise.
+Measured 2026-08-07.
+[`memories/git-worktrees.md`](memories/git-worktrees.md) carries the evidence.
+[`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.
 
 **The general rule is the more valuable half.** When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
 A repealed decision changes no artifact, so review, tests, and hooks are all blind to it by construction, and the only detector is someone who remembers.

@@ -83,6 +83,75 @@ A conflict inside your own added lines is a real disagreement.
 - **Don't:** read `DIRTY` as "this PR is broken" --- most of the time it is a
   statement about `main`, not about the PR.
 
+## A conflict your sweep found is not a conflict your merge caused
+
+The section above splits a `DIRTY` flag by whether the PR's own content is
+wrong, which is a question about the PR.
+There is a second question, about **you**: of the conflicts a post-merge sweep
+turns up, only some were caused by the merge you just made.
+The rest predate you --- a stale backlog collides on `DESCRIPTION`, a word
+list, a directory deleted months ago --- and were conflicting before you
+arrived.
+
+Both axes are needed, because a conflict can be stale by that section's test
+and still be yours.
+Collapsing them prescribes one action for both, and on a repo whose PRs have
+been open for months that means claiming and resolving other people's branches
+for no reason.
+
+Attribution is mechanical, and it runs **before** the claim rather than after.
+Deletions and renames are what to intersect, because they are what breaks a
+branch that still references the old path:
+
+```bash
+git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'
+```
+
+A conflicting path in neither set is drift.
+The intersection subtracts as well as adds, which is the half a detector cannot
+supply: a PR conflicting on a *similarly named* file that some older commit
+deleted is exonerated outright, not merely deprioritized.
+Settle that with `git log --diff-filter=D -- <path>`, noting that a shallow
+clone answers "never deleted" for anything removed before its window
+([`memories/claude-code.md`](../../memories/claude-code.md)).
+
+**`git show --name-status <merge>` prints no file list at all on a true
+merge**, and it is the natural command to reach for here.
+A true merge has two parents, and `git show` defaults to the combined (`--cc`)
+diff, which omits any path matching some parent --- on a clean merge that is
+every path, so it yields an empty attribution set.
+Grepping that output for `^[ADMR]` then returns 3, because `Merge:`, `Author:`
+and `Date:` each begin with one of those letters.
+A squash merge is an ordinary single-parent commit and is diffed normally, so
+`git show` would serve there.
+That is the reason to standardize on the `git diff` form: it is correct under
+both merge styles, and which style produced the commit in front of you is a
+property of the repo's settings rather than of the commit.
+So its empty answer and its broken answer look alike, per
+[`fail-fast`](../principles/fail-fast.md).
+Use the `git diff <merge>^1 <merge>` form above.
+
+Then match the response to standing, not only to cause.
+A conflict you caused on a branch you do not own is an explanatory comment
+naming the deletion or rename and where the content went, rather than a push.
+[`sync-with-main`](sync-with-main.md) does prescribe pushing the re-applied
+change to a sibling branch, and that fits a CI workflow in a repo you drive; it
+does not fit a release branch carrying an out-of-band process a push can
+disrupt.
+
+- **Do:** derive the merge's own deleted and renamed paths, and intersect them
+  with each conflict before claiming anything.
+- **Do:** report both counts --- conflicts found, and conflicts caused --- so
+  the gap between them is visible rather than implied.
+- **Do:** comment rather than push when a conflict you caused sits on a branch
+  you do not own.
+- **Don't:** read a post-merge sweep's hit list as your work queue; on an old
+  backlog most of it predates your merge.
+- **Don't:** derive that path set with `git show` --- it reports nothing for a
+  true merge, and a naive grep of its header reports three phantom paths.
+  It happens to work on a squash merge, which is what makes reaching for it
+  unreliable rather than simply wrong.
+
 ## Independent per-PR checking cannot see pair collisions
 
 Every PR can be individually clean against `main` while two of them conflict
@@ -291,9 +360,10 @@ labelled advisory may genuinely exit 0 while a self-test inside that same
 check's **test suite** asserts the real corpus complies and gates the job.
 Grepping a workflow for what enforces a threshold can therefore find the
 advisory step and conclude wrongly.
-[`fully-clean`](fully-clean.md) already owns the near half of this, in its case
-covering a check "designed to NEVER fail regardless of their own posted
-content, so their green color carries zero signal at all".
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md) already owns the near
+half of this, in its case covering a check "designed to NEVER fail regardless
+of their own posted content, so their green color carries zero signal at
+all".
 What the capped-file case adds is that the signal is not merely absent but
 **misdirecting**: a second step enforces the same threshold, so the advisory
 label is accurate about its own step and false about the job.

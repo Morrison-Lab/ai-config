@@ -502,6 +502,124 @@ a claim about the input domain, and it is the claim that excuses the control.
 - **Don't:** let a fix inherit the scrutiny that produced it, since the repair
   is the least-reviewed code in the round.
 
+### A fallback chain flattens which alternative won
+
+A `||` chain advances **only** on failure, so a later branch running is proof
+an earlier one failed.
+Making that failure invisible takes two things at once: the loser's error is
+suppressed, and the winner's output does not name itself.
+
+```bash
+ls "$A" 2>/dev/null || ls "$B" 2>/dev/null || { echo "searching..."; find ...; }
+```
+
+The first is this fragment's own opening principle rather than anything new ---
+no silent failures, the same discarded stderr the fan-out section above marks
+`>/dev/null 2>&1   # every failure discarded` --- and dropping that one token
+makes the loser announce itself by name.
+Be exact about which half is lost, though, because the "In code" bullets ban a
+different mechanism: `|| true` and a bare `except:` swallow the **failure**,
+while `2>/dev/null` suppresses only the **message** and leaves the exit status
+intact, which is precisely what `||` then reads.
+The second is the increment, and it is a property of the commands rather than
+of `||`: `ls DIR/` prints the directory's **contents**, so its stdout never
+names the directory it read.
+`ls -d DIR/` prints the path, and `command -v` prints the resolved binary, so a
+chain over those forms identifies its own winner and leaves only the
+suppression to fix.
+
+What makes the misreading survive a re-read is that the output is genuine
+evidence.
+Two files really were listed; nothing in the transcript says they were listed
+from the path you had in mind, so looking again confirms the reading you
+already had rather than exposing it.
+
+Drop the suppression first.
+Where the resolved value is what you actually want, take it from a variable and
+fail loudly when nothing matched, per the canonical form at
+[`use-mcp-servers`](../workflow/use-mcp-servers.md):
+
+```bash
+for p in "$A" "$B"; do
+  [ -e "$p" ] && { GODOT="$p"; break; }
+done
+if [ -z "${GODOT:-}" ]; then
+  echo "no Godot binary at $A or $B" >&2      # loud, and it names both candidates
+  exit 1
+fi
+printf 'resolved: %s\n' "$GODOT"
+```
+
+A `||` chain is also one of the errexit-suppression contexts in
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md), so one chain
+can be silent in two independent ways at once.
+That fragment governs the exit status such a chain suppresses; this one governs
+an output that does not name its source.
+
+- **Do:** drop `2>/dev/null` before anything else --- the loser's own error
+  message is the cheapest thing that names it.
+- **Do:** check whether the winning branch's stdout identifies itself, and
+  prefer a form that does (`ls -d` over `ls`) or print the resolved value.
+- **Don't:** read a later branch running as evidence that nothing failed; `||`
+  advances only on failure.
+- **Don't:** assume the first branch won because it is the one you expected to
+  win.
+
+### A read-only question does not license a state-mutating answer
+
+Every subsection above asks whether a hand-run check's **answer** can be
+trusted.
+This one asks what asking it **cost**, which is a property the answer never
+reports: the check can return the right result and still have destroyed the
+state you were checking against.
+
+The shape is a diagnostic whose question is plainly read-only --- "does this
+also fail on `main`?", "what did this file look like before?" --- answered by a
+command that puts the working tree into the state being asked about.
+Chained into one call it reads as a single act of looking:
+
+```sh
+# looks like one lookup; is a lookup plus two mutations
+<run the failing check>; git stash -q; git checkout -q origin/main -- hooks/
+```
+
+Nothing in that line is wrong as a command.
+`git stash` and `git checkout <ref> -- <path>` both do exactly what they say,
+which is why the composition passes a read-through: the scrutiny lands on
+whether each piece is correct rather than on whether a diagnostic should be
+doing this at all.
+The result is that uncommitted work is stashed and a whole directory in the
+working tree **and index** is replaced by another ref's version, discarding the
+branch's own committed changes from the tree, in service of a question that
+only ever needed to read.
+
+Materialize the other ref somewhere else instead.
+Extraction to a scratch directory touches neither the tree nor the index:
+
+```sh
+scratch="$(mktemp -d)"
+git archive <ref> <path> | tar -x -C "$scratch"   # nothing in the tree moves
+```
+
+A throwaway `git worktree add --detach <ref>` does the same for a whole tree,
+and both leave `git status` unchanged --- which is the property to check after
+running a diagnostic, not before.
+
+The generalizable test is a sentence, not a command list: **say what the
+question needs to read, and confirm the answer writes nothing outside a scratch
+path.** A diagnostic that fails that test is not a diagnostic, whatever it
+returns.
+
+- **Do:** materialize another ref with `git archive | tar -x` into a scratch
+  directory, or a detached throwaway worktree, when a question spans refs.
+- **Do:** run `git status` after a diagnostic you composed on the spot, and
+  treat any change as the diagnostic having done something it was not asked to.
+- **Don't:** chain a mutating command onto a read-only question because the
+  mutation is the shortest route to the answer.
+- **Don't:** let each command being individually correct stand in for the
+  composition being appropriate --- that check passes on every instance of
+  this.
+
 ## In a guard you ship: partial is worse than absent
 
 Everything above concerns a check whose failure is invisible **at runtime**,
@@ -600,6 +718,74 @@ step to take at the moment you write the comment, not at review.
   was handled everywhere it applies; a removal note is the artifact most likely
   to stop the search early.
 
+**Widen that last bullet's trigger: any sentence naming a hazard is a
+predicate, and the first code it applies to is the code directly beneath it.**
+The block above needs a *removal* note --- members taken out of an alternation,
+with a stated reason that can be re-run over the survivors.
+The commoner artifact states the hazard and removes nothing, so there is no
+survivor set to sweep and that remedy has nothing to operate on.
+It still supplies a predicate.
+A comment reading "an over-broad pattern here would let X through" names the
+exact test the lines under it have to pass, and applying it to them costs one
+reading.
+
+The reason it goes unapplied is that describing the hazard has already
+discharged the feeling of having handled it.
+Naming a risk in prose is the part that *feels* like diligence, and it is
+finished the moment the sentence is, so nothing prompts the second step.
+That is why same-author and same-commit are the diagnostic rather than a
+mitigating detail: this is not a stale note somebody else left behind, and the
+comment and the violation are minutes apart in one edit.
+
+It is worse than silence, on the terms this section already prices.
+An unguarded pattern with no comment invites the next reader to ask.
+The same pattern under a sentence explaining why over-broad matching would be
+dangerous reads as surveyed, so the comment spends the one signal that would
+have surfaced it, and keeps spending it for every later reader.
+
+Distinguish this from a comment that asserts a property of the code beneath it
+("only matches at the start of a command"), which
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md) already covers
+under treating a comment claiming the matcher's scope as an untested assertion.
+There the comment and the code agree and are both wrong, so only a test
+separates them.
+Here they disagree, and a reading separates them.
+
+- **Do:** re-read the lines under a hazard comment against the hazard it names,
+  in the edit that writes the comment.
+- **Don't:** count naming a risk as handling it --- the sentence is a
+  specification, and nothing has yet met it.
+
+**When the hazard is a phrase a qualifier can reverse, enumerate the qualifier
+classes by which SIDE of the phrase they sit on.**
+The "members of one pattern" block above enumerates along the alternation's own
+members, and a reader who applies it correctly still ships this bug, because
+these classes are not members of the pattern at all --- they are positions
+relative to it.
+
+A negation sits **before** ("this is not ready for merge").
+A condition sits **after** ("ready for merge once the findings are fixed").
+"Add a negation guard" is the natural reading of the problem, it produces a
+lookbehind, and a lookbehind closes only the first of those.
+The after-side form is the likelier one in practice, since it is how a reviewer
+signs off on work that is nearly done, so the guard that feels complete misses
+the commoner case.
+
+Enumerate the positions before writing the guard: a prefix that negates, a
+suffix that conditions, and a mid-phrase qualifier that narrows scope.
+Then write a case per side and confirm each fails without its own half of the
+guard, per the mutation discipline in
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
+
+- **Do:** list the qualifier classes by position --- before, after, within ---
+  and cover each with its own case.
+- **Do:** treat the after-side conditional as the likely form when the guarded
+  phrase is an approval, not as the exotic one.
+- **Don't:** read "add a negation guard" as the whole requirement; negation is
+  one side, and it is the side that comes to mind first.
+- **Don't:** reach for the members-of-one-pattern rule here --- enumerating an
+  alternation's members leaves both sides of every member unguarded.
+
 **One level up from a partial guard: editing state that two consumers share
 regresses the consumer you were not looking at.**
 Every case above spreads a guard across *sites* --- emitters, discharge paths,
@@ -673,6 +859,45 @@ dangerous direction, and prefer keeping the over-warn (and rebutting the
 request with this reasoning) over trading the fail-safe away.
 Reducing a safe-direction over-block is exactly how a fail-safe guard grows a
 dangerous hole.
+
+**Once the safe direction is known, it is a property to build the guard around,
+not only one to defend it in.**
+The paragraph above is defensive: it says which way *not* to be pushed.
+The constructive form is to ask which way an **unforeseen** case falls, because
+that is decided by the guard's shape rather than by its contents.
+
+A guard that **enumerates what may act** fails open on anything the enumeration
+misses, and the miss is silent, so each new construct is a fresh fail-open found
+only by whoever goes looking.
+A guard that instead **removes what cannot act** and then treats everything
+remaining as live fails the other way: an unforeseen construct is caught by the
+default rather than missed by the list, so the cost of being wrong is a loud
+over-block that a documented override clears.
+Same information, inverted, and the residual risk moves from the dangerous
+direction to the safe one.
+
+Do not read this as licence to drop the narrow pass.
+"What cannot act" is a real claim about the world and it can be false --- a
+quoted span is inert until something defers execution of it, so an evaluator
+that runs its own quoted operand makes the exclusion wrong.
+Keep the narrow, raw-text pass and add the inverted one as strictly additive,
+so the two disagree only where the exclusion is unsound.
+
+- **Do:** ask which direction an unforeseen case falls, and prefer the guard
+  shape that sends it to the safe one.
+- **Do:** pair an inverted pass with the original narrow pass, additively,
+  rather than replacing it.
+- **Don't:** keep extending an enumeration whose every gap is a silent
+  fail-open, when inverting it makes the same gaps loud.
+- **Don't:** treat an exclusion set as self-evidently safe --- "this text cannot
+  execute" is a claim, and a deferred evaluator falsifies it.
+
+The worked instance is
+[`address-every-comment`](../workflow/address-every-comment.cases.md)'s
+"Deriving the class is necessary and not sufficient", where two rounds of
+extending an enumeration of shell constructs kept producing fresh silent
+fail-opens until the guard was inverted to blank inert quoted spans and treat
+every remaining position as live.
 
 (Distinct from
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A reminder

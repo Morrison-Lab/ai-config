@@ -22,7 +22,7 @@ Re-running the POST bare discharged it and produced a second, identical refusal 
 
 (Morrison-Lab/ai-config#1077, 2026-08-03: two explicit requests each returned `["Copilot"]` and each left `reviewRequests` empty within a minute, and both were reported as a possible blocked/silent reviewer.
 The repo's `main` ruleset carries `copilot_code_review` with `review_on_push: true` and `review_draft_pull_requests: false`, so neither request was ever needed.
-Copilot separately did stay silent on that PR, which is the distinct third state [`fully-clean`](fully-clean.md) records --- the point here is that the empty pending-list was not the evidence for it.)
+Copilot separately did stay silent on that PR, which is the distinct third state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) records --- the point here is that the empty pending-list was not the evidence for it.)
 
 ## Request the reviewer in the same step; don't leave it "review owed"
 

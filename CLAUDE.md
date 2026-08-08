@@ -709,6 +709,30 @@ Don't retry the 403 --- it's a policy denial, not a transient error.
 **Prefer stacking the fix, not superseding the PR.** When the work is an incremental fix to an existing, still-open PR (a review finding, a small addition) rather than a full rebuild, push the fix to the assigned branch and open it as a PR **stacked on** the original --- `base` set to the original PR's own branch, per the [`stack-prs`](skills/stack-prs/SKILL.md) skill --- rather than superseding it. Comment on the original PR pointing to the stacked one, and note the dependency ("stacked on this branch — either merge #N into this branch first, or merge this PR and #N will retarget to `main`"). This keeps the diff to just the incremental change instead of re-litigating the whole original PR's content, and it composes correctly regardless of how the maintainer merges it: they can merge the stacked PR straight into the original's branch (folding the fix in before the original PR itself merges) or merge the original first and let the stacked PR retarget to `main` per that skill's step 4.
 Reserve the supersede path (below) for when stacking doesn't fit --- the original branch/PR is abandoned, or the fix amounts to a full rebuild rather than an incremental addition.
 
+**A plain `git merge --ff-only` plus push is a third way to fold a stacked PR
+into its base, alongside GitHub's own merge button --- and GitHub notices
+either way.**
+When the stacked PR's branch is a strict superset of its base
+(confirm with `git merge-base --is-ancestor <base-tip> <stacked-tip>`),
+merging the stacked branch into the base branch locally with `--ff-only` and
+pushing moves only a ref, with no new commit created.
+GitHub still detects that the stacked PR's head commit is now reachable from
+its base, and closes that PR as **merged** on its own, deleting its head
+branch if the repo auto-deletes on merge.
+This is the same outcome the paragraph above describes for GitHub's merge
+button, reached by a different door.
+
+Verify the superset relationship before relying on this, and prefer
+`--ff-only` specifically --- it refuses rather than silently rewriting history
+if the two branches have actually diverged.
+Confirm the auto-close afterward with `gh pr view <stacked-N> --json
+state,mergeCommit`; a `state: MERGED` with `mergeCommit.oid` equal to the
+commit you just pushed confirms the fast-forward was picked up.
+(`UCD-SERG/serocalculator#547` -> `#545`, 2026-08-08: `git merge
+origin/claude/pr-545-fix-h4gclq --ff-only` in `#545`'s worktree, followed by a
+push, left both branches at commit `6a6f83c0d`; GitHub closed `#547` as merged
+and deleted its head branch within the same push.)
+
 **Supersede fallback, when stacking doesn't apply:** push the fix to the assigned branch, open a **new** PR off `main` that supersedes the original (say "Supersedes #N" in the body and rebuild as a single clean commit so no sensitive history leaks through), comment on the original PR pointing to the replacement, and close the original once the new PR merges.
 
 **Rebuilding the single clean commit: diff against `main`, don't cherry-pick from the write-protected branch.** `main` usually doesn't yet contain the original PR's changes, so cherry-picking just your incremental fix commit conflicts --- it was written against the PR branch's state, not `main`'s.

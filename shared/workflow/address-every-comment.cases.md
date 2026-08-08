@@ -409,7 +409,7 @@ completeness against free-form English".
 
 In both rounds the redirect arrived beside example cases, and in both the
 examples were worked while the sentence was read past.
-#1287's round 2 sharpens why: it quoted this corpus's own "never predict which
+Round 2 on #1287 sharpens why: it quoted this corpus's own "never predict which
 case will fail; enumerate the class" and then suggested adding `)` to the
 character class --- so its actionable half proposed one more enumeration step
 against the lever its diagnostic half had just called incomplete.

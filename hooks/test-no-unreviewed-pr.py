@@ -829,6 +829,21 @@ case([bash(PUSH_CMD, tid="p"), res("p", ""),
       say("Pushed to a branch with no PR.")], False,
      "pushes in a session that opened no PR arm nothing")
 
+# `live` is keyed by PR number alone, so the same number in two repositories
+# would otherwise collapse to one key and report ONE live PR when there are two,
+# arming a push that is genuinely unattributable.
+case([bash("gh pr create --title a", tid="c1"),
+      res("c1", "https://github.com/o/r1/pull/50\n"),
+      bash('gh api "repos/o/r1/pulls/50/requested_reviewers" -X POST', tid="q1"),
+      res("q1", OK),
+      bash("gh pr create --title b", tid="c2"),
+      res("c2", "https://github.com/o/r2/pull/50\n"),
+      bash('gh api "repos/o/r2/pulls/50/requested_reviewers" -X POST', tid="q2"),
+      res("q2", OK),
+      bash(PUSH_CMD, tid="p"), res("p", ""),
+      say("Pushed with #50 open in two repos.")], False,
+     "the same PR number in two repos is two live PRs, so a push arms nothing")
+
 # The push wording must be distinguishable from the open wording: it states a
 # different fact (the PR WAS reviewed, at a commit that is no longer its head).
 def _push_wording():

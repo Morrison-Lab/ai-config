@@ -586,10 +586,27 @@ def _new_obl(num, repo, tid, self_, slast, srnum, srrepo, push=False):
             "slast": slast, "srnum": srnum, "srrepo": srrepo, "push": push}
 
 
+# A PR number seen in two DIFFERENT repositories. `live` is keyed by number
+# alone -- deliberately, because a number's repo is often unknown at append time
+# and backfills from the result, so keying by (num, repo) would file one PR
+# under two keys and permanently suppress arming. The cost is that the same
+# number in two repos collapses to one key, which would report ONE live PR when
+# there are two and arm a push that is genuinely unattributable. Marking the
+# number ambiguous keeps the exactly-one-live rule honest instead.
+_AMBIGUOUS = object()
+
+
 def _note_live(live, num, repo):
     """Record a PR this session opened or readied, once its number is known."""
-    if num is not None:
-        live[num] = repo or live.get(num)
+    if num is None:
+        return
+    prev = live.get(num)
+    if prev is _AMBIGUOUS:
+        return
+    if prev is not None and repo is not None and prev != repo:
+        live[num] = _AMBIGUOUS      # same number, two repositories
+        return
+    live[num] = repo or prev
 
 
 def _rearm(obligations, live, tid):
@@ -614,7 +631,7 @@ def _rearm(obligations, live, tid):
     if len(live) != 1:
         return
     num, repo = next(iter(live.items()))
-    if num is None:
+    if num is None or repo is _AMBIGUOUS:
         return
     for ob in obligations:
         if ob["num"] == num and _repo_ok(ob["repo"], repo):

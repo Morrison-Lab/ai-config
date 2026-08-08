@@ -208,6 +208,16 @@ BLOCK = [
     ("<<EOF sudo -u x bash\ngh pr merge 411\nEOF", "a wrapper after the heredoc token"),
     ("cd /r && <<EOF bash\ngh pr merge 411\nEOF", "the reordered form in a later segment"),
     ("bash <<EOF 2>/dev/null\ngh pr merge 411\nEOF", "a redirection after the heredoc token"),
+    # mask_payloads blanks the word after -m/-b/-d/-t/-s without checking the
+    # flag belongs to a gh/glab invocation, so an unrelated program's flag
+    # erased the EXECUTOR before the liveness check could see it. The executor
+    # scan reads the pre-mask_payloads text now.
+    ('nsenter -t 1 -m bash -c "gh pr merge 411"', "a payload flag erasing the executor"),
+    ('foo -m bash -c "gh pr merge 411"', "-m immediately before the executor"),
+    ('foo -b sh -c "gh pr merge 411"', "-b before sh"),
+    ('foo -t eval "gh pr merge 411"', "-t before eval"),
+    ('foo -d ssh host "gh pr merge 411"', "-d before ssh"),
+    ('foo -s bash -c "glab mr merge 12"', "-s before the executor, glab payload"),
 ]
 
 ALLOW = [
@@ -436,6 +446,20 @@ wrong += (_elapsed_q > 1.0)
 print(f"  {'allow' if _elapsed_q <= 1.0 else 'SLOW ':<6} "
       f"2000 quoted spans scanned in {_elapsed_q * 1000:.0f}ms (bound 1000ms)")
 
-total = len(BLOCK) + len(ALLOW) + 9
+# The executor scan reads a DIFFERENT string from the one being masked, and the
+# two are interchangeable only because both are length-preserving. A caller that
+# passes a mismatched subject would silently index the wrong offsets, so the
+# guard falls back to the masked text rather than trusting the argument.
+_txt = 'bash -c "gh pr merge 411"'
+# A mismatched subject must fall back to `text`, so the operand still reads as
+# LIVE and survives unmasked. Asserting only that the length is preserved would
+# pass either way -- masking is length-preserving by construction.
+_short = _guard.mask_inert_quotes(_txt, "too short")
+_ok = ("pr merge" in _short) and len(_short) == len(_txt)
+wrong += (not _ok)
+print(f"  {'allow' if _ok else 'WRONG':<6} "
+      f"a mismatched-length executor subject falls back instead of indexing")
+
+total = len(BLOCK) + len(ALLOW) + 10
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

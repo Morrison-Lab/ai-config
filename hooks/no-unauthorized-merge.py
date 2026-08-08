@@ -320,8 +320,22 @@ def mask_subexpressions(val: str) -> str:
     return "".join(result)
 
 
-def mask_inert_quotes(text: str) -> str:
+def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
     """Blank quoted spans that bash cannot execute, preserving length.
+
+    `exec_subject` is the text the EXECUTOR scan reads, defaulting to `text`.
+    The caller passes the pre-`mask_payloads` string, because `mask_payloads`
+    blanks a flag's following word without checking that the flag belongs to a
+    `gh`/`glab` invocation -- so `nsenter -t 1 -m bash -c "<merge>"` had its
+    `bash` erased before this function ever saw it, and the operand was then
+    masked as prose. The executor word was invisible to the check that decides
+    whether it is there.
+
+    Both strings are length-preserving, so one set of offsets indexes either.
+    Separator offsets still come from `text`: a separator inside a quoted span
+    is not a command separator, and reading them off the unmasked subject would
+    push a segment boundary PAST a real executor -- under-detecting, which is
+    the direction that hides a merge.
 
     Length-preserving because `offending` derives segment offsets from one
     string and slices another with them; a shorter result would misalign the
@@ -349,6 +363,10 @@ def mask_inert_quotes(text: str) -> str:
     def blank(s: str) -> str:
         return "".join("\n" if c == "\n" else " " for c in s)
 
+    if exec_subject is None or len(exec_subject) != len(text):
+        exec_subject = text
+    exec_ends = [m.end() for m in EXEC_AT_CMD_POS.finditer(exec_subject)]
+
     def live_operand_test(subject: str):
         """A `quote_start -> bool` test over one fixed subject string.
 
@@ -362,7 +380,6 @@ def mask_inert_quotes(text: str) -> str:
         VAR_PREFIX's bound was added for, reached by a different route.
         """
         seps = [m.end() for m in COMMAND_SEPARATOR.finditer(subject)]
-        exec_ends = [m.end() for m in EXEC_BEFORE_QUOTE.finditer(subject)]
 
         def test(quote_start: int) -> bool:
             j = bisect.bisect_right(exec_ends, quote_start)
@@ -643,7 +660,7 @@ def offending(command: str, payload: dict | None = None):
     #    stops asking which constructs may precede a command word -- an
     #    enumeration two review rounds showed cannot be finished -- and instead
     #    removes the text that cannot execute. See PERMISSIVE_LEAD.
-    inert_command = mask_inert_quotes(masked_command)
+    inert_command = mask_inert_quotes(masked_command, unquoted_command)
 
     for start, end in zip(starts, ends):
         orig_seg = unquoted_command[start:end]

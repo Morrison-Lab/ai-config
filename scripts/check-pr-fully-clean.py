@@ -120,10 +120,36 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # each classified as no verdict at all -- so a genuine not-clean verdict
     # neither blocked nor superseded anything. Missing a not-clean signal is
     # the dangerous direction here, the mirror of an over-broad clean one.
-    r"\bNeeds\s+(?:\w+\s+){0,3}work\b",
+    #
+    # The filler refuses a NEGATOR, because the words it was widened to admit
+    # are the same ones that invert the phrase: `needs no work` and `needs no
+    # more work` are positive statements, and the widening turned every one of
+    # them into a not-clean verdict. A negator sitting BEFORE the phrase
+    # (`nothing here needs any further work`) is not the filler's business and
+    # is handled by NOT_CLEAN_NEGATION_PREFIX below -- the mechanism that
+    # already existed for `no changes requested`.
+    r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?)",
     r"changes\s+requested\b",
 ]
+
+# Applies to EVERY not-clean pattern, not to one named member.
+#
+# This guard already existed, as an `if pat == r"changes\s+requested\b"` branch
+# inside the matching loop -- so a sibling pattern added to the list above got
+# no negation handling at all, which is precisely what happened. Enumerating
+# which patterns need the guard is the same failure this file has already lost
+# to twice on the clean side.
+#
+# Adjacency-anchored rather than a bare negator search anywhere in the prefix,
+# and that is what keeps it in the safe direction. Missing a not-clean signal
+# is the dangerous direction here, so the guard must not fire on a negator
+# belonging to an earlier clause: the `\w+\s+` filler cannot cross punctuation,
+# so `This is not done. Needs work` and `It is not ready; needs more work` both
+# stay not-clean.
+NOT_CLEAN_NEGATION_PREFIX = re.compile(
+    r"\b(?:no|not|nothing|none|never)\s+(?:\w+\s+){0,2}$", re.IGNORECASE
+)
 
 # Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
 # it would let an incidental "looks ready" in a later chatty comment discharge a
@@ -256,10 +282,9 @@ def classify_verdict(body: str, state: str = "") -> str:
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
-            if pat == r"changes\s+requested\b":
-                prefix = scan[max(0, match.start() - 25):match.start()].lower()
-                if re.search(r"\bno\s+(\w+\s+)?$", prefix):
-                    continue
+            prefix = scan[max(0, match.start() - 25):match.start()]
+            if NOT_CLEAN_NEGATION_PREFIX.search(prefix):
+                continue
             return "not-clean"
 
     for pat in VERDICT_CLEAN_PATTERNS:

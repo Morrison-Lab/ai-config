@@ -364,6 +364,37 @@ def main() -> int:
         "classify_verdict: a heading-marked verdict IS clean",
         checker.classify_verdict("### Ready for merge") == "clean",
     )
+    # The NOT-CLEAN list needs the same negation handling the clean list has,
+    # and it needs it per-list rather than per-pattern. Widening the `Needs
+    # ... work` filler to admit intervening words also admitted the words that
+    # INVERT the phrase, so a positive per-section remark anywhere in a long
+    # review forced the whole comment to not-clean and could suppress a genuine
+    # clean verdict indefinitely.
+    for phrase in (
+        "This section needs no work.",
+        "The implementation is solid and needs no more work before merging.",
+        "Nothing here needs any further work.",
+        "No changes requested.",
+        "There are no changes requested on this round.",
+    ):
+        check(
+            f"classify_verdict: a NEGATED not-clean phrase is not a verdict -- {phrase!r}",
+            checker.classify_verdict(phrase) == "",
+        )
+    # The other direction, which is the dangerous one: a negator belonging to
+    # an EARLIER clause must not discharge the signal. Punctuation is what
+    # separates them, and the guard's filler cannot cross it.
+    for phrase, why in (
+        ("This is not done. Needs work.", "a negator in the previous sentence"),
+        ("It is not ready; needs more work.", "a negator before a semicolon"),
+        ("Needs minor work", "the bare widened form still matches"),
+        ("Needs a little more work", "multi-word filler still matches"),
+        ("Verdict: Changes requested", "a labelled not-clean verdict"),
+    ):
+        check(
+            f"classify_verdict: still not-clean -- {why}",
+            checker.classify_verdict(phrase) == "not-clean",
+        )
     check(
         "classify_verdict: a bullet-marked verdict IS clean",
         checker.classify_verdict("- **Approved for merge**") == "clean",

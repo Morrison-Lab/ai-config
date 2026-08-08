@@ -261,6 +261,32 @@ ends; running it is what showed each form fails at one, which changes the fix --
 adding the opposite delimiter does not help, because substring overlap between
 alternatives makes string replacement the wrong instrument regardless.)
 
+## There is a fourth outcome: a mutation that applies cleanly and is unfaithful
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, round 6: a mutation meant to restore
+the pre-fix guard shape `if pat == r"changes\s+requested\b":` was built inside a
+shell heredoc feeding Python, as `"...requested\\b\":"`.
+The doubled backslash collapsed before Python parsed the literal, so `\b` became
+a backspace and the generated line ended `requested\x08":` --- a comparison
+string no member of `VERDICT_NOT_CLEAN_PATTERNS` can equal, so the mutation
+silently became "remove the guard entirely".
+It reported 4 failures where the faithful mutation reports 1, and that 4 was
+about to be published in a review reply as evidence for a claim about which
+component carried which case.
+Reproducible in one line:
+`python -c "print(repr('            if pat == r\"changes\\\\s+requested\\\\b\":'))"`
+prints a string ending `requested\x08":`, while the same literal's `\\s` survives
+as a literal backslash-s.
+Python's only diagnostic is `SyntaxWarning: invalid escape sequence '\s'`, which
+names the escape that SURVIVED rather than the one that broke.
+The differs-from-original assert recorded in the section above passes on this
+mutant, because a corrupted line does differ from the original --- which is what
+makes this a fourth outcome rather than an instance of the third.
+A second mutation in the same harness, rebuilt with `repr()` of a raw string,
+reported `ANCHOR MISSING` instead: vacuous as well, because `repr()` does not
+reproduce a source line written as `r"..."`, but vacuous in the direction that
+announces itself.)
+
 ## A component that stops failing under mutation is a question
 
 (`Morrison-Lab/ai-config#1278`, 2026-08-08: after a positional guard replaced two
@@ -278,6 +304,28 @@ failing only its own cases when mutated.
 Adding the position guard is what made the two older components look redundant,
 so the moment their score dropped to zero was the moment the missing case was
 findable.)
+
+## When the artifact is a GUARD, an empty search is still not licence to delete
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08, round 6: `EXEC_WRAP` in
+`hooks/no-unauthorized-merge.py` lets a merge pattern step over an executor
+between the command position and `gh`, as in `bash -c gh pr merge`.
+Once that round's fix stopped `mask_inert_quotes` blanking an executor's live
+operand, the permissive pass anchored on the whitespace the quote left behind and
+matched the operand directly --- so dropping `EXEC_WRAP` from all nine merge
+patterns failed ZERO of the suite's cases, including every case it had originally
+been added for.
+It was kept, with the measurement recorded in its own comment: removing a
+redundant path "on suite evidence alone fails OPEN if the suite is the thing that
+is incomplete", and "its removal is a reviewable simplification, not a bug fix".
+The reasoning turns on the round's own subject.
+The PR existed because that guard's suite had been incomplete for five rounds
+running, so the search came back empty using precisely the instrument under
+repair.
+Note the contrast with a sibling component in the same file, which needed no
+judgment call at all: removing pass 1 fails two cases, both `gh api graphql`
+mutations whose payload the permissive pass has already masked, so that one is
+measurably alive.)
 
 ## Scale that from one reported input to a corpus of real ones
 

@@ -706,6 +706,77 @@ does not.
 - **Don't:** trust a single-sided delimiter token to reach every alternative;
   it reaches every one but the end the delimiter is missing from.
 
+**There is a fourth outcome, and the differs-from-original assert above cannot
+see it: a mutation that applies cleanly and is UNFAITHFUL.**
+That assert reports `inapplicable` when the mutated artifact matches the
+original, which is necessary and not sufficient.
+A mutation can differ from the original, run to completion, and still not say
+what its author wrote --- so the assert passes, the suite runs, and the harness
+reports a plausible wrong number for a mutant nobody built.
+
+The mechanism is escaping, and it appears whenever the mutation string is built
+through a nested context rather than written out.
+A doubled backslash inside a shell heredoc feeding Python collapses to a single
+backslash before Python parses the literal, so `\\b` arrives as `\b` and becomes
+a **backspace**.
+A mutation meant to restore an older `pat == r"changes\s+requested\b"` guard
+shape therefore generated a comparison string ending `\x08`, which can never
+equal any member of the list it is compared against --- so the mutation silently
+became "remove the guard entirely", and reported four failures where the
+faithful mutation reports one.
+
+Two properties make it worse than an ordinary typo.
+The corruption is **selective**, so the string still reads correctly at a
+glance: in that same literal `\\s` survived as a literal backslash-s while
+`\\b` did not, because `\s` is not a valid Python escape and `\b` is.
+And the interpreter's one diagnostic, `SyntaxWarning: invalid escape sequence`,
+names `\s` --- the escape that **survived** --- rather than the one that broke,
+so the only signal emitted points away from the defect.
+
+Two remedies, both cheap.
+Build a mutant from a **raw literal**, or write the mutant source to a **file**,
+rather than through a heredoc that re-escapes it; note that `repr()` of a raw
+string does not reproduce a source line written as `r"..."`, which made a
+different mutation in the same harness report `ANCHOR MISSING` instead --- a
+vacuous row, but one that announces itself.
+And **self-check the mutant against its own target**: assert that the value it
+compares against is genuinely a member of the collection it is supposed to
+match.
+One `assert` catches this where the differs-from-original check cannot.
+
+- **Do:** assert the mutant is faithful --- that what it compares against is a
+  real member of the set it names --- on top of asserting it differs from the
+  original.
+- **Do:** build a mutation from a raw literal or a written file, not through a
+  nested-escaping heredoc.
+- **Don't:** read `SyntaxWarning: invalid escape sequence` as naming the broken
+  escape; it names a surviving sibling, and the corrupted one is silent.
+- **Don't:** treat "the artifact changed" as "the intended mutation applied" ---
+  a corrupted mutant differs from the original too.
+
+**Generalize past mutation: a harness needs a self-check against a quantity it
+did not compute.**
+A harness bug and a real finding are indistinguishable from the harness's own
+output, because both arrive as a number the harness produced.
+What separates them is a second quantity with an independent origin --- the
+suite's own reported failure count, the corpus's own ground truth, the figure a
+different tool reports over the same input.
+A section-derived failure count that over-counted by a constant was caught only
+because the harness compared its own total against the total the suite itself
+printed and said `HARNESS DISAGREES`.
+A ground-truth extractor using `rfind("Verdict")` landed on prose *discussing*
+verdicts and blamed the classifier for three mismatches that were its own.
+Neither is visible to a harness that only reports what it computed.
+This is the negative-control rule below aimed at the harness's arithmetic rather
+than at its input: a control proves the instrument can fire, and a cross-check
+proves the number it produced is the number it meant.
+
+- **Do:** have a harness compare at least one figure against a quantity produced
+  by something other than itself, and fail loudly on disagreement.
+- **Don't:** debug the artifact first when a harness reports a uniform or
+  otherwise surprising result across a corpus whose members vary --- suspect the
+  harness.
+
 **A component that stops failing under mutation is a question, not a cleanup.**
 Adding a new, stronger guard alongside older ones routinely leaves one of the
 old components **dead** against the suite: mutate it away and nothing fails,
@@ -733,6 +804,41 @@ look, not a later tidying pass.
   just added is what made the component look redundant.
 - **Don't:** delete a component because mutating it no longer fails the suite
   --- that is the suite describing itself, not the component.
+
+**When the artifact is a GUARD, an empty search is still not licence to delete.**
+The branch above ends by deleting on evidence once the search for a remaining
+role comes back empty.
+That holds for ordinary code, where a wrong deletion surfaces as a failure.
+It does not hold for a guard, because the costs are asymmetric: a redundant path
+costs a few characters, while removing one that was load-bearing fails **open**,
+and a guard that fails open is silent by construction.
+
+The asymmetry sharpens when the suite is itself the thing under suspicion.
+A round whose whole subject is that a guard's suite had been incomplete cannot
+then cite that suite as evidence a component is unnecessary --- the search came
+back empty using the very instrument the round is correcting.
+So the emptier the result looks, the more it is worth asking which of the two
+things it actually measured.
+
+Report the measurement instead of acting on it.
+Keep the component, record in its own comment that it is measured dead and by
+what, and say plainly that removing it is a reviewable simplification rather
+than a bug fix.
+That hands the human a decision they can make on wider evidence than the suite,
+which is the disposition
+[`report-mistakes-proactively`](report-mistakes-proactively.md) already
+prescribes for anything noticed but out of scope --- and it keeps the finding
+visible instead of resolving it silently in the fail-open direction.
+
+- **Do:** record a measured-dead guard component in a comment naming the
+  measurement, and flag its removal as a separate reviewable simplification.
+- **Do:** treat a suite the current round is fixing as unusable evidence about
+  what that suite's guard no longer needs.
+- **Don't:** delete a redundant path in a guard on suite evidence alone --- for
+  ordinary code a wrong deletion costs a failure, and for a guard it costs a
+  silent fail-open.
+- **Don't:** read this as licence to keep every dead branch; the exemption is
+  for guards, where the failure mode is silence, not for code generally.
 
 ## Limits
 

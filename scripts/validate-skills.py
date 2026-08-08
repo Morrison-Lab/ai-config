@@ -119,11 +119,16 @@ TOKEN_PATTERN = re.compile(r"`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
 # (ai-config#195) — env vars, git refs, API constants. Not every such token is
 # meant to resolve via the registry, so they're exempted rather than flagged.
 NON_OPERATION_TOKENS = {
+    # env var: names a session to ai-session.sh, and is where
+    # no-unauthorized-merge.py resolves the session from
+    "AI_SESSION_ID",
     "ALLOWED_TOOLS",
     "ANTHROPIC_API_KEY",
     "CHANGES_REQUESTED",  # GitHub review state constant, not an operation token
     "CHERRY_PICK_HEAD",
     "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_PROJECT_DIR",  # env var, one of the roots the .mwc marker is resolved from
+    "CLAUDE_SESSION_ID",  # env var, the harness's own session id; AI_SESSION_ID's fallback
     "ENTITY_NUMBER",
     "ERR_TUNNEL_CONNECTION_FAILED",
     "GEMINI_API_KEY",

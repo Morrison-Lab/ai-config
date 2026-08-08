@@ -326,3 +326,56 @@ The PR body had even noted that "the merge guard's only scoped authorization
 path had no test at all, which is how these went unnoticed", so the absence was
 observed and never generalized into distrust of the suite total quoted beside
 it.)
+
+## A merge gate is not a work gate
+
+(`ucdavis/bcs#578`, 2026-08-07: a CI change adding Gemini/Antigravity as review
+options, with one unusual property --- no external reviewer had produced a
+verdict at any head.
+Every verdict-shaped comment on it was the session's own self-review posted
+under the maintainer's account.
+Copilot had refused nine times on quota,
+and the repo's `claude-review` ran twice at the current head with
+`conclusion: success` and posted nothing either time.
+The session correctly and repeatedly declined to **merge** it without being
+told to.
+`main` then advanced by four PRs and #578 went `CONFLICTING`/`DIRTY`.
+The status report carried a boxed RECOMMENDATION --- "let me resolve #578's
+conflict and re-run its review ...
+Say the word and I'll drive it;
+I won't merge it either way" --- and stopped there.
+The user replied "do it", then corrected: "you should have done it without
+waiting for approval".
+Both halves of the rule were already written down --- `CLAUDE.md`'s "never ask
+'should I watch this?' or 'should I iterate it?' first", and this fragment's own
+"a conflict ... is ARDI work immediately".
+The failure was conflating a correct gate on one action with a gate on the whole
+PR.)
+
+## A fix that reinstantiates the class it just closed
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08, rounds 3 and 4: the guard in
+`hooks/no-unauthorized-merge.py` has a command-position anchor, `LEAD`, whose
+narrowness had already produced one fail-open in round 1.
+Round 3's fix consolidated three drifted copies of the executor list into a
+single `EXEC_PROGS` consumed by all three sites --- a real DRY repair, reported
+as such --- and in the same commit, `28cb5366`, hand-rolled a new anchor,
+`HEREDOC_EXECUTOR`, instead of composing `LEAD`.
+Round 4 duly found the round-1 keyword gap reproduced in that new anchor:
+`sudo bash <<EOF`, `time bash <<EOF`, `! bash <<EOF`, a `then` branch body, and
+a brace group all reached a blocked merge command while the guard returned
+allow.
+The author's own reply names the mechanism:
+"I fixed one duplicated concept and forked a different one in the same breath,
+which is why the round-1 keyword gap reappeared in a fourth place."
+The same reply records that the review had already said so --- its paragraph
+explaining why `EXEC_WRAP` did not save `mask_heredocs` is a statement that one
+idea lived in two places --- and that it was read as context for the heredoc bug
+rather than as the finding it was.
+Round 4's fix, `500204d3`, rebuilt the anchor as `LEAD + ENV_WRAP + executor`,
+which is the compose-the-shared-definition remedy this rule prescribes.
+The two later rounds are a different failure, recorded against
+[`check-purpose-before-reusing`](check-purpose-before-reusing.md): round
+4's fix was strictly wider than the hand-rolled anchor it replaced, so it
+introduced no gap --- it composed the narrow variant of an anchor that also had
+a permissive one, which rounds 5 and 6 then found insufficient.)

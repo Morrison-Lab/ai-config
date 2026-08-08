@@ -388,9 +388,9 @@ def push_ident(cmd):
     """True if `cmd` contains a genuine `git push` simple command.
 
     Deliberately returns no `last` flag, unlike request_ident/draft_ident/
-    gone_ident. Those three all decide a RELEASING change, which may fire only
-    on positive evidence of its own success, so each needs to know whether the
-    call's is_error belongs to it. Arming is the safe over-warn direction, so a
+    close_ident/probe_ident. Those all decide a RELEASING change, which may fire
+    only on positive evidence of its own success, so each needs to know whether
+    the call's is_error belongs to it. Arming is the safe over-warn direction, so a
     push arms whether it succeeded or not -- a failed push that arms costs one
     warning, while waiting for proof would silently skip a real new head
     whenever the push shared a call with anything else (which, measured on this
@@ -404,15 +404,21 @@ def push_ident(cmd):
     return any(_argv_push(a) for a in cmds)
 
 
-def _argv_gone(argv):
-    """(is_gone, num, repo): a `gh pr merge`/`gh pr close` -- the PR is done.
+def _argv_close(argv):
+    """(is_close, num, repo) for one simple command's argv: a terminal action.
 
-    A merged or closed PR can never gain another reviewable head, so it leaves
-    the live set and stops re-arming. This deliberately does NOT clear an
-    outstanding obligation: merging an unreviewed PR is exactly the thing this
-    guard exists to have prevented, so a merge must not retroactively excuse it.
-    It only stops FUTURE pushes in the same session -- typically to the next
-    branch -- from re-arming a PR that is no longer open.
+    Merging or closing a PR takes it past the point where requesting a reviewer
+    means anything: GitHub ACCEPTS `POST /pulls/{n}/requested_reviewers` on a
+    merged PR with HTTP 200 and adds nobody, so the obligation this guard
+    reports becomes literally unsatisfiable and it re-fires forever
+    (ai-config#1279, defect 3). A guard that cannot be satisfied trains everyone
+    to narrate around it, which is how a guard stops being read at all.
+
+    Structural and gh-SCOPED exactly like _argv_draft: the verb must be the argv
+    of a real `gh pr` invocation, never a token inside some other command's
+    string argument, so a `--body "gh pr merge"` cannot forge a discharge.
+    Identity comes from the terminal command ITSELF, so a decoy PR number
+    earlier in a chain cannot misdirect the clear onto a different PR.
     """
     if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
         return False, None, None
@@ -422,13 +428,52 @@ def _argv_gone(argv):
     return False, None, None
 
 
-def gone_ident(cmd):
-    """(is_gone, num, repo, last): mirrors draft_ident for merge/close."""
+def close_ident(cmd):
+    """(is_close, num, repo, last): does `cmd` merge or close a PR, and is that
+    the LAST simple command?
+
+    Mirrors draft_ident, including its fail-safe: `last` is what makes the
+    harness `is_error` (the WHOLE call's exit status) authoritative for this
+    command's own outcome, so a terminal action chained AHEAD of something else
+    is treated as ambiguous and does NOT discharge. Fails toward
+    not-a-close on a parse error, so it never fabricates a clear.
+    """
     cmds = _simple_commands(cmd)
     if cmds is None:
         return False, None, None, False
     for i, argv in enumerate(cmds):
-        ok, num, repo = _argv_gone(argv)
+        ok, num, repo = _argv_close(argv)
+        if ok:
+            return True, num, repo, (i == len(cmds) - 1)
+    return False, None, None, False
+
+
+def _argv_probe(argv):
+    """(is_probe, num, repo) for a read-only single-PR status read.
+
+    `gh pr view <N>` / `gh pr checks <N>`. These discharge nothing by
+    themselves -- they are only the CHANNEL through which a PR merged OUTSIDE
+    this session (by a human, or by the merge queue) becomes visible in the
+    transcript. The discharge additionally requires the result body to report a
+    terminal state, and the probe must name a PR number, so a repo-wide
+    `gh pr list` -- whose body mentions many PRs and whose first match need not
+    be the obligation's -- is deliberately NOT a probe.
+    """
+    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+        return False, None, None
+    if argv[2] in ("view", "checks"):
+        num, repo = _verb_ident(argv)
+        return (num is not None), num, repo
+    return False, None, None
+
+
+def probe_ident(cmd):
+    """(is_probe, num, repo, last): mirrors close_ident, for a status read."""
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False, None, None, False
+    for i, argv in enumerate(cmds):
+        ok, num, repo = _argv_probe(argv)
         if ok:
             return True, num, repo, (i == len(cmds) - 1)
     return False, None, None, False
@@ -491,8 +536,19 @@ REQ_TOOLS = {"request_copilot_review", "mcp__github__request_copilot_review"}
 # Structured tools that commit to a branch, re-heading whatever PR it backs.
 PUSH_TOOLS = {"push_files", "mcp__github__push_files",
               "create_or_update_file", "mcp__github__create_or_update_file"}
-# Structured merge: the PR can gain no further reviewable head.
-GONE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
+CLOSE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
+
+# A result body reporting that a PR has reached a terminal state -- merged or
+# closed. Tolerates the escaped quotes of a json.dumps'd tool_result, exactly as
+# RX_RES_NUM does. Only ever consulted for a result whose own command named a
+# single PR (see _argv_probe), so a body listing many PRs cannot discharge an
+# obligation for one of them.
+RX_TERMINAL_STATE = re.compile(
+    r"\\?\"state\\?\"\s*:\s*\\?\"(?:MERGED|CLOSED)\\?\""
+    r"|\\?\"merged\\?\"\s*:\s*true"
+    r"|\\?\"mergedAt\\?\"\s*:\s*\\?\"\d",
+    re.I,
+)
 
 # A PR API path (`repos/o/r/pulls/1038`) inside a shell command, used by
 # _url_ident to read identity from a request command's own `gh api` URL. Open,
@@ -609,6 +665,26 @@ def _note_live(live, num, repo):
     live[num] = repo or prev
 
 
+def _note_drafted(live, num):
+    """A PR went back to draft, so it leaves the live set and stops re-arming.
+
+    The number is frequently absent: a bare `gh pr ready --undo` is the ordinary
+    way to draft the CURRENT branch's PR, exactly as a bare `gh pr ready` is the
+    ordinary way to ready it, so draft_ident yields num=None. Popping only on a
+    known number would leave the entry in `live` and let a later push re-arm
+    review for a PR that is legitimately drafted and needs none.
+
+    With one live PR the bare form is unambiguous -- that PR is the one on the
+    current branch -- so it is popped outright. With several, the transition
+    cannot be attributed to any of them, and the honest answer is that `live` no
+    longer supports the exactly-one-live rule _rearm depends on: every entry is
+    marked ambiguous, which withholds arming rather than guessing which PR is
+    still ready.
+    """
+    if num is not None:
+        live.pop(num, None)
+
+
 def _rearm(obligations, live, tid):
     """Re-arm the reviewer obligation for the sole live PR, if a push earns it.
 
@@ -678,13 +754,13 @@ def scan(path):
     """
     obligations = []
     pending = {}        # tool_use_id -> (num, repo) for reviewer requests
-    # tool_use_id -> (num, repo, last, kind) for a deferred state transition.
-    # kind "draft": the PR went back to draft, so it needs no reviewer now --
-    # clears the obligation AND leaves the live set. kind "gone": the PR merged
-    # or closed, so it can gain no further head -- leaves the live set ONLY,
-    # deliberately never clearing an outstanding obligation (see _argv_gone).
-    pending_clear = {}
-    live = {}           # num -> repo for PRs opened/readied and still open
+    pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
+    pending_close = {}  # tool_use_id -> (num, repo) for merge/close actions
+    pending_probe = {}  # tool_use_id -> (num, repo) for single-PR status reads
+    # num -> repo for PRs this session opened or readied and still open. A
+    # PR leaves on a draft transition and on any terminal state, so a later
+    # push never re-arms review for a PR that can no longer take one.
+    live = {}
     text = ""
     with open(path, errors="ignore") as fh:
         for line in fh:
@@ -839,18 +915,42 @@ def scan(path):
                     # shared/principles/fail-fast.md, prefer keeping the over-warn
                     # rather than narrowing it to cut nags.
                     if rid in pending_clear:
-                        cnum, crepo, clast, ckind = pending_clear.pop(rid)
+                        cnum, crepo, clast = pending_clear.pop(rid)
                         clear_failed = (not clast) or failed
                         if not clear_failed:
-                            # A merge/close carries no number when it acts on
-                            # the current branch's PR, so fall back to one the
-                            # result reports (`Merged pull request o/r#N`).
-                            if ckind == "gone" and cnum is None:
-                                cnum, crepo = cnum or rnum, crepo or rrepo
-                            if ckind == "draft":
-                                _clear(obligations, cnum, crepo)
-                            if cnum is not None:
-                                live.pop(cnum, None)
+                            _clear(obligations, cnum, crepo)
+                            _note_drafted(live, cnum)
+                    # A PR that MERGED or CLOSED is past the point where a
+                    # reviewer request does anything: the POST this guard
+                    # prescribes returns HTTP 200 on a merged PR and adds
+                    # nobody, so the obligation cannot be discharged by
+                    # complying with it (ai-config#1279, defect 3). Same
+                    # fail-safe rule as the draft clear above -- the terminal
+                    # action must be last/atomic and non-failed -- so a merge
+                    # that failed, or one chained ahead of another command whose
+                    # exit status is what `failed` really reflects, keeps the PR
+                    # tracked. A bare `gh pr merge` names no number, so identity
+                    # falls back to the result's own, exactly as the request
+                    # discharge above does.
+                    if rid in pending_close:
+                        xnum, xrepo, xlast = pending_close.pop(rid)
+                        if xlast and not failed:
+                            xnum, xrepo = xnum or rnum, xrepo or rrepo
+                            _clear(obligations, xnum, xrepo)
+                            # Terminal, so it can gain no further reviewable
+                            # head: it leaves the live set, and no later push in
+                            # this session re-arms review for it.
+                            live.pop(xnum, None)
+                    # A PR merged OUTSIDE this session (by a human, or by the
+                    # merge queue) leaves no action in the transcript -- only an
+                    # observation. Discharged on POSITIVE evidence only: the
+                    # probe named one PR, the read did not fail, and the body
+                    # actually reports a terminal state.
+                    if rid in pending_probe:
+                        pnum, prepo, plast = pending_probe.pop(rid)
+                        if plast and not failed and RX_TERMINAL_STATE.search(body):
+                            _clear(obligations, pnum, prepo)
+                            live.pop(pnum, None)
                     continue
 
                 if kind != "tool_use":
@@ -875,11 +975,6 @@ def scan(path):
                             True, num, repo))
                         _note_live(live, num, repo)
                     continue
-                if name in GONE_TOOLS:
-                    gnum, grepo = input_ident(inp)
-                    # Atomic structured tool, so is_error reflects THIS merge.
-                    pending_clear[tid] = (gnum, grepo, True, "gone")
-                    continue
                 if name in PUSH_TOOLS:
                     # These commit to a named branch, which re-heads whatever PR
                     # that branch backs. A write to the default branch is not a
@@ -889,6 +984,11 @@ def scan(path):
                     continue
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
+                    if str(inp.get("state") or "").lower() == "closed":
+                        # Closing is terminal for review purposes, same as a
+                        # merge. Atomic tool, so is_error reflects THIS change.
+                        pending_close[tid] = (num, repo, True)
+                        continue
                     if inp.get("draft") is False:
                         _note_live(live, num, repo)
                     if inp.get("draft") is True:
@@ -898,7 +998,7 @@ def scan(path):
                         # defer the clear to this call's own non-failed result.
                         # A structured tool is atomic -- one tool_use, one result
                         # -- so is_error reflects THIS transition: last=True.
-                        pending_clear[tid] = (num, repo, True, "draft")
+                        pending_clear[tid] = (num, repo, True)
                     elif inp.get("draft") is False:
                         # Structured, atomic: slast=True, reviewers target num.
                         obligations.append(_new_obl(
@@ -931,6 +1031,11 @@ def scan(path):
                     rn, rr = input_ident(inp)
                     pending[tid] = (rn, rr, True)  # atomic; is_error is trusted
                     continue
+                if name in CLOSE_TOOLS:
+                    # Structured tool: atomic, so is_error reflects THIS merge.
+                    cn, cr = input_ident(inp)
+                    pending_close[tid] = (cn, cr, True)
+                    continue
                 if name not in SHELL_TOOLS:
                     continue  # never text-match a non-shell tool
 
@@ -954,7 +1059,6 @@ def scan(path):
                 # deferred to the command's own non-failed result: a `gh pr
                 # ready --undo` that fails leaves the PR ready, so clearing at
                 # tool_use time would silently forget it.
-                _gok, gnum, grepo, glast = gone_ident(cmd_raw)
                 if draft:
                     # Identity and `last` come from the draft command ITSELF
                     # (draft_ident): a decoy PR verb earlier in the line cannot
@@ -963,12 +1067,7 @@ def scan(path):
                     # so the clear is withheld (is_error ambiguous). A draft form
                     # draft_ident does not resolve leaves dnum=None/dlast=False,
                     # which never clears -- the safe over-warn direction.
-                    pending_clear[tid] = (dnum, drepo, dlast, "draft")
-                elif _gok:
-                    # Deferred like a draft transition, and for the same reason:
-                    # leaving the live set is a releasing change, so it waits for
-                    # positive evidence the merge/close itself succeeded.
-                    pending_clear[tid] = (gnum, grepo, glast, "gone")
+                    pending_clear[tid] = (dnum, drepo, dlast)
                 elif opened:
                     # `self` carries the matched request's ordering (rlast) and
                     # target PR (rnum/rrepo) so the discharge can require the
@@ -983,12 +1082,33 @@ def scan(path):
                 # separate pending request here.
                 if requested and not opened:
                     pending[tid] = (rnum, rrepo, rlast)
+                # Terminal actions and status reads are registered regardless of
+                # the branches above: `gh pr merge` is neither an open nor a
+                # draft transition, and a `gh pr view` chained after a create
+                # must still be able to report that PR merged later.
+                cok, cnum, crepo, clast2 = close_ident(cmd_raw)
+                if cok:
+                    pending_close[tid] = (cnum, crepo, clast2)
+                pok, pnum, prepo, plast = probe_ident(cmd_raw)
+                if pok:
+                    pending_probe[tid] = (pnum, prepo, plast)
                 # A push re-heads the PR, so the per-head reviewer request is
-                # owed again. Checked last and independently of the branches
-                # above: a call that both pushes and requests (`git push && gh
-                # api ... -X POST`) arms here and is discharged by that same
-                # call's result, which is correct -- the request came after the
-                # push. Arming needs no result, per push_ident.
+                # owed again. Checked last: a call that both pushes and requests
+                # (`git push && gh api ... -X POST`) arms here and is discharged
+                # by that same call's result, which is correct -- the request
+                # came after the push. Arming needs no result, per push_ident.
+                #
+                # But NOT when the same call also drafts, merges, or closes a
+                # PR. Those two transitions are DEFERRED to this call's result
+                # while the arm fires here, synchronously, so a chained `gh pr
+                # merge 1038 --squash && git push -u origin next-branch` would
+                # arm 1038 off a `live` set the same call is about to empty.
+                # That direction is not a harmless over-warn: a merged PR cannot
+                # take a reviewer (ai-config#1279, defect 3), and when the
+                # terminal command is not last its own discharge is withheld as
+                # ambiguous, so the arm it raced would stand unsatisfiable. One
+                # call cannot both retire a PR and owe review on it, so the arm
+                # yields to the transition.
                 if pushed:
                     _rearm(obligations, live, tid)
     return obligations, text

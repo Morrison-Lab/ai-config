@@ -141,6 +141,46 @@ And the 52 was itself the narrow detector's output, missing all six
 The correct accounting is 84 identifier sites redacted: 64 pseudonymized in
 place across 9 files, plus 20 deleted with the two pasted blocks.)
 
+## Publishing a command is not enough; it has to be the command you ran
+
+(`Morrison-Lab/ai-config#1299`, 2026-08-08: a UMS PR recording that a unified
+diff's `+++ b/<path>` header is prefix-compatible with the `+` markers beside
+it, so `git diff | grep '^+' | sed 's/^+//'` leaks a mangled `++ b/<path>` line
+into extracted content.
+
+The PR verified its own diff with trailing-space-anchored patterns, listed in
+its description: `^++ `, `^+++ `, `^-- [ab]/`, `^--- [ab]/`, and `^@@ `, over
+147 added lines, with a 5-of-5 synthetic-positive control.
+Into the corpus it wrote `grep -v '^+++'` as the prescribed guard, described as
+excluding the delimiter by full length.
+So the precise pattern and the loose one were authored minutes apart, by the
+same author, in the same PR, and only the precise one was ever run.
+
+Round 2's review found it, and named the gap in exactly those terms: the
+dogfooding table "already used the more precise trailing-space-anchored
+patterns ... so a more accurate pattern was already in hand and simply wasn't
+the one written into the prescribed fix".
+
+The same PR carries the control that makes the point rather than merely
+illustrating it.
+A third pattern, `^--- `, was suggested to the author and *was* run, whereupon
+it collided with this corpus's own spaced dash line starts and produced many
+false positives across 491 tracked Markdown files; the author tightened it to
+`^--- [ab]/` before shipping.
+Same author, same PR, same class of over-loose prefix: caught in the pattern
+that was executed, missed in the pattern that was only published.
+
+The reviewer's own suggested fix was a further instance.
+Commit `a60d967f` measured all three on git 2.50.1, against a commit adding
+`++i;`, `++ foo`, and `plain`, and reported that `grep -v '^+++'` keeps only
+`plain`, the suggested `grep -v '^+++ '` keeps `++i;` and `plain`, and only a
+positional guard keeps all three.
+No prefix separates the header from its data, which is the PR's own thesis
+turned on its own remedy.
+The shipped fix is positional, `grep '^+' | tail -n +2`, and `d426bf83` added
+its per-file precondition after the dogfooding scan violated it and returned
+three hits that read as defects in the files rather than in the scan.)
+
 ## A reference frame chosen from the initial condition expires as the system moves
 
 (`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: an instrument
@@ -221,6 +261,49 @@ ends; running it is what showed each form fails at one, which changes the fix --
 adding the opposite delimiter does not help, because substring overlap between
 alternatives makes string replacement the wrong instrument regardless.)
 
+## There is a fourth outcome: a mutation that applies cleanly and is unfaithful
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, round 6: a mutation meant to restore
+the pre-fix guard shape `if pat == r"changes\s+requested\b":` was built inside a
+shell heredoc feeding Python, as `"...requested\\b\":"`.
+The doubled backslash collapsed before Python parsed the literal, so `\b` became
+a backspace and the generated line ended `requested\x08":` --- a comparison
+string no member of `VERDICT_NOT_CLEAN_PATTERNS` can equal, so the mutation
+silently became "remove the guard entirely".
+It reported 4 failures where the faithful mutation reports 1, and that 4 was
+about to be published in a review reply as evidence for a claim about which
+component carried which case.
+Reproducible in one line:
+`python -c "print(repr('            if pat == r\"changes\\s+requested\\b\":'))"`
+prints a string ending `requested\x08":`, while the same literal's `\\s` survives
+as a literal backslash-s.
+
+The backslash count in that line is load-bearing, and getting it wrong is this
+case's own failure a third time.
+The line first shipped with `\\s`/`\\b`, which does NOT reproduce: one shell
+layer collapses the doubled pair to a single backslash, Python then reads `\\b`
+as an escaped backslash rather than a backspace, and the reader gets a clean
+result while the prose promises corruption.
+A review caught it and was rebutted, on a measurement showing both forms
+printing `\x08` --- taken through a harness that wrapped the command in a
+SECOND shell, which collapsed the pair twice and silently turned the
+four-backslash form into the two-backslash one.
+Running each form from a file, so exactly one shell layer applies, separates
+them: the doubled form prints `requested\\b":` with no warning, and the single
+form prints `requested\x08":` with one.
+So a command measured through a tool that adds a layer is not the command a
+reader runs, and the way to compare them is to write each to a file and run the
+file.
+Python's only diagnostic is `SyntaxWarning: invalid escape sequence '\s'`, which
+names the escape that SURVIVED rather than the one that broke.
+The differs-from-original assert recorded in the section above passes on this
+mutant, because a corrupted line does differ from the original --- which is what
+makes this a fourth outcome rather than an instance of the third.
+A second mutation in the same harness, rebuilt with `repr()` of a raw string,
+reported `ANCHOR MISSING` instead: vacuous as well, because `repr()` does not
+reproduce a source line written as `r"..."`, but vacuous in the direction that
+announces itself.)
+
 ## A component that stops failing under mutation is a question
 
 (`Morrison-Lab/ai-config#1278`, 2026-08-08: after a positional guard replaced two
@@ -238,3 +321,65 @@ failing only its own cases when mutated.
 Adding the position guard is what made the two older components look redundant,
 so the moment their score dropped to zero was the moment the missing case was
 findable.)
+
+## When the artifact is a GUARD, an empty search is still not licence to delete
+
+(`Morrison-Lab/ai-config#1287`, 2026-08-08, round 6: `EXEC_WRAP` in
+`hooks/no-unauthorized-merge.py` lets a merge pattern step over an executor
+between the command position and `gh`, as in `bash -c gh pr merge`.
+Once that round's fix stopped `mask_inert_quotes` blanking an executor's live
+operand, the permissive pass anchored on the whitespace the quote left behind and
+matched the operand directly --- so dropping `EXEC_WRAP` from all nine merge
+patterns failed ZERO of the suite's cases, including every case it had originally
+been added for.
+It was kept, with the measurement recorded in its own comment: removing a
+redundant path "on suite evidence alone fails OPEN if the suite is the thing that
+is incomplete", and "its removal is a reviewable simplification, not a bug fix".
+The reasoning turns on the round's own subject.
+The PR existed because that guard's suite had been incomplete for five rounds
+running, so the search came back empty using precisely the instrument under
+repair.
+Note the contrast with a sibling component in the same file, which needed no
+judgment call at all: removing pass 1 fails two cases, both `gh api graphql`
+mutations whose payload the permissive pass has already masked, so that one is
+measurably alive.)
+
+## Scale that from one reported input to a corpus of real ones
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, rounds 4 to 6: `classify_verdict()`
+in `scripts/check-pr-fully-clean.py` had taken four rounds of authored cases,
+each round's reviewer supplying counter-examples the previous fix missed.
+Instead of inventing more, the author ran the classifier over the real verdict
+bodies on the six PRs open that night, where ground truth was known
+independently.
+Two findings followed that no synthetic case had produced.
+
+The first is an under-block on the side nobody was editing.
+Three rounds of "Needs **minor** work" on `Morrison-Lab/ai-config#1293`
+classified as no verdict at all, because the not-clean pattern required
+`Needs\s+work` adjacency --- a genuine not-clean verdict that neither blocked
+nor superseded anything, which is the mirror of the bug the PR existed to fix.
+The author's note is the argument for the method: "no synthetic case would have
+produced the phrasing", and the corpus "is now better evidence than the unit
+suite, because I did not choose its wording".
+
+The second is the over-block, and it appeared only on re-running the corpus
+after a later widening.
+With `\n` no longer terminating a sentence, that same PR's genuinely clean
+verdict began classifying as not clean, on an ordinary `but` roughly 120
+characters downstream in one long sentence.
+That direction makes criterion 4 unsatisfiable for a clean PR, which is worse
+than the under-block being fixed, so the scan was bounded to 60 characters as
+well as to the sentence --- a qualifier retracts only when it sits close.
+Post-fix the classifier reproduced ground truth across 20 verdict bodies on six
+PRs.
+
+The harness itself is the third instrument failure recorded that session, after
+a mutation harness that silently no-opped and a `grep`-based keyword count that
+returned 8 for 7.
+The first comparison run reported all six PRs as MISMATCH.
+The classifier was right; the harness derived the PR number with `split('c12')`,
+turning `c1257.json` into `57`, so every ground-truth lookup missed.
+A uniform verdict across a corpus whose members vary is the tell --- and the
+author's own framing of why it still deserved recording is that failing loudly
+is the safe direction for a broken instrument, not a correct one.)

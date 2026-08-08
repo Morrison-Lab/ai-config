@@ -68,22 +68,116 @@ information about that artifact, which is the mirror of the benchmark-check
 case this file records, whose green carries none about its content.
 Two timestamps then localize it exactly, per
 [`algorithmatize-checks`](algorithmatize-checks.md): bracket the verdict
-comment's `updated_at` inside the **review** step's own `started_at` and
+comment's `created_at` inside the **review** step's own `started_at` and
 `completed_at`.
 A comment written while that step was running is a comment that run produced.
 Comparing it against the guard step's `started_at` instead does not
 discriminate, since the guard always runs after the review step in the same
 job, so a stale comment from any earlier round clears that bar just as easily.
 
+**That field reads `created_at` deliberately, and it used to read
+`updated_at`, which is wrong in the one direction the bracket exists to
+catch.**
+Correcting it visibly rather than silently, since a reader who applied the
+older wording got a false negative and has no other way to learn that.
+
+The reusable workflow ends each review with a step named
+`Collapse previous Claude review comments`, and its own source says the run
+that wins the per-PR concurrency race must fold the earlier pushes' review
+comments "or they linger".
+So every round after the first **minimizes** every earlier round's verdict
+comment, and `updated_at` advances to whenever the newest round finished.
+Only the newest comment on a PR still satisfies a bracket keyed on it.
+Every earlier one reports `updated_at` outside its own producing run and
+reads as though no run produced it.
+
+The mechanism is worth stating precisely, because it makes the warning
+sharper rather than weaker.
+That step's only mutation is the GraphQL `minimizeComment` mutation with
+`classifier: OUTDATED`, which marks a comment collapsed and outdated.
+It issues no REST `PATCH` and rewrites no text, so **nothing about the
+comment's content changes at all** and `updated_at` still moves.
+A reader who expected the timestamp to track edits has no surviving reason
+to trust it: it advances on a bookkeeping action that leaves the body byte
+for byte identical.
+`created_at` is the only field the fold cannot touch.
+
+Nothing in the comment's text reveals the fold, which follows from the
+mutation rather than being a separate mercy.
+It adds no `<details>` wrapper and no supersession note: measured on the
+comment below, a `grep -cE '<details|<summary'` over the folded body returns
+`0`.
+Confirm the same from the API rather than from the rendered page, since
+GraphQL exposes both halves of the claim on one object and REST exposes
+neither.
+
+The same drift defeats the cheaper check a reader reaches for first, comparing
+a verdict comment's timestamp against a commit's.
+An `updated_at` later than a push is **not** evidence the review saw that
+push, because the fold that advanced it can postdate the push by any amount.
+
+```bash
+NODE=$(gh api repos/Morrison-Lab/ai-config/issues/comments/5227428537 \
+  --jq '.node_id')
+gh api graphql -f id="$NODE" -f query='query($id: ID!) {
+  node(id: $id) { ... on IssueComment {
+    isMinimized minimizedReason lastEditedAt createdAt updatedAt } } }'
+gh api repos/Morrison-Lab/ai-config/actions/runs/31270501058/jobs \
+  --jq '.jobs[] | select(.name == "review / claude-review")
+        | {started_at, completed_at}'
+```
+
+Measured on `Morrison-Lab/ai-config#1299`, 2026-08-08.
+Round 2's verdict comment reports `created_at 18:08:08Z` and
+`updated_at 18:26:27Z`, against a producing job that ran `17:52:49Z` to
+`18:08:14Z`.
+`created_at` falls inside that window and matches the run's own
+`Post review comment` step (`18:08:08Z` to `18:08:09Z`) exactly.
+`updated_at` falls 18 minutes past the job's end, inside the round 3 run
+(`31271746935`, `18:21:56Z` to `18:26:38Z`), two seconds after round 3 posted
+its own verdict at `18:26:25Z`.
+The two commits round 2 never saw, `a60d967f` and `d426bf83`, landed at
+`18:10:48Z` and `18:11:44Z`, so they fall after that `created_at` and before
+that `updated_at`: the two fields answer the did-it-see-this-push question
+oppositely, and only `created_at` answers it correctly.
+That same comment reports `isMinimized true`, `minimizedReason outdated`, and
+`lastEditedAt null`, so its body was never edited at any point while
+`updated_at` moved 18 minutes.
+[`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)'s
+permissions-argument bullet cited the same pair as evidence and was narrowed
+to `created_at` in the same change.
+
+The step's source is `Morrison-Lab/gha`'s
+`.github/workflows/claude-code-review.yml` at `origin/main`, where
+`Collapse previous Claude review comments` begins on line 914 and its only
+mutation is the `minimizeComment` call on line 941.
+The one `PATCH` in that file, on line 975, belongs to a different step,
+`Explain and fold tracking comment when canceled` on line 954, which runs only
+`if: cancelled()` and prepends a warning to the **current** run's own tracking
+comment.
+It never touches an earlier round's verdict, so it is not the mechanism behind
+the drift measured above.
+
 - **Do:** read the PR's own comments before accepting that a failed review run
   produced no verdict.
 - **Do:** read a guard's failure branch to learn whether its red is evidence
   about the artifact at all, rather than keeping "go look" as a habit to
   remember.
+- **Do:** bracket a verdict comment's `created_at`, never its `updated_at`,
+  inside the producing review step's window.
+- **Do:** read an older review comment that renders as collapsed or outdated as
+  expected housekeeping, rather than as a tampered or refreshed verdict.
+- **Don't:** read a moved `updated_at` as evidence that anything in the comment
+  changed; `minimizeComment` moves it while editing nothing.
 - **Don't:** infer that a run produced nothing from a true report that it ended
   in an error.
 - **Don't:** treat "the guard did not misfire" as establishing that its red is
   informative.
+- **Don't:** compare a comment's `updated_at` against a push time to decide
+  whether the review saw that push.
+- **Don't:** conclude from an out-of-window `updated_at` that no run produced a
+  comment; on any PR that reached a second round, that is true of every earlier
+  comment.
 
 **A third case, distinct from either misfire above: some checks are designed to NEVER fail regardless of their own posted content, so their green color carries zero signal at all.** A CI-runner-relative benchmark check that gates a soft threshold (e.g. "regressed beyond 20% vs. baseline") may deliberately report success/pass at the GitHub-check level even when it posts a `:warning:` regression comment, precisely because the project has decided that threshold is "a human call, not an auto-block" rather than a hard gate. `gh pr checks` (or the equivalent status API) showing this check as PASS is consequently not evidence there is nothing to look at --- it only means the check ran, not that its content was clean. Read the check's own posted comment body every time, the same discipline the review-job case above already demands, but don't expect the check's pass/fail conclusion to ever flip for this class of check even on a real, large regression.
 
@@ -806,8 +900,6 @@ tracked in ai-config#811.
 - **Don't:** assume the run you are about to cancel is your own.
 - **Don't:** filter in-flight review runs by branch; a dispatched run reports
   the default branch whatever `--ref` it was given.
-
-++ b/shared/workflow/fully-clean.md
 
 **The cheap version of that pre-check asks the PR instead of the runs, and it
 is sound only when the dispatch attached the run to the PR.**

@@ -62,6 +62,45 @@ published in an issue and a merged PR body as *the* verification command
 for a security invariant, so the phantom it produced was reported as a
 regression before the pattern was re-read.)
 
+## "A third direction" --- the diff header that rode into ported prose
+
+(Morrison-Lab/ai-config#1290 -> #1296, 2026-08-08.
+Sibling PR #1291 merged at 14:41:26Z, splitting
+`shared/workflow/fully-clean.md` and
+moving #1290's target section into the new
+`shared/workflow/review-verdict-pitfalls.md`, so #1290 had to *port* its prose
+rather than merge it.
+The port extracted the content with
+`git diff <base> <head> -- shared/workflow/fully-clean.md | grep '^+' | sed 's/^+//'`,
+which kept the `+++ b/shared/workflow/fully-clean.md` header and stripped one
+character from it.
+The resulting `++ b/shared/workflow/fully-clean.md` landed mid-prose at line
+810 in the conflict-resolution merge `4acf1895` at 14:51:38Z, eight minutes
+before #1290 merged as `fa55c46a` at 14:59:26Z.
+
+Four verdict-bearing review rounds had already run that morning --- 06:27:19Z,
+06:44:13Z, 06:53:29Z, 07:01:10Z --- and none had the artifact in scope, since
+the destination file did not enter the PR's diff until that final merge commit.
+The reviewer said so itself: "review-verdict-pitfalls.md didn't exist in this
+PR's diff until this merge commit, so it wasn't reachable by any prior review
+round."
+A fifth round dispatched at 15:02:53Z, after the merge, caught it; `613aba15`
+removed it at 17:28:10Z, so it stood on `main` for 2h28m.
+
+Two things kept it there.
+A conflict-resolution commit is the least-scrutinized commit on a PR: it lands
+after the review rounds and reads as mechanical.
+And the mangling disguised the artifact --- an intact `+++ b/<path>` in prose
+reads as machine output and gets deleted on sight, while `++ b/<path>` reads
+as a typo or an odd bullet, so a read-through for sense passes over it.
+
+The corpus already held the mechanism, at `memories/git.md`'s
+stash-supersession bullet, which ships `grep '^+[^+]'` and names the
+`+++ b/<path>` headers it excludes.
+It did not transfer, and would not have been the right guard here anyway:
+measured on git 2.50.1, `^+[^+]` drops added blank lines, so on prose it merges
+paragraphs.
+
 ## "The third one arrives in the repair" --- the empty-input sentinel
 
 (Morrison-Lab/ai-config#1056, 2026-08-02: review round 1 found that a
@@ -145,6 +184,27 @@ The stated reason covers both forms, so applying it as a predicate would have
 caught them when the comment was written.
 Fixed in `dcd7eb0c` by giving every command name a `(?![-\w])` suffix.)
 
+## The members in a LIST, with the branch inside the loop
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, round 6: `classify_verdict()` in
+`scripts/check-pr-fully-clean.py` iterates
+`for pat in VERDICT_NOT_CLEAN_PATTERNS`, and applied its negation-prefix guard
+under `if pat == r"changes\s+requested\b":` --- the single member the guard had
+originally been written for.
+A sibling pattern added to that list in an earlier round therefore received no
+negation handling at all, which is the defect round 6's reviewer found.
+The members were not hidden inside one expression the way this section's
+alternation case describes: the list literal spells them out, one per line, so
+the "same expression, on the same screen" tell did not apply.
+What suppressed the enumeration was the branch's own shape --- an equality test
+against one literal reads as a special case rather than as an enumeration of
+one, so adding a member to the list prompts no look at it.
+The fix applies the guard to every member.
+The same function's clean-side loop already showed the correct shape for a
+genuine exception: `if pat in BARE_CLEAN_PATTERNS:` names the subset, so the
+members it excludes are a list a reader can check rather than a literal nobody
+revisits.)
+
 ## "A combined result cannot attribute a per-step outcome"
 
 (Morrison-Lab/ai-config#1042, 2026-08-02/03: the `no-unreviewed-pr.py` Stop
@@ -210,3 +270,36 @@ as|contingent`, applied only to the two bare phrases --- the `Verdict:`-anchored
 patterns need no guard, since they require adjacency to the label.
 The after-side form is the likelier one in a real review, because it is how a
 reviewer signs off on nearly-done work.)
+
+## "One side's own BOUNDARY can encode the negation of the other side's assumption"
+
+(`Morrison-Lab/ai-config#1278`, 2026-08-08, rounds 2 to 6, on the same
+`classify_verdict()` guard as the case above.
+Rounds 2 and 3 built the before-side negation scan so that it deliberately looks
+backward across a line break, and the reasoning was stated outright: this corpus
+writes semantic line breaks, so a negation routinely sits at the end of the
+previous line.
+Two tests pin it.
+Round 4's redesign then replaced a fixed-offset check with a sentence-scoped
+one, defining `SENTENCE_END` as `[.!?\n]` --- a bare newline weighted equally
+with a full stop.
+`_sentence_remainder` therefore returned the empty string whenever a clean
+pattern was followed immediately by a newline, so a qualifier opening the next
+line was never searched, and the verdict classified as clean.
+Round 5's review reproduced it against the extracted classifier and named the
+split as "a very natural split under this corpus's own semantic-line-break
+convention".
+The author's own reply is the entry: "Same corpus property, mirrored side,
+opposite conclusion, one round apart", adding "this is the same corpus property
+the negation guard is built around" and "the part I should not have gotten
+wrong".
+Fixed in `7acb6bdd` by dropping `\n` as a terminator while keeping a blank line
+as one, "since that is a paragraph break rather than a wrapped clause".
+Widening it immediately surfaced the opposite failure, recorded against
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.cases.md): a
+genuinely clean verdict began classifying as not-clean on an ordinary `but`
+about 120 characters downstream, so the scan is now bounded to 60 characters or
+the sentence, whichever ends first.
+Note the four rounds' own progression, which the author summarised before the
+last one: vocabulary, then scope, then position --- "each fix was correct about
+the case in front of it and wrong about one level up".)

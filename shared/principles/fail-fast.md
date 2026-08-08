@@ -209,6 +209,69 @@ wrong moment.
 - **Don't:** treat an exit-status or locale guard as covering this --- both
   pass cleanly while the check examines nothing.
 
+### A sound command can still examine almost nothing, when the selection stage collapses
+
+The two cases above are the check **breaking** and the input being **empty**.
+This is the one where neither holds: the command is well-formed, the file is
+right there with the content in it, and an intermediate **selection** stage
+quietly hands the matcher one line instead of forty.
+
+The worked instance is an `awk` range whose closing pattern also matches its
+own opening line:
+
+```bash
+# scripts/Unit.gd really does contain `func _separate(delta: float) -> void:`
+awk '/^func _separate/,/^func [a-z_]+\(.*\) -> (void|bool)/' scripts/Unit.gd |
+  grep "position +="        # returns nothing --- the range was ONE line
+```
+
+The start anchor matches the function header, and so does the end anchor, so
+the range opens and closes on the same line.
+`grep` then reports honestly on a single line, and the empty result reads as
+"this function never writes `position`" --- which was published as a claim, and
+was false.
+
+**The existing awk-range caution does not cover this, and its check passes
+here.**
+[`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md)
+warns that "a repeated start anchor makes an `awk` range restart and silently
+widen", and prescribes confirming each anchor matches exactly once.
+That is the **opposite** direction --- widening, not collapsing --- and both
+anchors clear its test: the start matches once, and the end is a general pattern
+that legitimately matches many lines.
+Its *second* habit is the one that would have caught this, and it generalizes
+past `awk`: run the selection once **without** the counting stage, and look at
+what it selected.
+
+That is the same point [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
+makes in "A negative control must enter at the real input", where extraction is
+named as the usual culprit "precisely because it looks like plumbing rather than
+logic".
+A denominator states it as a number: `0 hits in 1 line selected` is obviously
+wrong, where a bare `0` is not.
+
+- **Do:** print how much the selection stage returned, not only what the matcher
+  found in it.
+- **Do:** run a range or extraction on its own once, and read what it selected,
+  before piping it anywhere.
+- **Don't:** treat a well-formed command over a non-empty file as evidence that
+  anything was examined.
+- **Don't:** rely on the anchors-match-once check to catch a collapsed range ---
+  it is aimed at the widening case and passes cleanly on this one.
+
+(2026-08-07: five instruments in one session each returned an empty or zero
+result that was read as absence --- a cumulative delta over a per-tick-cleared
+array, a `gh pr diff --name-only` empty from API lag that returned 2 files on
+re-query, an `ls A || ls B` fallback that did not say which branch answered, a
+diff-scoped grep blind to a defect caused by a *deleted* line, and this one.
+The last was published as a false claim by a session that had, earlier that same
+day, written the vacuous-zero trap into this very file.
+Read that as the argument for the denominator being a property of the
+instrument rather than something recalled at the call site ---
+[`skill-checklists`](../workflow/skill-checklists.md) already draws exactly that
+conclusion, in its "knowing the rule is not what fails here" passage, and is the
+place to read rather than restate it.)
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass
@@ -452,6 +515,125 @@ That fragment governs a **sound** command whose conclusion overreaches --- the
 null result is a real fact about the pattern, and only the step to "the corpus
 lacks this" is wrong.
 Here the command itself is unsound, so the result is not a fact about anything.
+
+**A third direction, and the one the remedy above passes: the pattern is right
+about the data and admits the stream's own metadata, because that metadata is
+written in the data's alphabet.**
+Both directions above are a pattern matching the wrong *things*.
+Here it matches the right things and one more, because the stream it reads is
+not pure data.
+A unified diff marks added content with `+` and names the file that content
+came from with `+++ b/<path>`, so a filter for added lines cannot separate the
+two by prefix:
+
+```bash
+git diff <base> <head> -- <path> | grep '^+' | sed 's/^+//'   # leaks the header
+```
+
+`sed` then strips one character rather than the whole marker, so the header
+does not leave --- it is *disguised*, arriving in the output as `++ b/<path>`.
+The deletion side does the same, leaving `-- a/<path>`.
+Neither `--no-prefix` nor `-U0` helps: the first shortens the header to
+`+++ <path>` and the second changes only the context, so both still open with
+the marker character.
+
+Note that this defeats the remedy this section prescribes.
+Testing the instrument against a known positive **passes**, since the pattern
+does match the content, correctly, and merely takes one line more.
+Anchoring to structure does not help either, because here the header *is* the
+structure.
+No prefix pattern separates them, which is worth stating plainly because the
+obvious repair looks like it does.
+`grep -v '^+++'` drops the header, and it also drops any added line whose own
+text starts with `++`, since git prepends its marker to produce `+++i;`.
+Anchoring the trailing space, `grep -v '^+++ '`, narrows that and does not
+close it: an added line reading `++ foo` arrives as `+++ foo` and matches too.
+Measured on git 2.50.1, against a commit adding `++i;`, `++ foo` and `plain`:
+
+| guard | survives |
+|---|---|
+| `grep -v '^+++'` | `plain` |
+| `grep -v '^+++ '` | `++i;`, `plain` |
+| positional | `++i;`, `++ foo`, `plain` |
+
+The exact separator is **position**, not shape.
+In a single-file diff the header is the first `+`-matching line and nothing
+else can be, so drop it by ordinal:
+
+```bash
+git diff <base> <head> -- <path> | grep '^+' | tail -n +2 | sed 's/^+//'
+```
+
+That is a general move rather than a trick for this case.
+When a delimiter cannot be told from its data by content, tell it by where it
+sits --- and if position is not fixed either, stop parsing the stream and ask
+the tool for the data directly (`git show <rev>:<path>`).
+
+**Mind the precondition, because it is easy to lose.**
+"First `+`-matching line" holds per **file**, so a multi-file diff carries one
+header per file and `tail -n +2` drops only the first.
+Scope the diff to one path, or loop over `git diff --name-only` and scan each
+file separately.
+This is not a hypothetical: the pass that wrote this entry ran the guard over
+its own three-file diff as a dogfooding check, and got three hits --- its own
+two undropped headers plus one --- which read at first like defects in the
+files rather than in the scan.
+Per-file scanning returned 0 for every file, as did grepping the files
+directly.
+
+**What the pattern feeds decides how much this costs.**
+A too-loose pattern in a **detector** surfaces as a phantom finding, which is
+the first direction above: somebody investigates it and finds nothing.
+The same looseness in an **extractor** turns the extra match into *content*,
+and nothing investigates content.
+So one flaw is self-reporting in the first role and silent in the second.
+
+**The tighter guard over-corrects, and what it loses is invisible to the check
+that would look for it.**
+`grep '^+[^+]'` drops the header in a single pass, and
+[`memories/git.md`](../../memories/git.md)'s stash-supersession bullet uses it
+correctly --- there each added line is grepped for in `main`, so a blank line is
+noise.
+Reuse it on prose and it silently drops every added **blank** line, collapsing
+paragraph boundaries.
+Measured on git 2.50.1 against a two-paragraph addition: `^+[^+]` returned the
+two lines of text and not the blank between them, while the positional form
+returned all three.
+
+Carry that pair together, because a whitespace-normalizing word-level
+comparison --- the content-preservation check
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) prescribes for
+exactly this kind of move --- cannot see either failure.
+The leaked header is an **addition**, and a check phrased as "did anything go
+missing" is one-sided.
+The dropped blank line contributes no words, and the check normalizes
+whitespace away before comparing.
+So the two candidate guards fail in precisely the two directions that check is
+blind in.
+
+- **Do:** separate a prefix-compatible delimiter by **position**
+  (`grep '^+' | tail -n +2`) rather than by a longer prefix, since a longer
+  prefix is still a prefix and still collides.
+- **Don't:** read a narrowed pattern as a fixed one --- `^+++ ` collides with
+  an added `++ foo` exactly as `^+++` collides with an added `++i;`.
+- **Do:** ask what a pattern *feeds* --- a detector's extra match gets
+  investigated, an extractor's becomes content.
+- **Do:** compare a moved block in both directions, so an added line is as
+  visible as a dropped one.
+- **Don't:** read a passing known-positive test as clearing this; the pattern
+  matches the content correctly and takes one line more.
+- **Don't:** reuse `^+[^+]` on prose --- it eats added blank lines, and the
+  whitespace-normalized check will not report that either.
+
+The class is wider than diffs.
+Any delimiter carried **in band**, in the data's own alphabet, has this
+property: a fence marker inside fenced content, a heredoc terminator the
+heredoc's own text can contain, a comment character that also opens a
+directive.
+[`batch-merge-and-resolve`](../workflow/batch-merge-and-resolve.md) records the
+mirror failure, where `grep -c '^<<<<<<<'` returns 0 on a real conflict because
+`merge-tree` indents every line by the diff's own leading character.
+There the collision hides a true positive; here it manufactures a false one.
 Read that one before concluding a concept is absent; read this one before
 trusting any grep as an instrument.
 
@@ -718,6 +900,31 @@ step to take at the moment you write the comment, not at review.
   was handled everywhere it applies; a removal note is the artifact most likely
   to stop the search early.
 
+**The same defect arrives with the members in a LIST and the branch inside the
+loop, which this block's "same expression, on the same screen" tell misses.**
+An alternation hides its members in one string.
+A list consumed by a loop spreads them across lines, so there *is* a second site
+to find --- and the enumeration still does not fire, because the guard is not
+written as an enumeration.
+`if pat == r"changes\s+requested\b":` inside
+`for pat in VERDICT_NOT_CLEAN_PATTERNS` reads as handling a special case rather
+than as a list of one, so a sibling pattern added to that list later gets no
+guard at all, and nothing about adding it prompts a look.
+
+The tell is syntactic, which makes it greppable: **an equality test against a
+single literal member, inside a loop over the collection that member belongs
+to.**
+The remedy is this block's own, applied to the branch rather than to the
+pattern.
+Guard every member --- or, where the guard genuinely applies to some and not
+others, name the subset (`if pat in BARE_CLEAN_PATTERNS:`) so the excluded
+members are a list a reader can check rather than a literal nobody revisits.
+
+- **Do:** grep a guarded loop for `== <literal>`, and turn each hit into a
+  whole-collection rule or a named subset.
+- **Don't:** read a per-member equality branch as a special case; it is an
+  enumeration of one, and the collection it enumerates can grow.
+
 **Widen that last bullet's trigger: any sentence naming a hazard is a
 predicate, and the first code it applies to is the code directly beneath it.**
 The block above needs a *removal* note --- members taken out of an alternation,
@@ -785,6 +992,52 @@ guard, per the mutation discipline in
   one side, and it is the side that comes to mind first.
 - **Don't:** reach for the members-of-one-pattern rule here --- enumerating an
   alternation's members leaves both sides of every member unguarded.
+
+**Getting both sides covered is not the end of it: one side's own BOUNDARY can
+encode the negation of the assumption the other side rests on.**
+The block above ends with a guard that scans before the phrase and after it.
+This is what can still go wrong once both exist.
+The two sides are separate scans, each with its own notion of where the
+statement it is reading stops, and a boundary is a claim about the text with
+the same standing as the scan it bounds.
+
+The assumption is usually a property of the corpus.
+A corpus written in semantic line breaks puts one clause per line, so a
+qualifier routinely sits at the end of the PREVIOUS line --- which is precisely
+why a before-side scan has to look backward across a line break, and is worth
+arguing for explicitly and pinning with cases.
+The mirror of that same property is that a qualifier just as routinely STARTS
+the next line.
+An after-side scan that treats a bare newline as a terminator therefore cannot
+see it, and the guard's two halves now disagree about whether a line break ends
+a statement.
+
+What lets this survive is that each half is separately defensible and they are
+written apart.
+The backward scan's reasoning is explicit, argued, and tested; the forward
+scan's boundary is a one-token definition that reads as ordinary sentence
+splitting.
+Nobody compares them, because the property was settled rounds earlier, and a
+settled question is not re-opened --- so the author most likely to write the
+contradiction is the one who just argued the point.
+
+So when a change relies on a property of the corpus, search your own diff for
+the mirrored direction before pushing.
+The search is mechanical rather than a matter of insight: the property names a
+direction, so a backward assumption means checking every forward boundary the
+same change introduces, and the reverse.
+Keep the distinction the property actually supports --- a paragraph break really
+does end a statement where a wrapped clause does not --- rather than dropping
+the terminator altogether.
+
+- **Do:** name the corpus property a guard depends on, and check the same diff
+  for a boundary assuming its mirror.
+- **Do:** distinguish a paragraph break from a wrapped line when defining a
+  terminator, since only one of them ends a statement.
+- **Don't:** treat a property you argued for two rounds ago as settled for the
+  whole guard --- it was settled for the side you were writing then.
+- **Don't:** let a boundary definition ride in as an implementation detail; it
+  is a claim about the corpus, and it can contradict one you already made.
 
 **One level up from a partial guard: editing state that two consumers share
 regresses the consumer you were not looking at.**

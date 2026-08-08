@@ -34,7 +34,18 @@ For **HACtions** specifically: there are no local unit tests. The test
 strategy is to trigger a pipeline in a revdep like `test.hac` (project 1611)
 that exercises the templates.
 
-### 2. Local unit tests (if applicable)
+### 2. Isolate credentials before testing external writes
+
+Before running a script whose success path can mutate an external service (uploads, releases, deployments, secret rotation), inspect every ambient authentication source it can inherit: environment variables, process options, credential helpers, and keyrings.
+Omitting the script's explicit login call is not isolation; an earlier session may already have populated one of those sources.
+
+- If the user reserved the authenticated action for themselves, run only parse/lint and credential-free preflight paths.
+  Start a clean process that explicitly clears the script's documented auth variables and in-process options, and prove it stops before the network write.
+- If end-to-end testing is necessary, get explicit authorization and use a disposable target or a documented dry-run mode.
+  Verify the remote state before and after.
+- Never treat an unchanged remote version as permission to have contacted the service; disclose any accidental authenticated request immediately.
+
+### 3. Local unit tests (if applicable)
 
 ```bash
 # R package
@@ -52,7 +63,7 @@ for f in scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
 
 Report pass/fail. If tests fail, investigate and fix before proceeding.
 
-### 3. Downstream / revdep testing
+### 4. Downstream / revdep testing
 
 When the change is to shared infrastructure (CI templates, shared scripts),
 test it in a consumer repo.
@@ -90,7 +101,7 @@ glab api "projects/<CONSUMER_PROJECT_ID>/pipelines/<PIPELINE_ID>" \
 
 Poll every 30–60 seconds until status is `success`, `failed`, or `canceled`.
 
-### 4. Report results
+### 5. Report results
 
 Summarize what was tested and the outcome:
 
@@ -141,3 +152,4 @@ to the user.
 - Don't declare an MR ready to merge without at least one successful
   downstream pipeline if the change touches shared CI infrastructure.
 - Don't trigger pipelines on production consumer repos if a test bed exists.
+- Don't test an upload or deployment script in a process that may inherit ambient credentials when the user reserved the external write for themselves.

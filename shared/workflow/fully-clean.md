@@ -422,6 +422,62 @@ rather than substituting the nearest available count.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
 
+**A comment can be evidence-dense, correct throughout, and state no verdict at
+all --- and its density is what gets read as the conclusion.**
+The "no verdict is its own state" bullet above covers a job that posted
+*nothing*, and the instrument it prescribes is to read the job's own step
+outcomes.
+Neither half reaches this case.
+The job succeeded, the comment is long and rigorous, and there is no failed step
+to inspect --- so that remedy points at a surface reporting success.
+
+It is not the "reviewer's own verification block can be wrong" case either,
+which is a *wrong* verification under a *right* verdict.
+Here the verification is correct and there is no verdict at all, which inverts
+which part deserves suspicion.
+That section already notes a block labelled "verification" is the part least
+likely to be re-checked, because it presents as the checking having been done.
+When such a block is the last thing on the thread it does something further:
+it reads as the sign-off, and the more rigorous it is the more it reads that way.
+So thoroughness is not evidence of a conclusion --- it is what disguises the
+absence of one.
+
+**A later comment stating no verdict does not supersede an earlier one.**
+This refines the latest-wins rules rather than contradicting them.
+Those rules (`CLAUDE.md`'s "re-read the **most recent** review comment", and
+criterion 2's "latest review") assume the most recent artifact *is* a verdict,
+and say to prefer it over a cached one.
+They do not say what happens when the most recent artifact concludes nothing.
+Absence is not a clearing: the standing verdict is the last one anyone actually
+stated, however much has been posted since.
+Read "latest" as ranging over verdict-bearing statements, not over comments.
+
+Note this is wider than the HEAD-SHA scope the rest of criterion 2 uses.
+A "Needs more work" posted against an *earlier* commit is outside every
+HEAD-matching check, and a later verdict-less comment raises no finding either,
+so a PR reads clean on both while its last real verdict was not.
+`scripts/check-pr-fully-clean.py` decides this as its criterion 4, scanning the
+whole review history chronologically for the last verdict-bearing statement.
+
+- **Do:** identify the last statement that actually states a verdict, and treat
+  that as the standing one.
+- **Do:** scan the whole review history for it, not only items matching HEAD.
+- **Don't:** read a verification section, however rigorous, as an approval ---
+  it is evidence, and a verdict is a conclusion about evidence.
+- **Don't:** treat a later comment's silence on the verdict as superseding an
+  earlier "Needs more work".
+
+(Morrison-Lab/ai-config#1267, 2026-08-07, reverted by #1275.
+Verified from the API rather than from the revert's own account: the PR carried
+`reviews | length` of 0, and its four comments ran
+`21:56:09Z` **Needs more work**, `22:12:47Z` no verdict, `22:49:12Z` **Needs more
+work**, `23:05:32Z` no verdict --- a long `### Verification` section ending
+"Not merging."
+It was merged at `23:38:12Z`, 49 minutes after the last stated verdict, and
+reverted at `23:47:50Z`.
+All four comments were posted under the author's own login, so "the PR has been
+reviewed" was true while "an independent reviewer approved it" was not.)
+
 **Another surface,
 and the one that defeats the gate itself:
 the review check can pass on a blocking verdict.**
@@ -484,6 +540,67 @@ than the script's raw pattern match.
   against a review whose prose merely discusses finding vocabulary.
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
+
+**A verdict comment quotes verdict phrases, so a phrase search identifies
+nothing --- and it misreads in both directions at once.**
+Every case above concerns *reading* a verdict correctly.
+This one is about the instrument a multi-PR status sweep reaches for, where the
+tempting shortcut is a one-line `jq` `capture` of the first verdict phrase
+appearing anywhere in the body.
+
+The premise under that shortcut is that a verdict comment states verdict
+vocabulary only when stating its own verdict.
+It does the opposite.
+Quoting is part of the genre: a comment cites the previous round's verdict to
+say what it is confirming, pastes a repro block showing what a classifier
+returned, and discusses what a phrase *should* classify as --- all before
+reaching its own `### Verdict` section.
+So the first match is usually somebody else's verdict.
+
+The bidirectionality is what makes this worth its own entry rather than a note
+on the section above.
+That one is fail-closed by construction, which is why it is called the safe
+direction.
+A first-match phrase search has no direction at all, so it cannot be corrected
+by an offset or by assuming the reviewer errs one way.
+Measured on one sweep, 2026-08-08, taking the latest verdict-bearing comment on
+each PR:
+
+| PR | first phrase match | real verdict, at the last `### Verdict` | direction |
+|---|---|---|---|
+| [#1278](https://github.com/Morrison-Lab/ai-config/pull/1278) | `Ready for merge`, inside a fenced block quoting a classifier call | **Needs more work** | false-clean |
+| [#1257](https://github.com/Morrison-Lab/ai-config/pull/1257) | `Needs more work`, inside a parenthetical citing the prior round | **Ready for merge** | false-blocked |
+
+The false-clean direction is the expensive one: it produced a **merge
+recommendation** on a PR whose verdict was blocking.
+
+So call the instrument.
+`scripts/check-pr-fully-clean.py` is this corpus's verdict authority, and
+[`ardi`](ardi.md) already requires it for the single-PR loop --- the gap is that
+nothing said so for a **sweep**, which is where the hand-rolled parser goes in.
+That is [`deterministic-tools`](../principles/deterministic-tools.md)'s
+constraint violated in the presence of the instrument, which is the shape worth
+recognizing: the tool existed, was documented, and was mandated one workflow
+over.
+
+Where a body genuinely must be parsed by hand, anchor on the **last**
+`### Verdict` heading and take the first non-empty line after it, which returns
+the right answer on both rows above.
+Two hazards survive even then, and both were observed on #1278.
+A `### Verdict:` heading can itself appear quoted inside prose, so the *last*
+heading rather than the first is load-bearing.
+And a **human** comment can carry a backticked `### Verdict` while stating no
+verdict at all, so select candidates on the `**Claude finished` body marker
+above rather than on the presence of a heading.
+
+- **Do:** call `check-pr-fully-clean.py` for a sweep's verdict column, exactly
+  as [`ardi`](ardi.md) requires for one PR.
+- **Do:** anchor on the last `### Verdict` heading when parsing by hand, after
+  selecting candidates on the `**Claude finished` marker.
+- **Don't:** take the first verdict phrase in a body as that body's verdict ---
+  quoting other verdicts is part of what a review comment does.
+- **Don't:** assume such a misread has a safe direction; one sweep produced a
+  false-clean and a false-blocked.
 
 **A review comment's header SHA can be stale, so take the reviewed commit from
 the run's own `head_sha`.**

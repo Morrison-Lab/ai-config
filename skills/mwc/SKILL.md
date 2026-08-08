@@ -44,16 +44,56 @@ When MWC is enabled for a session:
 3. If an active `.mwc` marker exists for the current session, `no-unauthorized-merge.py` allows merge tool executions.
 4. `ai-session.sh disable-mwc` removes the `.mwc` marker file, restoring the strict prohibition immediately.
 
+**The session id has to match on both sides, and that is the part that breaks.**
+The guard resolves which session it is running under from the hook payload's own
+`session_id` field, then the transcript filename stem, then `AI_SESSION_ID` /
+`CLAUDE_SESSION_ID`.
+It used to read only the two environment variables, and the hook process inherits
+neither, so a grant made the sanctioned way was invisible to it and every merge was
+blocked no matter what the user had granted (ai-config#1279).
+Pass the harness session id explicitly when granting, since the shell script has no
+payload to read.
+
+`check-mwc` distinguishes three outcomes rather than reporting one sentence for all
+of them, because "never granted" and "granted but the session reads dead" want
+opposite responses:
+
+| Exit | Meaning | What to do |
+| :--- | :--- | :--- |
+| 0 | active | nothing; the guard will honour it |
+| 1 | no grant recorded | `enable-mwc --id <id>` |
+| 2 | granted, but not currently honourable | the message names which case and the fix |
+
+It is a **query**: it never prunes and never deletes the marker, so a stale read
+cannot silently revoke a grant, and a `heartbeat` restores one.
+Use `disable-mwc`, `release`, or `prune` to actually remove a grant.
+
 ## Procedure for Agents Handling `/mwc`
 
 When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
 
-1. Run `skills/session-lock/scripts/ai-session.sh enable-mwc`
-   (or `~/.claude/skills/session-lock/scripts/ai-session.sh enable-mwc`)
-   to mechanistically set the session merge permission flag for `no-unauthorized-merge.py`,
-   and acknowledge the grant in one sentence
+1. **Run the enabling step first, and confirm it took.**
+   `skills/session-lock/scripts/ai-session.sh enable-mwc --id "<session id>"`
+   (or `~/.claude/skills/session-lock/scripts/ai-session.sh enable-mwc --id "<session id>"`)
+   sets the session merge-permission flag `no-unauthorized-merge.py` reads.
+   This step is what makes the grant real: without the `.mwc` marker it creates,
+   `no-unauthorized-merge.py` cannot see the grant and correctly keeps blocking.
+   **A grant acknowledged only in prose is not a grant the machinery can see**,
+   so skipping this step leaves you believing you hold a permission that does not
+   exist --- and then reading the resulting block as an obstacle rather than as
+   the accurate answer it is.
+   Only then acknowledge the grant in one sentence,
    so the user knows it's active for the session,
    and what it does and doesn't cover.
+   Pass `--id` explicitly unless `AI_SESSION_ID` or `CLAUDE_SESSION_ID` is set in
+   the shell: without one the script cannot resolve an id and dies with
+   "no session id".
+   Its value is the harness session id, which is the transcript filename stem.
+   Then confirm with `check-mwc --id "<session id>"`,
+   which exits 0 only when the guard will actually honour the grant.
+   Do not skip that confirmation:
+   an `enable-mwc` that reports success still leaves the guard blocking if the
+   two sides resolved different ids, which is exactly what ai-config#1279 was.
 2. Proceed with the task (e.g. driving PRs to clean via `ardi`).
 3. When a PR reaches 100% clean state, merge it immediately
    (default: squash merge via `gh pr merge <number> --squash --delete-branch`),
@@ -61,10 +101,81 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
    and run the post-merge skill (`post-merge` / `ums`).
 4. If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.
 
+## What a re-grant does NOT mean
+
+The grant is **conditional**, and the condition is the Scope Limit above.
+Re-issuing a conditional permission does not make its condition true.
+That distinction collapses in one specific situation, so it is worth naming
+mechanically rather than trusting judgment in the moment:
+a merge command is blocked, you ask whether to retry, and the user answers with
+the keyword.
+
+Read as an answer to "should I retry?", the keyword looks like "yes, merge that
+PR."
+It is not.
+It re-states a standing, conditional policy, and the PR in front of you is
+precisely the one that failed the condition --- otherwise nothing would have
+blocked.
+The framing of your own question is what makes the keyword look like an
+instruction about one specific PR.
+
+Three rules follow, and they hold whatever the block turned out to be:
+
+- **A conditional grant re-issued in response to a blocked action is not
+  authorization for that action.**
+  Re-check the condition before acting, and say which specific PR you are
+  claiming the grant for and why it qualifies --- naming it forces the check
+  that the keyword bypassed.
+- **A permission whose enforcement is mechanized has an enabling step.**
+  Run it when the grant is given.
+  If you did not, a block is evidence the grant is **not active** --- not an
+  obstacle to retry.
+- **Never retry a denied merge on the strength of a keyword.**
+  The denial and the grant are about different things: one is a guard's state,
+  the other is the user's intent, and only the guard's state gates the action.
+
+## Two properties of the guard worth knowing before you trust it
+
+**The denial you hit may not be this guard.**
+`no-unauthorized-merge.py` is a `PreToolUse` hook, and a hook only runs if it is
+**registered** --- which is a separate question from whether its file exists.
+Claude Code's own auto-mode permission classifier blocks merge commands too, and
+the two are independent mechanisms.
+They differ in exactly the way that matters here: the hook reads a **marker
+file**, so re-asking cannot move it, while the classifier reads the
+**conversation**, so re-stating intent can.
+So a denial that clears on a retry was, by that fact, probably not this guard.
+Check registration rather than assuming, per `CLAUDE.md`'s
+"Keep ai-config and repo checkouts fresh":
+
+```bash
+python3 <ai-config-checkout>/scripts/install-hooks.py   # report only; --fix binds
+```
+
+Measured on one machine, 2026-08-07: `registered=0 missing=15`, with
+`enabledPlugins` unset in `~/.claude/settings.json` --- so every guard in
+`hooks/hooks.json`, this one included, was placed but unbound.
+The guard's own logic was fine: fed a `gh pr merge` payload directly it returned
+`permissionDecision: deny`, and with a valid marker it allowed.
+It simply never ran.
+
+**The marker is per-repository, so a grant in one repo authorizes nothing in
+another.**
+`check_mwc_active()` looks for `<git-common-dir>/ai-sessions/<session>.mwc`,
+resolved from the current working directory and `CLAUDE_PROJECT_DIR`.
+Enabling MWC while working in repo A therefore leaves a merge in repo B blocked,
+which is correct and easy to misread as the guard malfunctioning.
+It also requires `AI_SESSION_ID` or `CLAUDE_SESSION_ID` to be set; with neither
+set the function returns `False` and the guard denies even with a valid marker.
+Run `check-mwc` from the repo you intend to merge in, not merely once per session.
+
 ## Quick Reference
 
 | Command | Effect |
 | :--- | :--- |
-| `skills/session-lock/scripts/ai-session.sh enable-mwc` | Enables session-wide merge grant |
-| `skills/session-lock/scripts/ai-session.sh disable-mwc` | Revokes session-wide merge grant |
-| `skills/session-lock/scripts/ai-session.sh check-mwc` | Checks if session-wide merge grant is active |
+| `skills/session-lock/scripts/ai-session.sh enable-mwc --id "<id>"` | Enables session-wide merge grant |
+| `skills/session-lock/scripts/ai-session.sh disable-mwc --id "<id>"` | Revokes session-wide merge grant |
+| `skills/session-lock/scripts/ai-session.sh check-mwc --id "<id>"` | Checks the grant; exits 0 / 1 / 2 (see above) |
+
+`--id` is optional only when `AI_SESSION_ID` or `CLAUDE_SESSION_ID` is set in the
+shell, which in a Claude Code session it generally is not.

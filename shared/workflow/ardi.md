@@ -75,6 +75,63 @@ clean-but-unmerged PR is not a stop; move to the next item, and stack it when it
 isn't naturally independent of that PR. See
 [`stack-dont-pause`](stack-dont-pause.md).
 
+**The same gate does not pause the loop *within* a single PR either, and that
+is the harder half to see.**
+The paragraph above says the merge gate does not stop you moving to the *next*
+PR.
+This says it does not stop you working *this* one.
+An authorization gate attaches to a specific **action** --- the merge, a
+force-push, a destructive one-off --- never to the PR as a whole.
+Everything else the loop already mandates stays pre-authorized on that PR:
+syncing with `main`, resolving a conflict, pushing a fix, re-dispatching a
+review, resolving threads, reporting the result.
+`CLAUDE.md`'s "Watch and ARDI every PR you touch --- don't ask first" states
+the standing yes; this names the boundary it stops at.
+
+Conflict resolution in particular is not merely permitted but **owed**, per the
+continuous-monitoring paragraph at the top of this fragment: a conflict "is ARDI
+work immediately --- sync and resolve the conflict ... not merely a status item
+to hand back to the user".
+Handing it back is the named anti-pattern rather than a cautious reading of the
+merge gate.
+
+What makes this hard to catch from the inside is that it is not laziness or
+evasion.
+The gate being over-applied is a **real** gate, correctly identified, and
+usually one you have already invoked several times on that same PR for the
+action it genuinely covers.
+Having rightly refused to merge, refusing to touch it at all reads as
+consistency rather than as a second and different refusal.
+So the lesson is not "be more proactive" --- diligence was never the missing
+input.
+It is that a gate has a scope, and the scope is the action.
+
+**The tell is lexical, and it sits in your own outgoing message: a
+RECOMMENDATION or question whose proposed action is ordinary ARDI work.**
+If the sentence you are about to write asks permission to do something the loop
+already requires, that is the error.
+Do it, and report in the past tense.
+
+This bites hardest on a PR that **cannot** reach a clean verdict --- no external
+reviewer will answer at any head, so nothing about it feels routine and the
+whole PR starts to read as gated.
+Drive it to whatever state it *can* reach: merged with current `main`, green on
+every check that runs, threads resolved, self-review posted.
+Then report it as blocked on the specific thing it is actually blocked on,
+rather than leaving it dirty because the terminal step is unavailable.
+
+- **Do:** resolve conflicts, sync, push fixes, and re-dispatch reviews on a PR
+  whose merge you are correctly withholding, and report those in the past
+  tense.
+- **Do:** name the one action that is gated, so "blocked" stays a claim about a
+  step rather than about the PR.
+- **Don't:** generalize a withheld merge into withholding the rest of the loop
+  as though one authorization covered both.
+- **Don't:** write a recommendation proposing work ARDI already mandates --- a
+  request to do the required thing is the error, not a courtesy.
+
+See [`ardi.cases.md`](ardi.cases.md), "A merge gate is not a work gate".
+
 **Self-review against the project's own stated conventions before every
 push, not just the first --- and don't just re-read the criteria, actually
 run the applicable review skills against your own diff and iterate on
@@ -1026,6 +1083,50 @@ twice over.
   since that is the only place the near-miss is visible.
 - **Don't:** treat the effort of writing a correction as evidence the
   correction is verified.
+
+**The same rule reaches past a literal, to the defect CLASS a code fix just
+closed.**
+The block above governs a correction to prose, where the artifact is a citation
+and the risk is one more guessable literal.
+A fix to code carries the same exposure at a larger unit: the change that
+closes an instance of a defect class is itself new code, so it can instantiate
+that class again, one layer down, in the very edit that removes it.
+
+Nothing about writing the fix surfaces this.
+The finding names a site, the fix closes that site, and the diff reads as a
+strict improvement, so the question "does what I just wrote have the property I
+just removed" is never posed.
+The next round then reports the original class at a new address, and it reads
+as a fresh gap rather than as the previous fix's own residue.
+
+**A consolidation commit is the highest-risk host for it, and the likeliest to
+be trusted.**
+Merging several drifted copies of a concept into one shared definition is a
+textbook DRY repair, and it makes the commit *feel* like the opposite of
+forking.
+That feeling is what carries a newly hand-rolled helper past your own review: a
+second concept can be duplicated in the same edit, and the de-duplication of
+the first supplies the whole commit's framing.
+Consolidating one duplicated concept is no protection against forking a
+different one beside it.
+
+So after fixing an instance of a class, ask what the fix **added**, not only
+what it removed, and check the addition against the class.
+For a new helper the mechanical form is cheap: whatever shared definition the
+neighbouring code already composes for the same job, compose that instead of
+writing a fresh equivalent, so the new site inherits every property the old
+sites have and whatever they gain next.
+
+- **Do:** ask whether the fix's own new code instantiates the class it closed,
+  before committing it.
+- **Do:** treat a commit that consolidates one duplicated concept as owing a
+  check that it forked none, since its framing argues the other way.
+- **Do:** compose an existing shared anchor or helper into a new site rather
+  than hand-rolling an equivalent, so the site inherits later fixes too.
+- **Don't:** read a diff that removes a duplicate as evidence that it added
+  none.
+- **Don't:** treat the next round's finding at a new address as a fresh gap
+  without first checking whether your own previous fix created that address.
 
 **When regenerating a generated tree makes it most of the diff, say so in the
 PR body --- otherwise a reviewer reads it as pollution and blocks.**

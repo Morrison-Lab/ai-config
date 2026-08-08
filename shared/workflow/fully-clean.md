@@ -1499,4 +1499,19 @@ The run object offers no attribution either: `pull_requests` is empty,
 `head_branch` is `main`, and `display_title` is the workflow name.
 This repo's `claude-bot.yml` pins `Morrison-Lab/gha/.github/workflows/claude.yml@v1`
 while `claude-review.yml` pins `claude-code-review.yml@v2`, so the gha#286 fix
-is present on one leg of the chain and not the other.)
+is present on one leg of the chain and not the other.
+
+The `--ref` half is measured rather than inherited, against the neighbouring
+PR whose review happened to be dispatched with one:
+
+| PR | head | dispatch | run's `head_sha` | review check runs at the PR head |
+| --- | --- | --- | --- | --- |
+| #1281 | `edc9cb8c` | no `--ref` | `27bbe9be`, `main`'s tip | 0 of 6 |
+| #1285 | `fd02b494` | `--ref ums/reusable-workflow-concurrency` | `fd02b494`, the PR head | 3 of 10 |
+
+Same repo, same workflow, adjacent PRs, one variable.
+Run `31234176429` is the second row, and its `head_branch` reads
+`ums/reusable-workflow-concurrency` rather than `main`, which is the one case
+where `gh run list`'s branch column does attribute a dispatched run --- so
+passing the ref repairs the actor-indexed view and the artifact-indexed one
+together.)

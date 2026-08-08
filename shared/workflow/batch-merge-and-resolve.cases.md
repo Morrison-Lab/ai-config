@@ -27,12 +27,12 @@ The other 18 collided on `DESCRIPTION`, `inst/WORDLIST`, a `pkgdown/`
 directory removed long ago, and workflow files: ordinary drift in a repo whose
 PRs had been open for months.
 The subtraction mattered as much as the addition.
-#555 looked caused, because its conflict was on
+PR #555 looked caused, because its conflict was on
 `simulate_xsectionalData.**Rmd**` --- a different file, deleted long before by
 `19ab811d`, confirmed with `git log --diff-filter=D`.
 Without attribution the sweep prescribes claiming and resolving all 20.
-#511's branch was a CRAN release branch this session did not own, so the
-response was an explanatory comment naming the rename and where the content
+The branch behind #511 was a CRAN release branch this session did not own, so
+the response was an explanatory comment naming the rename and where the content
 went, not a push.
 `git show --name-status "$merge"` was the first command reached for and printed
 no file list at all; re-measured against this corpus's own merge `f6be2ab3`, it

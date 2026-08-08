@@ -12,6 +12,7 @@ Before `git push` if the diff touches any of:
 - `R/*.R` roxygen comments (`#'`)
 - `man/*.Rd`
 - `vignettes/*.Rmd`
+- `vignettes/**/*.qmd` — including a change that only **renames or repoints a Quarto `{{< include >}}`**, since the include path is itself scanned as prose (see step 3)
 - `README.Rmd` / `README.md`
 - `DESCRIPTION` `Title:` / `Description:` fields
 
@@ -35,6 +36,7 @@ CI-only / workflow-YAML changes alone don’t need a spellcheck pass.
     - Real misspelling → fix it in the source file.
     - Legitimate technical term, proper noun, acronym, or domain word → add to `inst/WORDLIST`.
     - Possessive of an existing word (e.g., `PR's`) → usually rewrite as `PR` or `the PR's foo`; only WORDLIST it if rewriting hurts clarity.
+    - Token came from a Quarto `{{< include >}}` **path** rather than from the prose -\> rename the subfile so its name is made of dictionary words. Don’t backtick the shortcode (that disables the transclusion), and prefer renaming over a WORDLIST add, which puts a path artifact into a word list. Check `FOUND IN` before assuming a token is prose: a hit whose only occurrence is an include line is this case, not a misspelling.
 
 4.  **Add to `inst/WORDLIST` correctly.** This is the easy place to break CI.
 

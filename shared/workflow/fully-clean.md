@@ -1302,3 +1302,96 @@ allowlist --- rather than in a wait for something to recover.
   money --- the spend already proved the credential authenticates.
 - **Don't:** read varying cost and duration as evidence of transience while
   the turn count is fixed.
+
+**A `cancelled` review is the one case where retrying is the cause rather than
+the remedy.**
+Every retry rule above is written for a run that **failed** --- errored,
+stubbed, refused, crashed --- where a second attempt costs one review and buys
+a genuine negative control.
+A `cancelled` run is not a failure.
+It is a run that something else killed, and under
+`concurrency: cancel-in-progress` the thing that kills it is the **next
+dispatch for the same key**.
+So the standing retry-once remedy, applied here, is the mechanism that produced
+the symptom: dispatching again cancels whatever is currently running.
+
+Two places in this corpus currently say the opposite, and both need reading
+with this caveat.
+[`ardi`](../../skills/ardi/SKILL.md)'s step 6 and
+[`preferences.md`](../../memories/preferences.md) each say that a review
+cancelled with no comment should be dispatched cleanly.
+That is right when nothing else is running and wrong when something is, and
+neither says which case you are in.
+
+**The casualty may not be yours.**
+Every existing entry frames the victim as your own push-triggered run.
+It can equally be a review a **human** asked for: `claude-bot.yml` carries
+`review-workflow-file: claude-review.yml`, so a human posting the
+review-trigger mention does not summon a separate reviewer --- it re-dispatches
+the *same* workflow into the *same* per-PR group.
+Neither party can see the other's intent, so the collision reads as a broken
+workflow rather than as two people asking at once, and the retry that appears
+to fix it destroys minutes of someone else's in-flight review.
+
+So check before dispatching, and key the check on the **PR number** rather than
+the branch.
+[`push`](../../skills/push/SKILL.md)'s in-flight check filters
+`gh run list --branch`, which is sound for a push-triggered run and unsound
+here: a dispatched review records `headBranch: main`, so a branch filter finds
+none of them --- and the run list therefore cannot say which PR any dispatched
+run belongs to.
+Counting adjacent rows there attributes other PRs' reviews to yours, and since
+the group is keyed on the PR number, a run for another PR cannot have collided
+with yours however close in time it sits.
+Attribute each in-flight run from its own `gather-context` log instead:
+
+```bash
+jid=$(gh api "repos/<owner>/<repo>/actions/runs/<run-id>/jobs" \
+  --jq '.jobs[] | select(.name=="gather-context") | .id')
+gh api "repos/<owner>/<repo>/actions/jobs/$jid/logs" |
+  grep -oE 'PR_NUMBER: [0-9]+' | head -1
+```
+
+[`memories/github-actions.md`](../../memories/github-actions.md)'s "A caller
+with no `concurrency:` block can still have its runs cancelled" carries the
+mechanism.
+It generalizes past this one property, too: `permissions`, `timeout-minutes`,
+and job-level `if` gates can equally be declared in a callee, so read the chain
+rather than the caller whenever a workflow's behaviour is the question.
+That file sits at exactly its 1200-line advisory threshold, which is why this
+paragraph lives here rather than beside the section it extends; splitting it is
+tracked in ai-config#811.
+
+- **Do:** read a review run's `conclusion` before retrying, and treat
+  `cancelled` as "something newer is running" rather than as a failure to
+  retry.
+- **Do:** list the review workflow's in-flight runs and attribute each to a PR
+  before dispatching, then wait for the survivor and name in the status report
+  which run you are waiting on.
+- **Don't:** apply the retry-once remedy to a run whose conclusion is
+  `cancelled` in a `cancel-in-progress` group --- the retry is what cancels.
+- **Don't:** assume the run you are about to cancel is your own.
+- **Don't:** filter in-flight review runs by branch; a dispatched run reports
+  the default branch whatever `--ref` it was given.
+
+(`Morrison-Lab/ai-config#1281`, 2026-08-08: five `claude-review.yml` dispatches
+ran within twenty minutes and only three were for #1281, each run's PR
+confirmed from its own `gather-context` log.
+
+| run | PR | dispatched by | created | ended | outcome |
+| --- | --- | --- | --- | --- | --- |
+| `31232187007` | 1281 | agent | 01:14:45 | 01:30:38 | cancelled |
+| `31232684036` | 1276 | --- | 01:27:27 | 01:37:18 | success |
+| `31232771312` | 1281 | human mention, via `claude-bot.yml` | 01:29:48 | 01:32:29 | cancelled |
+| `31232853975` | 1281 | agent, retrying the cancelled first run | 01:31:40 | 01:50:52 | success |
+| `31232973624` | 1283 | --- | 01:34:36 | --- | --- |
+
+Each cancellation follows the next **same-PR** dispatch by 50 and 49 seconds,
+matching the 45-to-46-second signature measured on #1224.
+The human's mention killed a run 15m53s into its work, and the agent's retry
+then killed the human's.
+The survivor is simply the one nothing followed; it posted a genuine verdict at
+01:50:37, so the window discarded two runs' work and produced one verdict.
+The session's own reading of `gh run list` counted four colliding dispatches,
+because that list reports `headBranch: main` for every one of them --- two of
+the four were other PRs' reviews and were never in #1281's group at all.)

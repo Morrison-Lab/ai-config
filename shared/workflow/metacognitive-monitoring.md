@@ -518,8 +518,8 @@ this exact race.
 The grep was sound and covered 68 lines of a call chain over 1150 lines long,
 so it could not have returned a hit whether or not the claim was true.
 `memories/github-actions.md`'s "A caller with no `concurrency:` block can still
-have its runs cancelled" had recorded the same fact two days earlier, from PR
-#1224, and was not consulted.)
+have its runs cancelled" had recorded the same fact two days earlier, from
+PR #1224, and was not consulted.)
 
 ## "Unresolved between two sources" is a place to stop checking, not a finding
 

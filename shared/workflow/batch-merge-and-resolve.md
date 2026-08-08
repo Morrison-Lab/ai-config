@@ -83,6 +83,67 @@ A conflict inside your own added lines is a real disagreement.
 - **Don't:** read `DIRTY` as "this PR is broken" --- most of the time it is a
   statement about `main`, not about the PR.
 
+## A conflict your sweep found is not a conflict your merge caused
+
+The section above splits a `DIRTY` flag by whether the PR's own content is
+wrong, which is a question about the PR.
+There is a second question, about **you**: of the conflicts a post-merge sweep
+turns up, only some were caused by the merge you just made.
+The rest predate you --- a stale backlog collides on `DESCRIPTION`, a word
+list, a directory deleted months ago --- and were conflicting before you
+arrived.
+
+Both axes are needed, because a conflict can be stale by that section's test
+and still be yours.
+Collapsing them prescribes one action for both, and on a repo whose PRs have
+been open for months that means claiming and resolving other people's branches
+for no reason.
+
+Attribution is mechanical, and it runs **before** the claim rather than after.
+Deletions and renames are what to intersect, because they are what breaks a
+branch that still references the old path:
+
+```bash
+git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'
+```
+
+A conflicting path in neither set is drift.
+The intersection subtracts as well as adds, which is the half a detector cannot
+supply: a PR conflicting on a *similarly named* file that some older commit
+deleted is exonerated outright, not merely deprioritized.
+Settle that with `git log --diff-filter=D -- <path>`, noting that a shallow
+clone answers "never deleted" for anything removed before its window
+([`memories/claude-code.md`](../../memories/claude-code.md)).
+
+**`git show --name-status <merge>` prints no file list at all**, and it is the
+natural command to reach for here.
+It defaults to the combined (`--cc`) diff, which omits any path matching some
+parent, so an ordinary merge yields an empty attribution set --- and grepping
+that output for `^[ADMR]` returns 3, because `Merge:`, `Author:` and `Date:`
+each begin with one of those letters.
+So its empty answer and its broken answer look alike, per
+[`fail-fast`](../principles/fail-fast.md).
+Use the `git diff <merge>^1 <merge>` form above.
+
+Then match the response to standing, not only to cause.
+A conflict you caused on a branch you do not own is an explanatory comment
+naming the deletion or rename and where the content went, rather than a push.
+[`sync-with-main`](sync-with-main.md) does prescribe pushing the re-applied
+change to a sibling branch, and that fits a CI workflow in a repo you drive; it
+does not fit a release branch carrying an out-of-band process a push can
+disrupt.
+
+- **Do:** derive the merge's own deleted and renamed paths, and intersect them
+  with each conflict before claiming anything.
+- **Do:** report both counts --- conflicts found, and conflicts caused --- so
+  the gap between them is visible rather than implied.
+- **Do:** comment rather than push when a conflict you caused sits on a branch
+  you do not own.
+- **Don't:** read a post-merge sweep's hit list as your work queue; on an old
+  backlog most of it predates your merge.
+- **Don't:** derive that path set with `git show` --- it reports nothing for a
+  merge commit, and a naive grep of its header reports three phantom paths.
+
 ## Independent per-PR checking cannot see pair collisions
 
 Every PR can be individually clean against `main` while two of them conflict

@@ -1038,6 +1038,10 @@ The key points, restated here because a bare pointer is invisible to a consumer 
 - **A `DIRTY` flag means stale or defective, and only the second is a defect.**
   A PR whose content is clean but whose base moved is stale rather than broken.
   Staleness resolves once, at merge time, so re-syncing it eagerly spends a CI cycle and a review round on a state that expires within one merge interval.
+- **A conflict your sweep found is not a conflict your merge caused.**
+  Attribution is a second axis, and it runs before the claim: intersect the merge's own deleted and renamed paths (`git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'`) with each conflict, and report conflicts caused alongside conflicts found.
+  `git show --name-status <merge>` cannot supply that set --- it prints no file list for a merge commit, and grepping its header for `^[ADMR]` returns three phantom paths.
+  A conflict you caused on a branch you do not own is an explanatory comment, not a push.
 - **Independent per-PR checking cannot see pair collisions.**
   Every PR can be clean against `main` while two of them conflict with each other.
   Only a pairwise `git merge-tree` between PR heads finds that.

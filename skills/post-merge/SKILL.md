@@ -276,13 +276,29 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    `resolve-conflicts`, "Verify before you act": `git merge-tree --write-tree
    origin/main origin/<branch>` gives ground truth without a worktree
    (git ≥ 2.38). Skip if it comes back clean.
-2. **Check claim status.** Read the most recent comment. If it says "Working on
+2. **Attribute before claiming --- a conflict this sweep found is not
+   necessarily one your merge caused.** On a repo with an old PR backlog most
+   surviving conflicts are ordinary drift (`DESCRIPTION`, a word list, a
+   directory deleted months ago) and were conflicting before you arrived;
+   claiming them means resolving other people's branches for no reason.
+   Derive the merge's own deleted and renamed paths and intersect them with
+   each conflict's paths:
+   ```bash
+   merge=$(git rev-parse HEAD)   # the squash-merge you just confirmed
+   git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'
+   ```
+   A conflicting path in neither set is drift --- skip it. Note `git show
+   --name-status "$merge"` prints **no** file list for a merge commit and so
+   silently yields an empty attribution set; use the `git diff` form above.
+   See [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md),
+   "A conflict your sweep found is not a conflict your merge caused".
+3. **Check claim status.** Read the most recent comment. If it says "Working on
    this — paws off" (or equivalent), skip it — another session owns it.
-3. **Claim it.**
+4. **Claim it.**
    ```bash
    gh pr comment <N> --body "Working on this — paws off until I'm done."   # COMMENT_PR
    ```
-4. **Create an isolated worktree**, fetch the latest `main` (the squash-merge
+5. **Create an isolated worktree**, fetch the latest `main` (the squash-merge
    commit that caused the conflict), and merge:
    ```bash
    git fetch origin main <branch>   # FETCH — fetch both: we need the new main tip
@@ -291,9 +307,9 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    git checkout -b <branch>         # or --track origin/<branch> if the name is free
    git merge origin/main            # MERGE_BRANCH — picks up the new squash-merge commit
    ```
-5. **Resolve conflicts** using the `resolve-conflicts` skill (consolidate both
+6. **Resolve conflicts** using the `resolve-conflicts` skill (consolidate both
    sides' intent; do not blindly pick one side wholesale).
-6. **Run the repo's pre-commit checks, `git fetch` the branch again, then push.**
+7. **Run the repo's pre-commit checks, `git fetch` the branch again, then push.**
    The claim comment isn't an atomic lock — a repo's own automated bot (e.g. an
    `@claude` CI agent triggered independently by the same merge event) can pick up
    and resolve the identical cascade conflict in parallel even when no claim
@@ -311,7 +327,7 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    cd -
    git worktree remove .claude/worktrees/pr-<N>
    ```
-7. **Unclaim** with a brief resolution summary:
+8. **Unclaim** with a brief resolution summary:
    ```bash
    gh pr comment <N> --body "Conflict resolved — branch is now mergeable. <one-line summary of what conflicted and how it was resolved>"   # COMMENT_PR
    ```
@@ -321,6 +337,15 @@ worktree is an independent checkout), but because the same human or bot may be
 actively working a PR between your claim and your push. One-at-a-time keeps
 the blast radius small. Skip any PR whose conflict is in a file you can't
 understand without more context — comment asking for clarification instead.
+
+**Match the response to standing, not only to cause.** Step 2 says whether a
+conflict is yours; it does not say the branch is. A conflict you genuinely
+caused, on a branch you do not own --- a colleague's in-flight work, and most
+sharply a release branch carrying an out-of-band process --- is an explanatory
+comment naming the deletion or rename and where the content went, rather than a
+push to their branch. `sync-with-main` does prescribe re-applying the change on
+the sibling branch and pushing it, and that fits a workflow or CI file in a repo
+you drive; it is not the default for someone else's release branch.
 
 ### 2. Tidy the local branch
 
@@ -642,3 +667,8 @@ PT on a machine set to any other zone).
   release ref against `main` (step 3.5) -- the merged docs pin a version
   consumers cannot resolve until a human slides the tag.
 - ❌ Reporting "all cleaned up" while a stacked sibling branch dangles unmentioned.
+- ❌ Treating the whole cascade-scan hit list as work caused by this merge, without
+  intersecting it against the merge's own deleted and renamed paths (step 2) --- on
+  an old backlog that claims other people's stale PRs for no reason.
+- ❌ Pushing a resolution to a branch you don't own when a comment would do ---
+  sharpest on a release branch, where a push can disrupt an out-of-band process.

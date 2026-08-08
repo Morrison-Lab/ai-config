@@ -274,6 +274,19 @@ open in parallel, edited that same inline block to allowlist `WebFetch`/
 change to the new composite action --- rather than leaving its author to
 discover a conflict --- let it merge within the hour instead of stalling.)
 
+**That "push to their branch" is scoped by standing, not only by cause.**
+gha#201/#202 were CI workflow files in a repo the author drove, where a push
+saves the sibling's author a round and risks nothing they were relying on.
+The same push onto a branch you do not own --- a colleague's active work, and
+most sharply a release branch carrying an out-of-band process --- can disrupt
+something a comment would not. There, name the extraction, the deletion, or
+the rename and where the content went in a PR comment, and leave the push to
+whoever owns the branch. Causing the conflict obliges you to *surface* it; it
+does not by itself license editing someone else's branch. See
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md), "A conflict your sweep
+found is not a conflict your merge caused", for the attribution step that says
+which conflicts are yours in the first place.
+
 **An add/add conflict on a *shared config file* usually means two PRs
 independently fixed the same root cause --- reconcile the reasoning, don't
 just pick a side.** This generalizes the skill-file case above beyond

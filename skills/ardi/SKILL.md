@@ -148,11 +148,17 @@ Don't trust earlier cached verdicts --- actively poll until a review appears tha
    ARD skill).
 
 6. **Re-request review --- but don't double-trigger.**
-How depends on whether this round pushed code:
-   - **Code was pushed:** the push **already** triggers the review (e.g. `claude-code-review` on `pull_request` sync).
+How depends on the repo's review trigger first, and on whether this round pushed code second.
+**Read the review workflow's `on:` block once per repo** (the first time you push to a PR there) before applying the branches below --- the first one is wrong for a repo that has no push-based trigger, and nothing about the PR's appearance will tell you.
+   - **Code was pushed, and the review workflow carries a push-based trigger** (`pull_request:` with `synchronize`): the push **already** triggers the review.
      Do **NOT** also post "@claude review again".
      On workflows with `concurrency: cancel-in-progress`, the push-triggered and mention-triggered runs **cancel each other**, leaving the latest commit with a canceled, never-posted verdict.
      Just wait for the push-triggered review.
+   - **Code was pushed, and the review workflow is dispatch-only** --- its `pull_request:` trigger is absent or commented out, leaving `workflow_dispatch` (and perhaps `issue_comment`), which is how a repo disables automatic review on PR activity.
+     The push fires **nothing**, so you must dispatch explicitly, **after every push** rather than once when the PR opened: `gh workflow run <review-workflow>.yml -R <owner>/<repo> -f pr_number=<N>`, taking the input's name from that workflow's own file.
+     There is no cancel-in-progress race to avoid here, because there is no competing run.
+     This is the branch that fails silently: CI still goes green on each push, so watching CI to green feels like watching the PR, and a verdict from an earlier head stands unchallenged for as long as you keep pushing.
+     (UCD-SERG/serocalculator, 2026-08-07: `claude-code-review.yml` has its `pull_request:` trigger commented out with the note "reviews are on request only". Six pushes across several hours were each followed by watching CI to green; no review was ever dispatched, and a verdict from roughly 20 hours earlier stood until the user asked whether the PR had a clean review.)
    - **No code pushed** (all Rebut/Defer): no push occurred, so nothing
      auto-triggers --- you **must** explicitly re-request (post `@claude review`,
      or the forge's equivalent). This is the only case where you post the
@@ -212,8 +218,11 @@ Do-Confirm; per
       against the index; stage any resulting artifacts before pushing.
 - [ ] ARD summary was posted and corresponding inline-thread replies/resolutions
       were handled.
-- [ ] Re-review trigger was chosen correctly: push-trigger only when code was
-      pushed; explicit mention/dispatch only when no code was pushed.
+- [ ] Re-review trigger was chosen correctly, reading the repo's trigger class
+      first: rely on the push alone only where the review workflow carries a
+      push-based trigger; dispatch explicitly after **every** push where it is
+      dispatch-only; post the mention only when no code was pushed.
+      A green CI run at the current head is not a review in flight.
 
 7. **Repeat from step 2** until the PR/MR is **fully clean** (see [*The bar: "fully clean"*](#the-bar-fully-clean) -- zero findings **and** all CI workflows and check runs green and completed **and** every inline thread resolved).
    Don't exit on a clean review body alone.

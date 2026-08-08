@@ -22,6 +22,20 @@ in progress; do not call the PR clean from an earlier head or from green CI
 without a current-head review verdict.
 Pushing fixes for a finding-bearing review starts a new review cycle: the ARDI loop is NOT finished when you push fixes or post an ARD summary.
 You must wait for the fresh review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it is clean before declaring the loop finished.
+
+**That wait is conditional on a run having been scheduled, and on some repos a push schedules nothing.**
+A review workflow whose `on:` block carries no push-based trigger --- `workflow_dispatch` and `issue_comment` only, which is how a repo disables automatic review on PR activity --- fires nothing when you push, so the run you are told to wait for will never exist and the poll cannot terminate.
+The obligation is then discharged by **dispatching**, not by waiting, and it recurs on **every** push rather than once at PR-open time: `gh workflow run <review-workflow>.yml -R <owner>/<repo> -f pr_number=<N>`, taking the input's name from that workflow's own file.
+Read the `on:` block once per repo, the first time you push to a PR there, and record which class it is.
+This is the shape most likely to be missed while everything looks healthy, because CI still goes green on each push, and watching CI to green feels like watching the PR --- so the loop closes on "checks passed" while the last verdict on file dates from an earlier head.
+`check-pr-fully-clean.py` returning non-zero for "no review at this HEAD SHA" on such a repo means *dispatch now*, not *poll longer*.
+[`pr-on-claim`](pr-on-claim.md) covers the PR-open and draft-to-ready end of this; the increment here is that each subsequent push owes its own dispatch.
+
+- **Do:** read the review workflow's `on:` block before the first push to a PR in an unfamiliar repo, and dispatch explicitly after every push when it carries no push-based trigger.
+- **Do:** treat a non-zero `check-pr-fully-clean.py` on a dispatch-only repo as a prompt to dispatch.
+- **Don't:** read green CI at the current head as evidence a review is in flight --- on a dispatch-only repo that is the steady state, not a transient one.
+- **Don't:** let a verdict from an earlier head stand because the repo's trigger class was already known; knowing it is not the same as acting on it each round.
+
 NEVER use background tasks, async sleep commands, or schedule timers for ARDI status polling.
 Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn.
 This applies transitively to PR-driving

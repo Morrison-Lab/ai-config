@@ -5,6 +5,7 @@ Prohibits commands attempting to merge PRs/MRs (e.g. `gh pr merge`, `glab mr mer
 `gh api .../merge`, `glab api .../merge`, or GraphQL `mergePullRequest` / `enablePullRequestAutoMerge`)
 unless explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
 """
+import bisect
 import json
 import os
 import platform
@@ -68,14 +69,27 @@ ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
 # shell (`bash <<EOF`). Three rounds of review found one door each. Keeping the
 # membership in one place is what makes the residual a single reviewable list
 # rather than three lists that drift.
+#
+# Both masking consumers now share ONE anchor (EXEC_AT_CMD_POS below). The
+# third, EXEC_WRAP, is pattern-side and is measured DEAD against the suite --
+# see its own note.
 EXEC_PROGS = r"env|exec|command|bash|sh|zsh|ksh|dash|eval|trap|watch|su|ssh"
 
-# Quoting is what makes these different from the KEYWORD_PREFIX family: pass 2
-# blanks a quoted span as inert, which is right for prose and wrong here, so
-# these must be recognised on the raw text in pass 1.
-# The optional non-flag word is `ssh`'s hostname: `ssh host '<merge>'` puts a
-# positional between the executor and its operand, which a flags-only wrapper
-# never reached. This was round 2's stated residual, closed rather than left.
+# Lets a matching pattern step over an executor between the command position
+# and `gh`, e.g. `bash -c gh pr merge`. The optional non-flag word is `ssh`'s
+# hostname.
+#
+# MEASURED DEAD, and kept deliberately. Since mask_inert_quotes stopped
+# blanking an executor's live operand, the permissive pass anchors on the
+# whitespace left where the quote was and matches the operand directly, so
+# dropping EXEC_WRAP from all nine patterns fails ZERO of the suite's cases --
+# including every one it was originally added for. Retained because this is a
+# guard: a redundant path costs a few characters of regex, while removing one
+# on suite evidence alone fails OPEN if the suite is the thing that is
+# incomplete. Its removal is a reviewable simplification, not a bug fix.
+#
+# Pass 1 itself is NOT dead: removing it fails two cases, both `gh api graphql`
+# mutations whose payload the permissive pass has already masked.
 EXEC_WRAP = (
     r"""(?:[/\w.-]+/)?(?:""" + EXEC_PROGS + r""")"""
     r"""(?:\s+-[a-zA-Z0-9]+)*(?:\s+[A-Za-z0-9_.@-]+)?(?:\s+-[a-zA-Z0-9]+)*"""
@@ -106,9 +120,23 @@ EXEC_WRAP = (
 # positive costs a scan; a false negative hides a merge. That asymmetry is the
 # reverse of pass 1's, which is why the two anchors genuinely differ rather
 # than one being a stale copy.
-HEREDOC_EXECUTOR = re.compile(
-    PERMISSIVE_LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b[^\n]*?<<",
+# One anchor for "an executor is invoked here", shared by both masking
+# decisions. Rolling a second one is what produced round 5's gap and round 6's,
+# so the two consumers now differ only in what they require AFTER the executor.
+EXEC_AT_CMD_POS = (
+    PERMISSIVE_LEAD + ENV_WRAP + r"(?:[/\w.-]+/)?(?:" + EXEC_PROGS + r")\b"
 )
+HEREDOC_EXECUTOR = re.compile(EXEC_AT_CMD_POS + r"[^\n]*?<<")
+# The quote-masking counterpart. A quoted span is inert only when nothing
+# before it in the same simple command can run it; `bash -c "<merge>"`,
+# `eval "<merge>"` and `ssh host "<merge>"` are the executor's own operand and
+# are LIVE. Same asymmetry as the heredoc anchor above: over-detecting means
+# declining to mask, which costs a scan, while under-detecting hides a merge.
+EXEC_BEFORE_QUOTE = re.compile(EXEC_AT_CMD_POS)
+# Where the current simple command begins. An operand cannot be separated from
+# its executor by a command separator, so scanning back only this far keeps
+# `bash -c "x"; echo "prose"` from treating the second quote as live.
+COMMAND_SEPARATOR = re.compile(r"[;&|\n`()]")
 OPT_VAL = r"""(?:="[^"]*"|='[^']*'|=[^\s;&|`()]+|\s+"[^"]*"|\s+'[^']*'|\s+[^\s;&|`()]+|\$\{IFS\}[^\s;&|`()]+)"""
 OPT_FLAGS = rf"(?:\s+-[A-Za-z0-9_-]+(?:{OPT_VAL})?)*"
 HTTP_METHOD = r"(?:[pP][uU][tT]|[pP][oO][sS][tT]|[pP][aA][tT][cC][hH])"
@@ -292,21 +320,66 @@ def mask_inert_quotes(text: str) -> str:
     double quotes -- those are preserved verbatim, so hiding a merge in one
     still blocks.
 
-    This is only ever applied for the PERMISSIVE pass. An executor's own quoted
-    operand (`bash -c "<merge>"`, `eval "<merge>"`) IS live, and blanking it
-    here would lose it -- pass 1 catches those on unmasked text via EXEC_WRAP,
-    which is why the narrow pass is kept rather than replaced.
+    An executor's own quoted operand (`bash -c "<merge>"`, `eval "<merge>"`,
+    `ssh host "<merge>"`) is NOT inert -- bash runs it -- so it is kept
+    verbatim and only its delimiters are blanked. Blanking the delimiters
+    rather than skipping the span is what leaves a whitespace command position
+    in front of the operand for the permissive pass to anchor on.
+
+    An earlier version masked every quoted span and relied on the narrow pass
+    to catch these on raw text via EXEC_WRAP. That worked only while the
+    wrapper before the executor was one of KEYWORD_PREFIX's six literals: any
+    flag or unlisted wrapper (`sudo -u x bash -c`, `timeout 5 bash -c`,
+    `xargs -0 bash -c`) broke the narrow anchor, the span was masked as prose,
+    and the merge ran. The enumeration failing in a third place is what moved
+    the decision here, where the safe direction is to mask LESS.
     """
     def blank(s: str) -> str:
         return "".join("\n" if c == "\n" else " " for c in s)
 
+    def live_operand_test(subject: str):
+        """A `quote_start -> bool` test over one fixed subject string.
+
+        BOTH the separator offsets and the executor offsets are computed once
+        per pass, and each quote then answers by binary search. Scanning for an
+        executor per quote is quadratic in the number of quoted spans -- and
+        bounding the scan by the nearest separator does not fix it, because a
+        long command line with no separators at all leaves every scan starting
+        from zero. Measured on 2000 quoted spans: 1787ms rescanning, 305ms
+        precomputed, against a hook that runs before every Bash call. Same trap
+        VAR_PREFIX's bound was added for, reached by a different route.
+        """
+        seps = [m.end() for m in COMMAND_SEPARATOR.finditer(subject)]
+        exec_ends = [m.end() for m in EXEC_BEFORE_QUOTE.finditer(subject)]
+
+        def test(quote_start: int) -> bool:
+            j = bisect.bisect_right(exec_ends, quote_start)
+            if j == 0:
+                return False
+            i = bisect.bisect_left(seps, quote_start)
+            seg_start = seps[i - 1] if i else 0
+            return exec_ends[j - 1] >= seg_start
+
+        return test
+
+    live = live_operand_test(text)
+
     def repl_double(m: "re.Match") -> str:
         inner = m.group(0)[1:-1]
+        if live(m.start()):
+            return " " + inner + " "
         return " " + mask_subexpressions(inner) + " "
 
     text = re.sub(r"\"(?:\\.|[^\"\\])*\"", repl_double, text, flags=re.DOTALL)
-    text = re.sub(r"'[^']*'", lambda m: blank(m.group(0)), text, flags=re.DOTALL)
-    return text
+
+    live = live_operand_test(text)
+
+    def repl_single(m: "re.Match") -> str:
+        if live(m.start()):
+            return " " + m.group(0)[1:-1] + " "
+        return blank(m.group(0))
+
+    return re.sub(r"'[^']*'", repl_single, text, flags=re.DOTALL)
 
 
 HEREDOC_START = re.compile(
@@ -551,8 +624,9 @@ def offending(command: str, payload: dict | None = None):
     ends = [m.start() for m in matches] + [len(masked_command)]
 
     # 6. Two passes, both length-preserving so the same offsets slice both.
-    #    Pass 1 (narrow LEAD, raw text) keeps every behaviour the suite pins,
-    #    including an executor's live quoted operand (`bash -c "<merge>"`).
+    #    Pass 1 (narrow LEAD, raw text) is what still sees a `gh api graphql`
+    #    mutation, whose payload pass 2 has masked. It no longer carries the
+    #    executor's quoted operand -- mask_inert_quotes keeps that live now.
     #    Pass 2 (permissive LEAD, quote-masked text) is strictly ADDITIVE: it
     #    stops asking which constructs may precede a command word -- an
     #    enumeration two review rounds showed cannot be finished -- and instead

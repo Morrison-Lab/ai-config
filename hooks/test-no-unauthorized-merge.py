@@ -138,9 +138,10 @@ BLOCK = [
     ("xargs gh pr merge", "xargs"),
     ("[[ -f x ]] && gh pr merge 411", "after a conditional expression"),
     ("case $x in *) command gh pr merge 411 ;; esac", "a case arm plus an exec wrapper"),
-    # Quoted, but bash evaluates it later -- so pass 2's "a quoted span is
-    # inert" is WRONG here and pass 1 has to carry it. This is why the narrow
-    # pass is kept alongside the permissive one rather than replaced by it.
+    # Quoted, but bash evaluates it later -- so "a quoted span is inert" is
+    # WRONG here. mask_inert_quotes now recognises an executor's own operand
+    # and keeps it live, which is what carries these; they no longer depend on
+    # the narrow pass.
     ("trap 'gh pr merge 411' EXIT", "a trap handler runs its single-quoted operand"),
     ("watch 'gh pr merge 411'", "watch runs its quoted operand"),
     # A heredoc body is inert only where its CONSUMER treats it as data. Fed to
@@ -177,9 +178,37 @@ BLOCK = [
     ("setsid sh <<EOF\ngh pr merge 411\nEOF", "setsid before the executor"),
     ("ssh -o X=y host <<EOF\ngh pr merge 411\nEOF", "ssh with an option and a host"),
     ("echo a | sudo -u x bash <<EOF\ngh pr merge 411\nEOF", "after a pipe"),
+    # The SAME wrapper forms against a QUOTED operand rather than a heredoc.
+    # Round 5 reported both halves and only the heredoc half was fixed: the
+    # narrow pass could not see past `sudo -u x` to the executor, and the
+    # permissive pass had already blanked the operand as prose, so ten
+    # executable merges ran with the guard returning allow.
+    ('sudo -u x bash -c "gh pr merge 411"', "a flag-carrying wrapper before a quoted operand"),
+    ('sudo -E bash -c "gh pr merge 411"', "a bare flag before a quoted operand"),
+    ('timeout 5 bash -c "gh pr merge 411"', "a wrapper with a positional before a quoted operand"),
+    ('nice bash -c "gh pr merge 411"', "an unlisted wrapper before a quoted operand"),
+    ('setsid eval "gh pr merge 411"', "an unlisted wrapper before eval"),
+    ('xargs -0 bash -c "gh pr merge 411"', "xargs with a flag before a quoted operand"),
+    ('command -p sudo bash -c "gh pr merge 411"', "a chain of wrappers before a quoted operand"),
+    ('sudo -u x eval "gh pr merge 411"', "a flag-carrying wrapper before eval"),
+    ('sudo -u x ssh host "gh pr merge 411"', "a wrapper, ssh and a hostname"),
+    ('timeout 5 bash -c "glab mr merge 411"', "the same shape for glab"),
+    ("timeout 5 bash -c 'gh pr merge 411'", "a SINGLE-quoted live operand"),
+    ("sudo -u x sh -c 'glab mr merge 411'", "a single-quoted glab operand"),
+    ('cd /r && timeout 5 bash -c "gh pr merge 411"', "a live operand in a later segment"),
+    ('echo hi; nice bash -c "gh pr merge 411"', "a live operand after an inert one"),
 ]
 
 ALLOW = [
+    # Keeping an executor's operand live must not leak into the NEXT command.
+    # A command separator ends the simple command, so a quote after one is
+    # prose again however many executors preceded it -- without this bound,
+    # every diagnostic written after a `bash -c` in the same session blocks.
+    ('bash -c "true"; echo "you can gh pr merge later"', "prose after a separator, following an executor"),
+    ('bash -c "true" && git commit -m "why gh pr merge is blocked"', "a commit message after an executor"),
+    ('eval "true" | grep "gh pr merge"', "a grep pattern after an executor and a pipe"),
+    # A word ENDING in an executor's name is not that executor.
+    ('rebash -c "gh pr merge 411"', "an executor name as a word suffix is not a command position"),
     # The keyword prefix above must not become bare whitespace by another name:
     # a keyword only counts at a command position, so a keyword-shaped word
     # sitting mid-sentence or mid-command still leaves the mention allowed.
@@ -383,6 +412,19 @@ wrong += (_elapsed > 1.0)
 print(f"  {'allow' if _elapsed <= 1.0 else 'SLOW ':<6} "
       f"1600 chained substitutions scanned in {_elapsed * 1000:.0f}ms (bound 1000ms)")
 
-total = len(BLOCK) + len(ALLOW) + 8
+# Deciding whether a quoted span is a live operand needs the start of its
+# simple command. Rescanning for that from position zero per quote is
+# quadratic; the separator offsets are computed once per pass instead. Without
+# the precompute this input takes ~10x as long, so the bound is a real guard
+# and not decoration.
+_manyquotes = " ".join(f'echo "field {i}"' for i in range(2000))
+_t0 = time.perf_counter()
+_guard.offending(_manyquotes)
+_elapsed_q = time.perf_counter() - _t0
+wrong += (_elapsed_q > 1.0)
+print(f"  {'allow' if _elapsed_q <= 1.0 else 'SLOW ':<6} "
+      f"2000 quoted spans scanned in {_elapsed_q * 1000:.0f}ms (bound 1000ms)")
+
+total = len(BLOCK) + len(ALLOW) + 9
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

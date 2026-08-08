@@ -387,6 +387,30 @@ def main() -> int:
         "classify_verdict: a hedge on the previous line still blocks",
         checker.classify_verdict("It is almost\nready for merge.") == "",
     )
+    # A `Verdict:` label was exempted from every guard on the reasoning that
+    # adjacency after the label already binds the phrase. That is true of what
+    # PRECEDES it and says nothing about what FOLLOWS, so the labelled form was
+    # the one path a trailing qualifier still walked straight through.
+    check(
+        "classify_verdict: 'Verdict: Ready, but ...' is NOT clean",
+        checker.classify_verdict("Verdict: Ready, but two items remain.") == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: Clean once ...' is NOT clean",
+        checker.classify_verdict("Verdict: Clean once the findings are fixed.") == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: Approved except for ...' is NOT clean",
+        checker.classify_verdict("Verdict: Approved except for the nit below.") == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: Ready -- however, ...' is NOT clean",
+        checker.classify_verdict("Verdict: Ready -- however, one item stands.") == "",
+    )
+    check(
+        "classify_verdict: a bare 'Verdict: Ready' IS still clean",
+        checker.classify_verdict("Verdict: Ready") == "clean",
+    )
 
     # POSITIVE CONTROL -- the exact #1267 shape that bypassed the gate.
     # An explicit "Needs more work" at an EARLIER commit (so it never enters

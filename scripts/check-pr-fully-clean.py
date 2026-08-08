@@ -213,6 +213,10 @@ def classify_verdict(body: str, state: str = "") -> str:
 
     for pat in VERDICT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+            # Position and negation are about how the phrase is INTRODUCED, so
+            # they apply only to a bare phrase -- a `Verdict:` label is itself
+            # the marking, and it already excludes a preceding negation by
+            # adjacency.
             if pat in BARE_CLEAN_PATTERNS:
                 line_start = scan.rfind("\n", 0, match.start()) + 1
                 if not BARE_CLEAN_MARKED.search(scan[line_start:match.start()]):
@@ -220,8 +224,14 @@ def classify_verdict(body: str, state: str = "") -> str:
                 prefix = scan[max(0, match.start() - 40):match.start()]
                 if CLEAN_NEGATION_PREFIX.search(prefix):
                     continue
-                if CLEAN_CONDITIONAL_SUFFIX.match(scan[match.end():match.end() + 40]):
-                    continue
+            # A trailing qualifier is about what FOLLOWS, and nothing about a
+            # label stops one: `Verdict: Ready, but two items remain` reads as
+            # clean to any prefix-anchored check. So this guard applies to every
+            # clean pattern. It was scoped to the bare ones on the reasoning
+            # that adjacency after the label "already binds it" -- which is true
+            # of what precedes the phrase and says nothing about what follows.
+            if CLEAN_CONDITIONAL_SUFFIX.match(scan[match.end():match.end() + 40]):
+                continue
             return "clean"
 
     return ""

@@ -272,7 +272,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unreviewed-pr.py\"",
             "timeout": 10,
             "script": "no-unreviewed-pr.py",
-            "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down."
+            "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down. A reviewer request is per-HEAD, so a push re-arms the obligation: without that the guard is armed once and permanently discharged by the first request, and every later round carries a review of a commit that is no longer the PR's head (ai-config#1282)."
           }
         ]
       }

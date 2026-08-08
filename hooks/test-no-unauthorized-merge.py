@@ -83,9 +83,159 @@ BLOCK = [
     ('gh$IFS pr$IFS merge 123', "short IFS word-split gh pr merge"),
     ('gh$(true) pr merge 123', "subshell expansion inside executable name gh"),
     ('GH=gh; $GH pr merge 123', "variable indirection for gh executable name"),
+    # --- ai-config#1279 defect 2: anchoring must not UNDER-block ------------
+    # Every command position within a segment still counts. Splitting happens on
+    # `;`, `&&`, `||`, `|` and newlines, so what remains inside a segment is a
+    # background `&`, a subshell/command-substitution opener, and the start.
+    ("sleep 1 & gh pr merge 411", "background & is still a command position"),
+    ("$EMPTY gh pr merge 411", "empty variable expansion before the command word"),
+    ("${EMPTY} gh pr merge 411", "braced empty variable expansion before the command word"),
+    ("cd /tmp && ALLOW_MERGE=0 gh pr merge 411", "ALLOW_MERGE=0 is not an override"),
+    ("cd /tmp && echo ALLOW_MERGE=1 && gh pr merge 411", "override in a DIFFERENT segment does not authorize the merge segment"),
+    ("cat <<EOF\n$(gh pr merge 411)\nEOF", "live subshell inside an UNQUOTED heredoc still executes"),
+    ("cat <<EOF\n`gh pr merge 411`\nEOF", "live backtick inside an UNQUOTED heredoc still executes"),
+    # Heredoc masking must not become a hiding place. A `<<WORD` that is only
+    # TEXT introduces no heredoc, so it must not blank the lines beneath it --
+    # that would fail OPEN, masking a real merge rather than merely over-warning.
+    ('echo "see <<EOF for details"\ngh pr merge 411',
+     "a quoted <<EOF is not a heredoc, so the next line is still scanned"),
+    ("echo 'mentions <<BODY somewhere'\ngh pr merge 411",
+     "a single-quoted <<BODY is not a heredoc either"),
+    ('grep -n "<<HEREDOC" notes.txt\ngh pr merge 411',
+     "a grep pattern containing << does not mask what follows"),
+    ("grep foo <<<PAYLOAD\ngh pr merge 411",
+     "a bare-word <<< herestring is not a heredoc introducer"),
+    # A shell keyword's operand is still a command word. Narrowing CMD_POS to
+    # punctuation-only dropped these, which fail OPEN: each is executable bash
+    # that runs the merge (ai-config#1287 review).
+    ("! gh pr merge 411", "`!` only inverts the exit status; the merge still runs"),
+    ("time gh pr merge 411", "`time` wraps and runs its operand"),
+    ("nohup gh pr merge 411", "`nohup` wraps and runs its operand"),
+    ("sudo gh pr merge 411", "`sudo` wraps and runs its operand"),
+    ("{ gh pr merge 411; }", "a brace group's body is at a command position"),
+    ("if true; then gh pr merge 411; fi", "a `then` branch body is at a command position"),
+    ("while true; do gh pr merge 411; done", "a `do` body is at a command position"),
+    ("if gh pr merge 411; then echo ok; fi", "an `if` CONDITION runs too"),
+    ("if false; then echo no; else gh pr merge 411; fi", "an `else` branch body"),
+    ("if false; then echo no; elif gh pr merge 411; then echo ok; fi", "an `elif` condition"),
+    ("while gh pr merge 411; do echo ok; done", "a `while` condition"),
+    ("until gh pr merge 411; do echo ok; done", "an `until` condition"),
+    ("! time gh pr merge 411", "stacked keywords"),
+    ("time ${EMPTY} gh pr merge 411", "a keyword followed by an empty expansion"),
+    # Pass 2. The first two below were the SECOND round of reported bypasses,
+    # and the rest are the same class unreported -- which is the point: pass 2
+    # stops enumerating what may precede a command word and blanks what cannot
+    # run instead, so a construct nobody thought of blocks rather than slipping.
+    ("case $x in merge) gh pr merge 411 ;; esac", "a one-line case arm"),
+    ("f() { gh pr merge 411; }; f", "a function defined and then called"),
+    ("case $x in\n  a) gh pr merge 411 ;;\nesac", "a multi-line case arm"),
+    ("for i in 1 2; do gh pr merge 411; done", "a for-loop body"),
+    ("f() {\n  gh pr merge 411\n}\nf", "a multi-line function body"),
+    ("coproc gh pr merge 411", "coproc"),
+    ("nice -n 5 gh pr merge 411", "a wrapper carrying a flag"),
+    ("timeout 30 gh pr merge 411", "a wrapper carrying a positional argument"),
+    ("setsid gh pr merge 411", "a wrapper in no keyword list"),
+    ("xargs gh pr merge", "xargs"),
+    ("[[ -f x ]] && gh pr merge 411", "after a conditional expression"),
+    ("case $x in *) command gh pr merge 411 ;; esac", "a case arm plus an exec wrapper"),
+    # Quoted, but bash evaluates it later -- so "a quoted span is inert" is
+    # WRONG here. mask_inert_quotes now recognises an executor's own operand
+    # and keeps it live, which is what carries these; they no longer depend on
+    # the narrow pass.
+    ("trap 'gh pr merge 411' EXIT", "a trap handler runs its single-quoted operand"),
+    ("watch 'gh pr merge 411'", "watch runs its quoted operand"),
+    # A heredoc body is inert only where its CONSUMER treats it as data. Fed to
+    # a shell it is a script, and masking it hid the merge from both passes.
+    # The quoted-delimiter form is no exception: `<<'EOF'` suppresses expansion,
+    # and bash still runs what it reads.
+    ("bash <<EOF\ngh pr merge 411\nEOF", "a heredoc fed to bash is a script"),
+    ("sh <<EOF\ngh pr merge 411\nEOF", "a heredoc fed to sh"),
+    ("bash -s <<EOF\ngh pr merge 411\nEOF", "bash -s reads the body as a script"),
+    ("ssh myhost <<EOF\ngh pr merge 411\nEOF", "ssh sends the body to a remote shell"),
+    ("ssh -T user@host <<EOF\ngh pr merge 411\nEOF", "ssh with a flag and a host"),
+    ("bash <<'EOF'\ngh pr merge 411\nEOF", "a QUOTED delimiter still executes under bash"),
+    ("cd /r && bash <<EOF\ngh pr merge 411\nEOF", "the executor in a later segment"),
+    ("/usr/bin/bash <<EOF\ngh pr merge 411\nEOF", "an absolute-path executor"),
+    ("ssh host 'gh pr merge 411'", "a positional hostname between executor and operand"),
+    # The heredoc anchor gets the SAME keyword/wrapper prefixes the matching
+    # passes do, because it is built from the same LEAD. Hand-rolling a second
+    # anchor is what let these through.
+    ("sudo bash <<EOF\ngh pr merge 411\nEOF", "a wrapper before the heredoc's executor"),
+    ("time bash <<EOF\ngh pr merge 411\nEOF", "a keyword before the executor"),
+    ("! bash <<EOF\ngh pr merge 411\nEOF", "a negation before the executor"),
+    ("if true; then bash <<EOF\ngh pr merge 411\nEOF\nfi", "a then-body executor"),
+    ("nohup ssh h <<EOF\ngh pr merge 411\nEOF", "a wrapper before ssh"),
+    ("{ bash <<EOF\ngh pr merge 411\nEOF\n}", "a brace-group executor"),
+    ("FOO=1 bash <<EOF\ngh pr merge 411\nEOF", "an env assignment before the executor"),
+    # A wrapper carrying its OWN argument. The keyword list has no way to
+    # express `sudo -u x` or `timeout 30`, so the masking anchor uses the
+    # permissive lead: over-detecting an executor only declines to mask, which
+    # scans more text rather than less.
+    ("sudo -u x bash <<EOF\ngh pr merge 411\nEOF", "a wrapper with a flag and its value"),
+    ("timeout 30 bash <<EOF\ngh pr merge 411\nEOF", "a wrapper with a positional argument"),
+    ("nice bash <<EOF\ngh pr merge 411\nEOF", "a wrapper in no keyword list"),
+    ("xargs bash <<EOF\ngh pr merge 411\nEOF", "xargs before the executor"),
+    ("setsid sh <<EOF\ngh pr merge 411\nEOF", "setsid before the executor"),
+    ("ssh -o X=y host <<EOF\ngh pr merge 411\nEOF", "ssh with an option and a host"),
+    ("echo a | sudo -u x bash <<EOF\ngh pr merge 411\nEOF", "after a pipe"),
+    # The SAME wrapper forms against a QUOTED operand rather than a heredoc.
+    # Round 5 reported both halves and only the heredoc half was fixed: the
+    # narrow pass could not see past `sudo -u x` to the executor, and the
+    # permissive pass had already blanked the operand as prose, so ten
+    # executable merges ran with the guard returning allow.
+    ('sudo -u x bash -c "gh pr merge 411"', "a flag-carrying wrapper before a quoted operand"),
+    ('sudo -E bash -c "gh pr merge 411"', "a bare flag before a quoted operand"),
+    ('timeout 5 bash -c "gh pr merge 411"', "a wrapper with a positional before a quoted operand"),
+    ('nice bash -c "gh pr merge 411"', "an unlisted wrapper before a quoted operand"),
+    ('setsid eval "gh pr merge 411"', "an unlisted wrapper before eval"),
+    ('xargs -0 bash -c "gh pr merge 411"', "xargs with a flag before a quoted operand"),
+    ('command -p sudo bash -c "gh pr merge 411"', "a chain of wrappers before a quoted operand"),
+    ('sudo -u x eval "gh pr merge 411"', "a flag-carrying wrapper before eval"),
+    ('sudo -u x ssh host "gh pr merge 411"', "a wrapper, ssh and a hostname"),
+    ('timeout 5 bash -c "glab mr merge 411"', "the same shape for glab"),
+    ("timeout 5 bash -c 'gh pr merge 411'", "a SINGLE-quoted live operand"),
+    ("sudo -u x sh -c 'glab mr merge 411'", "a single-quoted glab operand"),
+    ('cd /r && timeout 5 bash -c "gh pr merge 411"', "a live operand in a later segment"),
+    ('echo hi; nice bash -c "gh pr merge 411"', "a live operand after an inert one"),
+    # A redirection may appear ANYWHERE in a simple command, so the executor
+    # can follow the heredoc token. The masking anchor scanned forward from the
+    # executor to the `<<`, which made every one of these read as data.
+    ("<<EOF bash\ngh pr merge 411\nEOF", "the heredoc token before its executor"),
+    ("<<EOF sh\ngh pr merge 411\nEOF", "the same for sh"),
+    ("<<'EOF' sh\ngh pr merge 411\nEOF", "a quoted delimiter before its executor"),
+    ("<<-EOF bash\ngh pr merge 411\nEOF", "a tab-stripping heredoc before its executor"),
+    ("<<EOF ssh host\ngh pr merge 411\nEOF", "a hostname after the heredoc token"),
+    ("<<EOF sudo -u x bash\ngh pr merge 411\nEOF", "a wrapper after the heredoc token"),
+    ("cd /r && <<EOF bash\ngh pr merge 411\nEOF", "the reordered form in a later segment"),
+    ("bash <<EOF 2>/dev/null\ngh pr merge 411\nEOF", "a redirection after the heredoc token"),
+    # mask_payloads blanks the word after -m/-b/-d/-t/-s without checking the
+    # flag belongs to a gh/glab invocation, so an unrelated program's flag
+    # erased the EXECUTOR before the liveness check could see it. The executor
+    # scan reads the pre-mask_payloads text now.
+    ('nsenter -t 1 -m bash -c "gh pr merge 411"', "a payload flag erasing the executor"),
+    ('foo -m bash -c "gh pr merge 411"', "-m immediately before the executor"),
+    ('foo -b sh -c "gh pr merge 411"', "-b before sh"),
+    ('foo -t eval "gh pr merge 411"', "-t before eval"),
+    ('foo -d ssh host "gh pr merge 411"', "-d before ssh"),
+    ('foo -s bash -c "glab mr merge 12"', "-s before the executor, glab payload"),
 ]
 
 ALLOW = [
+    # Keeping an executor's operand live must not leak into the NEXT command.
+    # A command separator ends the simple command, so a quote after one is
+    # prose again however many executors preceded it -- without this bound,
+    # every diagnostic written after a `bash -c` in the same session blocks.
+    ('bash -c "true"; echo "you can gh pr merge later"', "prose after a separator, following an executor"),
+    ('bash -c "true" && git commit -m "why gh pr merge is blocked"', "a commit message after an executor"),
+    ('eval "true" | grep "gh pr merge"', "a grep pattern after an executor and a pipe"),
+    # A word ENDING in an executor's name is not that executor.
+    ('rebash -c "gh pr merge 411"', "an executor name as a word suffix is not a command position"),
+    # The keyword prefix above must not become bare whitespace by another name:
+    # a keyword only counts at a command position, so a keyword-shaped word
+    # sitting mid-sentence or mid-command still leaves the mention allowed.
+    ('echo "you can time gh pr merge later"', "a keyword inside quoted prose is not a command position"),
+    ('grep -rn "then gh pr merge" docs/', "a keyword inside a grep pattern is not a command position"),
+    ("gh issue comment 1 --body 'run time gh pr merge to time it'", "a keyword inside a comment body"),
     ("gh pr view 411", "read-only gh pr view"),
     ("gh api /repos/owner/repo/pulls/123/merge", "read-only REST GET PR merge status check"),
     ("gh pr checkout merge", "checking out branch named merge"),
@@ -111,13 +261,44 @@ ALLOW = [
     ('gh pr comment 999 --body "Ran $(pwd) today. Reminder: never run gh pr merge without asking."', "double-quoted payload mixing subshell with prose mentioning gh pr merge"),
     ("echo Even though pr merge conflicts arose it is fine", "prose sentence containing though followed by pr merge"),
     ("echo high pr merge priority task", "prose sentence containing high followed by pr merge"),
+    # --- ai-config#1279 defect 4: the documented override must authorize ----
+    # SPLIT leaves the separator's trailing space on the NEXT segment, so every
+    # override after a `cd &&` used to fail the `^`-anchored ALLOW_MERGE regex.
+    ("cd /tmp && ALLOW_MERGE=1 gh pr merge 411 --squash",
+     "ALLOW_MERGE=1 after cd && (leading whitespace in segment)"),
+    ("cd /repo && ALLOW_MERGE=1 gh pr merge 1226 -R o/r --squash --delete-branch 2>&1",
+     "the exact reported override form: cd && override + 2>&1 redirect"),
+    (" ALLOW_MERGE=1 gh pr merge 411", "ALLOW_MERGE=1 with plain leading whitespace"),
+    ("\tALLOW_MERGE=1 gh pr merge 411", "ALLOW_MERGE=1 with a leading tab"),
+    ("echo start; ALLOW_MERGE=1 gh pr merge 411", "ALLOW_MERGE=1 after a semicolon separator"),
+    ('cd /tmp && ALLOW_MERGE="1" gh pr merge 411', "quoted ALLOW_MERGE after cd &&"),
+    # --- ai-config#1279 defect 2: prose, quotes, greps and literals ---------
+    # fail-fast.md: "test that mentions, greps, and quotes of the gated command
+    # pass". Blocking these is what stopped the guard being documented, bug-
+    # reported, or debugged from an agent session at all.
+    ('echo "This hook blocks gh pr merge without an override"',
+     "prose MENTION of the command inside a double-quoted string"),
+    ("echo 'the gh pr merge guard fired again'",
+     "prose mention inside a single-QUOTED string"),
+    ('grep -rn "blocked: gh pr merge" hooks/',
+     "GREP pattern with the command name not at the quote boundary"),
+    ("""python3 -c "seg = 'ALLOW_MERGE=1 gh pr merge 1226 -R o/r'; print(seg)\"""",
+     "Python STRING LITERAL holding the failing segment (the blocked diagnostic)"),
+    ('printf "%s\\n" "MECHANISTIC PROHIBITION: gh pr merge is strictly blocked"',
+     "the guard's own refusal text quoted back"),
+    ("cat <<'EOF'\nMECHANISTIC PROHIBITION: `gh pr merge` is strictly blocked.\nEOF",
+     "quoted heredoc carrying the guard's own refusal text (the blocked bug report)"),
+    ("gh issue create --body-file - <<'BODY'\nRunning `gh pr merge` is blocked.\nBODY",
+     "quoted heredoc body for gh issue create (the ai-config#1279 filing shape)"),
 ]
 
 
-def verdict(cmd: str, env: dict = None) -> str:
+def verdict(cmd: str, env: dict = None, extra: dict = None) -> str:
+    payload = {"tool_name": "Bash", "tool_input": {"command": cmd}}
+    payload.update(extra or {})
     p = subprocess.run(
         [sys.executable, HOOK],
-        input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
+        input=json.dumps(payload),
         capture_output=True,
         text=True,
         env=env,
@@ -140,14 +321,37 @@ for cmd, desc in ALLOW:
     wrong += (v != "allow")
     print(f"  {v:<6} {desc}")
 
-# Test active MWC grant integration and session isolation with sanitized session IDs
+# Test active MWC grant integration and session isolation with sanitized session IDs.
+# Invoked through `bash` rather than executed directly: on Windows a .sh file is
+# not a valid executable image, so the direct form raised WinError 193 and every
+# MWC case below -- including the cross-session isolation one -- never ran at all.
 script_path = Path(__file__).parent.parent / "skills" / "session-lock" / "scripts" / "ai-session.sh"
 session_a = f"session:mwc-a/{os.getpid()}"
 session_b = f"session:mwc-b/{os.getpid()}"
+# Filename-shaped, like a real harness session id, so a transcript path can
+# round-trip it. Session A's id cannot -- that is the point of A's shape.
+session_c = f"mwc-c-{os.getpid()}"
 
-subprocess.run([str(script_path), "register", "--id", session_a], check=True, capture_output=True)
-subprocess.run([str(script_path), "register", "--id", session_b], check=True, capture_output=True)
-subprocess.run([str(script_path), "enable-mwc", "--id", session_a], check=True, capture_output=True)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
+from findbash import find_bash  # noqa: E402
+
+BASH = find_bash(script_path)
+if BASH is None:
+    sys.exit("FATAL: no bash able to run ai-session.sh; set AI_SESSION_BASH. "
+             "The MWC authorization cases cannot be verified without it.")
+
+
+def ai_session(*args):
+    return subprocess.run([BASH, str(script_path), *args],
+                          check=True, capture_output=True)
+
+
+ai_session("register", "--id", session_a)
+ai_session("register", "--id", session_b)
+ai_session("register", "--id", session_c)
+ai_session("enable-mwc", "--id", session_a)
+ai_session("enable-mwc", "--id", session_c)
 
 try:
     # Session A (sanitized) has MWC enabled -> allowed
@@ -162,15 +366,100 @@ try:
     wrong += (v_b != "BLOCK")
     print(f"  {v_b:<6} cross-session isolation for sanitized session B")
 
+    # ai-config#1279 defect 1: the hook process inherits NEITHER AI_SESSION_ID
+    # nor CLAUDE_SESSION_ID, so an env-only lookup could never see a grant made
+    # the sanctioned way (`/mwc` -> `ai-session.sh enable-mwc --id <harness id>`).
+    # The harness's own `session_id` payload field is that same id, so the grant
+    # must be honoured from the payload with no session env var set at all.
+    env_bare = {k: v for k, v in os.environ.items()
+                if k not in ("AI_SESSION_ID", "CLAUDE_SESSION_ID")}
+    v_pay = verdict("gh pr merge 411 --squash", env=env_bare,
+                    extra={"session_id": session_a})
+    wrong += (v_pay != "allow")
+    print(f"  {v_pay:<6} MWC grant honoured from the payload session_id (no env var)")
+
+    # Same, via the transcript filename stem, for a harness that omits the
+    # field. Uses session C, whose id is filename-shaped like a real harness
+    # UUID -- session A's id deliberately contains `/` and `:` to exercise
+    # sanitize(), and no filename can carry those back.
+    v_tr = verdict("gh pr merge 411 --squash", env=env_bare,
+                   extra={"transcript_path": f"/tmp/projects/x/{session_c}.jsonl"})
+    wrong += (v_tr != "allow")
+    print(f"  {v_tr:<6} MWC grant honoured from the transcript_path stem")
+
+    # Cross-session isolation must survive the new resolution path: session B
+    # holds no grant, so a payload naming B is still blocked.
+    v_pay_b = verdict("gh pr merge 411 --squash", env=env_bare,
+                      extra={"session_id": session_b})
+    wrong += (v_pay_b != "BLOCK")
+    print(f"  {v_pay_b:<6} payload session_id for ungranted session B still blocks")
+
+    # No identity at all -> no grant can be resolved -> block (fails closed).
+    v_none = verdict("gh pr merge 411 --squash", env=env_bare)
+    wrong += (v_none != "BLOCK")
+    print(f"  {v_none:<6} no session identity anywhere still blocks")
+
     # Disable MWC for Session A -> must block immediately
-    subprocess.run([str(script_path), "disable-mwc", "--id", session_a], check=True, capture_output=True)
+    ai_session("disable-mwc", "--id", session_a)
     v_a_revoked = verdict("gh pr merge 411 --squash", env=env_a)
     wrong += (v_a_revoked != "BLOCK")
     print(f"  {v_a_revoked:<6} revoked MWC grant blocks for session A")
 finally:
-    subprocess.run([str(script_path), "release", "--id", session_a], check=True, capture_output=True)
-    subprocess.run([str(script_path), "release", "--id", session_b], check=True, capture_output=True)
+    ai_session("release", "--id", session_a)
+    ai_session("release", "--id", session_b)
+    ai_session("release", "--id", session_c)
 
-total = len(BLOCK) + len(ALLOW) + 3
+# The command-position anchor makes every `;`, `&`, backtick and `$(` a place
+# the matcher restarts. With an UNBOUNDED expansion prefix each of those N
+# restarts rescanned the rest of a long substitution run before failing, which
+# is quadratic: 610ms on 800 chained backtick pairs, against 2.8ms for the
+# pre-anchor matcher, on a hook that runs before EVERY Bash call. Bounding the
+# repetition restores linear behaviour (~19ms at 1600).
+#
+# The threshold is deliberately loose -- this asserts the SHAPE of the growth,
+# not a runtime budget, so it survives a slow or loaded runner. A reintroduced
+# quadratic lands near 2.4s here, over an order of magnitude past the bound.
+import importlib.util  # noqa: E402
+import time  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("_guard", HOOK)
+_guard = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_guard)
+_adversarial = "`x` " * 1600 + "echo hi"
+_t0 = time.perf_counter()
+_guard.offending(_adversarial)
+_elapsed = time.perf_counter() - _t0
+wrong += (_elapsed > 1.0)
+print(f"  {'allow' if _elapsed <= 1.0 else 'SLOW ':<6} "
+      f"1600 chained substitutions scanned in {_elapsed * 1000:.0f}ms (bound 1000ms)")
+
+# Deciding whether a quoted span is a live operand needs the start of its
+# simple command. Rescanning for that from position zero per quote is
+# quadratic; the separator offsets are computed once per pass instead. Without
+# the precompute this input takes ~10x as long, so the bound is a real guard
+# and not decoration.
+_manyquotes = " ".join(f'echo "field {i}"' for i in range(2000))
+_t0 = time.perf_counter()
+_guard.offending(_manyquotes)
+_elapsed_q = time.perf_counter() - _t0
+wrong += (_elapsed_q > 1.0)
+print(f"  {'allow' if _elapsed_q <= 1.0 else 'SLOW ':<6} "
+      f"2000 quoted spans scanned in {_elapsed_q * 1000:.0f}ms (bound 1000ms)")
+
+# The executor scan reads a DIFFERENT string from the one being masked, and the
+# two are interchangeable only because both are length-preserving. A caller that
+# passes a mismatched subject would silently index the wrong offsets, so the
+# guard falls back to the masked text rather than trusting the argument.
+_txt = 'bash -c "gh pr merge 411"'
+# A mismatched subject must fall back to `text`, so the operand still reads as
+# LIVE and survives unmasked. Asserting only that the length is preserved would
+# pass either way -- masking is length-preserving by construction.
+_short = _guard.mask_inert_quotes(_txt, "too short")
+_ok = ("pr merge" in _short) and len(_short) == len(_txt)
+wrong += (not _ok)
+print(f"  {'allow' if _ok else 'WRONG':<6} "
+      f"a mismatched-length executor subject falls back instead of indexing")
+
+total = len(BLOCK) + len(ALLOW) + 10
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

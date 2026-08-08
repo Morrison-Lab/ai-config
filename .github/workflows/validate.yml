@@ -62,6 +62,12 @@ jobs:
         run: python3 scripts/test_pr_sweep.py
       - name: Run context-closure tests
         run: python3 scripts/test_check_context_closure.py
+      - name: Run ai-session MWC grant tests
+        # The merge guard's only scoped authorization path runs through
+        # ai-session.sh's MWC marker, and it shipped with no test at all --
+        # which is how ai-config#1279's check-mwc defects went unnoticed. Runs
+        # against a throwaway git repo, so it never touches a real registry.
+        run: python3 scripts/test_ai_session.py
       - name: Run enforcement-hook tests
         # The hooks/ guards enforce corpus rules but their test-<name>.py files
         # ran nowhere until now (ai-config#1065). This runner pairs each test

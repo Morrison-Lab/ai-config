@@ -141,6 +141,26 @@ And the 52 was itself the narrow detector's output, missing all six
 The correct accounting is 84 identifier sites redacted: 64 pseudonymized in
 place across 9 files, plus 20 deleted with the two pasted blocks.)
 
+## A reference frame chosen from the initial condition expires as the system moves
+
+(`Lacaedemon/sparta#1222`, merged 2026-08-07 as `320fe3b2`: an instrument
+attributing a two-regiment rotation projected each candidate's per-tick
+contribution onto world X, on the stated grounds that the separation between
+the two regiments starts along +Y.
+It does, at tick 0, where world X is exactly tangential and the projection
+measures precisely what it was built to measure.
+By tick 700 the pair had rotated 56 degrees, so world X had become 83% radial
+--- `cos(90 - 56) = 0.829`, computed here rather than recalled --- and the
+radial channel is dominated by `Unit._press_into`, the one candidate that is
+purely central away from a field edge and therefore contributes essentially no
+rotation there --- 0.002 degrees, measured.
+The instrument accordingly reported `_press_into` at +/-152 wu of exactly
+anti-symmetric world-X displacement and read it as the driver, where
+attributing the bearing directly via `cross(r_hat, dr) / |r|` puts it at 0.002
+degrees against `SoldierBodies.couple`'s -59.163 of the -59.16 total.
+The projection never failed, never went empty, and never returned anything but
+a large stable number; only its meaning changed.)
+
 ## A reminder guard's discharge condition is a second matcher, and its failure is silence
 
 (`Morrison-Lab/ai-config#1075`, 2026-08-03: the review of a new inject-only

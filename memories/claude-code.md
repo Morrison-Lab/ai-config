@@ -70,6 +70,33 @@
   that PR. There's no CLI shortcut for **Auto-merge when ready**; that one
   always needs a manual toggle. A true default would require a feature
   request via `/feedback`.
+- **No tool on the agent's side can toggle this itself.** Checked the full
+  available toolset (Bash, every loaded MCP tool including `github`,
+  `update-config`) for a client-side settings lever and found none: the
+  panel is client-UI-only state, not something `update-config`'s
+  `settings.json` surface reaches. If the user reports the checkbox
+  changed, that's their action, not something to claim credit or
+  responsibility for.
+- **What actually fires once "Auto-fix CI & address comments" is on:** the
+  harness starts pushing `<ci-monitor-event>` messages mid-turn (arriving
+  alongside the next tool result, same delivery mechanism as a background
+  task notification) whenever the PR gets a new review comment. Each event
+  quotes the comment(s) verbatim and appends a **fixed instruction
+  template**: "address the feedback and push a fix... post a one-line
+  reply on the thread... end with '_🤖 Addressed by Claude Code_'... resolve
+  the thread... skip replies for comments you didn't act on."
+- **That template is boilerplate applied to every new comment, not gated on
+  whether the comment is a real finding.** Observed firing on: a Copilot
+  quota-refusal ("unable to review... reached their quota limit"), a
+  Copilot "wasn't able to review any files" refusal, and a sticky
+  PR-preview-deploy comment (`rossjrw/pr-preview-action`) that just posts a
+  preview URL and updates in place on every push. None of those carry an
+  actionable finding. Treat every `<ci-monitor-event>` as a prompt to go
+  verify the PR's actual state via the API (`gh api .../issues/.../comments`,
+  `gh pr checks`) rather than complying with "push a fix" reflexively: the
+  template's own trailing clause ("skip replies for comments you didn't act
+  on") is the license to do nothing when there's nothing to do, and it's
+  worth reading, not just the imperative sentence before it.
 
 ## AskUserQuestion (Claude Code harness tool)
 - Each entry in `questions[]` **requires a `question` field** (the full question

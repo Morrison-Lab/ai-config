@@ -459,6 +459,68 @@ The general rule stays judgment.
 - **Don't:** let the act of retracting stand in for having verified the
   replacement --- a correction is a claim, and it carries its instrument with it.
 
+## A retraction is only as good as the instrument's reach
+
+The section above concerns a second reading from the **same command**, where
+the gauge is shared and so proves nothing.
+This concerns a retraction made from a **genuinely different** instrument --- a
+new command, a real source of truth, correctly run --- whose input could not
+have contained the evidence for the claim being withdrawn.
+
+The direction is the opposite of the one everything else here guards.
+The rest of this file warns against **trusting** a null result as a finding.
+This warns against **withdrawing a true claim** on one.
+[`fail-fast`](../principles/fail-fast.md)'s "A zero-shaped summary can be
+sound" is the nearest neighbour and differs in mechanism: there a scope line
+was printed and misread, whereas here the scope is the argument you passed and
+nothing prints it at all.
+
+What makes it survive scrutiny is that the check is sound.
+Every "did you actually verify this?" prompt fires and passes --- a real
+command, a real file, a correct reading, a null result honestly reported.
+The error is in the **join**: the claim was about a system, and the instrument
+was pointed at one file of it.
+That is the shape
+[`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)'s "mirror
+direction" records for a file read at the wrong ref, one axis over --- there
+the wrong version of the right file, here the wrong file in the right chain.
+
+So widen the tell the section above gives.
+It fires when the new figure comes from the same command; extend it to fire
+whenever **the new reading comes from an instrument that could not have seen
+the original evidence**.
+The question is not "is this check clean" but "could this check have returned
+anything else, if the claim were true".
+Where it could not, the null result is silent about the claim rather than
+against it, and retracting on it publishes a second, worse error under a banner
+of care --- one that, per the section above, reaches everyone the first claim
+reached and teaches them the matter is settled.
+
+- **Do:** ask what a positive result would have looked like, and where it would
+  have appeared, before treating a null result as grounds to withdraw a claim.
+- **Do:** state the scope a check covered when reporting it, so a reader can
+  see what it could not have reached.
+- **Don't:** retract on silence from an instrument whose input excluded the
+  evidence --- soundness is not reach.
+- **Don't:** read the effort of correcting yourself as evidence that the
+  correction is right.
+
+(`Morrison-Lab/ai-config#1281`, 2026-08-07: a review cancelled with no verdict
+was explained by `concurrency: cancel-in-progress`, correctly.
+Asked to check, the session grepped the **caller** workflow,
+`.github/workflows/claude-review.yml`, found no `concurrency` block, and
+retracted the explanation to the user as something carried over from another
+repo's setup without checking.
+That caller is 68 lines and delegates to
+`Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`, which declares
+the group at job level, line 328 of 1091, beneath a 25-line comment describing
+this exact race.
+The grep was sound and covered 68 lines of a call chain over 1150 lines long,
+so it could not have returned a hit whether or not the claim was true.
+`memories/github-actions.md`'s "A caller with no `concurrency:` block can still
+have its runs cancelled" had recorded the same fact two days earlier, from PR
+#1224, and was not consulted.)
+
 ## "Unresolved between two sources" is a place to stop checking, not a finding
 
 The section above is one instrument read twice.

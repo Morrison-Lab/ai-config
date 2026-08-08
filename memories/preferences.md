@@ -517,7 +517,9 @@
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
   On workflows with `concurrency: cancel-in-progress` (d-morrison/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
-  If a review ends up canceled with no comment, dispatch one cleanly: `gh workflow run claude-review.yml -f pr_number=<N>`.
+  If a review ends up canceled with no comment, check first whether a newer run for the **same PR** is already in flight --- a retry cancels it, and it may be a review a human just requested --- and dispatch only when nothing is running: `gh workflow run claude-review.yml -f pr_number=<N>`.
+  Attribute in-flight runs to a PR from each run's own `gather-context` log; `gh run list` reports `main` as the branch for every dispatched review.
+  See [`fully-clean`](../shared/workflow/fully-clean.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy".
 - During ARDI loops: always ANTICIPATE what the reviewer will flag next and fix those issues preemptively in the same commit.
   Don't wait for each round to surface issues one at a time --- read the code holistically, think about what patterns the reviewer has flagged in prior rounds (documentation gaps, coupling without cross-references, missing edge-case guards, inconsistent accounting), and fix analogous issues elsewhere in the same file before pushing.
   The goal is to minimize back-and-forth rounds.

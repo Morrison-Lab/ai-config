@@ -285,3 +285,35 @@ grep -nE '^#[^ #]'` returns every added line that opens with a bare `#`.
   neither reads column 1.
 - **Don't:** fix only the line CI named; the same phrasing habit produces the
   collision wherever a clause happens to start with a reference.
+
+**Repointing a citation to a longer filename can push an untouched
+`memories/` file over its hard-gated size ceiling, with zero content added.**
+The "Relocating prose" section above is about the *moved* content's own
+lines growing.
+The citing side has its own version, and it fires on a file you never meant
+to touch beyond a one-word swap.
+`memories/` files sit under a hard-gated ceiling --- the checker script
+calls itself advisory, but `test_check_memory_file_size.py`'s own
+regression test asserts the *live corpus* stays under it, which is a
+different, non-advisory guarantee --- so a file already sitting exactly at
+1200 lines has zero headroom.
+Repointing one citation inside it to a longer replacement name rewraps the
+sentence carrying it, and in this semantic-line-break corpus that rewrap can
+add a whole line, pushing the file to 1201 and failing CI though not one
+word of content changed.
+
+- **Do:** after repointing a citation, `wc -l` any touched `memories/` file
+  that was near 1200 lines, and re-wrap the sentence to recover the line if
+  it crossed.
+- **Do:** read `test_check_memory_file_size.py` itself, not just the
+  checker script's docstring --- the docstring calls the check advisory,
+  and the test suite hard-gates the live corpus anyway.
+- **Don't:** assume a citation swap with no other content change cannot
+  move a file's line count.
+
+(Morrison-Lab/ai-config#1291, 2026-08-08: repointing citations from
+`fully-clean.md` to the longer `review-verdict-pitfalls.md` inside
+`memories/claude-bot-workflows.md` and `memories/github-actions.md` tipped
+each from exactly 1200 to 1201 lines, failing `validate` with no content
+change; fixed by re-wrapping the same sentences at a different clause
+boundary, restoring both to 1200.)

@@ -860,6 +860,45 @@ request with this reasoning) over trading the fail-safe away.
 Reducing a safe-direction over-block is exactly how a fail-safe guard grows a
 dangerous hole.
 
+**Once the safe direction is known, it is a property to build the guard around,
+not only one to defend it in.**
+The paragraph above is defensive: it says which way *not* to be pushed.
+The constructive form is to ask which way an **unforeseen** case falls, because
+that is decided by the guard's shape rather than by its contents.
+
+A guard that **enumerates what may act** fails open on anything the enumeration
+misses, and the miss is silent, so each new construct is a fresh fail-open found
+only by whoever goes looking.
+A guard that instead **removes what cannot act** and then treats everything
+remaining as live fails the other way: an unforeseen construct is caught by the
+default rather than missed by the list, so the cost of being wrong is a loud
+over-block that a documented override clears.
+Same information, inverted, and the residual risk moves from the dangerous
+direction to the safe one.
+
+Do not read this as licence to drop the narrow pass.
+"What cannot act" is a real claim about the world and it can be false --- a
+quoted span is inert until something defers execution of it, so an evaluator
+that runs its own quoted operand makes the exclusion wrong.
+Keep the narrow, raw-text pass and add the inverted one as strictly additive,
+so the two disagree only where the exclusion is unsound.
+
+- **Do:** ask which direction an unforeseen case falls, and prefer the guard
+  shape that sends it to the safe one.
+- **Do:** pair an inverted pass with the original narrow pass, additively,
+  rather than replacing it.
+- **Don't:** keep extending an enumeration whose every gap is a silent
+  fail-open, when inverting it makes the same gaps loud.
+- **Don't:** treat an exclusion set as self-evidently safe --- "this text cannot
+  execute" is a claim, and a deferred evaluator falsifies it.
+
+The worked instance is
+[`address-every-comment`](../workflow/address-every-comment.cases.md)'s
+"Deriving the class is necessary and not sufficient", where two rounds of
+extending an enumeration of shell constructs kept producing fresh silent
+fail-opens until the guard was inverted to blank inert quoted spans and treat
+every remaining position as live.
+
 (Distinct from
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A reminder
 guard's discharge condition is a second matcher": that governs a discharge

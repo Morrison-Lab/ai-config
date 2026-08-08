@@ -597,6 +597,34 @@ does not.
 - **Don't:** trust a single-sided delimiter token to reach every alternative;
   it reaches every one but the end the delimiter is missing from.
 
+**A component that stops failing under mutation is a question, not a cleanup.**
+Adding a new, stronger guard alongside older ones routinely leaves one of the
+old components **dead** against the suite: mutate it away and nothing fails,
+because the new guard already catches every case the suite holds for it.
+The reading that suggests itself is that the old component is now redundant, and
+deleting it is the tidy move.
+
+That is wrong, and wrong in the fail-open direction, because what the suite just
+reported is a fact about **its own coverage** rather than about the component's
+necessity.
+So invert the question.
+Ask where the dead component is *still* load-bearing, looking specifically for
+an input the newer guard cannot see.
+The search either finds a real case --- in which case the component stays and
+the suite gains the case it was missing --- or it comes back empty and you
+delete on evidence instead of by inference.
+
+Sequence is the part that is easy to miss: adding the new guard is what *creates*
+the dead component, so the moment a mutation score drops to zero is the moment to
+look, not a later tidying pass.
+
+- **Do:** treat a zero mutation score on an existing component as a missing test
+  case, until a search for its remaining role comes back empty.
+- **Do:** run that search at the moment the score drops, since the guard you
+  just added is what made the component look redundant.
+- **Don't:** delete a component because mutating it no longer fails the suite
+  --- that is the suite describing itself, not the component.
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

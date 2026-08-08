@@ -452,6 +452,90 @@ That fragment governs a **sound** command whose conclusion overreaches --- the
 null result is a real fact about the pattern, and only the step to "the corpus
 lacks this" is wrong.
 Here the command itself is unsound, so the result is not a fact about anything.
+
+**A third direction, and the one the remedy above passes: the pattern is right
+about the data and admits the stream's own metadata, because that metadata is
+written in the data's alphabet.**
+Both directions above are a pattern matching the wrong *things*.
+Here it matches the right things and one more, because the stream it reads is
+not pure data.
+A unified diff marks added content with `+` and names the file that content
+came from with `+++ b/<path>`, so a filter for added lines cannot separate the
+two by prefix:
+
+```bash
+git diff <base> <head> -- <path> | grep '^+' | sed 's/^+//'   # leaks the header
+```
+
+`sed` then strips one character rather than the whole marker, so the header
+does not leave --- it is *disguised*, arriving in the output as `++ b/<path>`.
+The deletion side does the same, leaving `-- a/<path>`.
+Neither `--no-prefix` nor `-U0` helps: the first shortens the header to
+`+++ <path>` and the second changes only the context, so both still open with
+the marker character.
+
+Note that this defeats the remedy this section prescribes.
+Testing the instrument against a known positive **passes**, since the pattern
+does match the content, correctly, and merely takes one line more.
+Anchoring to structure does not help either, because here the header *is* the
+structure.
+What separates them is length rather than prefix, so exclude the delimiter by
+its full length:
+
+```bash
+git diff <base> <head> -- <path> | grep '^+' | grep -v '^+++' | sed 's/^+//'
+```
+
+**What the pattern feeds decides how much this costs.**
+A too-loose pattern in a **detector** surfaces as a phantom finding, which is
+the first direction above: somebody investigates it and finds nothing.
+The same looseness in an **extractor** turns the extra match into *content*,
+and nothing investigates content.
+So one flaw is self-reporting in the first role and silent in the second.
+
+**The tighter guard over-corrects, and what it loses is invisible to the check
+that would look for it.**
+`grep '^+[^+]'` drops the header in a single pass, and
+[`memories/git.md`](../../memories/git.md)'s stash-supersession bullet uses it
+correctly --- there each added line is grepped for in `main`, so a blank line is
+noise.
+Reuse it on prose and it silently drops every added **blank** line, collapsing
+paragraph boundaries.
+Measured on git 2.50.1 against a two-paragraph addition: `^+[^+]` returned the
+two lines of text and not the blank between them, while
+`grep '^+' | grep -v '^+++'` returned all three.
+
+Carry that pair together, because a whitespace-normalizing word-level
+comparison --- the content-preservation check
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) prescribes for
+exactly this kind of move --- cannot see either failure.
+The leaked header is an **addition**, and a check phrased as "did anything go
+missing" is one-sided.
+The dropped blank line contributes no words, and the check normalizes
+whitespace away before comparing.
+So the two candidate guards fail in precisely the two directions that check is
+blind in.
+
+- **Do:** exclude a delimiter by its full length (`grep -v '^+++'`) when it is
+  prefix-compatible with the data's own marker.
+- **Do:** ask what a pattern *feeds* --- a detector's extra match gets
+  investigated, an extractor's becomes content.
+- **Do:** compare a moved block in both directions, so an added line is as
+  visible as a dropped one.
+- **Don't:** read a passing known-positive test as clearing this; the pattern
+  matches the content correctly and takes one line more.
+- **Don't:** reuse `^+[^+]` on prose --- it eats added blank lines, and the
+  whitespace-normalized check will not report that either.
+
+The class is wider than diffs.
+Any delimiter carried **in band**, in the data's own alphabet, has this
+property: a fence marker inside fenced content, a heredoc terminator the
+heredoc's own text can contain, a comment character that also opens a
+directive.
+[`batch-merge-and-resolve`](../workflow/batch-merge-and-resolve.md) records the
+mirror failure, where `grep -c '^<<<<<<<'` returns 0 on a real conflict because
+`merge-tree` indents every line by the diff's own leading character.
+There the collision hides a true positive; here it manufactures a false one.
 Read that one before concluding a concept is absent; read this one before
 trusting any grep as an instrument.
 

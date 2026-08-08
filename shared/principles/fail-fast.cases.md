@@ -62,6 +62,44 @@ published in an issue and a merged PR body as *the* verification command
 for a security invariant, so the phantom it produced was reported as a
 regression before the pattern was re-read.)
 
+## "A third direction" --- the diff header that rode into ported prose
+
+(Morrison-Lab/ai-config#1290 -> #1296, 2026-08-08.
+#1291 merged at 14:41:26Z, splitting `shared/workflow/fully-clean.md` and
+moving #1290's target section into the new
+`shared/workflow/review-verdict-pitfalls.md`, so #1290 had to *port* its prose
+rather than merge it.
+The port extracted the content with
+`git diff <base> <head> -- shared/workflow/fully-clean.md | grep '^+' | sed 's/^+//'`,
+which kept the `+++ b/shared/workflow/fully-clean.md` header and stripped one
+character from it.
+The resulting `++ b/shared/workflow/fully-clean.md` landed mid-prose at line
+810 in the conflict-resolution merge `4acf1895` at 14:51:38Z, eight minutes
+before #1290 merged as `fa55c46a` at 14:59:26Z.
+
+Four verdict-bearing review rounds had already run that morning --- 06:27:19Z,
+06:44:13Z, 06:53:29Z, 07:01:10Z --- and none had the artifact in scope, since
+the destination file did not enter the PR's diff until that final merge commit.
+The reviewer said so itself: "review-verdict-pitfalls.md didn't exist in this
+PR's diff until this merge commit, so it wasn't reachable by any prior review
+round."
+A fifth round dispatched at 15:02:53Z, after the merge, caught it; `613aba15`
+removed it at 17:28:10Z, so it stood on `main` for 2h28m.
+
+Two things kept it there.
+A conflict-resolution commit is the least-scrutinized commit on a PR: it lands
+after the review rounds and reads as mechanical.
+And the mangling disguised the artifact --- an intact `+++ b/<path>` in prose
+reads as machine output and gets deleted on sight, while `++ b/<path>` reads
+as a typo or an odd bullet, so a read-through for sense passes over it.
+
+The corpus already held the mechanism, at `memories/git.md`'s
+stash-supersession bullet, which ships `grep '^+[^+]'` and names the
+`+++ b/<path>` headers it excludes.
+It did not transfer, and would not have been the right guard here anyway:
+measured on git 2.50.1, `^+[^+]` drops added blank lines, so on prose it merges
+paragraphs.
+
 ## "The third one arrives in the repair" --- the empty-input sentinel
 
 (Morrison-Lab/ai-config#1056, 2026-08-02: review round 1 found that a

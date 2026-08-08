@@ -229,8 +229,10 @@ back identical.
 
 - **Do:** fix banned glyphs and multi-sentence lines throughout any prose you
   relocate, in the same change that moves it.
-- **Do:** prove a mechanical reflow preserved content, by word-level comparison
-  against the original.
+- **Do:** prove a mechanical reflow preserved content *and added nothing*, by
+  word-level comparison in both directions --- a one-sided "did anything go
+  missing" check cannot see a line the move introduced, per
+  [`fail-fast`](../principles/fail-fast.md)'s third pattern direction.
 - **Don't:** treat "I only moved it" as grandfathering --- the diff cannot tell
   a move from an authoring pass, and neither can a reviewer.
 - **Don't:** defer to the corpus-wide sweep for lines your own diff is

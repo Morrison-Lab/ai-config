@@ -506,6 +506,18 @@ When a delimiter cannot be told from its data by content, tell it by where it
 sits --- and if position is not fixed either, stop parsing the stream and ask
 the tool for the data directly (`git show <rev>:<path>`).
 
+**Mind the precondition, because it is easy to lose.**
+"First `+`-matching line" holds per **file**, so a multi-file diff carries one
+header per file and `tail -n +2` drops only the first.
+Scope the diff to one path, or loop over `git diff --name-only` and scan each
+file separately.
+This is not a hypothetical: the pass that wrote this entry ran the guard over
+its own three-file diff as a dogfooding check, and got three hits --- its own
+two undropped headers plus one --- which read at first like defects in the
+files rather than in the scan.
+Per-file scanning returned 0 for every file, as did grepping the files
+directly.
+
 **What the pattern feeds decides how much this costs.**
 A too-loose pattern in a **detector** surfaces as a phantom finding, which is
 the first direction above: somebody investigates it and finds nothing.

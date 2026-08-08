@@ -39,6 +39,13 @@ warnings: list[str] = []
 
 FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.S)
 
+# The cloud plugin-marketplace Skills validator hard-rejects (`failed_content`)
+# any skill whose `description` exceeds this many characters. The local
+# Claude Code CLI only *truncates* an over-length description (at 1536
+# chars) and never errors, so a violation here passes locally and only
+# surfaces as a cryptic marketplace sync failure -- see ai-config#1263.
+MARKETPLACE_DESCRIPTION_LIMIT = 1024
+
 
 def parse_frontmatter(text: str, where: str):
     match = FRONTMATTER.match(text)
@@ -76,6 +83,13 @@ def check_skill(skill_dir: Path) -> None:
     desc = fm.get("description")
     if not desc or not str(desc).strip():
         errors.append(f"{rel}: frontmatter `description` is missing or empty")
+    elif len(str(desc)) > MARKETPLACE_DESCRIPTION_LIMIT:
+        errors.append(
+            f"{rel}: frontmatter `description` is {len(str(desc))} chars, "
+            f"over the marketplace's {MARKETPLACE_DESCRIPTION_LIMIT}-char limit "
+            "(the local CLI truncates instead of erroring, so this only "
+            "surfaces as a cloud marketplace sync failure -- see #1263)"
+        )
     if "user-invocable" in fm and not isinstance(fm["user-invocable"], bool):
         errors.append(f"{rel}: `user-invocable` must be true or false")
     tools = fm.get("allowed-tools")

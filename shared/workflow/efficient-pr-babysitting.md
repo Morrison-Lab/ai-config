@@ -12,6 +12,7 @@ Fewer, complete pushes mean fewer wasted CI minutes and fewer webhook events to 
 A note the reviewer *considered and explicitly declined to raise as a finding* is exactly that: not a posted finding, so it does not keep the loop open.
 Acting on it anyway costs a full round (CI plus a re-review), and the fix can itself draw a fresh declined note, so one clean verdict trickles into several rounds over nothing that was ever blocking.
 Default to holding, and spend a round on an optional improvement only when it clearly justifies the cost.
+That default is about the fix and not about the fact, so where a declined note asserts something checkable, verify it against the code before writing it off -- the cost argument here holds whether the note is right or wrong, and only checking says which, per [`address-every-comment`](address-every-comment.md)'s "A note the reviewer declined to raise is still a claim".
 
 Keep the Copilot observation separate, and do not attribute it to your own pushes.
 Copilot posts no formal review when it finds nothing, so `copilot-pull-request-reviewer` can complete `success` with `get_reviews` empty even on a stable, single-push head -- the silent-reviewer state [`fully-clean`](fully-clean.md) owns.

@@ -22,6 +22,22 @@ in progress; do not call the PR clean from an earlier head or from green CI
 without a current-head review verdict.
 Pushing fixes for a finding-bearing review starts a new review cycle: the ARDI loop is NOT finished when you push fixes or post an ARD summary.
 You must wait for the fresh review run evaluating your latest pushed commit to post, fetch and parse that review, and confirm it is clean before declaring the loop finished.
+
+**That wait is conditional on a run having been scheduled, and on some repos a push schedules nothing.**
+A review workflow whose `on:` block carries no push-based trigger --- `workflow_dispatch` and `issue_comment` only, which is how a repo disables automatic review on PR activity --- fires nothing when you push, so the run you are told to wait for will never exist and the poll cannot terminate.
+The obligation is then discharged by **dispatching**, not by waiting, and it recurs on **every** push rather than once at PR-open time: `gh workflow run <review-workflow>.yml -R <owner>/<repo> -f pr_number=<N>`, taking the input's name from that workflow's own file.
+Read the `on:` block once per repo, the first time you push to a PR there, and record which class it is.
+This is the shape most likely to be missed while everything looks healthy, because CI still goes green on each push, and watching CI to green feels like watching the PR --- so the loop closes on "checks passed" while the last verdict on file dates from an earlier head.
+`check-pr-fully-clean.py` returning non-zero for "no review at this HEAD SHA" on such a repo means *dispatch now*, not *poll longer*.
+[`pr-on-claim`](pr-on-claim.md) covers the PR-open and draft-to-ready end of this.
+The increment here is that each subsequent push owes its own dispatch.
+
+- **Do:** read the review workflow's `on:` block before the first push to a PR in an unfamiliar repo, and dispatch explicitly after every push when it carries no push-based trigger.
+- **Do:** treat a non-zero `check-pr-fully-clean.py` on a dispatch-only repo as a prompt to dispatch.
+- **Don't:** read green CI at the current head as evidence a review is in flight --- on a dispatch-only repo that is the steady state, not a transient one.
+- **Don't:** let a verdict from an earlier head stand because the repo's trigger class was already known.
+  Knowing it is not the same as acting on it each round.
+
 NEVER use background tasks, async sleep commands, or schedule timers for ARDI status polling.
 Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn.
 This applies transitively to PR-driving
@@ -89,8 +105,16 @@ catchable this way, since each was a direct match against gha's own
 ### Pre-push checklist
 
 **Pause point: after committing, before `git push`.**
-Do-Confirm --- the items are independent, so work in whatever order suits the
-round and confirm all seven here.
+Do-Confirm --- confirm all seven here, in whatever order suits the round, with
+one exception: the items that **edit** the diff have to precede the items that
+**measure** it.
+Regenerating a generated tree and merging `main` change which lines are added,
+so an added-lines scan or a deleted-lines read taken before either is an answer
+about a diff you no longer have.
+The same holds *inside* item 3, which bundles two checks: reflowing a long line
+to clear its multi-sentence half retires the very lines its punctuation half
+scanned, so satisfying one check expires the other's result
+([`semantic-line-breaks`](../writing/semantic-line-breaks.md)).
 Per [`skill-checklists`](skill-checklists.md); every item below exists because
 the bullets in this fragment record it failing at this exact boundary.
 
@@ -102,9 +126,11 @@ the bullets in this fragment record it failing at this exact boundary.
       touched a generator's inputs, and the PR body states how many changed
       files are generated.
 - [ ] **Added lines were scanned** for banned punctuation and multi-sentence
-      lines, run *after* committing and with the three-dot range
-      (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree,
-      and a two-dot range re-attributes whatever `main` deleted to you.
+      lines, run *after* committing, *after* every pass that edited the diff
+      (your own reflow included), and with the three-dot range
+      (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree, a
+      later edit retires the lines an earlier run scanned, and a two-dot range
+      re-attributes whatever `main` deleted to you.
 - [ ] **The changelog entry and the PR description were re-read** against the
       new behavior, not just the code --- neither is in the diff, so no
       reviewer and no grep will catch a stale one.

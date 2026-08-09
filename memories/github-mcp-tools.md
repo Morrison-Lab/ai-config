@@ -663,6 +663,24 @@ See ai-config#694 for the precedent.
   backticks. This is the same formatting-blind-substring failure mode as the
   bot-mention gate in `memories/claude-bot-workflows.md` -- a pass that inspects
   raw text while the author reasons in rendered Markdown.
+  **An empty backtick pair is the most visible damage, not the only damage, so
+  do not use it as the tell.** Removing a span mid-sentence also re-balances
+  whatever punctuation surrounded it: a following quotation mark becomes an
+  opening one, so a quote silently re-opens and runs on through later prose.
+  And a sentence contrasting a raw token against its escaped entity collapses
+  into a tautology, because the surviving raw token is itself entity-escaped on
+  the way in, leaving the two halves identical.
+  Both leave grammatical, plausible-looking text with no empty backticks
+  anywhere, which is why the re-read below has to be a **comparison against
+  what you sent** rather than a proofread of what is stored.
+  Note also that counting empty pairs naively over-reports: every fenced block
+  contributes its own marker, so separate them before believing a count.
+  (ai-config#1361, 2026-08-09: a PR body describing this very entry lost three
+  bracketed placeholders from inside code spans and carried both second-order
+  corruptions as well, while the tool reported success both times. A naive
+  count of empty pairs returned 6, all of which were the three fenced blocks'
+  own markers; the zero-genuine result came from a negative-lookaround match
+  that excludes triple-backtick runs.)
   **Write the URL with no angle brackets at all**: a `[text](url)` link, or
   the bare `https://...` (GitHub auto-links it in a PR body anyway). Then
   re-read the stored body after posting when a URL matters -- the call

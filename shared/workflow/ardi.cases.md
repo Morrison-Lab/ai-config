@@ -399,3 +399,73 @@ The two later rounds are a different failure, recorded against
 4's fix was strictly wider than the hand-rolled anchor it replaced, so it
 introduced no gap --- it composed the narrow variant of an anchor that also had
 a permissive one, which rounds 5 and 6 then found insufficient.)
+
+## A per-push dispatch cancels its own review, invisibly
+
+(`Morrison-Lab/ai-config#1361`, 2026-08-09: three review runs were dispatched
+across one ARD round on a repo whose `claude-review.yml` carries
+`workflow_dispatch` and nothing else.
+Runs `31341027707` and `31341383018` were each cancelled mid-review by the next
+dispatch; only `31341502912`, issued after the pushing stopped, survived and
+posted a verdict.
+Roughly nine minutes of review time produced nothing, twice.
+
+The concurrency group was read rather than inferred, at the ref the runs
+actually used, per
+[`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md).
+Run `31341027707`'s `referenced_workflows[]` reports
+`Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` resolved to
+`c05ca95cdb33a93ad7f7f51a90b67cedfa7afe56`, and at that commit the
+`claude-review` job carries, at lines 328 to 330:
+
+```yaml
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || inputs.pr-number }}
+      cancel-in-progress: true
+```
+
+The caller declares no `concurrency` block of its own, so reading the caller
+alone would have found nothing --- the case
+[`memories/github-actions.md`](../../memories/github-actions.md) records as "a
+caller with no `concurrency:` block can still have its runs cancelled".
+gha's own comment above that block already documents the consequence, that "a
+CANCELED claude-review run makes require-review FAIL outright (cancelled !=
+skipped)".
+
+The invisibility was measured on the same run: `head_branch` reads `main` and
+`head_sha` reads `92787c408b07d8e8aed0dbe029de663f07db173b`, which is the
+default branch's tip rather than the PR's head, because the dispatches passed no
+`--ref`.
+`shared/workflow/ardi.md`'s own dispatch command omitted the flag at the time,
+while the recovery command in `skills/ardi/SKILL.md` and `memories/preferences.md`
+carried it --- so the routine path used every round lacked the fix that the
+rarely-taken path had.)
+
+## An invented `Closes` in a merge commit message
+
+(`Morrison-Lab/ai-config#1361`, 2026-08-09: the squash commit `62ea72b3` ends
+`Closes #1358`.
+#1358 is an unrelated pull request from a parallel session, and #1361 had no
+tracking issue at all, having come from a subagent dispatch rather than the
+issue-first flow --- so the number was typed to fill a habitual slot rather than
+read from anywhere.
+
+The damage assessment first published on the PR read: "GitHub's closing keywords
+act on issues, not pull requests, and #1358 was already closed regardless."
+The second clause is right and the first is wrong.
+GitHub's documentation states that a closing keyword referencing another pull
+request links them and that "Merging the referencing pull request also closes
+the referenced pull request"
+(`github/docs@1ef6cd3`,
+`content/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue.md`,
+line 47; read 2026-08-09).
+
+Nothing changed state here for the reason the second clause gives rather than
+the first: #1358 merged at `23:27:32Z` and #1361 merged at `23:31:39Z`, so the
+target was already terminal when the reference landed.
+That is a fact about the target's timing, not about the keyword, and the
+instance therefore cannot support the general claim it was offered as evidence
+for --- the shape
+[`fail-fast`](../principles/fail-fast.md) records as "a proxy that answers a
+narrower question passes the same way".
+Had #1358 still been open, merging #1361 would have closed it.)

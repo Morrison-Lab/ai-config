@@ -1206,6 +1206,52 @@ guard's discharge condition is a second matcher": that governs a discharge
 *condition* too broad to begin with, this governs a correct condition *firing*
 on evidence it cannot attribute.)
 
+### Measure how each wrong answer decays, and check what the status quo already pays
+
+The two bullets above rank the directions by what each error costs **at the
+moment it occurs**: an over-warn is visible, a silent discharge is not.
+That ranking holds, and it is not the whole comparison, because an error also
+has a **future**.
+A wrong answer is either self-limiting --- the next event supplies the evidence
+that corrects it --- or self-sustaining, reproducing on every later event until
+someone intervenes.
+Two errors costing the same today can differ by an unbounded factor over a
+session, and which one is which is not readable off that cost.
+
+So the comparison has a second axis, and the trap is that it invites exactly the
+kind of argument this corpus rewards.
+"Wrongly withholding self-heals on the next event, whereas wrongly warning
+recurs on every later one" is specific, causal, and mechanism-level, which is
+why nothing prompts a check of it.
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s **cause**
+type asks what else explains an observation, and a decay claim contains no
+observation yet --- only a prediction about events that have not happened.
+Being checkable is not being checked.
+
+**Check the counterfactual in the same pass, because the decay you fear may
+already be running.**
+A cost the status quo already pays is not an argument against a change.
+Where the recurrence you are protecting against happens with or without the
+change, the suppression being defended buys delay rather than protection ---
+frequently exactly one event's worth.
+
+The instrument is cheap enough that reasoning is not worth its cost.
+Construct the input, run the real code, then run it again with one more event
+appended, and compare.
+Run that same pair against the unchanged code, so the status-quo column sits
+beside the change's: one column is a claim about the change, and two are a
+comparison.
+
+- **Do:** run each candidate direction forward one extra event, against both the
+  changed and the unchanged code, and report all four results.
+- **Do:** state what the status quo already pays before offering a cost as an
+  argument against a change.
+- **Don't:** settle a direction on a persistence argument you have not run ---
+  a well-formed mechanism claim about future events is a prediction, not a
+  measurement.
+- **Don't:** credit a suppression with protection it does not supply; measure
+  whether it prevents the recurrence or only postpones one event of it.
+
 ### A combined result cannot attribute a per-step outcome
 
 The commonest way a discharge fires on false evidence: the guard reads a

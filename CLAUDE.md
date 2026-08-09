@@ -1576,6 +1576,19 @@ same weight as the other modularity checks above.
 
 The `use-preferred-style` skill (alias `style`) spells out the procedure, the PSW chapter links, and a filler/jargon swap table; the `find-ai-tells` skill (alias `ai-tells`) is the scan-after detector counterpart.
 
+## Writing style: name the referent, so no pronoun is ambiguous
+
+A specific case of the plain-prose rule above, and the one self-review is worst at catching.
+The tell is a pronoun or demonstrative --- `it`, `this`, `that`, `which`, `they` --- whose **nearest grammatical antecedent is not its intended referent**.
+A pronoun with no clear referent makes a reader pause and re-read, so the cost is a moment.
+A pronoun whose *wrong* referent sits closer reads perfectly well, so the reader takes away the wrong fact without ever being unsure.
+The remedy is to replace the pronoun with the noun, not to reword around it.
+
+@shared/writing/ambiguous-reference.md
+
+This is distinct from [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md), which governs a word whose **meaning** is unresolved rather than a word whose **antecedent** is.
+Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the other prose-review rules in this file.
+
 ## Writing style: semantic line breaks in prose
 
 @shared/writing/semantic-line-breaks.md

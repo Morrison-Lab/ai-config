@@ -349,3 +349,32 @@ review should have started, per
 [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
 subagent-report section --- the rest of the work followed the brief and was
 largely correct.)
+
+## "Measure how each wrong answer decays, and check what the status quo already pays"
+
+(`Morrison-Lab/ai-config#1283`, 2026-08-09, round 7 finding 5b, on
+`hooks/no-unreviewed-pr.py`.
+The question was what the guard should do when a same-turn transition is chained
+ahead of a push, so the combined exit status cannot say whether that transition
+succeeded: withhold the arm, risking a silently unreported unreviewed head, or
+arm it, risking a warning the session cannot clear.
+
+The rebuttal rested on an asymmetry between the two errors' futures.
+A wrongly withheld arm self-heals, because the same ambiguity also withholds the
+PR's pop from `live`, so the next push re-arms; a wrongly fired arm would recur
+on every later event.
+Well-formed, mechanism-level, and of exactly the shape this corpus rewards,
+which is why nothing in the round prompted a check of it.
+
+Running it settled what arguing about it had not.
+Constructing the transcripts and executing both versions showed that the feared
+recurrence was already present in the unchanged code, and unaffected by the
+change under discussion --- so it was not a cost the change imposed.
+What the suppression actually bought was one event's delay, a materially smaller
+claim than the protection the argument had attributed to it.
+
+Note what did not catch it.
+The same round carried a clause-by-clause mutation matrix in which every clause
+was detected and isolated by at least one case.
+Mutation testing asks whether a clause is load-bearing; it never asks whether
+the reason given for that clause is true.)

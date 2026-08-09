@@ -627,10 +627,12 @@ _f, _m, _i, _amb = ccc.walk_closure(
 check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 
 # This repo's own CLAUDE.md is the real instance, so pin it: the count must
-# stay at 72 anchored imports whatever the fence handling does. (Was 69 until
+# stay at 73 anchored imports whatever the fence handling does. (Was 69 until
 # ai-config#1065 added @shared/workflow/learn-from-review-findings.md; 70 until
 # ai-config#1205 added @shared/workflow/agent-teams.md; 71 until ai-config#1325
-# added @shared/writing/ambiguous-reference.md.)
+# added @shared/writing/ambiguous-reference.md; 72 until ai-config#1334 moved
+# the existing-PR-branch section out to
+# @shared/workflow/use-existing-pr-branch.md.)
 #
 # The pin is deliberately a magic number rather than a value derived from
 # CLAUDE.md. Deriving it would make the guard vacuous, since it would then
@@ -639,12 +641,12 @@ check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 # so the assertion name below carries that remedy: `check` prints only the
 # name, and this is the failure an import-list edit actually produces.
 check(
-    "this repo's CLAUDE.md still yields 72 anchored imports "
+    "this repo's CLAUDE.md still yields 73 anchored imports "
     "(adding or removing an @-import bumps this pin -- update the count and "
     "record the bump in the annotation style of the comment above)",
     len(ccc.import_paths(
         (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    )[0]) == 72,
+    )[0]) == 73,
 )
 
 # --- round-6 review findings ------------------------------------------------

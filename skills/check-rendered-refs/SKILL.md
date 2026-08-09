@@ -152,6 +152,14 @@ underlying `.qmd` is a normal edit the user can ask for next (or hand to
   output; source has the un-broken `@key`. Scan the artifacts.
 - ❌ Trusting a stale `_book/`/`_site/` — a fixed-in-source break can still
   show, and a new break can hide. Re-render when in doubt.
+- ❌ Scanning a deployed preview URL (Step 2b) without first confirming it was
+  built from your commit.
+  A `?@` hit on a page that predates your fix reads exactly like a fix that did
+  not work.
+  Grep the fetched page for a string only your commit introduced before
+  reporting anything from it, per
+  [`fact-check-prose`](../../shared/writing/fact-check-prose.md)'s "Confirm a
+  rendered page carries your commit before reading anything off it".
 - ❌ Reporting every `@`-containing string as a broken citation — `@handle`,
   emails, and code can match. `?@` is certain; `[@…]`/`@key` is heuristic.
 - ❌ Dropping the `-F` (or escaping) so the shell/grep mangles `?@`.

@@ -814,6 +814,68 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     say("Drafted and pushed in one call.")], False,
      "a push chained with a draft transition in ONE call does not re-arm")
 
+# Round-5 finding (#1283). The two cases above put the push and the transition
+# in ONE chained command. A turn can carry them as separate tool_use blocks
+# instead, and then the per-command check sees neither: read the push first and
+# the sibling's transition is not registered yet, read it second and it is
+# registered but still deferred to its own result. Both orders are tested,
+# because "order does not matter" is the claim being pinned.
+#
+# The bare-undo form is the one that never self-heals. A merge whose result
+# echoes `o/r#N` is retroactively cleaned up by _clear(), but `gh pr ready
+# --undo` resolves no number from `{}`, so a wrongly-armed obligation stands.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr ready --undo"), "u"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("u", "{}", False), ("p", "", False)),
+                    say("Drafted and pushed in one turn.")], False,
+     "a batched draft+push in ONE turn does not re-arm (draft block first)")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="git push -u origin next"), "p"),
+                         ("Bash", dict(command="gh pr ready --undo"), "u")),
+                    results(("p", "", False), ("u", "{}", False)),
+                    say("Pushed and drafted in one turn.")], False,
+     "a batched push+draft in ONE turn does not re-arm (push block first)")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr merge --squash"), "m"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("m", "{}", False), ("p", "", False)),
+                    say("Merged and pushed in one turn.")], False,
+     "a batched bare-merge+push in ONE turn does not re-arm")
+# NOT evidence for the turn predicate, and labelled so rather than counted:
+# this case passes under every mutation of it, because a structured tool always
+# carries `pull_number`, so the deferred clear names 1038 and _clear() removes
+# the wrongly-armed obligation retroactively. That is the self-healing the round
+# 5 review describes for a merge echoing `o/r#N`. Kept as documentation that the
+# structured path is not at risk -- the risk needs a transition whose result
+# resolves NO number, which only the bare CLI forms produce.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("update_pull_request",
+                          dict(owner="o", repo="r", pull_number=1038,
+                               draft=True), "u"),
+                         ("push_files",
+                          dict(owner="o", repo="r", branch="next"), "p")),
+                    results(("u", "{}", False), ("p", "{}", False)),
+                    say("Drafted and pushed via structured tools.")], False,
+     "a batched structured draft+push self-heals via its numbered clear")
+# The control the finding itself names: strictly sequential, one turn each, is
+# already correct and must stay correct -- otherwise the fix above is untested
+# against the case it must NOT change.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready --undo", tid="u"), res("u", "{}"),
+                    bash("git push -u origin next", tid="p"), res("p", ""),
+                    say("Drafted, then pushed, in separate turns.")], False,
+     "a sequential draft then push in separate turns does not re-arm")
+# The mirror that keeps the fix from being vacuous: a turn that pushes and does
+# NOT draft or retire anything must still arm, or the guard has been silenced
+# rather than corrected.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="git status"), "s"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("s", "", False), ("p", "", False)),
+                    say("Checked status and pushed, in one turn.")], True,
+     "a batched turn with a push and NO transition still arms")
+
 # Gate: a merged PR can gain no further reviewable head. Without this, the
 # ordinary post-merge shape (merge, branch, push) nags about the merged PR.
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),

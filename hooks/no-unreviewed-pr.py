@@ -665,6 +665,51 @@ def _note_live(live, num, repo):
     live[num] = repo or prev
 
 
+def _turn_has_transition(blocks):
+    """True if any tool_use in THIS assistant turn drafts or retires a PR.
+
+    The arm and the transitions run on different clocks, and that difference is
+    the whole defect. An arm fires synchronously while the tool_use is read; a
+    draft or terminal transition is DEFERRED to its own tool_result, for the
+    fail-safe reason that a releasing change may fire only on positive evidence
+    it succeeded. So at the moment an arm fires, no transition from the same
+    turn has been applied yet, and `live` still holds a PR the turn is about to
+    retire.
+
+    Scoping the check to the push's OWN command closed only the case where both
+    sit in one chained Bash line. A turn can just as well carry them as separate
+    tool_use blocks, and then neither order helps: read the push first and the
+    sibling's transition is not registered yet, read it second and the
+    transition is registered but still deferred. Asking about the TURN answers
+    both, and subsumes the chained case, since the push's own block is one of
+    the blocks examined here.
+
+    A transition in an EARLIER turn is not a race: its tool_result arrives in
+    the user message before the next assistant turn, so it has already been
+    applied by the time any later arm fires.
+
+    Fails toward "no transition" on anything unparseable, which only permits an
+    arm -- the over-warn direction, per shared/principles/fail-fast.md.
+    """
+    for b in blocks:
+        if not isinstance(b, dict) or b.get("type") != "tool_use":
+            continue
+        name = b.get("name") or ""
+        inp = b.get("input")
+        inp = inp if isinstance(inp, dict) else {}
+        if name in CLOSE_TOOLS:
+            return True
+        if name in EDIT_TOOLS and (
+                inp.get("draft") is True
+                or str(inp.get("state") or "").lower() == "closed"):
+            return True
+        if name in SHELL_TOOLS:
+            cmd = inp.get("command") or ""
+            if RX_DRAFT.search(_scrub_all(cmd)) or close_ident(cmd)[0]:
+                return True
+    return False
+
+
 def _note_drafted(live, num):
     """A PR went back to draft, so it leaves the live set and stops re-arming.
 
@@ -776,6 +821,10 @@ def scan(path):
             blocks = (m.get("message") or {}).get("content") or []
             if not isinstance(blocks, list):
                 continue
+            # Whether THIS turn also drafts or retires a PR, computed over the
+            # whole turn before any of its blocks are read -- a sibling call is
+            # invisible to the push's own command, in either block order.
+            turn_transition = _turn_has_transition(blocks)
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -984,7 +1033,8 @@ def scan(path):
                     # These commit to a named branch, which re-heads whatever PR
                     # that branch backs. A write to the default branch is not a
                     # PR head, so it never arms.
-                    if str(inp.get("branch") or "") not in ("", "main", "master"):
+                    if str(inp.get("branch") or "") not in ("", "main", "master") \
+                            and not turn_transition:
                         _rearm(obligations, live, tid)
                     continue
                 if name in EDIT_TOOLS:
@@ -1114,7 +1164,7 @@ def scan(path):
                 # ambiguous, so the arm it raced would stand unsatisfiable. One
                 # call cannot both retire a PR and owe review on it, so the arm
                 # yields to the transition.
-                if pushed and not (draft or cok):
+                if pushed and not turn_transition:
                     _rearm(obligations, live, tid)
     return obligations, text
 

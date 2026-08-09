@@ -527,3 +527,72 @@ The denominator note above comes from a separate finding on the same PR, which
 caught 561/2837 = 19.8% --- the increase over the old count --- being reported
 where 561/3398 = 16.5% was meant; only the second answers how much the old
 regex had been hiding.)
+
+## A definition can resolve, render, and still say nothing
+
+The "Rendered/computed artifacts" bullet above covers a computed value or a
+figure the prose describes.
+A **definition** is checkable against the rendered page in the same way, and it
+fails in a way the source cannot show.
+
+When a macro corpus contains **aliases**, both sides of a definition can expand
+to the same glyph.
+A line written as `\score(\lambda) \eqdef \llik'(\lambda)` names a concept on the
+left and defines it in terms of the log-likelihood on the right, which is exactly
+what a definition should look like.
+Expand the aliases and it is `A \eqdef A`.
+The rendered page shows a symbol defined as itself.
+
+Two properties make it survive every check short of reading the output.
+
+**The source reads correctly**, because the two names are genuinely different
+strings and each is genuinely defined.
+Nothing about the line is malformed, so no linter, no render warning, and no
+source-reading reviewer has anything to report.
+Only expansion collapses the two sides, and expansion happens at render time.
+
+**Checking that the reference resolves answers a different question.**
+Confirming that `@def-score` has a matching `::: {#def-score}` target, that no
+`?@` marker leaked into the HTML, and that the crossref numbers correctly,
+establishes that the definition **exists**.
+It establishes nothing about whether the definition **says** anything.
+That gap is easy to walk into precisely because the resolve check is real work
+and comes back clean.
+
+So the general rule: **a check that a reference resolves is not a check that the
+referenced thing has content.**
+Read the rendered form of a definition, not its source, and read it for whether
+the two sides differ after expansion.
+
+Where a corpus defines the concept canonically, prefer its form over an alias
+restatement.
+Spelling the operator out (`\deriv{\lambda}\llik(\lambda)`) says something the
+alias cannot, and a definition that merely renames is usually a deviation from
+the corpus's own house style rather than a shorthand for it.
+
+- **Do:** read a definition's rendered output and confirm the two sides differ
+  after macro expansion.
+- **Do:** grep the macro corpus for the concept's canonical definition before
+  writing your own, since a library that has aliased a symbol has usually
+  defined it properly somewhere too.
+- **Don't:** treat a resolving crossref, a clean `?@` scan, or a correct
+  definition number as evidence that the definition has content.
+- **Don't:** define a macro'd concept by restating another macro, which is the
+  form that collapses under expansion while reading perfectly in source.
+
+(`UCD-SERG/serocalculator`
+[#654](https://github.com/UCD-SERG/serocalculator/pull/654), 2026-08-08/09: a
+methodology vignette formalized the score and Hessian as
+`$$\score(\lambda) \eqdef \llik'(\lambda)$$` and
+`$$\hess(\lambda) \eqdef \llik''(\lambda)$$`.
+The vendored `d-morrison/macros` submodule defines `\def\llik{\ell}` at
+`macros.qmd:143`, `\def\score{\ell'}` at 165, and `\def\hess{\llik''}` at 170,
+so both lines rendered as a symbol defined as itself.
+Two automated review rounds passed over them, and so did I --- having verified
+that the crossrefs resolved, which is the check described above as answering a
+different question.
+The same file defines the concepts properly at `macros.qmd:511-512`, as
+`\def\defScore{\score \eqdef \deriv{\th} \lik(\vx|\th)}` and
+`\def\defHess{\hess \eqdef \deriv{\vth}\deriv{\vth\'} \llik(\vx | \vth)}`, so
+the alias-only form was the deviation from house style.
+Fixed by spelling the operator out with `\deriv` and `\dderiv`.)

@@ -2,7 +2,8 @@ When reviewing prose that defines technical terms or named results via
 formal cross-reference divs --- Quarto's theorem-like div syntax
 (`::: {#def-...}`, `{#thm-...}`, `{#lem-...}`, `{#cor-...}`, `{#prp-...}`,
 `{#cnj-...}`, `{#exm-...}`, `{#exr-...}`) or an equivalent
-glossary/definition-list convention --- check two things for every mention:
+glossary/definition-list convention --- check each of the following for
+every mention:
 
 - **Hyperlinked on first mention.** The first place a technical term or
   named result appears in running prose should link to the div that
@@ -10,6 +11,17 @@ glossary/definition-list convention --- check two things for every mention:
   `@thm-cauchy-schwarz`) or an explicit markdown link to the div's anchor.
   A bare mention of a term the reader hasn't been given a definition for
   forces them to search instead of click.
+- **No hand-written type word in front of the crossref.**
+  Quarto emits the type name as part of a theorem-family crossref, so
+  `@def-hessian` already renders as "Definition 5".
+  Writing `Definition @def-hessian` therefore renders as
+  "Definition Definition 5", and the doubling hits every member of the
+  family: `Proposition @prp-x` renders as "Proposition Proposition 4",
+  `Theorem @thm-x` as "Theorem Theorem 1".
+  Write the bare `@def-hessian` and let Quarto supply the word.
+  It renders capitalized, so a parenthesized or sentence-initial mention
+  reads correctly with no prefix of your own --- `(@def-hessian)` renders
+  as "(Definition 5)", and `of @prp-x` as "of Proposition 4".
 - **No forward references.** The definition/theorem/lemma/etc. div itself
   must appear **before** its first mention in reading order --- earlier in
   the same document, not later. A crossref pointing at a div the reader
@@ -36,6 +48,16 @@ diff.
   definitional precision somewhere in the prose --- just not inside a
   formal div --- that's [`informal-definitions.md`](informal-definitions.md)'s
   case specifically, not this one.
+- Grep the source for a type word immediately preceding a theorem-family
+  crossref, which is the whole of the doubling check and needs no
+  judgment:
+
+  ```bash
+  grep -nEi '(definition|theorem|lemma|corollary|proposition|conjecture|example|exercise) +@(def|thm|lem|cor|prp|cnj|exm|exr)-' <file>.qmd
+  ```
+
+  Derive the site list rather than fixing the flagged line, since the habit
+  produces the same collision at every mention.
 
 ## What to report
 
@@ -49,6 +71,8 @@ one of:
   precedes its use.
 - **Undefined term** --- the term is mentioned but no div defines it
   anywhere in the document; add the missing definition.
+- **Doubled type word** --- the mention writes the type name in front of a
+  crossref that already supplies it; drop the hand-written word.
 
 ## Relationship to other checks
 
@@ -75,3 +99,35 @@ one of:
   catches terms whose *meaning* is unresolved; this check assumes the
   meaning is fine and instead verifies the *link and its ordering* --- a
   resolved term can still be unlinked or defined too late.
+
+## The doubling check is only visible in rendered output
+
+The linking and ordering checks above are decidable from the source: a
+mention is linked or it is not, and a div precedes a mention or it does not.
+The doubled type word is not.
+`Definition @def-hessian` is a well-formed crossref that resolves, numbers
+correctly, and leaks no `?@` marker, so every source-side signal is clean
+and the defect exists only on the page.
+
+That is why it survives a review round rather than being caught in one.
+An automated reviewer reads the diff, and the diff shows a sentence that
+looks like ordinary prose introducing a reference.
+
+- **Do:** write the bare `@def-x` and let Quarto emit the type name.
+- **Do:** read the rendered page, or run the grep above over the source,
+  before calling a crossref pass clean.
+- **Don't:** write `Definition @def-x`, `Proposition @prp-x`, or
+  `Theorem @thm-x` --- Quarto supplies the word, so yours doubles it.
+- **Don't:** read a clean `check-rendered-refs` scan as covering this; that
+  scan answers whether the reference resolved, and a doubled type word is a
+  reference that resolved perfectly.
+
+(`UCD-SERG/serocalculator`
+[#654](https://github.com/UCD-SERG/serocalculator/pull/654), 2026-08-08/09: a
+methodology vignette formalizing statistical definitions into theorem-style
+divs wrote the type word in front of 25 crossrefs, so the rendered page read
+"Definition Definition 5", "Proposition Proposition 4", and "Theorem Theorem
+1".
+Two automated review rounds came back clean over them, because the source is
+well formed and every reference resolved.
+Fixed by dropping the hand-written word at all 25 sites.)

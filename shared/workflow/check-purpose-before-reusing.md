@@ -157,11 +157,96 @@ the false negative is usually unrecoverable, which settles it.
 - **Don't:** read composing an existing helper as exempt from this check ---
   reuse is where the direction gets chosen without being decided.
 
+## Reusing a CLAIM: its truth conditions travel with the question, not the sentence
+
+Every section above reuses a **structure** --- a template, a directory tree, a
+guard helper --- and each fails by carrying a shape into a purpose it does not
+fit.
+A sentence is reusable in the same way and fails differently, because a
+structure at least *looks* like something that might not belong, whereas a
+true sentence copied verbatim looks like the safest possible move.
+
+The failure is that a claim is only ever an answer to a question, and the
+question is the part that does not get copied.
+Move the sentence into prose that asks something else and the words are
+unchanged while the assertion is not, so the usual reuse check --- does the
+mechanism still work --- has nothing to bite on.
+Nothing here is a paraphrase error either, which is what makes re-reading the
+source useless as a detector: the source is still right about its own subject.
+
+**The threat model is the question that changes most often and is stated
+least.**
+A claim about identity, provenance, or authorship is answering some implicit
+"as against what?", and the answer is usually a *cooperative* world when the
+sentence is first written.
+Restate it where an adversary is in scope and it silently acquires a stronger
+reading, since text that merely distinguishes a friendly case from another
+friendly case now reads as resisting a hostile one.
+
+**Two questions decide it, and they are cheap:**
+
+1. **What is this claim ruling out?**
+   Name the alternative it distinguishes against.
+   A claim that separates A from B says nothing about C, however confidently
+   it is phrased.
+2. **Does the destination rule out more?**
+   Read what the *new* surroundings assert, not what the source did.
+   A destination that establishes untrusted input, concurrency, or a second
+   actor has widened the question, and the sentence has not kept up.
+
+**Expect the answer to be a demotion rather than a deletion.**
+The claim usually survives with its scope named, and frequently one direction
+of it survives outright --- a signal too weak to confirm a thing can still be
+strong enough to rule it out.
+Keep the surviving direction and say which one it is, since "this is weaker
+than it looked" is not the same finding as "this is wrong".
+
+Note that the checks the rest of this fragment prescribes all pass here.
+No test fails, no mechanism misbehaves, and the two-sentence purpose
+comparison is about what an artifact is *for*, which a sentence does not
+obviously have.
+So this needs its own trigger: **the act of quoting yourself.**
+
+- **Do:** name what a claim rules out, and re-read what the destination rules
+  out, before restating the claim there.
+- **Do:** demote to the direction that survives, and say which direction that
+  is, rather than deleting a claim whose scope merely shrank.
+- **Do:** treat a destination that introduces an adversary, a second actor, or
+  concurrency as having changed the question, even when the sentence is
+  copied verbatim.
+- **Don't:** read "the source says exactly this" as clearing a claim --- the
+  source is answering its own question, which is the one thing the copy leaves
+  behind.
+- **Don't:** rely on the structural purpose check above to catch it; a
+  sentence has no interface, no tests, and no shape to compare.
+
+(`Morrison-Lab/wai#54`, 2026-08-09, review finding 5.
+[`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md) said a
+webhook comment ending in the Claude Code attribution footer is
+"mechanically, unambiguously your own post" --- sound for its own question,
+separating a self-echo from a **human** reply.
+Quoted into a chapter that states a threat model, it became false twice over:
+the footer is body text anyone who can comment can paste, and it names a
+class rather than an instance, so a concurrently-watching PR Steward carries
+the identical footer.
+The absence of a footer survived both objections and was kept.
+The source file establishes no threat model at all --- grepping it for
+`untrusted|attacker|adversar|injection` returns zero hits --- which is the
+point rather than a mitigating detail: the claim did not change, and the
+question around it did.)
+
 ## In review
 
 Flag a diff that introduces a structure closely mirroring an existing one
 where the two serve different purposes, and ask for the purpose
 comparison rather than for the mechanism to be re-tested.
+
+Flag a claim quoted or paraphrased out of another document into prose whose
+surroundings assert more than the source's did --- an adversary, a second
+actor, concurrency --- and ask what the claim rules out rather than whether it
+is faithfully reproduced.
+Verifying it against its source is the check most likely to be offered here,
+and it is the one that cannot fail.
 This is the arrival path for the "correct-looking implementation of the
 wrong strategy" case in
 [`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s strategic

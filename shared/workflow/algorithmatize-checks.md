@@ -874,6 +874,15 @@ none was used at the time --- go back and check before finalizing the
 bullet, the same way a reviewer would flag a manual check that should be
 automated. (`ai-config#688`: a first-draft bullet on detecting self-echoed
 PR replies said to match body text and timing --- both fuzzy --- when
-every reply already carried a mechanical, unambiguous marker, the Claude
+every reply already carried a mechanical marker, the Claude
 Code attribution footer, sitting unused in the same data. Caught only when
 asked directly why the sharper signal hadn't been the first idea.)
+
+That case record originally called the footer *unambiguous*, and
+[`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md) has since
+qualified it: the footer separates an agent post from a **human** one, and
+does not separate this session from a peer agent session.
+The lesson here is unaffected, because it is about *noticing* an available
+mechanical signal rather than about how much that signal proves --- but note
+the pair, since "mechanical" and "sufficient" are different properties and
+this section is only ever arguing the first.

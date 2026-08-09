@@ -677,3 +677,70 @@ The same file defines the concepts properly at `macros.qmd:511-512`, as
 `\def\defHess{\hess \eqdef \deriv{\vth}\deriv{\vth\'} \llik(\vx | \vth)}`, so
 the alias-only form was the deviation from house style.
 Fixed by spelling the operator out with `\deriv` and `\dderiv`.)
+
+## Confirm a rendered page carries your commit before reading anything off it
+
+The "Rendered/computed artifacts" bullet above sends you to the preview.
+The section directly above sends you there again, to read a definition's
+expanded form.
+Neither says how to tell that the page you fetched is the one your branch
+produced.
+
+A published preview is a **build**, not a view of your branch.
+Three things put a lag between the two, and they compound: the build has not
+started yet, the build is still running while later pushes queue behind it, and
+a cache serves whatever was deployed last.
+So the page can sit one commit behind, or several, with nothing on it saying
+so.
+
+The failure direction is the expensive one.
+A stale page still shows the defect you already fixed, so it argues for
+re-fixing correct code.
+Unlike an ordinary stale reading, the natural response is to **edit**, on top
+of a file that was already right.
+That reading is also the one that feels diligent, since it looks like catching
+your own incomplete work.
+
+The positive test costs one grep.
+Pick a string your commit introduced that no earlier build could contain, such
+as a renamed symbol, a new sentence, or the corrected side of a definition.
+Search the fetched page for it.
+Present means you are reading your build.
+Absent means you are reading an older one, and the page is silent about your
+fix rather than evidence against it.
+That is [`fail-fast`](../principles/fail-fast.md)'s denominator move applied to
+a page: a check that cannot separate "not fixed" from "not built yet" is not
+yet a check.
+
+The mechanics live elsewhere and are not repeated here.
+[`memories/github.md`](../../memories/github.md) covers reading the deployed
+bytes off `gh-pages` when the served URL is blocked, and reading that branch's
+own commit log to see which build is actually deployed.
+[`check-rendered-refs`](../../skills/check-rendered-refs/SKILL.md) covers the
+local rendered tree, where the fix is a re-render rather than a wait.
+
+- **Do:** grep a fetched page for a string unique to your commit before drawing
+  any conclusion from it.
+- **Do:** compare the docs build's own duration against your push spacing when
+  a preview keeps disagreeing with your source, since pushes that outpace
+  builds guarantee a lag.
+- **Don't:** read a defect still present on a preview as evidence your fix
+  failed; a build predating the fix looks exactly like that.
+- **Don't:** treat a preview comment's timestamp, or the mere existence of a
+  deployed page, as saying which commit it was built from.
+
+(`UCD-SERG/serocalculator`
+[#654](https://github.com/UCD-SERG/serocalculator/pull/654), 2026-08-09: the
+docs workflow took 11 to 14 minutes per run on that branch while pushes arrived
+3 to 9 minutes apart, so the deployed preview trailed `HEAD` for most of the
+session.
+Derived with
+`gh run list -R UCD-SERG/serocalculator --workflow 223280926 --branch
+claude/cluster-robust-variance-formalize-4004b8 --json
+headSha,createdAt,updatedAt,conclusion`:
+the run for `6a2f4cb9` started at 17:10:19Z and finished at 17:24:35Z, by which
+time `06f381c5` (17:18:59Z) and `35acf3dc` (17:24:32Z) had both been pushed, so
+the page that had just deployed was two commits old the moment it appeared.
+The build-versus-push intervals above are measured; that a marker check caught
+this three times in the session is reported from that session rather than
+derived here.)

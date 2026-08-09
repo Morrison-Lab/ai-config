@@ -471,3 +471,45 @@ is handed to.
 The suite did not catch it for the reason its siblings did not: every heredoc
 case in it fed `cat`, `grep`, `echo`, or `gh issue create --body-file -`, and
 none fed a shell.)
+
+## "A rebuttal's own evidence is the least-checked claim in a review round"
+
+(`Morrison-Lab/ai-config#1304`, 2026-08-07/08: the case record added by that PR
+carried a "Reproducible in one line" command whose backslash count is
+load-bearing, and it shipped with four backslashes, which does not reproduce.
+A reviewer flagged it twice.
+The first response rebutted, citing a measurement showing both the four- and
+two-backslash forms printing `\x08`, and asserting the point had been
+"confirmed at the argv level".
+The reviewer held, ran the four-backslash form itself, and was right.
+
+The rebuttal's measurement had gone through a tool that wraps a command in a
+second shell, so the doubled pair collapsed twice and the four-backslash form
+arrived at Python as the two-backslash one.
+The two forms were therefore indistinguishable TO THAT MEASUREMENT while
+differing to a reader, and the argv inspection offered as corroboration had
+passed through the same two layers, so it confirmed the artifact.
+
+Re-measured 2026-08-08, each form written to its own file and run as
+`bash <file>` so exactly one layer applies:
+
+| form | from a file (1 layer) | typed into the tool (2 layers) |
+| --- | --- | --- |
+| four backslashes | `requested\\b`, no warning | `requested\x08`, warning |
+| two backslashes | `requested\x08`, warning | `requested\x08`, warning |
+| one backslash | `requested\x08`, warning | `requested\x08`, warning |
+
+Through the tool all three collapse to the same output; from a file the
+four-backslash form separates from the other two, and that separation is the
+entire disagreement.
+Corrected on that PR's branch in commit `fd109db7`.
+
+Two details are worth keeping.
+Python's only diagnostic names the escape that SURVIVED (`SyntaxWarning:
+invalid escape sequence '\s'`) rather than the `\b` that became a backspace, so
+the warning points away from the corruption.
+And while this record was being verified, the instrument's own exit status was
+first read from a `... | tail -5` pipeline, which reports the status of `tail`
+and showed 0 for a run that really exited 1 --- the pipeline defect
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md) documents,
+reproduced while documenting a neighbouring one.)

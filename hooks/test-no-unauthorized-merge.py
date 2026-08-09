@@ -218,6 +218,78 @@ BLOCK = [
     ('foo -t eval "gh pr merge 411"', "-t before eval"),
     ('foo -d ssh host "gh pr merge 411"', "-d before ssh"),
     ('foo -s bash -c "glab mr merge 12"', "-s before the executor, glab payload"),
+    # --- ai-config#1352: the standing per-repository grant must not widen ---
+    # Every one of these is a merge the grant does NOT cover. They are the
+    # whole content of the grant being target-scoped: if any of them allows,
+    # the grant has stopped meaning "PRs targeting ai-config".
+    ("gh pr merge 1352 --squash",
+     "a bare merge names no repo, so no target is determined"),
+    ("gh pr merge 1352 -R Morrison-Lab/gha --squash",
+     "an explicit target outside the grant list"),
+    ("gh api -X PUT repos/Morrison-Lab/gha/pulls/1/merge",
+     "a REST PR merge against a repo outside the grant list"),
+    ("gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x",
+     "a repository BRANCH merge is not a PR merge, granted repo or not"),
+    ("gh pr merge 1352 -R Morrison-Lab/ai-config -R Morrison-Lab/gha",
+     "two different targets in one segment is not a determination"),
+    ("gh api -X PUT repos/Morrison-Lab/gha/pulls/1/merge -R morrison-lab/ai-config",
+     "a granted -R must not authorize a merge whose path names another repo"),
+    ('gh pr merge 1352 -R Morrison-Lab/gha --body "morrison-lab/ai-config"',
+     "a granted repo named inside a masked payload supplies no target"),
+    ("gh pr merge 1352 -R Morrison-Lab/gha # morrison-lab/ai-config",
+     "a granted repo named inside a trailing comment supplies no target"),
+    # The two above are caught by the AMBIGUITY clause -- each names a second,
+    # ungranted repo -- so neither tests the payload masking at all. Nor does a
+    # bare repo name in a payload, which supplies no target either way: only an
+    # `-R`/`--repo` flag or a `repos/<owner>/<name>/` path is ever read as one.
+    # These are the shapes where the masking is load-bearing -- a FORGED flag
+    # or REST path inside a payload, with no real target elsewhere to make the
+    # segment ambiguous.
+    ('gh pr merge 1352 --body "run it with --repo morrison-lab/ai-config"',
+     "a --repo flag forged inside a quoted payload"),
+    ("gh pr merge 1352 --body 'see repos/morrison-lab/ai-config/pulls/1/merge'",
+     "a REST repo path forged inside a single-quoted payload"),
+    ("gh pr merge 1352 # --repo morrison-lab/ai-config",
+     "a --repo flag forged inside a trailing shell comment"),
+    # The flag anchor. `-R` is read only at a token boundary, so a longer word
+    # merely ENDING in it supplies no target -- without the anchor this segment
+    # names a granted repo and merges.
+    ("gh pr merge 1352 --unrelated-R morrison-lab/ai-config",
+     "a word ending in -R is not the -R flag"),
+    ("glab mr merge 12 -R morrison-lab/ai-config",
+     "the glab forms are GitLab and carry no grant"),
+    ("gh api graphql -f query='mutation { mergePullRequest(input: {...}) }' -R morrison-lab/ai-config",
+     "a GraphQL mutation names its target by node id, so -R proves nothing"),
+    ("gh pr merge 1352 -R Morrison-Lab/ai-config-fork",
+     "a repo whose name merely starts with the granted one"),
+    ("gh pr merge 1352 -R Other-Owner/ai-config",
+     "the same repo name under a different owner"),
+    # --- ai-config#1353 review round 1: the merge-TYPE ambiguity bypass -----
+    # `_merge_patterns` tries the `pulls/N/merge` forms before the
+    # `repos/<o>/<n>/merges` ones, and both scan the segment unanchored. So a
+    # real BRANCH merge carrying a forged `pulls/N/merge` substring anywhere
+    # in the line is labelled `gh api PR merge` -- and because both the real
+    # and the forged path name the SAME granted repo, the target test sees one
+    # target and grants a direct push to the default branch. `-H`/`--header`
+    # is the vehicle: it is a documented `gh api` flag and is NOT in
+    # mask_payloads's list, so its value survives to the pattern scan.
+    ('gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x'
+     ' -H "X-Note: repos/Morrison-Lab/ai-config/pulls/1/merge"',
+     "a branch merge mislabelled a PR merge by a forged path in an -H header"),
+    ("gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x"
+     " --header 'X-Note: repos/Morrison-Lab/ai-config/pulls/1/merge'",
+     "the same bypass via the --header spelling and single quotes"),
+    ("gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x"
+     " --jq 'repos/Morrison-Lab/ai-config/pulls/1/merge'",
+     "the same bypass via another unmasked flag's value (--jq)"),
+    # The mirror: a granted PR merge that ALSO reads as an excluded type is
+    # ambiguous too, and denies. Over-blocking is the safe direction here.
+    ("gh api -X PUT repos/Morrison-Lab/ai-config/pulls/1/merge"
+     " -H 'X-Note: repos/Morrison-Lab/ai-config/merges'",
+     "a PR merge that also matches the branch-merge pattern is ambiguous"),
+    ("gh api graphql -X POST repos/Morrison-Lab/ai-config/pulls/1/merge"
+     " -f query='mutation { mergePullRequest(input: {...}) }'",
+     "a PR merge that also matches the GraphQL pattern is ambiguous"),
 ]
 
 ALLOW = [
@@ -290,6 +362,30 @@ ALLOW = [
      "quoted heredoc carrying the guard's own refusal text (the blocked bug report)"),
     ("gh issue create --body-file - <<'BODY'\nRunning `gh pr merge` is blocked.\nBODY",
      "quoted heredoc body for gh issue create (the ai-config#1279 filing shape)"),
+    # --- ai-config#1352: the standing per-repository grant ------------------
+    # A PR merge whose target resolves, unambiguously and from the command
+    # text itself, to a repo in STANDING_MERGE_GRANT_REPOS. No marker file and
+    # no per-session enabling step: that is what "standing" means.
+    ("gh pr merge 1352 -R Morrison-Lab/ai-config --squash --delete-branch",
+     "the canonical form: gh pr merge with -R naming the granted repo"),
+    ("gh pr merge 1352 --repo morrison-lab/ai-config",
+     "--repo spelling, and lowercase (GitHub routes case-insensitively)"),
+    ("gh pr merge 1352 --repo=Morrison-Lab/ai-config",
+     "--repo=value spelling"),
+    ("gh pr merge 1352 -R=Morrison-Lab/ai-config",
+     "-R=value spelling"),
+    ("gh pr merge 1352 -RMorrison-Lab/ai-config",
+     "-Rvalue with no separator, which gh's flag parser accepts"),
+    ('gh pr merge 1352 -R "Morrison-Lab/ai-config" --squash',
+     "a quoted repo argument, unquoted by unquote_words before the lookup"),
+    ("gh api -X PUT repos/Morrison-Lab/ai-config/pulls/1352/merge",
+     "the REST PR-merge form against the granted repo"),
+    ("gh api --method PUT /repos/Morrison-Lab/ai-config/pulls/1352/merge",
+     "the REST form with a leading slash and --method"),
+    ('gh pr merge 1352 -R Morrison-Lab/ai-config --subject "merge other/repo work"',
+     "a second repo named only inside a masked payload does not create ambiguity"),
+    ("cd /repo && gh pr merge 1352 -R Morrison-Lab/ai-config --squash",
+     "the granted target survives a cd && segment split"),
 ]
 
 

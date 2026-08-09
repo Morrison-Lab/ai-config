@@ -1,6 +1,6 @@
 ---
 name: mwc
-description: "Grant standing session-scoped permission to merge fully-clean PRs autonomously, without asking per PR, for the rest of the current session. Use when the user says 'merge when confident', 'mwc', 'merge at will', 'maw', 'you can merge PRs when you're confident', or otherwise grants a forward-looking, session-wide merge exception."
+description: "Grant standing session-scoped permission to merge fully-clean PRs autonomously, without asking per PR, for the rest of the current session; also records the one standing per-repository grant (PRs targeting Morrison-Lab/ai-config), which needs no session step. Use when the user says 'merge when confident', 'mwc', 'merge at will', 'maw', 'you can merge PRs when you're confident', or otherwise grants a forward-looking, session-wide or repo-wide merge exception."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -22,6 +22,8 @@ without asking confirmation before every merge.
   without explicit user instruction for that specific PR.
   Pushing, building, or driving a PR to 100% clean CI
   DOES NOT grant permission to merge.
+  One repository is exempted standing --- see "The standing per-repository
+  grant" below --- and the Scope Limit binds that exemption too.
 - **MWC Override Scope**: When the user explicitly issues `/mwc`,
   "merge when confident", "merge at will", or "maw",
   that baseline prohibition is suspended for the current session only.
@@ -30,6 +32,73 @@ without asking confirmation before every merge.
   It NEVER authorizes merging a PR with failing CI, unresolved findings, or pending reviews.
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
+
+## The standing per-repository grant
+
+One repository carries the grant **standing**, with no session step at all:
+PRs targeting `Morrison-Lab/ai-config` (ai-config#1352).
+`no-unauthorized-merge.py` reads the merge's target repository off the command
+itself, so there is nothing to enable, nothing to expire, and no marker to go
+stale.
+
+The two grants differ on every axis except the Scope Limit, which binds both:
+
+| | session grant (`/mwc`) | standing grant |
+| :--- | :--- | :--- |
+| scope | this session, every repo | `Morrison-Lab/ai-config`, forever |
+| keyed on | a `.mwc` marker in the **current** repo's git dir | the **target** repo named in the command |
+| enabling step | `enable-mwc`, then `check-mwc` | none |
+| covers | any merge command run from that checkout | `gh pr merge` / `gh api .../pulls/N/merge` only |
+| requires a fully clean PR | yes | yes |
+
+Read the second row carefully, since it is the one that surprises.
+The session grant is keyed on **where you are** and the standing grant on
+**what you are merging**, so the standing one is the tighter of the two: an
+active `/mwc` in an ai-config checkout authorizes `gh pr merge -R other/repo`,
+and the standing grant never does.
+
+Three things the standing grant deliberately does not cover, each of which
+keeps the baseline prohibition:
+
+- **A merge with no repo named in the command.**
+  The target is read from the command text only, never from the working
+  directory --- `offending` splits on `&&`, so `cd ../other && gh pr merge 1`
+  would otherwise resolve to ai-config.
+  `hooks/require-gh-repo-flag.py` already refuses a `gh pr merge` without `-R`,
+  so this costs nothing in practice.
+- **A repository branch merge** (`gh api -X POST repos/<owner>/<name>/merges`).
+  That writes to the default branch with no PR, no review and no required
+  check, and the grant is for PRs.
+- **A GraphQL `mergePullRequest` mutation**, which names its target by node id,
+  so no repository is derivable from the command at all.
+
+Those last two are excluded by **every** interpretation the segment matches,
+not by the first one.
+The merge patterns are unanchored scans over the whole segment, so one command
+line can satisfy several at once --- and the `pulls/N/merge` forms are tried
+before the `repos/<owner>/<name>/merges` ones.
+A real branch merge carrying a forged `pulls/1/merge` substring in an unmasked
+flag (`-H`, `--jq`) is therefore *labelled* a PR merge, and both the forged and
+the real `repos/<owner>/<name>/` path name the same granted repo, so a
+first-label reading grants a direct push to the default branch.
+Reported and reproduced on ai-config#1353.
+
+So the guard runs the same ambiguity test on two axes --- **what kind** of
+merge this is, and **which repository** it lands in --- and either one coming
+back undetermined denies.
+
+What the standing grant removes is the need to **ask**, not the judgment about
+whether the PR is done.
+[`ardi`](../../shared/workflow/ardi.md)'s loop still terminates by reporting the
+PR ready, so the grant changes what happens at that moment and not what has to
+be true before you get there.
+
+Adding a repository to the grant is a one-line diff to
+`STANDING_MERGE_GRANT_REPOS` in the hook.
+It is deliberately not settable from the environment: `ALLOW_MERGE=1` already
+covers the one-off case from inside the command text, and an env-settable
+allowlist would widen a security guard from ambient state a reader of the
+command cannot see.
 
 ## Session Lock & Hook Integration
 

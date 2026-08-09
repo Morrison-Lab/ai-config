@@ -143,6 +143,9 @@ NON_OPERATION_TOKENS = {
     "REVERT_HEAD",
     "R_LIBS_USER",
     "SHA_PLACEHOLDER",
+    # Python constant in no-unauthorized-merge.py: the allowlist of repos whose
+    # PRs carry a standing merge grant (ai-config#1352), not an operation
+    "STANDING_MERGE_GRANT_REPOS",
     "SUBMODULES_TOKEN",
     "WORKFLOW_TOKEN",
 }

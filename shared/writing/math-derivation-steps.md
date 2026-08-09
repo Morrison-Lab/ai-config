@@ -120,6 +120,63 @@ Stopping at the first split is the failure mode, and it is a comfortable one:
 the diff already shows a clear improvement, so nothing about it prompts
 another look.
 
+### Where to stop: a quantity the reader already accepts
+
+The recursion above says to keep going, so it needs a floor, and "until each
+line carries one operation" is not one.
+A density can always be unfolded further into whatever constructed it.
+
+Stop at the level where an expression names a **modeled quantity the reader
+already accepts** --- usually a density, sometimes a moment, sometimes a data
+summary.
+Operationally: keep naming intermediates until the next unfolding would
+replace an accepted quantity with internal construction the reader does not
+need at this point.
+
+That is what settled the worked example.
+$\Lik_i$ was the right floor not because densities are primitive, but because
+by that point in the document the reader has already accepted the
+marginal-likelihood proposition and should not have to re-open it.
+Note the difference in kind from the earlier heuristic that a name should be
+reusable and consistent: that one describes what makes a name *cheap*, and
+this one answers *how far down to go*, which is the question the recursion
+actually raises.
+
+#### Why the floor is not simply "a single probability expression"
+
+In likelihood-based work, decompositions usually do terminate at a single
+probability expression, and that is a serviceable heuristic.
+It is worth knowing why it is only a heuristic, because the three ways it
+fails are the three ways this rule gets misapplied.
+
+1. **Operators are atomic too, and are not probability expressions.**
+   The irreducible pieces of the worked example include $\nabla_\lambda$,
+   $\log$, $\sum$, $\prod$, and $\int$, each as non-decomposable as the
+   density they act on.
+   Atomicity splits into objects and operations, and only the first family is
+   probabilistic.
+2. **Moment expressions are a parallel family of atoms, not derived ones.**
+   Expectation can be taken as primitive with the density derived, and whole
+   methods deliberately stop at the moment level and never descend to a
+   density: method of moments, GEE, quantile regression, the empirical CDF.
+   The sandwich estimator in the worked example is itself an instance ---
+   its justification is $E[UU^\top]$ against $-E[H]$, and its selling point
+   is remaining valid when the probability model is not correctly specified.
+3. **Atomicity is relative to the exposition, not intrinsic to the
+   expression.**
+   In the same vignette, $\dens(Y_i \mid \lambda)$ is atomic in the
+   sandwich-variance section and *composite* one section earlier, where it
+   unfolds into an integral over the continuous part plus a never-infected
+   term.
+   Nothing about the symbol changed; the level of the argument did.
+
+The third is the load-bearing one, and it is what makes this a test rather
+than a list of primitive kinds.
+You are not looking for an intrinsically irreducible object.
+You are looking for the level at which *this* reader, at *this* point in the
+argument, should stop unfolding --- which is why the same expression can be a
+floor in one section and the thing to decompose in the next.
+
 ### Apply it at document scope, not one equation at a time
 
 The recursion above is still local: it fixes the equation in front of you.
@@ -263,6 +320,12 @@ the counterpart of the skipped-step rule at the top of this file.
   write the outer equation in terms of that symbol.
 - **Do:** reapply the rule to the intermediate you just named, and keep going
   until each line carries one operation.
+- **Do:** stop at the level where an expression names a modeled quantity the
+  reader already accepts at that point in the argument.
+- **Don't:** unfold past that floor into internal construction the reader has
+  already been asked to accept --- and don't decide the floor from the kind
+  of expression, since the same expression can be a floor in one section and
+  composite in the next.
 - **Do:** introduce the name where the concept first enters the document, not
   where you happened to notice the dense equation, so later sections consume
   it instead of rebuilding it.
@@ -303,6 +366,12 @@ copies are found by searching, never by reading the diff.
 A diff that decomposes one equation while two other sections still spell the
 same object out has taken the tidy-up and left the DRY gain on the table.
 
+Flag over-decomposition on the same terms: a diff that unfolds a quantity the
+surrounding argument had already established is making the reader re-open a
+settled point.
+Judge that against where the document is, not against the kind of expression,
+and say which earlier result the reader is being sent back to.
+
 (Three directives from the user, 2026-08-09.
 First: "try keep each equation simple, by decomposing out complicated
 internal structures using extra notation.
@@ -337,4 +406,15 @@ Both `\Lik` and `\llik` were already the vignette's own notation before this
 change --- it defines `$\Lik(\lambda) \eqdef \dens(\text{data} \mid
 \lambda)$` at :472 and `$\llik(\lambda) \eqdef \logf{\Lik(\lambda)}$` at
 :474 --- which is what made `\Lik_i` and `\llik_i` a cheap mirror pair rather
-than two new symbols to learn.)
+than two new symbols to learn.
+
+The stopping rule came out of a follow-up exchange on the same example, from
+the question of whether the atoms of statistical notation are essentially
+always single probability expressions, and the user approved encoding the
+answer.
+It is stated here as a test rather than as a taxonomy because complication 3
+is real and checkable in this very document: `@prp-marginal-likelihood` at
+:746 unfolds `$\dens(Y=y)$` into `$\int_0^a \dens(Y=y\mid
+T=t)\,\lambda\expf{-\lambda t}\,dt$` plus a never-infected term, so the
+expression that is the floor in the sandwich-variance section is composite
+two propositions earlier.)

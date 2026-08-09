@@ -1669,6 +1669,9 @@ notation, then reapply that until each line carries one operation.
 Apply the second thoroughly rather than per equation: name the concept where
 it first enters the document, since an unnamed concept is one that gets
 silently duplicated across sections.
+Stop unfolding at a modeled quantity the reader already accepts at that point
+in the argument, which is a test against the exposition rather than a class
+of expression.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.

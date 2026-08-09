@@ -368,3 +368,62 @@ Later, the fully-clean sweep ran against `5220802` --- `main`'s tip --- and
 reported 51 check runs complete and none failing, for a PR whose head was
 `d877f6d`.
 Re-running it against the real head returned 32.)
+
+## A repo script run from a worktree can measure the MAIN checkout, because it resolves paths relative to itself
+
+The section above is about a `cd` that sends *you* to the wrong checkout.
+This is the case where your working directory is right and the **script** goes
+somewhere else, so every instinct that rule trains does not fire.
+
+A repo script that locates the repository from its own location --- `__file__`,
+`$(dirname "$0")`, or a walk upward from there --- reads the tree containing the
+script, not the tree you are standing in.
+So invoking the main checkout's copy from a worktree measures the main
+checkout:
+
+```bash
+cd /path/to/worktree
+python3 /path/to/main-checkout/scripts/check-context-closure.py   # measures the MAIN checkout
+python3 ./scripts/check-context-closure.py                        # measures the worktree
+```
+
+Both commands succeed, both print a plausible figure, and nothing names which
+tree was read.
+
+**The tell is a number that matches `main` exactly.**
+A worktree carrying uncommitted or unpushed work should differ from `main` in
+whatever the script measures, so a figure identical to `main`'s is the signal to
+re-run the local copy rather than a reassuring coincidence.
+That is the only cheap discriminator, because the script's output usually does
+not name its own root.
+
+Two consequences beyond getting one number wrong.
+A guard consulted this way reports on the wrong tree, so it can pass a worktree
+whose content would fail --- the fail-green direction, per
+[`fail-fast`](../shared/principles/fail-fast.md)'s "A proxy that answers a
+narrower question passes the same way".
+And a brief that tells a subagent to run a check without saying *which copy*
+hands it the same ambiguity, which is
+[`challenge-the-assignment`](../shared/workflow/challenge-the-assignment.md)'s
+authoring-side rule: do not assert anything about the recipient's environment
+you cannot query.
+
+- **Do:** run a repo script from the worktree's **own** copy, by a path inside
+  that worktree.
+- **Do:** treat a measurement identical to `main`'s as evidence you measured
+  `main`, and re-run locally before reporting it.
+- **Do:** name the copy to run when briefing an agent working in a worktree.
+- **Don't:** assume `cd` into the worktree redirects a script invoked by an
+  absolute path elsewhere --- the script never reads your cwd.
+- **Don't:** trust a script's output to identify its own root; most do not print
+  it, which is why the matching-number tell is worth memorizing.
+
+(`Morrison-Lab/ai-config#1347`, 2026-08-09: `check-context-closure.py` was run
+from the PR's worktree by the main checkout's path and reported `CLAUDE.md` at
+133,901 characters --- exactly the main checkout's figure.
+The worktree's own copy reported 134,415.
+The wrong number was caught only because it matched a figure measured earlier in
+the same session.
+By then it had already been written into a PR comment as verification.
+The same trap was then hand-carried into a subagent brief to prevent a repeat,
+which is what showed it belonged here rather than in one session's head.)

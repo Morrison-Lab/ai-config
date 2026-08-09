@@ -1658,9 +1658,14 @@ re-verify it.
 
 @shared/writing/timestamp-volatile-claims.md
 
-## Writing style: math derivations — include every step; flag gaps in review
+## Writing style: math --- include every step; keep each equation simple
 
 @shared/writing/math-derivation-steps.md
+
+Two axes.
+*Between* displayed lines, write out every step, and flag gaps in review.
+*Within* one line, decompose complicated internal structure out into extra
+notation, then reapply that until each line carries one operation.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.

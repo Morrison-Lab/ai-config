@@ -79,9 +79,6 @@ CASES = [
     ("gh pr view 1278 -R o/r --json comments --jq "
      "'.comments[-1].body | test(\"Ready for merge\")'",
      [], True, "gh pr view --json comments piped through a jq test()"),
-    ("gh api repos/o/r/pulls/1278/reviews | jq '[.[]|select(.body|"
-     "contains(\"Needs more work\"))]'",
-     [], True, "pulls/N/reviews with a contains() on the phrase"),
     ("jq -r '.body | capture(\"(?<v>Ready for merge)\").v' /tmp/review-1278.json",
      [], True, "a saved review body file re-parsed later"),
     ("gh api repos/o/r/issues/1278/comments | python3 -c "
@@ -138,6 +135,23 @@ CASES = [
      "arbitrarily-named file is not caught -- widening to any file would fire "
      "on every jq in the session"),
 
+    # -- negatives: SELECTION is not extraction ----------------------------
+    ("gh api repos/o/r/issues/1278/comments --paginate "
+     "| jq -s '[.[][] | select(.body | test(\"\\\\*\\\\*Claude finished|### Verdict\"))] "
+     "| last | .body'", [], False,
+     "fully-clean.md's OWN documented query: select() picks the candidate "
+     "comment and prints the whole body for a careful read -- blocking this "
+     "would block the query the corpus tells you to run"),
+    ("gh api repos/o/r/issues/1278/comments | jq -r "
+     "'[.[]|select(.body|contains(\"### Verdict\"))]|last|.body' | tail -60",
+     [], False,
+     "the same shape with contains(), piped to a pager for reading"),
+    ("gh api repos/o/r/pulls/1278/reviews | jq "
+     "'[.[]|select(.body|contains(\"Needs more work\"))]'", [], False,
+     "selecting the REVIEWS that mention a phrase and printing them is a "
+     "filter over a corpus, not a verdict read -- this case was written as a "
+     "block-case and the real-corpus measurement corrected it"),
+
     # -- negatives: unrelated work -----------------------------------------
     ("gh pr checks 1278 -R o/r", [], False, "an ordinary check-state query"),
     ("python3 scripts/check-pr-fully-clean.py 1278", [], False,
@@ -180,13 +194,9 @@ MUTANTS = [
 
     ("clause 2: the phrase must sit in a MATCHER's argument",
      "    for m in MATCHER_TOKEN.finditer(cmd):\n"
-     "        window = cmd[m.end():m.end() + MATCH_WINDOW]\n"
-     "        hit = VERDICT_PHRASE.search(window)\n"
-     "        if hit:\n"
-     "            return hit.group(0)\n"
-     "    return None",
-     "    hit = VERDICT_PHRASE.search(cmd)\n"
-     "    return hit.group(0) if hit else None",
+     "        start = m.end()",
+     "    for m in [None]:\n"
+     "        start = 0",
      ECHO, [], False, True),
 
     ("clause 3: the data must be REVIEW-derived",
@@ -199,6 +209,14 @@ MUTANTS = [
      '\\S*(?:review|comment|verdict|body)\\S*\\.(?:json|jsonl|txt)\\b',
      '\\S*(?:review|comment|verdict|body)\\S*',
      HOOK_GREP, [], False, True),
+
+    ("clause 2a: a phrase inside select() is SELECTION, not extraction",
+     "            if any(a <= pos <= b for a, b in spans):\n"
+     "                continue  # candidate selection, not extraction",
+     "            if False:\n                continue",
+     "gh api repos/o/r/issues/1278/comments --paginate "
+     "| jq -s '[.[][] | select(.body | test(\"\\\\*\\\\*Claude finished|### Verdict\"))] "
+     "| last | .body'", [], False, True),
 
     ("clause 4: the discharge is PER-PR",
      "        if targets <= checked:\n                return 0",

@@ -86,6 +86,26 @@ invocations still fires), lenient only about WHICH PR. That leniency is
 deliberate at the ambiguous edge, because this is a `deny` --- a guard that
 blocks work it cannot attribute is a guard that gets switched off.
 
+MEASURED ON A REAL CORPUS
+-------------------------
+Authored cases inherit the blind spot of whoever already understands the rule,
+so the matcher was also run over **7837 real Bash commands** harvested from
+live transcripts (`~/.claude/projects/*/*.jsonl`), whose wording nobody here
+chose.
+
+    clauses 1-3 fire on 123 / 7837  (1.57%)   before the select() exemption
+    clauses 1-3 fire on  53 / 7837  (0.68%)   after
+
+That corpus is what found the `select()` over-block: the 70 commands it
+removed are dominated by this corpus's OWN documented candidate-selection
+query, which no authored case had thought to include. The surviving 53 are
+overwhelmingly the target class -- `grep -iE "ready for merge|findings"` over
+a fetched review body, and `capture()` on a verdict comment.
+
+Re-run it after widening anything here, in both directions: an over-block on a
+legitimate read is the more urgent finding, since it is the direction that
+gets a guard switched off.
+
 KNOWN GAP
 ---------
 A body saved to an arbitrarily-named file (`gh api ... > /tmp/x.json`, then
@@ -179,12 +199,62 @@ OVERRIDE = re.compile(
     r"(?:^|[|;&]\s*|\(\s*)(?:\w+=\S*\s+)*ALLOW_HANDROLLED_VERDICT_PARSE=1\b")
 
 
+def select_spans(cmd):
+    """Character spans of every `select( ... )`, by paren balance.
+
+    A phrase inside one is CANDIDATE SELECTION, not verdict extraction -- see
+    `phrase_in_matcher_position`.
+    """
+    spans = []
+    for m in re.finditer(r"\bselect\s*\(", cmd):
+        depth, i = 0, m.end() - 1
+        while i < len(cmd):
+            if cmd[i] == "(":
+                depth += 1
+            elif cmd[i] == ")":
+                depth -= 1
+                if depth == 0:
+                    spans.append((m.start(), i))
+                    break
+            i += 1
+        else:
+            spans.append((m.start(), len(cmd)))  # unbalanced: treat as open
+    return spans
+
+
 def phrase_in_matcher_position(cmd):
-    """Clause 1 AND 2: a verdict phrase sitting in a matcher's argument."""
+    """Clause 1 AND 2: a verdict phrase in a matcher's argument, EXTRACTING.
+
+    A phrase inside a `select(...)` is exempt, and that exemption is the
+    difference between the incident and the corpus's own endorsed query. Both
+    match a verdict phrase against review comments; only one of them reads a
+    verdict off it.
+
+        # fully-clean.md's OWN documented idiom -- selection, then print the
+        # whole body for a careful read. Must pass.
+        jq -s '[.[][] | select(.body | test("\\*\\*Claude finished|### Verdict"))]
+               | last | .body'
+
+        # the incident -- selection, then EXTRACT a verdict from the body.
+        ... select(.body|test("\\*\\*Claude finished")) ... | .body
+            | capture("(?<v>Ready for merge|Needs more work)").v
+                     ^^^^ outside any select(): this is the parse
+
+Blocking the first would be a serious over-block: it is the query this
+    corpus tells you to run, it is how a careful read starts, and the brief
+    for this guard names "a legitimate careful read" as a must-pass. Measured
+    on 7837 real Bash commands from live transcripts, the select() exemption
+    is what separates 123 raw hits from the far smaller set that actually
+    extract a verdict.
+    """
+    spans = select_spans(cmd)
     for m in MATCHER_TOKEN.finditer(cmd):
-        window = cmd[m.end():m.end() + MATCH_WINDOW]
-        hit = VERDICT_PHRASE.search(window)
-        if hit:
+        start = m.end()
+        window = cmd[start:start + MATCH_WINDOW]
+        for hit in VERDICT_PHRASE.finditer(window):
+            pos = start + hit.start()
+            if any(a <= pos <= b for a, b in spans):
+                continue  # candidate selection, not extraction
             return hit.group(0)
     return None
 

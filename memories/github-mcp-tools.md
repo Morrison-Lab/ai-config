@@ -664,7 +664,8 @@ See ai-config#694 for the precedent.
   bot-mention gate in `memories/claude-bot-workflows.md` -- a pass that inspects
   raw text while the author reasons in rendered Markdown.
   **An empty backtick pair is the most visible damage, not the only damage, so
-  do not use it as the tell.** Removing a span mid-sentence also re-balances
+  do not use it as the tell.**
+  Removing a span mid-sentence also re-balances
   whatever punctuation surrounded it: a following quotation mark becomes an
   opening one, so a quote silently re-opens and runs on through later prose.
   And a sentence contrasting a raw token against its escaped entity collapses
@@ -677,7 +678,8 @@ See ai-config#694 for the precedent.
   contributes its own marker, so separate them before believing a count.
   (ai-config#1361, 2026-08-09: a PR body describing this very entry lost three
   bracketed placeholders from inside code spans and carried both second-order
-  corruptions as well, while the tool reported success both times. A naive
+  corruptions as well, while the tool reported success both times.
+  A naive
   count of empty pairs returned 6, all of which were the three fenced blocks'
   own markers; the zero-genuine result came from a negative-lookaround match
   that excludes triple-backtick runs.)

@@ -375,6 +375,43 @@ overwriting, since the wrong version is what earlier comments respond to.
 - **Don't:** treat a clean `grep` over the diff as evidence every paraphrase
   is synced --- the description was never in it.
 
+**A body that reports volatile external state goes stale with no edit of
+yours, so the trigger above never fires on it.**
+That trigger is an action *you* take, and this is the case where you take
+none.
+
+A description of the **change** is anchored: the diff is fixed, so prose
+about it stays true until the diff moves, which is exactly what the rule
+above covers.
+A description of **external state** --- CI status, mergeability, a blocker,
+"waiting on X", a base-branch condition --- has no anchor.
+It is a measurement with a timestamp nobody wrote down, published in a
+document that is edited rarely and read constantly.
+On a long-lived PR its staleness is not a risk but a certainty.
+
+It composes badly with review timing, too.
+A reviewer snapshots the body when its run starts, so a late correction is
+invisible to it --- the same mechanism the timestamp check below describes
+for a rebuttal posted after a run began.
+The result is a finding about a paragraph that was already fixed, costing a
+round trip on both sides.
+
+The remedy is not more diligence, since the failure has no moment to be
+diligent at.
+It is to keep the volatile claim out of the body, or to date it so it reads
+as a past observation rather than a present one.
+This is
+[`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md)
+applied to the artifact a maintainer reads while deciding to merge.
+
+- **Do:** describe the change, and let CI report CI.
+- **Do:** timestamp and scope any status you must state ("red as of `<sha>`,
+  cause was X"), so it cannot be read as a present claim.
+- **Don't:** put current CI status, mergeability, or a blocker in a PR body
+  undated --- the body is the one place nothing re-measures.
+- **Don't:** expect the "after any Address" trigger to catch it; that fires
+  on your edits, and this goes stale without one.
+
 **Following that "state it as history" advice is what produces the next
 block, because an automated reviewer reads the body as a flat statement of
 intent.**

@@ -281,6 +281,16 @@ The generalization, for any automated link sweep: a status code answers
 Anything asserting provenance, a quotation, or a specific claim needs the
 target opened.
 
+(UCD-SERG/serocalculator#619, 2026-07-28: a workflow comment was repinned from
+a deleted-on-`main` file to `5d1efae04f`, verified `200`, and shipped.
+Review fetched the file at that SHA and found it had already been reduced to a
+one-line delegator by the first half of the same migration, hours before the
+deletion --- so the citation resolved while pointing at nothing resembling
+what the file was derived from.
+`1865ad02a6`, the last commit carrying the standalone workflow, was the right
+pin.
+The PR's whole purpose was citation accuracy.)
+
 ## Cite an external result by name, never by its rendered number
 
 The section above is a citation whose target is wrong.
@@ -346,8 +356,8 @@ Those two own the internal case; this section owns the external one.
   correctly; the anchor and the number decay independently.
 
 (UCD-SERG/serocalculator, 2026-08-09: `vignettes/methodology.qmd` cited
-"[Theorem 15](https://d-morrison.github.io/rme/chapters/math-prereqs.html#thm-log-prod)
-in *Regression Models for Epidemiology*".
+`[Theorem 15](https://d-morrison.github.io/rme/chapters/math-prereqs.html#thm-log-prod)`,
+in *Regression Models for Epidemiology*.
 That number is literally an ordinal position.
 In `d-morrison/rme`, `thm-log-prod` is the 15th theorem div in
 `chapters/algebra.qmd`, which is the first file `chapters/math-prereqs.qmd`
@@ -355,13 +365,3 @@ includes, so a theorem added above it in any earlier include moves it:
 `grep -n '{#thm-' chapters/algebra.qmd | grep -n 'thm-log-prod'` returns
 `15:279:`, whose leading field is the ordinal.
 Fixed in `84d0052de` by naming the result rather than numbering it.)
-
-(UCD-SERG/serocalculator#619, 2026-07-28: a workflow comment was repinned from
-a deleted-on-`main` file to `5d1efae04f`, verified `200`, and shipped.
-Review fetched the file at that SHA and found it had already been reduced to a
-one-line delegator by the first half of the same migration, hours before the
-deletion --- so the citation resolved while pointing at nothing resembling
-what the file was derived from.
-`1865ad02a6`, the last commit carrying the standalone workflow, was the right
-pin.
-The PR's whole purpose was citation accuracy.)

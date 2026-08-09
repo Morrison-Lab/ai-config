@@ -665,8 +665,8 @@ def _note_live(live, num, repo):
     live[num] = repo or prev
 
 
-def _turn_has_transition(blocks):
-    """True if any tool_use in THIS assistant turn drafts or retires a PR.
+def _turn_transition_targets(blocks):
+    """PR numbers THIS assistant turn drafts or retires; None if unresolved.
 
     The arm and the transitions run on different clocks, and that difference is
     the whole defect. An arm fires synchronously while the tool_use is read; a
@@ -688,9 +688,29 @@ def _turn_has_transition(blocks):
     the user message before the next assistant turn, so it has already been
     applied by the time any later arm fires.
 
+    Returning a bare boolean was wrong, and wrong in the DANGEROUS direction. A
+    turn-wide flag suppressed the arm for the live PR whenever any transition
+    appeared anywhere in the turn, including one for a different, untracked PR
+    -- the routine "merge an approved PR while still pushing fixes on the one I
+    am driving" shape. That is a silent under-warn: the tracked PR gets a new
+    head, nothing arms, and the guard never reports the very thing it exists
+    for. So identity is resolved here exactly as every other function in this
+    file resolves it, from the specific command rather than from anything else
+    in the turn.
+
+    `None` means a transition whose PR could not be resolved -- a bare
+    `gh pr merge` or `gh pr ready --undo`, which act on the CURRENT branch's PR.
+    Those suppress, on the same reasoning _note_drafted uses for the bare form:
+    with one live PR the current branch's PR is that one.
+
+    `gh pr create --draft` is deliberately NOT a target. It OPENS a new draft
+    rather than transitioning a live PR, so treating it as one suppressed the
+    arm for an unrelated PR that was never touched.
+
     Fails toward "no transition" on anything unparseable, which only permits an
     arm -- the over-warn direction, per shared/principles/fail-fast.md.
     """
+    targets = set()
     for b in blocks:
         if not isinstance(b, dict) or b.get("type") != "tool_use":
             continue
@@ -698,16 +718,28 @@ def _turn_has_transition(blocks):
         inp = b.get("input")
         inp = inp if isinstance(inp, dict) else {}
         if name in CLOSE_TOOLS:
-            return True
-        if name in EDIT_TOOLS and (
-                inp.get("draft") is True
-                or str(inp.get("state") or "").lower() == "closed"):
-            return True
+            targets.add(input_ident(inp)[0])
+            continue
+        if name in EDIT_TOOLS:
+            if inp.get("draft") is True \
+                    or str(inp.get("state") or "").lower() == "closed":
+                targets.add(input_ident(inp)[0])
+            continue
         if name in SHELL_TOOLS:
-            cmd = inp.get("command") or ""
-            if RX_DRAFT.search(_scrub_all(cmd)) or close_ident(cmd)[0]:
-                return True
-    return False
+            cmds = _simple_commands(inp.get("command") or "")
+            if cmds is None:
+                continue
+            for argv in cmds:
+                ok, num, _repo = _argv_close(argv)
+                if ok:
+                    targets.add(num)
+                    continue
+                # `gh pr ready [<N>] --undo` only. The create form that
+                # _argv_draft also matches opens a new PR instead.
+                if len(argv) >= 3 and argv[0] == "gh" and argv[1] == "pr" \
+                        and argv[2] == "ready" and _has_flag(argv[3:], "--undo"):
+                    targets.add(_verb_ident(argv)[0])
+    return targets
 
 
 def _note_drafted(live, num):
@@ -735,7 +767,7 @@ def _note_drafted(live, num):
             live[key] = _AMBIGUOUS
 
 
-def _rearm(obligations, live, tid):
+def _rearm(obligations, live, tid, turn_targets=()):
     """Re-arm the reviewer obligation for the sole live PR, if a push earns it.
 
     Three gates, each of which alone withholds the arm:
@@ -758,6 +790,10 @@ def _rearm(obligations, live, tid):
         return
     num, repo = next(iter(live.items()))
     if num is None or repo is _AMBIGUOUS:
+        return
+    # This turn is drafting or retiring THIS PR, so the arm yields to it. A
+    # transition for some OTHER PR is none of this push's business.
+    if None in turn_targets or num in turn_targets:
         return
     for ob in obligations:
         if ob["num"] == num and _repo_ok(ob["repo"], repo):
@@ -821,10 +857,11 @@ def scan(path):
             blocks = (m.get("message") or {}).get("content") or []
             if not isinstance(blocks, list):
                 continue
-            # Whether THIS turn also drafts or retires a PR, computed over the
-            # whole turn before any of its blocks are read -- a sibling call is
-            # invisible to the push's own command, in either block order.
-            turn_transition = _turn_has_transition(blocks)
+            # Which PRs THIS turn drafts or retires, computed over the whole
+            # turn before any of its blocks are read -- a sibling call is
+            # invisible to the push's own command, in either block order. Only
+            # a transition targeting the live PR withholds its arm.
+            turn_targets = _turn_transition_targets(blocks)
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -1033,9 +1070,8 @@ def scan(path):
                     # These commit to a named branch, which re-heads whatever PR
                     # that branch backs. A write to the default branch is not a
                     # PR head, so it never arms.
-                    if str(inp.get("branch") or "") not in ("", "main", "master") \
-                            and not turn_transition:
-                        _rearm(obligations, live, tid)
+                    if str(inp.get("branch") or "") not in ("", "main", "master"):
+                        _rearm(obligations, live, tid, turn_targets)
                     continue
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
@@ -1164,8 +1200,8 @@ def scan(path):
                 # ambiguous, so the arm it raced would stand unsatisfiable. One
                 # call cannot both retire a PR and owe review on it, so the arm
                 # yields to the transition.
-                if pushed and not turn_transition:
-                    _rearm(obligations, live, tid)
+                if pushed:
+                    _rearm(obligations, live, tid, turn_targets)
     return obligations, text
 
 

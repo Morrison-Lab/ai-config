@@ -876,6 +876,46 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     say("Checked status and pushed, in one turn.")], True,
      "a batched turn with a push and NO transition still arms")
 
+# Round-6 finding (#1283). The turn predicate was a bare boolean, so ANY
+# transition in the turn suppressed the arm -- including one for a different,
+# untracked PR. That is the routine "merge an approved PR while still pushing
+# fixes on the one I am driving" shape, and it is the DANGEROUS direction: the
+# tracked PR gets a new head, nothing arms, and the guard never reports it.
+# Both variants are the reviewer's own reproductions.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr merge 2000 --squash"), "m"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("m", "Merged pull request o/r#2000", False),
+                            ("p", "", False)),
+                    say("Merged an unrelated PR and pushed mine.")], True,
+     "an unrelated PR's merge in the same turn does not suppress the arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash",
+                          dict(command="gh pr create --title unrelated --draft"),
+                          "nd"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("nd", "https://github.com/o/r/pull/2050", False),
+                            ("p", "", False)),
+                    say("Opened an unrelated draft and pushed mine.")], True,
+     "opening a NEW draft PR in the same turn does not suppress the arm")
+# The structured mirror of the same over-suppression.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("merge_pull_request",
+                          dict(owner="o", repo="r", pullNumber=2000), "m"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("m", "{}", False), ("p", "", False)),
+                    say("Merged an unrelated PR via the tool and pushed mine.")],
+     True,
+     "an unrelated structured merge in the same turn does not suppress the arm")
+# The boundary the fix must NOT cross: a NUMBERED transition for the live PR
+# still suppresses, so scoping by identity did not reopen rounds 3 to 5.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr ready 1038 --undo"), "u"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("u", "{}", False), ("p", "", False)),
+                    say("Drafted THIS PR by number and pushed.")], False,
+     "a numbered transition for the LIVE PR still suppresses the arm")
+
 # Gate: a merged PR can gain no further reviewable head. Without this, the
 # ordinary post-merge shape (merge, branch, push) nags about the merged PR.
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),

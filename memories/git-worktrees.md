@@ -274,3 +274,71 @@ The receiving agent caught the contradiction and recovered on its own, which is
 the discretionary premise check
 [`challenge-the-assignment`](../shared/workflow/challenge-the-assignment.md) says
 not to leave as the only detector.)
+
+## In a session rooted in a worktree, `cd <repo-root>` lands in the MAIN checkout
+
+The section at the top of this file covers `git worktree add` leaving the shell
+in the original checkout.
+This is the inverse, and it fires in a session that is *already* rooted in a
+worktree --- the shape the Claude Code harness sets up when it opens one.
+
+Two ordinary facts combine into it.
+The shell's working directory **resets between tool calls**, so a long task
+tends to open each command with a `cd`.
+And the worktree lives *under* the repo root
+(`<repo>/.claude/worktrees/<name>`), so the repo root is a real, valid,
+plausible-looking path that is **not** the worktree.
+
+So `cd /path/to/repo` is the most natural thing to type and the wrong thing to
+type: it silently selects the main checkout, which is on a different branch.
+Nothing errors, and every command afterwards is individually correct.
+
+**The two failure modes look nothing alike, which is why fixing one does not
+inoculate you against the other.**
+
+- **Writes land on the wrong branch.**
+  Editing by absolute path writes into the main checkout, and a following
+  `git add -A && git commit` commits them onto whatever branch that checkout has
+  --- typically `main`.
+  The feature branch in the worktree stays empty, so a later `git push` from the
+  worktree answers `Everything up-to-date` while carrying none of the work.
+  That answer is the tell: an up-to-date push on a branch you have been editing
+  all session means the edits are somewhere else.
+- **Reads answer about the wrong commit.**
+  `HEAD=$(git rev-parse HEAD)` in the main checkout returns `main`'s tip, so a
+  verification sweep keyed on `$HEAD` reports on `main` rather than on the PR.
+  This is the dangerous one: `main` is green, so the sweep returns "all complete,
+  none failing" --- a false all-clear, delivered by a command that did exactly
+  what it was told.
+  The count is the tell, if you read it: 51 check runs at `main`'s tip against 32
+  at the PR head, for a PR whose own checks were the subject.
+
+Recovery from the write case is cheap, and no work is lost: the commit is a real
+commit, so cherry-pick it onto the feature branch from the worktree, then
+`git reset --hard origin/main` in the main checkout.
+Do it before pushing, and nothing ever leaves the machine.
+
+The remedy is to stop passing the repo root at all.
+Use `git -C <explicit-path>` when a command must target a specific checkout, and
+otherwise let the harness's own cwd stand rather than re-establishing it.
+Where a `cd` is genuinely wanted, print `git branch --show-current` in the same
+call and read it.
+
+- **Do:** run `git -C <path>` against a named checkout instead of `cd`-ing to it.
+- **Do:** treat `Everything up-to-date` on a branch you have been editing as
+  evidence the edits went elsewhere, not as evidence they were already pushed.
+- **Do:** compare a derived `$HEAD` against the PR's own `headRefOid` before
+  keying any verification sweep on it.
+- **Don't:** read the repo root as "the repo" in a worktree session --- it is one
+  specific checkout, on one specific branch, and not the one you are working.
+- **Don't:** trust a sweep that returned a clean answer without checking which
+  commit it examined; querying the wrong SHA fails green.
+
+(`Morrison-Lab/gha#440`, 2026-08-09: both modes in one session.
+The implementation was written and committed onto `main` in the main checkout
+while the branch sat at its empty claim commit, caught only when `git push`
+answered `Everything up-to-date`.
+Later, the fully-clean sweep ran against `5220802` --- `main`'s tip --- and
+reported 51 check runs complete and none failing, for a PR whose head was
+`d877f6d`.
+Re-running it against the real head returned 32.)

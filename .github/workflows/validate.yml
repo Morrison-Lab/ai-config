@@ -78,11 +78,21 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
-      - name: Measure the auto-loaded context closure (advisory)
-        # Reports rather than gates, and deliberately so: this repo is
-        # currently ~4x the shipped budget (ai-config#897), so a blocking
-        # form would be red on every PR and would train everyone to ignore
-        # it -- the failure mode algorithmatize-checks warns about.
+      - name: Measure the auto-loaded context closure (advisory) and gate its root char cap
+        # The BUDGET half reports rather than gates, and deliberately so:
+        # this repo is currently ~4x the shipped budget (ai-config#897), so a
+        # blocking form would be red on every PR and would train everyone to
+        # ignore it -- the failure mode algorithmatize-checks warns about.
+        #
+        # The root file's CHARACTER CAP is the exception, and gates without
+        # --strict (ai-config#897, #1258). It is not our budget but the
+        # harness's hard limit on the auto-loaded CLAUDE.md, past which that
+        # file is not loaded whole -- a failure that shows up nowhere else,
+        # since a rule that never loaded looks exactly like one that loaded
+        # and was obeyed. The cry-wolf objection above does not transfer:
+        # this one is a cliff rather than a heuristic, it can only be crossed
+        # by a PR that adds to CLAUDE.md, and the run prints the remaining
+        # headroom every time so the wall is visible before it is hit.
         #
         # The value here is the NUMBER in the log on each run. The closure
         # grew ~12x in a month with nothing reporting it, because a per-file

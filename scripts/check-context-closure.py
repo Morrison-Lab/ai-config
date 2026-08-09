@@ -59,6 +59,17 @@ same stance ai-config#695 settled for the memory-file check -- crossing the
 line is a prompt to decide what comes out, not a defect that should block an
 unrelated PR. Under `--strict` in `--compare` mode, a bump that would cross
 the budget fails too, even while the current pin is under it.
+
+**One limit here is not advisory**, and it is not ours. The root file also
+has the Claude Code harness's own hard cap, stated in CHARACTERS, past which
+it is not auto-loaded whole (`--root-char-cap`, default 150,000). That is a
+defect rather than a size finding, so it fails regardless of `--strict`,
+like a dangling anchored import -- and it fails silently everywhere else,
+since a rule that never loaded and a rule that loaded and was followed look
+identical from the outside. The count is reported on every run, passing or
+failing, with a warning band below the cap, because on a file that has grown
+thousands of characters in a day the remaining headroom is the actionable
+number (ai-config#897, #1258).
 """
 from __future__ import annotations
 
@@ -73,6 +84,34 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 DEFAULT_BUDGET_BYTES = 200_000
 DEFAULT_ROOT = "CLAUDE.md"
+
+# The root file has a SECOND limit, and it differs from the budget above in
+# kind rather than in size. The budget is ours: a soft target over the whole
+# closure, advisory by design (ai-config#695). This is the Claude Code
+# harness's own hard cap on the auto-loaded `CLAUDE.md`, denominated in
+# CHARACTERS rather than bytes, which the harness reports as e.g.
+#
+#     /Users/<u>/.claude/CLAUDE.md is over the 150.0k-char limit (150.9k chars)
+#
+# Crossing it is not a prompt to consider splitting. It is a file the harness
+# will not load whole, which fails silently: a rule that never loaded and a
+# rule that loaded and was followed look identical from the outside. So it
+# fails regardless of `--strict`, like a dangling anchored import, rather
+# than joining the advisory budget (ai-config#897, #1258).
+DEFAULT_ROOT_CHAR_CAP = 150_000
+
+# Measured 2026-08-07: at 153,217 raw characters the harness reported
+# "150.9k", so its count runs about 2,300 below a raw `len()` of the decoded
+# text. What it excludes is NOT established -- HTML comments (2,750 chars)
+# and `@import` lines (2,839) were each checked and neither matches the gap.
+# Gating on the raw count is the conservative direction under that
+# uncertainty, since raw >= the harness's figure in the one case measured.
+# Re-derive rather than trusting this note if the margin ever matters.
+#
+# The warning band exists because the cap is a cliff: at the corpus's
+# observed growth this file can cross it between one session and the next,
+# and a check that only speaks once it is too late gives no room to act.
+DEFAULT_ROOT_CHAR_WARN_FRACTION = 0.90
 
 # English prose runs roughly 3.5-4.5 bytes per token, so a token figure from
 # any single divisor is an estimate with about +/-15% in it. Byte counts are
@@ -466,6 +505,54 @@ def render_delta(before_total, after_total, bytes_per_token, rev) -> str:
     )
 
 
+def root_char_count(base: Path, root: str) -> int | None:
+    """Characters in the root file, or None if it cannot be read.
+
+    Characters rather than bytes, because the harness's cap is stated in
+    characters and this corpus's prose is not pure ASCII -- the two diverge
+    by every multi-byte glyph in the file.
+    """
+    try:
+        return len((base / root).read_text(encoding="utf-8"))
+    except OSError:
+        return None
+
+
+def render_root_chars(chars: int | None, root: str, cap: int, warn_fraction: float):
+    """(over, text) for the root file's hard character cap.
+
+    Always reports the count, passing or failing. A check that prints only
+    on failure leaves a reader unable to tell a comfortable margin from one
+    that is about to close -- and on this cap the margin is the actionable
+    part, per `shared/principles/fail-fast.md` on reporting what was
+    examined rather than only what was found.
+    """
+    if chars is None:
+        return False, f"\n  {root}: unreadable, so the character cap was NOT checked."
+    pct = 100 * chars / cap
+    if chars > cap:
+        return True, (
+            f"\n  OVER THE HARD CHARACTER CAP: {root} is {chars:,} characters "
+            f"against the harness's {cap:,} ({pct:.1f}%),\n"
+            f"  so it is over by {chars - cap:,}. The harness will not load it "
+            f"whole, and nothing else reports that.\n"
+            f"  Move content into an @-imported fragment or a linked companion "
+            f"file (see ai-config#1259 for the pattern)."
+        )
+    text = (
+        f"\n  {root}: {chars:,} characters against the harness's {cap:,}-char "
+        f"cap ({pct:.1f}%), {cap - chars:,} to spare."
+    )
+    if chars >= cap * warn_fraction:
+        text += (
+            f"\n  WARNING: within {100 * (1 - warn_fraction):.0f}% of the cap. "
+            f"This file has grown by thousands of characters in a day before, "
+            f"so treat this as the moment to trim rather than the moment to "
+            f"note it."
+        )
+    return False, text
+
+
 def positive_int(value: str) -> int:
     """An argparse type that rejects zero and negatives.
 
@@ -519,6 +606,24 @@ def main(argv=None) -> int:
         help=f"divisor for the token estimate (default: {DEFAULT_BYTES_PER_TOKEN})",
     )
     parser.add_argument(
+        "--root-char-cap",
+        type=positive_int,
+        default=DEFAULT_ROOT_CHAR_CAP,
+        help=(
+            "hard character cap on the root file, failing regardless of "
+            f"--strict (default: {DEFAULT_ROOT_CHAR_CAP:,})"
+        ),
+    )
+    parser.add_argument(
+        "--root-char-warn-fraction",
+        type=float,
+        default=DEFAULT_ROOT_CHAR_WARN_FRACTION,
+        help=(
+            "warn once the root file reaches this fraction of the cap "
+            f"(default: {DEFAULT_ROOT_CHAR_WARN_FRACTION})"
+        ),
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="exit 1 if over budget (default: advisory, exits 0). In --compare "
@@ -546,6 +651,14 @@ def main(argv=None) -> int:
             args.bytes_per_token, str(base),
         )
     )
+
+    root_over, root_text = render_root_chars(
+        root_char_count(base, args.root),
+        args.root,
+        args.root_char_cap,
+        args.root_char_warn_fraction,
+    )
+    print(root_text)
 
     total = sum(size for _, size, _ in files)
     after_total = None
@@ -636,6 +749,13 @@ def main(argv=None) -> int:
         # A dangling anchored import is a defect rather than a size finding,
         # so it fails regardless of --strict. Unresolved INLINE tokens do not
         # fail: they are reported above, being usually prose.
+        return 1
+    if root_over:
+        # Same reasoning as `missing` above, and deliberately NOT gated on
+        # --strict: the byte budget is ours to miss, while this cap belongs
+        # to the harness and crossing it means the file is not fully loaded.
+        # See the DEFAULT_ROOT_CHAR_CAP comment for why that failure is
+        # silent everywhere else.
         return 1
     # --strict covers the compared total too. Gating only on the current
     # total would print "this bump would cross the budget" and then exit 0,

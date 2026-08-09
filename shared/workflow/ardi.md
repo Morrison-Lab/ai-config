@@ -70,7 +70,8 @@ This is [`fail-fast`](../principles/fail-fast.md)'s partial guard exactly: a rea
 - **Do:** pass `--ref <PR-branch>` on every dispatch, so the review's check runs attach to the PR head.
 - **Do:** diagnose a missing verdict by reading the run, since a cancelled dispatched run leaves no trace on the PR at all.
 - **Don't:** dispatch per push --- each one cancels the last, and the round spends review time producing nothing.
-- **Don't:** re-dispatch reflexively when a verdict is missing; if one is in flight, the retry cancels it.
+- **Don't:** re-dispatch reflexively when a verdict is missing.
+  If one is in flight, the retry cancels it.
 - **Don't:** read a green, nothing-pending PR as reviewed on such a repo --- that is also what an invisible cancelled gate looks like.
 
 See [`ardi.cases.md`](ardi.cases.md), "A per-push dispatch cancels its own review, invisibly".

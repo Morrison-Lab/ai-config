@@ -157,7 +157,8 @@ How depends on the repo's review trigger first, and on whether this round pushed
    - **Code was pushed, and the review workflow is dispatch-only** --- its `pull_request:` trigger is absent or commented out, leaving `workflow_dispatch` (and perhaps `issue_comment`), which is how a repo disables automatic review on PR activity.
      The push fires **nothing**, so you must dispatch explicitly, **after the round's last push** rather than once when the PR opened: `gh workflow run <review-workflow>.yml -R <owner>/<repo> --ref <PR-branch> -f pr_number=<N>`, taking the input's name from that workflow's own file.
      **There IS a cancel-in-progress race here, and it is one you create yourself** --- dispatching after each push means each dispatch cancels the last, since the group is keyed on the PR number rather than on the trigger.
-     Finish pushing, then dispatch once; and pass `--ref`, or the cancelled run's failing review gate attaches to the default branch and never appears on the PR.
+     Finish pushing, then dispatch once.
+     Pass `--ref` as well, or the cancelled run's failing review gate attaches to the default branch and never appears on the PR.
      See [`ardi`](../../shared/workflow/ardi.md)'s "Dispatch once, after the round's LAST push".
      This is the branch that fails silently: CI still goes green on each push, so watching CI to green feels like watching the PR, and a verdict from an earlier head stands unchallenged for as long as you keep pushing.
      (UCD-SERG/serocalculator, 2026-08-07: `claude-code-review.yml` has its `pull_request:` trigger commented out with the note "reviews are on request only".

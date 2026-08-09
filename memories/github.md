@@ -538,6 +538,51 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     needed tag shas from `actions/`, `r-lib/`, `r-hub/`, `quarto-dev/`, and
     `JamesIves/`, none of them in session scope, and `add_repo` would have been
     five pointless scope grants for five ref lookups.)
+  - **The `github.com` web host 403s on scope exactly as `api.github.com`
+    does, so `curl -I https://github.com/<owner>/<repo>` answers nothing
+    about whether the repo exists.**
+    The bullet above covers the API host; the web host is the one reached for
+    when the question is existence rather than data, and it is the likelier
+    mistake because a `403` there reads as GitHub refusing rather than as the
+    proxy refusing.
+    Both hosts return the proxy's verdict on **session scope**, so a repo can
+    be public, healthy, and 403 --- and the same probe returns 200 for a repo
+    that is merely in scope, which makes the pair look like a real signal
+    about the repos rather than about the allowlist.
+    `git ls-remote` is the instrument, per the ladder above, and it
+    discriminates every case.
+    Measured 2026-08-09, from a session scoped to `Morrison-Lab/ai-config`
+    and `Morrison-Lab/wai`:
+
+    | repo | `curl -I` | `git ls-remote <url> HEAD` |
+    |---|---|---|
+    | `d-morrison/ai-config` | 403 | `7d843650...` |
+    | `Morrison-Lab/ai-config` | 200 | `7d843650...` |
+    | `d-morrison/macros` | 403 | `8ce5d0cf...` |
+    | `Morrison-Lab/macros` | 403 | `fatal: could not read Username` |
+
+    Read the `curl` column as a table of the allowlist and nothing else:
+    the one 200 is `ai-config`, which is in scope.
+    Two things the `ls-remote` column settles that no `curl` here could.
+    An **identical HEAD under two owner spellings** proves a live rename
+    redirect, which makes it the sharpest rename detector available --- better
+    than the `raw.githubusercontent.com` probe in this file's own
+    "`raw.githubusercontent.com` FOLLOWS repository-rename redirects" bullet,
+    since that one has to be run under the *new* name with a known-moved
+    control or it answers backwards, whereas comparing two shas needs no
+    control at all.
+    And `fatal: could not read Username for 'https://github.com'` is how an
+    **absent or private** repo presents on an anonymous read: git falls back
+    to asking for credentials rather than reporting a 404.
+    Set `GIT_TERMINAL_PROMPT=0` so that case fails immediately instead of
+    blocking on a prompt.
+    Note the pair `d-morrison/macros` resolving while `Morrison-Lab/macros`
+    does not --- the opposite direction from `ai-config`, which is why a
+    blanket owner rewrite across both would break a working reference.
+    (`Morrison-Lab/wai#54`, 2026-08-09: a `.gitmodules` still naming
+    `d-morrison/ai-config` resolved only through the rename redirect, so
+    nothing was visibly broken; `macros` was correctly left pointed at
+    `d-morrison`.)
 - **The proxy allows branch creation/push but BLOCKS branch deletion.** Pushing a
   *new* branch (even one other than the harness-assigned `claude/...`) works, but a
   delete push — `git push origin --delete <b>` or `git push origin :<b>` — is rejected.

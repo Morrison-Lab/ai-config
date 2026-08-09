@@ -191,6 +191,9 @@ the bullets in this fragment record it failing at this exact boundary.
 - [ ] **The changelog entry and the PR description were re-read** against the
       new behavior, not just the code --- neither is in the diff, so no
       reviewer and no grep will catch a stale one.
+      This fires on a **prose** diff too: a body that explains the claim the
+      round just walked back is stale in the way that matters most, and
+      "reconciling prose" does not feel like changing what the PR does.
 - [ ] **The diff's deleted lines were read**
       (`git diff origin/main...HEAD | grep '^-'`), and each one was a decision
       rather than collateral from an edit's blast radius --- a reviewer reads

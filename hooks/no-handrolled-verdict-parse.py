@@ -122,21 +122,28 @@ MATCHER_TOKEN = re.compile(
 # here costs a false positive only when the command ALSO reads review comments.
 MATCH_WINDOW = 400
 
-# Clause 3: the command's data is review-derived.
+# Clause 3: the command's data is review-derived. Two alternatives, and no
+# more -- a `gh pr view N --json comments` form was dropped as redundant, since
+# the `--json` alternative already decides it.
 REVIEW_SOURCE = re.compile(
-    r"issues/\d+/comments|pulls/\d+/(?:comments|reviews)|"
-    r"--json\s+[\w,]*(?:comments|reviews)|"
-    r"gh\s+pr\s+view\s+\d+[^|;&]*--json[^|;&]*(?:comments|reviews)|"
-    r"gh\s+api\s+\S*(?:issues|pulls)\S*/(?:comments|reviews)",
+    # REST: repos/O/R/issues/N/comments, .../pulls/N/reviews, and the
+    # repo-wide forms that omit the number.
+    r"(?:issues|pulls)/(?:\d+/)?(?:comments|reviews)"
+    # gh pr view --json comments, --json state,reviews
+    r"|--json\s+[\w,]*(?:comments|reviews)",
     re.I,
 )
-# A body previously saved to a data file. Deliberately restricted to data-ish
-# paths: matching any file whose NAME contains "verdict" would fire on this
-# hook's own source and on its test, which is precisely the negative case the
-# README's cautionary example warns about.
+# A body previously saved to a data file.
+#
+# Matched on the NAME, and only for data-ish extensions. Both restrictions are
+# load-bearing. Matching any file whose name contains "verdict" would fire on
+# this hook's own source and on its test -- the README's cautionary example
+# exactly. And an earlier draft also matched any `/tmp/*.json` at all, which was
+# both untested and inconsistent with the KNOWN GAP above: it is the same claim
+# as "an arbitrarily-named saved body is not caught", made twice in opposite
+# directions. Dropped in favour of the stated gap.
 SAVED_BODY = re.compile(
-    r"(?:/tmp/\S*|\S*(?:review|comment|verdict|body)\S*)"
-    r"\.(?:json|jsonl|txt)\b",
+    r"\S*(?:review|comment|verdict|body)\S*\.(?:json|jsonl|txt)\b",
     re.I,
 )
 

@@ -133,6 +133,10 @@ CASES = [
      "grepping this very test file, for the same reason"),
     ("git log --oneline | grep 'Ready for merge'", [], False,
      "a matcher and the phrase, over data that is not a review body"),
+    ("jq -r '.body|test(\"Ready for merge\")' /tmp/x.json", [], False,
+     "THE KNOWN GAP, asserted rather than left accidental: a body saved to an "
+     "arbitrarily-named file is not caught -- widening to any file would fire "
+     "on every jq in the session"),
 
     # -- negatives: unrelated work -----------------------------------------
     ("gh pr checks 1278 -R o/r", [], False, "an ordinary check-state query"),
@@ -192,8 +196,8 @@ MUTANTS = [
 
     ("clause 3a: a saved body must be a DATA file, not any path named "
      "'verdict'",
-     '    r"\\.(?:json|jsonl|txt)\\b",',
-     '    r"",',
+     '\\S*(?:review|comment|verdict|body)\\S*\\.(?:json|jsonl|txt)\\b',
+     '\\S*(?:review|comment|verdict|body)\\S*',
      HOOK_GREP, [], False, True),
 
     ("clause 4: the discharge is PER-PR",

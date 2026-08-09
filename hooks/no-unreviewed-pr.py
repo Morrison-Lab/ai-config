@@ -665,8 +665,9 @@ def _note_live(live, num, repo):
     live[num] = repo or prev
 
 
-def _turn_transition_targets(blocks):
-    """PR numbers THIS assistant turn drafts or retires; None if unresolved.
+def _turn_transitions(blocks):
+    """(PR number, tool_use_id) THIS turn drafts or retires; number None if
+    unresolved.
 
     The arm and the transitions run on different clocks, and that difference is
     the whole defect. An arm fires synchronously while the tool_use is read; a
@@ -707,23 +708,34 @@ def _turn_transition_targets(blocks):
     rather than transitioning a live PR, so treating it as one suppressed the
     arm for an unrelated PR that was never touched.
 
+    Each transition carries its own tool_use_id, because knowing that a turn
+    ATTEMPTED a transition is not knowing that the transition HAPPENED. The
+    attempt is all this function can see -- it reads tool_use blocks, and a
+    result exists for none of them yet -- so an arm suppressed on the attempt
+    alone is suppressed on no evidence. A `gh pr ready --undo` that fails
+    leaves the PR ready, unreviewed, and freshly re-headed by the push, which
+    is the exact silent under-warn this hook exists to report. The id is what
+    lets _rearm DEFER the decision to that transition's own result, the same
+    way pending_clear and pending_close already defer their discharges.
+
     Fails toward "no transition" on anything unparseable, which only permits an
     arm -- the over-warn direction, per shared/principles/fail-fast.md.
     """
-    targets = set()
+    out = []
     for b in blocks:
         if not isinstance(b, dict) or b.get("type") != "tool_use":
             continue
         name = b.get("name") or ""
+        tid = b.get("id")
         inp = b.get("input")
         inp = inp if isinstance(inp, dict) else {}
         if name in CLOSE_TOOLS:
-            targets.add(input_ident(inp)[0])
+            out.append((input_ident(inp)[0], tid))
             continue
         if name in EDIT_TOOLS:
             if inp.get("draft") is True \
                     or str(inp.get("state") or "").lower() == "closed":
-                targets.add(input_ident(inp)[0])
+                out.append((input_ident(inp)[0], tid))
             continue
         if name in SHELL_TOOLS:
             cmds = _simple_commands(inp.get("command") or "")
@@ -732,14 +744,14 @@ def _turn_transition_targets(blocks):
             for argv in cmds:
                 ok, num, _repo = _argv_close(argv)
                 if ok:
-                    targets.add(num)
+                    out.append((num, tid))
                     continue
                 # `gh pr ready [<N>] --undo` only. The create form that
                 # _argv_draft also matches opens a new PR instead.
                 if len(argv) >= 3 and argv[0] == "gh" and argv[1] == "pr" \
                         and argv[2] == "ready" and _has_flag(argv[3:], "--undo"):
-                    targets.add(_verb_ident(argv)[0])
-    return targets
+                    out.append((_verb_ident(argv)[0], tid))
+    return out
 
 
 def _note_drafted(live, num):
@@ -767,7 +779,7 @@ def _note_drafted(live, num):
             live[key] = _AMBIGUOUS
 
 
-def _rearm(obligations, live, tid, turn_targets=()):
+def _rearm(obligations, live, tid, turn_targets=(), pending_arm=None):
     """Re-arm the reviewer obligation for the sole live PR, if a push earns it.
 
     Three gates, each of which alone withholds the arm:
@@ -785,15 +797,30 @@ def _rearm(obligations, live, tid, turn_targets=()):
 
     The synthetic `tid` can never equal a real tool_use_id, so a re-armed
     obligation is never mistaken for the open that a tool_result resolves.
+
+    A same-turn transition targeting this PR DEFERS the arm rather than
+    cancelling it. Suppressing outright treated the mere ATTEMPT as proof the
+    PR was retired, and a transition that fails retires nothing: the PR stays
+    ready, the push still re-headed it, and nothing would ever report it. That
+    is the silent under-warn direction, and withholding an arm has the same
+    effect as discharging one, so it owes the same positive evidence every
+    other releasing path here owes (shared/principles/fail-fast.md). The
+    candidate is parked under the transition's own tool_use_id and resolved by
+    _resolve_arm when that result arrives.
     """
     if len(live) != 1:
         return
     num, repo = next(iter(live.items()))
     if num is None or repo is _AMBIGUOUS:
         return
-    # This turn is drafting or retiring THIS PR, so the arm yields to it. A
-    # transition for some OTHER PR is none of this push's business.
-    if None in turn_targets or num in turn_targets:
+    # This turn is drafting or retiring THIS PR, so the arm waits for that
+    # transition's result. A transition for some OTHER PR is none of this
+    # push's business and does not defer anything.
+    hits = [t for (tnum, t) in turn_targets if tnum is None or tnum == num]
+    if hits:
+        if pending_arm is not None:
+            for ttid in hits:
+                pending_arm.setdefault(ttid, tid)
         return
     for ob in obligations:
         if ob["num"] == num and _repo_ok(ob["repo"], repo):
@@ -801,6 +828,36 @@ def _rearm(obligations, live, tid, turn_targets=()):
     obligations.append(
         _new_obl(num, repo, "rearm:%s" % (tid,), False, False, None, None,
                  push=True))
+
+
+def _resolve_arm(pending_arm, rid, failed, obligations, live):
+    """Settle an arm a same-turn transition deferred, now that its result is in.
+
+    Fires only on POSITIVE evidence the transition FAILED. That asymmetry is
+    deliberate, and it is narrower than "not confirmed to have succeeded":
+
+      * FAILED -- the transition did not happen, so the PR is still ready and
+        the push that re-headed it still owes a reviewer. Arm.
+      * SUCCEEDED -- the PR is drafted or retired and owes nothing. Withhold.
+      * AMBIGUOUS -- a transition chained ahead of another command shares one
+        combined exit status, which belongs to the LAST command, so this call
+        cannot attribute an outcome to the transition at all (the combined
+        -result rule in shared/principles/fail-fast.md). Withhold, which is what
+        the draft and terminal discharges in this same call already do on the
+        same input: an ambiguous call changes nothing in either direction
+        rather than acting on ambiguity in one of them.
+
+    Withholding on ambiguity is bounded in a way a wrong discharge is not: the
+    PR stays in `live` precisely because that same ambiguity withheld its own
+    pop, so the NEXT push re-arms. The miss costs one push, not the session.
+
+    _rearm re-runs its own gates here, so a sibling transition that succeeded
+    earlier in this same result message has already removed the PR from `live`
+    and no arm fires.
+    """
+    ptid = pending_arm.pop(rid, None)
+    if ptid is not None and failed:
+        _rearm(obligations, live, ptid)
 
 
 def _repo_ok(a, b):
@@ -843,6 +900,9 @@ def scan(path):
     pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
     pending_close = {}  # tool_use_id -> (num, repo) for merge/close actions
     pending_probe = {}  # tool_use_id -> (num, repo) for single-PR status reads
+    # transition tool_use_id -> the push tool_use_id whose arm it deferred. An
+    # arm may not be cancelled by a transition that merely tried and failed.
+    pending_arm = {}
     # num -> repo for PRs this session opened or readied and still open. A
     # PR leaves on a draft transition and on any terminal state, so a later
     # push never re-arms review for a PR that can no longer take one.
@@ -860,8 +920,9 @@ def scan(path):
             # Which PRs THIS turn drafts or retires, computed over the whole
             # turn before any of its blocks are read -- a sibling call is
             # invisible to the push's own command, in either block order. Only
-            # a transition targeting the live PR withholds its arm.
-            turn_targets = _turn_transition_targets(blocks)
+            # a transition targeting the live PR defers its arm, and only that
+            # transition's own result decides whether the arm is cancelled.
+            turn_targets = _turn_transitions(blocks)
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -1011,6 +1072,11 @@ def scan(path):
                         if not clear_failed:
                             _clear(obligations, cnum, crepo)
                             _note_drafted(live, cnum)
+                        # This same result settles any arm the draft deferred:
+                        # a draft that FAILED left the PR ready, so the push
+                        # that re-headed it still owes a reviewer.
+                        _resolve_arm(pending_arm, rid, failed, obligations,
+                                     live)
                     # A PR that MERGED or CLOSED is past the point where a
                     # reviewer request does anything: the POST this guard
                     # prescribes returns HTTP 200 on a merged PR and adds
@@ -1025,6 +1091,11 @@ def scan(path):
                     # discharge above does.
                     if rid in pending_close:
                         xnum, xrepo, xlast = pending_close.pop(rid)
+                        # Same settlement as the draft clear above: a merge or
+                        # close that FAILED retired nothing, so an arm it
+                        # deferred is owed after all.
+                        _resolve_arm(pending_arm, rid, failed, obligations,
+                                     live)
                         if xlast and not failed:
                             xnum, xrepo = xnum or rnum, xrepo or rrepo
                             _clear(obligations, xnum, xrepo)
@@ -1071,7 +1142,8 @@ def scan(path):
                     # that branch backs. A write to the default branch is not a
                     # PR head, so it never arms.
                     if str(inp.get("branch") or "") not in ("", "main", "master"):
-                        _rearm(obligations, live, tid, turn_targets)
+                        _rearm(obligations, live, tid, turn_targets,
+                               pending_arm)
                     continue
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
@@ -1199,9 +1271,10 @@ def scan(path):
                 # terminal command is not last its own discharge is withheld as
                 # ambiguous, so the arm it raced would stand unsatisfiable. One
                 # call cannot both retire a PR and owe review on it, so the arm
-                # yields to the transition.
+                # yields to the transition -- but only DEFERS to it, since a
+                # transition that fails retires nothing (see _resolve_arm).
                 if pushed:
-                    _rearm(obligations, live, tid, turn_targets)
+                    _rearm(obligations, live, tid, turn_targets, pending_arm)
     return obligations, text
 
 

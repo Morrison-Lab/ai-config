@@ -916,6 +916,64 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     say("Drafted THIS PR by number and pushed.")], False,
      "a numbered transition for the LIVE PR still suppresses the arm")
 
+# Round-7 finding (#1283). Rounds 4 to 6 suppressed the arm on the mere
+# ATTEMPT of a same-turn transition, which is evidence of nothing: the arm
+# fires while the tool_use is read, and no result exists for any block in the
+# turn yet. A transition that FAILS retires nothing -- the PR stays ready, the
+# push still re-headed it, and nothing ever reports it. Withholding an arm has
+# the same effect as discharging one, so it owes the same positive evidence.
+# Both variants are the reviewer's own reproductions.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr ready 1038 --undo"), "u"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("u", "cannot be requested", True), ("p", "", False)),
+                    say("Tried to draft, it failed, and pushed.")], True,
+     "a FAILED draft in the same turn does not cancel the push's arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr merge 1038 --squash"), "m"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("m", "merge conflict, cannot merge", True),
+                            ("p", "", False)),
+                    say("Merge hit a conflict; pushed anyway.")], True,
+     "a FAILED merge in the same turn does not cancel the push's arm")
+# The structured mirror: an atomic tool whose own result errored.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("update_pull_request",
+                          dict(owner="o", repo="r", pull_number=1038,
+                               draft=True), "u"),
+                         ("push_files",
+                          dict(owner="o", repo="r", branch="next"), "p")),
+                    results(("u", '{"status":422}', True), ("p", "{}", False)),
+                    say("Structured draft failed; pushed.")], True,
+     "a FAILED structured draft does not cancel the push's arm")
+# The boundary the fix must NOT cross, and a deliberate decision rather than an
+# oversight: a transition chained AHEAD of the push shares ONE combined exit
+# status, which belongs to the LAST command, so the call cannot attribute an
+# outcome to the transition either way. The draft and terminal discharges in
+# this same call already withhold on exactly this input, so the arm withholds
+# too -- an ambiguous call changes nothing in either direction. The cost is
+# bounded: the PR stays live (that same ambiguity withheld its own pop), so the
+# next push re-arms, which the case below pins.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo; git push -u origin next",
+                         tid="x"),
+                    res("x", "", False),
+                    say("Chained an undo and a push in one call.")], False,
+     "an AMBIGUOUS chained transition still withholds the arm")
+# NOT evidence for the fix, and labelled so rather than counted: this case
+# passes under every mutation of the arm logic, because each of them arms at
+# one push or the other. It pins the REBUTTAL's premise instead -- that
+# withholding on ambiguity costs one push rather than the session -- and it
+# fails if a later change ever makes an ambiguous transition pop `live`, which
+# is what would turn that bounded miss into a permanent one.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo; git push -u origin next",
+                         tid="x"),
+                    res("x", "", False),
+                    bash("git push -u origin next2", tid="p2"), res("p2", ""),
+                    say("...and the next push recovers the arm.")], True,
+     "the next push recovers an arm the ambiguous call withheld")
+
 # Gate: a merged PR can gain no further reviewable head. Without this, the
 # ordinary post-merge shape (merge, branch, push) nags about the merged PR.
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),

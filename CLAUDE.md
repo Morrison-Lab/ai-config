@@ -355,6 +355,17 @@ In every session — at session start, and again periodically during long sessio
    **If `pull --ff-only` fails with "diverged" rather than a dirty-tree error**, don't assume unpushed work is at risk — a fresh container can seed local `main` from a stale/orphaned snapshot (e.g. a pre-history-rewrite state) whose commits never landed on `origin/main` at all.
    Confirm the working tree is clean (`git status --short`) and spot-check a couple of the "unique" local commit messages against `git log origin/main` — if they don't appear there either (not even under a different hash), the divergent commits are orphaned, not real work, and it's safe to realign: `git checkout -B main origin/main`.
    Still flag it rather than force if the tree is dirty or the messages *do* look like genuine unpushed work.
+   **The message spot-check is a weak proxy, and the decisive test is a file-set comparison.**
+   A message grep answers "were these commits replayed under new hashes", which is one of two ways the content can already be safe, and it returns zero hits in both the reassuring case and the alarming one.
+   Ask instead whether realigning would **lose** anything, which is one command and admits no ambiguity:
+   ```bash
+   comm -23 <(git ls-tree -r --name-only main | sort) \
+            <(git ls-tree -r --name-only origin/main | sort)
+   ```
+   Empty output means every path on local `main` also exists on `origin/main`, so nothing disappears.
+   Pair it with a spot-check that a few of those files' *contents* are present too, since identical paths do not guarantee identical content.
+   **`git merge-base --all main origin/main` printing nothing is the positive signal for the orphaned-snapshot case**, and it is stronger than the message grep because it distinguishes *unrelated* histories from merely divergent ones --- a history rewrite gives the two sides no common ancestor at all, which is what a stale pre-rewrite snapshot looks like from the inside.
+   Note that a realign only moves a local ref, so the discarded tip stays recoverable via `git reflog` regardless.
    **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely — `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
 2. **The `~/.claude` consumer copies.** On symlink-capable systems the children of `~/.claude` (`skills/`, `shared/`, `commands/`, `memories/`) are symlinks into the checkout, so the pull alone refreshes them; rerun `bootstrap.sh` only when the repo gained a new top-level dir.
    On Windows, Git Bash `ln -s` silently falls back to **real copies**, so a pull does NOT propagate there — copy-sync every file whose repo version changed into `~/.claude`.

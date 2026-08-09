@@ -1265,6 +1265,81 @@ silent-discharge bug this section exists to prevent.
 - **Don't:** trade a safe-direction over-warn for fewer nags --- that is the
   move that grows a silent-discharge hole.
 
+## An empty substitution changes what the command operates on
+
+Every case in "In a check you run by hand" above is a check whose failure
+path and pass path print the **same** thing.
+This one prints a **different** thing, and that is worse: there is no missing
+output to notice, just a plausible answer to a question you did not ask.
+
+A command substitution that yields nothing does not leave a hole in the
+command line.
+It vanishes, and whatever consumed it falls back to a default:
+
+```bash
+git log --oneline -1 $(git merge-base main origin/main)
+```
+
+With no merge base --- two histories genuinely unrelated --- `git merge-base`
+prints nothing, and `git log --oneline -1` receives **no revision argument**,
+so it reports `HEAD`.
+The output is a real commit, correctly formatted, and it is the local tip
+being presented as the merge base.
+
+Note which guards this defeats.
+The command does not error, its exit status is 0, no locale is involved, and
+the output has exactly the expected shape.
+The tell is only that the answer contradicts something else you measured ---
+here, `--is-ancestor` disagreeing --- so it survives any amount of re-reading
+the command itself.
+
+Capture the substitution, test it, and quote it:
+
+```bash
+base="$(git merge-base main origin/main)"
+if [ -z "$base" ]; then
+  echo "no merge base: histories are unrelated" >&2   # a finding, not an error
+else
+  git log --oneline -1 "$base"
+fi
+```
+
+The quoting matters independently of the emptiness check: `cmd "$base"` with
+an empty value passes a visible empty argument, which most commands reject,
+while `cmd $base` passes nothing at all.
+
+### `$?` belongs to the last thing evaluated, not the interesting thing
+
+Two attribution traps in the same family, both of which make a status line
+describe a command other than the one under judgment:
+
+```bash
+grep -q PATTERN file | head                  # rc is head's
+echo "hits: $(wc -l < out.txt) (rc=$?)"      # $? is wc's, not the earlier grep's
+```
+
+The second is the subtler one, because the `$?` sits inside the sentence
+describing the grep.
+The substitution runs first, so the status reported belongs to it.
+
+- **Do:** assign a substitution to a variable, check it for emptiness, and
+  quote it at the point of use.
+- **Do:** treat "no output" from a query command as a **result** to report,
+  since it is frequently the informative answer rather than a failure.
+- **Don't:** read a command's output as an answer about an argument that came
+  from an unchecked substitution.
+- **Don't:** write `$?` after a pipeline or a substitution and label it with
+  the name of an earlier command.
+
+(`Morrison-Lab/ai-config`, 2026-08-09, post-merge cleanup: local `main` and
+`origin/main` had **no merge base at all**, and
+`git log --oneline -1 $(git merge-base main origin/main)` duly printed local
+`main`'s own tip, which was read as the merge base.
+That reading implied `main` was an ancestor of `origin/main` while
+`git merge-base --is-ancestor` in the same block reported it was not.
+The same session then misattributed `$?` twice more, in both forms above,
+while dupe-checking whether this very entry already existed.)
+
 ## In review
 
 Flag error handling that hides failure — swallowed exceptions, silent

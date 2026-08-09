@@ -779,6 +779,24 @@ def _note_drafted(live, num):
             live[key] = _AMBIGUOUS
 
 
+def _mark_uncertain(live, uncertain, num):
+    """Record that a transition may have retired a PR, without proof that it did.
+
+    The number is frequently absent, for the reason _note_drafted gives: a bare
+    `gh pr merge` or `gh pr ready --undo` is the ordinary way to act on the
+    CURRENT branch's PR. The same tie-break applies here -- with one live PR the
+    bare form is unambiguous, so that PR is the one marked.
+
+    With several the transition cannot be attributed, and nothing is marked.
+    That costs nothing: two or more live PRs already withhold the arm on their
+    own, so there is no rival to de-count and no arm to rescue.
+    """
+    if num is None and len(live) == 1:
+        num = next(iter(live))
+    if num is not None:
+        uncertain.add(num)
+
+
 def _rearm(obligations, live, tid, turn_targets=(), pending_arm=None,
            uncertain=()):
     """Re-arm the reviewer obligation for the sole live PR, if a push earns it.
@@ -1103,11 +1121,11 @@ def scan(path):
                         elif failed:
                             # It certainly did NOT retire the PR.
                             uncertain.discard(cnum)
-                        elif cnum is not None:
+                        else:
                             # Non-last, non-failed: the outcome is unknowable,
                             # so the PR stays armable but stops blocking a
                             # later PR's arm.
-                            uncertain.add(cnum)
+                            _mark_uncertain(live, uncertain, cnum)
                         # This same result settles any arm the draft deferred:
                         # a draft that FAILED left the PR ready, so the push
                         # that re-headed it still owes a reviewer.
@@ -1142,12 +1160,12 @@ def scan(path):
                             uncertain.discard(xnum)
                         elif failed:
                             uncertain.discard(xnum or rnum)
-                        elif (xnum or rnum) is not None:
+                        else:
                             # A terminal command chained ahead of something
                             # else. Whether it retired the PR is unknowable, so
                             # the entry stays for its own sake and stops
                             # counting against a later PR (see _rearm).
-                            uncertain.add(xnum or rnum)
+                            _mark_uncertain(live, uncertain, xnum or rnum)
                     # A PR merged OUTSIDE this session (by a human, or by the
                     # merge queue) leaves no action in the transcript -- only an
                     # observation. Discharged on POSITIVE evidence only: the

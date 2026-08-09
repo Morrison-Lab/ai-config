@@ -1010,6 +1010,23 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     say("Drafted 1038 in a chained call, then opened, "
                         "requested and re-headed 2000.")], True,
      "a PR drafted by a chained call does not silence a LATER PR's arm")
+# The BARE form of the same shape, which resolves no number at all. It takes
+# _note_drafted's own tie-break: with one live PR the bare form is unambiguous,
+# so that PR is the one marked. Without this the residual survives for exactly
+# the commands most likely to be typed, since a bare `gh pr merge` is the
+# ordinary way to merge the current branch's PR.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr merge --squash && "
+                         "git push -u origin next-branch", tid="mp"),
+                    res("mp", ""),
+                    bash("gh pr create --title next", tid="c2"),
+                    res("c2", "https://github.com/o/r/pull/2000\n"),
+                    bash(REQ_2000, tid="q2"), res("q2", OK),
+                    bash("git push -u origin next-branch", tid="p5"),
+                    res("p5", ""),
+                    say("Bare-merged in a chained call, then opened, "
+                        "requested and re-headed 2000.")], True,
+     "a BARE chained merge does not silence a LATER PR's arm either")
 
 # Gate: a merged PR can gain no further reviewable head. Without this, the
 # ordinary post-merge shape (merge, branch, push) nags about the merged PR.

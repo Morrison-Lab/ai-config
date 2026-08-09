@@ -7,6 +7,38 @@ Worked-example case records for the rules below live in
 Each separate push re-triggers CI and the review bot from scratch, and two pushes close together race each other's review runs (see [`fully-clean`](fully-clean.md) and gha's own `CLAUDE.md` "canceled review" section for the concrete failure mode this causes).
 Fewer, complete pushes mean fewer wasted CI minutes and fewer webhook events to triage.
 
+**That saving presupposes that a push triggers a review, so confirm the cost exists in this repo before holding a finished commit back.**
+The rule above is denominated entirely in review runs: a re-trigger to avoid, a race to lose.
+Both require the repo's review workflow to carry a push-based trigger.
+Where it carries only `workflow_dispatch`, a push schedules no review at all, so there is no second run to avoid and no `cancel-in-progress` race to lose --- and batching buys exactly zero.
+Meanwhile the withheld commit exists only in a working tree, which an ephemeral container can reclaim.
+
+The two prices are asymmetric, which is what decides an uncertain case rather than merely making it a wash.
+The avoided cost is one review run.
+The risked cost is losing committed work outright.
+So even a genuine doubt about whether the precondition holds resolves toward pushing.
+
+The general form is worth carrying past this rule.
+**A cost-avoidance rule is conditional on the mechanism that generates the cost being present here, so confirm the cost exists before paying a real price to avoid it.**
+The failure is not disregarding a rule but applying it where its premise does not hold, and it is invisible from the inside: following a written rule feels like compliance, which is the one thing that stops you asking whether the rule applies.
+[`challenge-the-assignment`](challenge-the-assignment.md) is the neighbouring rule, and it governs a premise inside a task you were handed rather than one inside a standing rule you invoked on your own initiative.
+
+Note where the gap actually sat, because it was not in the knowledge.
+[`ardi`](ardi.md) and [`pr-on-claim`](pr-on-claim.md) both already say to read the review workflow's `on:` block and to dispatch explicitly when it carries no push-based trigger, and [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md) owns the per-repo trigger facts.
+Every one of those fires around a push or a draft-to-ready transition.
+None fires when you invoke the batching rule to withhold one, which is the moment the premise needed checking.
+One read settles it, once per repo:
+
+```bash
+sed -n '/^on:/,/^[a-z]/p' .github/workflows/<review-workflow>.yml
+```
+
+- **Do:** confirm this repo's review workflow carries a push-based trigger before withholding a finished commit to batch it.
+- **Do:** push when the precondition is uncertain, since one review run is cheaper than losing committed work.
+- **Don't:** hold a committed fix out of a push in a dispatch-only repo --- there is no second review run there to avoid.
+- **Don't:** read "I am applying a written rule" as evidence the rule applies here.
+  That feeling is precisely what suppresses the check.
+
 **A reviewer's "considered but declined to raise" note is not an open item -- a clean verdict standing over it is a stop, and acting on it reopens a settled loop.**
 [`ardi`](../../skills/ardi/SKILL.md)'s **Stopping conditions** make a totally clean review -- no raised nits, no non-blocking comments -- one of the three ways the loop ends.
 A note the reviewer *considered and explicitly declined to raise as a finding* is exactly that: not a posted finding, so it does not keep the loop open.

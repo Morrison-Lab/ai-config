@@ -106,12 +106,31 @@ Re-run it after widening anything here, in both directions: an over-block on a
 legitimate read is the more urgent finding, since it is the direction that
 gets a guard switched off.
 
-KNOWN GAP
----------
-A body saved to an arbitrarily-named file (`gh api ... > /tmp/x.json`, then
-`jq ... /tmp/x.json`) fails clause 3 in the second command and is not caught.
-Widening clause 3 to any file at all would fire on every `jq` in the session.
-Recorded rather than papered over.
+KNOWN GAPS
+----------
+Both recorded rather than papered over, and both are deliberate choices to err
+toward allowing, because this is a `deny` and an over-block is the direction
+that gets a guard switched off.
+
+1. **An arbitrarily-named saved body.** `gh api ... > /tmp/x.json`, then
+   `jq ... /tmp/x.json`, fails clause 3 in the second command. Widening clause
+   3 to any file at all would fire on every `jq` in the session.
+
+2. **An OUTCOME phrase inside `select()`.** The exemption above treats
+   everything inside a `select(...)` as candidate selection, so
+   `select(.body | contains("Needs more work"))` is allowed. That is right when
+   the selected bodies are printed for reading, and wrong if the selection
+   itself is being read as the verdict -- counting how many bodies matched is
+   the first-match fallacy wearing a filter.
+
+   A sharper rule is available and was deliberately not taken: exempt a phrase
+   in `select()` only when it is a MARKER (`**Claude finished`, `### Verdict`)
+   rather than an OUTCOME (`Ready for merge`, ...), which is what separates the
+   corpus's endorsed query -- it selects on the marker -- from selecting on the
+   verdict. It was left out because the guard cannot see what the output is
+   used for, so the split would block legitimate filtering to catch a misuse
+   that only exists downstream. Worth revisiting if the gap is ever observed
+   causing harm.
 
 Fails OPEN on any parse trouble. A guard that breaks Bash when a regex
 misbehaves costs more than the mistake it prevents.
@@ -159,7 +178,7 @@ REVIEW_SOURCE = re.compile(
 # load-bearing. Matching any file whose name contains "verdict" would fire on
 # this hook's own source and on its test -- the README's cautionary example
 # exactly. And an earlier draft also matched any `/tmp/*.json` at all, which was
-# both untested and inconsistent with the KNOWN GAP above: it is the same claim
+# both untested and inconsistent with KNOWN GAPS item 1 above: it is the same claim
 # as "an arbitrarily-named saved body is not caught", made twice in opposite
 # directions. Dropped in favour of the stated gap.
 SAVED_BODY = re.compile(

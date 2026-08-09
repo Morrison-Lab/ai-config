@@ -344,6 +344,29 @@ judgment call at all: removing pass 1 fails two cases, both `gh api graphql`
 mutations whose payload the permissive pass has already masked, so that one is
 measurably alive.)
 
+## A case labelled non-discriminating is a claim about the current clause set
+
+(`Morrison-Lab/ai-config#1283`, rounds 7 and 8, on
+`hooks/test-no-unreviewed-pr.py`, whose suite is mutation-tested clause by
+clause.
+Round 7 added a next-push recovery case, and deliberately labelled it
+`NOT evidence` in a comment, because it passed under every mutation then
+available --- each of those mutations armed the obligation at one push or the
+other, so the case could not discriminate between them.
+The label was honest, and correct as measured: it said the case pins a
+rebuttal's premise rather than the fix, and the case was excluded from the count
+of cases the fix was credited with.
+
+Round 8's finding forced a new clause.
+Re-running the extended matrix showed that same case is now the only one that
+fails when an uncertain entry is made unarmable --- which is precisely the
+obvious-but-wrong way to fix the round-8 finding.
+So the case had silently become load-bearing, and its own comment had become
+false, with nothing to announce either: the case kept passing, the suite stayed
+green at 126 passed and 0 failed, and the label read as settled.
+The comment now records both roles, naming the rebuttal premise it still pins
+and the half of the round-8 fix that keeps that premise true.)
+
 ## Scale that from one reported input to a corpus of real ones
 
 (`Morrison-Lab/ai-config#1278`, 2026-08-08, rounds 4 to 6: `classify_verdict()`

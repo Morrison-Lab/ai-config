@@ -840,6 +840,51 @@ visible instead of resolving it silently in the fail-open direction.
 - **Don't:** read this as licence to keep every dead branch; the exemption is
   for guards, where the failure mode is silence, not for code generally.
 
+**The dual of those two sections: a case labelled NON-DISCRIMINATING is a claim
+about the current clause set, not about the case.**
+Both sections above track a clause whose mutation score falls to zero.
+A case's score can rise from zero just as quietly, and the label asserting it
+cannot is the artifact that goes stale.
+
+A mutation matrix runs against the clauses that exist when it runs, so a case
+failing under none of them really is non-discriminating at that moment, and
+labelling it so is honest rather than sloppy.
+Adding a clause changes the matrix underneath the label.
+The case can become the only one that fails under some mutation while nothing
+announces the change: the case keeps passing, the suite stays green, and the
+label reads as settled precisely because it was true when written.
+
+**Such a label is worse than no label, because it instructs the next reader not
+to count the case.**
+An unlabelled case is at least weighed on its merits.
+A case marked "not evidence" is pre-excluded from the count, so a later
+simplification pass can drop it as dead weight --- taking with it the only input
+that separates a specific wrong fix from the right one.
+That is [`fail-fast`](../principles/fail-fast.md)'s partial guard reading as
+coverage, arriving through a comment rather than through a code path.
+
+The same reasoning covers any **exclusion annotation** on a test or a check:
+`skip`, `xfail`, "known-vacuous", "kept for documentation".
+Each one asserts a relationship between a case and the code, and the code moves.
+
+The remedy is a trigger rather than more care, and it is the trigger the
+dead-component section already uses one direction over: growth in the clause set
+is the moment to look.
+Re-run the matrix over the cases previously labelled non-discriminating, and
+rewrite every label the new matrix falsifies.
+
+- **Do:** re-run the mutation matrix over previously-excluded cases whenever a
+  clause is added, and correct each label the new matrix falsifies.
+- **Do:** name in the label the clause set it was measured against, so a later
+  reader reads a measurement with an expiry rather than a verdict.
+- **Don't:** read a non-discriminating label as a property of the case; it
+  records a measurement against the clauses that existed when it was taken.
+- **Don't:** drop an excluded case as dead weight on the strength of its own
+  label, without re-running the matrix that produced that label.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A case labelled non-discriminating is a claim about the current clause set".
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

@@ -1331,6 +1331,14 @@ The substitution runs first, so the status reported belongs to it.
 - **Don't:** write `$?` after a pipeline or a substitution and label it with
   the name of an earlier command.
 
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md)'s "A pipe
+discards the status of everything left of it" covers the neighbouring
+mechanism and is worth reading alongside this.
+The two are not the same failure: there, a pipeline's status is genuinely
+*lost* and `set -e` never fires on it, which `pipefail` fixes.
+Here the status is fine and the **read** of it is misdirected, so `pipefail`
+changes nothing --- the `$?` was simply evaluated after something else.
+
 ### A proxy that answers a narrower question passes the same way
 
 The same session hit the pattern one level up, in a **recovery procedure**

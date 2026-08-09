@@ -288,8 +288,8 @@ as non-blocking on #1007.
 are under the default and hard-fails, turning `validate` red on the next push.
 The claim had to be retracted on #1007 as well as fixed in the PR.)
 
-(Morrison-Lab/ai-config, 2026-08-08: the same pair one script over, and this
-time the gating assertion was an exact count rather than a threshold.
+(Morrison-Lab/ai-config#1325, 2026-08-08: the same pair one script over, and
+this time the gating assertion was an exact count rather than a threshold.
 A new `@shared/writing/ambiguous-reference.md` import was added to this repo's
 own `CLAUDE.md`, and the pre-push sweep reported, verbatim, that
 "`check-context-closure.py` exits 0 and reports the same 1 unbalanced

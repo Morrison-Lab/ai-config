@@ -627,15 +627,17 @@ _f, _m, _i, _amb = ccc.walk_closure(
 check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 
 # This repo's own CLAUDE.md is the real instance, so pin it: the count must
-# stay at 72 anchored imports whatever the fence handling does. (Was 69 until
+# stay at 73 anchored imports whatever the fence handling does. (Was 69 until
 # ai-config#1065 added @shared/workflow/learn-from-review-findings.md; 70 until
 # ai-config#1205 added @shared/workflow/agent-teams.md; 71 until ai-config#1325
-# added @shared/writing/ambiguous-reference.md.)
+# added @shared/writing/ambiguous-reference.md; 72 until ai-config#1328 moved
+# the existing-PR-branch section out to
+# @shared/workflow/use-existing-pr-branch.md.)
 check(
-    "this repo's CLAUDE.md still yields 72 anchored imports",
+    "this repo's CLAUDE.md still yields 73 anchored imports",
     len(ccc.import_paths(
         (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    )[0]) == 72,
+    )[0]) == 73,
 )
 
 # --- round-6 review findings ------------------------------------------------

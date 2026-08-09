@@ -7,16 +7,22 @@ Worked-example case records for the rules below live in
 Each separate push re-triggers CI and the review bot from scratch, and two pushes close together race each other's review runs (see [`fully-clean`](fully-clean.md) and gha's own `CLAUDE.md` "canceled review" section for the concrete failure mode this causes).
 Fewer, complete pushes mean fewer wasted CI minutes and fewer webhook events to triage.
 
-**That saving presupposes that a push triggers a review, so confirm the cost exists in this repo before holding a finished commit back.**
-The rule above is denominated entirely in review runs: a re-trigger to avoid, a race to lose.
-Both require the repo's review workflow to carry a push-based trigger.
-Where it carries only `workflow_dispatch`, a push schedules no review at all, so there is no second run to avoid and no `cancel-in-progress` race to lose --- and batching buys exactly zero.
-Meanwhile the withheld commit exists only in a working tree, which an ephemeral container can reclaim.
+**The largest part of that saving presupposes that a push triggers a review, so price the cost in this repo before holding a finished commit back.**
+The rule above names three savings, and they do not stand or fall together.
+Two of them --- the review re-trigger and the `cancel-in-progress` race --- require the repo's review workflow to carry a push-based trigger.
+Where it carries only `workflow_dispatch`, a push schedules no review at all, so both of those go to zero.
+The third does not: a CI workflow triggered on push still runs, so the wasted CI minutes and the webhook event are still real, and batching still saves them.
+
+Price what remains rather than assuming it is nothing.
+Here that is one `validate` run, because `validate.yml` carries `on: [push, pull_request, workflow_dispatch]` --- which is a real cost and a small one beside the risk of holding the commit at all.
 
 The two prices are asymmetric, which is what decides an uncertain case rather than merely making it a wash.
-The avoided cost is one review run.
-The risked cost is losing committed work outright.
+The avoided cost is a CI run, plus a review run only where a push would have triggered one.
+The risked cost is losing committed work outright, since a withheld commit exists only in a working tree an ephemeral container can reclaim.
 So even a genuine doubt about whether the precondition holds resolves toward pushing.
+
+Note what the correction does **not** change, because that is the part worth carrying: the conclusion survives, and only its size moved.
+A rule that bundles several savings under one recommendation invites reading a precondition on one of them as a precondition on all of them, so itemize before concluding that a rule buys nothing here.
 
 The general form is worth carrying past this rule.
 **A cost-avoidance rule is conditional on the mechanism that generates the cost being present here, so confirm the cost exists before paying a real price to avoid it.**

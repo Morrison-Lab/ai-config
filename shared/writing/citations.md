@@ -281,6 +281,81 @@ The generalization, for any automated link sweep: a status code answers
 Anything asserting provenance, a quotation, or a specific claim needs the
 target opened.
 
+## Cite an external result by name, never by its rendered number
+
+The section above is a citation whose target is wrong.
+This is the one where the target is right, the link is right, and only the
+human-readable label silently stops matching what it points at.
+
+Quarto and every comparable generator assign a theorem, a figure, or a
+section its number from its **position in the document**, at render time.
+The anchor is written by hand and is stable.
+The number is derived and is not.
+So `[Theorem 15](.../math-prereqs.html#thm-log-prod)` pins a stable anchor
+to a volatile label, and a theorem inserted anywhere earlier in that book
+renumbers this one, in a repository you do not watch, in a commit that
+never mentions you.
+
+Name the result instead, and let the anchor carry the reader:
+`[the logarithm-of-a-product theorem](.../math-prereqs.html#thm-log-prod)`.
+A name is a claim about content, so it survives renumbering.
+
+**Nothing reports the drift**, which is why this needs a rule rather than
+care.
+The link keeps resolving, so a link sweep passes, which is the
+reachability-is-not-accuracy point above arriving one step further out.
+Both repositories also stay individually correct: the cited book renumbers
+its own theorems properly, and the citing sentence is unchanged.
+The defect lives only in the relation between them, so neither one's CI can
+see it, and the citation goes on rendering as a confident, correctly linked
+reference.
+
+**The test is whether the cited document can be re-rendered.**
+Apply it to any ordinal its generator assigns, not to theorems alone:
+section and chapter numbers, figure, table, equation and listing numbers, a
+numbered list item's position, and a page number in a document that is
+rebuilt rather than published once.
+A frozen artifact is the exception, because its ordinals cannot move.
+So when a number is genuinely needed, cite a pinned version alongside it ---
+a DOI, a tagged release, an archived snapshot --- so the number and the
+artifact it was true of travel together, the same move as pinning a commit
+for provenance above.
+
+**Internal references are the same root defect with the opposite remedy**,
+which is why they belong elsewhere rather than here.
+A literal ordinal typed by hand is the failure in both cases.
+Externally nothing will regenerate the number for you, so you name the
+thing.
+Inside your own document the renderer regenerates it on every build, so the
+remedy is to write the crossref and never a literal:
+[`definition-crossrefs`](definition-crossrefs.md) establishes that a Quarto
+theorem-family crossref already emits the number as well as the type word,
+and [`memories/preferences.md`](../../memories/preferences.md) makes the
+same call for a computed figure,
+preferring an inline R expression over a hard-coded analysis number so the
+text cannot go stale on re-render.
+Those two own the internal case; this section owns the external one.
+
+- **Do:** cite an external result by its name, with the stable anchor as the
+  link target.
+- **Do:** pin the version beside the number on the rare occasion a number is
+  needed, so a reader can reach the artifact it was true of.
+- **Don't:** type an ordinal that someone else's renderer assigns --- its
+  author can change it without touching anything of yours.
+- **Don't:** read a resolving link as evidence the reference still reads
+  correctly; the anchor and the number decay independently.
+
+(UCD-SERG/serocalculator, 2026-08-09: `vignettes/methodology.qmd` cited
+"[Theorem 15](https://d-morrison.github.io/rme/chapters/math-prereqs.html#thm-log-prod)
+in *Regression Models for Epidemiology*".
+That number is literally an ordinal position.
+In `d-morrison/rme`, `thm-log-prod` is the 15th theorem div in
+`chapters/algebra.qmd`, which is the first file `chapters/math-prereqs.qmd`
+includes, so a theorem added above it in any earlier include moves it:
+`grep -n '{#thm-' chapters/algebra.qmd | grep -n 'thm-log-prod'` returns
+`15:279:`, whose leading field is the ordinal.
+Fixed in `84d0052de` by naming the result rather than numbering it.)
+
 (UCD-SERG/serocalculator#619, 2026-07-28: a workflow comment was repinned from
 a deleted-on-`main` file to `5d1efae04f`, verified `200`, and shipped.
 Review fetched the file at that SHA and found it had already been reduced to a

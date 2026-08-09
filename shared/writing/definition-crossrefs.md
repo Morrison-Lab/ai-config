@@ -100,14 +100,15 @@ one of:
   meaning is fine and instead verifies the *link and its ordering* --- a
   resolved term can still be unlinked or defined too late.
 
-## The doubling check is only visible in rendered output
+## The doubling survives every check that already runs
 
 The linking and ordering checks above are decidable from the source: a
 mention is linked or it is not, and a div precedes a mention or it does not.
-The doubled type word is not.
+The doubled type word is decidable from the source too --- the grep above
+settles it outright --- but only for a reader who already knows to look.
 `Definition @def-hessian` is a well-formed crossref that resolves, numbers
-correctly, and leaks no `?@` marker, so every source-side signal is clean
-and the defect exists only on the page.
+correctly, and leaks no `?@` marker, so every check that asks whether a
+reference *worked* reports clean, and the defect shows up only on the page.
 
 That is why it survives a review round rather than being caught in one.
 An automated reviewer reads the diff, and the diff shows a sentence that

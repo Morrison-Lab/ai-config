@@ -93,6 +93,37 @@ A search at the time found the general rule cited but never written:
 unfakeable asks` rule", and `unfakeable` occurs nowhere else in the corpus, so
 only that rule's commit-SHA instance had ever been recorded.)
 
+## A hedge you attach for one audience is owed to the other
+
+(Morrison-Lab/ai-config#1299, 2026-08-08: a timing relationship measured on that
+PR was read as showing that a verdict comment's timestamp can postdate commits
+the review never saw.
+The conclusion was stated to the user in chat as a flat finding, and put into a
+subagent brief minutes later with an explicit instruction to verify it, saying
+the ordering was the whole point.
+
+The subagent verified it and the field was wrong.
+`created_at` is `18:08:08Z` and *predates* both commits, `a60d967f` at
+`18:10:48Z` and `d426bf83` at `18:11:44Z`, so it is a sound anchor.
+`updated_at` is `18:26:27Z`, and GraphQL reports the comment `isMinimized: true`
+with `minimizedReason: "outdated"` -- a later run collapsed it, which is what
+moved that field.
+So the claim is false of the field anyone would anchor on and true only of one
+nobody does.
+
+```bash
+gh api repos/Morrison-Lab/ai-config/issues/comments/5227428537 \
+  --jq '{created_at, updated_at}'
+gh api repos/Morrison-Lab/ai-config/pulls/1299/commits \
+  --jq '.[] | {sha: .sha[0:8], date: .commit.committer.date}'
+```
+
+The brief's own hedge is what caught it, so this is also a case of
+[`challenge-the-assignment`](challenge-the-assignment.md)'s authoring-side rule
+working rather than being skipped -- and it is the reason the asymmetry was
+visible at all.
+The delegated copy carried a detector; the copy the user acted on did not.)
+
 ## An action you recommend is a claim about state
 
 (2026-08-02, this repo: a boxed RECOMMENDATION advised merging `#1058` and

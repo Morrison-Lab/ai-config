@@ -675,6 +675,65 @@ any Quarto website (rme, psw, qwt, …).
   `quarto render <file>.qmd` for per-document work (chunk output, per-format
   `echo`, figures) where the project config is not involved.
 
+## Quarto crossref labels are PAGE-scoped, so an include fragment can only reference labels on its own including page
+
+In a Quarto **website** project a `@sec-` (or `@fig-`, `@tbl-`) label resolves
+only within the page that renders it.
+A `{{< include >}}` fragment has no page of its own --- it is spliced into
+whichever chapter transcludes it --- so it can reference a label defined in
+that chapter, or in another fragment the *same* chapter includes, and nothing
+else.
+Reference a label defined in a different chapter and the render emits a
+literal broken `?@sec-...` into the page rather than failing the build.
+
+The consequence is a design constraint rather than a formatting nit: **a
+shared fragment's crossrefs decide which chapter can transclude it.**
+A fragment whose topic reads as belonging to chapter A, but which references
+two labels defined in chapter B, belongs in B --- or has to stop referencing
+them.
+That question is settled before the fragment is placed, and re-placing it
+later means rewriting its cross-references.
+
+Two things make this easy to get wrong.
+The failure is a **rendering** defect, not a build failure, so CI stays green
+and the broken ref reaches the deployed page --- which is the same
+green-CI-with-a-broken-artifact shape the `check-rendered-refs` skill exists
+to sweep for, and the reason that skill greps rendered HTML for `?@` rather
+than trusting the build.
+And the label being referenced is perfectly real and perfectly defined, just
+on another page, so grepping the source for its definition finds it and
+suggests the reference is fine.
+
+The same scoping is why such fragments are excluded from standalone rendering.
+`Morrison-Lab/wai`'s `_quarto-website.yml:15-18` states it directly, as the
+reason for its `- "!chapters/ai-tools/"` exclusion:
+
+> `chapters/ai-tools/*.qmd` are `{{< include >}}` fragments transcluded by
+> `chapters/*.qmd`, not standalone pages.
+> Their `@sec-ai-*` crossrefs are only defined on the including page, so
+> rendering them standalone also produces broken crossref warnings.
+
+Note that comment establishes the **standalone-render** direction; the
+cross-page direction above is the same page-scoping property met from the
+other side, so a project carrying that exclusion has already conceded the
+constraint this section describes.
+
+- **Do:** before placing a shared fragment, list the labels it references and
+  confirm every one is defined on the chapter that will include it.
+- **Do:** check a rendered page for literal `?@` text after adding a fragment,
+  since the build will not fail on one.
+- **Don't:** infer a crossref resolves because `grep` finds its label
+  somewhere in the project --- the question is which *page* defines it.
+- **Don't:** choose the including chapter by topic alone when the fragment
+  carries cross-references.
+
+(`Morrison-Lab/wai#54`, 2026-08-09: a new PR-activity fragment read as
+belonging to `pr-workflow-with-agents.qmd` by topic, but referenced
+`@sec-ai-claude-cloud-env` and `@sec-ai-mcp-server-setup`, both defined in
+`coding-agents.qmd`.
+Including it from the PR-workflow chapter would have emitted two broken
+`?@sec-` refs, so it was transcluded from `coding-agents.qmd` instead.)
+
 ## renv — each git worktree gets its own (empty) project library
 
 renv keys the project library path on the project directory name, so a

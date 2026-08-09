@@ -282,12 +282,38 @@ in the original checkout.
 This is the inverse, and it fires in a session that is *already* rooted in a
 worktree --- the shape the Claude Code harness sets up when it opens one.
 
-Two ordinary facts combine into it.
-The shell's working directory **resets between tool calls**, so a long task
-tends to open each command with a `cd`.
-And the worktree lives *under* the repo root
-(`<repo>/.claude/worktrees/<name>`), so the repo root is a real, valid,
-plausible-looking path that is **not** the worktree.
+The worktree lives *under* the repo root (`<repo>/.claude/worktrees/<name>`),
+so the repo root is a real, valid, plausible-looking path that is **not** the
+worktree --- and it is the path every instinct reaches for when a command needs
+to name the repo.
+
+**The trap does not depend on how the shell's working directory behaves between
+calls, and it fires either way.**
+If the directory persists, one wrong `cd` sends every later command to the main
+checkout.
+If it resets, each command re-opens with a `cd` and each one is wrong
+separately.
+So read the reconciliation below as explaining how *often* the mistake recurs,
+never as the mechanism that causes it.
+
+Which behaviour you get is genuinely unsettled, and
+[`claude-code.md`](claude-code.md)'s "Bash tool cwd persists across calls"
+section disagrees with what this session measured.
+That section says a **main** session's cwd persists, citing the Bash tool's own
+description, and that only an Agent/subagent thread resets it.
+This was a main session, and the harness reset the cwd to the worktree root
+after every call, printing `Shell cwd was reset to <worktree>` each time ---
+in the same session whose Bash tool description read "Working directory
+persists between calls".
+So the tool's own description and its behaviour disagreed, and the behaviour is
+what governed.
+
+That observation does not establish *why*, and one session cannot separate the
+two candidates: a worktree-rooted session may reset where an ordinary one
+persists, or the persists claim may simply be stale.
+Don't settle the disagreement by picking one.
+Read the `Shell cwd was reset` line in the session in front of you, which
+answers it directly and costs nothing.
 
 So `cd /path/to/repo` is the most natural thing to type and the wrong thing to
 type: it silently selects the main checkout, which is on a different branch.

@@ -621,8 +621,17 @@ check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 # stay at 71 anchored imports whatever the fence handling does. (Was 69 until
 # ai-config#1065 added @shared/workflow/learn-from-review-findings.md; 70 until
 # ai-config#1205 added @shared/workflow/agent-teams.md.)
+#
+# The pin is deliberately a magic number rather than a value derived from
+# CLAUDE.md. Deriving it would make the guard vacuous, since it would then
+# agree with whatever the file happens to say -- the one thing a regression
+# guard must not do. The cost is that an @-import edit has to bump it by hand,
+# so the assertion name below carries that remedy: `check` prints only the
+# name, and this is the failure an import-list edit actually produces.
 check(
-    "this repo's CLAUDE.md still yields 71 anchored imports",
+    "this repo's CLAUDE.md still yields 71 anchored imports "
+    "(adding or removing an @-import bumps this pin -- update the count and "
+    "record the bump in the annotation style of the comment above)",
     len(ccc.import_paths(
         (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
     )[0]) == 71,

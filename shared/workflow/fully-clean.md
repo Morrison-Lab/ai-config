@@ -67,6 +67,42 @@ Worked-example case records for the rules below live in
    - **Don't:** conclude a job is still running, or has passed some duration
      threshold, from `in_progress` plus the wall clock.
 
+   **When you are waiting for a job rather than timing one, poll its step list
+   instead of its status --- the steps are not subject to the same lag.**
+   The rule above says not to infer *duration* from `status`, which leaves the
+   ordinary case looking harmless: a poll loop waiting for `completed` merely
+   costs an extra poll when the field lags.
+   That is true of any single poll and false of the loop, because the loop
+   reads the one field the lag applies to, over and over, and stops only when
+   it clears.
+   So the lag is not amortized away --- it is the whole of the loop's tail.
+   Worse, the loop's output is a column of identical `in_progress` lines, which
+   is indistinguishable from a genuinely stuck job.
+
+   `gh api repos/<owner>/<repo>/actions/jobs/<job-id>` returns the job's own
+   `steps[]`, each carrying its own `status`/`conclusion`.
+   A terminal step (`Complete job`, or the last one the workflow defines)
+   reading `completed` settles it, and the step list doubles as a progress
+   indicator while the job really is running --- which the status field cannot
+   offer at all, having one value for the entire run.
+
+   Reach for it whenever the answer changes what you do next: a review whose
+   verdict is already posted is one you should be reading, not waiting on.
+
+   - **Do:** poll `actions/jobs/<id>`'s `steps[]` when waiting on a specific
+     job, and treat its terminal step completing as the signal.
+   - **Do:** report which step the job is on, so a stalled job is
+     distinguishable from a slow one.
+   - **Don't:** poll a check run's `status` in a loop and read repeated
+     `in_progress` as evidence the job is still working.
+
+   (`Morrison-Lab/gha#440`, 2026-08-09: a review check run read `in_progress`
+   for roughly ten minutes after its job had finished every step, "Post review
+   comment" included, so the verdict sat on the PR unread for that whole
+   stretch.
+   Twenty-one consecutive polls of the check run returned `in_progress`; one
+   read of the job's step list showed `Complete job` already `completed`.)
+
    **A `BlobNotFound` / HTTP 404 on the job-log fetch means the job has not completed, not that it has hung.**
    The block above says to read a run's duration from its log timestamps.
    That remedy is unavailable while a job is still running, because there is no log to read yet: GitHub archives a job's log blob only when the job completes, so `gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs"` (and the MCP `get_job_logs`) returns `BlobNotFound` / 404 until then.

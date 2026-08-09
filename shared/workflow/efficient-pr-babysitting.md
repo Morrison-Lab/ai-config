@@ -14,7 +14,15 @@ Where it carries only `workflow_dispatch`, a push schedules no review at all, so
 The third does not: a CI workflow triggered on push still runs, so the wasted CI minutes and the webhook event are still real, and batching still saves them.
 
 Price what remains rather than assuming it is nothing.
-Here that is one `validate` run, because `validate.yml` carries `on: [push, pull_request, workflow_dispatch]` --- which is a real cost and a small one beside the risk of holding the commit at all.
+Here that is **two** `validate` runs, not one, because `validate.yml` carries `on: [push, pull_request, workflow_dispatch]` and a push to a PR branch fires both the `push` and the `pull_request` event.
+Count the check runs rather than the workflows, which is what makes the difference visible:
+
+```bash
+gh pr checks <N> --json name,workflow | jq -r '.[] | .name'   # same name, twice
+```
+
+That is still a real cost and a small one beside the risk of holding the commit at all, so the conclusion is unchanged --- but note the error ran in the direction that *flattered* the argument, making batching look cheaper to skip than it is.
+An error favouring your own conclusion is the one least likely to be re-checked, which is why this one survived a round that had already corrected the sentence around it.
 
 The two prices are asymmetric, which is what decides an uncertain case rather than merely making it a wash.
 The avoided cost is a CI run, plus a review run only where a push would have triggered one.

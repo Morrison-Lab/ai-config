@@ -1472,7 +1472,25 @@ Measured on `Morrison-Lab/ai-config`, 2026-08-09, against PR #1283's branch comm
 | `git show origin/main:hooks/no-unreviewed-pr.py \| grep -c "_mark_uncertain"` | 3 |
 
 So three identity proxies disagree with each other while the content check settles it outright.
-The message-scoped hit is not a reprieve: 4 of the 5 most recent squash merges on that repo carry zero preserved bullets in their bodies, so the form that *can* hit usually does not either.
+The message-scoped hit is not a reprieve, because whether the squash body kept
+those bullets is a per-merge editorial accident rather than a property of
+squashing.
+Re-derive it rather than trusting a figure written here, since "the N most
+recent" is a window that slides:
+
+```bash
+for sha in $(git log origin/main --format=%H -5); do
+  printf '%s bullets=%s\n' "$(git log -1 --format=%h "$sha")" \
+    "$(git log -1 --format=%b "$sha" | grep -c '^\* ' || true)"
+done
+```
+
+Measured 2026-08-09 on `Morrison-Lab/ai-config`, that returned 3 of 5 carrying
+zero bullets.
+The sentence this replaced claimed 4 of 5, and the discrepancy is the point
+rather than a correction to file away: one merge landed between the measurement
+and the review that questioned it, so a bare count published without its command
+was stale before anyone read it.
 
 The unifying statement is worth carrying past this procedure.
 **Whether a change landed is decided by looking for the change.**

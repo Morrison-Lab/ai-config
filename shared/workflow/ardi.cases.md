@@ -445,8 +445,8 @@ rarely-taken path had.)
 
 (`Morrison-Lab/ai-config#1361`, 2026-08-09: the squash commit `62ea72b3` ends
 `Closes #1358`.
-#1358 is an unrelated pull request from a parallel session, and #1361 had no
-tracking issue at all, having come from a subagent dispatch rather than the
+That number names an unrelated pull request from a parallel session, and #1361
+had no tracking issue at all, having come from a subagent dispatch rather than the
 issue-first flow --- so the number was typed to fill a habitual slot rather than
 read from anywhere.
 

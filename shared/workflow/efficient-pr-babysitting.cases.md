@@ -40,6 +40,59 @@ invoked to withhold one.)
 Acting on it drew a second clean verdict plus a fresh declined note -- a forward-pointing phrase the added cross-link introduced -- and acting on that drew a third: three review rounds for a change mergeable after the first.
 Copilot's check went green with `get_reviews` empty on every head, including #1118's stable single-push head, so its silence was its no-findings behavior rather than anything the pushes caused -- an earlier version of this entry wrongly called that silence self-inflicted.)
 
+## "A caveat reporting that the reviewer could not check is not a declined note"
+
+(`Morrison-Lab/ai-config`, 2026-08-09: both shapes occurred hours apart in one
+session, and the correct responses diverged.
+
+[#1345](https://github.com/Morrison-Lab/ai-config/pull/1345)'s round-2 review
+closed with a **ranking**: "One purely optional, non-blocking observation: the
+corrected text prices the CI cost as 'one `validate` run,' which is technically
+a slight undercount (it's actually two, per the check-run evidence above) ...
+so it isn't worth another round."
+That reviewer had checked the fact itself, so the note was weighed and ranked
+low, and holding it was right.
+
+[#1347](https://github.com/Morrison-Lab/ai-config/pull/1347)'s round-2 review
+closed with an **inability**: "One claim I could not independently verify: the
+PR body's/new content's statement that '4 of the 5 most recent squash merges on
+that repo carry zero preserved bullets in their bodies.'
+Repeated attempts to fetch individual squash-commit message bodies via
+`gh api repos/.../commits/<sha>` were denied by this session's tool-approval
+gate (while `gh pr list`/`gh pr view`/`gh pr diff` worked fine).
+This is an illustrative, non-load-bearing detail ... so I'm not treating this as
+a finding, just noting it as unverified."
+Both verdicts read **Ready for merge**, and the second caveat was held as though
+it were the first.
+
+The blocked check ran fine from the driving session, which is the sandbox
+asymmetry the rule names: `gh api` was gated for the reviewer while plain
+`git log` was never gated for the author.
+It refuted the claim.
+The five most recent first-parent commits at that moment returned three carrying
+zero bullets, not four:
+
+```bash
+for sha in $(git log origin/main --format=%H -5); do
+  printf '%s bullets=%s\n' "$(git log -1 --format=%h "$sha")" \
+    "$(git log -1 --format=%b "$sha" | grep -c '^\* ' || true)"
+done
+```
+
+The false ratio merged into
+[`fail-fast`](../principles/fail-fast.md) and needed
+[#1351](https://github.com/Morrison-Lab/ai-config/pull/1351) to correct it,
+which is the whole cost of reading an inability as a ranking: a command before
+the merge, or a PR after it.
+
+Re-running that same loop later on 2026-08-09, after #1351 merged, returns 3 of
+5 again over an entirely different five commits ---
+`1ab91d69 0`, `f9884cc5 0`, `165d8a96 2`, `02146f6d 2`, `2b368175 0` --- which
+is why #1351's fix published the loop rather than refreshing 4 to 3.
+"The N most recent" is a sliding window, so a bare count is stale on arrival,
+per [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md)'s
+rule that refreshing a drifted figure only resets the clock.)
+
 ## "Merge first, then commit the fix, then push once"
 
 (ai-config#700: pushed the review fix, then merged `main` and pushed again about a minute later; the first review run was cancelled mid-flight and the round cost an extra cycle.)

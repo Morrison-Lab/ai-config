@@ -69,6 +69,57 @@ A green Copilot check is therefore not a verdict; read `get_reviews`, and treat 
 - **Don't:** treat an explicitly-declined optional note as an open item and spend a round on it -- per [`ardi`](../../skills/ardi/SKILL.md)'s Stopping conditions, a review with no raised findings is a stop.
 - **Don't:** read an empty `get_reviews` under a green Copilot check as approval or as self-inflicted; it is Copilot's no-findings behavior.
 
+**A caveat reporting that the reviewer *could not check* is not a declined note, and the two call for opposite responses.**
+The rule above governs a note the reviewer weighed and ranked low.
+A reviewer can also report that it was unable to look at all --- a tool gate, a
+sandbox restriction, a denied network call --- and it says so in the same
+courteous, non-blocking register, inside the same clean verdict, frequently in
+the same sentence position.
+Reading the second as the first is the error, because it inherits a judgment
+nobody ever made.
+
+Two asymmetries decide it.
+A review sandbox is usually **more** restricted than the session driving the
+PR, since the reviewer runs under a tool-approval gate the driving session does
+not, so a claim the reviewer could not settle is frequently one you can settle
+in a single command.
+And a declined note has been examined by someone and found minor, whereas an
+unverified one has been examined by **nobody** --- so holding it is not a
+considered risk but an unexamined one, and it reads as considered precisely
+because it arrives inside a clean verdict from a careful reviewer.
+
+The discriminating question is cheap enough to run against any caveat in front
+of you: **did the reviewer weigh this and rank it low, or report that it could
+not look?**
+The wording answers it directly.
+"Isn't worth another round" and "not worth blocking on" rank a thing.
+"Could not independently verify", "denied by this session's tool-approval
+gate", and "noting it as unverified" report a blind spot, whatever softening
+rides alongside them.
+Expect that softening, and discount it: a reviewer routinely attaches its own
+guess at importance to the second kind --- "illustrative", "non-load-bearing"
+--- and that guess is worth nothing, because it grades an item the same
+sentence just said it could not read.
+
+Verifying is not spending a round, which is what keeps this compatible with the
+rule above.
+Run the check.
+Where it confirms the claim, hold exactly as before and the clean verdict still
+stands.
+Where it refutes the claim you have a defect rather than an optional
+improvement, and the cost argument was never about defects.
+Run it before the merge, since afterwards the same correction costs a whole PR.
+
+- **Do:** run the reviewer's own blocked check yourself, in the session driving
+  the PR, before treating an unverified claim as settled.
+- **Do:** discriminate on what the caveat reports --- a ranking or an inability
+  --- rather than on how non-blocking it sounds.
+- **Don't:** read a reviewer's guess that an unverified item is illustrative or
+  non-load-bearing as evidence about that item; it is grading something it did
+  not read.
+- **Don't:** treat verifying as reopening the loop --- confirming a claim costs
+  one command, and holding afterwards is the same stop.
+
 **When a round needs both a `main` merge and a code fix, merge first, then commit the fix, then push once.**
 This is the ordering the batch rule implies but doesn't spell out, and the natural sequence is the wrong one: you fix what the review flagged, push it, then notice `main` moved, merge, and push again --- two pushes seconds apart, two review runs, the second cancelling the first.
 Merging first costs nothing (the merge commit and the fix commit both ride out in the same push) and collapses the round to a single review run.

@@ -1331,6 +1331,57 @@ The substitution runs first, so the status reported belongs to it.
 - **Don't:** write `$?` after a pipeline or a substitution and label it with
   the name of an earlier command.
 
+### A proxy that answers a narrower question passes the same way
+
+The same session hit the pattern one level up, in a **recovery procedure**
+rather than a single command.
+
+`CLAUDE.md`'s "Keep ai-config and repo checkouts fresh" step for a diverged
+local `main` says to spot-check a few divergent commit messages against
+`origin/main`, and to realign if they do not appear there.
+That grep answers "were these commits replayed under new hashes", which is
+only **one** of two ways the content can already be safe.
+It returns zero hits in the reassuring case and the alarming case alike, so
+its answer does not discriminate between them.
+
+Measured on `Morrison-Lab/ai-config`, where the two halves disagreed
+outright:
+
+| check | result |
+|---|---|
+| sampled local commit messages found on `origin/main` | 0 of 4 |
+| files those commits touched, present on `origin/main` | 4 of 4 |
+| paths on local `main` absent from `origin/main` | 0 |
+
+The proxy said "orphaned"; the content had in fact landed under a rewritten
+history.
+Both readings license the same action, which is exactly why a weak test
+survives: it is usually right, and it is right for a reason it did not
+check.
+
+Ask the question the decision actually turns on --- whether realigning would
+**lose** anything:
+
+```bash
+comm -23 <(git ls-tree -r --name-only main | sort) \
+         <(git ls-tree -r --name-only origin/main | sort)
+```
+
+Empty output means every path on local `main` also exists on `origin/main`.
+Spot-check a few of those files' contents too, since identical paths do not
+guarantee identical content.
+And note that `git merge-base --all main origin/main` printing **nothing**
+is the positive signal for the orphaned-snapshot case, since it separates
+*unrelated* histories from merely divergent ones --- which is what a stale
+pre-rewrite snapshot looks like from the inside.
+A realign only moves a local ref, so the discarded tip stays recoverable
+via `git reflog` either way.
+
+- **Do:** ask what a proxy check would report in the case you are worried
+  about, not only in the case you expect.
+- **Don't:** accept a check that is right for a reason it never tested, when
+  the deciding question is one command away.
+
 (`Morrison-Lab/ai-config`, 2026-08-09, post-merge cleanup: local `main` and
 `origin/main` had **no merge base at all**, and
 `git log --oneline -1 $(git merge-base main origin/main)` duly printed local

@@ -368,3 +368,97 @@ Later, the fully-clean sweep ran against `5220802` --- `main`'s tip --- and
 reported 51 check runs complete and none failing, for a PR whose head was
 `d877f6d`.
 Re-running it against the real head returned 32.)
+
+## A repo script run from a worktree can measure the MAIN checkout, because it resolves paths relative to itself
+
+The section above is about a `cd` that sends *you* to the wrong checkout.
+This is the case where your working directory is right and the **script** goes
+somewhere else, so every instinct that rule trains does not fire.
+
+A repo script that locates the repository from its own location --- `__file__`,
+`$(dirname "$0")`, or a walk upward from there --- reads the tree containing the
+script, not the tree you are standing in.
+So invoking the main checkout's copy from a worktree measures the main
+checkout:
+
+```bash
+cd /path/to/worktree
+python3 /path/to/main-checkout/scripts/check-context-closure.py   # measures the MAIN checkout
+python3 ./scripts/check-context-closure.py                        # measures the worktree
+```
+
+Both commands succeed and both print a plausible figure.
+
+**The output usually does say which tree it read, and discarding that line is
+how the mistake actually happens.**
+A well-behaved instrument prints its scope, and it prints it on a *different
+line* from the figure you came for --- which is
+[`fail-fast`](../shared/principles/fail-fast.md)'s "A zero-shaped summary can be
+sound, and the scope line is what decides it", met one artifact over.
+`check-context-closure.py` opens every run with its resolved base:
+
+```
+/home/user/ai-config: 74 file(s), 1,151,207 bytes (~287,801 tokens at 4 B/token)
+```
+
+So the cheapest discriminator is not a heuristic at all.
+It is reading the first line.
+
+The habit that defeats it is piping a check through `tail` to keep the output
+short.
+The figure you want is usually near the end, the provenance is at the start, and
+`| tail -2` keeps the first and drops the second --- so the truncation is
+invisible, deliberate, and self-inflicted.
+Read the whole output at least once per script, and reach for `tail` only after
+you know what the header says.
+
+**Where a script genuinely prints no root, fall back to comparing the figure
+against `main`.**
+A worktree carrying uncommitted or unpushed work should differ from `main` in
+whatever is being measured, so an identical figure is the signal to re-run the
+local copy rather than a reassuring coincidence.
+Treat that as the fallback it is, not as the primary check.
+
+Two consequences beyond getting one number wrong.
+A guard consulted this way reports on the wrong tree, so it can pass a worktree
+whose content would fail --- the fail-green direction, per
+[`fail-fast`](../shared/principles/fail-fast.md)'s "A proxy that answers a
+narrower question passes the same way".
+And a brief that tells a subagent to run a check without saying *which copy*
+hands it the same ambiguity, which is
+[`challenge-the-assignment`](../shared/workflow/challenge-the-assignment.md)'s
+authoring-side rule: do not assert anything about the recipient's environment
+you cannot query.
+
+- **Do:** run a repo script from the worktree's **own** copy, by a path inside
+  that worktree.
+- **Do:** read a check's first line before piping it through `tail`, since
+  scope and provenance live in the header and the figure lives at the end.
+- **Do:** name the copy to run when briefing an agent working in a worktree.
+- **Don't:** assume `cd` into the worktree redirects a script invoked by an
+  absolute path elsewhere --- the script never reads your cwd.
+- **Don't:** invent a heuristic to recover information you truncated away; check
+  whether the tool already reports it.
+
+(`Morrison-Lab/ai-config#1347`, 2026-08-09: `check-context-closure.py` was run
+from the PR's worktree by the main checkout's path and reported `CLAUDE.md` at
+133,901 characters --- exactly the main checkout's figure.
+The worktree's own copy reported 134,415.
+The wrong number was caught only because it matched a figure measured earlier in
+the same session.
+By then it had already been written into a PR comment as verification.
+The same trap was then hand-carried into a subagent brief to prevent a repeat,
+which is what showed it belonged here rather than in one session's head.
+
+Review round 1 on `#1358` then found the first draft of this entry overclaiming:
+it asserted that nothing names the tree, and that the matching-number comparison
+was therefore the only cheap discriminator.
+Both are false for the very script cited here.
+Every invocation in that session had been piped through `| tail -2` or
+`| tail -1`, which keeps the closing `CLAUDE.md: N characters` line and drops the
+opening `/home/user/ai-config: 74 file(s), ...` line that names the resolved
+base.
+So the blind spot was self-inflicted, and the heuristic was invented to recover
+information that was being discarded on purpose --- which is a better lesson
+than the one first written down, and is why the entry now leads with reading the
+header rather than with comparing figures.)

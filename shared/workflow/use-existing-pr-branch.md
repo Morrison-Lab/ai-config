@@ -19,12 +19,15 @@ and update that same PR.
 Do not open a separate PR unless the user explicitly asks for one.
 
 **Exception --- the session can only push to its own branch.**
-Some web/remote sessions are scoped so the agent proxy allows pushing *only* to the harness-assigned branch; a push to any other branch (the existing PR's branch included) is rejected with `HTTP 403`.
+Some web/remote sessions are scoped so the agent proxy allows pushing *only* to the harness-assigned branch;
+a push to any other branch (the existing PR's branch included) is rejected with `HTTP 403`.
 When that happens you cannot follow step 3.
 Don't retry the 403 --- it's a policy denial, not a transient error.
 
 **Prefer stacking the fix, not superseding the PR.**
-When the work is an incremental fix to an existing, still-open PR (a review finding, a small addition) rather than a full rebuild, push the fix to the assigned branch and open it as a PR **stacked on** the original --- `base` set to the original PR's own branch, per the [`stack-prs`](../../skills/stack-prs/SKILL.md) skill --- rather than superseding it. Comment on the original PR pointing to the stacked one, and note the dependency ("stacked on this branch --- either merge #N into this branch first, or merge this PR and #N will retarget to `main`"). This keeps the diff to just the incremental change instead of re-litigating the whole original PR's content, and it composes correctly regardless of how the maintainer merges it: they can merge the stacked PR straight into the original's branch (folding the fix in before the original PR itself merges) or merge the original first and let the stacked PR retarget to `main` per that skill's step 4.
+When the work is an incremental fix to an existing, still-open PR (a review finding, a small addition) rather than a full rebuild, push the fix to the assigned branch and open it as a PR **stacked on** the original --- `base` set to the original PR's own branch, per the [`stack-prs`](../../skills/stack-prs/SKILL.md) skill --- rather than superseding it.
+Comment on the original PR pointing to the stacked one, and note the dependency ("stacked on this branch --- either merge #N into this branch first, or merge this PR and #N will retarget to `main`").
+This keeps the diff to just the incremental change instead of re-litigating the whole original PR's content, and it composes correctly regardless of how the maintainer merges it: they can merge the stacked PR straight into the original's branch (folding the fix in before the original PR itself merges) or merge the original first and let the stacked PR retarget to `main` per that skill's step 4.
 Reserve the supersede path (below) for when stacking doesn't fit --- the original branch/PR is abandoned, or the fix amounts to a full rebuild rather than an incremental addition.
 
 **A plain `git merge --ff-only` plus push is a second way to fold a stacked PR

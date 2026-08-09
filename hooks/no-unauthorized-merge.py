@@ -4,6 +4,10 @@
 Prohibits commands attempting to merge PRs/MRs (e.g. `gh pr merge`, `glab mr merge`,
 `gh api .../merge`, `glab api .../merge`, or GraphQL `mergePullRequest` / `enablePullRequestAutoMerge`)
 unless explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
+
+Three authorization paths, narrowest last: the per-command ALLOW_MERGE=1 /
+--allow-merge override, an active session `/mwc` grant, and a STANDING
+per-repository grant for PRs targeting a repo in STANDING_MERGE_GRANT_REPOS.
 """
 import bisect
 import json
@@ -521,6 +525,148 @@ def mask_payloads(text: str) -> str:
     return text
 
 
+# --- Standing per-repository merge grant ---------------------------------
+#
+# ai-config#1352: the user granted a STANDING merge permission for PRs
+# targeting this repository -- "PRs targeting the ai-config repo should have a
+# standing mwc". That is not the session-scoped kind `/mwc` records, so the
+# guard has to honour it with no marker file and no per-session enabling step.
+#
+# The grant is TARGET-scoped, which makes it strictly TIGHTER than the session
+# grant it sits beside: `check_mwc_active()`'s marker lives in the CURRENT
+# repository's git dir, so an active MWC authorizes `gh pr merge -R other/repo`
+# run from an ai-config checkout. This one reads the repo the merge lands in.
+#
+# Deliberately NOT env-configurable, against the usual
+# shared/coding/configurable-parameters.md default. An env-settable allowlist
+# would widen a security guard from ambient state that a reader of the command
+# cannot see, and `ALLOW_MERGE=1` already covers the one-off case from inside
+# the command text. Adding a repository here is a one-line diff, and code
+# review is the right gate for an allowlist.
+STANDING_MERGE_GRANT_REPOS = frozenset({"morrison-lab/ai-config"})
+
+# Only the GitHub PR-merge forms carry the grant, which is what the user
+# granted: "PRs targeting the ai-config repo".
+#   - `repos/<owner>/<name>/merges` is a direct BRANCH merge, not a PR merge --
+#     it writes to the default branch with no PR, review or required check.
+#   - a GraphQL `mergePullRequest` names its target by node id, so no repo is
+#     derivable from the command at all.
+#   - the two glab forms are GitLab; this repository is on GitHub.
+# Each of those three keeps the baseline prohibition.
+STANDING_GRANT_LABELS = frozenset({"gh pr merge", "gh api PR merge"})
+
+NWO = r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+"
+# `-R x/y`, `-Rx/y`, `-R=x/y`, `--repo x/y`, `--repo=x/y`. Anchored so a longer
+# flag ending in `-R` is not read as one.
+REPO_FLAG = re.compile(rf"(?:^|[\s;&|`()])(?:-R|--repo)\s*=?\s*({NWO})(?:\b|$)")
+# `gh api .../repos/<owner>/<name>/pulls/N/merge`, with or without a leading
+# slash. The trailing `/` is required so the two path components cannot run
+# past the repo name.
+REPO_API_PATH = re.compile(rf"""(?:^|[\s/'"])repos/({NWO})/""")
+
+# Mutation measurements over the 243-case suite, taken 2026-08-09. Reverting a
+# clause and counting the cases that then fail is the only thing that tells a
+# load-bearing clause from a decorative one, so the numbers live here rather
+# than in a commit message that nobody re-reads.
+#
+#   merge-type subset check ................................  8 cases
+#   target ambiguity (`len(targets) != 1`) .................  2
+#   allowlist membership ................................... 17
+#   payload-masked target subject (mutated at the call site)  3
+#   `-R` token anchor ......................................  1
+#   the standing-grant call site ........................... 10
+#
+# Three clauses fail ZERO and are KEPT, per shared/principles/fail-fast.md:
+# for a guard, a redundant path costs a few characters while removing one on
+# suite evidence alone fails OPEN when the suite is the incomplete thing. Each
+# is a reviewable simplification rather than a bug fix.
+#
+#   - REPO_API_PATH's trailing `/`. `/` is outside NWO's charset, so neither
+#     component can over-consume with or without it.
+#   - `matched_merge_labels`'s permissive pass. NOT inert: it adds a label the
+#     narrow pass misses on 29 of the suite's 233 commands. In none of those 29
+#     does the extra label change the outcome, because each is denied on other
+#     grounds anyway -- so it is additive but not yet decisive.
+#   - `standing_grant_target`'s `not labels` guard, unreachable from the one
+#     call site (which only calls after a hit, so a label always re-derives).
+#     It matters if anything ever calls this without pre-matching, since an
+#     empty set is a subset of every set and would ALLOW.
+#
+# Those last two cover each other: mutating BOTH together still fails zero.
+# A case separating them would need the narrow pass to see only granted labels
+# while the permissive pass adds an excluded one, and GH_PROG plus `[^\n]*`
+# means any segment opening with a command-position `gh` matches every gh
+# pattern narrowly -- so it may not be constructible at all.
+
+
+def matched_merge_labels(masked_seg: str, inert_seg: str) -> set:
+    """EVERY merge interpretation these segments match, not just the first.
+
+    `offending` stops at its first hit, which is all a BLOCK decision needs --
+    one match is enough to refuse. An ALLOW decision needs the whole set,
+    because the patterns are unanchored `[^\\n]*` scans over the segment and a
+    single command line can satisfy several of them at once.
+    """
+    labels = set()
+    for seg, patterns in ((masked_seg, MERGE_PATTERNS), (inert_seg, PERMISSIVE_MERGE_PATTERNS)):
+        for pattern, label in patterns:
+            if re.search(pattern, seg):
+                labels.add(label)
+    return labels
+
+
+def standing_grant_target(masked_seg: str, inert_seg: str) -> bool:
+    """True when this segment's merge provably lands in a granted repository.
+
+    TWO ambiguity tests, and they are the same test on two axes: WHAT kind of
+    merge this is, and WHICH repository it lands in. Either one coming back
+    undetermined denies, per shared/principles/fail-fast.md -- a guard's
+    discharge fires on positive evidence, and "I could not tell" is not
+    evidence.
+
+    **Merge type.** Every interpretation the segment matches must be a granted
+    one. Reading the FIRST matched label instead is a bypass, because
+    `_merge_patterns` tries the `pulls/N/merge` forms before the
+    `repos/<o>/<n>/merges` ones and both scan the whole segment unanchored: a
+    real BRANCH merge carrying a forged `pulls/1/merge` substring in an
+    unmasked flag (`-H "X-Note: .../pulls/1/merge"` -- `-H` is not in
+    `mask_payloads`'s list) is labelled `gh api PR merge`, and the two forged
+    and real `repos/<o>/<n>/` paths then name the SAME granted repo, so the
+    target test sees one target and grants a direct push to the default
+    branch with no PR, review or required check. Reported and reproduced on
+    ai-config#1353.
+
+    That is precisely the reasoning the target test below already rejects,
+    one axis over: the first match is not the determination.
+
+    **Target.** Read from the COMMAND TEXT only -- an `-R`/`--repo` flag or a
+    REST `repos/<owner>/<name>/` path -- never from the current working
+    directory. A cwd fallback would fail OPEN on the commonest shape there is:
+    `offending` splits on `&&`, so `cd ../other-repo && gh pr merge 1` reaches
+    this function as a bare `gh pr merge 1` while the hook's own cwd is still
+    the ai-config checkout, and the merge would be allowed into a repo nobody
+    granted anything for. `hooks/require-gh-repo-flag.py` already refuses a
+    `gh pr merge` with no -R, so requiring an explicit target costs nothing.
+
+    Zero targets denies, and so do two different ones -- reading the first
+    would let `gh api -X PUT repos/other/repo/pulls/1/merge -R
+    morrison-lab/ai-config` through on the strength of a repo it does not
+    touch.
+
+    Targets come from the PAYLOAD-MASKED segment, so that an `-R` flag or a
+    `repos/.../` path forged inside a `--body` or a trailing `#` comment
+    cannot supply one.
+    """
+    labels = matched_merge_labels(masked_seg, inert_seg)
+    if not labels or not labels <= STANDING_GRANT_LABELS:
+        return False
+    targets = {m.group(1).lower() for m in REPO_FLAG.finditer(masked_seg)}
+    targets |= {m.group(1).lower() for m in REPO_API_PATH.finditer(masked_seg)}
+    if len(targets) != 1:
+        return False
+    return next(iter(targets)) in STANDING_MERGE_GRANT_REPOS
+
+
 def sanitize(name: str) -> str:
     """Sanitize session ID matching ai-session.sh: tr -c 'A-Za-z0-9._-' '_'"""
     return re.sub(r"[^A-Za-z0-9._-]", "_", name)
@@ -681,6 +827,8 @@ def offending(command: str, payload: dict | None = None):
             continue
         if check_mwc_active(payload):
             continue  # Allowed via active MWC session grant
+        if standing_grant_target(masked_command[start:end], inert_command[start:end]):
+            continue  # Allowed via the standing per-repository grant
         return hit, orig_seg.strip()
     return None
 
@@ -705,7 +853,8 @@ def main() -> int:
         f"MECHANISTIC PROHIBITION: `{label}` is strictly blocked without explicit permission.\n\n"
         f"    Offending command segment: {segment}\n\n"
         "AI agents are mechanistically forbidden from merging PRs/MRs unless explicitly instructed "
-        "by the user or executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc)."
+        "by the user, executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc), or "
+        "merging a PR whose target repo carries a standing grant (see STANDING_MERGE_GRANT_REPOS)."
     )
     print(json.dumps({
         "hookSpecificOutput": {

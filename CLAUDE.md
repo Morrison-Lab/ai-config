@@ -1625,3 +1625,10 @@ Open the PR.
   Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
   Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
 
+**One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
+[`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.
+It is scoped to the **target**, so a merge from an ai-config checkout into another repo is unaffected.
+
+- **Do:** merge a fully-clean ai-config PR without asking, and say in the same reply that you did and why it qualified.
+- **Don't:** read it as covering a PR that is not fully clean, or another repo's PR merged from an ai-config checkout.
+

@@ -1445,6 +1445,38 @@ That reading implied `main` was an ancestor of `origin/main` while
 The same session then misattributed `$?` twice more, in both forms above,
 while dupe-checking whether this very entry already existed.)
 
+**A history rewrite is the exotic cause of that zero; a squash merge is the routine one, and it makes the subject test fail by construction.**
+The case above reached its zero through a rewritten history, which is rare enough to read as a special case --- so the proxy looks weak rather than broken, and a reader can reasonably expect it to work on an ordinary repo.
+It does not.
+A squash merge writes **one** commit whose subject is the PR title, so a merged branch's own subjects never appear as subjects on `origin/main` at all.
+No rewrite is required, and nothing about the repo has to be unusual.
+
+The two scans differ, which is why the failure is deterministic rather than merely likely.
+A subject-scoped scan (`git log origin/main --oneline | grep`) reads only subjects, so it returns zero for **every** squash-merged branch commit.
+A message-scoped scan (`git log --grep`) also reads the body, so it hits when the squash body kept GitHub's default bullet list of branch messages, and misses when that body was rewritten.
+Measured on `Morrison-Lab/ai-config`, 2026-08-09, against PR #1283's branch commit `bd9bd5ae` (subject `fix: close the bare-form residual rather than tracking it`), squash-merged as `0e86ac34`:
+
+| check | result |
+|---|---|
+| subject-scoped grep over `--oneline` | 0 |
+| message-scoped `--grep` (`--fixed-strings`) | 1 |
+| `git merge-base --is-ancestor bd9bd5ae origin/main` | non-ancestor |
+| `git show origin/main:hooks/no-unreviewed-pr.py \| grep -c "_mark_uncertain"` | 3 |
+
+So three identity proxies disagree with each other while the content check settles it outright.
+The message-scoped hit is not a reprieve: 4 of the 5 most recent squash merges on that repo carry zero preserved bullets in their bodies, so the form that *can* hit usually does not either.
+
+The unifying statement is worth carrying past this procedure.
+**Whether a change landed is decided by looking for the change.**
+Ancestry, hashes, and subjects are all facts about commit *identity*, which a squash merge replaces by design --- and each fails toward "not merged" while the work is present, so all three mislead in the alarming direction.
+Verify a merge, and diagnose a divergence, with `git show <ref>:<path> | grep` for a string only that change introduced.
+[`memories/git.md`](../../memories/git.md) carries the ancestry half of this and the per-repo merge-strategy facts.
+
+- **Do:** decide "did this land?" by grepping the content at the ref, naming a string only that change introduced.
+- **Do:** treat a zero from a subject match in a squash-merging repo as carrying no information, rather than as evidence of orphaned work.
+- **Don't:** read `--is-ancestor` returning non-ancestor as "not merged" in a repo that squash-merges --- it returns that for every merged branch.
+- **Don't:** substitute a message-scoped `--grep` for the content check; it depends on whether the squash body was rewritten, which is nobody's invariant.
+
 ## In review
 
 Flag error handling that hides failure — swallowed exceptions, silent

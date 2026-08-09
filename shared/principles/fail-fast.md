@@ -1087,6 +1087,68 @@ with more than one `return True` path, whose paths read different variables.**
 - **Don't:** excuse an over-broad guard as the safe direction when the inputs
   it over-reports are the tool's main use case.
 
+**A rule you write down for one axis does not fire on the sibling axis in the
+same function, and having written it is what makes the sibling invisible.**
+The block above is a **disjunction**, where each clause is independently
+sufficient and the loosest sets the behaviour, so its tell is a predicate with
+more than one `return True` path reading different variables.
+This is a **conjunction**: both conditions must hold to grant, neither is
+sufficient alone, and that tell does not fire.
+What the two conditions share is not a clause shape but a *derivation* --- each
+reads the **first** hit of an ordered scan --- and the argument against that
+derivation was written out in full for one of them and never applied to the
+other.
+
+The prose is the aggravating factor rather than a mitigating one.
+A docstring arguing at length that reading the first of several matches is
+unsound, and prescribing denial on ambiguity, is a **specification**, and the
+code beneath it can satisfy that specification completely while a sibling
+reading in the same function violates it.
+So the check the "hazard comment is a predicate" block prescribes --- re-read
+the lines under the comment against the hazard it names --- **passes here**.
+Its scope is "the code directly beneath it", and the code directly beneath is
+correct.
+The violated reading sits elsewhere in the same function, or at the call site
+that supplies the function's argument, which is outside the neighbourhood any
+of these rules currently sweeps.
+
+Writing the argument is also what discharges the search.
+Having reasoned carefully about why first-match is unsound, the reasoning
+*feels* spent, so the one person positioned to notice the second instance is
+the one who has just convinced themselves the question is settled.
+That is the same-author, same-commit diagnostic the hazard-comment block
+already names, arriving through an argument rather than through a warning.
+
+The remedy is a grep rather than more care, because the derivation has a
+lexical signature.
+When you write down why a first-match, first-hit, or first-element reading is
+unsound, search the same function and the same module for every other reading
+of that shape --- an index `[0]`, a `next(...)`, a loop that `break`s on the
+first hit, a pattern list tried in order --- and apply the argument to each.
+Then apply the same denial the argument prescribes: derive the **whole** set of
+interpretations and require all of them to qualify, rather than trusting
+whichever one matched first.
+
+- **Do:** treat an argument against a first-match reading as a predicate over
+  every first-match reading in the same function and module, not only the one
+  it was written beside.
+- **Do:** re-derive the full set and require the whole set to qualify, which is
+  the same ambiguity test the argument already prescribes for its own axis.
+- **Do:** check the call site that supplies an argument, since a first-match
+  derivation upstream reaches the guard as an ordinary parameter.
+- **Don't:** count having written the reasoning as having applied it --- the
+  argument is a specification, and only the axis you were thinking about has
+  met it.
+- **Don't:** reach for the disjunction rule above here; enumerating
+  independently-sufficient clauses finds nothing when both conditions are
+  necessary and the defect is in how each one's input was computed.
+- **Don't:** read the hazard-comment rule as covering it either --- that rule
+  sweeps the lines beneath the comment, and those are the lines that already
+  comply.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A rule written for one axis
+does not fire on the sibling axis".
+
 **One level up from a partial guard: editing state that two consumers share
 regresses the consumer you were not looking at.**
 Every case above spreads a guard across *sites* --- emitters, discharge paths,

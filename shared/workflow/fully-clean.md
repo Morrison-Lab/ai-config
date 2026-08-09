@@ -292,6 +292,12 @@ Read it as the mirror of [`ardi`](ardi.md)'s "A systematic audit done by
 skimming is worse than the one-at-a-time version it replaces".
 That entry governs an audit *you* produce; this one governs an audit arriving
 *as evidence*.
+Both assume a lapse of care at some desk.
+For the author-side case where every figure was gathered carefully and the table
+simply went stale as later rounds changed the diff, see [`ardi`](ardi.md)'s
+"A verification table you write in the PR body is the same defect one artifact
+over" --- and note that its remedy is to re-derive by command at push time
+rather than to re-read, since reading is no instrument for a wrong count.
 
 The secondary signal is worth acting on rather than merely noting.
 A reviewer's reconstruction error usually traces to something genuinely

@@ -83,7 +83,7 @@ benefit from being citable, is a confirmed finding.
 
 ## This is KISS applied to definitions, not a separate rule
 
-Both shapes below are the prose/math counterpart of
+The shapes below are the prose/math counterpart of
 [`avoid-nesting`](../coding/avoid-nesting.md)'s "avoid ... nested function
 definitions": a definition, like a function, should do one job and stand on
 its own, and defining it inside another definition's scope is the same
@@ -119,6 +119,36 @@ than defining one and merely mentioning the other in passing.
 Two full definitions sharing one heading and one id is the finding; one
 definition whose statement happens to use the word "and" is not.
 
+**Shape 3: a definition div carries motivation, justification, or
+"why this matters" commentary that isn't part of the definition itself.**
+A definition div's job is to state what something *is*, precisely and
+citably.
+A sentence explaining why the definition is useful, reassuring the
+reader that a property is expected rather than a bug, or motivating the
+next section is a different kind of content --- true, often valuable,
+and not part of the thing being defined.
+Left inside the div, it does the same damage nesting does: a reader who
+wants to cite "what X is" gets X's precise statement bundled with
+opinion about X, and the div grows past the one job it exists to do.
+
+The tell is a sentence inside a `{#def-...}`/`{#thm-...}` div that could
+be deleted without changing what the defined quantity or claim *is* ---
+only how well-motivated it feels.
+"It is maximized at the same $\lambda$, and is easier to work with
+because the logarithm turns products into sums" explains why a
+log-likelihood definition is convenient; it adds nothing to what the
+definition states.
+"This is a documented property ... not a bug" reassures rather than
+specifies.
+Both are candidates for extraction.
+
+Not everything inside a definition div is commentary, though.
+A worked-out detail needed to state the definition precisely --- a
+finite-difference approximation's step size, a fallback's exact
+condition --- is part of the specification, not motivation for it.
+The test is whether removing the sentence changes what a reader would
+need to *compute* or *cite*, not just how *persuaded* they would be.
+
 ## Fixing a confirmed finding
 
 1. **Wrap it in its own formal-definition div**, with its own id and
@@ -135,6 +165,11 @@ definition whose statement happens to use the word "and" is not.
    "riding along" case above), **split it out** rather than leaving both
    concepts sharing one id --- each gets its own div, its own id, and its
    own example.
+5. If it's shape 3's motivation/justification commentary rather than a
+   second concept, **move it to a `::: notes` aside** immediately after
+   the definition div, rather than deleting it --- the document's own
+   convention already uses `::: notes` throughout for exactly this kind
+   of "why this matters" content, so the fix is relocation, not loss.
 
 ## Relationship to other checks
 

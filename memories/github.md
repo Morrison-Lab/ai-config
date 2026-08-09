@@ -237,6 +237,20 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   (`ucdavis/bcs`, 2026-07-30: an agent driving #473 was handed #468's "Needs more work" verdict, with two HIGH findings about restricted-data handling, and was three sentences into treating them as #473's before the body's own `## Code Review: ucdavis/bcs#468` header caught it.
   The same query had been used for two earlier rounds and was right both times, by luck.)
 - **Finding the PR(s) linked to an issue from the CLI: use the REST timeline endpoint, not `gh issue view --json`.** `gh issue view --json` has no `timelineItems` field (that exists only on `gh pr view --json`), so `gh issue view <N> --json timelineItems` errors — and a `2>/dev/null` swallows the error so the check silently returns nothing and *looks* like it passed. Query the timeline instead, with three gotchas: (1) in a `cross-referenced` event, `source.type` is always `"issue"`, so a PR is one whose `source.issue.pull_request` is non-null (`source.type == "pull_request"` never matches); (2) `--paginate` is required, or `gh api` returns only the first 30 events and silently misses a later cross-reference; (3) filter `source.issue.state` if you only want open PRs. Full call: `gh api --paginate repos/<o>/<r>/issues/<N>/timeline --jq '.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"'`. (Learned over three review rounds on #287.)
+- **Whether `#N` is an issue or a PR is decided by the `pull_request` key, and `gh issue view` cannot decide it.**
+  GitHub's REST API models every PR as an issue, so `gh issue view <N>` resolves a **PR** number too, returning its
+  `state` (`MERGED`) as though it were an issue's --- a success there is evidence of nothing.
+  Only `gh pr view <N>` discriminates, and it does so by *failing* on an issue
+  (`Could not resolve to a PullRequest`), so the informative answer is an error rather than a value, which is easy to
+  read as a broken command.
+  One call answers it directly: `gh api repos/<o>/<r>/issues/<N> --jq '.pull_request != null'` --- `true` for a PR,
+  `false` for an issue.
+  Reach for it whenever two sources disagree about what `#N` is, rather than trusting whichever one resolved;
+  per `metacognitive-monitoring.md`, a two-source disagreement is a prompt for a third check, not a finding.
+  (Measured 2026-08-09 on `Morrison-Lab/ai-config`: `#1328` returns `false` and `#1334` returns `true`, while
+  `gh issue view 1334` returns `{"number":1334,"state":"MERGED",...}` without complaint.
+  Same key the timeline bullet above relies on.
+  What it adds is that the plain `gh issue view` path answers for both kinds, and so distinguishes neither.)
 - **`gh pr checks` does NOT say which checks are REQUIRED, and the legacy protection endpoint 404s on ruleset-gated repos — so the lazy check confirms the wrong answer.** `gh pr checks` reports check *state* only; required-ness is nowhere in its output. And `gh api repos/<o>/<r>/branches/<branch>/protection` returns `404 Branch not protected` on a repo that gates the branch with a **ruleset** rather than legacy branch protection, which reads as "nothing is required" and *confirms* the mistaken assumption. Query rulesets too, before any "ready to merge" or "that check doesn't gate us" claim:
   ```bash
   gh api "repos/<o>/<r>/rulesets" --jq '.[] | "\(.id) \(.name) \(.target) \(.enforcement)"'

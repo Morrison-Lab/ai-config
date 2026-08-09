@@ -44,3 +44,32 @@ The dupe-check then found #815 already covering it, so the correct action was
 a comment carrying the new evidence --- not a new issue at any number.
 Both halves had to be repaired: a correction comment on the PR withdrawing
 the citation, and the evidence re-posted onto #815.)
+
+## "Never name an issue number before the issue exists" --- ai-config#1328 in a source comment
+
+(Corrected 2026-08-09, an ai-config session: a comment in
+`scripts/test_check_context_closure.py` cited `ai-config#1328` for the change
+the same commit was about to make, guessed from the recent numbering before
+the PR existed.
+It opened as #1334 and merged as `a8bd2604`.
+`#1328` is a real, closed, unrelated item, so the citation resolved and
+nothing looked broken;
+it is also an issue rather than a PR, which the comment got wrong as well.
+The wrong number reached `main` and was corrected on a later PR's merge
+commit, `3b9d4834`.
+
+Two things distinguish this from the #821 record above, and neither is a new
+rule.
+The surface was a tracked source comment rather than a PR comment, so no
+reviewer read it as a citation and no instrument saw it:
+`scripts/check-links.py`'s `SCAN_GLOBS` cover `shared/`, `skills/`, and
+`*.md`, never `scripts/`, and it matches only Markdown link syntax.
+And the artifact cited was the PR that this very commit would open, so the
+section's remedy --- create first, then cite the identifier the create call
+returned --- is unavailable in one pass, because the commit has to exist
+before the PR does.
+That is what made the rule read as inapplicable at the moment of writing.
+Either ordering restores it: commit, open the PR, then amend the comment with
+the number the API returned;
+or cite nothing numeric and name the change and its destination path, which a
+reader can check against the filesystem.)

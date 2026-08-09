@@ -1265,6 +1265,140 @@ silent-discharge bug this section exists to prevent.
 - **Don't:** trade a safe-direction over-warn for fewer nags --- that is the
   move that grows a silent-discharge hole.
 
+## An empty substitution changes what the command operates on
+
+Every case in "In a check you run by hand" above is a check whose failure
+path and pass path print the **same** thing.
+This one prints a **different** thing, and that is worse: there is no missing
+output to notice, just a plausible answer to a question you did not ask.
+
+A command substitution that yields nothing does not leave a hole in the
+command line.
+It vanishes, and whatever consumed it falls back to a default:
+
+```bash
+git log --oneline -1 $(git merge-base main origin/main)
+```
+
+With no merge base --- two histories genuinely unrelated --- `git merge-base`
+prints nothing, and `git log --oneline -1` receives **no revision argument**,
+so it reports `HEAD`.
+The output is a real commit, correctly formatted, and it is the local tip
+being presented as the merge base.
+
+Note which guards this defeats.
+The command does not error, its exit status is 0, no locale is involved, and
+the output has exactly the expected shape.
+The tell is only that the answer contradicts something else you measured ---
+here, `--is-ancestor` disagreeing --- so it survives any amount of re-reading
+the command itself.
+
+Capture the substitution, test it, and quote it:
+
+```bash
+base="$(git merge-base main origin/main)"
+if [ -z "$base" ]; then
+  echo "no merge base: histories are unrelated" >&2   # a finding, not an error
+else
+  git log --oneline -1 "$base"
+fi
+```
+
+The quoting matters independently of the emptiness check: `cmd "$base"` with
+an empty value passes a visible empty argument, which most commands reject,
+while `cmd $base` passes nothing at all.
+
+### `$?` belongs to the last thing evaluated, not the interesting thing
+
+Two attribution traps in the same family, both of which make a status line
+describe a command other than the one under judgment:
+
+```bash
+grep -q PATTERN file | head                  # rc is head's
+echo "hits: $(wc -l < out.txt) (rc=$?)"      # $? is wc's, not the earlier grep's
+```
+
+The second is the subtler one, because the `$?` sits inside the sentence
+describing the grep.
+The substitution runs first, so the status reported belongs to it.
+
+- **Do:** assign a substitution to a variable, check it for emptiness, and
+  quote it at the point of use.
+- **Do:** treat "no output" from a query command as a **result** to report,
+  since it is frequently the informative answer rather than a failure.
+- **Don't:** read a command's output as an answer about an argument that came
+  from an unchecked substitution.
+- **Don't:** write `$?` after a pipeline or a substitution and label it with
+  the name of an earlier command.
+
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md)'s "A pipe
+discards the status of everything left of it" covers the neighbouring
+mechanism and is worth reading alongside this.
+The two are not the same failure: there, a pipeline's status is genuinely
+*lost* and `set -e` never fires on it, which `pipefail` fixes.
+Here the status is fine and the **read** of it is misdirected, so `pipefail`
+changes nothing --- the `$?` was simply evaluated after something else.
+
+### A proxy that answers a narrower question passes the same way
+
+The same session hit the pattern one level up, in a **recovery procedure**
+rather than a single command.
+
+`CLAUDE.md`'s "Keep ai-config and repo checkouts fresh" step for a diverged
+local `main` says to spot-check a few divergent commit messages against
+`origin/main`, and to realign if they do not appear there.
+That grep answers "were these commits replayed under new hashes", which is
+only **one** of two ways the content can already be safe.
+It returns zero hits in the reassuring case and the alarming case alike, so
+its answer does not discriminate between them.
+
+Measured on `Morrison-Lab/ai-config`, where the two halves disagreed
+outright:
+
+| check | result |
+|---|---|
+| sampled local commit messages found on `origin/main` | 0 of 4 |
+| files those commits touched, present on `origin/main` | 4 of 4 |
+| paths on local `main` absent from `origin/main` | 0 |
+
+The proxy said "orphaned"; the content had in fact landed under a rewritten
+history.
+Both readings license the same action, which is exactly why a weak test
+survives: it is usually right, and it is right for a reason it did not
+check.
+
+Ask the question the decision actually turns on --- whether realigning would
+**lose** anything:
+
+```bash
+comm -23 <(git ls-tree -r --name-only main | sort) \
+         <(git ls-tree -r --name-only origin/main | sort)
+```
+
+Empty output means every path on local `main` also exists on `origin/main`.
+Spot-check a few of those files' contents too, since identical paths do not
+guarantee identical content.
+And note that `git merge-base --all main origin/main` printing **nothing**
+is the positive signal for the orphaned-snapshot case, since it separates
+*unrelated* histories from merely divergent ones --- which is what a stale
+pre-rewrite snapshot looks like from the inside.
+A realign only moves a local ref, so the discarded tip stays recoverable
+via `git reflog` either way.
+
+- **Do:** ask what a proxy check would report in the case you are worried
+  about, not only in the case you expect.
+- **Don't:** accept a check that is right for a reason it never tested, when
+  the deciding question is one command away.
+
+(`Morrison-Lab/ai-config`, 2026-08-09, post-merge cleanup: local `main` and
+`origin/main` had **no merge base at all**, and
+`git log --oneline -1 $(git merge-base main origin/main)` duly printed local
+`main`'s own tip, which was read as the merge base.
+That reading implied `main` was an ancestor of `origin/main` while
+`git merge-base --is-ancestor` in the same block reported it was not.
+The same session then misattributed `$?` twice more, in both forms above,
+while dupe-checking whether this very entry already existed.)
+
 ## In review
 
 Flag error handling that hides failure — swallowed exceptions, silent

@@ -894,6 +894,10 @@ execute in the WRONG repository.
   a failed `cd` leaves the writes running in the project repo rather than
   stopping.
 
+**A main session has been measured RESETTING**, so don't infer persistence
+from being in a main session.
+Read the printed `Shell cwd was reset` line, per [`git-worktrees.md`](git-worktrees.md).
+
 (2026-08-03: `cd /tmp/rpt-test && cat > .github/workflows/... && git commit &&
 git push` ran in the `gha` repo -- clobbering a workflow file on a stray branch
 -- because the `cd` target was wrong and there was no `set -e` to stop the

@@ -208,6 +208,53 @@ the bullets in this fragment record it failing at this exact boundary.
       green because it correctly validated the older head, and the session's
       own recollection agrees with the reply.
 
+**Review a round's fixes as one diff, not as N independent fixes: two of them,
+each correctly addressing its own finding, can compose into a defect neither
+introduces alone.**
+Every check in this loop is scoped to a single finding.
+You read finding A, fix it, satisfy yourself; you read finding B, fix it,
+satisfy yourself; and nothing at any point looks at the two together.
+So the composition is the one thing in the round that nobody examined, and the
+next round's reviewer is no better placed, because it sees a diff rather than
+the sequence that produced it.
+
+The shape to watch for is a pair of fixes that touch **the same mechanism from
+opposite ends** --- one relaxing a guarantee, the other adding a consumer that
+depended on it.
+Relaxing a step from fail-hard to best-effort is the classic first half, since
+that is the standard remedy for "this shouldn't fail the job".
+Making something downstream fire on that step's *precondition* rather than on
+its *outcome* is the classic second.
+Individually those are both right.
+Together, the downstream action runs on a run where the upstream one silently
+did nothing.
+
+The tell is free, and it is the commit you are about to write: if its message
+needs more than one numbered item, the round changed more than one thing, and
+the items are worth reading against each other before pushing.
+Ask specifically whether any fix **weakened a property** another fix now relies
+on.
+
+- **Do:** re-read the round's full diff as a unit once every finding is
+  addressed, before running the pre-push checklist.
+- **Do:** treat a multi-item commit message as the prompt to check the items
+  against each other.
+- **Don't:** conclude the round is sound because each finding's fix is sound;
+  that is a claim about the parts.
+- **Don't:** rely on the next review round to catch it --- it may, but it is
+  then spending a round on something the previous round created.
+
+(Morrison-Lab/gha#440, 2026-08-09: round 1 made a notice-posting step
+best-effort (`|| echo "::warning::"`) in response to one finding, and in the
+same commit extended a collapse step's `if:` to that step's path in response to
+another.
+Each was correct.
+Together, a run whose post failed would fold the *previous* run's notice and
+post nothing, leaving the PR with a gray gate and no explanation --- the exact
+symptom the PR existed to fix, reproduced in a single run.
+Round 2 caught it; reading the two-item commit message against itself would
+have.)
+
 **A clean verdict does not certify that your diff contains only what you
 meant, because a reviewer cannot tell an accident from a decision.**
 Every check above tests whether the diff is *correct*.

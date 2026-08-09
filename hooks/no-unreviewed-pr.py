@@ -21,6 +21,30 @@ a hook rather than a rule to remember:
     a PR was created or marked ready this session
     AND no reviewer request came after it
 
+A reviewer request is per-HEAD, not per-PR, so the same obligation re-arms on
+every push that re-heads a tracked PR. Without that the guard is armed once and
+PERMANENTLY discharged by the first request: round 2 pushes a new head, nothing
+re-arms, and the PR carries a review of a commit that is no longer its head
+(ai-config#1274, where round 1's Copilot request at 6a4101e5 was never renewed
+at 76e619aa and nothing warned).
+
+Attribution is the hard part, and it is answered by EXCLUSION rather than by
+guessing. A push almost never names the PR it re-heads. Measured over this
+machine's transcript corpus (204 transcripts, 20102 tool_use records): 718
+`git push` commands, against 51 tool results anywhere carrying a PR's
+`headRefName`. So branch-matching a push to a PR is unavailable for most
+pushes, and a guard built on it would rarely fire.
+So a push re-arms only when the session has exactly ONE live tracked PR, which
+is the case where the push has only one PR it COULD re-head. With two or more
+the push is genuinely unattributable and nothing is re-armed: arming all of
+them would demand N requests for one push and wedge the session, which costs
+more than the gap it closes.
+
+Arming is the SAFE direction (an over-warn), so unlike every discharge path it
+does not wait for a result and does not read `is_error`. Only releasing changes
+need positive evidence of success -- see shared/principles/fail-fast.md, "A
+guard's discharge fires on positive success".
+
 Correlation is by tool_use identity, not by position or by a scalar
 timestamp. Three facts make that necessary, each an independently-reproduced
 bug in the position/timestamp model this replaces:
@@ -330,6 +354,56 @@ def draft_ident(cmd):
     return False, None, None, False
 
 
+def _argv_push(argv):
+    """True if argv is a `git push` that genuinely re-heads a branch.
+
+    Structural, exactly like _argv_request/_argv_draft: `git push` counts only
+    as the argv of an actual `git` invocation, never as a quoted example inside
+    another command's string argument (this hook's own docs and tests are full
+    of literal `git push` text, which must not arm anything).
+
+    Global options are skipped so `git -C <dir> push` and `git -c k=v push`
+    are recognised. Two push forms are excluded because they do NOT re-head the
+    branch, so no new head exists to review: `--dry-run`/`-n` performs no push
+    at all, and `--delete`/`-d` removes a ref rather than advancing one.
+    """
+    if not argv or argv[0] != "git":
+        return False
+    i = 1
+    while i < len(argv):                 # skip git's own global options
+        a = argv[i]
+        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+            i += 2
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        break
+    if i >= len(argv) or argv[i] != "push":
+        return False
+    return not _has_flag(argv[i + 1:], "--dry-run", "-n", "--delete", "-d")
+
+
+def push_ident(cmd):
+    """True if `cmd` contains a genuine `git push` simple command.
+
+    Deliberately returns no `last` flag, unlike request_ident/draft_ident/
+    close_ident/probe_ident. Those all decide a RELEASING change, which may fire
+    only on positive evidence of its own success, so each needs to know whether
+    the call's is_error belongs to it. Arming is the safe over-warn direction, so a
+    push arms whether it succeeded or not -- a failed push that arms costs one
+    warning, while waiting for proof would silently skip a real new head
+    whenever the push shared a call with anything else (which, measured on this
+    corpus, is nearly every push).
+
+    Fails toward NOT-a-push on a parse error, so a malformed command never arms.
+    """
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return False
+    return any(_argv_push(a) for a in cmds)
+
+
 def _argv_close(argv):
     """(is_close, num, repo) for one simple command's argv: a terminal action.
 
@@ -459,6 +533,9 @@ SHELL_TOOLS = {"Bash", "bash", "run_command"}
 OPEN_TOOLS = {"create_pull_request", "mcp__github__create_pull_request"}
 EDIT_TOOLS = {"update_pull_request", "mcp__github__update_pull_request"}
 REQ_TOOLS = {"request_copilot_review", "mcp__github__request_copilot_review"}
+# Structured tools that commit to a branch, re-heading whatever PR it backs.
+PUSH_TOOLS = {"push_files", "mcp__github__push_files",
+              "create_or_update_file", "mcp__github__create_or_update_file"}
 CLOSE_TOOLS = {"merge_pull_request", "mcp__github__merge_pull_request"}
 
 # A result body reporting that a PR has reached a terminal state -- merged or
@@ -548,7 +625,7 @@ def result_ident(body):
     return None, None
 
 
-def _new_obl(num, repo, tid, self_, slast, srnum, srrepo):
+def _new_obl(num, repo, tid, self_, slast, srnum, srrepo, push=False):
     """One outstanding-open record.
 
     `self_` marks an open whose SAME action also requested a reviewer, so the
@@ -556,9 +633,272 @@ def _new_obl(num, repo, tid, self_, slast, srnum, srrepo):
     carry that request's ordering and target so the `self` discharge can apply the
     same fail-safe guard as pending[tid] (discharge only on a last/atomic,
     same-PR, non-failed request). They are unread when `self_` is False.
+
+    `push` marks an obligation re-armed by a push rather than by an open, so the
+    warning can say the head moved instead of claiming the PR was never
+    reviewed at all.
     """
     return {"num": num, "repo": repo, "tid": tid, "self": self_,
-            "slast": slast, "srnum": srnum, "srrepo": srrepo}
+            "slast": slast, "srnum": srnum, "srrepo": srrepo, "push": push}
+
+
+# A PR number seen in two DIFFERENT repositories. `live` is keyed by number
+# alone -- deliberately, because a number's repo is often unknown at append time
+# and backfills from the result, so keying by (num, repo) would file one PR
+# under two keys and permanently suppress arming. The cost is that the same
+# number in two repos collapses to one key, which would report ONE live PR when
+# there are two and arm a push that is genuinely unattributable. Marking the
+# number ambiguous keeps the exactly-one-live rule honest instead.
+_AMBIGUOUS = object()
+
+
+def _note_live(live, num, repo):
+    """Record a PR this session opened or readied, once its number is known."""
+    if num is None:
+        return
+    prev = live.get(num)
+    if prev is _AMBIGUOUS:
+        return
+    if prev is not None and repo is not None and prev != repo:
+        live[num] = _AMBIGUOUS      # same number, two repositories
+        return
+    live[num] = repo or prev
+
+
+def _turn_transitions(blocks):
+    """(PR number, tool_use_id) THIS turn drafts or retires; number None if
+    unresolved.
+
+    The arm and the transitions run on different clocks, and that difference is
+    the whole defect. An arm fires synchronously while the tool_use is read; a
+    draft or terminal transition is DEFERRED to its own tool_result, for the
+    fail-safe reason that a releasing change may fire only on positive evidence
+    it succeeded. So at the moment an arm fires, no transition from the same
+    turn has been applied yet, and `live` still holds a PR the turn is about to
+    retire.
+
+    Scoping the check to the push's OWN command closed only the case where both
+    sit in one chained Bash line. A turn can just as well carry them as separate
+    tool_use blocks, and then neither order helps: read the push first and the
+    sibling's transition is not registered yet, read it second and the
+    transition is registered but still deferred. Asking about the TURN answers
+    both, and subsumes the chained case, since the push's own block is one of
+    the blocks examined here.
+
+    A transition in an EARLIER turn is not a race: its tool_result arrives in
+    the user message before the next assistant turn, so it has already been
+    applied by the time any later arm fires.
+
+    Returning a bare boolean was wrong, and wrong in the DANGEROUS direction. A
+    turn-wide flag suppressed the arm for the live PR whenever any transition
+    appeared anywhere in the turn, including one for a different, untracked PR
+    -- the routine "merge an approved PR while still pushing fixes on the one I
+    am driving" shape. That is a silent under-warn: the tracked PR gets a new
+    head, nothing arms, and the guard never reports the very thing it exists
+    for. So identity is resolved here exactly as every other function in this
+    file resolves it, from the specific command rather than from anything else
+    in the turn.
+
+    `None` means a transition whose PR could not be resolved -- a bare
+    `gh pr merge` or `gh pr ready --undo`, which act on the CURRENT branch's PR.
+    Those suppress, on the same reasoning _note_drafted uses for the bare form:
+    with one live PR the current branch's PR is that one.
+
+    `gh pr create --draft` is deliberately NOT a target. It OPENS a new draft
+    rather than transitioning a live PR, so treating it as one suppressed the
+    arm for an unrelated PR that was never touched.
+
+    Each transition carries its own tool_use_id, because knowing that a turn
+    ATTEMPTED a transition is not knowing that the transition HAPPENED. The
+    attempt is all this function can see -- it reads tool_use blocks, and a
+    result exists for none of them yet -- so an arm suppressed on the attempt
+    alone is suppressed on no evidence. A `gh pr ready --undo` that fails
+    leaves the PR ready, unreviewed, and freshly re-headed by the push, which
+    is the exact silent under-warn this hook exists to report. The id is what
+    lets _rearm DEFER the decision to that transition's own result, the same
+    way pending_clear and pending_close already defer their discharges.
+
+    Fails toward "no transition" on anything unparseable, which only permits an
+    arm -- the over-warn direction, per shared/principles/fail-fast.md.
+    """
+    out = []
+    for b in blocks:
+        if not isinstance(b, dict) or b.get("type") != "tool_use":
+            continue
+        name = b.get("name") or ""
+        tid = b.get("id")
+        inp = b.get("input")
+        inp = inp if isinstance(inp, dict) else {}
+        if name in CLOSE_TOOLS:
+            out.append((input_ident(inp)[0], tid))
+            continue
+        if name in EDIT_TOOLS:
+            if inp.get("draft") is True \
+                    or str(inp.get("state") or "").lower() == "closed":
+                out.append((input_ident(inp)[0], tid))
+            continue
+        if name in SHELL_TOOLS:
+            cmds = _simple_commands(inp.get("command") or "")
+            if cmds is None:
+                continue
+            for argv in cmds:
+                ok, num, _repo = _argv_close(argv)
+                if ok:
+                    out.append((num, tid))
+                    continue
+                # `gh pr ready [<N>] --undo` only. The create form that
+                # _argv_draft also matches opens a new PR instead.
+                if len(argv) >= 3 and argv[0] == "gh" and argv[1] == "pr" \
+                        and argv[2] == "ready" and _has_flag(argv[3:], "--undo"):
+                    out.append((_verb_ident(argv)[0], tid))
+    return out
+
+
+def _note_drafted(live, num):
+    """A PR went back to draft, so it leaves the live set and stops re-arming.
+
+    The number is frequently absent: a bare `gh pr ready --undo` is the ordinary
+    way to draft the CURRENT branch's PR, exactly as a bare `gh pr ready` is the
+    ordinary way to ready it, so draft_ident yields num=None. Popping only on a
+    known number would leave the entry in `live` and let a later push re-arm
+    review for a PR that is legitimately drafted and needs none.
+
+    With one live PR the bare form is unambiguous -- that PR is the one on the
+    current branch -- so it is popped outright. With several, the transition
+    cannot be attributed to any of them, and the honest answer is that `live` no
+    longer supports the exactly-one-live rule _rearm depends on: every entry is
+    marked ambiguous, which withholds arming rather than guessing which PR is
+    still ready.
+    """
+    if num is not None:
+        live.pop(num, None)
+    elif len(live) == 1:
+        live.clear()
+    else:
+        for key in live:
+            live[key] = _AMBIGUOUS
+
+
+def _mark_uncertain(live, uncertain, num):
+    """Record that a transition may have retired a PR, without proof that it did.
+
+    The number is frequently absent, for the reason _note_drafted gives: a bare
+    `gh pr merge` or `gh pr ready --undo` is the ordinary way to act on the
+    CURRENT branch's PR. The same tie-break applies here -- with one live PR the
+    bare form is unambiguous, so that PR is the one marked.
+
+    With several the transition cannot be attributed, and nothing is marked.
+    That costs nothing: two or more live PRs already withhold the arm on their
+    own, so there is no rival to de-count and no arm to rescue.
+    """
+    if num is None and len(live) == 1:
+        num = next(iter(live))
+    if num is not None:
+        uncertain.add(num)
+
+
+def _rearm(obligations, live, tid, turn_targets=(), pending_arm=None,
+           uncertain=()):
+    """Re-arm the reviewer obligation for the sole live PR, if a push earns it.
+
+    Three gates, each of which alone withholds the arm:
+
+      * EXACTLY ONE live PR, counting only the CERTAIN ones (see `uncertain`
+        below). With none the push belongs to no tracked PR at all (the
+        overwhelming majority of pushes -- a session that opened no PR must
+        never be nagged). With two or more the push is unattributable, and
+        arming every candidate would demand N requests for one push and wedge
+        the session.
+      * NO obligation already outstanding for that PR. Without this, N pushes
+        between two requests stack N obligations that one request cannot clear,
+        so the guard would nag forever after the user did exactly what it asked.
+      * A number is known. An obligation with num=None can never be cleared by
+        _clear(), so arming one would wedge the session.
+
+    The synthetic `tid` can never equal a real tool_use_id, so a re-armed
+    obligation is never mistaken for the open that a tool_result resolves.
+
+    A same-turn transition targeting this PR DEFERS the arm rather than
+    cancelling it. Suppressing outright treated the mere ATTEMPT as proof the
+    PR was retired, and a transition that fails retires nothing: the PR stays
+    ready, the push still re-headed it, and nothing would ever report it. That
+    is the silent under-warn direction, and withholding an arm has the same
+    effect as discharging one, so it owes the same positive evidence every
+    other releasing path here owes (shared/principles/fail-fast.md). The
+    candidate is parked under the transition's own tool_use_id and resolved by
+    _resolve_arm when that result arrives.
+
+    `uncertain` holds PRs a transition tried to retire without an attributable
+    result. Membership in `live` answers two questions that pull in OPPOSITE
+    safe directions once the answer is uncertain, which is why one flag cannot
+    serve both:
+
+      * "may a future push arm THIS PR?" -- keeping it is the over-warn
+        direction, so an uncertain entry is still armable.
+      * "does this entry make the push unattributable?" -- keeping it is the
+        UNDER-warn direction, because a stale entry pushes the count past one
+        and silently disables arming for every OTHER PR for the rest of the
+        session.
+
+    So an uncertain entry is skipped when counting rivals, and armed only when
+    it is the sole live PR. A PR merged by a command chained ahead of a push no
+    longer suppresses a later, unrelated PR's arm, while the sole-PR recovery
+    that bounds the cost of ambiguity is kept.
+    """
+    certain = {n: r for n, r in live.items() if n not in uncertain}
+    if len(certain) == 1:
+        num, repo = next(iter(certain.items()))
+    elif not certain and len(live) == 1:
+        num, repo = next(iter(live.items()))
+    else:
+        return
+    if num is None or repo is _AMBIGUOUS:
+        return
+    # This turn is drafting or retiring THIS PR, so the arm waits for that
+    # transition's result. A transition for some OTHER PR is none of this
+    # push's business and does not defer anything.
+    hits = [t for (tnum, t) in turn_targets if tnum is None or tnum == num]
+    if hits:
+        if pending_arm is not None:
+            for ttid in hits:
+                pending_arm.setdefault(ttid, tid)
+        return
+    for ob in obligations:
+        if ob["num"] == num and _repo_ok(ob["repo"], repo):
+            return
+    obligations.append(
+        _new_obl(num, repo, "rearm:%s" % (tid,), False, False, None, None,
+                 push=True))
+
+
+def _resolve_arm(pending_arm, rid, failed, obligations, live, uncertain=()):
+    """Settle an arm a same-turn transition deferred, now that its result is in.
+
+    Fires only on POSITIVE evidence the transition FAILED. That asymmetry is
+    deliberate, and it is narrower than "not confirmed to have succeeded":
+
+      * FAILED -- the transition did not happen, so the PR is still ready and
+        the push that re-headed it still owes a reviewer. Arm.
+      * SUCCEEDED -- the PR is drafted or retired and owes nothing. Withhold.
+      * AMBIGUOUS -- a transition chained ahead of another command shares one
+        combined exit status, which belongs to the LAST command, so this call
+        cannot attribute an outcome to the transition at all (the combined
+        -result rule in shared/principles/fail-fast.md). Withhold, which is what
+        the draft and terminal discharges in this same call already do on the
+        same input: an ambiguous call changes nothing in either direction
+        rather than acting on ambiguity in one of them.
+
+    Withholding on ambiguity is bounded in a way a wrong discharge is not: the
+    PR stays in `live` precisely because that same ambiguity withheld its own
+    pop, so the NEXT push re-arms. The miss costs one push, not the session.
+
+    _rearm re-runs its own gates here, so a sibling transition that succeeded
+    earlier in this same result message has already removed the PR from `live`
+    and no arm fires.
+    """
+    ptid = pending_arm.pop(rid, None)
+    if ptid is not None and failed:
+        _rearm(obligations, live, ptid, uncertain=uncertain)
 
 
 def _repo_ok(a, b):
@@ -601,6 +941,17 @@ def scan(path):
     pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
     pending_close = {}  # tool_use_id -> (num, repo) for merge/close actions
     pending_probe = {}  # tool_use_id -> (num, repo) for single-PR status reads
+    # transition tool_use_id -> the push tool_use_id whose arm it deferred. An
+    # arm may not be cancelled by a transition that merely tried and failed.
+    pending_arm = {}
+    # PR numbers a transition tried to retire without an attributable result.
+    # They stay armable on their own, and stop counting as rivals that would
+    # make some LATER PR's push unattributable. See _rearm.
+    uncertain = set()
+    # num -> repo for PRs this session opened or readied and still open. A
+    # PR leaves on a draft transition and on any terminal state, so a later
+    # push never re-arms review for a PR that can no longer take one.
+    live = {}
     text = ""
     with open(path, errors="ignore") as fh:
         for line in fh:
@@ -611,6 +962,12 @@ def scan(path):
             blocks = (m.get("message") or {}).get("content") or []
             if not isinstance(blocks, list):
                 continue
+            # Which PRs THIS turn drafts or retires, computed over the whole
+            # turn before any of its blocks are read -- a sibling call is
+            # invisible to the push's own command, in either block order. Only
+            # a transition targeting the live PR defers its arm, and only that
+            # transition's own result decides whether the arm is cancelled.
+            turn_targets = _turn_transitions(blocks)
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -672,6 +1029,9 @@ def scan(path):
                             ob["num"] = rnum
                         if ob["repo"] is None and rrepo:
                             ob["repo"] = rrepo
+                        # A create's number is knowable only here, so this is
+                        # where most PRs enter the live set.
+                        _note_live(live, ob["num"], ob["repo"])
                         # A `self` obligation (an open whose SAME action also
                         # requested a reviewer -- `gh pr create --reviewer`,
                         # `create_pull_request(reviewers=[...])`, or a create
@@ -756,6 +1116,21 @@ def scan(path):
                         clear_failed = (not clast) or failed
                         if not clear_failed:
                             _clear(obligations, cnum, crepo)
+                            _note_drafted(live, cnum)
+                            uncertain.discard(cnum)
+                        elif failed:
+                            # It certainly did NOT retire the PR.
+                            uncertain.discard(cnum)
+                        else:
+                            # Non-last, non-failed: the outcome is unknowable,
+                            # so the PR stays armable but stops blocking a
+                            # later PR's arm.
+                            _mark_uncertain(live, uncertain, cnum)
+                        # This same result settles any arm the draft deferred:
+                        # a draft that FAILED left the PR ready, so the push
+                        # that re-headed it still owes a reviewer.
+                        _resolve_arm(pending_arm, rid, failed, obligations,
+                                     live, uncertain)
                     # A PR that MERGED or CLOSED is past the point where a
                     # reviewer request does anything: the POST this guard
                     # prescribes returns HTTP 200 on a merged PR and adds
@@ -770,8 +1145,27 @@ def scan(path):
                     # discharge above does.
                     if rid in pending_close:
                         xnum, xrepo, xlast = pending_close.pop(rid)
+                        # Same settlement as the draft clear above: a merge or
+                        # close that FAILED retired nothing, so an arm it
+                        # deferred is owed after all.
+                        _resolve_arm(pending_arm, rid, failed, obligations,
+                                     live, uncertain)
                         if xlast and not failed:
-                            _clear(obligations, xnum or rnum, xrepo or rrepo)
+                            xnum, xrepo = xnum or rnum, xrepo or rrepo
+                            _clear(obligations, xnum, xrepo)
+                            # Terminal, so it can gain no further reviewable
+                            # head: it leaves the live set, and no later push in
+                            # this session re-arms review for it.
+                            live.pop(xnum, None)
+                            uncertain.discard(xnum)
+                        elif failed:
+                            uncertain.discard(xnum or rnum)
+                        else:
+                            # A terminal command chained ahead of something
+                            # else. Whether it retired the PR is unknowable, so
+                            # the entry stays for its own sake and stops
+                            # counting against a later PR (see _rearm).
+                            _mark_uncertain(live, uncertain, xnum or rnum)
                     # A PR merged OUTSIDE this session (by a human, or by the
                     # merge queue) leaves no action in the transcript -- only an
                     # observation. Discharged on POSITIVE evidence only: the
@@ -781,6 +1175,7 @@ def scan(path):
                         pnum, prepo, plast = pending_probe.pop(rid)
                         if plast and not failed and RX_TERMINAL_STATE.search(body):
                             _clear(obligations, pnum, prepo)
+                            live.pop(pnum, None)
                     continue
 
                 if kind != "tool_use":
@@ -803,6 +1198,15 @@ def scan(path):
                         obligations.append(_new_obl(
                             num, repo, tid, bool(inp.get("reviewers")),
                             True, num, repo))
+                        _note_live(live, num, repo)
+                    continue
+                if name in PUSH_TOOLS:
+                    # These commit to a named branch, which re-heads whatever PR
+                    # that branch backs. A write to the default branch is not a
+                    # PR head, so it never arms.
+                    if str(inp.get("branch") or "") not in ("", "main", "master"):
+                        _rearm(obligations, live, tid, turn_targets,
+                               pending_arm, uncertain)
                     continue
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
@@ -811,6 +1215,8 @@ def scan(path):
                         # merge. Atomic tool, so is_error reflects THIS change.
                         pending_close[tid] = (num, repo, True)
                         continue
+                    if inp.get("draft") is False:
+                        _note_live(live, num, repo)
                     if inp.get("draft") is True:
                         # Converting a ready PR back to draft defers review, but
                         # only if it SUCCEEDS. Clearing at tool_use time would
@@ -873,6 +1279,7 @@ def scan(path):
                 onum, orepo = open_ident(cmd_raw)
                 requested, rnum, rrepo, rlast = request_ident(cmd_raw)
                 _dok, dnum, drepo, dlast = draft_ident(cmd_raw)
+                pushed = push_ident(cmd_raw)
                 # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
                 # too, and it is the draft action that decides. The clear is
                 # deferred to the command's own non-failed result: a `gh pr
@@ -895,6 +1302,7 @@ def scan(path):
                     # must not silently discharge this open.
                     obligations.append(_new_obl(
                         onum, orepo, tid, requested, rlast, rnum, rrepo))
+                    _note_live(live, onum, orepo)
                 # A create --reviewer both opens and requests; its `self` flag
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.
@@ -910,6 +1318,27 @@ def scan(path):
                 pok, pnum, prepo, plast = probe_ident(cmd_raw)
                 if pok:
                     pending_probe[tid] = (pnum, prepo, plast)
+                # A push re-heads the PR, so the per-head reviewer request is
+                # owed again. Checked last: a call that both pushes and requests
+                # (`git push && gh api ... -X POST`) arms here and is discharged
+                # by that same call's result, which is correct -- the request
+                # came after the push. Arming needs no result, per push_ident.
+                #
+                # But NOT when the same call also drafts, merges, or closes a
+                # PR. Those two transitions are DEFERRED to this call's result
+                # while the arm fires here, synchronously, so a chained `gh pr
+                # merge 1038 --squash && git push -u origin next-branch` would
+                # arm 1038 off a `live` set the same call is about to empty.
+                # That direction is not a harmless over-warn: a merged PR cannot
+                # take a reviewer (ai-config#1279, defect 3), and when the
+                # terminal command is not last its own discharge is withheld as
+                # ambiguous, so the arm it raced would stand unsatisfiable. One
+                # call cannot both retire a PR and owe review on it, so the arm
+                # yields to the transition -- but only DEFERS to it, since a
+                # transition that fails retires nothing (see _resolve_arm).
+                if pushed:
+                    _rearm(obligations, live, tid, turn_targets, pending_arm,
+                           uncertain)
     return obligations, text
 
 
@@ -927,10 +1356,33 @@ def main() -> int:
     named = sorted({o["num"] for o in obligations if o["num"]}, key=int)
     which = ", ".join("#" + n for n in named) if named else "a PR"
 
+    # An obligation re-armed by a push states a different fact from one armed by
+    # an open -- the PR was reviewed, at a commit that is no longer its head --
+    # so it gets its own lead paragraph. Both can be outstanding at once.
+    pushed_only = all(o["push"] for o in obligations)
+    lead = (
+        "You pushed a new head to {w} in this session and no SUCCESSFUL "
+        "reviewer request follows that push.\n\n"
+        "A reviewer request is per-HEAD, not per-PR: an earlier round's "
+        "request was answered at a commit that is no longer this PR's head, so "
+        "nothing has read the code you just pushed. Nothing re-requests a "
+        "reviewer on your behalf."
+    ) if pushed_only else (
+        "You opened or readied {w} in this session and no SUCCESSFUL "
+        "reviewer request follows for it.\n\n"
+        "Opening a PR auto-triggers the repo's own review workflow but does "
+        "NOT summon Copilot, which reviews only when explicitly requested. The "
+        "auto-triggered half is what disguises this: the PR shows "
+        "review-shaped activity while nothing has read the diff."
+    )
+
     # Sentinel scoped to this transcript AND this message, so a later session
-    # ending with the same recap text does not silently skip the guard.
+    # ending with the same recap text does not silently skip the guard. The
+    # mode is part of the key so a push re-arm is not suppressed by an earlier
+    # open-block that happened to name the same PR from the same message.
     key = hashlib.sha256(
-        (transcript + "\0" + text + "\0" + which).encode()).hexdigest()[:16]
+        (transcript + "\0" + text + "\0" + which + "\0" + str(pushed_only))
+        .encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-unreviewed-pr-{key}")
     if os.path.exists(sentinel):
         return 0
@@ -942,13 +1394,7 @@ def main() -> int:
     print(json.dumps({
         "decision": "block",
         "reason": (
-            f"You opened or readied {which} in this session and no SUCCESSFUL "
-            "reviewer request follows for it.\n\n"
-            "Opening a PR auto-triggers the repo's own review workflow but "
-            "does NOT summon Copilot, which reviews only when explicitly "
-            "requested. The auto-triggered half is what disguises this: the "
-            "PR shows review-shaped activity while nothing has read the "
-            "diff.\n\n"
+            lead.format(w=which) + "\n\n"
             "Request it now, in this same message. Quote every placeholder -- "
             "an unquoted `<` is a shell redirect:\n\n"
             "    gh api \"repos/<owner>/<repo>/pulls/<N>/requested_reviewers\" "

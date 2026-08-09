@@ -725,6 +725,393 @@ case(create("c") + [bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}")],
      "ordering", "RX_DRAFT must be checked before RX_OPEN")
 
 
+# --- a push re-heads the PR, so the per-head request is owed again ---------
+# Case #1 is the incident itself (ai-config#1274), with its commands pasted in
+# the shape the corpus actually carries -- a `cd`, a `git push ... | tail`, and
+# a separate `gh workflow run` dispatch -- rather than a tidied one-liner. The
+# guard is designed against a SUMMARY of the incident, so the literal text is
+# what tests whether the design survives contact with it.
+PUSH_CMD = ('cd /home/demorrison/Projects/ai-config\n'
+            'git push -q origin HEAD 2>&1 | tail -3\n'
+            'echo "local:  $(git rev-parse HEAD)"')
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p"), res("p", "local:  76e619aa"),
+                    bash("gh workflow run claude-review.yml -f pr_number=1038",
+                         tid="w"), res("w", ""),
+                    say("Round 2 pushed and dispatched claude-review.")], True,
+     "ai-config#1274 verbatim: round 2 pushes, only claude-review dispatched")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p"), res("p", ""),
+                    bash(REQ_CMD_Q, tid="q2"), res("q2", OK),
+                    say("Pushed and re-requested at the new head.")], False,
+     "a request AFTER the push discharges the re-armed obligation")
+# Ordering is the whole point: the same two actions in the other order leave
+# the push unanswered, which is exactly the per-head gap.
+case(create("c") + [bash(PUSH_CMD, tid="p"), res("p", ""),
+                    bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p2"), res("p2", ""),
+                    say("Requested, then pushed again.")], True,
+     "a request BEFORE the last push does not discharge it")
+
+# Gate: exactly one live PR. Two open PRs make a push unattributable, and
+# arming both would demand two requests for one push and wedge the session.
+case([bash("gh pr create --title a", tid="c1"), res("c1", URL),
+      bash(REQ_CMD_Q, tid="q1"), res("q1", OK),
+      bash("gh pr create --title b", tid="c2"),
+      res("c2", "https://github.com/o/r/pull/1039\n"),
+      bash('gh api "repos/o/r/pulls/1039/requested_reviewers" -X POST',
+           tid="q2"), res("q2", OK),
+      bash(PUSH_CMD, tid="p"), res("p", ""),
+      say("Pushed with two PRs open.")], False,
+     "a push with TWO live PRs is unattributable and arms nothing")
+
+# Gate: no duplicate obligation. Several pushes between two requests must
+# collapse to ONE obligation, or the request the guard asks for cannot clear it.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p1"), res("p1", ""),
+                    bash(PUSH_CMD, tid="p2"), res("p2", ""),
+                    bash(PUSH_CMD, tid="p3"), res("p3", ""),
+                    bash(REQ_CMD_Q, tid="q2"), res("q2", OK),
+                    say("Three pushes, then one request.")], False,
+     "three pushes arm ONE obligation, cleared by one request")
+
+# Gate: a drafted PR needs no reviewer, so a push to it must not re-arm.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}"),
+                    bash(PUSH_CMD, tid="p"), res("p", ""),
+                    say("Back to draft, then pushed.")], False,
+     "a push to a PR converted back to draft does not re-arm")
+
+# Review finding 1 (#1283). The case above uses the NUMBERED undo. A bare
+# `gh pr ready --undo` is the ordinary way to draft the current branch's PR --
+# the file's own comment says exactly that about bare `gh pr ready` -- so
+# draft_ident yields num=None. Popping `live` only on a known number left the
+# entry behind and re-armed review for a legitimately drafted PR.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready --undo", tid="u"), res("u", "{}"),
+                    bash(PUSH_CMD, tid="p"), res("p", ""),
+                    say("Drafted the current branch's PR, then pushed.")], False,
+     "a numberless `gh pr ready --undo` leaves the live set, so a push "
+     "does not re-arm")
+
+# Review finding 2 (#1283). The arm fires synchronously at tool_use while the
+# terminal/draft transition is DEFERRED to this same call's result, so a push
+# chained with either one saw a `live` set the call was about to empty. The
+# merge form is the severe one: chained ahead of the push it is not `last`, so
+# its own discharge is withheld as ambiguous and the raced arm would stand
+# against a merged PR that can never take a reviewer.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr merge 1038 --squash && "
+                         "git push -u origin next-branch", tid="mp"),
+                    res("mp", "Merged pull request o/r#1038"),
+                    say("Merged and pushed the next branch in one call.")],
+     False,
+     "a push chained with a merge in ONE call does not arm the merged PR")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo && "
+                         "git push -u origin next-branch", tid="up"),
+                    res("up", "{}"),
+                    say("Drafted and pushed in one call.")], False,
+     "a push chained with a draft transition in ONE call does not re-arm")
+
+# Round-5 finding (#1283). The two cases above put the push and the transition
+# in ONE chained command. A turn can carry them as separate tool_use blocks
+# instead, and then the per-command check sees neither: read the push first and
+# the sibling's transition is not registered yet, read it second and it is
+# registered but still deferred to its own result. Both orders are tested,
+# because "order does not matter" is the claim being pinned.
+#
+# The bare-undo form is the one that never self-heals. A merge whose result
+# echoes `o/r#N` is retroactively cleaned up by _clear(), but `gh pr ready
+# --undo` resolves no number from `{}`, so a wrongly-armed obligation stands.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr ready --undo"), "u"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("u", "{}", False), ("p", "", False)),
+                    say("Drafted and pushed in one turn.")], False,
+     "a batched draft+push in ONE turn does not re-arm (draft block first)")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="git push -u origin next"), "p"),
+                         ("Bash", dict(command="gh pr ready --undo"), "u")),
+                    results(("p", "", False), ("u", "{}", False)),
+                    say("Pushed and drafted in one turn.")], False,
+     "a batched push+draft in ONE turn does not re-arm (push block first)")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr merge --squash"), "m"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("m", "{}", False), ("p", "", False)),
+                    say("Merged and pushed in one turn.")], False,
+     "a batched bare-merge+push in ONE turn does not re-arm")
+# NOT evidence for the turn predicate, and labelled so rather than counted:
+# this case passes under every mutation of it, because a structured tool always
+# carries `pull_number`, so the deferred clear names 1038 and _clear() removes
+# the wrongly-armed obligation retroactively. That is the self-healing the round
+# 5 review describes for a merge echoing `o/r#N`. Kept as documentation that the
+# structured path is not at risk -- the risk needs a transition whose result
+# resolves NO number, which only the bare CLI forms produce.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("update_pull_request",
+                          dict(owner="o", repo="r", pull_number=1038,
+                               draft=True), "u"),
+                         ("push_files",
+                          dict(owner="o", repo="r", branch="next"), "p")),
+                    results(("u", "{}", False), ("p", "{}", False)),
+                    say("Drafted and pushed via structured tools.")], False,
+     "a batched structured draft+push self-heals via its numbered clear")
+# The control the finding itself names: strictly sequential, one turn each, is
+# already correct and must stay correct -- otherwise the fix above is untested
+# against the case it must NOT change.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready --undo", tid="u"), res("u", "{}"),
+                    bash("git push -u origin next", tid="p"), res("p", ""),
+                    say("Drafted, then pushed, in separate turns.")], False,
+     "a sequential draft then push in separate turns does not re-arm")
+# The mirror that keeps the fix from being vacuous: a turn that pushes and does
+# NOT draft or retire anything must still arm, or the guard has been silenced
+# rather than corrected.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="git status"), "s"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("s", "", False), ("p", "", False)),
+                    say("Checked status and pushed, in one turn.")], True,
+     "a batched turn with a push and NO transition still arms")
+
+# Round-6 finding (#1283). The turn predicate was a bare boolean, so ANY
+# transition in the turn suppressed the arm -- including one for a different,
+# untracked PR. That is the routine "merge an approved PR while still pushing
+# fixes on the one I am driving" shape, and it is the DANGEROUS direction: the
+# tracked PR gets a new head, nothing arms, and the guard never reports it.
+# Both variants are the reviewer's own reproductions.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr merge 2000 --squash"), "m"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("m", "Merged pull request o/r#2000", False),
+                            ("p", "", False)),
+                    say("Merged an unrelated PR and pushed mine.")], True,
+     "an unrelated PR's merge in the same turn does not suppress the arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash",
+                          dict(command="gh pr create --title unrelated --draft"),
+                          "nd"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("nd", "https://github.com/o/r/pull/2050", False),
+                            ("p", "", False)),
+                    say("Opened an unrelated draft and pushed mine.")], True,
+     "opening a NEW draft PR in the same turn does not suppress the arm")
+# The structured mirror of the same over-suppression.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("merge_pull_request",
+                          dict(owner="o", repo="r", pullNumber=2000), "m"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("m", "{}", False), ("p", "", False)),
+                    say("Merged an unrelated PR via the tool and pushed mine.")],
+     True,
+     "an unrelated structured merge in the same turn does not suppress the arm")
+# The boundary the fix must NOT cross: a NUMBERED transition for the live PR
+# still suppresses, so scoping by identity did not reopen rounds 3 to 5.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr ready 1038 --undo"), "u"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("u", "{}", False), ("p", "", False)),
+                    say("Drafted THIS PR by number and pushed.")], False,
+     "a numbered transition for the LIVE PR still suppresses the arm")
+
+# Round-7 finding (#1283). Rounds 4 to 6 suppressed the arm on the mere
+# ATTEMPT of a same-turn transition, which is evidence of nothing: the arm
+# fires while the tool_use is read, and no result exists for any block in the
+# turn yet. A transition that FAILS retires nothing -- the PR stays ready, the
+# push still re-headed it, and nothing ever reports it. Withholding an arm has
+# the same effect as discharging one, so it owes the same positive evidence.
+# Both variants are the reviewer's own reproductions.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr ready 1038 --undo"), "u"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("u", "cannot be requested", True), ("p", "", False)),
+                    say("Tried to draft, it failed, and pushed.")], True,
+     "a FAILED draft in the same turn does not cancel the push's arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("Bash", dict(command="gh pr merge 1038 --squash"), "m"),
+                         ("Bash", dict(command="git push -u origin next"), "p")),
+                    results(("m", "merge conflict, cannot merge", True),
+                            ("p", "", False)),
+                    say("Merge hit a conflict; pushed anyway.")], True,
+     "a FAILED merge in the same turn does not cancel the push's arm")
+# The structured mirror: an atomic tool whose own result errored.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    uses(("update_pull_request",
+                          dict(owner="o", repo="r", pull_number=1038,
+                               draft=True), "u"),
+                         ("push_files",
+                          dict(owner="o", repo="r", branch="next"), "p")),
+                    results(("u", '{"status":422}', True), ("p", "{}", False)),
+                    say("Structured draft failed; pushed.")], True,
+     "a FAILED structured draft does not cancel the push's arm")
+# The boundary the fix must NOT cross, and a deliberate decision rather than an
+# oversight: a transition chained AHEAD of the push shares ONE combined exit
+# status, which belongs to the LAST command, so the call cannot attribute an
+# outcome to the transition either way. The draft and terminal discharges in
+# this same call already withhold on exactly this input, so the arm withholds
+# too -- an ambiguous call changes nothing in either direction. The cost is
+# bounded: the PR stays live (that same ambiguity withheld its own pop), so the
+# next push re-arms, which the case below pins.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo; git push -u origin next",
+                         tid="x"),
+                    res("x", "", False),
+                    say("Chained an undo and a push in one call.")], False,
+     "an AMBIGUOUS chained transition still withholds the arm")
+# This began as NOT evidence -- it passed under every round-7 mutation, since
+# each of them armed at one push or the other, and it was labelled so. Round 8
+# made it load-bearing: it is now the only case that fails when an uncertain
+# entry is made unarmable, which is the obvious wrong way to stop a stale entry
+# from silencing a later PR. So it pins both the REBUTTAL's premise (withholding
+# on ambiguity costs one push, not the session) and the half of the round-8 fix
+# that keeps that premise true.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo; git push -u origin next",
+                         tid="x"),
+                    res("x", "", False),
+                    bash("git push -u origin next2", tid="p2"), res("p2", ""),
+                    say("...and the next push recovers the arm.")], True,
+     "the next push recovers an arm the ambiguous call withheld")
+
+# Round-8 finding (#1283). The `live` pop is gated on the SAME attributability
+# check as the discharge, so a merge chained ahead of a push never pops even
+# when it plainly succeeded. That stale entry does not just affect its own PR:
+# `_rearm` needs exactly one live PR, so the next PR opened in that session
+# pushes the count to two and arming goes silent for EVERY PR thereafter --
+# the dangerous direction, and unbounded, unlike the one-push cost of
+# ambiguity. The trace is the reviewer's own, reproduced.
+REQ_2000 = ('gh api "repos/o/r/pulls/2000/requested_reviewers" -X POST '
+            "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr merge 1038 --squash && "
+                         "git push -u origin next-branch", tid="mp"),
+                    res("mp", "Merged pull request o/r#1038"),
+                    bash("gh pr create --title next", tid="c2"),
+                    res("c2", "https://github.com/o/r/pull/2000\n"),
+                    bash(REQ_2000, tid="q2"), res("q2", OK),
+                    bash("git push -u origin next-branch", tid="p5"),
+                    res("p5", ""),
+                    say("Merged 1038 in a chained call, then opened, "
+                        "requested and re-headed 2000.")], True,
+     "a PR retired by a chained call does not silence a LATER PR's arm")
+# The draft mirror of the same stale entry, which reaches `live` by the other
+# result path (_note_drafted rather than the terminal pop).
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo && "
+                         "git push -u origin next-branch", tid="up"),
+                    res("up", "{}"),
+                    bash("gh pr create --title next", tid="c2"),
+                    res("c2", "https://github.com/o/r/pull/2000\n"),
+                    bash(REQ_2000, tid="q2"), res("q2", OK),
+                    bash("git push -u origin next-branch", tid="p5"),
+                    res("p5", ""),
+                    say("Drafted 1038 in a chained call, then opened, "
+                        "requested and re-headed 2000.")], True,
+     "a PR drafted by a chained call does not silence a LATER PR's arm")
+# The BARE form of the same shape, which resolves no number at all. It takes
+# _note_drafted's own tie-break: with one live PR the bare form is unambiguous,
+# so that PR is the one marked. Without this the residual survives for exactly
+# the commands most likely to be typed, since a bare `gh pr merge` is the
+# ordinary way to merge the current branch's PR.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr merge --squash && "
+                         "git push -u origin next-branch", tid="mp"),
+                    res("mp", ""),
+                    bash("gh pr create --title next", tid="c2"),
+                    res("c2", "https://github.com/o/r/pull/2000\n"),
+                    bash(REQ_2000, tid="q2"), res("q2", OK),
+                    bash("git push -u origin next-branch", tid="p5"),
+                    res("p5", ""),
+                    say("Bare-merged in a chained call, then opened, "
+                        "requested and re-headed 2000.")], True,
+     "a BARE chained merge does not silence a LATER PR's arm either")
+
+# Gate: a merged PR can gain no further reviewable head. Without this, the
+# ordinary post-merge shape (merge, branch, push) nags about the merged PR.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr merge 1038 --squash", tid="m"),
+                    res("m", "Merged pull request o/r#1038"),
+                    bash(PUSH_CMD, tid="p"), res("p", ""),
+                    say("Merged, then pushed the next branch.")], False,
+     "a push after the PR merged does not re-arm it")
+# This branch was written to assert that a merge does NOT excuse a PR that was
+# never reviewed. #1287 reversed that on main, deliberately: GitHub accepts the
+# reviewer POST on a merged PR with HTTP 200 and adds nobody, so the obligation
+# becomes literally unsatisfiable and the guard re-fires forever (#1279, defect
+# 3). An unsatisfiable guard trains everyone to narrate around it, which costs
+# more than the case it was protecting. The assertion now lives one block down,
+# under "a merged PR no longer demands a reviewer request", with the opposite
+# expectation -- see the merge note in the PR body.
+
+# Push detection is structural and scoped, exactly like the other detectors.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash('gh pr comment 1038 --body "then run git push"',
+                         tid="p"), res("p", ""),
+                    say("Commented about pushing.")], False,
+     "a quoted `git push` inside another command's argument does not re-arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push --dry-run origin HEAD", tid="p"),
+                    res("p", ""), say("Dry run only.")], False,
+     "`git push --dry-run` re-heads nothing, so it does not re-arm")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git push origin --delete old-branch", tid="p"),
+                    res("p", ""), say("Deleted a stale branch.")], False,
+     "`git push --delete` removes a ref rather than advancing one")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("git -C /tmp/wt push origin HEAD", tid="p"),
+                    res("p", ""), say("Pushed from a worktree.")], True,
+     "`git -C <dir> push` is recognised past git's global options")
+# A failed push still arms: arming is the safe over-warn direction, and a push
+# is nearly always chained, so waiting for an attributable exit status would
+# skip real new heads.
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash(PUSH_CMD, tid="p"), res("p", "rejected", err=True),
+                    say("Push was rejected.")], True,
+     "a failed push still arms (over-warn is the safe direction)")
+
+# A session that opened no PR must never be nagged, however much it pushes --
+# this is the bulk of all pushes and the whole reason the guard stays usable.
+case([bash(PUSH_CMD, tid="p"), res("p", ""),
+      bash(PUSH_CMD, tid="p2"), res("p2", ""),
+      say("Pushed to a branch with no PR.")], False,
+     "pushes in a session that opened no PR arm nothing")
+
+# `live` is keyed by PR number alone, so the same number in two repositories
+# would otherwise collapse to one key and report ONE live PR when there are two,
+# arming a push that is genuinely unattributable.
+case([bash("gh pr create --title a", tid="c1"),
+      res("c1", "https://github.com/o/r1/pull/50\n"),
+      bash('gh api "repos/o/r1/pulls/50/requested_reviewers" -X POST', tid="q1"),
+      res("q1", OK),
+      bash("gh pr create --title b", tid="c2"),
+      res("c2", "https://github.com/o/r2/pull/50\n"),
+      bash('gh api "repos/o/r2/pulls/50/requested_reviewers" -X POST', tid="q2"),
+      res("q2", OK),
+      bash(PUSH_CMD, tid="p"), res("p", ""),
+      say("Pushed with #50 open in two repos.")], False,
+     "the same PR number in two repos is two live PRs, so a push arms nothing")
+
+# The push wording must be distinguishable from the open wording: it states a
+# different fact (the PR WAS reviewed, at a commit that is no longer its head).
+def _push_wording():
+    ev = create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                        bash(PUSH_CMD, tid="p"), res("p", ""),
+                        say("Pushed round 2.")]
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in ev:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        out = subprocess.run(
+            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
+        return "per-HEAD" in out and "pushed a new head" in out
+    finally:
+        os.unlink(path)
+
 # --- a PR that reached a terminal state cannot be discharged by complying ---
 # ai-config#1279 defect 3. GitHub ACCEPTS
 # `POST /pulls/{n}/requested_reviewers` on a merged PR -- HTTP 200,
@@ -885,6 +1272,14 @@ def main():
     else:
         print(f"FAIL: sentinel scope wrong "
               f"(first={first} repeat={repeat} other={other})")
+        failures += 1
+
+    if _push_wording():
+        print("PASS: a push re-arm says the head moved, not that the PR is "
+              "unreviewed")
+        passes += 1
+    else:
+        print("FAIL: push re-arm reuses the open wording")
         failures += 1
 
     print(f"\n{passes} passed, {failures} failed")

@@ -303,3 +303,49 @@ the sentence, whichever ends first.
 Note the four rounds' own progression, which the author summarised before the
 last one: vocabulary, then scope, then position --- "each fix was correct about
 the case in front of it and wrong about one level up".)
+
+## "A narrowing you argued for on one axis can be undone by an independent clause on a DIFFERENT axis"
+
+(`Morrison-Lab/ai-config#1309`, 2026-08-08, on `scripts/compare-shell-forms.py`,
+built by a subagent.
+Its brief said any non-zero interpreter exit is a harness failure.
+The agent narrowed that to 126/127 and flagged the departure, reasoning that
+`grep` exits 1 legitimately and that comparing `grep` spellings is a core use of
+the tool --- correct on its own terms, and the whole point of the deviation.
+`looks_like_harness_failure` then read:
+
+```python
+if returncode in (CANNOT_EXECUTE, NOT_FOUND):
+    return True
+return any(marker in stderr for marker in NOT_FOUND_MARKERS)
+```
+
+The first clause implements the argued narrowing; the second matches
+`command not found` / `No such file or directory` / `cannot execute` anywhere in
+stderr, independent of the exit status, and restores the breadth the first
+clause had just removed.
+So `grep pat missing.txt` --- exit 2, printing "No such file or directory" ---
+was reported HARNESS FAILURE, meaning "not a result about the forms", about the
+most ordinary command the tool exists to compare.
+Two clauses, two axes (a status and a text match), one question.
+
+Fixed in `f6fbffc6` by deleting the marker clause rather than gating it, on the
+measurement that it bought nothing: on this bash an unknown command exits 127
+and a missing script exits 127, so every genuine case the markers were meant to
+catch already carried a code.
+Mutation-checked per clause afterwards --- restoring the free-floating matcher
+fails exactly the new marker case, and removing the exit-code check fails five
+--- which is the discipline the block prescribes, and it is what showed the
+marker clause had been carrying no unique case at all.
+
+Two cross-references rather than new rules.
+The suite had contained
+`check("a not-found message is a harness failure whatever the status", ...)` at
+line 166, a regression test asserting the defect, which is
+[`ardi`](../workflow/ardi.md)'s "a regression test written alongside a fix can
+lock the bug in" rather than anything this section adds.
+And the deviation was flagged in the agent's own report, which is where the
+review should have started, per
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+subagent-report section --- the rest of the work followed the brief and was
+largely correct.)

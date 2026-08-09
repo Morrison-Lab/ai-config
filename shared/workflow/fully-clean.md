@@ -602,6 +602,15 @@ above rather than on the presence of a heading.
 - **Don't:** assume such a misread has a safe direction; one sweep produced a
   false-clean and a false-blocked.
 
+[`hooks/no-handrolled-verdict-parse.py`](../../hooks/no-handrolled-verdict-parse.py)
+mechanizes this, per
+[`algorithmatize-checks`](algorithmatize-checks.md): it refuses a Bash command
+that matches a verdict phrase against a PR's review comments while
+`check-pr-fully-clean.py` has not answered for that PR.
+The discharge is deliberately per-PR --- one call early in a sweep must not
+license hand-rolling the rest of it --- and a genuinely needed hand parse
+clears the guard with an `ALLOW_HANDROLLED_VERDICT_PARSE=1` prefix.
+
 **A review comment's header SHA can be stale, so take the reviewed commit from
 the run's own `head_sha`.**
 Criterion 2 requires the verdict to sit at the current head, and the obvious

@@ -228,6 +228,44 @@ said.
 This governs a claim about the **world** that you are about to repeat as your
 own.
 
+**The same asymmetry decides where to look in the delivered WORK, and there it
+points at the deviation the agent flagged.**
+Everything above is about the report's *claims*.
+A delegated task also produces an artifact, and the question of where to spend
+a finite review on it has the same answer for the same reason.
+Most of the work is brief-following, which the brief itself constrains and a
+second reader can check against it.
+A deviation is the one place the agent substituted its own judgment for an
+instruction, so it is the least externally checked thing in the diff -- and it
+is stated plainly in the report, which makes it also the cheapest to find.
+Highest yield and lowest cost coincide, which is rare enough to be worth a
+rule.
+
+What suppresses the check is that flagging *feels* like handling.
+An agent that names its own departure reads as candid, and candour reads as
+diligence, so the disclosure discharges the suspicion it should create.
+It is the same trade [`fail-fast`](../principles/fail-fast.md) prices for a
+partial guard, arriving through the artifact written to demonstrate care: the
+sentence spends the one signal that would have sent you looking.
+Read a flagged deviation as a pointer to where the work was least constrained,
+never as evidence it was considered enough.
+
+Note what does **not** discharge it: agreeing with the reasoning.
+A deviation's stated rationale can be correct on its own terms while the code
+implementing it is not, so check the implementation against the rationale
+rather than checking only whether the rationale persuades you.
+[`fail-fast`](../principles/fail-fast.md)'s partial-guard family covers the
+shape that takes inside a predicate.
+
+- **Do:** review a delegated diff at the flagged deviation first, before the
+  parts that merely followed the brief.
+- **Do:** treat the rationale and the implementation as two claims, and check
+  the second against the first.
+- **Don't:** read a disclosed deviation as a handled one -- disclosure is where
+  the review starts.
+- **Don't:** stop at "the reasoning is sound"; that is a verdict on the
+  sentence, not on the code.
+
 - **Do:** run the deriving query before repeating a subagent's factual claim to
   a human, and name that query beside the claim.
 - **Do:** re-derive the particulars specifically -- the count, the identifier,
@@ -237,6 +275,39 @@ own.
   confirming the claim.
 - **Don't:** generalize this into distrusting subagents; the rule picks which
   **half** of a report to re-derive, not whether to use one.
+
+**A hedge you attach for one audience is owed to the other, and writing it
+once is the tell.**
+The section above governs a claim arriving *from* a subagent.
+This governs one going *to* a subagent, at the same moment it goes to the
+user.
+A finding you have just measured is routinely stated twice in close
+succession: flatly in chat, and in a brief that says to verify it.
+
+That brief's hedge is correct, and it is
+[`challenge-the-assignment`](challenge-the-assignment.md)'s authoring-side rule
+working as written.
+What nothing currently reads it as is **your own doubt in writing**.
+The "premise you were handed" tell above keys on a hedge someone else wrote;
+this is the same signal with the authorship reversed, so it fires on nothing --
+and it is the easier of the two to see, since you typed it.
+
+The two audiences are not symmetric, which is why the hedge belongs to the one
+that does not get it.
+An agent told to verify can re-derive the claim and reports back when it fails.
+The user cannot re-derive it, is the one who acts on it, and hears nothing
+further unless you go back.
+So the qualified copy goes to the reader who needs it least, and the artifact
+ends up protected while the person does not.
+
+- **Do:** treat writing "verify this" into a brief as a trigger to qualify the
+  same claim wherever else you have just stated it.
+- **Do:** name the field or query a state claim rests on, so the reader can
+  fail it the way the agent would.
+- **Don't:** let a claim reach the user unqualified because the copy sent to an
+  agent carried the hedge.
+- **Don't:** read having delegated the check as having qualified the claim;
+  that is the dispatched-verification bullet above, one audience over.
 
 ## An action you recommend is a claim about state
 

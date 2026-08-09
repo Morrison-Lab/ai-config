@@ -876,7 +876,9 @@ it does so where the reviewer's credibility will carry it.
 What is new is the **trigger**.
 Both of those rules fire on an act you recognize as asserting something, and
 agreeing does not present as one.
-Rebutting is adversarial and prompts you to verify.
+Rebutting is adversarial and prompts you to verify --- the reviewer's claim,
+that is, which is not the same as your own counter-measurement, and the
+rebuttal section below covers that gap.
 Extending is agreement wearing extra diligence, and agreement is not a thing
 anyone verifies.
 So the rule is already there and nothing calls it, which is how the escalation
@@ -988,6 +990,60 @@ Telling an author their diagnosis is contradicted by the logs is a strong
 claim that invites them to stop investigating.
 Getting it wrong can stall a correct fix for the exact bug still breaking
 everything.
+
+**A rebuttal's own evidence is the least-checked claim in a review round, and
+the commonest way it goes wrong is being measured through a tool that adds a
+shell layer.**
+The section above governs rebuttal evidence that went stale, and its tell is
+"a rebuttal whose evidence you did not generate yourself in this turn".
+This case fails that tell.
+The evidence WAS generated in the turn, by a command run on purpose to settle
+the disagreement, and it was still wrong.
+
+Each shell layer a command passes through collapses one level of backslash
+quoting.
+So a command typed into a tool that wraps it in a second shell is not the
+command a reader runs from a file.
+Two spellings differing by a doubled backslash pair then reach the program
+identical, and a measurement comparing them reports them equivalent --- which
+is a true statement about the harness and a false one about the command.
+The remedy is positional rather than analytical: write each form to its own
+file and run the file, so exactly one layer applies.
+Reasoning about how many backslashes survive is the step that failed, and it
+fails reliably enough to be worth not attempting.
+
+Two things then make such a rebuttal persuasive rather than suspicious.
+Disagreeing feels like the rigorous move, so a rebuttal draws LESS scrutiny
+than accepting the finding would.
+The escalation section above treats a rebuttal as the high-scrutiny baseline
+it measures agreement against, and this is the counterexample to that: the
+reflex disagreement triggers is real, and it points at the reviewer's claim
+rather than at your own.
+And naming a check settles the question for a reader whether or not the check
+discriminates.
+"Confirmed at the argv level" reads as a check performed, when that inspection
+had passed through the same two layers and so confirmed the artifact rather
+than the fact.
+
+[`scripts/compare-shell-forms.py`](../../scripts/compare-shell-forms.py)
+decides this mechanically, per
+[`deterministic-tools`](../principles/deterministic-tools.md): it writes each
+spelling to its own file, runs each under exactly one shell, and reports
+IDENTICAL, DIFFERING, or HARNESS FAILURE --- exiting non-zero on the third so a
+broken run cannot be read as a result about the forms.
+
+- **Do:** write each command spelling to its own file and run the file when
+  comparing them, so exactly one shell layer applies.
+- **Do:** hold your own rebuttal to the standard you would apply to the
+  finding, and say which instrument produced the counter-measurement.
+- **Do:** re-run the measurement outside the harness when a reviewer holds
+  their ground, before rebutting a second time.
+- **Don't:** read a rebuttal as self-verifying because disagreeing felt like
+  the rigorous move.
+- **Don't:** cite a named check as settling a question without saying what it
+  ran through; a named check reads as a performed one.
+- **Don't:** compare two command spellings by typing both into the same tool,
+  which is the one measurement guaranteed to make them look alike.
 
 **A finding built on a *negative* result -- "I searched and it isn't there"
 -- is only as strong as the paths that were searched, and the search scope

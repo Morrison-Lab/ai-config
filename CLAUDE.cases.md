@@ -113,6 +113,17 @@ The first `git branch -D` failed with the worktree message, and `git worktree li
    The lapse was first self-attributed to ignoring the hook, which was wrong in a way worth recording: the guard was never installed, so there was nothing to ignore.
    `install-hooks.py --fix` took it to `registered=11 missing=0`, and merging the then-open #1139 made it 12.)
 
+## Keep ai-config and repo checkouts fresh --- An entry that genuinely IS a symlink resolves through the checkout's CURRENT BRANCH
+
+(2026-08-08, this machine, minutes after #1287 merged its fix to the merge guard.
+   `~/.claude/hooks/no-unauthorized-merge.py` is a real symlink (`lrwxrwxrwx`) into the checkout, which was parked on another session's `ums/session-learnings-redo`.
+   `git show origin/main:hooks/no-unauthorized-merge.py | grep -c EXEC_AT_CMD_POS` returned 6 and the same grep on the resolved file returned 0, so the merged fix was not the guard running.
+   `git merge-base --is-ancestor origin/main ums/session-learnings-redo` exits 1, confirming the branch predates the merge rather than the file having been edited.
+   Both instruments were clean at that moment: `check-install.py` reported `268 ok, 0 stale, 0 unlinked, 0 missing, 0 misdirected, 0 foreign`, and `install-hooks.py` reported `registered=15 missing=0 stale=0` / `All hooks registered.`
+   The exposed surface is not hook-shaped.
+   `~/.claude/shared/principles` is a symlink too, so that session's own `@shared/principles/fail-fast.md` import loaded 831 lines against `origin/main`'s 1246, and `git diff origin/main --stat -- shared hooks skills memories CLAUDE.md` in that checkout reported 52 files changed, 850 insertions, 5870 deletions.
+   Run `check-install.py` from a *worktree* instead and it reports `268 misdirected`, since it compares against its own root --- a different and equally misleading answer, so the instrument is not rescued by running it elsewhere.)
+
 ## Keep ai-config and repo checkouts fresh --- The same "diverged" failure from point 1 above can hit any repo's main, not just...
 
 (Hit in both `ai-config` and `gha` checkouts in the same session, 2026-07-06: `gha`'s local `main` tip commit didn't match `origin/main` by hash *or* message at all --- unlike the milder "same content, rewritten hash" case documented in point 1 --- but was still just a stale checkout snapshot with nothing of value, confirmed once the working tree was verified clean.)

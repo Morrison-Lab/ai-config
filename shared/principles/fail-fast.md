@@ -1039,6 +1039,54 @@ the terminator altogether.
 - **Don't:** let a boundary definition ride in as an implementation detail; it
   is a claim about the corpus, and it can contradict one you already made.
 
+**A narrowing you argued for on one axis can be undone by an independent clause
+on a DIFFERENT axis of the same predicate.**
+The two blocks above both keep the guard on one axis: the members block
+enumerates an alternation's own members, and the boundary block covers two
+halves that disagree about a *direction* along one phrase.
+This is neither.
+The clauses are not members of anything and not two ends of anything --- they
+read different **inputs** and are joined by `or`, so each is independently
+sufficient and the loosest one sets the behaviour.
+
+That is what makes the reasoning feel discharged.
+You argue the narrowing, you implement it in the clause that carries the axis
+you were thinking about, and reading the function top-down you meet that clause
+first and stop --- it says exactly what you decided.
+The clause beneath it is on a different axis, so it does not read as a second
+opinion about the same question, which is precisely what it is.
+A disjunction has no obligation to be consistent with itself, and nothing in
+the syntax announces that two clauses answer one question.
+
+Do not let the fail-closed direction excuse it.
+The discharge section below is right that an over-warn is the safe direction,
+and safety there is a property of the **guard**, not of the tool: a predicate
+that misreports the most ordinary input in its domain defeats the thing it was
+built for, whichever way it errs.
+
+So when you narrow a predicate, enumerate every clause that can independently
+return the guarded verdict, and re-run the narrowing's stated reason over each
+one --- the same move the members block makes, with clauses rather than members
+as the unit.
+Then mutation-check per clause, per
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md), since a
+disjunction's clauses mask each other: removing one changes nothing on any case
+another clause already catches, so a suite that passes without it is evidence
+the clause is redundant rather than evidence it is fine.
+
+The tell is syntactic and greppable, like the loop case above: **a predicate
+with more than one `return True` path, whose paths read different variables.**
+
+- **Do:** list every independently-sufficient clause of a predicate you are
+  narrowing, and apply the stated reason to each.
+- **Do:** mutation-check clause by clause, and read a clause whose removal
+  changes no test as a claim about redundancy rather than about correctness.
+- **Don't:** treat a narrowing as implemented once the clause on the axis you
+  argued about carries it --- a sibling clause on another axis can restore the
+  breadth in the same function.
+- **Don't:** excuse an over-broad guard as the safe direction when the inputs
+  it over-reports are the tool's main use case.
+
 **One level up from a partial guard: editing state that two consumers share
 regresses the consumer you were not looking at.**
 Every case above spreads a guard across *sites* --- emitters, discharge paths,

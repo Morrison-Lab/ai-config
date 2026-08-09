@@ -228,6 +228,44 @@ said.
 This governs a claim about the **world** that you are about to repeat as your
 own.
 
+**The same asymmetry decides where to look in the delivered WORK, and there it
+points at the deviation the agent flagged.**
+Everything above is about the report's *claims*.
+A delegated task also produces an artifact, and the question of where to spend
+a finite review on it has the same answer for the same reason.
+Most of the work is brief-following, which the brief itself constrains and a
+second reader can check against it.
+A deviation is the one place the agent substituted its own judgment for an
+instruction, so it is the least externally checked thing in the diff -- and it
+is stated plainly in the report, which makes it also the cheapest to find.
+Highest yield and lowest cost coincide, which is rare enough to be worth a
+rule.
+
+What suppresses the check is that flagging *feels* like handling.
+An agent that names its own departure reads as candid, and candour reads as
+diligence, so the disclosure discharges the suspicion it should create.
+It is the same trade [`fail-fast`](../principles/fail-fast.md) prices for a
+partial guard, arriving through the artifact written to demonstrate care: the
+sentence spends the one signal that would have sent you looking.
+Read a flagged deviation as a pointer to where the work was least constrained,
+never as evidence it was considered enough.
+
+Note what does **not** discharge it: agreeing with the reasoning.
+A deviation's stated rationale can be correct on its own terms while the code
+implementing it is not, so check the implementation against the rationale
+rather than checking only whether the rationale persuades you.
+[`fail-fast`](../principles/fail-fast.md)'s partial-guard family covers the
+shape that takes inside a predicate.
+
+- **Do:** review a delegated diff at the flagged deviation first, before the
+  parts that merely followed the brief.
+- **Do:** treat the rationale and the implementation as two claims, and check
+  the second against the first.
+- **Don't:** read a disclosed deviation as a handled one -- disclosure is where
+  the review starts.
+- **Don't:** stop at "the reasoning is sound"; that is a verdict on the
+  sentence, not on the code.
+
 - **Do:** run the deriving query before repeating a subagent's factual claim to
   a human, and name that query beside the claim.
 - **Do:** re-derive the particulars specifically -- the count, the identifier,

@@ -129,6 +129,19 @@ underlying `.qmd` is a normal edit the user can ask for next (or hand to
   `.qmd`/code references for keys that don't resolve; this skill catches the
   ones that already leaked into rendered output. Use `ph` to trace a `?@key`
   hit back to the offending source line.
+- **[`fact-check-prose`](../../shared/writing/fact-check-prose.md)** --- the
+  boundary worth stating, because a clean scan here is easy to over-read.
+  This skill answers whether a reference **resolved**; it says nothing about
+  whether the referenced thing has **content**.
+  A definition whose two sides expand to the same glyph resolves, numbers, and
+  leaks no `?@` marker, and a crossref carrying a hand-written type word
+  (`Definition @def-x`, rendering as "Definition Definition 5") resolves
+  perfectly too.
+  Both are visible only on the rendered page, and neither is this skill's job
+  --- see that fragment's "A definition can resolve, render, and still say
+  nothing", and
+  [`definition-crossrefs`](../../shared/writing/definition-crossrefs.md) for
+  the doubling check.
 - **`r-pkg-spellcheck`** — a sibling "check before you publish" gate; both run
   on rendered/user-facing text before a push or announce.
 - **`reprexes`** — when a break needs a minimal reproducer to file upstream.

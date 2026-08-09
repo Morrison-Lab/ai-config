@@ -981,3 +981,15 @@ a document separator that truncates the generated script.)
   (4) no formal `CHANGES_REQUESTED` or `REJECTED` state exists on the PR (integrating GitHub's computed `reviewDecision` API field directly from `gh pr view --json reviewDecision` and preserving decision state across subsequent `COMMENTED` reviews).
   Returns exit code 0 only when fully clean.
   Must be executed synchronously in the foreground turn before declaring any ARDI loop complete or unclaiming a PR.
+
+## check-context-closure.py is advisory; its test pins ai-config's own import count
+
+- **Editing the `@`-import list in ai-config's own `CLAUDE.md` changes a number that [scripts/test_check_context_closure.py](../scripts/test_check_context_closure.py) asserts, so that edit must bump the pin and must be verified with the TEST, not the script.**
+  [scripts/check-context-closure.py](../scripts/check-context-closure.py) reports and exits 0 even while over budget and even while reporting an unbalanced fence, deliberately (see its `validate.yml` step comment).
+  Its test file is a separate `validate` step in the same job, and that one hard-fails: it pins the exact number of anchored imports the repo's `CLAUDE.md` yields.
+  So adding one `@shared/...` line turns `validate` red with a message naming a count, and the advisory script says nothing about it either way.
+  Bump the pin in the same commit, and record the bump in the annotation style the pin's own comment already uses (each past bump names the PR and the import that caused it).
+  The pin is a magic number on purpose: deriving it from `CLAUDE.md` would make it agree with whatever the file says and stop guarding anything.
+- **This is the exact-count instance of the general rule in [ardi](../shared/workflow/ardi.md), "Running a script is not running its tests, and an 'advisory' check can have a hard-gating twin".**
+  The other live-corpus assertions in `scripts/test_*.py` are bounds or thresholds that ordinary growth does not break, so this is the only one an unrelated edit invalidates outright.
+  Do not read the count off this bullet: it is stated once, in the assertion, and repeating it here would be a second copy to go stale.

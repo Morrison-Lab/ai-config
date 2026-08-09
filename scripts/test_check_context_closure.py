@@ -259,9 +259,18 @@ for bad in ("0", "-1", "abc"):
         # A crash downstream is not "rejected at parse time".
         rejected = False
     check(f"--bytes-per-token {bad} is rejected by the parser", rejected)
+# This real-corpus call, and the one at the end of this file, raise the char
+# cap deliberately. Both assert things about the PARSER, and leaving them on
+# the real cap would make them fail the day `CLAUDE.md` grows past it -- a
+# test failing because corpus content grew, reported as a parser regression.
+# The cap's own signal belongs to the check step, which reports it once and
+# says what it means.
 check(
     "a positive --bytes-per-token is accepted",
-    ccc.main(["--bytes-per-token", "4", "--budget", "100000000"]) == 0,
+    ccc.main(
+        ["--bytes-per-token", "4", "--budget", "100000000",
+         "--root-char-cap", "100000000"]
+    ) == 0,
 )
 check("positive_int accepts a positive value", ccc.positive_int("4") == 4)
 
@@ -618,14 +627,26 @@ _f, _m, _i, _amb = ccc.walk_closure(
 check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 
 # This repo's own CLAUDE.md is the real instance, so pin it: the count must
-# stay at 71 anchored imports whatever the fence handling does. (Was 69 until
+# stay at 73 anchored imports whatever the fence handling does. (Was 69 until
 # ai-config#1065 added @shared/workflow/learn-from-review-findings.md; 70 until
-# ai-config#1205 added @shared/workflow/agent-teams.md.)
+# ai-config#1205 added @shared/workflow/agent-teams.md; 71 until ai-config#1325
+# added @shared/writing/ambiguous-reference.md; 72 until ai-config#1334 moved
+# the existing-PR-branch section out to
+# @shared/workflow/use-existing-pr-branch.md.)
+#
+# The pin is deliberately a magic number rather than a value derived from
+# CLAUDE.md. Deriving it would make the guard vacuous, since it would then
+# agree with whatever the file happens to say -- the one thing a regression
+# guard must not do. The cost is that an @-import edit has to bump it by hand,
+# so the assertion name below carries that remedy: `check` prints only the
+# name, and this is the failure an import-list edit actually produces.
 check(
-    "this repo's CLAUDE.md still yields 71 anchored imports",
+    "this repo's CLAUDE.md still yields 73 anchored imports "
+    "(adding or removing an @-import bumps this pin -- update the count and "
+    "record the bump in the annotation style of the comment above)",
     len(ccc.import_paths(
         (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    )[0]) == 71,
+    )[0]) == 73,
 )
 
 # --- round-6 review findings ------------------------------------------------
@@ -749,7 +770,79 @@ check("this repo's own closure resolves more than just the root", len(files) > 1
 # this check switched off.
 check(
     "unresolved inline @tokens in this corpus are reported, not fatal",
-    ccc.main(["--budget", "100000000"]) == 0,
+    ccc.main(["--budget", "100000000", "--root-char-cap", "100000000"]) == 0,
+)
+
+# --- the root file's hard character cap -------------------------------------
+# The harness's own cap on the auto-loaded CLAUDE.md, which differs from the
+# byte budget in kind: it is external, it is denominated in characters, and
+# crossing it is a defect rather than a prompt. See DEFAULT_ROOT_CHAR_CAP.
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    (base / "CLAUDE.md").write_text("x" * 100 + "\n", encoding="utf-8")
+
+    check(
+        "the root's character count is read from the decoded text",
+        ccc.root_char_count(base, "CLAUDE.md") == 101,
+    )
+    check(
+        "an unreadable root yields None rather than 0",
+        ccc.root_char_count(base, "absent.md") is None,
+    )
+
+    # Blocking WITHOUT --strict is the whole point: the byte budget is ours
+    # to miss, this cap is the harness's. Both directions are asserted, so a
+    # future change that quietly gates it on --strict fails here.
+    check(
+        "over the char cap exits 1 without --strict",
+        ccc.main(
+            ["--base", str(base), "--budget", "100000000", "--root-char-cap", "50"]
+        ) == 1,
+    )
+    check(
+        "under the char cap exits 0",
+        ccc.main(
+            ["--base", str(base), "--budget", "100000000", "--root-char-cap", "500"]
+        ) == 0,
+    )
+
+    # Characters, not bytes. A file of multi-byte glyphs is comfortably under
+    # a character cap it would blow through if the check measured bytes --
+    # which is the one test that distinguishes the two implementations, and
+    # this corpus's prose is not pure ASCII.
+    # \u2014 (em-dash) is 3 bytes in UTF-8 and 1 character. Written as an
+    # escape rather than the glyph, per ascii-punctuation-in-source: the
+    # rule covers string literals in code, and the escape is the form it
+    # prescribes when the character itself is the point.
+    (base / "CLAUDE.md").write_text("\u2014" * 100, encoding="utf-8")
+    check(
+        "the cap counts characters rather than bytes",
+        ccc.root_char_count(base, "CLAUDE.md") == 100
+        and (base / "CLAUDE.md").stat().st_size == 300,
+    )
+    check(
+        "a multi-byte file under the char cap passes",
+        ccc.main(
+            ["--base", str(base), "--budget", "100000000", "--root-char-cap", "150"]
+        ) == 0,
+    )
+
+over, text = ccc.render_root_chars(95, "CLAUDE.md", 100, 0.90)
+check("the warning band fires below the cap", not over and "WARNING" in text)
+check("the warning band reports the remaining headroom", "5 to spare" in text)
+
+over, text = ccc.render_root_chars(50, "CLAUDE.md", 100, 0.90)
+check("a comfortable margin reports the count without warning", not over
+      and "WARNING" not in text and "50 " in text)
+
+over, text = ccc.render_root_chars(101, "CLAUDE.md", 100, 0.90)
+check("over the cap reports by how much", over and "over by 1" in text)
+
+over, text = ccc.render_root_chars(None, "CLAUDE.md", 100, 0.90)
+check(
+    "an unreadable root says the cap was NOT checked rather than passing quietly",
+    not over and "NOT checked" in text,
 )
 
 print(f"\n{passes} passed, {failures} failed")

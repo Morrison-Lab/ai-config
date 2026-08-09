@@ -237,6 +237,20 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   (`ucdavis/bcs`, 2026-07-30: an agent driving #473 was handed #468's "Needs more work" verdict, with two HIGH findings about restricted-data handling, and was three sentences into treating them as #473's before the body's own `## Code Review: ucdavis/bcs#468` header caught it.
   The same query had been used for two earlier rounds and was right both times, by luck.)
 - **Finding the PR(s) linked to an issue from the CLI: use the REST timeline endpoint, not `gh issue view --json`.** `gh issue view --json` has no `timelineItems` field (that exists only on `gh pr view --json`), so `gh issue view <N> --json timelineItems` errors — and a `2>/dev/null` swallows the error so the check silently returns nothing and *looks* like it passed. Query the timeline instead, with three gotchas: (1) in a `cross-referenced` event, `source.type` is always `"issue"`, so a PR is one whose `source.issue.pull_request` is non-null (`source.type == "pull_request"` never matches); (2) `--paginate` is required, or `gh api` returns only the first 30 events and silently misses a later cross-reference; (3) filter `source.issue.state` if you only want open PRs. Full call: `gh api --paginate repos/<o>/<r>/issues/<N>/timeline --jq '.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title)"'`. (Learned over three review rounds on #287.)
+- **Whether `#N` is an issue or a PR is decided by the `pull_request` key, and `gh issue view` cannot decide it.**
+  GitHub's REST API models every PR as an issue, so `gh issue view <N>` resolves a **PR** number too, returning its
+  `state` (`MERGED`) as though it were an issue's --- a success there is evidence of nothing.
+  Only `gh pr view <N>` discriminates, and it does so by *failing* on an issue
+  (`Could not resolve to a PullRequest`), so the informative answer is an error rather than a value, which is easy to
+  read as a broken command.
+  One call answers it directly: `gh api repos/<o>/<r>/issues/<N> --jq '.pull_request != null'` --- `true` for a PR,
+  `false` for an issue.
+  Reach for it whenever two sources disagree about what `#N` is, rather than trusting whichever one resolved;
+  per `metacognitive-monitoring.md`, a two-source disagreement is a prompt for a third check, not a finding.
+  (Measured 2026-08-09 on `Morrison-Lab/ai-config`: `#1328` returns `false` and `#1334` returns `true`, while
+  `gh issue view 1334` returns `{"number":1334,"state":"MERGED",...}` without complaint.
+  Same key the timeline bullet above relies on.
+  What it adds is that the plain `gh issue view` path answers for both kinds, and so distinguishes neither.)
 - **`gh pr checks` does NOT say which checks are REQUIRED, and the legacy protection endpoint 404s on ruleset-gated repos — so the lazy check confirms the wrong answer.** `gh pr checks` reports check *state* only; required-ness is nowhere in its output. And `gh api repos/<o>/<r>/branches/<branch>/protection` returns `404 Branch not protected` on a repo that gates the branch with a **ruleset** rather than legacy branch protection, which reads as "nothing is required" and *confirms* the mistaken assumption. Query rulesets too, before any "ready to merge" or "that check doesn't gate us" claim:
   ```bash
   gh api "repos/<o>/<r>/rulesets" --jq '.[] | "\(.id) \(.name) \(.target) \(.enforcement)"'
@@ -538,6 +552,51 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     needed tag shas from `actions/`, `r-lib/`, `r-hub/`, `quarto-dev/`, and
     `JamesIves/`, none of them in session scope, and `add_repo` would have been
     five pointless scope grants for five ref lookups.)
+  - **The `github.com` web host 403s on scope exactly as `api.github.com`
+    does, so `curl -I https://github.com/<owner>/<repo>` answers nothing
+    about whether the repo exists.**
+    The bullet above covers the API host; the web host is the one reached for
+    when the question is existence rather than data, and it is the likelier
+    mistake because a `403` there reads as GitHub refusing rather than as the
+    proxy refusing.
+    Both hosts return the proxy's verdict on **session scope**, so a repo can
+    be public, healthy, and 403 --- and the same probe returns 200 for a repo
+    that is merely in scope, which makes the pair look like a real signal
+    about the repos rather than about the allowlist.
+    `git ls-remote` is the instrument, per the ladder above, and it
+    discriminates every case.
+    Measured 2026-08-09, from a session scoped to `Morrison-Lab/ai-config`
+    and `Morrison-Lab/wai`:
+
+    | repo | `curl -I` | `git ls-remote <url> HEAD` |
+    |---|---|---|
+    | `d-morrison/ai-config` | 403 | `7d843650...` |
+    | `Morrison-Lab/ai-config` | 200 | `7d843650...` |
+    | `d-morrison/macros` | 403 | `8ce5d0cf...` |
+    | `Morrison-Lab/macros` | 403 | `fatal: could not read Username` |
+
+    Read the `curl` column as a table of the allowlist and nothing else:
+    the one 200 is `ai-config`, which is in scope.
+    Two things the `ls-remote` column settles that no `curl` here could.
+    An **identical HEAD under two owner spellings** proves a live rename
+    redirect, which makes it the sharpest rename detector available --- better
+    than the `raw.githubusercontent.com` probe in this file's own
+    "`raw.githubusercontent.com` FOLLOWS repository-rename redirects" bullet,
+    since that one has to be run under the *new* name with a known-moved
+    control or it answers backwards, whereas comparing two shas needs no
+    control at all.
+    And `fatal: could not read Username for 'https://github.com'` is how an
+    **absent or private** repo presents on an anonymous read: git falls back
+    to asking for credentials rather than reporting a 404.
+    Set `GIT_TERMINAL_PROMPT=0` so that case fails immediately instead of
+    blocking on a prompt.
+    Note the pair `d-morrison/macros` resolving while `Morrison-Lab/macros`
+    does not --- the opposite direction from `ai-config`, which is why a
+    blanket owner rewrite across both would break a working reference.
+    (`Morrison-Lab/wai#54`, 2026-08-09: a `.gitmodules` still naming
+    `d-morrison/ai-config` resolved only through the rename redirect, so
+    nothing was visibly broken; `macros` was correctly left pointed at
+    `d-morrison`.)
 - **The proxy allows branch creation/push but BLOCKS branch deletion.** Pushing a
   *new* branch (even one other than the harness-assigned `claude/...`) works, but a
   delete push — `git push origin --delete <b>` or `git push origin :<b>` — is rejected.

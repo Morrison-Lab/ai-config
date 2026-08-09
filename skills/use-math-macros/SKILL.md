@@ -118,6 +118,36 @@ comm -23 \
 # review the remainder: each must be standard LaTeX (\frac, \text, \sim, \hat, …)
 ```
 
+**When the math being rewritten is a *definition*, expand both sides before
+believing it.**
+The library aliases heavily, so a definition can name a concept on the left and
+define it in terms of a second macro on the right, while both expand to the same
+glyph.
+`\score(\lambda) \eqdef \llik'(\lambda)` reads as a definition in source and
+renders as a symbol defined as itself, because `\def\score{\ell'}` and
+`\def\llik{\ell}` collapse the two sides.
+This is the opposite failure from inventing a macro name: every command resolves,
+so the `comm -23` check above passes cleanly and the render emits no warning.
+
+Two greps settle it, and both are cheap:
+
+```bash
+# what each side of the definition actually expands to
+grep -nE '^\\def\\(score|hess|llik)\b' <macros-dir>/macros.qmd
+
+# whether the library already defines this concept canonically
+grep -nE '^\\def\\def[A-Z]' <macros-dir>/macros.qmd
+```
+
+The library's own canonical definitions spell the operator out rather than
+restating an alias, so prefer that form: `\deriv{\lambda}\llik(\lambda)` for a
+score, `\dderiv` for a Hessian.
+An alias-only definition is a deviation from house style, not a shorthand for it.
+Verify the result by reading the **rendered** page, per
+[`fact-check-prose`](../../shared/writing/fact-check-prose.md)'s "A definition
+can resolve, render, and still say nothing" --- source cannot show this, and
+neither can a check that the crossref resolves.
+
 ### 5. Fix the vignette spellcheck leak
 
 Custom macro command-names (`paren`, `Ep`, `expit`, `Prf`, `cb`, …) **leak into
@@ -185,5 +215,10 @@ Commit the rewritten `.qmd`, the `include` line, the submodule pointer, and the
   with `\providecommand` — MathJax skips it because the built-in is already
   defined, so the built-in survives and the render breaks silently. Use `\def` /
   `\renewcommand` for those names (see step 2 and `memories/preferences.md`).
+- ❌ Defining a macro'd concept by restating another macro (`\score \eqdef
+  \llik'`) --- the aliases collapse, so the rendered page shows a symbol defined as
+  itself while the source reads as a proper definition.
+  Spell the operator out (`\deriv`, `\dderiv`), and check the rendered output
+  rather than the source.
 - ❌ Changing a formula's meaning while "condensing" — preserve the math exactly;
   only re-express it.

@@ -323,6 +323,67 @@ reports `review / claude-review` and `review / require-review` as `skipped`,
 so no wait is needed there either.
 (ai-config#754, 2026-07-28.)
 
+**Reading the caller's `on:` block is not reading the workflow's trigger
+conditions, because a reusable workflow gates independently --- at job level,
+in another repo.**
+The paragraph above is right that the draft gate is "a property of the
+workflow, not something to assume", and it leaves open *which file* to read.
+[`ardi`](ardi.md) answers that with "read the review workflow's `on:` block",
+which is complete for a self-contained workflow and incomplete for a thin
+caller.
+
+A caller that delegates via `uses:` carries the `on:` block and frequently
+carries no gating at all.
+`on: pull_request: types: [opened, synchronize, ready_for_review, reopened]`
+therefore looks like an unconditional trigger while the reusable workflow it
+calls refuses drafts in its job `if:`, one repo away.
+So the conclusion drawn from the caller alone is not merely unsupported, it is
+**inverted**: the trigger list is the widest thing in the file, and the
+narrowing lives somewhere the file only names.
+
+Two things make the incomplete read feel finished.
+An `on:` block is what a reader is *told* to check, so finding one satisfies
+the instruction.
+And the caller usually opens with a comment explaining what it delegates and
+why, which reads as the file having accounted for itself.
+
+The `uses:` line is the tell, and it names the ref to read at.
+Resolve it and grep the job-level `if:`, per
+[`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)'s rule about
+reading a dependency at the ref a run actually used rather than at `main`:
+
+```bash
+grep -nE '^\s*uses:.*\.github/workflows/' .github/workflows/<review-workflow>.yml
+git clone --depth 1 --branch <ref> https://github.com/<owner>/<repo> /tmp/rw
+grep -nE 'draft|if:' /tmp/rw/.github/workflows/<called-workflow>.yml
+```
+
+An out-of-scope repo still clones, since the git proxy serves anonymous public
+reads --- see [`memories/github.md`](../../memories/github.md)'s ladder, which
+covers the same fallback for ref lookups.
+
+- **Do:** follow a `uses:` delegation to the called workflow at its pinned
+  ref, and read the job-level `if:` there, before concluding anything about
+  when a review fires.
+- **Do:** treat a caller whose only content is `on:`, `permissions:`, `uses:`,
+  and `with:` as having told you nothing about gating.
+- **Don't:** read a caller's `on:` types list as the trigger condition --- it
+  is the widest of the two constraints, and the narrowing is in the callee.
+- **Don't:** conclude a repo lacks a draft gate from the absence of `draft` in
+  the file you happened to open.
+
+(`Morrison-Lab/wai#54`, 2026-08-09: wai's `claude-code-review.yml` carries
+`types: [opened, synchronize, ready_for_review, reopened]` and no draft
+filter, which was read as this repo burning a review round on every draft
+scaffold PR.
+It does not.
+The caller is a 90-line delegation to
+`Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`, whose
+`gather-context` and review jobs both gate on
+`github.event.pull_request.draft == false` at lines 185 and 346.
+The false premise reached a UMS brief as a candidate learning and was caught
+only by cloning gha and grepping it.)
+
 So the per-issue order becomes: claim → branch → **open the draft PR now** →
 implement → mark ready-for-review → ARDI.
 

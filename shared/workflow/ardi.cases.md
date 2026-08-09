@@ -288,6 +288,26 @@ as non-blocking on #1007.
 are under the default and hard-fails, turning `validate` red on the next push.
 The claim had to be retracted on #1007 as well as fixed in the PR.)
 
+(Morrison-Lab/ai-config#1325, 2026-08-08: the same pair one script over, and
+this time the gating assertion was an exact count rather than a threshold.
+A new `@shared/writing/ambiguous-reference.md` import was added to this repo's
+own `CLAUDE.md`, and the pre-push sweep reported, verbatim, that
+"`check-context-closure.py` exits 0 and reports the same 1 unbalanced
+`CLAUDE.md` fence before and after; its over-budget figure is pre-existing".
+Every clause of that is true, and the script does exit 0 while over budget by
+roughly 894,000 bytes.
+`scripts/test_check_context_closure.py` pins the number of anchored imports
+`CLAUDE.md` yields, so the new import took it past the pin and `validate` went
+red on `FAIL: this repo's CLAUDE.md still yields 71 anchored imports`.
+The two steps sit about thirty lines apart in one job, and the advisory one
+carries a comment explaining that it reports rather than gates --- so reading
+the workflow around the script confirms the harmless reading and never reaches
+the twin.
+Recorded as an execution miss rather than a coverage gap: the rule above
+already said to run the test files, so the follow-up was to make the failure
+self-documenting and to write the repo-specific mechanism down, not to restate
+the rule a fourth time.)
+
 (d-morrison/altdoc#95 and #96, 2026-07-29: twice in one session.
 On #95 a test asserting "aborts when no venv is configured" read that
 precondition from the ambient environment; the local run missed it because

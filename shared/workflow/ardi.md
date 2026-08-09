@@ -467,8 +467,9 @@ misdirects exactly the reader the table was written for.
 
 The remedy is not to re-read the table.
 Re-reading catches a stale **description**, because a description can be checked
-against the code it describes; it cannot catch a stale **count**, because a wrong
-count reads exactly as plausible as the right one.
+against the code it describes.
+It cannot catch a stale **count**, because a wrong count reads exactly as
+plausible as the right one.
 Derive each figure with a command at push time, and paste the command beside the
 figure, per
 [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md).

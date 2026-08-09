@@ -62,3 +62,86 @@ and both PRs merged within the following half hour.
 The splitting rule directly above already existed and was simply not applied
 when #847 was filed, which is the argument for stating its consequence rather
 than only its instruction.)
+
+## Deferring a request out of the current change is allowed, and the tracking issue is what allows it
+
+The rule at the top governs work you are about to start.
+Its mirror governs work you are declining to start now: a request that arrives
+while a change is already in flight, and that would grow that change past what
+it set out to do.
+Such a request may be deferred, on your own judgment, **provided the deferred
+item is filed as an issue in the same reply**.
+The permission and the condition are one rule rather than two.
+An untracked deferral is not a deferral, it is dropping the request in the
+vocabulary of scope discipline.
+
+**The requests this covers come from the user, which is what makes it worth
+stating.**
+A reviewer's finding already has a Defer disposition, per [`ardi`](ardi.md)'s
+ARD step, and a request the user explicitly defers already routes to
+[`defer-issue`](../../skills/defer-issue/SKILL.md).
+Neither reaches the commonest case, where the user asks for something adjacent
+mid-review and the standing instinct treats any direct request as
+automatically in scope for whatever happens to be open.
+A request can be genuinely wanted and genuinely out of scope for the current
+PR at once, and saying so is a service rather than a refusal.
+
+**It is a grant of latitude and not an instruction to defer.**
+The default is unchanged: do what was asked.
+What the grant removes is the bind a mid-flight request creates, where
+responsiveness and scope discipline pull opposite ways and doing everything
+asked is the only move that reads as cooperative.
+
+**File the issue so it stands alone**, by this fragment's own standard.
+The conversation that produced the request will not survive it, so an issue
+reading "do the thing we discussed" defers nothing and only moves the loss
+somewhere harder to notice.
+
+**Say which parts you deferred and why, in the same reply.**
+This is the near-miss, and it reads as compliance from the inside: three
+things were asked, two were done, the reply describes the two, and nothing
+states that a third existed.
+A silent partial delivery is indistinguishable from having done the whole
+thing, so the user finds out what was dropped only by rereading their own
+request.
+Name the deferred item, give the reason, and link the issue.
+
+### The boundary with technical debt
+
+[`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md) says
+a filed issue records debt rather than paying it, and that a defect you have
+already diagnosed inside your own diff is yours to fix now.
+Nothing here softens that, and the two rules read as contradictory until the
+boundary is drawn.
+
+That fragment supplies the discriminator, so use its question:
+
+> Does the diff I am about to push contain the thing I just diagnosed as
+> wrong?
+
+When it does, the request is not out of scope, it is the scope, and no issue
+number buys it out.
+This rule covers work **adjacent to** the diff instead: pre-existing prose the
+change never authored, a broader sweep the change happens to touch one
+instance of, a follow-on improvement that would be welcome later.
+
+- **Do:** defer an out-of-scope request on your own judgment, and file the
+  tracking issue in the same reply that declines it.
+- **Do:** name each deferred item, its reason, and its issue, so a partial
+  delivery is visible as partial.
+- **Do:** ask the technical-debt question first, and fix rather than defer
+  whatever the current diff itself introduced.
+- **Don't:** treat a request as in scope merely because the user made it
+  directly.
+- **Don't:** defer without filing --- an untracked deferral is a dropped
+  request, and it reads as scope discipline while being the opposite.
+- **Don't:** read this as a reason to defer; the default is still to do what
+  was asked.
+
+(Directive from the user, 2026-08-09: "cai: it's ok to defer out-of-scope
+requests from me; just make sure to track them in issues".
+It came mid-review on `UCD-SERG/serocalculator#654`, a Quarto
+methodology-vignette formalization, where adjacent requests kept arriving in
+quick succession --- convert propositions to theorems, sweep the chapter for
+overclaims, reformat multi-equality display equations --- several of them
+touching prose the PR had never authored.)

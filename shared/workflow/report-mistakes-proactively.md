@@ -226,9 +226,11 @@ the issue's priority, not whether it's recorded.
   will work them soon.
 - [`upstream-issues`](upstream-issues.md) supplies the where-to-file ladder
   this rule's external-repo case defers to.
-- The [`defer-issue`](../../skills/defer-issue/SKILL.md) skill fires only
-  on the **user's** explicit deferral ("let's handle this later"); this
-  rule is self-initiated — no prompt needed.
+- The [`defer-issue`](../../skills/defer-issue/SKILL.md) skill fires on the
+  **user's** explicit deferral ("let's handle this later"), and on
+  [`issue-first`](issue-first.md)'s standing permission to defer a request
+  the user made that is out of scope for the change in flight; this rule is
+  self-initiated, with no prompt needed.
 - [`ardi`](ardi.md)'s Defer step already tracks out-of-scope **review
   findings**; this rule generalizes the same habit to any mistake noticed
   in any task.

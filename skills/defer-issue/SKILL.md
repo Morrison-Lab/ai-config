@@ -25,6 +25,16 @@ User says something like:
 Don't fire just because something looks unfinished. The user must
 explicitly defer.
 
+**One standing exception, which is a grant rather than a loophole.**
+[`issue-first`](../../shared/workflow/issue-first.md)'s deferral section
+licenses deferring a request the user made but that is out of scope for the
+change in flight, on your own judgment, so long as the deferred item is filed
+in the same reply.
+Run this skill's procedure for that case too, since the filing mechanics are
+identical and only the trigger differs.
+Read that section's boundary first: a defect inside your own diff is never
+deferrable, however cleanly the issue is written.
+
 ## Procedure
 
 ### 1. Identify the forge

@@ -1,6 +1,6 @@
 ---
 name: "mwc"
-description: "Codex wrapper for the ai-config Claude skill `mwc`. Grant standing session-scoped permission to merge fully-clean PRs autonomously, without asking per PR, for the rest of the current session. Use when the user says 'merge when confident', 'mwc', 'merge at will', 'maw', 'you can merge PRs when you're confident', or otherwise grants a forward-looking, session-wide merge exception. Use when Codex is asked to use `mwc`, `/mwc`, or the corresponding ai-config/Claude skill workflow."
+description: "Codex wrapper for the ai-config Claude skill `mwc`. Grant standing session-scoped permission to merge fully-clean PRs autonomously, without asking per PR, for the rest of the current session; also records the one standing per-repository grant (PRs targeting Morrison-Lab/ai-config), which needs no session step. Use when the user says 'merge when confident', 'mwc', 'merge at will', 'maw', 'you can merge PRs when you're confident', or otherwise grants a forward-looking, session-wide or repo-wide merge exception. Use when Codex is asked to use `mwc`, `/mwc`, or the corresponding ai-config/Claude skill workflow."
 ---
 
 # mwc (Codex wrapper)

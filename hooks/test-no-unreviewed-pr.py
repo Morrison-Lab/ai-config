@@ -960,12 +960,13 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     res("x", "", False),
                     say("Chained an undo and a push in one call.")], False,
      "an AMBIGUOUS chained transition still withholds the arm")
-# NOT evidence for the fix, and labelled so rather than counted: this case
-# passes under every mutation of the arm logic, because each of them arms at
-# one push or the other. It pins the REBUTTAL's premise instead -- that
-# withholding on ambiguity costs one push rather than the session -- and it
-# fails if a later change ever makes an ambiguous transition pop `live`, which
-# is what would turn that bounded miss into a permanent one.
+# This began as NOT evidence -- it passed under every round-7 mutation, since
+# each of them armed at one push or the other, and it was labelled so. Round 8
+# made it load-bearing: it is now the only case that fails when an uncertain
+# entry is made unarmable, which is the obvious wrong way to stop a stale entry
+# from silencing a later PR. So it pins both the REBUTTAL's premise (withholding
+# on ambiguity costs one push, not the session) and the half of the round-8 fix
+# that keeps that premise true.
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     bash("gh pr ready 1038 --undo; git push -u origin next",
                          tid="x"),
@@ -973,6 +974,42 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     bash("git push -u origin next2", tid="p2"), res("p2", ""),
                     say("...and the next push recovers the arm.")], True,
      "the next push recovers an arm the ambiguous call withheld")
+
+# Round-8 finding (#1283). The `live` pop is gated on the SAME attributability
+# check as the discharge, so a merge chained ahead of a push never pops even
+# when it plainly succeeded. That stale entry does not just affect its own PR:
+# `_rearm` needs exactly one live PR, so the next PR opened in that session
+# pushes the count to two and arming goes silent for EVERY PR thereafter --
+# the dangerous direction, and unbounded, unlike the one-push cost of
+# ambiguity. The trace is the reviewer's own, reproduced.
+REQ_2000 = ('gh api "repos/o/r/pulls/2000/requested_reviewers" -X POST '
+            "-f 'reviewers[]=copilot-pull-request-reviewer[bot]'")
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr merge 1038 --squash && "
+                         "git push -u origin next-branch", tid="mp"),
+                    res("mp", "Merged pull request o/r#1038"),
+                    bash("gh pr create --title next", tid="c2"),
+                    res("c2", "https://github.com/o/r/pull/2000\n"),
+                    bash(REQ_2000, tid="q2"), res("q2", OK),
+                    bash("git push -u origin next-branch", tid="p5"),
+                    res("p5", ""),
+                    say("Merged 1038 in a chained call, then opened, "
+                        "requested and re-headed 2000.")], True,
+     "a PR retired by a chained call does not silence a LATER PR's arm")
+# The draft mirror of the same stale entry, which reaches `live` by the other
+# result path (_note_drafted rather than the terminal pop).
+case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                    bash("gh pr ready 1038 --undo && "
+                         "git push -u origin next-branch", tid="up"),
+                    res("up", "{}"),
+                    bash("gh pr create --title next", tid="c2"),
+                    res("c2", "https://github.com/o/r/pull/2000\n"),
+                    bash(REQ_2000, tid="q2"), res("q2", OK),
+                    bash("git push -u origin next-branch", tid="p5"),
+                    res("p5", ""),
+                    say("Drafted 1038 in a chained call, then opened, "
+                        "requested and re-headed 2000.")], True,
+     "a PR drafted by a chained call does not silence a LATER PR's arm")
 
 # Gate: a merged PR can gain no further reviewable head. Without this, the
 # ordinary post-merge shape (merge, branch, push) nags about the merged PR.

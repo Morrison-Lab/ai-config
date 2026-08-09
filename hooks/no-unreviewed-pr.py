@@ -779,13 +779,15 @@ def _note_drafted(live, num):
             live[key] = _AMBIGUOUS
 
 
-def _rearm(obligations, live, tid, turn_targets=(), pending_arm=None):
+def _rearm(obligations, live, tid, turn_targets=(), pending_arm=None,
+           uncertain=()):
     """Re-arm the reviewer obligation for the sole live PR, if a push earns it.
 
     Three gates, each of which alone withholds the arm:
 
-      * EXACTLY ONE live PR. With none the push belongs to no tracked PR at all
-        (the overwhelming majority of pushes -- a session that opened no PR must
+      * EXACTLY ONE live PR, counting only the CERTAIN ones (see `uncertain`
+        below). With none the push belongs to no tracked PR at all (the
+        overwhelming majority of pushes -- a session that opened no PR must
         never be nagged). With two or more the push is unattributable, and
         arming every candidate would demand N requests for one push and wedge
         the session.
@@ -807,10 +809,31 @@ def _rearm(obligations, live, tid, turn_targets=(), pending_arm=None):
     other releasing path here owes (shared/principles/fail-fast.md). The
     candidate is parked under the transition's own tool_use_id and resolved by
     _resolve_arm when that result arrives.
+
+    `uncertain` holds PRs a transition tried to retire without an attributable
+    result. Membership in `live` answers two questions that pull in OPPOSITE
+    safe directions once the answer is uncertain, which is why one flag cannot
+    serve both:
+
+      * "may a future push arm THIS PR?" -- keeping it is the over-warn
+        direction, so an uncertain entry is still armable.
+      * "does this entry make the push unattributable?" -- keeping it is the
+        UNDER-warn direction, because a stale entry pushes the count past one
+        and silently disables arming for every OTHER PR for the rest of the
+        session.
+
+    So an uncertain entry is skipped when counting rivals, and armed only when
+    it is the sole live PR. A PR merged by a command chained ahead of a push no
+    longer suppresses a later, unrelated PR's arm, while the sole-PR recovery
+    that bounds the cost of ambiguity is kept.
     """
-    if len(live) != 1:
+    certain = {n: r for n, r in live.items() if n not in uncertain}
+    if len(certain) == 1:
+        num, repo = next(iter(certain.items()))
+    elif not certain and len(live) == 1:
+        num, repo = next(iter(live.items()))
+    else:
         return
-    num, repo = next(iter(live.items()))
     if num is None or repo is _AMBIGUOUS:
         return
     # This turn is drafting or retiring THIS PR, so the arm waits for that
@@ -830,7 +853,7 @@ def _rearm(obligations, live, tid, turn_targets=(), pending_arm=None):
                  push=True))
 
 
-def _resolve_arm(pending_arm, rid, failed, obligations, live):
+def _resolve_arm(pending_arm, rid, failed, obligations, live, uncertain=()):
     """Settle an arm a same-turn transition deferred, now that its result is in.
 
     Fires only on POSITIVE evidence the transition FAILED. That asymmetry is
@@ -857,7 +880,7 @@ def _resolve_arm(pending_arm, rid, failed, obligations, live):
     """
     ptid = pending_arm.pop(rid, None)
     if ptid is not None and failed:
-        _rearm(obligations, live, ptid)
+        _rearm(obligations, live, ptid, uncertain=uncertain)
 
 
 def _repo_ok(a, b):
@@ -903,6 +926,10 @@ def scan(path):
     # transition tool_use_id -> the push tool_use_id whose arm it deferred. An
     # arm may not be cancelled by a transition that merely tried and failed.
     pending_arm = {}
+    # PR numbers a transition tried to retire without an attributable result.
+    # They stay armable on their own, and stop counting as rivals that would
+    # make some LATER PR's push unattributable. See _rearm.
+    uncertain = set()
     # num -> repo for PRs this session opened or readied and still open. A
     # PR leaves on a draft transition and on any terminal state, so a later
     # push never re-arms review for a PR that can no longer take one.
@@ -1072,11 +1099,20 @@ def scan(path):
                         if not clear_failed:
                             _clear(obligations, cnum, crepo)
                             _note_drafted(live, cnum)
+                            uncertain.discard(cnum)
+                        elif failed:
+                            # It certainly did NOT retire the PR.
+                            uncertain.discard(cnum)
+                        elif cnum is not None:
+                            # Non-last, non-failed: the outcome is unknowable,
+                            # so the PR stays armable but stops blocking a
+                            # later PR's arm.
+                            uncertain.add(cnum)
                         # This same result settles any arm the draft deferred:
                         # a draft that FAILED left the PR ready, so the push
                         # that re-headed it still owes a reviewer.
                         _resolve_arm(pending_arm, rid, failed, obligations,
-                                     live)
+                                     live, uncertain)
                     # A PR that MERGED or CLOSED is past the point where a
                     # reviewer request does anything: the POST this guard
                     # prescribes returns HTTP 200 on a merged PR and adds
@@ -1095,7 +1131,7 @@ def scan(path):
                         # close that FAILED retired nothing, so an arm it
                         # deferred is owed after all.
                         _resolve_arm(pending_arm, rid, failed, obligations,
-                                     live)
+                                     live, uncertain)
                         if xlast and not failed:
                             xnum, xrepo = xnum or rnum, xrepo or rrepo
                             _clear(obligations, xnum, xrepo)
@@ -1103,6 +1139,15 @@ def scan(path):
                             # head: it leaves the live set, and no later push in
                             # this session re-arms review for it.
                             live.pop(xnum, None)
+                            uncertain.discard(xnum)
+                        elif failed:
+                            uncertain.discard(xnum or rnum)
+                        elif (xnum or rnum) is not None:
+                            # A terminal command chained ahead of something
+                            # else. Whether it retired the PR is unknowable, so
+                            # the entry stays for its own sake and stops
+                            # counting against a later PR (see _rearm).
+                            uncertain.add(xnum or rnum)
                     # A PR merged OUTSIDE this session (by a human, or by the
                     # merge queue) leaves no action in the transcript -- only an
                     # observation. Discharged on POSITIVE evidence only: the
@@ -1143,7 +1188,7 @@ def scan(path):
                     # PR head, so it never arms.
                     if str(inp.get("branch") or "") not in ("", "main", "master"):
                         _rearm(obligations, live, tid, turn_targets,
-                               pending_arm)
+                               pending_arm, uncertain)
                     continue
                 if name in EDIT_TOOLS:
                     num, repo = input_ident(inp)
@@ -1274,7 +1319,8 @@ def scan(path):
                 # yields to the transition -- but only DEFERS to it, since a
                 # transition that fails retires nothing (see _resolve_arm).
                 if pushed:
-                    _rearm(obligations, live, tid, turn_targets, pending_arm)
+                    _rearm(obligations, live, tid, turn_targets, pending_arm,
+                           uncertain)
     return obligations, text
 
 

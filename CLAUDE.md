@@ -927,6 +927,10 @@ Its last section generalizes past MCP: when a standing rule names a mechanism th
 
 The `st` (Start Task) skill operationalizes this; `gi` (Grab Issue) is the path when the issue already exists.
 
+Its last section is the mirror, and it covers requests that arrive rather than work you go looking for: a request the user makes mid-flight may be deferred on your own judgment when it would grow the change past what it set out to do, provided the deferred item is filed as an issue in the same reply and the reply says what was deferred and why.
+The grant is latitude rather than an instruction, and the tracking issue is the whole of what licenses it --- an untracked deferral is a dropped request wearing the vocabulary of scope discipline.
+Read the fragment's boundary with `dont-incur-technical-debt` before invoking it, since a defect inside your own diff stays yours to fix now.
+
 ## Issue or discussion? Pick the venue by best practice, not by precedent
 
 @shared/workflow/choose-issue-or-discussion.md

@@ -89,6 +89,42 @@ merge, so the right action is `git reset --hard origin/<branch>`.
 The remote carried `b8d2273`, a merge of the same two parents, with tree
 `1bda1bc`, identical to the local merge's.)
 
+**Matching parents with a differing tree means the two sessions resolved
+the same merge differently --- merge the two commits together, don't
+reset onto either one.**
+Identical parents but a different tree is not the "same merge" case
+above: a concurrent session (a human, or an `@claude`-style bot
+reacting to PR activity) merged the same `main` commit into the same
+branch, but resolved a real conflict (or made an additional fix)
+differently than you did.
+`git reset --hard origin/<branch>` here silently discards whatever your
+version got right that theirs didn't --- e.g. a version-parity bump
+their merge didn't carry, or a merge-conflict resolution theirs got
+wrong.
+Instead, fetch and merge the remote branch into your local one (an
+ordinary three-way merge, since the two commits share both parents as a
+common ancestor between them); resolve any conflict on its own merits,
+the same as any other merge, then push the result.
+
+- **Do:** compare parents first, then trees; matching parents with a
+  differing tree calls for a merge of the two commits, not a reset.
+- **Do:** merge the remote branch in normally, resolving whatever
+  differs on its own merits.
+- **Don't:** `git reset --hard` onto a same-parents-different-tree
+  remote commit --- that discards your own resolution outright, on the
+  assumption the two were interchangeable.
+
+(`UCD-SERG/serocalculator#654`, 2026-08-08: `main` had absorbed a
+same-version dev bump from an unrelated PR, so this session merged
+`main` in and bumped the version past it while separately resolving a
+real conflict in `inst/WORDLIST`.
+The `@claude` review bot's own `main`-sync had pushed a merge with the
+same two parents in the meantime, but it left the version at parity ---
+still failing `version-check` --- and had never seen the `WORDLIST`
+conflict at all, since its sync predated that conflict existing.
+Merging the two commits, rather than resetting onto either, kept both
+fixes.)
+
 **Handing off mid-task to another agent, on user request ("finish what you're
 doing, then relinquish holds; I'll put another agent on them"):** don't just
 stop --- leave the next agent a clean starting point. On each claimed PR/issue:

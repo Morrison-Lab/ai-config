@@ -79,7 +79,11 @@ Operationalized by:
 (the review side),
 [`least-flexible-tool`](../coding/least-flexible-tool.md) (the general
 form: prefer the construct that can do least),
-[`avoid-nesting`](../coding/avoid-nesting.md),
+[`avoid-nesting`](../coding/avoid-nesting.md) (and its prose/math
+counterpart,
+[`informal-definitions`](../writing/informal-definitions.md#this-is-kiss-applied-to-definitions-not-a-separate-rule) ---
+don't nest one definition inside another, or name two concepts in one
+heading with only one getting a citable id),
 [`tidy-code`](../coding/tidy-code.md), and
 [`per-operation-grouping`](../coding/per-operation-grouping.md).
 

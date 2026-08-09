@@ -167,7 +167,7 @@ need to *compute* or *cite*, not just how *persuaded* they would be.
    own example.
 5. If it's shape 3's motivation/justification commentary rather than a
    second concept, **move it to a `::: notes` aside** immediately after
-   the definition div, rather than deleting it --- the project's own
+   the definition div, rather than deleting it --- the document's own
    convention already uses `::: notes` throughout for exactly this kind
    of "why this matters" content, so the fix is relocation, not loss.
 

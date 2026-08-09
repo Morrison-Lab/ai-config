@@ -88,22 +88,26 @@ Both shapes below are the prose/math counterpart of
 definitions": a definition, like a function, should do one job and stand on
 its own, and defining it inside another definition's scope is the same
 complexity cost the coding rule already prices --- it hides a reusable unit
-inside a container that wasn't built to hold it. The general principle is
+inside a container that wasn't built to hold it.
+The general principle is
 [KISS](../principles/README.md#kiss--keep-it-simple-stupid); this file is
 its definitions-specific operationalization.
 
 **Shape 1: a new concept defined inside a div that names something else.**
 Already covered above --- the div's id and heading name concept A, and the
 body's own naming sentence or bolded term precisely defines concept B, with
-B getting no id of its own. A reader who wants to cite B has nothing to
-link to except A's div, which is about a different thing.
+B getting no id of its own.
+A reader who wants to cite B has nothing to link to except A's div,
+which is about a different thing.
 
 **Shape 2: a div's own heading names two concepts, and only one gets an
-id.** A heading like "Likelihood and log-likelihood" under a single
+id.**
+A heading like "Likelihood and log-likelihood" under a single
 `{#def-likelihood}` div is not shape 1's case of a concept smuggled in
 unnamed --- both concepts are named, right there in the heading --- but the
 second one (log-likelihood) still has no citable id of its own, because a
-div can only have one. The heading itself is the tell:
+div can only have one.
+The heading itself is the tell:
 
 ```bash
 rg -n '^#### .+ and .+$' <file>
@@ -111,9 +115,9 @@ rg -n '^#### .+ and .+$' <file>
 
 For each hit, check whether the body gives *each* named concept its own
 precise definition (its own `\eqdef`, its own "is defined as ...") rather
-than defining one and merely mentioning the other in passing. Two full
-definitions sharing one heading and one id is the finding; one definition
-whose statement happens to use the word "and" is not.
+than defining one and merely mentioning the other in passing.
+Two full definitions sharing one heading and one id is the finding; one
+definition whose statement happens to use the word "and" is not.
 
 ## Fixing a confirmed finding
 

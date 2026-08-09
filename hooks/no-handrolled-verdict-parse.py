@@ -368,6 +368,18 @@ def main() -> int:
     except Exception:
         return 0  # fail open
 
+    # The emit is inside its own try for the same reason the decision is: the
+    # docstring promises this fails OPEN on any trouble, and a crash while
+    # BUILDING the refusal would otherwise exit non-zero with a traceback --
+    # failing open in the docstring and not in the code.
+    try:
+        emit(phrase, targets, checked)
+    except Exception:
+        return 0
+    return 0
+
+
+def emit(phrase, targets, checked):
     unchecked = sorted(targets - checked) if targets else []
     which = f" for PR #{', #'.join(unchecked)}" if unchecked else ""
     print(json.dumps({

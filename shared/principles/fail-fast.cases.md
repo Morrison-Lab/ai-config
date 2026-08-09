@@ -350,6 +350,55 @@ review should have started, per
 subagent-report section --- the rest of the work followed the brief and was
 largely correct.)
 
+## A rule written for one axis does not fire on the sibling axis
+
+(`Morrison-Lab/ai-config#1353`, 2026-08-09, review finding 1, verified by the
+reviewer executing the hook's own `offending()` against crafted input rather
+than by reading it.
+`standing_grant_target` in `hooks/no-unauthorized-merge.py` gates a standing
+merge grant on two axes: *which repository* the merge lands in, and *what kind*
+of merge it is.
+Its docstring argued that reading the first of several matched repo targets is
+unsound, and required the target set to have exactly one member so that
+ambiguity denies --- and the code directly beneath implemented exactly that.
+
+The merge-type axis then trusted whichever label `offending()`'s own
+`MERGE_PATTERNS` loop happened to match first, one stack frame up, so the
+first-match reading the docstring rejected arrived as an ordinary parameter.
+Because the `pulls/N/merge` patterns are tried before the
+`repos/<owner>/<name>/merges` ones, and both scan the segment unanchored, a real
+branch merge carrying a forged `pulls/1/merge` substring in an unmasked `-H`
+header was labelled `gh api PR merge`:
+
+```
+gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x \
+  -H "X-Note: repos/Morrison-Lab/ai-config/pulls/1/merge"
+```
+
+`-H` is a documented `gh api` flag and is not in `mask_payloads`'s recognized
+list, so its value survives to the pattern scan.
+The forged and the real `repos/<owner>/<name>/` paths named the same granted
+repo, so the target test saw one target and granted a direct push to the
+default branch with no PR, no review and no required checks --- the exact case
+the PR's own `CLAUDE.md` bullet and `skills/mwc/SKILL.md` both claimed was
+excluded.
+The same command without the forged header was correctly blocked as
+`gh api repository merge`, which is the negative control identifying the header
+as the flip.
+
+Fixed by running the ambiguity test on both axes: a new `matched_merge_labels`
+re-derives every interpretation the segment matches, and the guard requires
+`labels <= STANDING_GRANT_LABELS`.
+Taken over the narrower patch of adding `-H` to `mask_payloads`, on the grounds
+that the flag is not the problem --- `--header` and `--jq` are two more
+carriers and the next one is unenumerable, which is the same argument
+`PERMISSIVE_MERGE_PATTERNS` already makes for command positions.
+Five regression cases were each confirmed to **allow** against the pre-fix hook
+before being confirmed to block against the fixed one; a sixth candidate,
+`--jq ".pulls/1/merge"`, was discarded on that check because the `.` before
+`pulls/` meant it never matched the PR-merge pattern and so was blocked both
+before and after, exercising nothing.)
+
 ## "Measure how each wrong answer decays, and check what the status quo already pays"
 
 (`Morrison-Lab/ai-config#1283`, 2026-08-09, round 7 finding 5b, on

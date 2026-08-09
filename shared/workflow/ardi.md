@@ -194,6 +194,11 @@ the bullets in this fragment record it failing at this exact boundary.
       This fires on a **prose** diff too: a body that explains the claim the
       round just walked back is stale in the way that matters most, and
       "reconciling prose" does not feel like changing what the PR does.
+      Every **number** in the body was re-*derived* by command rather than
+      re-read, with the command pasted beside it --- a wrong count reads
+      exactly as plausible as a right one, so reading is no instrument for it,
+      and a base figure owes its own derivation rather than riding on the
+      delta's.
 - [ ] **The diff's deleted lines were read**
       (`git diff origin/main...HEAD | grep '^-'`), and each one was a decision
       rather than collateral from an edit's blast radius --- a reviewer reads
@@ -427,6 +432,80 @@ casually, with nothing in the repository to contradict it.
   commit you just made.
 - **Don't:** expect review to catch it --- a reviewer has no reason to suspect
   a citation, and the body is not in the diff they are reading.
+
+**A verification table you write in the PR body is the same defect one artifact
+over, and re-reading it cannot catch a wrong number.**
+[`fully-clean`](fully-clean.md)'s "a reviewer's own verification block can be
+wrong while its verdict is right" is written entirely about a block arriving
+**as evidence** from a reviewer, and points at this fragment's skimmed-audit
+bullet as the author-side counterpart.
+That bullet governs care-per-item during a batched audit.
+It does not govern the commoner author-side case, where each figure was
+gathered carefully and the table simply stopped being true.
+
+Two things make the author-side version distinct from the reviewer's, and both
+argue for deriving rather than reading.
+
+**It goes stale rather than being wrong on arrival.**
+A verification table is written once, early, when the round's evidence is fresh,
+and then later rounds change the diff underneath it.
+So the failure has no moment of carelessness to catch: the number was right when
+typed, and nothing about adding three more test cases feels like invalidating a
+paragraph elsewhere.
+That makes it a pause-point problem in
+[`skill-checklists`](skill-checklists.md)'s sense rather than an arithmetic one,
+which is why the remedy is a step at the boundary and not more care at the desk.
+
+**It sits in the PR body, which nothing re-reads.**
+[`address-every-comment`](address-every-comment.md) already establishes that the
+body is in no diff, so no reviewer reads it as part of the change and no `grep`
+over the diff finds it --- the same property that lets an invented SHA survive
+in the bullet above.
+It is also what a maintainer reads while deciding to merge, so on a PR whose
+argument for safety *is* the verification table, a wrong headline number
+misdirects exactly the reader the table was written for.
+
+The remedy is not to re-read the table.
+Re-reading catches a stale **description**, because a description can be checked
+against the code it describes; it cannot catch a stale **count**, because a wrong
+count reads exactly as plausible as the right one.
+Derive each figure with a command at push time, and paste the command beside the
+figure, per
+[`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md).
+That fragment's "a count in the prose above a block" section is the same remedy
+for a count whose subject sits one line away and which your own edit falsifies
+first; here the distance is the problem rather than the adjacency, and the
+subject is a diff between two commits rather than a block in one file.
+
+- **Do:** re-derive every count in the PR body with a command at push time, and
+  publish the command next to the count.
+- **Do:** treat any round that changes the diff as expiring every figure the
+  body already states, not only the figure that round was about.
+- **Don't:** substitute re-reading for re-deriving --- re-reading is the right
+  instrument for a stale description and no instrument at all for a stale
+  number.
+- **Don't:** report a delta without deriving its base; a base carried from
+  recollection is unfalsifiable by any later check of the delta.
+
+(`Morrison-Lab/ai-config#1353`, 2026-08-09, review finding 2.
+The PR body claimed the guard's suite "grew from 226 to 238 cases (12 new
+BLOCK, 10 new ALLOW)".
+Neither number was derived: the base had never been counted at all, and the
+BLOCK delta was stale from an earlier drafting round that later rounds had
+added cases past.
+The reviewer counted the `BLOCK`/`ALLOW` list lengths with `ast.parse` rather
+than trusting the file's own runner, and reported 202 to 228 at the review head
+`7d063f2`.
+Round 1's own fix then added five more regression cases, so by `2f0b697` the
+real figures were 202 to 233 list cases (BLOCK 157 to 178, +21; ALLOW 45 to 55,
++10), or 212 to 243 including the runner's ten inline checks.
+That second movement is the point rather than a footnote: the *reviewer's*
+correctly-derived count went stale within one round too, so the defect is not
+carelessness at any one desk but a figure published where nothing re-measures
+it.
+The corrected body now shows the base, head and delta per group, states the
+`ast.parse` derivation, and keeps the wrong figures on the record rather than
+silently overwriting them, since the review thread refers to them.)
 
 **The read side of that comparison can lag a push by a few seconds, so test
 the two *local* refs against each other before concluding anything failed.**

@@ -754,6 +754,75 @@ One `assert` catches this where the differs-from-original check cannot.
 - **Don't:** treat "the artifact changed" as "the intended mutation applied" ---
   a corrupted mutant differs from the original too.
 
+**A fifth outcome, which both asserts above pass: a mutation that substitutes a
+DERIVED value for its source measures nothing, and scores a clean zero.**
+The block above splits on whether the mutant *says what its author wrote*, and
+its remedy is to build the mutant from a raw literal and assert that the value
+it compares against is a real member of the set it names.
+Neither reaches this case, because here the mutant says exactly what its author
+wrote.
+It is syntactically perfect, it differs from the original, it runs to
+completion, and it is **semantically vacuous** --- the value substituted in is
+computed *from* the value substituted out, so both sides of the mutation carry
+the same ancestor and the behaviour cannot change.
+
+The zero it reports is the dangerous part, because a zero from a mutation
+harness has an established, reassuring meaning: no test distinguishes this
+clause, so the clause is a candidate for the measured-dead treatment two blocks
+below.
+A vacuous mutant produces that same zero while establishing nothing at all, so
+it does not merely fail to test the clause --- it argues, in the harness's own
+vocabulary, that the clause is redundant.
+That is the [`fail-fast`](../principles/fail-fast.md) figure where a check's
+failure path and its pass path print the same thing, arriving at the one number
+a reader is most likely to act on.
+
+The check is provenance, and it is one question per mutant: **can the
+replacement vary independently of the thing it replaces?**
+Where one is computed from the other --- a masked form of the same buffer, a
+normalized copy, a filtered subset, a field read off the same object --- the
+mutation is probing a shared ancestor and the answer is fixed before the suite
+runs.
+Trace the replacement back to its assignment rather than judging it by name;
+two locals whose names suggest different stages of a pipeline are exactly the
+pair most likely to be one derived from the other.
+
+When the two are not independent, mutate somewhere that is.
+The **call site** is usually the nearest such place, because it is where the
+genuinely different input still exists before any derivation has been applied.
+
+Read this as the same word "independent" the block below applies to a harness's
+cross-check figure, moved one artifact over: there the second quantity must have
+an origin the harness did not compute, and here the replacement must have an
+origin the original did not compute.
+Both fail silently, and both fail by comparing something against itself.
+
+- **Do:** trace a mutant's replacement to its assignment and confirm it is not
+  derived from the value it replaces, before recording the mutation's score.
+- **Do:** mutate the call site, or wherever the undeepened input still exists,
+  when the two candidate values inside the function are not independent.
+- **Do:** treat a zero from a mutant you have not provenance-checked as
+  unmeasured rather than as evidence of redundancy.
+- **Don't:** read "the mutation applied, and the mutant is faithful" as "the
+  mutation tested something" --- both asserts above pass on a vacuous mutant.
+- **Don't:** pick a replacement by name similarity; the names that read as
+  sibling stages of a pipeline are the ones most likely to be ancestor and
+  descendant.
+
+(`Morrison-Lab/ai-config#1353`, 2026-08-09, found while re-running the mutation
+matrix after review round 1 changed the clause set.
+The mutant for the payload-masked-target clause in
+`hooks/no-unauthorized-merge.py` swapped `masked_seg` for `inert_seg`.
+Those are not two independent views of the command: `inert_seg` is
+`mask_inert_quotes(masked_seg, ...)`, so it is derived from `masked_seg` and
+every forged target masked out of the one is already absent from the other.
+The mutation applied cleanly, the mutant was exactly what its author intended,
+and it failed **0** of 233 cases --- which, sitting in a column whose other
+zeros were being argued about as measured-dead paths, read as one more
+redundant clause.
+Mutating the call site to pass the genuinely unmasked segment instead failed
+**3**, which is the figure the PR body now reports for that clause.)
+
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**
 A harness bug and a real finding are indistinguishable from the harness's own

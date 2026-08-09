@@ -230,10 +230,17 @@ the footer is body text anyone who can comment can paste, and it names a
 class rather than an instance, so a concurrently-watching PR Steward carries
 the identical footer.
 The absence of a footer survived both objections and was kept.
-The source file establishes no threat model at all --- grepping it for
-`untrusted|attacker|adversar|injection` returns zero hits --- which is the
-point rather than a mitigating detail: the claim did not change, and the
-question around it did.)
+The source file was not written with a threat model in view: grepping it at
+`7d84365`, this change's own base, for
+`untrusted|attacker|adversar|injection` returns zero hits.
+That is the point rather than a mitigating detail --- the claim did not
+change, and the question around it did.
+
+Anchor that grep to the base ref rather than running it bare, because this
+same change edits that file and introduces two of those very words.
+A bare present-tense count would therefore have been true when written and
+false on merge, which is this section's own subject arriving one artifact
+early: the sentence stayed put while the file underneath it moved.)
 
 ## In review
 

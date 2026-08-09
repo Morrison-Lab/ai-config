@@ -14,169 +14,10 @@ passes. See README.md, "Shared content".
 
 ## Run UMS proactively, as learnings accumulate
 
-Don't wait for `/clear` or the end of a task to run `ums` (Update Memories and Skills).
-As soon as a learning worth saving shows up during a session — a corrected mistake, a new preference, a tool quirk, a workflow gap — run UMS right then, interleaved with the main work, rather than batching it for a wrap-up step at the end.
+@shared/workflow/run-ums-proactively.md
 
-Still run UMS before `/clear` too, as a final catch-all for anything accumulated since the last proactive pass — but treat that as a backstop, not the trigger to wait for.
-
-**In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."**
-"As learnings accumulate" is easy to defer indefinitely during heads-down execution across several PRs, since no single moment feels like the obvious trigger --- a merge is a natural, unmissable boundary to pause at instead.
-
-**A PR's clean review verdict is a proactive-UMS checkpoint in its own right, and it fires strictly earlier than the merge -- run the pass there rather than holding it until the PR lands.**
-The bullet above picked the merge because it is unmissable, and it is; the problem is that it may never arrive on this session's clock.
-Merging is human-gated: [`ardi`](shared/workflow/ardi.md)'s terminal action is to report the PR ready, never to merge it.
-So a clean-but-unmerged PR can sit for hours, for days, or across a `/clear`, and the review lifecycle's learnings sit with it in conversation state that may not survive the wait.
-Waiting buys nothing either, because by the time the verdict is clean every finding has already been Addressed, Rebutted, or Deferred -- the review has taught everything it is going to teach, and the merge adds only whatever the merge itself surfaces.
-So run UMS when the verdict comes back clean, and treat the merge-time pass as a top-up rather than the trigger.
-
-**Offering to run UMS is not running it.**
-Everything above rules out *deferring* the pass to a wrap-up step.
-It has to rule out the adjacent move as well, because that one reads as compliance rather than evasion: surface the learning now, and run the pass once the user says go.
-
-An offer to run UMS is worth exactly what an unrecorded learning is worth, since both live only in the conversation and both die with it.
-The two asymmetries that decide it are already written down, for issues rather than for learnings, in [`report-mistakes-proactively`](shared/workflow/report-mistakes-proactively.md)'s "Filing is not gated on approval" section: a redundant entry is cheap while a lost one is not, and only the user can say a thing is not worth keeping --- which they can do after it is written, not only before.
-Read that section rather than re-deriving the argument here.
-The pattern is identical, and only the artifact differs.
-
-What stays genuinely worth asking is **where** a learning belongs when the destination is unclear, never **whether** to record it --- the same split that fragment draws around its own dupe-check step.
-Write it down first, then ask.
-
-**The offer also survives being phrased as a decision, and that form is harder to see.**
-The bullet above rules out the question.
-It does not rule out the sentence that states an intention and then hands the timing back: "I'll run it now unless you'd rather I do something else first."
-
-That reads as a commitment rather than a request, which is exactly why it passes self-review.
-It is not one.
-The pass still does not start, the user still has to spend a turn, and the trailing clause is doing the same work the question did --- it just moved the gate from *whether* to *when*.
-It usually appears at the end of a long status recap, where it reads as courtesy about sequencing rather than as a request for permission.
-
-The test is mechanical, so apply it rather than judging the tone: **if the sentence about UMS contains a conditional referring to the user, it is an offer.**
-"Unless you'd rather", "if that works", "let me know if" --- all of them.
-Run the pass, then report it in the past tense, and put any genuine sequencing question in its own sentence about the *other* work.
-
-- **Do:** run the pass and say "ran UMS; here is what it recorded".
-- **Do:** ask about ordering the remaining work, once the pass is already done.
-- **Don't:** attach a user-conditional to a stated intention to run it.
-- **Don't:** read "I will" as sufficient --- the trailing clause is what decides it.
-
-**A new instruction arriving at a checkpoint does not cancel the checkpoint.**
-The bullet above covers the pass you *announce* and never run; this is the one you never announce at all, because something else arrived first.
-A merge or clean verdict is usually the exact moment I report back, so it is also the moment the next request lands.
-That request then reads as the live task, and the checkpoint silently evaporates -- never refused, never deferred out loud, just never performed.
-Note the asymmetry with the deferral the earlier bullets describe: there no moment feels like the trigger, whereas here a moment *did* fire and was preempted.
-The remedies differ, and the preempted case cannot be fixed by naming more checkpoints.
-
-The fix is cheap, because the pass is short.
-When a request arrives at a checkpoint, either run UMS first and then start the request, or say in the same reply that the pass is owed and when it will run -- the latter being a real commitment, per the bullet above, not an offer.
-
-The same skip has a second route worth checking, since several skills end in a UMS step ([`post-merge`](skills/post-merge/SKILL.md), [`ardi`](shared/workflow/ardi.md), [`wrap-up`](skills/wrap-up/SKILL.md)).
-Reporting one of those skills complete asserts that its final step ran, so before calling a merge wrapped up, confirm the UMS pass actually happened rather than only the steps before it.
-
-**A merge you discover rather than perform is still a checkpoint, and it is the one that never feels like a moment.**
-Every bullet above describes a checkpoint that *happens* while you are watching: you push, the verdict lands, the PR merges, you report back.
-The merge someone else performs while you are away arrives differently --- as a row in a status table, hours later, alongside a dozen other rows.
-Nothing about reading `MERGED` in a poll resembles the event the rule was written for, so the checkpoint passes without ever presenting itself as one.
-
-The asymmetry is worth naming because it inverts the usual risk.
-A checkpoint you witness is at least *available* to be skipped.
-This one is never noticed to begin with, and the more of them arrive at once, the less any single one reads as an occasion to stop.
-A status poll that flips several PRs from open to merged is therefore a strong UMS trigger, not a weak one.
-
-So treat any transition **to** merged as the trigger, whoever performed it and whenever you learn of it.
-The cheap check is the poll you are already running: if a PR you were driving reads merged now and did not last time you looked, the pass is owed.
-
-- **Do:** run the pass when a status query first shows a PR merged, exactly as if you had merged it yourself.
-- **Do:** treat a batch of merges discovered together as one checkpoint carrying all of their learnings, rather than as background news.
-- **Don't:** require that you witnessed the merge for it to count.
-- **Don't:** let a poll that reports several merges roll straight into the next task because no single row felt like an event.
-
-**Recommending that the session end is itself a UMS trigger, and it is the one route where skipping the pass destroys the learnings rather than merely delaying them.**
-The three bullets above all describe a pass that is *postponed*: no moment felt like the trigger, or a moment fired and was announced, or a moment fired and was preempted.
-In each of those the material survives in the conversation, so a later pass can still recover it.
-This route closes that door.
-Proposing `/clear`, a fresh session, or a handoff while the pass is owed is proposing to discard exactly what the pass exists to save, and the recommendation reads as responsible precisely because it is framed as tidying up.
-
-Disclosing the owed pass in the same message as the `/clear` flag is not enough either.
-That is the *offer* failure one level up: it names the debt in the same breath as recommending the action that voids it, which leaves the user to notice the contradiction.
-So invert the order.
-Run the pass, then flag the stopping point.
-A flag that has to mention an owed UMS is a flag raised too early.
-
-**"I am low on context" does not exempt it, and that claim needs the same test any other asserted blocker does** (see [`ardi`](shared/workflow/ardi.md)'s "Verify a blocker you assert").
-It is the one blocker that is never tested, because it feels like introspection rather than a claim, and it is self-serving in a way the others are not: it excuses the work while sounding diligent.
-The asymmetry also runs the wrong way for caution.
-A pass that records the top three learnings in a few edits is worth far more than a thorough one that never runs, so shrink the pass rather than deferring it, and say what got left out.
-If context genuinely runs out mid-pass, the entries already written are durable and the session ends having banked most of the value.
-
-- **Do:** run the pass, then flag the stopping point, then let the user decide how to end the session.
-- **Do:** shrink a pass you genuinely cannot finish, record the top items first, and say what was left out.
-- **Don't:** recommend `/clear`, a fresh session, or a handoff while a pass is owed, however clearly the debt is disclosed alongside it.
-- **Don't:** cite remaining context as a reason to defer, without having attempted the pass.
-
-**"That would mean another open PR" is the same deferral wearing repo hygiene, and it is the one that sounds like good judgment.**
-Every bullet above rules out a deferral whose stated reason is about *me* --- no moment felt like the trigger, a request preempted it, context is short.
-This one's stated reason is about the **repo**, so it reads as restraint rather than avoidance: holding a fourth concurrent PR looks like consideration for the reviewer and the merge queue.
-
-Three things dissolve it.
-A UMS PR is *usually* disjoint --- it touches a memory file or a fragment nothing else in flight is editing --- so it usually costs no merge-order constraint and no conflict, which is exactly the case `CLAUDE.md`'s own merge-order section says to state plainly rather than manage.
-Verify that rather than assuming it, because two UMS passes in one session land in the same few files and collide readily.
-When they do, the answer is still to open the PR and resolve the collision, not to hold the pass.
-The queue is durable and the learning is not: an extra open PR waits patiently, while an unrecorded learning dies with the session, so the two costs are not comparable.
-And the deferral is usually announced in the same breath as reporting a PR ready, which is the moment the next instruction arrives --- so "once this lands" reliably becomes never.
-
-The permission to announce a pass rather than run it, granted above, is for a **real** blocker.
-Not wanting another PR is a preference, and a preference does not license the announcement.
-
-- **Do:** open the UMS PR immediately, however many of yours are already open, and resolve any collision it turns out to have.
-- **Do:** check whether its files overlap your other open PRs, and say either that it is disjoint or exactly where it collides, so the count does not read as a problem.
-- **Don't:** defer a pass to keep the open-PR count down, or until an unrelated PR merges.
-- **Don't:** treat "I will write it once #N lands" as a commitment --- it is the announced-and-never-run failure with a due date attached.
-
-**Correcting your own understanding of a technical issue is itself a trigger, and it fires immediately rather than at the next checkpoint.**
-Every trigger above is an event in the *work*: a verdict lands, a PR merges, a poll reports a merge, a stopping point gets proposed.
-This one is an event in what you *believe*, and it leaves no artifact behind.
-Nothing merges, no check turns green, and the only record is that you were wrong and then were not.
-
-That absence is why it needs naming rather than being left to "as learnings accumulate".
-A corrected misunderstanding feels resolved the moment it is corrected, so the correction reads as the completion when it is only the input.
-Nothing is left outstanding, so nothing prompts the pass, and the learning evaporates with the conversation that produced it.
-That puts it alongside the recommend-a-fresh-session route above, as a case where skipping the pass destroys the material rather than merely delaying it.
-It is also unusually valuable material, because a correction names both the model that was wrong and the thing that displaced it -- which is exactly the pair the section below asks every entry to carry.
-
-So run the pass at the correction, not at the end of whatever task the correction unblocked.
-The task will still be there; what you believed ten minutes ago will not.
-
-- **Do:** run the pass as soon as a technical belief is corrected, before resuming the work it was blocking.
-- **Do:** record the belief that was wrong alongside the fact that replaced it, not just the fact.
-- **Don't:** wait for the unblocked task to reach a checkpoint of its own -- that checkpoint carries the task's learnings, not the correction's.
-- **Don't:** treat "I know the right answer now" as the pass having happened.
-
-**A false claim about *state* is the same trigger, and it is the one you can be wrong about without ever holding a wrong belief.**
-The bullet above covers a corrected *understanding* --- a model of how something works, which you held, and which turned out to be false.
-The commoner failure has no belief in it at all.
-You assert that a repository is public, that a PR is green, that a corpus lacks a feature, that a list has nine entries.
-None of those were things you thought.
-They are things you did not look up, or looked up once against a stale checkout and then repeated.
-
-That absence is why the trigger above does not obviously fire here.
-Nothing that feels like a belief gets corrected, so the discovery reads as a small factual fix rather than as the event this section is about.
-It also arrives mid-task, at the moment the natural impulse is to repair the claim and carry on --- which is the opposite of a checkpoint, and is exactly when nothing prompts a pass.
-
-Treat any discovery that you were wrong as the trigger, whatever kind of wrong it was.
-The class matters for what you *record*, not for whether the pass runs: a corrected belief yields the belief and its replacement, while a false state claim yields the query you should have run, which is the more reusable of the two.
-
-Two mechanisms make this survivable rather than merely mandated.
-**Delegate the pass**, per "Use subagents when helpful" below, which already pre-authorizes an owed UMS pass as sidecar work --- that is what keeps the pass from competing with the task the correction interrupted.
-And **algorithmatize the trigger** rather than relying on noticing it, per [`algorithmatize-checks`](shared/workflow/algorithmatize-checks.md): `hooks/remind-ums-after-error.py` detects a first-person admission in the transcript and injects a reminder on the next prompt when no memory, skill, or shared write followed it.
-That hook only ever *adds context*.
-An error admission must never be blocked, delayed, or suppressed --- see its own docstring, and the "Never activate a new hook before its PR merges" gate in [`README.md`](README.md).
-Building such an instrument is itself delegable sidecar work, not a reason to postpone the pass.
-
-- **Do:** run the pass the moment you discover any claim of yours was false, including one you never believed so much as asserted.
-- **Do:** record the *query that settles it* for a state claim, not just the corrected value.
-- **Do:** delegate the pass, and delegate the instrument, rather than queueing either.
-- **Don't:** treat a factual correction as too small to record because no belief changed.
-- **Don't:** wait for the task the correction interrupted to reach a checkpoint of its own.
+Don't wait for `/clear`, a wrap-up step, or a merge to run `ums` (Update Memories and Skills) --- run it the moment a learning shows up: a corrected mistake, a new preference, a tool quirk, a workflow gap.
+The fragment above walks through the specific moments this gets skipped even by someone trying to follow the rule --- an offer to run it standing in for running it, a new instruction preempting an owed pass, a recommendation to `/clear` or start fresh while a pass is still owed, a PR-count worry used to justify deferring it, and a corrected belief or a corrected false state-claim that never gets banked because nothing merged --- and gives the fix for each: run the pass now, delegate it as pre-authorized sidecar work, and report it in the past tense rather than announcing an intention.
 
 ## Record both the pattern and the anti-pattern
 
@@ -203,99 +44,16 @@ It also applies to this entry: below is its own pair.
 
 ## Flag good moments to `/clear` in long-running sessions
 
-Proactively tell me — don't wait to be asked — when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
-Use the `⚠️ FLAG` tag from this file's chat-output-tagging convention, one line, at the natural end of that turn's recap — don't interrupt mid-task to say it.
+@shared/workflow/flag-session-boundaries.md
 
-Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, **any PR this session opened or pushed to that has not yet merged or closed**, an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
-`/clear` wipes conversation state outright (unlike compaction, which summarizes) — anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
-If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per "Recommending that the session end is itself a UMS trigger" above.
-
-**That PR clause is a bright line, not a judgment call, and it was narrowed deliberately.**
-It used to read "a PR I'm actively babysitting", which invites the question of whether *this* PR still counts as active --- and the answer always sounds like no.
-A PR whose checks are green and whose review has not come back yet feels finished: there is nothing to do, so there is nothing live.
-That reading is what the rule has to rule out, because "waiting on a review round" is the single most common state for a PR to be in when a session reaches a natural pause, and it is exactly when the flag is most tempting.
-
-Two things make an unmerged PR live regardless of how quiet it looks.
-[`ardi`](shared/workflow/ardi.md) obliges the session to keep monitoring it until it merges or closes, so proposing a stop proposes abandoning that loop mid-flight.
-And a review can still come back with findings, which is work only this conversation has the context to address cheaply.
-
-Open PRs belonging to *other* sessions do not trigger this --- `wrap-up`'s sweep surfaces them, and they are worth reporting, but they are not this conversation's live state.
-
-- **Do:** hold the flag until every PR this session opened or pushed to has merged or closed.
-- **Do:** report an unmerged PR's status plainly instead, with no stopping-point suggestion attached.
-- **Don't:** treat "green checks, just awaiting review" as not-live --- it is the archetypal live PR.
-- **Don't:** flag a stopping point and disclose the open PR in the same breath, which is the same too-early flag the UMS rule above rejects.
-
-**Run `wrap-up`'s state sweep *before* flagging a stopping point, not after the user asks for one.**
-The paragraph above says not to flag while live state remains; it doesn't say how to know.
-Answering that from memory only covers the PRs and branches *this conversation* created, which is exactly the blind spot: a bot-opened PR, a leftover branch from the harness or an earlier session in the same container, or another session's PR in the same repo never entered the conversation, so nothing about them feels outstanding.
-Run the sweep --- open PRs and issues per repo, `git status`, local branches, worktrees --- and let its output decide, the same way [`fully-clean`](shared/workflow/fully-clean.md) insists a PR's readiness comes from a fresh query rather than a cached verdict.
-
-**Two mechanical details about that leftover-branch case, one of which reads as the opposite of what it is.**
-The harness assigns its branch name in *every* scoped repo and leaves each one checked out on it, including repos the session never opens.
-So the sweep finds the branch sitting in places nothing in the conversation points at, and two things follow from that.
-
-Point 3 of the "Keep ai-config and repo checkouts fresh" section quietly does nothing in those repos.
-It fast-forwards `main` only when `main` is the checked-out branch, and here it never is, so a repo you never opened stays as stale as the container left it.
-
-And `git branch -D` refuses, with `cannot delete branch 'X' used by worktree at '<path>'`.
-That message names a worktree, which reads as a second checkout holding live parallel work --- the one condition that would genuinely make deleting the branch unsafe.
-It is almost always just that repo's ordinary checkout sitting on the branch.
-So the cautious reading is the wrong one here, and acting on it leaves a dead branch in place for the next session to re-discover and re-adjudicate.
-
-Settle liveness from the branch's own commits rather than from the error text, and settle it before deleting anything.
-Zero commits in `origin/main..<branch>`, plus absence from the remote, together mean there is nothing to lose.
-Resist adding an ancestry check beside the first of those.
-An empty `origin/main..<branch>` range is the same fact as `git merge-base --is-ancestor <branch> origin/main` succeeding, so running both confirms one thing twice rather than two things once.
-Once liveness is settled, switch that repo to `main` --- which is what the refusal is really asking for --- and then delete.
-
-- **Do:** run the sweep across every scoped repo, not only the ones this session worked in.
-- **Do:** settle liveness first, then `git checkout main` in that repo, then `git branch -D`.
-- **Don't:** read `used by worktree` as evidence that a separate live worktree exists.
-- **Don't:** assume a repo the session never opened is on `main`.
-
-**When flagging a good moment to `/clear`, offer archiving as the default alternative.** Whenever there's a meaningful chance I'd want to come back to this conversation later, recommend leaving the session alone and starting a fresh one for the next task, instead of `/clear`ing it -- the old session stays fully retrievable (nothing to lose), at the cost of a small navigation step to reopen it. Reserve a bare `/clear` recommendation for when nothing in the session is worth revisiting; when in doubt, default to the archive-and-start-new option since it's strictly safer.
-
-**`/compact` is a third alternative, for weak continuity rather than a clean break.**
-When the next move is to keep working on *loosely related* things in the same window -- no concrete open item, so not the live state that triggers the `compress-session` flag, but enough of a thread that a clean slate would lose something worth keeping -- recommend `/compact` instead of archive-and-start-new.
-It carries a lossy summary forward in place, keeping the gist and skipping the reopen step, at the cost of a session that keeps growing and detail that is lost.
-Pick among the options by what the *next* work needs from this session.
-Nothing, and unrelated to what's next, is archive-and-start-new by default, or a bare `/clear` only when nothing is worth revisiting;
-the gist in the same window is `/compact`;
-the full live task state is the `compress-session` flag, not this one.
-Archive still beats compact for pure *reference*, since a retrievable full thread dominates a lossy summary, so reserve the compact recommendation for continuation rather than preservation.
-
-**Starting a new PR is itself a moment to weigh compacting, clearing, or a fresh session -- not only a natural stopping point is.**
-The options above all fire on a *stopping* point: a task wrapped, a PR merged, a question answered.
-Opening a new PR is a *starting* point, and it feels the opposite -- momentum rather than pause -- which is exactly why the consideration gets skipped.
-But a new PR is where a fresh chunk of context begins accumulating, so it is the cleanest seam at which to decide whether to carry this session forward or reset, and deciding *before* the new state exists is cheaper than untangling it after.
-
-So before opening a new PR, pause and pick from the same menu, by what the *new* PR needs from this session:
-
-- Unrelated to everything in the current window, and nothing here is worth revisiting -> archive-and-start-new (the default), or a bare `/clear` only when nothing is worth revisiting.
-- Builds loosely on the current thread -> `/compact`.
-- Small, fresh context -> do nothing and open the PR.
-
-The bright line still governs, and it changes what "reset" can even mean here.
-If this session has an unmerged PR it opened or pushed to, it owes that PR active monitoring (per [`ardi`](shared/workflow/ardi.md)), so *this* session must not be `/clear`ed or walked away from -- the new PR either rides along in the same window (where `compress-session` or `/compact` can still lighten the carried context), or goes to a genuinely separate fresh session while this one keeps monitoring.
-Only when no such live PR remains is the full menu (archive-and-start-new, `/clear`, `/compact`, or nothing) open, chosen by the criteria above.
-Run UMS first if it is owed, per "Recommending that the session end is itself a UMS trigger" above -- not disclosed inside the flag.
-
-- **Do:** pause at the new-PR boundary and recommend the fitting session-management option, before opening the PR.
-- **Do:** keep monitoring an unmerged PR in the session that owns it -- send only the *new* PR to a fresh session, rather than resetting the one that owes monitoring.
-- **Don't:** barrel into a new PR carrying a long, unrelated session by reflex, just because opening a PR feels like forward motion rather than a stopping point.
-- **Don't:** `/clear` or abandon a session while a PR it opened is still unmerged -- that drops the monitoring loop the bright line protects.
+Proactively flag a good stopping point --- a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, an open question answered with nothing pending --- with the `⚠️ FLAG` tag, at the end of a turn's recap rather than mid-task.
+Hold the flag while any PR this session opened or pushed to is still unmerged, per the bright line the fragment states in full; run `wrap-up`'s state sweep first rather than trusting memory, since a bot-opened PR or a leftover branch never entered the conversation.
+Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread; the fragment covers each option's tradeoff and the same menu applied at the moment of opening a *new* PR, not only at a stopping point.
 
 ## Flag good moments to run `compress-session`, too
 
-The mid-task counterpart to the section above: don't wait for the automatic compaction to guess what matters, and don't wait to be asked.
-Proactively flag (same `⚠️ FLAG` tag) when a session is still mid-task but has grown large — many tool calls, long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured, or a session that's already been through one automatic compaction and is heading for another.
-Then run `compress-session` yourself: write the focused distillation and, if compaction looks imminent, trigger `/compact focus on <what matters>` rather than leaving it to the automatic pass.
-
-Use this instead of the `/clear` flag above when there's still live state worth carrying forward: an unfinished task, an unmerged PR this session opened or pushed to, or an open question.
-`/clear` is for a clean task boundary with nothing left to carry.
-This is for continuing the same work with a lighter context.
-That middle item uses the same bright line as the section above, deliberately: the two are complements, so a PR that disqualifies the `/clear` flag is exactly what makes `compress-session` the right tool instead.
+The mid-task counterpart, covered in the fragment above: don't wait for automatic compaction to guess what matters, and flag it yourself (same `⚠️ FLAG` tag) once a session has grown large with a live task still in flight --- many tool calls, long tool outputs no longer needed, or a session already through one auto-compaction.
+Use `/clear`'s menu when there is nothing left to carry forward; use `compress-session` when there is.
 
 ## Actively manage quota usage: models and compaction
 
@@ -348,123 +106,10 @@ Fold a finished session's notebook into durable memory (or prune it) during UMS 
 
 ## Keep ai-config and repo checkouts fresh
 
-In every session — at session start, and again periodically during long sessions — refresh the local state that goes stale as PRs merge elsewhere:
+@shared/workflow/keep-checkouts-fresh.md
 
-1. **The ai-config checkout.** Check that the local ai-config clone is on `main` — not a leftover work branch from an earlier session — and run `git pull --ff-only`.
-   Only switch back to `main` when the working tree is clean; leave a dirty tree or another session's in-flight work alone and flag it instead.
-   **If `pull --ff-only` fails with "diverged" rather than a dirty-tree error**, don't assume unpushed work is at risk — a fresh container can seed local `main` from a stale/orphaned snapshot (e.g. a pre-history-rewrite state) whose commits never landed on `origin/main` at all.
-   Confirm the working tree is clean (`git status --short`), then settle it by **content**, not by commit identity.
-   `comm -23 <(git ls-tree -r --name-only main | sort) <(git ls-tree -r --name-only origin/main | sort)` returning nothing, plus a spot-check that a few of those files' contents match, means realigning loses nothing and is safe: `git checkout -B main origin/main`.
-   **Don't decide this by matching the divergent commits' subjects against `git log origin/main`.**
-   A squash merge writes one commit whose subject is the PR title, so a merged branch's own subjects are absent from `origin/main` by construction, and the check reports "orphaned" for ordinary merged work --- the alarming direction.
-   See [`fail-fast`](shared/principles/fail-fast.md), "A proxy that answers a narrower question passes the same way".
-   Still flag it rather than force if the tree is dirty, or if a path on local `main` is genuinely missing from `origin/main`.
-   **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely — `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
-2. **The `~/.claude` consumer copies.** On symlink-capable systems the children of `~/.claude` (`skills/`, `shared/`, `commands/`, `memories/`) are symlinks into the checkout, so the pull alone refreshes them; rerun `bootstrap.sh` only when the repo gained a new top-level dir.
-   On Windows, Git Bash `ln -s` silently falls back to **real copies**, so a pull does NOT propagate there — copy-sync every file whose repo version changed into `~/.claude`.
-   Before overwriting, check for edits made directly in `~/.claude` (a diff that adds prose the repo lacks) and upstream the genuine ones into the repo first; never clobber an un-upstreamed local edit.
-   Don't rely on mtime to spot local edits — git operations reset mtimes on checkout, so it false-positives right after a `pull`, the case this check most needs to handle correctly.
-   **Don't read "symlink-capable system" as "therefore all four children are symlinks" -- verify per child, because the split can fall inside one `~/.claude`.**
-   In a remote/web container, a subset of `~/.claude/skills/` ends up as real directories holding older content, which shadow the repo for the whole session.
-   `shared/`, `memories/`, `commands/`, and `CLAUDE.md` symlink normally in the same container, which is what makes this hard to spot: the child that silently doesn't refresh is the one carrying the procedures you are about to follow.
-   `git pull` cannot fix it, because the loaded file is a copy rather than a link.
-   Don't sweep this by hand.
-   Run the instrument, which compares whole trees rather than `SKILL.md` alone and repairs what it finds, backing up every displaced copy:
-   ```bash
-   python3 ~/.claude/scripts/check-install.py          # report
-   python3 ~/.claude/scripts/check-install.py --fix     # repair
-   ```
-   It reports `stale` (a real copy that has drifted -- the active defect), `unlinked` (a real copy that matches today but won't track the next pull), `missing`, `misdirected`, and `foreign`.
-   **`~/.claude/scripts/` can itself be absent, and then that command is unreachable in exactly the container it diagnoses -- run the repo's own copy instead of concluding there is no instrument.**
-   The path above assumes `~/.claude` links back to the checkout; a container can ship `~/.claude` holding **only** a real-copy `skills/`, with no `scripts/`, `shared/`, `memories/`, `commands/`, or `CLAUDE.md` at all, which is a strictly worse shape than the partial split described above.
-   `$HOME` need not be anywhere near the checkout either (`/root` versus `/home/user/ai-config`), so a `~`-relative path is the wrong instrument for finding the repo at all.
-   Run `python3 <ai-config-checkout>/scripts/check-install.py` against the checkout the session actually has.
-   **Point 1 is a precondition for this one, not merely an earlier item in a list.**
-   The instrument compares installed copies against the checkout, so a checkout that has not been pulled makes every report suspect -- both by measuring drift against stale reference content, and by hiding the script itself when it landed in a commit you do not have yet.
-   Pull first, then measure, and re-read any figure taken before the pull as unreliable rather than merely approximate.
-   **`foreign` is reported but never removed, and is not a synonym for "deleted from the repo".**
-   The category mixes skills we deleted with Anthropic-provided built-ins that were never ours (`docx`, `pdf`, `pptx`, `xlsx`, `skill-creator`), and deleting those would remove working harness functionality.
-   Git history cannot separate the two, because remote containers check the repo out **shallow** -- `git log --diff-filter=D -- skills/<name>` returns nothing for either case -- so the call stays human.
-   The repo's `UserPromptSubmit` hook runs the repair once per session, so this is normally already done by the time you would think to check.
-   **The clobber happens after `bootstrap.sh`, not before it, so don't diagnose this as bootstrap skipping a pre-seeded copy.**
-   Measured in one container: at `07:25:00.084` bootstrap reported 527 `already linked` and zero skips, so every skill was still a symlink; `~/.claude/skills` was then modified at `07:25:01.608`, leaving 53 real directories.
-   The upstream cause is `upload_skills.sh`, which is idempotent by **skipping** any skill already in the workspace (`skip (exists)`) rather than adding a version, so the workspace copy the harness syncs down stays frozen at whatever revision was first uploaded.
-   That is why a repair wired into `SessionStart` would run before the damage and report a clean install every time.
-   **`check-install.py` says nothing about whether the hooks are *registered*, so run `install-hooks.py` as a separate freshness check.**
-   The two answer different questions and are easy to conflate, because both concern `~/.claude` and both report a tidy count.
-   `check-install.py` compares **files**: it asks whether `~/.claude/hooks/<script>` tracks the checkout.
-   `install-hooks.py` compares **bindings**: it asks whether `~/.claude/settings.json` actually invokes those scripts on an event.
-   A hook can be perfectly linked and never run, so a clean report from the first is not evidence about the second.
-   The failure is silent in the way this corpus is worst at noticing: an unregistered guard and a guard with nothing to block look identical, since neither ever produces output.
-   It also degrades **one hook at a time** rather than all at once, which is why nothing announces it --- `bootstrap.sh` places every new script, while registration happens only when someone runs the second command, so each hook added since the last run sits inert.
-   That makes it a per-session freshness item rather than a one-time setup step.
-   ```bash
-   python3 <ai-config-checkout>/scripts/install-hooks.py          # report
-   python3 <ai-config-checkout>/scripts/install-hooks.py --fix     # register the missing ones
-   ```
-   Four caveats before running `--fix`.
-   Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.
-   And hooks connect at **session start**, so a mid-session `--fix` arms nothing until a restart.
-   Say so rather than reporting the guards as live.
-   **Run `check-install.py --fix` first, so the scripts are on disk before anything binds to them.**
-   `install-hooks.py` only writes `settings.json`.
-   It never places a file, and it does not check that the script it is registering exists.
-   Registering a hook whose file is absent is worse than leaving it unregistered: an unregistered guard is inert, while a registered-but-absent `PreToolUse` `Bash` hook makes `python3` exit 2 on **every** Bash call and takes the shell down.
-   `--fix` prints the note naming this division of labour only when run *without* `--fix`, so the run that causes the damage is the one that stays silent about it.
-   **Point 1 governs this instrument too, and its stale run is the more dangerous of the two.**
-   A stale `check-install.py` run reports suspect numbers.
-   A stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
-   Pull first, then measure, and treat the examined count as the thing to read: it is the manifest's size, so a number below the current hook count means the checkout is behind rather than the machine being clean.
-   - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
-   - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`
-   - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.
-   - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
-   **An entry that genuinely IS a symlink resolves through the checkout's CURRENT BRANCH, so both instruments pass over a file from the wrong branch.**
-   Everything above splits the world into symlinks, which a pull refreshes, and real copies, which it does not.
-   That split is real and it is not exhaustive.
-   A symlink points at a **path in the working tree**, never at a commit, so the file the harness loads is whatever branch that checkout happens to have out --- which on a machine driving several PRs is routinely a feature branch rather than `main`.
-   A `git pull` on `main` then updates a ref the loaded file does not resolve through, and `git branch -f main origin/main` does not help either, for the same reason.
-   Note this is the opening sentence of point 2 failing, not a further wrinkle in the Windows real-copy case: "the pull alone refreshes them" holds only while the checkout is on the branch you pulled.
-
-   Neither instrument can see it, and the reason is structural rather than an oversight.
-   `check-install.py` classifies a symlink by **where it points** --- `misdirected` when it leaves this repo, `ok` otherwise --- and its `stale` category is defined over real copies only, its own legend reading `stale  real copy whose content differs from the repo`.
-   So a symlink cannot be classified `stale` whatever content sits behind it.
-   `install-hooks.py` reads `settings.json` and never opens the file at all.
-   A clean report from both is therefore consistent with every loaded file being a branch behind, which makes this a third way the installed state can be wrong, alongside the drifted registration and the registered-but-never-placed script in [`claude-code-hooks.md`](memories/claude-code-hooks.md).
-
-   The blast radius is the whole consumer surface rather than hooks alone, because `skills/`, `shared/`, `memories/`, and `CLAUDE.md` are linked the same way --- so the `@shared/...` fragments this file imports are exactly as exposed as a guard is.
-   One read settles it, and it is the content comparison neither instrument performs:
-   ```bash
-   git -C <ai-config-checkout> rev-parse --abbrev-ref HEAD                  # is it even on main?
-   git -C <ai-config-checkout> diff origin/main --stat -- shared hooks skills memories CLAUDE.md
-   ```
-   The repair is constrained in a way worth stating, since the obvious one is forbidden.
-   Point 1 already says to leave another session's in-flight work alone, and a checkout parked on someone else's branch is precisely what produces this drift, so switching it to refresh your own hook trades a stale guard for a clobbered colleague.
-   Report the drift instead and read from `origin/main` directly (`git show origin/main:<path>`).
-   - **Do:** read the checkout's current branch before believing any freshness report, and diff the consumer surface against `origin/main` when a loaded rule or guard matters.
-   - **Do:** say which branch a `~/.claude` file resolved through when reporting an install clean.
-   - **Don't:** read `check-install.py`'s `N/N ok` as meaning a symlinked file matches `main` --- it only means the link lands inside this repo.
-   - **Don't:** switch a checkout parked on another session's branch to refresh your own hook, or expect `git branch -f main origin/main` to move what a symlink resolves through.
-
-3. **The working repo's main checkout.**
-   Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) --- it goes stale as the session's own PRs and other sessions' PRs merge.
-   **The same "diverged" failure from point 1 above can hit any repo's `main`, not just ai-config's own** --- a fresh container's checkout isn't guaranteed fresh for every repo it holds.
-   Apply the same recovery: confirm the working tree is clean, then check whether the local tip's commit is actually reachable from `origin/main` (`git merge-base --is-ancestor <local-tip> origin/main`) before force-realigning with `git checkout -B main origin/main`.
-   Don't rely on a commit-message grep alone to decide safety --- the same message can appear under a *different hash* after a squash-merge or rebase (so the grep matches but the underlying commits differ, the milder case in point 1), and `git log origin/main` only reflects whatever your local remote-tracking ref last fetched (so a check run before fetching in this session can miss commits that already landed).
-   Re-run `git fetch origin main` immediately beforehand and use the hash-based ancestry check as the authoritative signal.
-   A clean working tree plus a non-ancestor local `main` tip is still safe to realign in the common case (the checkout is stale, not carrying real work), since realigning only moves a local branch ref --- the discarded commits stay recoverable via `git reflog` regardless.
-4. **The `.ai-config` submodule pin, in any repo that vendors ai-config as a git submodule** (check `.gitmodules` for a `.ai-config` entry — not every repo has one; most consume ai-config only via the Plugin Marketplace, which doesn't need this). Compare the pinned commit against ai-config's current `origin/main`: `git rev-parse HEAD:.ai-config` for the pin's SHA, then `git -C <path-to-a-local-ai-config-clone> rev-list --count <pin>..origin/main` for how far behind it is.
-   A pin more than a few weeks or dozens of commits stale is worth refreshing: file a tracking issue, bump it (`git submodule update --init --remote .ai-config` from the parent repo handles both init and fetch in one step; or, if already checked out, `git fetch origin` inside the submodule before `git checkout origin/main`), then `git add .ai-config` in the parent repo to record the new gitlink, verify the parent repo's own checks still pass, and open a PR.
-   Before assuming this is risk-free, check whether the parent repo's CI actually reads the submodule's checked-out content (vs. treating it as inert until a dev runs `git submodule update --init` locally) --- a pin bump is a pure pointer change with no functional surface only when nothing reads it.
-   **When the current checkout isn't `main` itself** (a feature branch or a worktree), `HEAD:.ai-config` only reflects that branch's own pin --- it can look badly stale purely because the branch was cut before a bump PR merged into `main`, not because the project's actual pin needs refreshing.
-   Also check `origin/main:.ai-config` (the pin as recorded on the base branch) against ai-config's `origin/main`;
-   if that one is already fresh, no bump PR is needed --- the branch's own pin resolves itself on its next merge/rebase.
-   On Windows Git Bash, that comparison command hits an MSYS gotcha --- see `memories/git.md`.
-   **When *adding a new citation* to an ai-config shared fragment inside a submodule-consuming repo's own `CLAUDE.md`, verify --- don't assume --- that the citation already resolves.**
-   It only does once BOTH (a) the source PR has merged into ai-config's `main`, and (b) that repo's own `.ai-config` pin has been bumped to a commit containing the path --- the pin doesn't auto-follow `main`.
-   Check with `git show <pin>:<path>` (or `ls` inside the checked-out submodule) before writing the citation in present tense;
-   if either gate hasn't cleared, hedge to future/conditional tense instead of asserting settled fact --- mirroring the "proposed in ai-config#N --- once merged, the fragment lives at ..." convention `gha`'s own `CLAUDE.md` already uses for citing its still-open companion PRs.
-   Once the citation does resolve, keep the local **restatement** of the rule's key points alongside the citation rather than trimming to a bare pointer --- unlike a skill distributed via the Plugin Marketplace (point 4's own preamble), `.ai-config`'s `shared/`/`memories/` fragments aren't auto-loaded into agent context --- they only enter it when a `CLAUDE.md` explicitly restates or `@`-references them --- so a bare citation is invisible to an agent that doesn't take the extra step of reading the fragment on demand.
+Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the `~/.claude` consumer copies (symlinks versus Windows real-copies versus a shadowed-container split, verified with `check-install.py` and `install-hooks.py`), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
+The fragment above carries the mechanics, the failure modes each check catches, and the case records.
 
 ## Timestamp recaps in local time
 
@@ -807,60 +452,10 @@ The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" mea
 
 ## Do the review yourself when the @claude workflow doesn't produce a verdict
 
-When a PR you're managing has its `@claude` review workflow fail to produce a usable verdict — whether because it was **skipped for quota** or because it **ran to completion but never stated a verdict** (a "stub review") — don't stall the ARDI loop waiting for it — **do the review yourself and post it** as a PR comment.
-Apply the same review standards the bot would (the SERG lab manual and d-morrison's modular/idiomatic priorities), then keep iterating to fully-clean on your own findings.
-Neither failure mode is an approval — an unreviewed PR stays unreviewed regardless of why the bot didn't weigh in.
+@shared/workflow/self-review-fallback.md
 
-**Quota-skipped:** surfaces as a bot comment — either `Claude review skipped — API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the `@claude` agent workflow).
-Both mean no bot will respond on this run; re-running the workflow only helps once the quota actually resets.
-
-**Stub review:** the review job reports success (`is_error: false`, real cost/turns logged) but the posted comment never states a `### Verdict` --- the run genuinely executed but got cut short before reaching a conclusion (e.g. by escalating permission denials on tool calls it needed).
-This looks superficially fine (green check, a comment exists) so it's easy to mistake for a real review --- read the comment body for an actual verdict section before trusting it.
-Re-running the same workflow can reproduce the same stub pattern repeatedly rather than self-resolving;
-if a retry doesn't help within a round or two, treat it as this failure mode and self-review rather than continuing to re-trigger.
-
-**No review workflow configured at all is a third failure mode, and the one nothing signals on its own.**
-Quota-skipped and a stub review both require a review workflow to exist and attempt to run.
-Some repos have none: no `@claude` job wired into CI at all, so there is nothing to time out, quota-skip, or stub.
-CI stays green because it never ran anything meant to notice, and the PR/MR simply accrues zero review comments.
-
-Check for this once per repo, right after the first push, rather than waiting to notice its absence: grep the repo's own CI config for the review job or template it would come from (a GitHub Actions workflow file, or a GitLab `.gitlab-ci.yml`'s `include:` list) rather than assuming a sibling or template repo's setup carried over.
-Treat "not configured" the same as the other two failure modes: self-review immediately, held to the same fact-check rigor "A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for" requires (fact-check-prose, the cause check, the cited-source rule).
-Because a genuine config gap is a standing property of the repo rather than a one-off outage, also file a tracking issue on it per [`report-mistakes-proactively`](shared/workflow/report-mistakes-proactively.md) --- wiring up review coverage is worth fixing, not just working around on every push.
-
-**Post the self-review before doing anything else --- don't stall the PR waiting for the bot.
-Then, before writing the check off as permanently broken, try one manual re-run of the failed job --- even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.**
-Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.
-If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR.
-
-Either way: don't wait on the bot indefinitely — do the review yourself and keep driving to fully-clean.
-
-**Self-review is the immediate fallback so the PR never stalls --
-but declaring the PR clean still requires an external verdict whenever one is reachable.**
-Don't wait to self-review: post it right away, same as above.
-But also check, the same round, whether a *different* configured reviewer is reachable
-(e.g. Copilot code review, if the repo/org has it) --
-not just whether the `@claude` bot specifically produced a verdict,
-since the two can fail independently (one quota-exhausted, the other working fine, or vice versa) --
-and request it in parallel with posting the self-review, not after.
-Re-check reachability every round:
-a reviewer that was ineligible/quota-exhausted a few pushes ago (a missing license, a temporary rate limit)
-can become reachable mid-session.
-Before reporting a PR **fully clean** / **ready** (ARDI's own terminal-state terms -- see `fully-clean.md`),
-confirm a genuine all-clear review is posted at the current head from an external reviewer, if one is reachable --
-a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
-doesn't satisfy this once an external verdict is obtainable.
-
-**A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for.**
-A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.
-The gap is specific and predictable: a shallow self-review checks *structure* --- a dogfood back-reference, ASCII punctuation, semantic line breaks --- and skips the prose *fact-check*, so a false mechanism claim or a misattributed citation sails straight through, since a structural pass has nothing to say about either.
-Run the applicable prose-review skills against the diff's own factual claims, not just its shape: [`fact-check-prose`](shared/writing/fact-check-prose.md), the **cause** claim-type check in [`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md), and the read-the-cited-source rule in [`address-every-comment`](shared/workflow/address-every-comment.md) --- a claim about *why* some mechanism behaves as it does gets asked what else would explain it, and a citation gets read against what the cited source actually says.
-This is the fallback-specific sharpening of "Apply the same review standards the bot would" above: the standard does not relax because the reviewer it replaces happened to be absent.
-
-- **Do:** run `fact-check-prose`, the **cause** check, and the cited-source check on a fallback self-review, exactly as on any pre-push self-review.
-- **Do:** treat the fallback's stopgap feel as the cue to slow down, not as license to skip the semantic checks.
-- **Don't:** let a fallback self-review stop at structural checks (dogfood, ASCII, line breaks) and report "no findings".
-- **Don't:** read "the bot was down" as permission for a lighter review than the bot itself would have given.
+When the `@claude` review workflow fails to produce a usable verdict --- quota-skipped, a stub review with no stated `### Verdict`, or no review workflow configured at all --- don't stall ARDI waiting for it: post a self-review at the same standard the bot would apply (including the prose fact-check, not just structural checks), request any other reachable reviewer in parallel, and keep driving to fully-clean.
+A fallback self-review is easy to under-scrutinize precisely because it feels like a stopgap; the fragment names the specific gap (structure checked, fact-check skipped) and holds the fallback to the bot's own bar.
 
 ## Watch and ARDI every PR you touch — don't ask first
 
@@ -943,66 +538,11 @@ The fragment also sets the default direction for the age factor: among several o
 
 ## Use subagents when helpful --- and delegate rather than queue
 
-When available, use subagents for helpful sidecar work: independent investigation, verification, or disjoint implementation slices.
-Keep immediate blocking critical-path edits local so progress does not wait unnecessarily.
+@shared/workflow/use-subagents.md
 
-**Nothing parallelizable should ever sit "queued."**
-Work that does not block the edit in front of you is, by definition, work another agent could already be doing.
-Deferring it buys nothing: the serial version finishes no sooner, and the deferred item is the one most likely to be dropped outright when the session ends or the context turns over.
-
-The tell is a phrase, which makes it cheap to catch, because you have to type it before the mistake is complete.
-Writing "queued", "next up", "after this", or "I will do that next" into a status recap is the signal that a subagent should already have been running on that item.
-Treat the urge to write the word as the trigger to launch, not as an acceptable way to describe the plan.
-
-**Sidecar delegation is pre-authorized, so it is never worth asking about.**
-Independent investigation, verification, a disjoint implementation slice, an owed UMS pass, a routed `cai` --- all of these are standing grants.
-This section is the user instruction that settles it, so a harness default of the form "do not call the Agent tool unless the user requested it" is already satisfied: the request is here, standing, and does not need restating each session.
-Asking anyway costs a round trip and returns the answer already written down.
-
-- **Do:** launch the subagent at the moment you would otherwise have typed "queued", and say in the recap what it is working on.
-- **Do:** treat an owed UMS pass or a routed `cai` as delegable sidecar work rather than as a wrap-up step to reach later.
-- **Don't:** report an item as queued, next up, or deferred to later in the session when nothing actually blocks it.
-- **Don't:** wait for a per-session request before delegating, or ask whether to use a subagent.
-- **Don't:** hand off the blocking edit itself --- the critical-path change stays local, so progress never waits on a round trip.
-
-**"I owe you X" is a tell, not a status, and it is the one that evades the tells above.**
-Those all describe a *plan*: queued, next up, after this.
-This family describes a *debt already acknowledged to the user*: "I owe", "still owe", "I'll get to", "on my list", "pending on my side".
-Naming what you owe someone reads as accountability rather than as deferral, so it feels like the diligent thing to write, and the work stays parked exactly the same.
-
-The phrase reports work that has already been identified and scoped, which is what makes it a dispatch signal.
-If it is well enough specified to be described as owed, it is well enough specified to brief a subagent with.
-That is the whole test: could you write a self-contained brief?
-If you can, you should have.
-
-The asymmetry is what makes this a rule rather than a reminder.
-Work parked in my own queue is invisible to the user, competes with the live task for attention, and is lost outright when the session ends.
-Work handed to a subagent is none of those three.
-The limit is the mirror of that test: work that genuinely depends on this conversation's context, or a single edit cheaper to make than to describe, is not worth dispatching.
-
-**Research and reading are dispatchable by default, and the test is the size of the comprehension rather than the size of the fetch.**
-One call that returns something you then have to understand, extract from, and synthesize is a task, not an errand.
-The miss here is subtler than a deferred to-do, because "I need to read something" does not present as work at all.
-It feels like a prerequisite to thinking, so the dispatch question is never asked --- and a category of work that does not present as work cannot be caught by a rule about how to handle work.
-
-This composes with [`research-before-asking`](shared/workflow/research-before-asking.md) rather than competing with it.
-That fragment makes reading an obligation before asking a human.
-This one makes it delegable once you are doing it.
-Neither is licence to skip it.
-
-Note what makes a routing failure hard to catch at all: **it leaves no trace in the artifact**.
-The reading can be done correctly and the resulting entry can be sound, so no output, test, or reviewer would reveal anything.
-Only asking why the work was routed that way surfaces it.
-
-- **Do:** launch the subagent at the moment you would otherwise have typed "I owe you", and say in the recap what it is working on.
-- **Do:** dispatch reading and research whose comprehension is substantial, however small the fetch that starts it.
-- **Don't:** report an owed item as a status --- describing it that well is proof the brief already exists.
-- **Don't:** apply a "cheaper to do than to brief" test to the fetch when the reading is the actual work.
-
-Distinct from [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md), which governs the heavier `Workflow` tool.
-That rule is a **gate**: a fan-out across four or more verification-bearing targets is a real spend, so it has to be opted into or proposed with a cost estimate.
-This one is a **grant**: a single `Agent` call covering one sidecar task is cheap, needs no opt-in, and the cost it prevents is an idle parallel track rather than an overspend.
-So when a task clears that fragment's three-part bar, follow it and propose the workflow; everything below that bar is a subagent to launch now.
+Nothing parallelizable should ever sit "queued" --- writing "queued", "next up", "I owe you X", or "still need to" into a status recap is the trigger to launch a subagent on it right then, not a way to describe the plan.
+Sidecar delegation (independent investigation, verification, a disjoint slice, an owed UMS pass, a routed `cai`) is pre-authorized and never worth asking about; keep only the blocking critical-path edit local.
+Research and reading are dispatchable too, sized by how much comprehension the result needs rather than by how small the fetch looks --- the fragment above covers why that category of work is easy to route wrong without anything in the artifact showing it.
 
 ## Derive a set of work items; never hand over an enumeration of it
 
@@ -1516,6 +1056,13 @@ The same problem shows up more broadly as plain-text signposting — "as discuss
 
 Unlike `definition-crossrefs.md` above, `forward-references.md` has a dedicated actionable skill: the `fix-forward-references` skill (alias `ffr`) detects these with a grep-for-directional-word heuristic and rearranges (or rewords) the prose to fix them.
 Run it — or apply its check inline — wherever `ard`/`ardi` reviews a prose diff, alongside the other prose-review rules in this file.
+
+## Rearranging sections, paragraphs, and content across documents is part of editing prose
+
+@shared/writing/reorganize-prose.md
+
+Moving a section, subsection, paragraph, or sentence — within a document, or in a multi-document repo (a website, a book, a manuscript) across documents — is in scope for a prose edit whenever it improves flow, fixes a forward reference, removes duplicate content, or reunites related content split across distant locations.
+A move is authorship, not a no-op: sweep for stale self-references and count-based back-references, bring the relocated lines into compliance with the line-level checks above, migrate any referenced assets, and prove nothing was lost or accidentally added with a bidirectional content comparison.
 
 ## Detect concepts defined only in prose, never formalized
 

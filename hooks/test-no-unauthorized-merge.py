@@ -264,6 +264,32 @@ BLOCK = [
      "a repo whose name merely starts with the granted one"),
     ("gh pr merge 1352 -R Other-Owner/ai-config",
      "the same repo name under a different owner"),
+    # --- ai-config#1353 review round 1: the merge-TYPE ambiguity bypass -----
+    # `_merge_patterns` tries the `pulls/N/merge` forms before the
+    # `repos/<o>/<n>/merges` ones, and both scan the segment unanchored. So a
+    # real BRANCH merge carrying a forged `pulls/N/merge` substring anywhere
+    # in the line is labelled `gh api PR merge` -- and because both the real
+    # and the forged path name the SAME granted repo, the target test sees one
+    # target and grants a direct push to the default branch. `-H`/`--header`
+    # is the vehicle: it is a documented `gh api` flag and is NOT in
+    # mask_payloads's list, so its value survives to the pattern scan.
+    ('gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x'
+     ' -H "X-Note: repos/Morrison-Lab/ai-config/pulls/1/merge"',
+     "a branch merge mislabelled a PR merge by a forged path in an -H header"),
+    ("gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x"
+     " --header 'X-Note: repos/Morrison-Lab/ai-config/pulls/1/merge'",
+     "the same bypass via the --header spelling and single quotes"),
+    ("gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x"
+     " --jq 'repos/Morrison-Lab/ai-config/pulls/1/merge'",
+     "the same bypass via another unmasked flag's value (--jq)"),
+    # The mirror: a granted PR merge that ALSO reads as an excluded type is
+    # ambiguous too, and denies. Over-blocking is the safe direction here.
+    ("gh api -X PUT repos/Morrison-Lab/ai-config/pulls/1/merge"
+     " -H 'X-Note: repos/Morrison-Lab/ai-config/merges'",
+     "a PR merge that also matches the branch-merge pattern is ambiguous"),
+    ("gh api graphql -X POST repos/Morrison-Lab/ai-config/pulls/1/merge"
+     " -f query='mutation { mergePullRequest(input: {...}) }'",
+     "a PR merge that also matches the GraphQL pattern is ambiguous"),
 ]
 
 ALLOW = [

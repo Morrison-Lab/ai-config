@@ -72,6 +72,21 @@ keeps the baseline prohibition:
 - **A GraphQL `mergePullRequest` mutation**, which names its target by node id,
   so no repository is derivable from the command at all.
 
+Those last two are excluded by **every** interpretation the segment matches,
+not by the first one.
+The merge patterns are unanchored scans over the whole segment, so one command
+line can satisfy several at once --- and the `pulls/N/merge` forms are tried
+before the `repos/<owner>/<name>/merges` ones.
+A real branch merge carrying a forged `pulls/1/merge` substring in an unmasked
+flag (`-H`, `--jq`) is therefore *labelled* a PR merge, and both the forged and
+the real `repos/<owner>/<name>/` path name the same granted repo, so a
+first-label reading grants a direct push to the default branch.
+Reported and reproduced on ai-config#1353.
+
+So the guard runs the same ambiguity test on two axes --- **what kind** of
+merge this is, and **which repository** it lands in --- and either one coming
+back undetermined denies.
+
 What the standing grant removes is the need to **ask**, not the judgment about
 whether the PR is done.
 [`ardi`](../../shared/workflow/ardi.md)'s loop still terminates by reporting the

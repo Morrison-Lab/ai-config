@@ -1666,6 +1666,9 @@ Two axes.
 *Between* displayed lines, write out every step, and flag gaps in review.
 *Within* one line, decompose complicated internal structure out into extra
 notation, then reapply that until each line carries one operation.
+Apply the second thoroughly rather than per equation: name the concept where
+it first enters the document, since an unnamed concept is one that gets
+silently duplicated across sections.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.

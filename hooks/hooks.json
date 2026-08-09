@@ -210,6 +210,43 @@
               "already-on-a-compute-node. Off a cluster the first branch is the",
               "one taken, so the guard is inert rather than merely quiet."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-add-a-outside-pathspec.py\"",
+            "timeout": 10,
+            "script": "flag-add-a-outside-pathspec.py",
+            "why": "ucdavis/bcs's CLAUDE.md bans a bare `git add -A` and prescribes `git add -A ':!inst/extdata'` as the sanctioned replacement, after a 2026-07-30 incident where an untracked-and-unignored directory leaked a credential and participant identifiers. On 2026-08-09 that sanctioned form was followed verbatim and still swept in two unrelated untracked scratch files at the repo root, because the exclusion pathspec protects only the path it names -- nothing checks the LIVE working tree for what else is untracked. Warns rather than blocks, per README's 'A hook that misfires is worse than a missing one': a bare `git add -A` is frequently exactly right, and this hook cannot tell intended untracked content from accidental.",
+            "_note_reads_live_git_status": [
+              "Unlike most hooks here, this one shells out to `git status`",
+              "at match time to compute what is actually untracked -- a",
+              "pure text match on the command string cannot answer 'does the",
+              "exclusion pathspec actually cover everything untracked',",
+              "since that depends on the live working tree, not the command.",
+              "Fails open on any git failure, timeout, or non-repo cwd.",
+              "",
+              "Emits only `additionalContext` and a `systemMessage`; no",
+              "`permissionDecision`, so the normal permission flow is",
+              "untouched."
+            ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-reset-hard-uncommitted-work.py\"",
+            "timeout": 10,
+            "script": "flag-reset-hard-uncommitted-work.py",
+            "why": "On 2026-08-09, in the same session as the git-add incident above, a `git reset --hard <ref>` run to drop a throwaway probe commit also discarded UNRELATED uncommitted edits to .Rbuildignore and NEWS.md sitting in the same working tree -- both had to be redone. `reset --hard` resetting the entire working tree (not just the commit being undone) is exactly its documented behaviour; the mistake was reaching for it in a tree with unrelated live edits, for an experiment that never needed to touch that tree. Warns rather than blocks: discarding a commit is frequently exactly the point, and this hook cannot tell 'this dirty state is unrelated' from 'this dirty state is what I meant to discard'.",
+            "_note_reads_live_git_status": [
+              "Also reads live `git status`, same reasoning as the sibling",
+              "hook above: whether uncommitted tracked-file changes exist is",
+              "a fact about the working tree, not about the command text.",
+              "Untracked files are deliberately out of scope -- `reset",
+              "--hard` does not touch them, `git clean` does -- so an",
+              "untracked scratch file alone does not trigger this.",
+              "",
+              "Emits only `additionalContext` and a `systemMessage`; no",
+              "`permissionDecision`."
+            ]
           }
         ]
       },

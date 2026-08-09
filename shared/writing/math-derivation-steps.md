@@ -2,12 +2,12 @@ When writing or reviewing a mathematical derivation --- an algebraic
 manipulation, a proof, a statistical argument --- hold it to a stricter
 completeness bar than ordinary prose reasoning.
 
-This fragment covers two axes, and the sections below take them in turn.
+This fragment covers two axes.
 The first is **between** displayed lines: how much happens from one line to
-the next, which the skipped-step rule governs.
+the next.
 The second is **within** a single line: how much structure is packed inside
-one expression, which the last section governs.
-That last section applies to any displayed equation, a standalone definition
+one expression.
+That second axis applies to any displayed equation, a standalone definition
 included, not only to a line inside a running derivation, and its remedy
 reaches document scope even though the defect shows up in one line.
 
@@ -137,10 +137,10 @@ That is what settled the worked example.
 $\Lik_i$ was the right floor not because densities are primitive, but because
 by that point in the document the reader has already accepted the
 marginal-likelihood proposition and should not have to re-open it.
-Note the difference in kind from the earlier heuristic that a name should be
-reusable and consistent: that one describes what makes a name *cheap*, and
-this one answers *how far down to go*, which is the question the recursion
-actually raises.
+This is a different question from whether a given name is *cheap* --- whether
+it is reusable, and consistent with notation the document already uses.
+Cheapness decides what a name costs to introduce; the floor decides *how far
+down to go*, which is the question the recursion actually raises.
 
 #### Why the floor is not simply "a single probability expression"
 
@@ -212,7 +212,8 @@ U_i = \nabla_\lambda \llik_i(\lambda), \qquad U_c = \sum_{i \in c} U_i
 The difference from the states above is scope rather than depth.
 Decomposing an equation where it stands is a tidy-up.
 Naming the concept where it first enters is a convention the rest of the
-document can rely on, and it is what the fourth gain below depends on.
+document can rely on, and it is what lets a construction repeated across
+sections become visible as redundancy.
 
 ### What the decomposition buys
 

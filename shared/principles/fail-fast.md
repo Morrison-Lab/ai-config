@@ -1391,10 +1391,18 @@ The same session hit the pattern one level up, in a **recovery procedure**
 rather than a single command.
 
 `CLAUDE.md`'s "Keep ai-config and repo checkouts fresh" step for a diverged
-local `main` says to spot-check a few divergent commit messages against
-`origin/main`, and to realign if they do not appear there.
+local `main` **used to say** to spot-check a few divergent commit messages
+against `origin/main`, and to realign if they do not appear there.
+It no longer does: the same change that added this paragraph replaced that
+instruction with a content check and now names the subject match as the thing
+not to do.
+The retired wording is kept here because the rest of this section is an
+argument about it, and an argument whose subject has been deleted reads as an
+argument about nothing.
 That grep answers "were these commits replayed under new hashes", which is
-only **one** of two ways the content can already be safe.
+only **one** of two ways the content can already be safe --- the technique
+still behaves this way, which is why it is worth understanding rather than
+merely deleting.
 It returns zero hits in the reassuring case and the alarming case alike, so
 its answer does not discriminate between them.
 

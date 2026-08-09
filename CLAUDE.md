@@ -1061,7 +1061,7 @@ Run it — or apply its check inline — wherever `ard`/`ardi` reviews a prose d
 
 @shared/writing/reorganize-prose.md
 
-Moving a section, subsection, paragraph, or sentence — within a document, or in a multi-document repo (a website, a book, a manuscript) across documents — is in scope for a prose edit whenever it improves flow, fixes a forward reference, removes duplicate content, or reunites related content split across distant locations.
+Moving a section, subsection, paragraph, or sentence --- within a document, or in a multi-document repo (a website, a book, a manuscript) across documents --- is in scope for a prose edit whenever it improves flow, fixes a forward reference, removes duplicate content, or reunites related content split across distant locations.
 A move is authorship, not a no-op: sweep for stale self-references and count-based back-references, bring the relocated lines into compliance with the line-level checks above, migrate any referenced assets, and prove nothing was lost or accidentally added with a bidirectional content comparison.
 
 ## Detect concepts defined only in prose, never formalized

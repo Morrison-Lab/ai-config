@@ -1,8 +1,8 @@
-Proactively tell me — don't wait to be asked — when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
-Use the `⚠️ FLAG` tag from `CLAUDE.md`'s chat-output-tagging convention, one line, at the natural end of that turn's recap — don't interrupt mid-task to say it.
+Proactively tell me --- don't wait to be asked --- when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
+Use the `⚠️ FLAG` tag from `CLAUDE.md`'s chat-output-tagging convention, one line, at the natural end of that turn's recap --- don't interrupt mid-task to say it.
 
 Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, **any PR this session opened or pushed to that has not yet merged or closed**, an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
-`/clear` wipes conversation state outright (unlike compaction, which summarizes) — anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
+`/clear` wipes conversation state outright (unlike compaction, which summarizes) --- anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
 If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per "Recommending that the session end is itself a UMS trigger" above.
 
 **That PR clause is a bright line, not a judgment call, and it was narrowed deliberately.**
@@ -86,7 +86,7 @@ Run UMS first if it is owed, per "Recommending that the session end is itself a 
 ## Flag good moments to run `compress-session`, too
 
 The mid-task counterpart to the section above: don't wait for the automatic compaction to guess what matters, and don't wait to be asked.
-Proactively flag (same `⚠️ FLAG` tag) when a session is still mid-task but has grown large — many tool calls, long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured, or a session that's already been through one automatic compaction and is heading for another.
+Proactively flag (same `⚠️ FLAG` tag) when a session is still mid-task but has grown large --- many tool calls, long tool outputs (test/CI logs, big diffs) no longer needed once their conclusions are captured, or a session that's already been through one automatic compaction and is heading for another.
 Then run `compress-session` yourself: write the focused distillation and, if compaction looks imminent, trigger `/compact focus on <what matters>` rather than leaving it to the automatic pass.
 
 Use this instead of the `/clear` flag above when there's still live state worth carrying forward: an unfinished task, an unmerged PR this session opened or pushed to, or an open question.

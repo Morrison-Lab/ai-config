@@ -1,8 +1,8 @@
-When a PR you're managing has its `@claude` review workflow fail to produce a usable verdict — whether because it was **skipped for quota** or because it **ran to completion but never stated a verdict** (a "stub review") — don't stall the ARDI loop waiting for it — **do the review yourself and post it** as a PR comment.
+When a PR you're managing has its `@claude` review workflow fail to produce a usable verdict --- whether because it was **skipped for quota** or because it **ran to completion but never stated a verdict** (a "stub review") --- don't stall the ARDI loop waiting for it --- **do the review yourself and post it** as a PR comment.
 Apply the same review standards the bot would (the SERG lab manual and d-morrison's modular/idiomatic priorities), then keep iterating to fully-clean on your own findings.
-Neither failure mode is an approval — an unreviewed PR stays unreviewed regardless of why the bot didn't weigh in.
+Neither failure mode is an approval --- an unreviewed PR stays unreviewed regardless of why the bot didn't weigh in.
 
-**Quota-skipped:** surfaces as a bot comment — either `Claude review skipped — API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the `@claude` agent workflow).
+**Quota-skipped:** surfaces as a bot comment --- either `Claude review skipped --- API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the `@claude` agent workflow).
 Both mean no bot will respond on this run; re-running the workflow only helps once the quota actually resets.
 
 **Stub review:** the review job reports success (`is_error: false`, real cost/turns logged) but the posted comment never states a `### Verdict` --- the run genuinely executed but got cut short before reaching a conclusion (e.g. by escalating permission denials on tool calls it needed).
@@ -24,7 +24,7 @@ Then, before writing the check off as permanently broken, try one manual re-run 
 Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.
 If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR.
 
-Either way: don't wait on the bot indefinitely — do the review yourself and keep driving to fully-clean.
+Either way: don't wait on the bot indefinitely --- do the review yourself and keep driving to fully-clean.
 
 **Self-review is the immediate fallback so the PR never stalls --
 but declaring the PR clean still requires an external verdict whenever one is reachable.**

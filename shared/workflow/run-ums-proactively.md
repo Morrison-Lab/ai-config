@@ -1,7 +1,7 @@
 Don't wait for `/clear` or the end of a task to run `ums` (Update Memories and Skills).
-As soon as a learning worth saving shows up during a session — a corrected mistake, a new preference, a tool quirk, a workflow gap — run UMS right then, interleaved with the main work, rather than batching it for a wrap-up step at the end.
+As soon as a learning worth saving shows up during a session --- a corrected mistake, a new preference, a tool quirk, a workflow gap --- run UMS right then, interleaved with the main work, rather than batching it for a wrap-up step at the end.
 
-Still run UMS before `/clear` too, as a final catch-all for anything accumulated since the last proactive pass — but treat that as a backstop, not the trigger to wait for.
+Still run UMS before `/clear` too, as a final catch-all for anything accumulated since the last proactive pass --- but treat that as a backstop, not the trigger to wait for.
 
 **In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."**
 "As learnings accumulate" is easy to defer indefinitely during heads-down execution across several PRs, since no single moment feels like the obvious trigger --- a merge is a natural, unmissable boundary to pause at instead.

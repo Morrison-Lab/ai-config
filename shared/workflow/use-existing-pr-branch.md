@@ -18,11 +18,13 @@ push updates to it,
 and update that same PR.
 Do not open a separate PR unless the user explicitly asks for one.
 
-**Exception --- the session can only push to its own branch.** Some web/remote sessions are scoped so the agent proxy allows pushing *only* to the harness-assigned branch; a push to any other branch (the existing PR's branch included) is rejected with `HTTP 403`.
+**Exception --- the session can only push to its own branch.**
+Some web/remote sessions are scoped so the agent proxy allows pushing *only* to the harness-assigned branch; a push to any other branch (the existing PR's branch included) is rejected with `HTTP 403`.
 When that happens you cannot follow step 3.
 Don't retry the 403 --- it's a policy denial, not a transient error.
 
-**Prefer stacking the fix, not superseding the PR.** When the work is an incremental fix to an existing, still-open PR (a review finding, a small addition) rather than a full rebuild, push the fix to the assigned branch and open it as a PR **stacked on** the original --- `base` set to the original PR's own branch, per the [`stack-prs`](../../skills/stack-prs/SKILL.md) skill --- rather than superseding it. Comment on the original PR pointing to the stacked one, and note the dependency ("stacked on this branch --- either merge #N into this branch first, or merge this PR and #N will retarget to `main`"). This keeps the diff to just the incremental change instead of re-litigating the whole original PR's content, and it composes correctly regardless of how the maintainer merges it: they can merge the stacked PR straight into the original's branch (folding the fix in before the original PR itself merges) or merge the original first and let the stacked PR retarget to `main` per that skill's step 4.
+**Prefer stacking the fix, not superseding the PR.**
+When the work is an incremental fix to an existing, still-open PR (a review finding, a small addition) rather than a full rebuild, push the fix to the assigned branch and open it as a PR **stacked on** the original --- `base` set to the original PR's own branch, per the [`stack-prs`](../../skills/stack-prs/SKILL.md) skill --- rather than superseding it. Comment on the original PR pointing to the stacked one, and note the dependency ("stacked on this branch --- either merge #N into this branch first, or merge this PR and #N will retarget to `main`"). This keeps the diff to just the incremental change instead of re-litigating the whole original PR's content, and it composes correctly regardless of how the maintainer merges it: they can merge the stacked PR straight into the original's branch (folding the fix in before the original PR itself merges) or merge the original first and let the stacked PR retarget to `main` per that skill's step 4.
 Reserve the supersede path (below) for when stacking doesn't fit --- the original branch/PR is abandoned, or the fix amounts to a full rebuild rather than an incremental addition.
 
 **A plain `git merge --ff-only` plus push is a second way to fold a stacked PR
@@ -64,7 +66,8 @@ explicit go-ahead on the underlying architectural decision.)
 
 **Supersede fallback, when stacking doesn't apply:** push the fix to the assigned branch, open a **new** PR off `main` that supersedes the original (say "Supersedes #N" in the body and rebuild as a single clean commit so no sensitive history leaks through), comment on the original PR pointing to the replacement, and close the original once the new PR merges.
 
-**Rebuilding the single clean commit: diff against `main`, don't cherry-pick from the write-protected branch.** `main` usually doesn't yet contain the original PR's changes, so cherry-picking just your incremental fix commit conflicts --- it was written against the PR branch's state, not `main`'s.
+**Rebuilding the single clean commit: diff against `main`, don't cherry-pick from the write-protected branch.**
+`main` usually doesn't yet contain the original PR's changes, so cherry-picking just your incremental fix commit conflicts --- it was written against the PR branch's state, not `main`'s.
 Instead, diff the whole file set and apply it fresh:
 ```bash
 git diff origin/main <old-branch> -- <changed-files> > /tmp/rebuild.diff
@@ -74,7 +77,8 @@ git add <changed-files> && git commit -m "..." && git push -u origin <assigned-b
 ```
 (Seen on ai-config#372 → #380: the assigned branch could push, `sync-freshness-rule` could not.)
 
-**Check whether the branch's own PR merged before adding more commits to it.** If a PR on this branch merged via **squash** (common in repos that enforce it), the branch's old commits are no longer ancestors of `main`'s new tip --- `git merge-base --is-ancestor <old-commit> origin/main` returns false.
+**Check whether the branch's own PR merged before adding more commits to it.**
+If a PR on this branch merged via **squash** (common in repos that enforce it), the branch's old commits are no longer ancestors of `main`'s new tip --- `git merge-base --is-ancestor <old-commit> origin/main` returns false.
 Committing follow-up work on top of that stale branch and pushing looks fine locally, but the resulting PR's diff shows the *entire prior PR's changes again* against `main`, confusing reviewers and re-litigating already-merged content.
 Before adding commits to a branch you didn't just create, fetch `origin/main` and check ancestry first.
 If the branch's own PR already merged, don't build on top of it --- start clean: `git checkout -b <branch> origin/main`, then `git cherry-pick` only the genuinely new commit(s).

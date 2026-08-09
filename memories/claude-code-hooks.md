@@ -157,6 +157,8 @@ The parent section prefers restoring the file to a settings.json edit, and is ri
 `/reload-plugins` re-runs the install and links every declared hook at once, so all the broken entries become valid together rather than one path at a time.
 It also needs no Bash, which matters because Bash is exactly what is down.
 Confirm it worked by reading `~/.claude/hooks/` and seeing symlinks into the checkout, timestamped at the reload.
+That confirms the link is **placed**, and not that the guard behind it is current: a symlink resolves through the checkout's working tree, so it serves whatever branch that checkout has out.
+`CLAUDE.md`'s "Keep ai-config and repo checkouts fresh" carries that case, including why `check-install.py` cannot report it.
 
 The transferable half is not about hooks.
 **A tool that succeeds at its own narrow job can leave the system worse than before it ran, and its success message reports the narrow job.**

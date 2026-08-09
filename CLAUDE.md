@@ -415,6 +415,32 @@ In every session — at session start, and again periodically during long sessio
    - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`
    - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.
    - **Don't:** run `install-hooks.py --fix` as the whole of "arm these hooks" --- it binds, it never places.
+   **An entry that genuinely IS a symlink resolves through the checkout's CURRENT BRANCH, so both instruments pass over a file from the wrong branch.**
+   Everything above splits the world into symlinks, which a pull refreshes, and real copies, which it does not.
+   That split is real and it is not exhaustive.
+   A symlink points at a **path in the working tree**, never at a commit, so the file the harness loads is whatever branch that checkout happens to have out --- which on a machine driving several PRs is routinely a feature branch rather than `main`.
+   A `git pull` on `main` then updates a ref the loaded file does not resolve through, and `git branch -f main origin/main` does not help either, for the same reason.
+   Note this is the opening sentence of point 2 failing, not a further wrinkle in the Windows real-copy case: "the pull alone refreshes them" holds only while the checkout is on the branch you pulled.
+
+   Neither instrument can see it, and the reason is structural rather than an oversight.
+   `check-install.py` classifies a symlink by **where it points** --- `misdirected` when it leaves this repo, `ok` otherwise --- and its `stale` category is defined over real copies only, its own legend reading `stale  real copy whose content differs from the repo`.
+   So a symlink cannot be classified `stale` whatever content sits behind it.
+   `install-hooks.py` reads `settings.json` and never opens the file at all.
+   A clean report from both is therefore consistent with every loaded file being a branch behind, which makes this a third way the installed state can be wrong, alongside the drifted registration and the registered-but-never-placed script in [`claude-code-hooks.md`](memories/claude-code-hooks.md).
+
+   The blast radius is the whole consumer surface rather than hooks alone, because `skills/`, `shared/`, `memories/`, and `CLAUDE.md` are linked the same way --- so the `@shared/...` fragments this file imports are exactly as exposed as a guard is.
+   One read settles it, and it is the content comparison neither instrument performs:
+   ```bash
+   git -C <ai-config-checkout> rev-parse --abbrev-ref HEAD                  # is it even on main?
+   git -C <ai-config-checkout> diff origin/main --stat -- shared hooks skills memories CLAUDE.md
+   ```
+   The repair is constrained in a way worth stating, since the obvious one is forbidden.
+   Point 1 already says to leave another session's in-flight work alone, and a checkout parked on someone else's branch is precisely what produces this drift, so switching it to refresh your own hook trades a stale guard for a clobbered colleague.
+   Report the drift instead and read from `origin/main` directly (`git show origin/main:<path>`).
+   - **Do:** read the checkout's current branch before believing any freshness report, and diff the consumer surface against `origin/main` when a loaded rule or guard matters.
+   - **Do:** say which branch a `~/.claude` file resolved through when reporting an install clean.
+   - **Don't:** read `check-install.py`'s `N/N ok` as meaning a symlinked file matches `main` --- it only means the link lands inside this repo.
+   - **Don't:** switch a checkout parked on another session's branch to refresh your own hook, or expect `git branch -f main origin/main` to move what a symlink resolves through.
 
 3. **The working repo's main checkout.**
    Fast-forward the `main` checkout of whatever repo the session is working on (`git fetch origin`, then `git pull --ff-only` when `main` is checked out) --- it goes stale as the session's own PRs and other sessions' PRs merge.

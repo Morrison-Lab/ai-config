@@ -59,6 +59,9 @@ All five must hold:
   2. that phrase sits in a MATCHING position --- an argument to jq
      test/capture/match/..., to grep/rg, to awk/sed, or to a python `re.` call.
      Merely echoing or printing the phrase is not a parse.
+     2a. AND it is not inside a `select(...)`, which is candidate selection
+         rather than verdict extraction. This is what lets `fully-clean.md`'s
+         own documented query through; see `phrase_in_matcher_position`.
   3. the data is REVIEW-DERIVED --- the same command names a review-comment
      source (`issues/N/comments`, `pulls/N/comments`, `--json comments`, ...)
      or reads a saved body file.

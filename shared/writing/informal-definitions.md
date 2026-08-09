@@ -95,8 +95,9 @@ its definitions-specific operationalization.
 **Shape 1: a new concept defined inside a div that names something else.**
 Already covered above --- the div's id and heading name concept A, and the
 body's own naming sentence or bolded term precisely defines concept B, with
-B getting no id of its own. A reader who wants to cite B has nothing to
-link to except A's div, which is about a different thing.
+B getting no id of its own.
+A reader who wants to cite B has nothing to link to except A's div,
+which is about a different thing.
 
 **Shape 2: a div's own heading names two concepts, and only one gets an
 id.** A heading like "Likelihood and log-likelihood" under a single

@@ -120,8 +120,8 @@ So:
 
 ## `update_trigger` with only a `prompt` does not reschedule a fired one-shot Routine
 
-A one-shot Routine --- one carrying `run_once_at`, which is what `send_later`
-builds --- retires itself once it fires.
+A one-shot Routine --- one carrying `run_once_at`, the shape `send_later`
+builds --- disables itself once it fires.
 Passing `update_trigger` a new `prompt` and nothing else replaces the prompt
 and leaves the schedule where firing left it, roughly 24 hours out.
 The call returns success either way.
@@ -151,9 +151,9 @@ once, roughly 24 hours after it was wanted, in a session that has long since
 moved on.
 
 Treat that second shape as a single observation rather than as settled.
-The retired shape is verified --- every fired, never-updated one-shot in two
-`list_triggers` reads 20 minutes apart showed `ended_reason` with no `enabled`
-field.
+The retired shape is verified --- every fired, never-updated one-shot showed
+`ended_reason` with no `enabled` field, in both `list_triggers` reads taken
+while this entry was written.
 The revived shape rests on one reading of one trigger, and it is no longer
 reproducible: that trigger has since been updated again, so the intermediate
 state is gone.
@@ -186,8 +186,10 @@ Across the 18 fired one-shots on the first `list_triggers` page,
 `next_run_at` minus `last_fired_at` was 24 hours in all 18, within a quarter of
 a second.
 It anchors on `last_fired_at` rather than on `run_once_at`: measured against
-`run_once_at + 24h` the same rows are off by 40 to 151 seconds, tracking each
-trigger's firing latency.
+`run_once_at + 24h` the same 18 rows spread from 0.6 to 556 seconds over.
+That spread is each trigger's own firing latency, so it collapses toward zero
+whenever the scheduler happened to be punctual --- which is why the anchor is
+settled by the spread rather than by any single row.
 Derive both rather than trusting these figures, since the page slides as
 triggers fire, and note that page reported `has_more: true`, so 18 is a page
 rather than the population:
@@ -195,7 +197,7 @@ rather than the population:
 ```python
 # mcp__Claude_Code_Remote__list_triggers, over rows carrying ended_reason
 (parse(next_run_at) - parse(last_fired_at)).total_seconds()  # 86399.77 .. 86399.86
-(parse(next_run_at) - parse(run_once_at)).total_seconds()    # 86440 .. 86551
+(parse(next_run_at) - parse(run_once_at)).total_seconds()    # 86400.60 .. 86956.03
 ```
 
 **Why a retired one-shot gets a `next_run_at` a day out at all is

@@ -233,7 +233,7 @@ So read the review workflow's own trigger block rather than recalling it, and di
 
 ```bash
 sed -n '/^on:/,/^[a-z]/p' .github/workflows/<review-workflow>.yml
-gh workflow run <review-workflow>.yml -R <owner>/<repo> -f pr_number=<N>
+gh workflow run <review-workflow>.yml -R <owner>/<repo> --ref <PR-branch> -f pr_number=<N>
 ```
 
 Take the input's name from that same file rather than assuming it, since a wrong `-f` name fails the dispatch outright.

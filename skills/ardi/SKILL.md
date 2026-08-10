@@ -170,7 +170,9 @@ How depends on the repo's review trigger first, and on whether this round pushed
      mention.
    - **Heads-up --- some repos' review workflow is *not* comment-triggered.**
      Some Quarto / R-package repos run `claude-code-review.yml` on `pull_request` (`opened, synchronize, ready_for_review, reopened`) and `workflow_dispatch` (input `pr_number`), not on an `@claude` comment.
-     A new push auto-fires it; to force a fresh review on an existing PR **without a new commit**, prefer `workflow_dispatch` (`gh workflow run claude-code-review.yml -f pr_number=<N>`; without `gh`, the REST `.../actions/workflows/claude-code-review.yml/dispatches` endpoint, or your GitHub MCP workflow-dispatch tool).
+     A new push auto-fires it.
+     To force a fresh review on an existing PR **without a new commit**, prefer `workflow_dispatch`: `gh workflow run claude-code-review.yml --ref <PR-branch> -f pr_number=<N>`.
+     Without `gh`, use the REST `.../actions/workflows/claude-code-review.yml/dispatches` endpoint, or your GitHub MCP workflow-dispatch tool.
      Closing+reopening the PR also works (fires `reopened`) but adds timeline noise.
      See [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md).
    - **Marking a draft ready seconds after its final push is another cancel-in-progress race** --- the ready-event and synchronize runs fire a second apart and the cancellation can land on the newer (current-head) run; see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) for the diagnosis and the `gh run rerun` remedy.

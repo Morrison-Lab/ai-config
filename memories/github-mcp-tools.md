@@ -368,6 +368,20 @@ See ai-config#694 for the precedent.
   text as `body`, clobbering the freshly-filed issue description --- caught
   immediately from the echoed response and fixed with a restore-then-comment
   pair of calls.)
+- **A milder, distinct mistake with the same tool: `issue_write`'s `method`
+  enum accepts only `"create"` or `"update"` --- there is no
+  `"add_comment"`.**
+  Guessing `method: "add_comment"` (a plausible name with no analog in the
+  real schema) fails loudly and immediately: `invalid method, must be
+  either 'create' or 'update'`.
+  No data is touched, unlike the silent clobbering above --- so this is a
+  safe failure mode, not a dangerous one, and the fix is simply to call
+  `add_issue_comment` instead.
+  Still worth naming so the two are not conflated: one fails loud and safe
+  at the call itself, the other succeeds and silently destroys prior
+  content.
+  (Hit while posting evidence to `Morrison-Lab/ai-config#1330`, 2026-08-10;
+  recovered with the correct tool on retry.)
 - **`mcp__github__create_or_update_file`'s `content` param is raw plain text,
   not base64** — despite the GitHub REST API's own `PUT /repos/.../contents/`
   endpoint taking base64, this MCP tool does the encoding for you. Passing an

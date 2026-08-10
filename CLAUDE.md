@@ -339,6 +339,16 @@ Re-derive it from a live query rather than trusting the earlier verdict.
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
 
+## Read a repo's canonical contributor doc before starting work, not just before pushing
+
+@shared/workflow/read-canonical-doc-before-starting.md
+
+When a short `CLAUDE.md` names a fuller document as the actual authority
+--- `.github/copilot-instructions.md`, `CONTRIBUTING.md`, a linked style
+guide --- read that document before the first edit, and front-load its
+pre-PR requirements into the first commit rather than discovering them via
+a red CI check.
+
 ## Open a PR immediately after claiming an issue
 
 @shared/workflow/pr-on-claim.md

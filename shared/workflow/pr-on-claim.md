@@ -107,6 +107,29 @@ Both keep the POST the last command.
 - **Do:** narrow the response with a flag on the POST itself rather than a downstream pipe.
 - **Don't:** pipe the POST anywhere, including to `tail`, `head`, or `jq` --- the hook cannot tell a formatting pipe from a chained verification, because the shell does not either.
 
+**A PreToolUse block for this was considered and rejected -- the Stop hook stays the only guard.**
+After hitting this exact mistake (a `--silent` POST followed by `&& echo`, chained in one call), the natural next question is whether a **PreToolUse** hook should refuse to run the compound command at all, rather than let it run and catch the omission afterward at Stop.
+It was investigated and rejected, so record the reasoning here rather than re-deriving it the next time someone proposes it.
+
+The Stop hook's `last`-computation is deliberately biased toward "ambiguous means not last": when `_simple_commands` cannot confirm a request is the final simple command, the hook keeps the PR tracked rather than risk a silent wrongful discharge, per [`fail-fast`](../principles/fail-fast.md)'s safe/dangerous asymmetry.
+That bias costs nothing at Stop time -- a false "not last" just means one more nag, and re-running the POST alone clears it in a single extra call, as it did here.
+The identical bias in a PreToolUse **block** costs something different: it would refuse a genuinely solo, well-formed command whenever the shlex-based parser could not positively confirm it was alone.
+A POST whose payload contains `$(...)` command substitution is the concrete case -- `(` and `)` are control-operator tokens to `_simple_commands`, so such a command can get mis-split into more than one "simple command" and read as chained when nothing follows the real request.
+Reusing the Stop hook's own parser for a block would therefore inherit a bias calibrated for a safe, low-cost consequence and apply it to an unsafe, high-cost one.
+
+[`hooks/no-unauthorized-merge.py`](../../hooks/no-unauthorized-merge.py) is the concrete evidence for how much engineering a *correctly calibrated* PreToolUse block over arbitrary shell-command structure costs in this repo: six review rounds (ai-config#1279, #1287) closing false-negative gaps in what counts as a command position, with its own comments stating the enumeration "cannot be finished."
+That investment is proportionate there because the thing being prevented is an unauthorized merge.
+It is not proportionate here, because the thing this new hook would prevent is a single wasted Bash call with a working safety net already in place -- the Stop hook already protects the actual invariant (no PR ships without a review request) and gives a one-round, self-explanatory fix.
+
+[`hooks/flag-unchained-branch-switch.py`](../../hooks/flag-unchained-branch-switch.py) already reached the same conclusion for a structurally similar "does this command chain something after a step whose success matters" concern, choosing to warn rather than block, on the same grounds: a blocking guard that misfires on a legitimate compound command is worse than the miss it exists to prevent.
+
+- **Do:** treat the Stop hook's post-hoc catch as sufficient for this specific mistake, and re-run the POST alone when it fires.
+- **Do:** re-open this question only once the mistake has recurred as a **dated, repeated** incident, per [`deterministic-tools`](../principles/deterministic-tools.md)'s "third occurrence" bar for building a tool -- not merely because it could recur.
+- **Don't:** reuse the Stop hook's `last`-computation for a PreToolUse block without re-deriving which direction is safe for THAT consequence -- the bias that is safe for a nag is not safe for a refusal.
+- **Don't:** read "the underlying question is decidable" as sufficient justification on its own; a genuinely safe block still needs the same order of adversarial hardening `no-unauthorized-merge.py` needed, and that cost has to be weighed against what is actually being prevented.
+
+(Morrison-Lab/ai-config#1367, 2026-08-09: investigated after chaining `gh api ".../requested_reviewers" -X POST ... --silent && echo "requested"` in one Bash call on a `Lacaedemon/sparta` PR; the Stop hook correctly flagged it, and recovery was one extra Bash call.)
+
 **Some repos schedule Copilot automatically, and this step is redundant there.**
 A repository ruleset can carry a `copilot_code_review` rule with
 `review_on_push: true` (and optionally `review_draft_pull_requests: true`),

@@ -19,7 +19,7 @@ Open PRs belonging to *other* sessions do not trigger this --- `wrap-up`'s sweep
 - **Do:** hold the flag until every PR this session opened or pushed to has merged or closed.
 - **Do:** report an unmerged PR's status plainly instead, with no stopping-point suggestion attached.
 - **Don't:** treat "green checks, just awaiting review" as not-live --- it is the archetypal live PR.
-- **Don't:** flag a stopping point and disclose the open PR in the same breath, which is the same too-early flag the UMS rule above rejects.
+- **Don't:** flag a stopping point and disclose the open PR in the same breath, which is the same too-early flag [`run-ums-proactively`](run-ums-proactively.md)'s "Recommending that the session end is itself a UMS trigger" section rejects.
 
 **Run `wrap-up`'s state sweep *before* flagging a stopping point, not after the user asks for one.**
 The paragraph above says not to flag while live state remains; it doesn't say how to know.
@@ -30,7 +30,7 @@ Run the sweep --- open PRs and issues per repo, `git status`, local branches, wo
 The harness assigns its branch name in *every* scoped repo and leaves each one checked out on it, including repos the session never opens.
 So the sweep finds the branch sitting in places nothing in the conversation points at, and two things follow from that.
 
-Point 3 of the "Keep ai-config and repo checkouts fresh" section quietly does nothing in those repos.
+Point 3 of [`keep-checkouts-fresh`](keep-checkouts-fresh.md)'s "The working repo's main checkout" step quietly does nothing in those repos.
 It fast-forwards `main` only when `main` is the checked-out branch, and here it never is, so a repo you never opened stays as stale as the container left it.
 
 And `git branch -D` refuses, with `cannot delete branch 'X' used by worktree at '<path>'`.

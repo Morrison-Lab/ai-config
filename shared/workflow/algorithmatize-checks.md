@@ -823,6 +823,74 @@ redundant clause.
 Mutating the call site to pass the genuinely unmasked segment instead failed
 **3**, which is the figure the PR body now reports for that clause.)
 
+**A sixth outcome, and the only one that runs the other way: a mutant that
+FAILS for a reason other than the mutation.**
+The five above are all the same direction --- a mutant scores clean while
+testing nothing, so the harness under-reports.
+This one over-reports.
+The mutant genuinely fails, the harness genuinely records a failure, and the
+failure has nothing to do with the change that was made.
+
+Every assert this section has accumulated passes here, because each of them
+interrogates the **mutant** and this is a fact about the **environment**.
+The artifact differs from the original, so the differs-from-original check
+passes.
+It says what its author wrote, so the faithfulness check passes.
+Its replacement is independent of what it replaced, so the provenance check
+passes.
+And then the run dies on something none of them looked at.
+
+**Location is the usual culprit, and mutation is what puts you in a strange
+one.**
+A mutant is normally written to a scratch directory, because that is how you
+avoid editing the real artifact --- so the act of being careful is what moves
+the run.
+Three things change with it, none of them announced: a resource resolved
+relative to the working directory is no longer there, an interpreter picked up
+from a different `PATH` may be a different version, and the scratch directory
+goes on the front of the module search path, where an unrelated file can shadow
+a standard-library name.
+
+Measured on one machine, 2026-08-09, with an **unmutated** copy of a script
+placed in `/tmp` and run from there:
+
+| run | outcome |
+|---|---|
+| unmutated copy, from the repo root | self-test passes |
+| unmutated copy, from `/tmp` | `error: .gitleaks.toml not found` |
+| `python3 -c "import inspect"`, from `/tmp` | executes a stray `/tmp/inspect.py` |
+| the machine's default `python3` | 3.10, while the script requires 3.11+ |
+
+Three independent ways for a run in that directory to fail, none of them a
+mutation, and each producing a traceback that reads like a real finding.
+
+**The discriminator is an unmutated copy run from the same location**, and it
+costs one command.
+A mutant that fails where its unmutated twin also fails has told you about the
+location.
+A mutant that fails where its twin passes has told you about the mutation.
+Nothing short of that separates them, because the mutant's own traceback names
+whatever broke first rather than whatever you changed.
+
+Read this as [`ardi`](ardi.md)'s "seen to fail" rule completed: that rule
+requires a test to be **seen to fail**, and this one requires it to be seen to
+fail **for its own stated reason**.
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "Mutate the fix,
+not only the test" already asks for exactly that, and enumerates six mechanisms
+--- all six of which are ways a mutant wrongly *passes*.
+This is the direction that list does not carry.
+
+- **Do:** run an unmutated copy from the mutant's own location, and treat a
+  shared failure as evidence about the location rather than the mutation.
+- **Do:** read the mutant's failure message against the change you made, and
+  distrust any failure that does not name it.
+- **Don't:** score a mutant as caught because the harness recorded a non-zero
+  exit --- the asserts above all inspect the mutant, and none inspects where it
+  ran.
+- **Don't:** treat moving the mutant to a scratch directory as inert; it
+  changes the working directory, the module search path, and possibly the
+  interpreter, all silently.
+
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**
 A harness bug and a real finding are indistinguishable from the harness's own

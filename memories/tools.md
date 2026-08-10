@@ -616,6 +616,63 @@ The second time, a branch sweep reported all 19 local branches as having no
 PR; the immediately preceding run of the same data had correctly shown 16 as
 `MERGED`, which is the only reason the contradiction was noticed at all.)
 
+**A second variant: the consumer can reject the unsplit string outright, and
+the loop's own progress output can then read as partial success.**
+The case above assumes the downstream consumer tolerates the unsplit string
+silently --- a `[ "$2" = "MERGED" ]` test just goes false.
+A stricter consumer does not.
+Collecting several GraphQL node ids into one variable and looping over them
+unquoted --- `IDS=$(gh api graphql ... --jq '...|.id')` then
+`for id in $IDS; do ...; done` --- runs the loop body exactly **once**, with
+every id joined by the embedded newlines from `$IDS`, because zsh never split
+it.
+GraphQL rejects that single malformed id outright, so the call errors instead
+of going quiet:
+
+```
+Could not resolve to a node with the global id of 'PRRT_kwDOTYdrl86Xsy0A
+PRRT_kwDOTYdrl86Xsy1o
+...'
+```
+
+The dangerous part is not the error.
+It is that a resolve-and-echo pattern inside the loop body can print a
+per-item success line for each id the error message happened to name, so the
+transcript reads like several calls each partly succeeded, when only one call
+ever ran and it failed.
+The tell is a ground-truth count that does not move: re-querying the number
+of items still needing resolution, rather than trusting the loop's own
+printed lines, is what actually caught it.
+
+Pipe multi-line command output into `while read -r`, never into an unquoted
+`for` loop, for exactly this idiom:
+
+```zsh
+gh api graphql -f query='...' --jq '...|.id' |
+  while read -r id; do
+    [ -z "$id" ] && continue
+    gh api graphql -f t="$id" -f query='...'
+  done
+```
+
+- **Do:** pipe multi-line command output into `while read -r`, not into an
+  unquoted `for x in $var` loop.
+- **Do:** re-query a ground-truth count (unresolved threads, open items)
+  after a loop like this, rather than trusting its own printed progress
+  lines.
+- **Don't:** read a script's per-item success echoes as evidence a
+  multi-step loop ran more than once; the unsplit-variable failure can make
+  one failed call look like several partial successes.
+
+(2026-08-09, resolving PR review threads on
+[`Morrison-Lab/wai#57`](https://github.com/Morrison-Lab/wai/pull/57):
+the `for id in $IDS` loop above ran once over all five thread ids
+concatenated by embedded newlines, and the GraphQL error it produced named
+all five in one string.
+The loop's per-line echo made the transcript read as four of five threads
+resolved; the unresolved-thread count, re-queried independently, was
+unchanged at 5.)
+
 ## `grep` in a Claude Code session is a shell function, so a script gets a different program
 
 Sibling of the entry above: another case where the harness's shell is not the

@@ -66,8 +66,9 @@ grants the move, it does not exempt it from what a move costs.
   reading, not by grep, because it is defined by what a sentence refers to
   rather than by what string it contains.
   See [`address-every-comment.cases.md`](../workflow/address-every-comment.cases.md),
-  "A defect whose surface form varies defeats a phrase grep", for the
-  five-rounds-to-find-five-instances case this generalizes from.
+  "A defect whose surface form varies defeats a phrase grep", for the case
+  this generalizes from --- a quoted-heading grep sweep still left two more
+  rounds' worth of differently-worded instances for reviewers to find.
 - **A downstream count or position reference can silently break**, even
   though you touched neither its sentence nor its file.
   [`forward-references.md`](forward-references.md)'s "Inserting prose makes a

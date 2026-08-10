@@ -1560,8 +1560,39 @@ Ancestry, hashes, and subjects are all facts about commit *identity*, which a sq
 Verify a merge, and diagnose a divergence, with `git show <ref>:<path> | grep` for a string only that change introduced.
 [`memories/git.md`](../../memories/git.md) carries the ancestry half of this and the per-repo merge-strategy facts.
 
+**That content check is itself line-oriented, so in a semantic-line-break
+corpus it produces the same alarming-direction false negative it was
+introduced to cure.**
+A phrase of any length straddles a newline where one clause per line is
+mandated, so `git show <ref>:<path> | grep` reports zero against a file that
+plainly contains the string.
+[`address-every-comment`](../workflow/address-every-comment.md)'s
+"a single-line `grep` returns false negatives on your own prose" owns that
+rule and the whitespace-and-markup normalization that fixes it, applied to
+both sides; read it there rather than re-deriving it.
+
+What is new here is *where* the false negative lands.
+That fragment frames the cost as re-doing work already done, which is a
+verification you repeat.
+At this prescription the same zero reads as **the merge did not land**, which
+is a verification you disbelieve --- so the remedy offered against the three
+identity proxies above fails in the same direction they do, one command later.
+
+Run the search as its own command, never chained.
+`grep -c` exits 1 when the count is zero, so an `&&` chain aborts on the very
+result you are inspecting and every later verification step silently never
+runs.
+The wrong answer and a short verification then arrive together, and the
+truncation reads as there having been nothing more to check.
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md) owns the exit
+status and where to state the tolerance.
+
 - **Do:** decide "did this land?" by grepping the content at the ref, naming a string only that change introduced.
+- **Do:** normalize whitespace and markup on both sides before concluding a merged phrase is absent, and name the search that settled it.
+- **Do:** run the content check as its own command, so a zero count cannot also truncate the rest of the verification.
 - **Do:** treat a zero from a subject match in a squash-merging repo as carrying no information, rather than as evidence of orphaned work.
+- **Don't:** read a zero from a line-oriented `grep` for your own merged prose as evidence the merge did not land --- in this corpus that is the search failing, until a normalized one agrees.
+- **Don't:** chain that grep with `&&` --- a zero count is also a non-zero exit, so it kills the steps behind it.
 - **Don't:** read `--is-ancestor` returning non-ancestor as "not merged" in a repo that squash-merges --- it returns that for every merged branch.
 - **Don't:** substitute a message-scoped `--grep` for the content check; it depends on whether the squash body was rewritten, which is nobody's invariant.
 

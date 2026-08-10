@@ -427,3 +427,60 @@ The same round carried a clause-by-clause mutation matrix in which every clause
 was detected and isolated by at least one case.
 Mutation testing asks whether a clause is load-bearing; it never asks whether
 the reason given for that clause is true.)
+
+## "Normalizing repairs the instrument and not the needle"
+
+(`Morrison-Lab/ai-config#1376`, squashed as `2ed74b89`, 2026-08-09/10.
+That PR's own subject was the sibling cause: a line-oriented content check
+false-negating in a semantic-line-break corpus.
+Minutes after it merged, the merge was verified with the corrected normalizing
+search, and two of three probes returned 0 against a file whose content had
+demonstrably landed.
+
+The instrument was not at fault.
+The probes were: two of the three had been invented from prose *about* the
+change rather than read out of it.
+
+| probe | source | normalized hit |
+| --- | --- | --- |
+| `needs a normalizing search` | the PR title | 0 |
+| `exits 1 when the count is 0` | paraphrase of the commit message | 0 |
+| `straddles a newline` | the PR body, which happened to overlap the diff | 1 |
+| `exits 1 when the count is zero` | the added prose itself | 1 |
+
+Note the last two rows against the second.
+The real text reads `zero` and the probe said `0`, so a single substituted word
+produced the whole false negative --- which is why quoting a commit message
+closely is not a defence.
+
+Re-derive rather than trusting the table, since it is a claim about one commit:
+
+```bash
+python3 - <<'PY'
+import re, subprocess
+norm = lambda s: re.sub(r"[`*_\s]+", " ", s)
+d = subprocess.run(["git","show","2ed74b89","--","shared/principles/fail-fast.md"],
+                   capture_output=True, text=True).stdout
+plus = [l for l in d.splitlines() if l.startswith("+")]
+h = norm("\n".join(l[1:] for l in plus[1:]))   # [1:] drops the +++ header
+for p in ["needs a normalizing search", "exits 1 when the count is 0",
+          "straddles a newline", "exits 1 when the count is zero"]:
+    print(f"{norm(p) in h!s:>5}  {p!r}")
+PY
+```
+
+Both checks that would have settled it were free.
+`git show --numstat 2ed74b89 -- shared/principles/fail-fast.md` returns
+`31  0  shared/principles/fail-fast.md`, which proves the content landed with
+no probe to get wrong.
+And the same diff's added lines contain every string that could have served as
+a probe, so deriving one discharges the known-positive rule at zero cost.
+
+The dupe check for the rule this record supports also ran the other way and
+found the general mechanism already owned.
+`memories/debugging.md`'s "An empty grep for one spelling is not evidence the
+concept is absent" covers a wrong-guessed spelling for a concept that is
+present, and prescribes re-searching for the stable part of the concept.
+What that entry does not say, and what is specific to merge verification, is
+that the correct needle is obtainable for free from the diff --- so here the
+guess is eliminable rather than merely improvable.)

@@ -161,6 +161,62 @@ Distinct from
 covers an inference drawn *from* a fixture back to the real system.
 Here the fixture is fine and the defect is in the test's own logic.
 
+## De-duplication corrupts a test the same way, and that direction is invisible
+
+The section above is the case everyone expects: two copies of one thing, so the
+test checks the copies against each other rather than against reality.
+The mirror runs the other way, and it arrives wearing this principle's own
+vocabulary.
+
+A test can assert two independent facts about a value that are each written as
+a literal.
+DRY says to name the value once and derive both from it, which is ordinarily
+right.
+When the two facts are *the fixture the test builds* and *the expectation it
+checks*, deriving both from one constant makes them move together, so a wrong
+constant satisfies both and the pair stops asserting anything about the world.
+
+That inverts the usual reading of duplication.
+Here the duplicated literals were the only thing holding the assertions apart,
+so the refactor traded a real check for a self-consistency check, and it did so
+in a commit whose message correctly says it removed a duplicate.
+
+Nothing about the diff shows it.
+The tests still pass, the constant is still correct, and the assertion still
+names the property it always named.
+Only a mutation reveals it: change the constant to something false and watch the
+suite stay green.
+
+So when a refactor pulls a literal out of a test, ask what the two sites were
+*independently* claiming, and anchor whichever one made a claim about the world
+against something the constant cannot move.
+A filesystem check, a recorded output, or a value read from a different source
+all work; another expression over the same constant does not.
+
+The rule is not "leave duplication in tests".
+It is that a **constant is not a source of truth**, so an assertion derived
+entirely from one is a tautology however many steps separate the two.
+
+- **Do:** mutate a named constant to a wrong value after de-duplicating a test,
+  and require the suite to fail.
+- **Do:** keep at least one assertion anchored outside the constant -- the
+  filesystem, a fixture recorded elsewhere, an independently computed value.
+- **Don't:** derive both a test's fixture and its expectation from the same
+  constant and read the passing test as coverage.
+- **Don't:** treat a DRY refactor of a test as behaviour-preserving because it
+  changed no logic; it can change what the test is able to detect.
+
+(`ucdavis/bcs#614`, 2026-08-09: `.github/scripts/detect-redaction-diff.py`'s
+self-test asserted that the script's own path is excluded from its scan and
+that the exclusion is reported.
+Both were hard-coded literals.
+Naming the path once as `SELF_PATH` made the fixture and the exclusion set both
+derive from it, so a `SELF_PATH` naming a file that does not exist passed both
+assertions -- verified by mutation, exit 0 -- while the pre-refactor duplicated
+version would have caught it.
+Repaired by adding a third assertion, `Path(SELF_PATH).exists()`, which the
+constant cannot satisfy on its own.)
+
 ## Relationship to the other principles
 
 - **[DRW](dont-reinvent-wheel.md)** covers searching before building.

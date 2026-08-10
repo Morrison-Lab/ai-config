@@ -637,6 +637,58 @@ There the collision hides a true positive; here it manufactures a false one.
 Read that one before concluding a concept is absent; read this one before
 trusting any grep as an instrument.
 
+**A fourth direction, and the one that answers a question you never asked:
+`grep -o` reports the MATCH, so it cannot describe the VALUE.**
+The three directions above all concern which lines a pattern selects.
+This one selects the right lines and then truncates what it shows you, because
+`-o` prints the matched substring and stops at the first character outside the
+pattern.
+So a pattern written to *find* something gets reused to *characterize* it, and
+it reports the shape of itself rather than the shape of the data.
+
+The output is what makes it convincing.
+It is not empty, it is not obviously wrong, and it is a real list of real
+substrings drawn from real lines --- so nothing about reading it suggests that
+each entry has been cut short.
+Worse, a pattern with a quantifier reports a *distribution*: matching `[0-9]+`
+against ten-character alphanumeric identifiers returns runs of one to ten
+digits, which reads as genuine variation in the data and is entirely an artifact
+of where each value's first letter happened to fall.
+The alphanumeric form never appears at all, so the one observation that would
+have corrected the description is the one `-o` structurally cannot produce.
+
+The cost is that a rule written from that description covers only the values the
+pattern's own alphabet reaches.
+Measured 2026-08-09 on `ucdavis/bcs`: of 45 sites carrying a ten-character
+identifier, a pure-digit pattern matched **12**, and the remaining 33 mix
+letters and digits in positions no digit-only rule reaches.
+
+The fix is to quote the whole value rather than the matched fragment.
+Match the delimiters --- `"[^"]*"` for a quoted literal, the full field for a
+delimited one --- and mask the contents before printing, so the shape is
+observed without the value being reproduced:
+
+```bash
+git grep -Ehoi 'field *= *"[^"]*"' -- 'path/**' |
+  sed -E 's/.*"([^"]*)"/\1/' |
+  sed -E 's/[A-Za-z]/@/g; s/[0-9]/#/g' | sort | uniq -c
+```
+
+Mask with characters **outside** both classes you are collapsing.
+Rewriting digits to `D` and then letters to `@` converts the `D`s too, so every
+value reports as pure letters --- a masking instrument that erases the very
+distinction it was built to show, which is this section's own subject one step
+further in.
+
+- **Do:** match the value's delimiters when the question is what the values look
+  like, and mask the contents rather than quoting the match.
+- **Do:** pick mask characters outside every class being collapsed, and check
+  the mask against a value you already know.
+- **Don't:** read a `grep -o` distribution as a fact about the data --- it is a
+  fact about where each value first leaves the pattern's alphabet.
+- **Don't:** promote a pattern written to locate something into the description
+  of what it located.
+
 ### The third one arrives in the repair, and only on the empty input
 
 The two cases above are checks written wrong the first time.

@@ -851,8 +851,11 @@ from a different `PATH` may be a different version, and the scratch directory
 goes on the front of the module search path, where an unrelated file can shadow
 a standard-library name.
 
-Measured on one machine, 2026-08-09, with an **unmutated** copy of a script
-placed in `/tmp` and run from there:
+Measured on one machine, 2026-08-09, with an **unmutated** copy of
+`ucdavis/bcs#614`'s `.github/scripts/detect-redaction-diff.py` --- the same
+script whose vacuous self-test
+[`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)
+records --- placed in `/tmp` and run from there:
 
 | run | outcome |
 |---|---|

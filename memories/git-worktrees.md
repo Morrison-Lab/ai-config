@@ -196,6 +196,111 @@ In practice the drift found there can be large even in an actively-used setup: o
 Before trusting a sync is complete, `diff -rq` (or `cp -r` unconditionally, after checking for genuine un-upstreamed local edits per the existing before-overwriting caution) all four directories, not just the one that happens to render in every prompt.
 (`Lacaedemon/sparta`, 2026-07-04.)
 
+## The same-branch collision can surface at TEARDOWN, and `git worktree list` cannot show it
+
+Two sections above already own this phenomenon --- the `checkout -B` bypass and
+the shared-ref move --- so read those for the mechanism and the recovery rather
+than re-deriving either here.
+Both place their prevention **before** the work: one says never to return to
+`main` inside a linked worktree, the other says to run
+`git worktree list | grep <branch>` before creating one.
+This entry is the case where neither ran, the collision was already in place,
+and the first thing to notice it was `git branch -d` during post-merge tidy-up.
+
+**`git worktree list` reports each worktree's HEAD, so it cannot show a diverged
+index.**
+Two worktrees attached to one branch both resolve HEAD to that branch, so both
+print the **same SHA** however far one worktree's index has moved from it.
+`--porcelain` adds no index field either; it merely labels the same value
+`HEAD`.
+So the duplicated **branch name** is the only part of that output which reveals
+the collision, and nothing in it reveals the staged divergence --- which is why
+this can sit unnoticed until something tries to delete the branch.
+
+**Read a `used by worktree` refusal twice when the branch is one you just
+merged.**
+`CLAUDE.md`'s wrap-up bullets say not to read `used by worktree` as evidence
+that a separate live worktree exists, since "it is almost always just that
+repo's ordinary checkout sitting on the branch".
+That is right for the sweep it governs --- leftover harness branches in scoped
+repos the session never opened --- and this is the other case.
+A branch you drove to merge in **this** session, refusing deletion by naming a
+path that is not your checkout, is the one place that "almost always" is worth
+spending two commands on:
+
+```bash
+git worktree list                       # more than one row for this branch?
+git -C <that-path> status --short       # does the other worktree hold an index?
+```
+
+**Git's own guard is the second of those, and `--force` is what skips it.**
+`git worktree remove <path>` refuses on a dirty tree
+(`fatal: '<path>' contains modified or untracked files, use --force to delete
+it`), which is exactly the check that surfaces a staged divergence.
+[`post-merge`](../skills/post-merge/SKILL.md) and
+[`clean-worktrees`](../skills/clean-worktrees/SKILL.md) both already say not to
+reach for `--force` blindly, so the procedural remedy exists; what this case
+adds is that the refusal one step earlier, from `git branch -d`, is itself a
+reason to look.
+
+**When the staged diff reverses already-merged work, settle discarding by
+content on `origin/main`.**
+The recovery advice in the sections above preserves and restores selectively,
+which is right when the worktree's own commits may be unique.
+A staged reversal of a fix that has already merged is the case where discarding
+is provably safe, and the deciding read is the content rather than any ancestry
+or SHA comparison, per
+[`fail-fast`](../shared/principles/fail-fast.md)'s "whether a change landed is
+decided by looking for the change":
+
+```bash
+git show origin/main:<path> | grep -n "<a string only that change introduced>"
+```
+
+- **Do:** treat a `used by worktree` refusal on a just-merged branch as a
+  prompt to count the rows in `git worktree list` and run `git status --short`
+  in the other worktree.
+- **Do:** confirm the fix is on `origin/main` by content before discarding a
+  staged reversal of it.
+- **Don't:** read matching SHAs in `git worktree list` as evidence the two
+  worktrees agree --- that column is HEAD, and it says nothing about either
+  index.
+- **Don't:** reach for `git worktree remove --force` before reading the
+  non-forced refusal, which is the only step that surfaces a staged divergence
+  on its own --- `git status --short` reports it more precisely, and only if
+  you think to run it.
+
+(`Morrison-Lab/ai-config`, 2026-08-10, tidying after PR #1365 merged as squash
+commit `491906bf`.
+`git branch -d learn/dispatch-cancel-and-commit-identifiers` refused, naming
+`/tmp/wt-ums-1363-1364`.
+`git worktree list` showed that path and `/home/user/ai-config` both on that
+branch and both at `2714db61`.
+The primary's `git status --short` was empty; the linked worktree's was not,
+reporting `M  shared/workflow/pr-on-claim.md` and `M  skills/ardi/SKILL.md`,
+both staged, and `git diff --cached` there showed the **pre-`2714db61`**
+content of both --- so committing it would have reverted the `--ref` fix that
+had just merged.
+Those two files are a subset of the four `491906bf` touched.
+Discarding was confirmed safe by content, for **both** files rather than one
+--- the section's own principle is that membership in a merged commit's file
+list is not the deciding read:
+`git show origin/main:shared/workflow/pr-on-claim.md` carries
+`gh workflow run <review-workflow>.yml -R <owner>/<repo> --ref <PR-branch> -f
+pr_number=<N>` at line 236, and
+`git show origin/main:skills/ardi/SKILL.md` carries the same string at line
+158.
+Resolved with `git worktree remove --force` plus `git branch -D`.
+How the two worktrees came to share the branch was **not** established, so
+nothing here asserts a mechanism for it.
+The output claims above were re-measured on git 2.43.0 against a synthetic
+two-worktree repo: with one worktree holding a staged reversal, both rows of
+`git worktree list` printed the same SHA, `--porcelain` printed that value as
+`HEAD` for each with no index field, the non-forced `git worktree remove`
+refused with the `contains modified or untracked files` message, and
+`git branch -d` refused with
+`error: cannot delete branch 'feat' used by worktree at '<path>'`.)
+
 ## `isolation: "worktree"` gives a worktree of the SESSION's repo, not of the repo a brief names
 
 Every section above concerns worktrees you create yourself.

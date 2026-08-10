@@ -406,11 +406,11 @@ See ai-config#694 for the precedent.
   by `content.size` reading 21 bytes for a ~50KB file.
   **A local clone plus a real `git push` avoids this class of mistake
   entirely, when push is available.**
-  `git clone --depth 1 --filter=blob:none --sparse` (the entry above) plus
-  `git push` from that clone worked in this same session, for a branch
-  that was neither harness-assigned nor the working directory's own repo ---
-  consistent with [`github.md`](github.md)'s "the proxy allows branch
-  creation/push but BLOCKS branch deletion."
+  `git clone --depth 1 --filter=blob:none --sparse` plus `git push` from
+  that clone worked in this same session, for a branch that was neither
+  harness-assigned nor the working directory's own repo --- consistent
+  with [`github.md`](github.md)'s "the proxy allows branch creation/push
+  but BLOCKS branch deletion."
   `git config -l` showed no local credential (only
   `http.proxyauthmethod=basic` and `credential.interactive=false`, no
   `~/.git-credentials` or `~/.netrc`), so authentication happens somewhere

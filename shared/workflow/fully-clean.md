@@ -690,6 +690,48 @@ A verdict that is empirically wrong about present file content is conclusive pro
 - **Do:** cross-check a stale-suspected verdict's specific claims against the file directly, rather than only against run metadata.
 - **Don't:** trust `head_sha` as "the commit reviewed" on a workflow-dispatch-triggered run --- that guarantee only holds for push/pull_request-triggered runs, which check out the PR head by construction.
 
+**A third surface names a commit the run never read, and unlike the two above
+it points the confident direction: the run object's own
+`pull_requests[].head.sha`.**
+Both rules above leave you without a usable SHA --- a caption that may be
+stale, and a `head_sha` that names the dispatch ref.
+A workflow run object also carries a `pull_requests[]` array, and its
+`head.sha` looks like the missing answer.
+It is not an answer about the run at all.
+That field is a live pointer to the pull request, resolved when you read it, so
+it reports the PR's **current** head whatever commit the run checked out or
+diffed.
+
+The failure direction inverts relative to the caption case.
+A stale caption reads as a stale review, which invites a needless re-trigger.
+This field reads as a **current** review, so it argues that the verdict already
+covers your latest push --- and it argues that with a real SHA matching your
+branch tip exactly.
+
+The field also empties once the PR closes, so on a merged PR it answers nothing
+rather than answering wrongly.
+Read an empty array as carrying no information, not as a finding.
+
+So the field cannot distinguish the case this criterion is about, and the
+remedy is the one the block above already reaches for in its last line:
+**read the review body.**
+Find a figure, a quotation, or a claim in the verdict whose value differs
+between the candidate commits, and check which one it states.
+A verdict empirically wrong about present file content read an earlier commit,
+whatever any SHA field says.
+
+- **Do:** settle which commit a review read from a discriminating claim in its
+  own body, since that is the only surface separating the candidates.
+- **Do:** read `pull_requests[].head.sha` as a fact about the PR's current
+  head, useful for nothing else.
+- **Don't:** read that field naming your latest commit as evidence the review
+  covered it --- it names the current head unconditionally.
+- **Don't:** read an empty `pull_requests` as evidence about the run; the array
+  empties when the PR closes.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md), "`pull_requests[].head.sha`
+named a commit pushed after the run started".
+
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---
 including gaining its own independent addition that collides with yours

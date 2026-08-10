@@ -55,6 +55,19 @@ grants the move, it does not exempt it from what a move costs.
   (and, for a cross-file move, the survivor left behind) for locative and
   directional phrases, and re-point or delete every one that no longer
   resolves.
+  **A phrase grep only catches the instances that quote their target.**
+  A reference can allude to a moved rule in its own words --- "the UMS rule
+  above", naming no heading --- and a grep keyed on the target's wording
+  finds nothing to match.
+  Once a reviewer (or a self-sweep) has found more than one instance of this
+  defect in a moved block, stop pattern-matching and read the block end to
+  end, checking each `above`/`below`/`bullet`/`section`/`rule` reference's
+  actual target by hand --- the site list for this defect class is derived by
+  reading, not by grep, because it is defined by what a sentence refers to
+  rather than by what string it contains.
+  See [`address-every-comment.cases.md`](../workflow/address-every-comment.cases.md),
+  "A defect whose surface form varies defeats a phrase grep", for the
+  five-rounds-to-find-five-instances case this generalizes from.
 - **A downstream count or position reference can silently break**, even
   though you touched neither its sentence nor its file.
   [`forward-references.md`](forward-references.md)'s "Inserting prose makes a

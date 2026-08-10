@@ -55,6 +55,36 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   with `graphql` at 4922/5000; the round's reply, thread-resolve, ARD
   summary, and clean-state verification all went through GraphQL, and
   `core` reset 11 minutes later.)
+- **A session's egress proxy can block GraphQL entirely, as a session-scoped
+  policy rather than an account-level quota --- distinct from the rate-limit
+  case above, and easy to conflate with it.**
+  The symptom looks identical at first glance: `gh pr view --json ...` fails.
+  The cause is not shared.
+  `gh api rate_limit` reports a healthy `graphql` pool, and `gh auth status`
+  plus a plain `gh api <rest-endpoint>` both report success, so the session
+  reads as fully authenticated and REST-capable while every GraphQL call
+  fails identically:
+  ```
+  HTTP 403: This GraphQL query is not enabled for this session --- only the
+  pinned set of PR-review operations is served. Use REST via
+  `gh api repos/{owner}/{repo}/...` instead.
+  ```
+  Confirmed not scoped to one query: a minimal hand-written
+  `gh api graphql -f query='{ ... }'` against the same PR gets the identical
+  403.
+  This breaks `scripts/check-pr-fully-clean.py` at its very first call
+  (`gh pr view --json ...` inside `get_pr_info()`), before anything
+  repo-specific runs, and the healthy `gh auth status`/REST readings make it
+  easy to misdiagnose as "something else is wrong" rather than "GraphQL is
+  closed here."
+  Route around it the same way as the rate-limit case: REST
+  (`gh api repos/<o>/<r>/pulls/<n>` plus `.../commits` for the head SHA) or
+  the GitHub MCP tools, which already implement `pull_request_read` over
+  REST.
+  (`Morrison-Lab/ai-config#1330`, 2026-08-10, comment: this session's proxy
+  refused every GraphQL call while `gh api user`/`gh api repos/<o>/<r>` both
+  returned 200 --- a second, distinct root cause for the same
+  `check-pr-fully-clean.py` failure symptom already tracked in that issue.)
 - **The @claude review bot's author name differs by API:** its comment author is `claude[bot]` in REST (`.user.login`) but `claude` in GraphQL (`.author.login`). A watcher filtering REST comments for `.user.login == "claude"` silently finds nothing — use `"claude[bot]"`.
 - **A third variant, and it is not one repo's quirk: the review comment can
   post as `github-actions[bot]` rather than `claude`/`claude[bot]`, and the

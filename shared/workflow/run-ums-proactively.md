@@ -150,7 +150,7 @@ Treat any discovery that you were wrong as the trigger, whatever kind of wrong i
 The class matters for what you *record*, not for whether the pass runs: a corrected belief yields the belief and its replacement, while a false state claim yields the query you should have run, which is the more reusable of the two.
 
 Two mechanisms make this survivable rather than merely mandated.
-**Delegate the pass**, per "Use subagents when helpful" below, which already pre-authorizes an owed UMS pass as sidecar work --- that is what keeps the pass from competing with the task the correction interrupted.
+**Delegate the pass**, per [`use-subagents`](use-subagents.md)'s "Use subagents when helpful" section, which already pre-authorizes an owed UMS pass as sidecar work --- that is what keeps the pass from competing with the task the correction interrupted.
 And **algorithmatize the trigger** rather than relying on noticing it, per [`algorithmatize-checks`](algorithmatize-checks.md): `hooks/remind-ums-after-error.py` detects a first-person admission in the transcript and injects a reminder on the next prompt when no memory, skill, or shared write followed it.
 That hook only ever *adds context*.
 An error admission must never be blocked, delayed, or suppressed --- see its own docstring, and the "Never activate a new hook before its PR merges" gate in [`README.md`](../../README.md).

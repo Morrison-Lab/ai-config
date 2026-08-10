@@ -3,7 +3,7 @@ Use the `⚠️ FLAG` tag from `CLAUDE.md`'s chat-output-tagging convention, one
 
 Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, **any PR this session opened or pushed to that has not yet merged or closed**, an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) --- anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
-If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per "Recommending that the session end is itself a UMS trigger" above.
+If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per [`run-ums-proactively`](run-ums-proactively.md)'s "Recommending that the session end is itself a UMS trigger" section.
 
 **That PR clause is a bright line, not a judgment call, and it was narrowed deliberately.**
 It used to read "a PR I'm actively babysitting", which invites the question of whether *this* PR still counts as active --- and the answer always sounds like no.
@@ -76,7 +76,7 @@ So before opening a new PR, pause and pick from the same menu, by what the *new*
 The bright line still governs, and it changes what "reset" can even mean here.
 If this session has an unmerged PR it opened or pushed to, it owes that PR active monitoring (per [`ardi`](ardi.md)), so *this* session must not be `/clear`ed or walked away from -- the new PR either rides along in the same window (where `compress-session` or `/compact` can still lighten the carried context), or goes to a genuinely separate fresh session while this one keeps monitoring.
 Only when no such live PR remains is the full menu (archive-and-start-new, `/clear`, `/compact`, or nothing) open, chosen by the criteria above.
-Run UMS first if it is owed, per "Recommending that the session end is itself a UMS trigger" above -- not disclosed inside the flag.
+Run UMS first if it is owed, per [`run-ums-proactively`](run-ums-proactively.md)'s "Recommending that the session end is itself a UMS trigger" section -- not disclosed inside the flag.
 
 - **Do:** pause at the new-PR boundary and recommend the fitting session-management option, before opening the PR.
 - **Do:** keep monitoring an unmerged PR in the session that owns it -- send only the *new* PR to a fresh session, rather than resetting the one that owes monitoring.

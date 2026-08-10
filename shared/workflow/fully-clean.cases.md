@@ -593,15 +593,59 @@ is a `workflow_dispatch` on an **open** PR's branch, and it returns a
 
 ```bash
 curl -sS "https://api.github.com/repos/Morrison-Lab/ai-config/actions/runs/31357711790" \
-  | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['event'], r['head_branch'], [(p['number'], p['head']['sha'][:8]) for p in r['pull_requests']])"
-#=> workflow_dispatch ums/pr1384-pull-requests-head-sha [(1388, 'ede6b0a9')]
+  | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['event'], r['head_branch'], r['head_sha'][:8], [(p['number'], p['head']['sha'][:8]) for p in r['pull_requests']])"
+#=> workflow_dispatch ums/pr1384-pull-requests-head-sha ede6b0a9 [(1388, '5bed1d61')]
 ```
+
+That output is **read at 2026-08-10, when #1388's head was `5bed1d61`**, and
+the second SHA is expected to differ on any later run.
+`head_sha` is fixed at `ede6b0a9` for the life of the run; the array's entry
+tracks the PR, so re-running the command reports whatever that PR's head is at
+read time.
+Read a mismatch between the two as the normal case rather than as a discrepancy
+to reconcile.
 
 So "dispatch runs never populate the array" is false, and the emptiness the
 sample recorded is explained by PR **closure** rather than by trigger type.
 One counterexample is enough here, because the hypothesis it refutes was a
 universal.
-Note the run was dispatched with `--ref` pointing at the PR branch, so its
-`head_sha` and the field agree --- which is what a correctly-dispatched review
-looks like, and is why this run cannot also serve as an example of the two
-diverging.)
+
+The same run is a **second case record for the entry's own thesis**, and it
+arrived by falsifying a sentence this file previously carried.
+That sentence said the run was dispatched with `--ref` at the PR branch, so its
+`head_sha` and the field agreed, and it therefore could not also illustrate the
+two diverging.
+Both halves were wrong.
+`--ref` pins `head_sha` and does nothing to the other field, which re-resolves
+on every read, so the agreement was never a guarantee --- only a fact about
+dispatch time, before any further push.
+Pushing the very commit that recorded the sentence is what separated them, and
+the output above is the corrected reading.
+
+What the run then shows is the field's usefulness **inverting** while its
+behaviour stays constant.
+On #1384 it pointed at a commit newer than the one reviewed, which made a
+superseded verdict look current --- the confident direction, and the reason
+this entry exists.
+Here it points at a commit newer than the one whose `require-review` went red,
+which correctly says the PR has moved past that commit and the red check is a
+`cancelled` run at a superseded head.
+Neither reading is wrong, because the field reports the PR's current head in
+both.
+What differs is the question being asked of it, which is the entry's thesis
+stated twice rather than once.
+
+The transferable lesson is one artifact further in than the PR-body staleness
+that
+[`address-every-comment`](address-every-comment.md) documents.
+A sentence asserting that two **live** fields agree is a state claim with a
+short shelf life, and where that sentence is written into a commit, the commit
+is itself the event that can falsify it.
+So a claim of agreement needs the time it was true at, or it needs to be a
+claim about mechanism instead --- and mechanism is what to reach for, since
+`--ref` supports a claim about `head_sha` alone.
+
+- **Do:** date a claim that two live fields agree, or state the mechanism that
+  makes one of them stable, rather than asserting the agreement flatly.
+- **Don't:** infer from `--ref` that `pull_requests[].head.sha` is pinned; it
+  pins `head_sha`, and the other field re-resolves on every read.)

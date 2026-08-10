@@ -375,6 +375,53 @@ overwriting, since the wrong version is what earlier comments respond to.
 - **Don't:** treat a clean `grep` over the diff as evidence every paraphrase
   is synced --- the description was never in it.
 
+**Answering a body-staleness finding with a correction comment does not clear
+it, and this corpus's own visible-correction convention is what makes that
+move attractive.**
+The paragraph above says to state the correction as history in the body.
+It does not name the near-miss, which is to leave the body alone and post a
+comment instead --- and that reads as compliance rather than as evasion,
+because [`ardi`](ardi.md)'s rule for a published wrong SHA prescribes exactly a
+visible note.
+
+The two artifacts differ in who re-reads them, which is what decides it.
+A claim in a comment thread is read once, so a later comment correcting it
+reaches everyone the original reached.
+A PR body is re-read from scratch by every subsequent reviewer, so the stale
+figure is still the first thing the next round meets.
+A comment therefore leaves the finding live, and the round buys nothing.
+
+Both halves are needed rather than either alone.
+Editing removes the false figure, and recording the correction inside the body
+keeps earlier rounds that cite the old numbers resolvable --- which is the
+thing the paragraph above is protecting.
+A short "Corrections to this body" table does both at once.
+
+The re-dispatch this costs is the part that usually goes unweighed, and it is
+cheap.
+A confirming round --- head unchanged, one finding to re-verify --- came in at
+roughly 40% of the first full round's cost on the PR below, so fixing the body
+and re-dispatching beats arguing the finding down.
+
+- **Do:** edit the body **and** record the correction inside it, so nothing is
+  silently overwritten and earlier rounds still resolve.
+- **Don't:** answer a body-staleness finding with a comment --- the next
+  reviewer re-reads the body, so the finding survives it.
+- **Don't:** treat the drift risk in rewriting a long body as a reason to leave
+  it; re-deriving every figure is what the round already requires.
+
+(Morrison-Lab/ai-config#1384, 2026-08-10.
+An earlier finding in the same PR was answered with a comment-only correction,
+reasoned from the risk of drift in rewriting a long body assembled across
+several rounds.
+That reasoning was sound about the risk and wrong about the outcome.
+The next round re-read the body and raised three stale figures --- a prose
+figure its own commit `7fe25776` had corrected, plus a line count and a
+diffstat --- and the fix was a body edit carrying a `Corrections to this body`
+table, which round 3 then confirmed resolved and cited by name.
+The three rounds cost `$11.1760`, `$8.4658`, and `$4.5018`; the last is the
+confirming round.)
+
 **A body that reports volatile external state goes stale with no edit of
 yours, so the trigger above never fires on it.**
 That trigger is an action *you* take, and this is the case where you take

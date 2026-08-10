@@ -510,3 +510,142 @@ The survivor is simply the one nothing followed; it posted a genuine verdict at
 The session's own reading of `gh run list` counted four colliding dispatches,
 because that list reports `headBranch: main` for every one of them --- two of
 the four were other PRs' reviews and were never in #1281's group at all.)
+
+## `pull_requests[].head.sha` named a commit pushed after the run started
+
+(Morrison-Lab/ai-config#1384, 2026-08-10, merged as `edfab8d8`.
+Review run
+[31354330266](https://github.com/Morrison-Lab/ai-config/actions/runs/31354330266)
+was a `workflow_dispatch` at `a0ef37c2`, started `04:03:25Z`.
+Commit `7fe25776` was authored `04:05:18Z`, after the run began, and became the
+PR's head.
+The run's `pull_requests[0].head.sha` was reported during the session as
+`7fe25776` --- the newer commit --- while its `head_sha` correctly read
+`a0ef37c2`.
+
+The body settled it.
+That review's verification section quotes the prose figure as "40 to 151
+seconds", which exists only at the older commit:
+
+```bash
+git show a0ef37c2:memories/claude-code-scheduling.md | grep -n '40 to 151'
+#=> 189:`run_once_at + 24h` the same rows are off by 40 to 151 seconds, tracking each
+git show 7fe25776:memories/claude-code-scheduling.md | sed -n '189p'
+#=> `run_once_at + 24h` the same 18 rows spread from 0.6 to 556 seconds over.
+```
+
+Timing would also have caught this one, per the block above, since the run
+predates the commit.
+What the field added was **positive evidence pointing the other way**, which is
+why it needed its own entry: it made "the verdict may already cover current
+content" a live hypothesis rather than an idle one.
+
+The specific reading is **not reproducible now**, because #1384 has merged and
+the array empties on close --- all three of its review runs return
+`pull_requests: []` today.
+The general behaviour is reproducible, and was measured over the 60 most recent
+runs in this repo on 2026-08-10:
+
+```bash
+curl -sS "https://api.github.com/repos/Morrison-Lab/ai-config/actions/runs?per_page=60" \
+  > runs.json
+python3 -c "
+import json, urllib.request
+runs = json.load(open('runs.json'))['workflow_runs']
+cur = {}
+def head(n):
+    if n not in cur:
+        u = f'https://api.github.com/repos/Morrison-Lab/ai-config/pulls/{n}'
+        cur[n] = json.load(urllib.request.urlopen(u))['head']['sha']
+    return cur[n]
+ne = [r for r in runs if (r.get('pull_requests') or [])]
+agree = sum(1 for r in ne if r['pull_requests'][0]['head']['sha'] == head(r['pull_requests'][0]['number']))
+stale = sum(1 for r in ne if r['head_sha'] != r['pull_requests'][0]['head']['sha'])
+print(f'examined {len(runs)}; non-empty {len(ne)}; field==current head {agree}; run head_sha differs {stale}')
+"
+#=> examined 60; non-empty 14; field==current head 14; run head_sha differs 8
+```
+
+So the field equalled the PR's current head in **14 of 14** cases, and in **8
+of those 14** the run's own `head_sha` was a different commit.
+The sharpest single instance is PR #1374, open at the time.
+Eight of its runs span four distinct `head_sha` values (`8e7a2526`,
+`af838843`, `158d311d`, `d1d02a19`), and every one of the eight reports
+`d1d02a19` --- the PR's head at read time --- as its `pull_requests[0].head.sha`.
+
+One limit on that measurement, stated rather than smoothed over.
+The instrument is validated in both directions, since 14 of 60 runs returned a
+non-empty array --- so an empty read is informative rather than a broken query.
+But every `workflow_dispatch` run in that sample returned empty (10 of 10), and
+none of them sat on a currently-open PR's branch, so the sample by itself could
+not separate "dispatch runs never populate the array" from "the array empties
+once the PR closes".
+The branch-level split already favoured the second: branches whose PRs are open
+returned non-empty in every case, and branches whose PRs had merged returned
+empty in every case.
+
+That ambiguity is now settled, by a counterexample this entry's own PR
+produced.
+`Morrison-Lab/ai-config#1388`'s review dispatch, run
+[31357711790](https://github.com/Morrison-Lab/ai-config/actions/runs/31357711790),
+is a `workflow_dispatch` on an **open** PR's branch, and it returns a
+**non-empty** array:
+
+```bash
+curl -sS "https://api.github.com/repos/Morrison-Lab/ai-config/actions/runs/31357711790" \
+  | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['event'], r['head_branch'], r['head_sha'][:8], [(p['number'], p['head']['sha'][:8]) for p in r['pull_requests']])"
+#=> workflow_dispatch ums/pr1384-pull-requests-head-sha ede6b0a9 [(1388, '5bed1d61')]
+```
+
+That output is **read at 2026-08-10, when #1388's head was `5bed1d61`**, and
+the second SHA is expected to differ on any later run.
+`head_sha` is fixed at `ede6b0a9` for the life of the run; the array's entry
+tracks the PR, so re-running the command reports whatever that PR's head is at
+read time.
+Read a mismatch between the two as the normal case rather than as a discrepancy
+to reconcile.
+
+So "dispatch runs never populate the array" is false, and the emptiness the
+sample recorded is explained by PR **closure** rather than by trigger type.
+One counterexample is enough here, because the hypothesis it refutes was a
+universal.
+
+The same run is a **second case record for the entry's own thesis**, and it
+arrived by falsifying a sentence this file previously carried.
+That sentence said the run was dispatched with `--ref` at the PR branch, so its
+`head_sha` and the field agreed, and it therefore could not also illustrate the
+two diverging.
+Both halves were wrong.
+`--ref` pins `head_sha` and does nothing to the other field, which re-resolves
+on every read, so the agreement was never a guarantee --- only a fact about
+dispatch time, before any further push.
+Pushing the very commit that recorded the sentence is what separated them, and
+the output above is the corrected reading.
+
+What the run then shows is the field's usefulness **inverting** while its
+behaviour stays constant.
+On #1384 it pointed at a commit newer than the one reviewed, which made a
+superseded verdict look current --- the confident direction, and the reason
+this entry exists.
+Here it points at a commit newer than the one whose `require-review` went red,
+which correctly says the PR has moved past that commit and the red check is a
+`cancelled` run at a superseded head.
+Neither reading is wrong, because the field reports the PR's current head in
+both.
+What differs is the question being asked of it, which is the entry's thesis
+stated twice rather than once.
+
+The transferable lesson is one artifact further in than the PR-body staleness
+that
+[`address-every-comment`](address-every-comment.md) documents.
+A sentence asserting that two **live** fields agree is a state claim with a
+short shelf life, and where that sentence is written into a commit, the commit
+is itself the event that can falsify it.
+So a claim of agreement needs the time it was true at, or it needs to be a
+claim about mechanism instead --- and mechanism is what to reach for, since
+`--ref` supports a claim about `head_sha` alone.
+
+- **Do:** date a claim that two live fields agree, or state the mechanism that
+  makes one of them stable, rather than asserting the agreement flatly.
+- **Don't:** infer from `--ref` that `pull_requests[].head.sha` is pinned; it
+  pins `head_sha`, and the other field re-resolves on every read.)

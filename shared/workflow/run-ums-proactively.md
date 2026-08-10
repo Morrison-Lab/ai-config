@@ -125,7 +125,7 @@ That absence is why it needs naming rather than being left to "as learnings accu
 A corrected misunderstanding feels resolved the moment it is corrected, so the correction reads as the completion when it is only the input.
 Nothing is left outstanding, so nothing prompts the pass, and the learning evaporates with the conversation that produced it.
 That puts it alongside the recommend-a-fresh-session route above, as a case where skipping the pass destroys the material rather than merely delaying it.
-It is also unusually valuable material, because a correction names both the model that was wrong and the thing that displaced it -- which is exactly the pair the section below asks every entry to carry.
+It is also unusually valuable material, because a correction names both the model that was wrong and the thing that displaced it -- which is exactly the pair `CLAUDE.md`'s ["Record both the pattern and the anti-pattern"](../../CLAUDE.md) section asks every entry to carry.
 
 So run the pass at the correction, not at the end of whatever task the correction unblocked.
 The task will still be there; what you believed ten minutes ago will not.

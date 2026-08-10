@@ -381,6 +381,23 @@ See ai-config#694 for the precedent.
   leave a broken file on the branch waiting for the next review round to catch
   it. (Hit on lab-manual#376: an editing slip sent a truncated placeholder
   instead of the real fragment text; caught by checking the returned `size`.)
+  **Confirmed again with a different downstream symptom, and it defeats a
+  naive round-trip check.** Passing an already-base64-encoded string produced
+  a `size` of 2310 bytes for content that should have been 1710 -- a ~4/3
+  inflation, the base64 expansion ratio, rather than a suspiciously *small*
+  number this time. The GitHub Actions symptom was different too: since the
+  stored blob was a bare base64 scalar rather than a YAML mapping, the
+  workflow read as having no triggers at all -- a dispatch-time `422
+  Workflow does not have 'workflow_dispatch' trigger` on that ref (dispatch
+  to the unmodified default branch worked fine), and the push itself
+  produced a generic `failure` conclusion with zero jobs (not
+  `startup_failure`, which is the permissions-cascade shape covered
+  elsewhere in this file). A naive "does it decode without erroring"
+  round-trip check does not catch this: base64-decoding what
+  `get_file_contents` reads back just undoes your own accidental encoding
+  and returns the intended text, which looks like confirmation. The `size`
+  comparison against the source's real byte length is the check that
+  actually discriminates. (Morrison-Lab/psw#44, 2026-08-10.)
 - **Issue *writes* 404 while *reads* succeed → the issue was transferred to
   another repo, not a permissions gap.** If `mcp__github__add_issue_comment` /
   `issue_write` to `owner/repo#<N>` fail (`404 Not Found`, or `Could not resolve
@@ -708,4 +725,3 @@ See ai-config#694 for the precedent.
   where the table actually lives. (Caught in ai-config#137 review: the gip
   skill referenced a table ai-config didn't have at the time; ai-config#327
   later added `tool-mappings.md` to close that gap.)
-

@@ -266,7 +266,9 @@ git show origin/main:<path> | grep -n "<a string only that change introduced>"
   worktrees agree --- that column is HEAD, and it says nothing about either
   index.
 - **Don't:** reach for `git worktree remove --force` before reading the
-  non-forced refusal, which is the only step that reports the index at all.
+  non-forced refusal, which is the only step that surfaces a staged divergence
+  on its own --- `git status --short` reports it more precisely, and only if
+  you think to run it.
 
 (`Morrison-Lab/ai-config`, 2026-08-10, tidying after PR #1365 merged as squash
 commit `491906bf`.
@@ -280,10 +282,14 @@ both staged, and `git diff --cached` there showed the **pre-`2714db61`**
 content of both --- so committing it would have reverted the `--ref` fix that
 had just merged.
 Those two files are a subset of the four `491906bf` touched.
-Discarding was confirmed safe by content:
+Discarding was confirmed safe by content, for **both** files rather than one
+--- the section's own principle is that membership in a merged commit's file
+list is not the deciding read:
 `git show origin/main:shared/workflow/pr-on-claim.md` carries
 `gh workflow run <review-workflow>.yml -R <owner>/<repo> --ref <PR-branch> -f
-pr_number=<N>` at line 236.
+pr_number=<N>` at line 236, and
+`git show origin/main:skills/ardi/SKILL.md` carries the same string at line
+158.
 Resolved with `git worktree remove --force` plus `git branch -D`.
 How the two worktrees came to share the branch was **not** established, so
 nothing here asserts a mechanism for it.

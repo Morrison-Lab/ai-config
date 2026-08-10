@@ -1560,10 +1560,102 @@ Ancestry, hashes, and subjects are all facts about commit *identity*, which a sq
 Verify a merge, and diagnose a divergence, with `git show <ref>:<path> | grep` for a string only that change introduced.
 [`memories/git.md`](../../memories/git.md) carries the ancestry half of this and the per-repo merge-strategy facts.
 
+**That content check is itself line-oriented, so in a semantic-line-break
+corpus it produces the same alarming-direction false negative it was
+introduced to cure.**
+A phrase of any length straddles a newline where one clause per line is
+mandated, so `git show <ref>:<path> | grep` reports zero against a file that
+plainly contains the string.
+[`address-every-comment`](../workflow/address-every-comment.md)'s
+"a single-line `grep` returns false negatives on your own prose" owns that
+rule and the whitespace-and-markup normalization that fixes it, applied to
+both sides; read it there rather than re-deriving it.
+
+What is new here is *where* the false negative lands.
+That fragment frames the cost as re-doing work already done, which is a
+verification you repeat.
+At this prescription the same zero reads as **the merge did not land**, which
+is a verification you disbelieve --- so the remedy offered against the three
+identity proxies above fails in the same direction they do, one command later.
+
+Run the search as its own command, never chained.
+`grep -c` exits 1 when the count is zero, so an `&&` chain aborts on the very
+result you are inspecting and every later verification step silently never
+runs.
+The wrong answer and a short verification then arrive together, and the
+truncation reads as there having been nothing more to check.
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md) owns the exit
+status and where to state the tolerance.
+
+**Normalizing repairs the instrument and not the needle, so a probe you
+invented returns the same confident zero.**
+The paragraphs above are about a *matcher* too narrow for the text.
+This is about a *search string* that is not in the text at all, and no amount
+of normalization reaches it, because there is nothing to match at any level of
+normalizing.
+
+The probe gets invented from whatever prose is nearest to hand: the PR title,
+your own commit message, the issue body.
+Every one of those is written to **describe** the change rather than to quote
+it, so paraphrase is the job they are doing, and a paraphrase of a sentence is
+precisely a string that sentence does not contain.
+One substituted word is enough to produce the zero.
+
+That makes this the more dangerous of the two causes, because the remedy for
+the first now stands between you and noticing it.
+Normalizing *feels* like the fix, so the zero it returns reads as a settled
+negative rather than as a search that is still failing.
+Note also that this prescription already names the property that fails ---
+"a string only that change introduced" --- while giving no way to obtain it or
+to check that you did.
+
+**The known-positive rule earlier in this file does not discharge it as
+written, and the reason is what points at the fix.**
+"Test the instrument against a known positive before trusting a negative" asks
+you to run the pattern against a case you know contains the thing.
+Here the only candidate location *is* the file under test, so no independent
+known positive exists to reach for --- unless the probe came from the diff, in
+which case the diff **is** that known positive and the rule is discharged for
+free.
+So the cheap thing is already on the table, and it is one command:
+
+```bash
+git show --numstat <sha> -- <path>                                 # no probe at all
+git show <sha> -- <path> | grep '^+' | tail -n +2 | sed 's/^+//'   # derive one
+```
+
+Prefer the first.
+A diffstat proves the content landed with no invented input to get wrong, so it
+cannot fail this way at all.
+Reach for the second only when a *specific* string has to be confirmed, and
+take that string out of its output rather than out of anything written about
+the change.
+The `tail -n +2` drops the `+++ b/<path>` header, which this file's own third
+pattern direction explains cannot be separated by any prefix pattern.
+Then normalize, per the paragraphs above.
+
+[`memories/debugging.md`](../../memories/debugging.md)'s "An empty grep for one
+spelling is not evidence the concept is absent" owns the general
+wrong-guessed-spelling mechanism and its remedy of re-searching for the stable
+part of the concept; read it there rather than re-deriving it.
+What is added here is that at *this* prescription the guess is eliminable
+rather than merely improvable.
+
 - **Do:** decide "did this land?" by grepping the content at the ref, naming a string only that change introduced.
+- **Do:** prove a merge landed with `--numstat` where you can, since a check carrying no invented input cannot false-negative on its needle.
+- **Do:** take the probe from the diff's own added lines whenever a specific string must be confirmed.
+- **Do:** normalize whitespace and markup on both sides before concluding a merged phrase is absent, and name the search that settled it.
+- **Do:** run the content check as its own command, so a zero count cannot also truncate the rest of the verification.
 - **Do:** treat a zero from a subject match in a squash-merging repo as carrying no information, rather than as evidence of orphaned work.
+- **Don't:** read a zero from a line-oriented `grep` for your own merged prose as evidence the merge did not land --- in this corpus that is the search failing, until a normalized one agrees.
+- **Don't:** chain that grep with `&&` --- a zero count is also a non-zero exit, so it kills the steps behind it.
 - **Don't:** read `--is-ancestor` returning non-ancestor as "not merged" in a repo that squash-merges --- it returns that for every merged branch.
 - **Don't:** substitute a message-scoped `--grep` for the content check; it depends on whether the squash body was rewritten, which is nobody's invariant.
+- **Don't:** build a probe from the PR title, the commit message, or the issue body --- that prose paraphrases the change by design, so it is the least likely text to appear in it.
+- **Don't:** read a normalized search's zero as settled --- normalization repairs the matcher, and an invented needle is a different fault it cannot touch.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "Normalizing repairs the
+instrument and not the needle".
 
 ## In review
 

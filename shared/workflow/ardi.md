@@ -25,18 +25,56 @@ You must wait for the fresh review run evaluating your latest pushed commit to p
 
 **That wait is conditional on a run having been scheduled, and on some repos a push schedules nothing.**
 A review workflow whose `on:` block carries no push-based trigger --- `workflow_dispatch` and `issue_comment` only, which is how a repo disables automatic review on PR activity --- fires nothing when you push, so the run you are told to wait for will never exist and the poll cannot terminate.
-The obligation is then discharged by **dispatching**, not by waiting, and it recurs on **every** push rather than once at PR-open time: `gh workflow run <review-workflow>.yml -R <owner>/<repo> -f pr_number=<N>`, taking the input's name from that workflow's own file.
+The obligation is then discharged by **dispatching**, not by waiting, and it recurs on **every round** rather than once at PR-open time: `gh workflow run <review-workflow>.yml -R <owner>/<repo> --ref <PR-branch> -f pr_number=<N>`, taking the input's name from that workflow's own file.
+Pass `--ref` rather than omitting it, for the reason the block below gives, and dispatch once per round rather than once per push.
 Read the `on:` block once per repo, the first time you push to a PR there, and record which class it is.
 This is the shape most likely to be missed while everything looks healthy, because CI still goes green on each push, and watching CI to green feels like watching the PR --- so the loop closes on "checks passed" while the last verdict on file dates from an earlier head.
 `check-pr-fully-clean.py` returning non-zero for "no review at this HEAD SHA" on such a repo means *dispatch now*, not *poll longer*.
 [`pr-on-claim`](pr-on-claim.md) covers the PR-open and draft-to-ready end of this.
 The increment here is that each subsequent push owes its own dispatch.
 
-- **Do:** read the review workflow's `on:` block before the first push to a PR in an unfamiliar repo, and dispatch explicitly after every push when it carries no push-based trigger.
+- **Do:** read the review workflow's `on:` block before the first push to a PR in an unfamiliar repo, and dispatch explicitly after the round's last push when it carries no push-based trigger.
 - **Do:** treat a non-zero `check-pr-fully-clean.py` on a dispatch-only repo as a prompt to dispatch.
 - **Don't:** read green CI at the current head as evidence a review is in flight --- on a dispatch-only repo that is the steady state, not a transient one.
 - **Don't:** let a verdict from an earlier head stand because the repo's trigger class was already known.
   Knowing it is not the same as acting on it each round.
+
+**Dispatch once, after the round's LAST push --- a per-push rhythm cancels its own reviews.**
+The paragraph above is right that a push on such a repo owes a dispatch, and the obvious reading of it produces a loop that reviews nothing:
+
+```text
+push -> dispatch -> push -> dispatch   # the second dispatch kills the first
+```
+
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy" supplies the half that turns the advice against itself: the reusable review workflow carries a job-level `concurrency` group keyed on the PR number with `cancel-in-progress: true`, so a second dispatch for the same PR kills whatever is running.
+
+The two rules are not redundant, and neither names the conflict.
+That fragment governs the **retry** you make after noticing a cancellation, which is reactive and fires once you already have a symptom.
+This governs the **rhythm** that manufactures the symptom, which fires on every ordinary round with nothing yet to notice.
+Read literally and together, "dispatch after every push" and "a dispatch cancels the run in flight" are self-defeating, so the ordering has to be stated rather than derived.
+
+So batch the round's commits, per [`efficient-pr-babysitting`](efficient-pr-babysitting.md), and treat the dispatch as a separate action that comes **last**.
+A dispatch is not free to repeat.
+
+**Dispatch with `--ref <PR-branch>`, or the resulting failure is invisible on the PR.**
+A `workflow_dispatch` run invoked without `--ref` runs against the default branch, so its `head_sha` is that branch's tip and every check run it produces attaches there rather than to the PR head.
+A cancelled review then fails its own review gate on a commit the PR does not display, and the PR reads `mergeable_state: clean` with nothing pending while its gate is red one surface over.
+Both instruments [`fully-clean`](fully-clean.md) prescribes miss it: a check-runs query answers for the PR's head SHA, and a comment scan finds nothing because a cancelled run posts no comment --- so "no findings" and "no verdict" present identically, which that file already warns about in the abstract.
+
+The remedy is not new, and its **incomplete application** is the part worth recording.
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md) already establishes that `--ref` decides this and reports the corpus's manual dispatch commands fixed.
+That fix reached the **recovery** command, run after you notice a cancellation, and not the **routine** command above, run every round --- so the flag was present on the path taken rarely and absent on the path taken always.
+This is [`fail-fast`](../principles/fail-fast.md)'s partial guard exactly: a reader who finds `--ref` on the recovery command reasonably concludes the hazard is handled.
+
+- **Do:** finish pushing, then dispatch once, and name in the status report which run you are waiting on.
+- **Do:** pass `--ref <PR-branch>` on every dispatch, so the review's check runs attach to the PR head.
+- **Do:** diagnose a missing verdict by reading the run, since a cancelled dispatched run leaves no trace on the PR at all.
+- **Don't:** dispatch per push --- each one cancels the last, and the round spends review time producing nothing.
+- **Don't:** re-dispatch reflexively when a verdict is missing.
+  If one is in flight, the retry cancels it.
+- **Don't:** read a green, nothing-pending PR as reviewed on such a repo --- that is also what an invisible cancelled gate looks like.
+
+See [`ardi.cases.md`](ardi.cases.md), "A per-push dispatch cancels its own review, invisibly".
 
 NEVER use background tasks, async sleep commands, or schedule timers for ARDI status polling.
 Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn.
@@ -432,6 +470,63 @@ casually, with nothing in the repository to contradict it.
   commit you just made.
 - **Don't:** expect review to catch it --- a reviewer has no reason to suspect
   a citation, and the body is not in the diff they are reading.
+
+**The same rule governs a merge or squash commit message, which is worse than a
+PR body on both counts the bullet above names.**
+That bullet calls the PR body the worst host for an invented identifier because
+it sits in no diff and is what a maintainer reads while deciding to merge.
+A commit message beats it on each.
+
+It is **permanent**.
+A PR body stays editable indefinitely, while a message on the default branch
+cannot be amended without rewriting shared history, so the correction has to
+live somewhere else and a later reader may never meet it.
+
+It is **composed after review ends**, in the same call that merges, so no round
+remains in which anyone would catch it.
+The PR body at least sits in front of whoever reviews the PR.
+
+**The trigger is a PR with no closing issue, which is why "verify identifiers"
+does not reach it.**
+`Closes #N` is habitual enough in a repo's merge messages that its **absence**
+reads as an omission to fill rather than as a fact to check, so a plausible
+number gets typed to complete the shape.
+That makes the remedy narrower and more actionable than the general rule: a PR
+with no tracking issue should say so, rather than leaving a `Closes` slot that
+invites filling, and any closing reference in a merge message should be read out
+of the PR body it came from rather than recalled.
+
+**An invented number here can close someone else's live work, because issues and
+pull requests share one number space.**
+This is the part to check rather than assume, and the intuitive answer is wrong.
+GitHub's documentation is explicit that a closing keyword acts on a referenced
+**pull request**, not only on an issue:
+
+> If you use a keyword to reference a pull request comment in another pull
+> request, the pull requests will be linked.
+> Merging the referencing pull request also closes the referenced pull request.
+
+So a merge message whose `Closes #N` names a plausible-but-wrong number is not
+merely a false statement in permanent history.
+Where that number belongs to an **open** PR, merging closes it, and the damage
+lands on an artifact whose author never saw the message.
+A wrong number that happens to name an already-merged PR changes no state, but
+that is luck about the target rather than a property of the keyword, so it
+cannot be the reason the practice is safe.
+
+- **Do:** read any `Closes`/`Fixes`/`Refs` number in a merge message out of the
+  PR body it came from, and confirm the target is what you think it is.
+- **Do:** say plainly that a PR closes nothing when it has no tracking issue,
+  rather than leaving the slot empty for a number to fill later.
+- **Do:** correct a published wrong reference visibly, in a comment, since the
+  message itself cannot be amended once it is on the default branch.
+- **Don't:** treat a closing keyword as inert against a pull request --- it
+  closes one, and the number space is shared with issues.
+- **Don't:** infer from "nothing changed state" that a wrong reference was
+  harmless; check whether the target was open.
+
+See [`ardi.cases.md`](ardi.cases.md), "An invented `Closes` in a merge commit
+message".
 
 **A verification table you write in the PR body is the same defect one artifact
 over, and re-reading it cannot catch a wrong number.**

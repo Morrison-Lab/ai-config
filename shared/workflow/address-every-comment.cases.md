@@ -513,3 +513,57 @@ first read from a `... | tail -5` pipeline, which reports the status of `tail`
 and showed 0 for a run that really exited 1 --- the pipeline defect
 [`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md) documents,
 reproduced while documenting a neighbouring one.)
+
+## A defect whose surface form varies defeats a phrase grep; only a full read finds every instance
+
+(`Morrison-Lab/ai-config#1366`, 2026-08-09/10: a PR split six large `CLAUDE.md`
+sections into `shared/workflow/` fragments --- the exact move
+[`reorganize-prose.md`](../writing/reorganize-prose.md), added by the same PR,
+licenses and warns to sweep for stale self-references.
+Round 1's review named three instances --- the inherit-the-enumeration
+failure [`address-every-comment.md`](address-every-comment.md)'s "That rule's
+scope is 'the same file'" section already describes --- and all three were
+fixed.
+Round 2 ran the "obvious" fix: grep the moved files for a quoted heading in
+`above`/`below` phrasing, per that section's own prescribed remedy.
+It missed a fourth instance, found in round 2's own review, because the
+target section had never been extracted at all --- it stayed inline in
+`CLAUDE.md`, so no quoted fragment heading existed for the pattern to match.
+Round 3's review found a fifth: `"...the same too-early flag the UMS rule
+above rejects"` names no heading at all, quoted or otherwise --- it alludes
+to a rule stated in a different file, in different words, with nothing for a
+grep to lock onto.
+
+The fix for round 3 is what broke the cycle, and it did not use a smarter
+pattern.
+Rather than grep again, it read all six touched files end to end, checked
+every `above`/`below`/`bullet`/`paragraph`/`section`/`rule` reference's
+actual target by hand, and separately cross-grepped every bold sub-heading
+phrase in each file against the other five for a stray unquoted mention.
+That pass found a sixth instance no round's grep had, fixed it in the same
+push, before round 4's review could name it --- and round 4 confirmed both
+fixes and reported no further findings.
+
+The general form is already in
+[`address-every-comment.md`](address-every-comment.md)'s "That rule's scope
+is 'the same file'" section, in its last "Don't" bullet: "a
+differently-worded instance would not have matched."
+What this case adds is how differently a defect can be worded when the thing
+moving is prose rather than code, and a phrase search is not even the second-
+best instrument here --- for a defect class defined by what a sentence
+*refers to* rather than by what string it *contains*, the site list cannot be
+derived by grep at all.
+It has to be derived by reading, because the only reliable test is "does this
+reference's target still live where the reference assumes it does," and that
+question has no fixed vocabulary.
+
+- **Do:** treat a locative or allusive cross-reference as needing per-instance
+  verification of its target, not a phrase-matched sweep, whenever the
+  referring wording is free to vary --- which prose self-references always are.
+- **Do:** read the whole affected scope end to end once a reviewer has found
+  two or more instances of the same reference-target defect; that is the
+  signal that the remaining instances are not sharing a phrase either.
+- **Don't:** treat a clean grep for the previously-flagged phrasing as
+  evidence the class is exhausted --- here, the grep-based fix applied after
+  round 1 still left two more rounds' worth of instances for reviewers to
+  find, each worded differently enough that the grep never touched it.

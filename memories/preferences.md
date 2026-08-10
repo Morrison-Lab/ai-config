@@ -233,7 +233,10 @@
   Use `glab api` for endpoints without a dedicated subcommand (e.g. `POST /projects/:id/uploads` for file attachments).
 - Run local validation before pushing R-pkg work: lintr::lint_package(), devtools::document(), devtools::test(), devtools::check(), pkgdown::build_site() (per repo copilot-instructions).
 - Before opening a PR, read the repo's own agent/contributor instructions (CLAUDE.md → the canonical reference it points to, e.g. `.github/copilot-instructions.md` / CONTRIBUTING) and front-load the required pre-PR housekeeping in the FIRST commit instead of discovering it via red CI.
-  For R packages this means a NEWS.md entry AND a `usethis::use_version()` DESCRIPTION dev-version bump, even for a docs-only / vignette-only change --- see `tools.md`'s "R-package PR CI gates" section for the full changelog-check / version-check / spellcheck / opt-out-label details.
+  For R packages this means a NEWS.md entry AND a `usethis::use_version()` DESCRIPTION dev-version bump, even for a docs-only / vignette-only change --- see `r-quarto.md`'s "R-package PR CI gates" section for the full changelog-check / version-check / spellcheck / opt-out-label details.
+  The concise, auto-loaded version of this rule now lives in
+  [`shared/workflow/read-canonical-doc-before-starting.md`](../shared/workflow/read-canonical-doc-before-starting.md),
+  wired into `CLAUDE.md` --- this bullet stays for its extra R-package specifics.
 - Never commit directly to a shared/multi-project CI-infra repo's `main` --- even when confident and already validated the fix live.
   Push to a branch and open an MR for review first.
   This applies going forward; it does not retroactively require undoing an already-validated fix already on main unless the user asks.

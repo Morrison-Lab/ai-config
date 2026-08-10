@@ -100,7 +100,8 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 - **`gh pr view --json` does not accept `merged` as a field.** Use `state` (returns `"MERGED"`) and `mergedAt` (ISO timestamp, null if not merged) to check merge status. Example: `gh pr view <N> --json state,mergedAt`.
   Verified 2026-08-09: `gh pr view <N> --json merged` fails with `Unknown JSON field: "merged"` and prints the full valid field list (`gh` 2.96.0), which includes `state`, `mergedAt`, `mergedBy`, `mergeCommit`, `closed`, and `closedAt` --- no bare `merged`.
   That absence is specific to `gh --json`'s spelling, not to the underlying data: REST's `GET /repos/{owner}/{repo}/pulls/{number}` and the GraphQL field it wraps both carry a genuine `merged` boolean (`gh api repos/<o>/<r>/pulls/<N> --jq .merged` returns `true`/`false` directly), and so does the GitHub MCP tool's `pull_request_read` `get` method --- see [`github-mcp-tools.md`](github-mcp-tools.md)'s note that `list_pull_requests` reports `merged: false` for every PR while `pull_request_read` `get` reports it correctly.
-  So the fix differs by surface: under `gh --json`, read `state`/`mergedAt`; under REST or the MCP `get` method, the `merged` field itself already works.
+  So the fix differs by surface.
+  Under `gh --json`, read `state`/`mergedAt`; under REST or the MCP `get` method, the `merged` field itself already works.
   **Never compare that `mergedAt` against a git timestamp as strings --- convert both to epochs first.**
   Every GitHub API timestamp is UTC (`...Z`), while git's `%cI`/`%cd` render in the *machine's local zone*, so a lexicographic `<` between them compares clock faces from two different zones and silently answers wrong.
   It fails in the unsafe direction west of UTC: a commit made *after* the merge still sorts first.

@@ -79,8 +79,14 @@ the enforcement follow-up: a repo with no such check yet needs to add one, and
 a repo whose check already scans `.R`/`.qmd` needs to extend it. For
 `d-morrison/gha`'s `check-non-standard-chars` specifically, the follow-up
 also needs to ensure its glyph set covers all four named glyphs (en/em-dash,
-curly quotes, multiplication sign), not just `.md` scanning -- as of this
-writing its `NON_STANDARD_CHARS` set has no U+00D7 entry yet.
+curly quotes, multiplication sign), not just `.md` scanning -- its
+`NON_STANDARD_CHARS` set has no U+00D7 entry, and its `extensions` list is
+hard-coded to `['.qmd', '.R']`, both still true on 2026-08-10.
+Both gaps are tracked in gha#322, whose proposed scope also makes that
+extension list a configurable input rather than a hard-coded literal, so a
+consumer can narrow or widen it without forking the script.
+Cite that issue rather than re-deriving the gaps: a follow-up named in prose
+with no tracker reads as untracked, and settling it is one search.
 When the glyph must appear in rendered output, keep the source ASCII in a
 context-appropriate way.
 In an R or Python string literal (a status message, a plot label), use the

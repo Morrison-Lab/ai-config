@@ -399,6 +399,35 @@ See ai-config#694 for the precedent.
   and returns the intended text, which looks like confirmation. The `size`
   comparison against the source's real byte length is the check that
   actually discriminates. (Morrison-Lab/psw#44, 2026-08-10.)
+  **A third instance is not an encoding mistake at all --- the `content`
+  parameter can simply be constructed wrong.**
+  A follow-up call meant to correct the two case records above instead sent
+  a literal placeholder string as the whole file body, caught immediately
+  by `content.size` reading 21 bytes for a ~50KB file.
+  **A local clone plus a real `git push` avoids this class of mistake
+  entirely, when push is available.**
+  `git clone --depth 1 --filter=blob:none --sparse` (the entry above) plus
+  `git push` from that clone worked in this same session, for a branch
+  that was neither harness-assigned nor the working directory's own repo ---
+  consistent with [`github.md`](github.md)'s "the proxy allows branch
+  creation/push but BLOCKS branch deletion."
+  `git config -l` showed no local credential (only
+  `http.proxyauthmethod=basic` and `credential.interactive=false`, no
+  `~/.git-credentials` or `~/.netrc`), so authentication happens somewhere
+  in the outbound proxy layer rather than the checkout --- consistent with
+  this environment's outbound HTTPS being proxied, though the exact
+  mechanism wasn't traced further.
+  Once a branch exists to push to, prefer editing the file locally and
+  pushing over `create_or_update_file`/`push_files` for anything beyond a
+  trivial edit: the committed content is exactly what `git diff` shows, and
+  `git hash-object` verifies it byte-for-byte before AND after the push,
+  with no encoding step or parameter-construction step for a mistake to
+  hide in.
+  Not every session gets this --- some are restricted to the
+  harness-assigned branch only, or fully read-only, per
+  [`github-actions.md`](github-actions.md)'s "403 caveat" and "fully
+  READ-ONLY" entries --- so test with a throwaway push before relying on
+  it.
 - **Issue *writes* 404 while *reads* succeed → the issue was transferred to
   another repo, not a permissions gap.** If `mcp__github__add_issue_comment` /
   `issue_write` to `owner/repo#<N>` fail (`404 Not Found`, or `Could not resolve

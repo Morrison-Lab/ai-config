@@ -43,6 +43,26 @@ completes with `startup_failure` and an empty `jobs` array.
 - **Do:** see `github-actions.md`'s "GitHub Actions workflow authoring
   gotchas" for the permission-grant mechanism and remedy; this only adds
   where to find the error text once you've hit it.
+- **Confirmed again, different repo, different permission**:
+  `Morrison-Lab/psw`'s `claude-code-review.yml` caller granted `contents`,
+  `pull-requests`, `issues`, `id-token` but omitted `actions`, while the
+  callee's `claude-review` job requests `actions: read` (to let
+  `claude-code-action` install its `github_ci` MCP server). Same
+  `startup_failure`, zero jobs, nothing in `pull_request_read`
+  `get_check_runs` or `get_job_logs`. `WebFetch` on the run's `html_url`
+  reliably surfaced the Annotations text verbatim -- "The nested job
+  'claude-review' is requesting 'actions: read', but is only allowed
+  'actions: none'." -- confirming this isn't `d-morrison/qwt`-specific and
+  that a plain `WebFetch` (not just a dedicated `get_page_text` browser
+  tool) is sufficient to read it. (Morrison-Lab/psw#43/#44, 2026-08-10.)
+  This exact `actions: read` gap -- same four granted permissions, same
+  `startup_failure`/zero-jobs shape -- had already happened once before,
+  in `ai-config` itself rather than a downstream consumer
+  ([`github-actions.md`](github-actions.md), ai-config#224).
+  So this is the third occurrence, not the second, and "not
+  `d-morrison/qwt`-specific" above undersells it -- the gap recurs
+  independently of which repo is calling `Morrison-Lab/gha`, ai-config's
+  own repo included.
 
 ## A caller-level `concurrency:` group with the same name as a nested job's own group deadlocks the run
 

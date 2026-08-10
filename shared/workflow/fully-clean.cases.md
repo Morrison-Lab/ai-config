@@ -573,13 +573,35 @@ Eight of its runs span four distinct `head_sha` values (`8e7a2526`,
 `af838843`, `158d311d`, `d1d02a19`), and every one of the eight reports
 `d1d02a19` --- the PR's head at read time --- as its `pull_requests[0].head.sha`.
 
-Two limits on that measurement, stated rather than smoothed over.
+One limit on that measurement, stated rather than smoothed over.
 The instrument is validated in both directions, since 14 of 60 runs returned a
 non-empty array --- so an empty read is informative rather than a broken query.
-But every `workflow_dispatch` run in the sample returned empty (10 of 10), and
-none of them sat on a currently-open PR's branch, so this sample cannot
-separate "dispatch runs never populate the array" from "the array empties once
-the PR closes".
-The branch-level split supports the second: branches whose PRs are open
+But every `workflow_dispatch` run in that sample returned empty (10 of 10), and
+none of them sat on a currently-open PR's branch, so the sample by itself could
+not separate "dispatch runs never populate the array" from "the array empties
+once the PR closes".
+The branch-level split already favoured the second: branches whose PRs are open
 returned non-empty in every case, and branches whose PRs had merged returned
-empty in every case.)
+empty in every case.
+
+That ambiguity is now settled, by a counterexample this entry's own PR
+produced.
+`Morrison-Lab/ai-config#1388`'s review dispatch, run
+[31357711790](https://github.com/Morrison-Lab/ai-config/actions/runs/31357711790),
+is a `workflow_dispatch` on an **open** PR's branch, and it returns a
+**non-empty** array:
+
+```bash
+curl -sS "https://api.github.com/repos/Morrison-Lab/ai-config/actions/runs/31357711790" \
+  | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['event'], r['head_branch'], [(p['number'], p['head']['sha'][:8]) for p in r['pull_requests']])"
+#=> workflow_dispatch ums/pr1384-pull-requests-head-sha [(1388, 'ede6b0a9')]
+```
+
+So "dispatch runs never populate the array" is false, and the emptiness the
+sample recorded is explained by PR **closure** rather than by trigger type.
+One counterexample is enough here, because the hypothesis it refutes was a
+universal.
+Note the run was dispatched with `--ref` pointing at the PR branch, so its
+`head_sha` and the field agree --- which is what a correctly-dispatched review
+looks like, and is why this run cannot also serve as an example of the two
+diverging.)

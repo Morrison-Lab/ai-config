@@ -272,6 +272,62 @@ instrument rather than something recalled at the call site ---
 conclusion, in its "knowing the rule is not what fails here" passage, and is the
 place to read rather than restate it.)
 
+### A fourth cause: the check is sound, and the subject is wrong
+
+The three above all leave the instrument examining too little --- it broke, its
+input was empty, or a selection stage collapsed.
+This one examines a complete, non-empty input, correctly, and reports a true
+result about **a different subject** than the question was about.
+
+A diff-scoped checker takes its subject from the **working directory**, which is
+the one input nobody passes and nobody prints:
+
+```bash
+cd /path/to/other-repo && python3 <checker>   # true, and about the wrong repo
+```
+
+Every remedy above passes here.
+The exit status is the clean one, so an `rc=$?` test is satisfied.
+The input is neither empty nor collapsed, so a denominator comes back non-zero
+and healthy-looking --- which is the sharp part, because the denominator is the
+remedy the three cases above converge on, and it is measuring the wrong tree.
+And the scope line such a checker prints usually names the **comparison** rather
+than the **subject**: a base ref like `origin/main` resolves in both
+repositories, so the printed scope reads identically whichever one you are in.
+
+That last point is what separates this from
+[`deterministic-tools`](deterministic-tools.md)'s "Read the scope an instrument
+prints".
+There the scope line carries the answer and gets read past, so reading it is the
+fix.
+Here it is read, it is true, and it carries no information about the dimension
+that is wrong.
+
+So state the subject, not only the comparison, and prefer passing it explicitly
+over inheriting it from wherever the shell happens to be:
+
+```bash
+git -C "$repo" rev-parse --show-toplevel   # name the tree the answer is about
+```
+
+The cwd deserves that suspicion specifically because it is **carried in** rather
+than chosen: it is set by whatever ran last, so nothing about composing this
+command decided it.
+[`memories/claude-code.md`](../../memories/claude-code.md) records how it
+persists (and, in an agent thread, resets) between calls.
+
+- **Do:** print or state the subject an instrument examined --- the repository,
+  tree, or path --- alongside its finding count.
+- **Do:** pass the subject explicitly (`git -C`, an explicit path argument)
+  rather than inheriting it from the working directory.
+- **Don't:** read a clean verdict as being about the repository you have in
+  mind; a sound check reports truthfully about whatever it was pointed at.
+- **Don't:** treat a printed scope line as covering this --- naming the base ref
+  says nothing about which tree that ref was resolved in.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A sound checker pointed at the
+wrong repository".
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass

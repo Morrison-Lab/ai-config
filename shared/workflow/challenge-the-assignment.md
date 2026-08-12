@@ -220,6 +220,73 @@ which is the discretionary detector the bullets above say not to rely on.
 [`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries the
 measurement and the recovery.)
 
+**A prose disclaimer does not neutralize a supplied command that encodes the
+assumption it disclaims.**
+The section above prescribes naming the target and letting the agent establish
+its own state, and a brief can follow that prescription in prose and still ship
+the false premise --- because the prescription governs what the brief *says*,
+and a brief also *supplies* things.
+A runnable command is the second channel, and it is the one carrying the
+assumption.
+
+The disclaimer makes this worse rather than neutral, which is the part worth
+stating.
+The section above describes a convenience instruction that presents as a
+convenience rather than as an assertion, so nothing marks it as a claim.
+Here something does: the prose names that exact hazard, in as many words, one
+line above the command embodying it.
+That sentence is the only signal that would have sent the author looking, so
+spending it is what leaves the command reading as already checked --- the
+partial-guard trade [`fail-fast`](../principles/fail-fast.md) prices, arriving
+through the artifact written to demonstrate care.
+
+Which channel wins is not the recipient's judgment call.
+Prose is read once and a command is pasted, so the assumption reaches execution
+whatever the surrounding sentence says.
+So read every command in a brief as an assertion about the recipient's
+environment, and ask what would have to be true for it to run.
+
+**A `||` fallback is how such a command passes as self-establishing, and the two
+directions of fallback are not equally dangerous.**
+`DEF=$(git symbolic-ref --short refs/remotes/origin/HEAD) || echo main` reads as
+dynamic resolution, which is exactly what the disclaimer asked for.
+It is a guess wearing resolution's clothes: where that ref is unset the
+substitution is empty, the fallback supplies a literal, and a right answer
+arrives for a reason nothing tested --- which is
+[`fail-fast`](../principles/fail-fast.md)'s "a proxy that answers a narrower
+question passes the same way".
+
+Contrast a fallback that fails **loudly**.
+Two `git worktree add` forms joined by `||` also read as defensive, and both can
+rest on one false premise, so the chain enumerates two states while the real one
+is a third.
+That errors at the recipient and costs a minute.
+The silent one cannot be caught at all, since a guessed default and a resolved
+one produce identical output.
+A brief may therefore carry a fallback that errors, and must not carry one that
+guesses.
+
+Resolve what a supplied command needs from a source that answers, and fail
+loudly when it does not:
+
+```bash
+DEF=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
+[ -n "$DEF" ] || { echo "cannot resolve default branch" >&2; exit 1; }
+```
+
+- **Do:** read every command you put in a brief as a claim about the
+  recipient's environment, and either drop it or make it self-establishing.
+- **Do:** end a resolution step with a loud failure rather than a guessed
+  default, so an unmet premise stops the agent instead of reaching execution.
+- **Don't:** treat a "do not assume" sentence as covering the command beneath
+  it --- the disclaimer is spent on the reader, and the command still runs.
+- **Don't:** read a `||` chain as defensive without asking whether its branches
+  differ on the axis that can actually fail; two forms sharing one false premise
+  cover nothing.
+
+See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+"A brief's own command contradicted its own disclaimer".
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise

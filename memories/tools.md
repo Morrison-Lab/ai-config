@@ -1081,6 +1081,59 @@ space/tab, and require the count to be `>= 3`.
 Sibling embedding trap: a bare `---` at column 0 inside a YAML `run: |` block is
 a document separator that truncates the generated script.)
 
+## awk brace handling differs by implementation, in both directions
+
+The section above covers two gotchas that come from **embedding** an awk program
+in a single-quoted shell string.
+This one is about the awk **implementation** the machine happens to provide,
+and it is the same file's third recorded trap.
+
+`mawk` is `awk` on Debian and Ubuntu, so a script that says `awk` gets it by
+default there, and it mishandles braces in two opposite ways:
+
+- **A brace you meant literally is read as an interval.**
+  `/\^{}$/` dies with `regular expression compile failed (bad interval
+  expression)`.
+  Bracket each brace (`\^[{][}]`) to make it a literal in every awk.
+  [`memories/git.md`](git.md) records this one, in the tag-peeling one-liner
+  that needed it.
+- **An interval you meant as an interval can abort the process.**
+  On `mawk 1.3.4 20240123`, the Ubuntu 24.04 build, `/^#{1,6}([ \t]|$)/` dies
+  with `REcompile() - panic: values still on machine stack`:
+  ```console
+  $ echo '## heading' | mawk '{ if ($0 ~ /^#{1,6}([ \t]|$)/) print "M"; else print "NO-M" }'
+  REcompile() - panic:  values still on machine stack for ^#{1,6}([ \t]|$)
+  ```
+  It prints **neither** branch.
+  Bracketing does not help, because here the interval is the thing you want:
+  avoid `{m,n}` outright, with `^#+([ \t]|$)` plus a length check on the run,
+  or the unrolled `^##?#?#?#?#?([ \t]|$)`.
+
+Three things about the pair.
+
+**The two error strings share no substring**, so a grep run after reading the
+first note does not find the second, and the first note's remedy reads as
+covering both.
+That is
+[`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) with the
+two facts one file apart.
+
+**The second direction fails toward silence at the caller.**
+mawk dies rather than returning a verdict, so a script that pipes a body
+through the awk gets an empty stream and reports whatever its no-match branch
+says --- which for a matcher is `false` on every input.
+
+**CI being green says nothing about it.**
+Whichever awk GitHub's `ubuntu-latest` provides does not hit the panic, so a
+`{m,n}` can sit in a shipped script indefinitely while every run passes.
+It surfaces only where `runs-on` is a consumer-settable input, or in a
+container.
+
+(Morrison-Lab/gha#448, 2026-08-12, in `strip-non-invoking-markup.sh` again:
+the panic took `detect-review-request.sh`'s verdict with it, so its own suite
+reported `30 of 64 detect-review-request case(s) did not behave as expected`
+while `_selftest.yml` was green on `main`.)
+
 ## validate-skills.py token validation
 
 - **`validate-skills.py` checks backtick-wrapped `ALL_CAPS_WITH_UNDERSCORE` tokens against `tool-mappings.yml` operation IDs.**

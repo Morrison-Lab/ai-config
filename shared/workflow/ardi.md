@@ -528,6 +528,45 @@ cannot be the reason the practice is safe.
 See [`ardi.cases.md`](ardi.cases.md), "An invented `Closes` in a merge commit
 message".
 
+**A SHA's provenance is the question its source command answers, not merely
+that a command produced it.**
+The read-never-recalled bullet above governs *recollection* --- seven plausible
+hex characters written from memory --- and its remedy, reading the value out of
+`git rev-parse` or `git log`, is satisfied by the failure described here.
+The SHA was read, out of real command output, seconds before it was pasted.
+It answered a different question.
+`git stash list` names the commit each stash was taken on, and
+`git worktree list`, `git reflog`, `git log <other-branch>`, a CI run's
+`head_sha`, and a review comment's caption each do the same for their own
+subject.
+So a value can be genuine, freshly read, and still not be the branch tip you
+are about to call it.
+
+This is harder to catch than recollection, because having just read a real
+value feels like having verified one, so the check the bullet above exists to
+prompt reports itself already satisfied.
+That is the shape
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "Illusions of
+knowing have an exact software form" describes for a claim whose supporting
+command was narrower than it looked --- read that rather than re-deriving it
+here.
+
+Name what you are asserting before pasting: a branch tip, the checkout's own
+commit, a merge base, the commit a run checked out.
+Then confirm the command you read the value from answers that question, one
+query per claim.
+`git rev-parse --short origin/main` for a branch tip,
+`git rev-parse --short HEAD` for the checkout.
+
+- **Do:** name the claim, then run the one command that answers it, and paste
+  that command's output.
+- **Don't:** lift a SHA out of nearby command output because it is genuine and
+  close at hand --- `git stash list` and `git reflog` answer about their own
+  subjects, not about the tip.
+
+See [`ardi.cases.md`](ardi.cases.md), "A read SHA can answer a different
+question".
+
 **A verification table you write in the PR body is the same defect one artifact
 over, and re-reading it cannot catch a wrong number.**
 [`fully-clean`](fully-clean.md)'s "a reviewer's own verification block can be

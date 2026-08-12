@@ -492,8 +492,10 @@ The same file passes in CI, where no such ancestor exists.
 So one environment exercised `unknown)`, the other exercised `alive)`, and the
 `dead)` branch --- the one a crashed session actually takes --- was exercised
 by neither.
-Nothing was skipped in either run, so the tests/failed/skipped triple gave no
-sign that the two runs had traversed different code.
+Nothing was skipped in either run, so the skip count gave no sign that the two
+runs had traversed different code.
+The **failed** counts did differ, 4 against 0, and that is what surfaced the
+divergence.
 The fix was a case that registers a genuinely dead PID and leaves the heartbeat
 **fresh**, so only the liveness branch can decide it, whatever the host
 supplies.)

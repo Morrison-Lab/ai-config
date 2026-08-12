@@ -1629,8 +1629,8 @@ cover.
   coverage, and say which branch each run took.
 - **Don't:** read green in CI as covering a branch whose selection depends on
   an input CI happens to supply one way.
-- **Don't:** reach for the skip count here --- nothing is skipped, so the
-  triple is identical on both machines.
+- **Don't:** reach for the skip count here --- nothing is skipped, so that
+  component is identical on both machines even when the failed counts diverge.
 
 See [`ardi.cases.md`](ardi.cases.md), "A suite whose branch coverage varies by
 host".

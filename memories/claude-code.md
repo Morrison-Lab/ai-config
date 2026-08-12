@@ -1138,7 +1138,7 @@ The last row is the working form --- spawn, kill, and `wait` inside a single
 shell, so that shell is the parent and the reap is synchronous.
 
 Treat PID 1's identity and its reap latency as volatile, per
-[`../shared/writing/timestamp-volatile-claims.md`](../shared/writing/timestamp-volatile-claims.md):
+[`timestamp-volatile-claims`](../shared/writing/timestamp-volatile-claims.md):
 both are properties of this container image rather than of Linux, and a
 subreaper or a different init changes the second row's numbers or removes the
 reap entirely.
@@ -1148,7 +1148,7 @@ Re-run `ps -o comm= -p 1` before relying on any of it.
   reliably gone.
 - **Do:** bound any `kill -0` poll and treat exhausting the bound as a result,
   not as a hang, per
-  [`../shared/principles/fail-fast.md`](../shared/principles/fail-fast.md).
+  [`fail-fast`](../shared/principles/fail-fast.md).
 - **Don't:** read `kill -0` succeeding as the process being alive --- it
   succeeds on a zombie, which is the one state a liveness check most needs to
   tell apart from alive.

@@ -70,6 +70,7 @@ Or try it interactively in any Claude Code session:
 ```
 
 ::: {.callout-warning}
+
 ## Pick one install route
 
 The plugin install and the `bootstrap.sh` symlink install are

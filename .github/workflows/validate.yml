@@ -49,6 +49,12 @@ jobs:
         # consumer directory (~/.claude) that no CI runner has, so on a runner
         # it correctly reports "nothing installed to check" and proves nothing.
         run: python3 scripts/test_check_install.py
+      - name: Run plugin-overlap detector tests
+        # Only the tests run here. check-plugin-overlap.py itself inspects a
+        # consumer directory (~/.claude) plus its settings.json, which no CI
+        # runner has, so on a runner it correctly reports nothing examined and
+        # proves nothing (ai-config#1409).
+        run: python3 scripts/test_plugin_overlap.py
       - name: Run token-rotation tool tests
         # Only the tests run here. rotate-claude-token.py itself mutates
         # repository secrets across the estate, so it is a local operator tool

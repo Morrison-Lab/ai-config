@@ -141,6 +141,35 @@ session (or prefix with `claude ` to run them in a terminal):
 No `version` is pinned, so every commit to this repo counts as a new version —
 sessions with marketplace auto-update pick up the latest automatically.
 
+### The plugin install and the symlink install are alternatives, not complements
+
+Both routes serve the same corpus,
+so a machine that ran `bootstrap.sh` (bare names, `/ardi`) **and** enables an
+`ai-config@*` plugin (prefixed names, `/ai-config:ardi`) lists every skill
+twice.
+The skill listing is budgeted at roughly 1% of the context window,
+and past that budget descriptions are truncated and skill routing degrades ---
+measured ~3.8x over budget on one doubly-installed machine (ai-config#1409).
+Pick one route.
+On a `bootstrap.sh` machine, leave the plugin disabled;
+the symlinked copy already serves every skill.
+
+The same goes for enabling the plugin from **more than one marketplace**:
+both `Morrison-Lab/ai-config` and `d-morrison/ai-config` publish a plugin
+named `ai-config` from the same repo, so only one entry can own the
+`ai-config:` namespace and the rest are no-op collisions.
+Enable at most one.
+
+`bootstrap.sh` runs `scripts/check-plugin-overlap.py` at the end of an
+install and warns when it detects either overlap;
+run it standalone any time to re-check a machine.
+
+A consumer repo's checked-in `.claude/settings.json` marketplace block (the
+JSON above) is correct for a teammate cloning fresh with no ai-config
+checkout, and redundant for anyone who ran `bootstrap.sh` --- the latter group
+can override it by setting `"ai-config@Morrison-Lab": false` in their own
+`~/.claude/settings.json` or the repo's `.claude/settings.local.json`.
+
 ## Use these skills with this repo's own `@claude` bot
 
 The two mechanisms above cover the **CLI** (`~/.claude/skills` via `bootstrap.sh`)

@@ -226,9 +226,14 @@ the bullets in this fragment record it failing at this exact boundary.
       (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree, a
       later edit retires the lines an earlier run scanned, and a two-dot range
       re-attributes whatever `main` deleted to you.
-- [ ] **The changelog entry and the PR description were re-read** against the
-      new behavior, not just the code --- neither is in the diff, so no
-      reviewer and no grep will catch a stale one.
+- [ ] **The changelog entry and EVERY PR description this round touched were
+      re-read** against the new behavior, not just the code --- none is in the
+      diff, so no reviewer and no grep will catch a stale one.
+      Read "every" literally: a round that corrects a claim appearing in two
+      PRs' bodies discharges the *feeling* of having synced bodies as soon as
+      one of them is done, and the one most likely to be skipped is your own,
+      because fixing the other repo's copy is the part that felt like the
+      work.
       This fires on a **prose** diff too: a body that explains the claim the
       round just walked back is stale in the way that matters most, and
       "reconciling prose" does not feel like changing what the PR does.
@@ -1427,6 +1432,69 @@ at a glance from one that verified everything.
 Match the environment the change will be judged in, too.
 Running with an env var set that CI does not set (or vice versa) reproduces
 a *different* configuration, and its failures and passes both mislead.
+
+**Matching the tool's VERSION is not matching its ENVIRONMENT, and when the
+tool GENERATES a file you are about to commit, the gap ships.**
+The paragraph above is about running a suite: a mismatched configuration
+misleads you about a verdict, and the cost is a wrong belief.
+A code generator run under a mismatched configuration writes a **different
+artifact**, and you commit it -- so the cost is a wrong file in the tree,
+carrying the authority of having been machine-generated.
+
+What makes it slip past is that the obvious precaution succeeds.
+Installing the exact version CI installs feels like reproducing CI, and it
+reproduces the half everyone thinks of.
+A generator's output also depends on what it can **resolve** while it runs:
+optional dependencies, plugins, a locale, a package it loads to read
+docstrings out of.
+Miss one of those and the tool usually does not **fail** --- it emits a
+degraded version of whatever it could not resolve, which is exactly the output
+that looks plausible.
+
+**Read the generator's own diagnostics first**, because a good one says so
+outright and names the cause.
+roxygen2 is the worked case and it warns loudly:
+`@inheritDotParams failed because testthat is not installed`, plus a line per
+tag that referenced the missing package.
+That is the earliest and most specific signal available, and it is free.
+
+**The file list is the backstop**, for a generator that degrades with no
+diagnostic, or one whose diagnostics scroll past in a long run.
+A generator run in a thinner environment usually touches a superset of what CI
+touches, since the extra file is the one it degraded.
+So compare the file *list* against the failing job's own log, and treat a file
+CI did not name as evidence about your environment rather than about the repo.
+
+Both are worth having, because they fail in different ways: a warning can be
+lost in noise or absent entirely, and a file-list comparison needs CI to have
+reported a list in the first place.
+
+- **Do:** read the generator's own warnings before its output --- roxygen2
+  names the missing package and the tag that needed it.
+- **Do:** compare your generator's changed-file list against the CI log's, and
+  treat any extra file as an environment mismatch until explained.
+- **Do:** install the optional/dev dependency set as well as the tool, when a
+  generator loads the package to do its work.
+- **Don't:** read "I installed the same version CI installs" as having matched
+  CI --- version is one input to the output, and rarely the one that differs.
+- **Don't:** commit generated output whose diff is wider than the job you are
+  trying to satisfy reported.
+
+(`UCD-SERG/serodynamics#291`, 2026-08-12: `docs-check` reported exactly two
+changed files, `DESCRIPTION` and `NAMESPACE`.
+Re-documenting locally with roxygen2 8.1.0 --- CI's own version, from CI's own
+RSPM binary repo --- changed **three**, the extra one being
+`man/expect_snapshot_data.Rd`, because `testthat` sits in `Suggests` and was
+not installed, so that file's
+`@inheritDotParams testthat::expect_snapshot_file` could not resolve and
+roxygen emitted the topic without the inherited arguments.
+`rjags` was absent too and was flagged on a different topic, which is worth
+separating: only the `testthat` gap changed a file, so the missing-package
+count and the changed-file count are not the same number.
+Committing that would have shipped a silently degraded help page.
+Installing the full `Suggests` set reproduced CI's two-file result exactly,
+with no warnings --- and the contrast between the two runs' warning output is
+itself the cheapest check that the environment is now right.)
 
 - **Do:** run the full suite before pushing, and state the tests/failed/
   skipped triple rather than "tests pass".

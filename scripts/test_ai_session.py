@@ -61,11 +61,17 @@ def dead_pid(bash):
     `os.kill` from this process cannot see a PID owned by another user, and
     would report it dead when the script would call it alive.
     """
-    # Spawn, kill, and `wait` inside ONE shell, so the child is reaped by the
-    # parent that owns it. Letting it exit on its own and reaping from a second
-    # shell does not work: that shell never owned the child, so `wait` is a
-    # no-op, and an orphan reparented to a PID 1 that does not reap stays a
-    # zombie -- whose process-table entry keeps `kill -0` returning 0.
+    # Spawn, kill, and `wait` inside ONE shell, so the owning parent reaps the
+    # child synchronously: `wait` returns only once it has (rc 143 on SIGTERM).
+    #
+    # Reaping from a second shell loses a race rather than hitting a permanent
+    # state. A killed orphan reparents to PID 1, which here DOES reap it, but
+    # takes ~1.6-2.0s. The check runs milliseconds after the kill, so it finds
+    # the process still in `Z` and `kill -0` still returning 0, and each retry
+    # spawns a fresh pid, so every iteration re-loses the same race. A second
+    # shell cannot `wait` on it either: that is an error rather than a no-op,
+    # `pid N is not a child of this shell`, rc 127.
+    # (Measured 2026-08-12 in this container; PID 1 is `process_api`.)
     spawn = "sleep 30 & p=$!; kill $p 2>/dev/null; wait $p 2>/dev/null; echo $p"
     for _ in range(20):
         p = subprocess.run([bash, "-c", spawn],

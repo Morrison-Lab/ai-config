@@ -193,9 +193,17 @@ Where the two are close, a ratchet is unimplementable, not merely noisy.
 The fix is not a wider margin --- a margin sized to survive today's rate
 still expires on tomorrow's --- but a **round policy line**, stated as a
 rule a reader can hold ("no file over 100 KB") rather than derived from
-whatever the corpus happened to measure at write time, sized with enough
-runway that the interval-versus-rate comparison above no longer applies to
-it.
+whatever the corpus happened to measure at write time.
+
+Be exact about what that buys, because the tempting overclaim is that a
+round line escapes the comparison.
+It does not.
+A round line is still a level, so the rate still eats its margin; what
+changes is that the margin is **stated and deliberate** rather than an
+artifact of when the threshold happened to be written, and that firing has
+a known response rather than reading as an arbitrary failure.
+A ratchet's margin is accidental and its firing is a surprise; a policy
+line's margin is a decision and its firing is the decision arriving.
 [`configurable-parameters`](../coding/configurable-parameters.md) already
 argues for keeping such a line as a named, adjustable parameter rather than
 a buried literal; this adds where the **value** of that parameter should
@@ -212,7 +220,7 @@ instead.
 - **Don't:** treat a check that goes red on an untouched file as flaky ---
   read it as the reference point having moved faster than the margin.
 
-(`Morrison-Lab/ai-config#1398`: a per-fragment size cap was first designed
+(`Morrison-Lab/ai-config#1398`, 2026-08-12: a per-fragment size cap was first designed
 as a ratchet, a few hundred bytes above the corpus's then-largest
 auto-loaded fragment.
 Measured over roughly two hours between filing and
@@ -220,11 +228,21 @@ implementing, `shared/workflow/ardi.md` grew 87,448 -> 93,326 bytes and
 `shared/principles/fail-fast.md` grew 89,175 -> 91,835 bytes --- so a cap
 pinned to that day's maximum would have gone red within a day on a PR that
 never touched either file.
-Proposed in `Morrison-Lab/ai-config#1406`: a
-round 100,000-byte line with several KB of runway over both, its own
-rationale documented at length in the check's source rather than only
-here --- once merged, the fragment lives at
-`scripts/check-context-closure.py`.)
+`Morrison-Lab/ai-config#1406` shipped a round 100,000-byte line with
+several KB of runway over both, adding a `--fragment-cap` flag and its
+rationale to the existing `scripts/check-context-closure.py` rather than
+documenting it only here.
+
+The sequel is the evidence for the paragraph above, and it arrived within
+the day: #1406 merged at `14:43:53Z`, `Morrison-Lab/ai-config#1407` merged
+nine minutes later carrying ordinary additions to both files, and by
+`19:20Z` `ardi.md` stood at 95,681 bytes --- 4,319 of runway left, under a
+day at the rates above.
+So the round line did not escape the rate comparison, and was never going
+to.
+What it bought was a firing with a known answer: split case records out to
+a `.cases.md` companion, which is what `Morrison-Lab/ai-config#1413` then
+did.)
 
 ## Never predict which case will fail; enumerate the class
 

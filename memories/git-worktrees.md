@@ -457,8 +457,11 @@ the anchor is the check, and the ordering is what keeps its failure path from
 doing damage.
 
 Don't settle the disagreement by picking one.
-Read the `Shell cwd was reset` line in the session in front of you, which
-answers it directly and costs nothing.
+Read the `Shell cwd was reset` line, which costs nothing and answers the
+question **for the call that printed it**.
+Do not read it as settling the session: the 2026-08-12 measurement above saw
+that line on several calls and still had a `cd` carry into a later one, so its
+presence earlier in a session is not evidence about the call in front of you.
 
 So `cd /path/to/repo` is the most natural thing to type and the wrong thing to
 type: it silently selects the main checkout, which is on a different branch.

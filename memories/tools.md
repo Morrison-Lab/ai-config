@@ -795,8 +795,48 @@ error underneath whatever the regex got wrong, per
 
 **When a check must be ad hoc, write it to a file rather than an inline
 heredoc.**
-Quoting is where these break, and a file removes the shell from the problem
-entirely.
+That is right for the stdin-contention entry below.
+It is **not** what fixes the charset collapse above: the cause recorded here
+was wrong, and correcting it changes the remedy.
+
+**The shell is not involved.**
+A quoted heredoc delimiter (`<<'PY'`) suppresses expansion outright, and the
+same literal in a plain file, with no shell in the picture at all, produces
+the identical contamination:
+
+```python
+# mech.py, run as `python3 mech.py`
+print(sorted(hex(ord(c)) for c in set('--""''x')))   # ['0x22', '0x2d', '0x78']
+```
+
+The mechanism is **Python adjacent-string-literal concatenation**.
+`'--""''x'` is two literals rather than one: the `''` in the middle is the
+Python string closing and reopening, so the `""` between them becomes ordinary
+content and the class silently gains ASCII `"`.
+Its precondition is that those quotes were **ASCII** all along --- a literal
+built from genuine curly quotes comes back clean, all seven code points intact
+--- so this bites exactly the author who believed they were typing curly
+quotes, and moving the check into a file does not save them.
+
+**A positive control cannot catch it.**
+"Sanity-test it on an input you know should fail" exercises the direction
+where the detector must fire, and a contaminated class fires enthusiastically.
+The direction needing a control is the one where it must stay **silent**.
+Two things supply that, and neither is a positive control:
+
+- **Assert what the class must NOT contain:**
+  `assert '"' not in BANNED and "'" not in BANNED`.
+- **Print the class you actually built, as code points rather than glyphs:**
+  `{hex(ord(c)) for c in BANNED}`.
+  A contaminating character is invisible rendered and unmistakable as `0x22`.
+
+Building the class from explicit `\uXXXX` escapes removes the ambiguity at
+the source.
+
+The two directions are worth separating because they cost differently.
+A false zero reads as an all-clear and is acted on by doing nothing, while a
+false positive arrives as **work to do** on lines that were never wrong, so
+the over-firing direction spends an edit corrupting correct prose.
 
 **The maintained instrument's silence is not proof either**, for two reasons
 of its own.
@@ -811,13 +851,30 @@ Read its output, not its conclusion.
 - **Do:** run the maintained checker against your own diff before pushing,
   and quote *its* output as the verification.
 - **Do:** put an unavoidable ad-hoc check in a file, and sanity-test it on an
-  input you know should fail.
+  input you know should fail **and** one you know should pass.
+- **Do:** print a constructed character class as code points before acting on
+  a nonzero result from it.
 - **Don't:** cite a hand-rolled check's clean result in a PR body as evidence.
 - **Don't:** read an advisory check's green CI status as a verdict on content.
+- **Don't:** read a passing positive control as evidence the detector is
+  correct --- it establishes only that it can fire at all.
+- **Don't:** blame the shell for a character class that came out wrong inside
+  a heredoc; check the literal's own quoting first.
 
 (2026-07-31, [ai-config#964](https://github.com/Morrison-Lab/ai-config/pull/964):
 the review caught 8 of the 12 lines my own detector had missed, and then a
 further one that the maintained tool had missed too.)
+
+(2026-08-12, [gha#449](https://github.com/Morrison-Lab/gha/pull/449): the same
+collapse recurred, reporting 7 hits across 112 added lines of ordinary YAML,
+all of them plain ASCII quotes.
+Rebuilt by code point with both controls, the same lines reported 0, and seven
+non-problems were nearly "fixed".
+The shell-quoting cause this entry originally recorded was disproved while
+answering the review of
+[ai-config#1403](https://github.com/Morrison-Lab/ai-config/pull/1403), by
+running the literal in a plain file and inside a `<<'PY'` heredoc and getting
+identical output.)
 
 ## `cmd | python3 - <<EOF` reads the heredoc, not the pipe, so `sys.stdin` scans nothing
 
@@ -875,64 +932,6 @@ was shell *quoting*, this one is stdin *contention*.
 diff for semantic-line-breaks, and it read nothing --- a real multi-sentence-line
 violation was reported as "0 found" and the vacuous all-clear was stated to the
 user before the method was caught.)
-
-## A positive control proves a detector can fire, and says nothing about whether it OVER-fires
-
-Every entry in the cluster above ends at a false **zero** -- a scan that
-reports nothing because it read nothing.
-The remedy they all reach for is a positive control, and it is the right
-remedy for that direction.
-It is silent about the other one.
-
-A detector can be contaminated so that it flags input it should pass, and a
-positive control still comes back green, because the detector demonstrably
-fires.
-That direction is not merely the mirror image: a false zero reads as an
-all-clear and gets acted on by doing nothing, while a false positive arrives
-as **work to do** on lines that were never wrong.
-
-The mechanism worth recognizing is a character class or pattern built from a
-quoted literal that a nesting shell has already re-quoted.
-Inside a bash heredoc, a Python set whose literal is written as the seven
-banned glyphs in single quotes -- U+2014, U+2013, the two curly double
-quotes, the two curly single quotes, U+00D7 -- does not contain what it
-looks like.
-The two curly single quotes sit adjacent in that literal, and the shell has
-already re-quoted the heredoc, so what Python parses is a string that closes
-and reopens: the set silently gains ASCII `"` and `'` and flags every
-ordinary quoted line in the file.
-Note the tell is absent by construction --- the expression is syntactically
-valid, raises nothing, and returns a real set.
-
-Two things settle it, and neither is a positive control:
-
-- **Assert what the detector must NOT contain**, which is the negative control
-  the positive one cannot supply:
-  `assert '"' not in BANNED and "'" not in BANNED`.
-- **Print the class you actually built**, as code points rather than glyphs:
-  `{hex(ord(k)): v for k, v in BANNED.items()}`.
-  Contaminating characters are invisible when rendered and obvious as `0x22`.
-
-Then avoid the nesting: build the class from explicit `\uXXXX` escapes, or put
-the script in its own file so no outer shell re-quotes it, per the
-stdin-contention entry above.
-
-- **Do:** run a negative control -- an input the detector must pass -- beside
-  the positive one, whenever a false positive would create work.
-- **Do:** print a constructed character class as code points before trusting a
-  nonzero result from it.
-- **Don't:** read a passing positive control as evidence the detector is
-  correct; it establishes only that it can fire at all.
-- **Don't:** act on a scan's hits before confirming the pattern's own
-  construction, especially one built through a heredoc.
-
-(2026-08-12, Morrison-Lab/gha#449: a banned-punctuation scan over a PR's added
-lines reported 7 hits, all of them plain ASCII quotes in ordinary YAML.
-The charset had been written as a quoted literal inside a `python3 - <<'PY'`
-heredoc and collapsed as above.
-Rebuilt with explicit code points plus the two controls, the same 112 added
-lines reported 0.
-Seven non-problems were nearly "fixed".)
 
 ## A process substitution feeding a pipeline fails under zsh, and reads as a clean zero
 
@@ -1111,12 +1110,13 @@ default there, and it mishandles braces in two opposite ways:
 
 Three things about the pair.
 
-**The two error strings share no substring**, so a grep run after reading the
-first note does not find the second, and the first note's remedy reads as
-covering both.
-That is
-[`grep-is-not-coverage`](../shared/workflow/grep-is-not-coverage.md) with the
-two facts one file apart.
+**Neither error leads a reader to the other.**
+[`memories/git.md`](git.md) records the first direction only, inside a
+tag-peeling one-liner and indexed by the literal-brace symptom that produced
+it --- it names neither the panic nor an interval you actually want.
+So arriving with the panic finds nothing there, and arriving with the
+bad-interval error finds a note that stops at the first direction.
+That is why both directions are written out here rather than cross-referenced.
 
 **The second direction fails toward silence at the caller.**
 mawk dies rather than returning a verdict, so a script that pipes a body
@@ -1133,6 +1133,18 @@ container.
 the panic took `detect-review-request.sh`'s verdict with it, so its own suite
 reported `30 of 64 detect-review-request case(s) did not behave as expected`
 while `_selftest.yml` was green on `main`.)
+
+- **Do:** assume `awk` is `mawk` in any program that ships to Debian or
+  Ubuntu, and bracket every brace you mean literally (`\^[{][}]`).
+- **Do:** express a bounded repetition without `{m,n}` --- `^#+([ \t]|$)` plus
+  a length check on the run, or the unrolled `^##?#?#?#?#?([ \t]|$)` --- when
+  the awk runs anywhere you do not control.
+- **Don't:** reach for the bracketing remedy on an interval you meant as an
+  interval; that is the fix for the opposite direction, and the two errors are
+  filed apart.
+- **Don't:** read a green `ubuntu-latest` run as evidence the awk is portable
+  --- whatever awk that runner provides does not hit the panic, so the defect
+  stays latent until a consumer sets `runs-on`.
 
 ## validate-skills.py token validation
 

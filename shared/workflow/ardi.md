@@ -226,9 +226,14 @@ the bullets in this fragment record it failing at this exact boundary.
       (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree, a
       later edit retires the lines an earlier run scanned, and a two-dot range
       re-attributes whatever `main` deleted to you.
-- [ ] **The changelog entry and the PR description were re-read** against the
-      new behavior, not just the code --- neither is in the diff, so no
-      reviewer and no grep will catch a stale one.
+- [ ] **The changelog entry and EVERY PR description this round touched were
+      re-read** against the new behavior, not just the code --- none is in the
+      diff, so no reviewer and no grep will catch a stale one.
+      Read "every" literally: a round that corrects a claim appearing in two
+      PRs' bodies discharges the *feeling* of having synced bodies as soon as
+      one of them is done, and the one most likely to be skipped is your own,
+      because fixing the other repo's copy is the part that felt like the
+      work.
       This fires on a **prose** diff too: a body that explains the claim the
       round just walked back is stale in the way that matters most, and
       "reconciling prose" does not feel like changing what the PR does.

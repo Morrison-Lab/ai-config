@@ -1245,6 +1245,53 @@ Each edit traded one regression for the other until the fix became
 architectural: a second, separately-scoped pass applied only after the first
 branch ran.)
 
+**The same shape governs an INSTRUCTION, and there the missing half is a step
+rather than a site.**
+Everything above concerns a guard in code.
+A documented enabling procedure fails identically: when a feature needs two
+steps to take effect and the docs name one, the instruction reads as complete,
+so a reader follows it exactly and gets nothing.
+
+It is worse than an undocumented feature, on this section's own terms.
+No instructions at all leaves a reader looking for the mechanism.
+A procedure naming one of two required steps answers the question before it is
+asked, so the reader stops -- the partial version spends the one signal that
+would have sent them looking, exactly as a partial guard does.
+
+The direction that bites is a feature whose *point* is to remove a silent
+failure, because following its own docs then reproduces the silence it was
+built to fix.
+That inversion is the tell worth remembering: a fix's docs can carry the very
+bug the fix removes, and nothing about writing them feels like reintroducing it.
+
+Enumerate the preconditions the same way this section already asks you to
+enumerate sites --- from the code, not from memory.
+A job that runs only on one event needs that trigger enabled, whatever else is
+configured, so grep the feature's own gate for every condition it tests and
+check the docs name each one.
+Then state them as required steps rather than as an aside, since a precondition
+mentioned in a neighbouring sentence scoped to a *different* path is one a
+reader with only this path in view will skip.
+
+- **Do:** derive a documented procedure's steps from the gate's own conditions,
+  and state each as required.
+- **Do:** re-read the docs of a fix that removes a silent failure, asking
+  whether following them literally reproduces it.
+- **Don't:** rely on an adjacent sentence to carry a precondition -- a reader
+  who does not want that adjacent path will not read it as applying to theirs.
+- **Don't:** treat "the docs mention the trigger somewhere in this file" as the
+  precondition being stated.
+
+(Morrison-Lab/gha#449, 2026-08-12: an opt-in `@claude review` dispatch was added
+for repos that disable the agent, enabled by a repository variable **and** by
+uncommenting an `issue_comment` trigger the stub ships commented out.
+Every doc site named only the variable.
+The job's `if:` requires `github.event_name == 'issue_comment'`, so following
+the docs produced a one-second run with every job skipped and nothing posted ---
+the exact silent no-op the PR existed to fix (gha#447).
+Review caught it and called it blocking-ish; the fix stated both steps at six
+sites, two more than the review had enumerated.)
+
 ## A guard's discharge fires on positive success, not the absence of failure
 
 The section above is about a guard that runs on too few sites.

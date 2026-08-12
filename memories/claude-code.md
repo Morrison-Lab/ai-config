@@ -778,6 +778,17 @@ checks — don't rely on remembering which directory the last call left you
 in. (Session sliding the `macros` submodule pin in `d-morrison/rme` and
 `ucdavis/epi204`, 2026-07-04.)
 
+**A parallel batch is the same trap in its sharpest form.**
+Two Bash calls composed into one message read as independent,
+but they share the one persistent shell and run serially,
+so the first call's `cd` decides the second call's repo.
+A verification command labeled for repo B, batched after a sibling that
+`cd`'d to repo A, returns repo A's clean status and HEAD under repo B's
+label --- plausible output, wrong subject.
+(Post-compaction verification batch, 2026-08-12: an ai-config
+`git status` check ran in the sparta checkout this way, and its output was
+initially read as the ai-config answer.)
+
 **In an AGENT / subagent thread the cwd behavior INVERTS -- it RESETS to the
 project root between Bash calls, so a `cd` does NOT persist.**
 The main-session persistence above is a property of that tool;

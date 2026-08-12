@@ -53,6 +53,12 @@ sed -n '/^on:/,/^[a-z]/p' .github/workflows/<review-workflow>.yml
 - **Don't:** read "I am applying a written rule" as evidence the rule applies here.
   That feeling is precisely what suppresses the check.
 
+**A review round is the most expensive thing on the PR, so cancelling one is a real spend rather than a way to save time.**
+Every cost this file prices so far is a CI minute or a wasted review-round race.
+The direct cost is larger: measured 2026-08-12 on `Morrison-Lab/ai-config`, one round billed **$42.92**, against **$5.91** for the confirming re-review of the same PR.
+So a slow review is not a thing to cancel impatiently, and the slowest run is liable to be the one that costs most to repeat.
+Whether to cancel a slow run at all is decided by whether the PR's head has moved rather than by how long the run has taken --- [`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s "Whether to cancel a slow review turns on whether the head has moved" carries the criterion, the two runs that showed the same symptom and needed opposite actions, and why a runtime baseline is the wrong instrument.
+
 **A reviewer's "considered but declined to raise" note is not an open item -- a clean verdict standing over it is a stop, and acting on it reopens a settled loop.**
 [`ardi`](../../skills/ardi/SKILL.md)'s **Stopping conditions** make a totally clean review -- no raised nits, no non-blocking comments -- one of the three ways the loop ends.
 A note the reviewer *considered and explicitly declined to raise as a finding* is exactly that: not a posted finding, so it does not keep the loop open.

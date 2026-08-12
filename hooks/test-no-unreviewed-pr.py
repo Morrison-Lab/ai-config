@@ -1159,6 +1159,145 @@ case(create("c") + [bash('gh pr comment 1038 --body "next step: gh pr merge"',
      "the verb quoted inside a --body value is not a merge")
 
 
+# --- redaction exemption (ai-config#1392) ----------------------------------
+# A redaction PR's diff carries the redacted literal on the REMOVED side of
+# every hunk, so requesting a reviewer is the exposure the redaction gate
+# exists to prevent (ucdavis/bcs#610/#614). Before this the guard had no
+# terminating state on such a PR: refusing, recording the refusal, and the
+# maintainer deciding to hold all left it firing, and its only discharges were
+# the exposure itself or a false claim of draft status.
+LABEL_CMD = "gh pr edit 1038 -R o/r --add-label no-ai-review"
+ENV_CMD = ("ALLOW_UNREVIEWED_REDACTION_PR=1 gh pr view 1038 -R o/r "
+           "--json number")
+
+case(create("c") + [bash(LABEL_CMD, tid="x"), res("x", "{}"),
+                    say("Redaction PR; held the AI review.")], False,
+     "a no-ai-review label exempts a redaction PR")
+case(create("c") + [bash("gh api repos/o/r/issues/1038/labels -X POST "
+                         "-f 'labels[]=no-ai-review'", tid="x"),
+                    res("x", '[{"name":"no-ai-review"}]'),
+                    say("Labelled via the API.")], False,
+     "the issue-labels endpoint exempts too")
+case(create("c") + [bash(ENV_CMD, tid="x"), res("x", '{"number":1038}'),
+                    say("Redaction PR; asserted the exemption.")], False,
+     "an ALLOW_UNREVIEWED_REDACTION_PR=1 assertion exempts")
+case(create("c") + [bash("ALLOW_UNREVIEWED_REDACTION_PR=1 gh api "
+                         "repos/o/r/pulls/1038 --jq .number", tid="x"),
+                    res("x", "1038"), say("Asserted.")], False,
+     "the env assertion resolves identity from an API path too")
+# Exemption is a property of the PR's CONTENT, not of one head: the removed
+# side still carries the literal after the next push, so unlike a reviewer
+# request it must survive a re-head.
+case(create("c") + [bash(ENV_CMD, tid="x"), res("x", '{"number":1038}'),
+                    bash("git push", tid="p"), res("p", "done"),
+                    say("Pushed a fix to the redaction PR.")], False,
+     "an exempted PR is not re-armed by a later push")
+# The env form takes effect at tool_use time, so it must also survive a push
+# CHAINED into that same call, where the arm fires synchronously.
+case(create("c") + [bash(ENV_CMD + " && git push", tid="x"),
+                    res("x", "1038\ndone"), say("Asserted and pushed.")], False,
+     "a push chained after the assertion does not re-arm")
+
+# ... and the discharge is narrow, since it is the DANGEROUS direction.
+case(create("c") + [bash(LABEL_CMD, tid="x"),
+                    res("x", "could not add label: 'no-ai-review' not found",
+                        err=True),
+                    say("Tried to label it.")], True,
+     "a FAILED label add does not exempt (the repo has no such label)")
+# Chained AHEAD of a succeeding command, the is_error belongs to that LATER
+# command, so the outcome is unknowable. The body here deliberately carries no
+# error-word or 4xx shape ("unable to add" matches nothing in RX_FAILED), so
+# only the `last` check can withhold the exemption -- the same ordering hazard
+# the draft clear above guards against.
+# The same ordering rule bites the natural way to batch the exemption with a
+# push, so both directions are pinned: chaining the label add BEFORE the push
+# does not discharge (the push arms, and the label's result is unattributable),
+# while chaining it AFTER does, since it is then last. This is why the block
+# message says to run the label add on its own. Dropping the `last` requirement
+# to make the forward ordering work would read `git push`'s exit status as the
+# label add's own -- the silent-discharge class every releasing path here
+# blocks -- so the over-warn is kept deliberately.
+case(create("c") + [bash("gh pr edit 1038 -R o/r --add-label no-ai-review "
+                         "&& git push", tid="x"), res("x", "done"),
+                    say("Labelled and pushed.")], True,
+     "a label add chained BEFORE a push does not exempt")
+case(create("c") + [bash("git push && gh pr edit 1038 -R o/r "
+                         "--add-label no-ai-review", tid="x"),
+                    res("x", "done"), say("Pushed and labelled.")], False,
+     "a label add chained AFTER a push is last, so it exempts")
+case(create("c") + [bash(LABEL_CMD + "; echo done", tid="x"),
+                    res("x", "unable to add label to this PR\ndone", err=False),
+                    say("Tried to label it.")], True,
+     "a label add chained AHEAD of a success does not exempt")
+case(create("c") + [bash("gh pr comment 1038 -R o/r --body "
+                         "'run: gh pr edit 1038 --add-label no-ai-review'",
+                         tid="x"), res("x", "{}"), say("Explained it.")], True,
+     "the label command quoted inside a --body does not exempt")
+case(create("c") + [bash("echo 'ALLOW_UNREVIEWED_REDACTION_PR=1 gh pr view 1038'",
+                         tid="x"), res("x", "ok"), say("Quoted it.")], True,
+     "the env token quoted inside a string does not exempt")
+case(create("c") + [bash("gh pr edit 1038 -R o/r --add-label needs-data",
+                         tid="x"), res("x", "{}"), say("Labelled.")], True,
+     "an unrelated label does not exempt")
+case(create("c") + [bash("gh pr edit 1038 -R o/r --add-label no-ai-review-later",
+                         tid="x"), res("x", "{}"), say("Labelled.")], True,
+     "a label whose name merely CONTAINS the token does not exempt")
+case(create("c") + [bash("gh api repos/o/r/issues/1038/labels", tid="x"),
+                    res("x", '[{"name":"no-ai-review"}]'),
+                    say("Read the labels.")], True,
+     "READING the labels endpoint is not applying the label")
+# `gh api` sends POST as soon as any `-f`/`-F` parameter is added, so the bare
+# form IS a write and must exempt; `--method GET` sends the same parameters as
+# a query string, so it is a read and must not.
+case(create("c") + [bash("gh api repos/o/r/issues/1038/labels "
+                         "-f 'labels[]=no-ai-review'", tid="x"),
+                    res("x", '[{"name":"no-ai-review"}]'),
+                    say("Labelled.")], False,
+     "a bare `-f` labels call is a POST and exempts")
+case(create("c") + [bash("gh api repos/o/r/issues/1038/labels --method GET "
+                         "-f 'labels[]=no-ai-review'", tid="x"),
+                    res("x", "[]"), say("Queried the labels.")], True,
+     "`--method GET` with the same parameters is a read, not a label add")
+case(create("c") + [bash("gh api repos/o/r/issues/1038/labels --method=GET "
+                         "-f 'labels[]=no-ai-review'", tid="x"),
+                    res("x", "[]"), say("Queried the labels.")], True,
+     "the `--method=GET` equals form is a read too")
+case(create("c") + [bash("gh pr edit 1039 -R o/r --add-label no-ai-review",
+                         tid="x"), res("x", "{}"),
+                    say("Exempted the other PR.")], True,
+     "exempting a DIFFERENT PR does not exempt this one")
+case(create("c") + [bash("ALLOW_UNREVIEWED_REDACTION_PR=1 echo held", tid="x"),
+                    res("x", "held"), say("Asserted with no PR named.")], True,
+     "the env assertion with no resolvable PR number does not exempt")
+case(create("c") + [bash("ALLOW_UNREVIEWED_REDACTION_PR=0 gh pr view 1038 "
+                         "-R o/r --json number", tid="x"),
+                    res("x", '{"number":1038}'), say("Not asserted.")], True,
+     "ALLOW_UNREVIEWED_REDACTION_PR=0 is not an assertion")
+
+
+def _redaction_wording():
+    """The block text must NAME the redaction deferral and both escapes.
+
+    Point 3 of ai-config#1392: enumerating the draft carve-out as though it
+    were exhaustive is what left a correctly-refusing session with no
+    sanctioned way to record why, and the next one liable to comply.
+    """
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in create("c") + [say("Opened it.")]:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        out = subprocess.run(
+            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
+        reason = json.loads(out).get("reason", "") if out.strip() else ""
+        return all(t in reason for t in
+                   ("REDACT", "no-ai-review", "ALLOW_UNREVIEWED_REDACTION_PR=1"))
+    finally:
+        os.unlink(path)
+
+
 def block_of(events):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
@@ -1272,6 +1411,14 @@ def main():
     else:
         print(f"FAIL: sentinel scope wrong "
               f"(first={first} repeat={repeat} other={other})")
+        failures += 1
+
+    if _redaction_wording():
+        print("PASS: the block text names the redaction deferral and both "
+              "escapes")
+        passes += 1
+    else:
+        print("FAIL: the block text does not name the redaction deferral")
         failures += 1
 
     if _push_wording():

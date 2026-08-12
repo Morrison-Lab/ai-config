@@ -69,6 +69,23 @@ Two review rounds read that body without flagging it; it surfaced only when the
 body was re-read against the diff before declaring the PR ready, which is the
 `address-every-comment` check above doing work its own rule did not anticipate.)
 
+## A read SHA can answer a different question
+
+(Morrison-Lab/ai-config#1396, 2026-08-12: the issue body read "Measured
+2026-08-12, `origin/main` at `3f8b2f1`", and `git rev-parse origin/main` had
+never been run.
+`3f8b2f1` came off a `git stash list` line produced seconds earlier ---
+`stash@{1}: WIP on main: 3f8b2f1 Add R-package test/lint/spellcheck
+verification lessons (#205)` --- which names the commit an unrelated stash was
+taken on.
+That commit is dated 2026-06-25, roughly seven weeks before the measurement it
+was being offered as the base for, and it is an ancestor of `origin/main`
+rather than its tip.
+The real tip was `b323a4fc`.
+The body has since been edited to drop the claim, though
+`gh search issues "3f8b2f1" --owner Morrison-Lab` still returns the issue, so
+the search index is what records that the string was there.)
+
 ## The read side of a push-verification comparison can lag
 
 (Morrison-Lab/ai-config#845, 2026-07-29: `git rev-parse HEAD` and
@@ -469,3 +486,33 @@ for --- the shape
 [`fail-fast`](../principles/fail-fast.md) records as "a proxy that answers a
 narrower question passes the same way".
 Had #1358 still been open, merging #1361 would have closed it.)
+
+## A suite whose branch coverage varies by host
+
+(Morrison-Lab/ai-config#1327 / #1395, 2026-08-12: `skills/session-lock`'s
+`is_stale()` tests `session_liveness()` first and consults the heartbeat only
+when liveness reads `unknown`, so which of its three branches a test reaches
+depends on whether the machine running the test has a live `claude` process in
+its ancestry.
+`scripts/test_ai_session.py` ages a session's heartbeat to make it stale, which
+works only on the `unknown` branch.
+
+Measured on a host where it does not.
+`find_agent_pid` returned PID 513 with `comm=claude`, so a registered record
+carries a live PID, `session_liveness()` returns `alive`, and `is_stale()`
+returns not-stale without reading the heartbeat at all.
+Running the pre-change suite there --- `python3 scripts/test_ai_session.py` at
+`e448b8ec` --- printed `4 FAILED`, among them
+`a stale session exits 2, not 1: rc=0`.
+The same file passes in CI, where no such ancestor exists.
+
+So one environment exercised `unknown)`, the other exercised `alive)`, and the
+`dead)` branch --- the one a crashed session actually takes --- was exercised
+by neither.
+Nothing was skipped in either run, so the skip count gave no sign that the two
+runs had traversed different code.
+The **failed** counts did differ, 4 against 0, and that is what surfaced the
+divergence.
+The fix was a case that registers a genuinely dead PID and leaves the heartbeat
+**fresh**, so only the liveness branch can decide it, whatever the host
+supplies.)

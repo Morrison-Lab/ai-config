@@ -775,9 +775,9 @@ Both were quoted as evidence in a PR body.
 - A multi-sentence-line detector tested `line.count('. ') > 1`, which only
   fires at **three** sentences on a line, so every two-sentence line passed.
   It reported 0; the real count was 12.
-- A banned-punctuation scan was written as an inline heredoc, and shell
-  quoting collapsed its character class `'--""''x'` into one string
-  containing ASCII `"`, so it flagged any line with a double quote.
+- A banned-punctuation scan built its character class as `'--""''x'`, which
+  Python reads as two adjacent literals rather than one, so the class
+  silently gained ASCII `"` and flagged any line with a double quote.
   It reported a phantom hit on clean text.
 
 The two failure directions are what make this worth a rule rather than a
@@ -796,8 +796,8 @@ error underneath whatever the regex got wrong, per
 **When a check must be ad hoc, write it to a file rather than an inline
 heredoc.**
 That is right for the stdin-contention entry below.
-It is **not** what fixes the charset collapse above: the cause recorded here
-was wrong, and correcting it changes the remedy.
+It is **not** what fixes the charset collapse above --- a remedy keyed on the
+heredoc would leave that bug exactly where it was.
 
 **The shell is not involved.**
 A quoted heredoc delimiter (`<<'PY'`) suppresses expansion outright, and the

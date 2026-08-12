@@ -214,11 +214,13 @@ instead.
 
 (`Morrison-Lab/ai-config#1398`: a per-fragment size cap was first designed
 as a ratchet, a few hundred bytes above the corpus's then-largest
-auto-loaded fragment. Measured over roughly two hours between filing and
+auto-loaded fragment.
+Measured over roughly two hours between filing and
 implementing, `shared/workflow/ardi.md` grew 87,448 -> 93,326 bytes and
 `shared/principles/fail-fast.md` grew 89,175 -> 91,835 bytes --- so a cap
 pinned to that day's maximum would have gone red within a day on a PR that
-never touched either file. Proposed in `Morrison-Lab/ai-config#1406`: a
+never touched either file.
+Proposed in `Morrison-Lab/ai-config#1406`: a
 round 100,000-byte line with several KB of runway over both, its own
 rationale documented at length in the check's source rather than only
 here --- once merged, the fragment lives at

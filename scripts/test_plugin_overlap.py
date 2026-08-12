@@ -59,6 +59,43 @@ check("a single enabled entry is returned, unrelated plugins ignored",
 check("a disabled (false) entry does not count",
       po.enabled_ai_config_plugins(
           {"enabledPlugins": {"ai-config@Morrison-Lab": False}}) == [])
+
+# --- ai_config_entries: both polarities, unlike the truthy-only helper ------
+
+check("ai_config_entries keeps an explicit false, which the name list drops",
+      po.ai_config_entries(
+          {"enabledPlugins": {"ai-config@Morrison-Lab": False,
+                              "ai-config@d-morrison": True}})
+      == {"ai-config@Morrison-Lab": False, "ai-config@d-morrison": True})
+check("ai_config_entries still ignores non-ai-config names",
+      po.ai_config_entries({"enabledPlugins": {"oss@x": True}}) == {})
+
+# --- resolve_enabled: ASCENDING precedence, last writer wins -----------------
+# The documented order is managed > cli > .claude/settings.local.json >
+# .claude/settings.json > ~/.claude/settings.json, so the USER scope is the
+# lowest. These are the cases that were wrong before ai-config#1417's
+# self-review: a union would have kept the plugin enabled in the first two.
+
+user_on = {"enabledPlugins": {"ai-config@Morrison-Lab": True}}
+local_off = {"enabledPlugins": {"ai-config@Morrison-Lab": False}}
+
+check("a later explicit false clears an earlier true (the documented opt-out)",
+      po.resolve_enabled([user_on, local_off]) == [])
+check("project-enabled then local-disabled resolves to disabled",
+      po.resolve_enabled([{}, user_on, local_off]) == [])
+check("a later true re-enables what an earlier false disabled",
+      po.resolve_enabled([local_off, user_on]) == ["ai-config@Morrison-Lab"])
+check("a scope with no entry does not clear a lower scope's true",
+      po.resolve_enabled([user_on, {"enabledPlugins": {"oss@x": True}}])
+      == ["ai-config@Morrison-Lab"])
+check("resolve_enabled over one scope matches the single-scope helper",
+      po.resolve_enabled([both]) == po.enabled_ai_config_plugins(both))
+check("first-seen order is preserved across scopes",
+      po.resolve_enabled([{"enabledPlugins": {"ai-config@Morrison-Lab": True}},
+                          {"enabledPlugins": {"ai-config@d-morrison": True}}])
+      == ["ai-config@Morrison-Lab", "ai-config@d-morrison"])
+check("no scopes at all resolves to nothing enabled",
+      po.resolve_enabled([]) == [])
 check("a name merely CONTAINING ai-config does not count",
       po.enabled_ai_config_plugins(
           {"enabledPlugins": {"my-ai-config@x": True,
@@ -134,6 +171,21 @@ with tempfile.TemporaryDirectory() as tmp:
           and po.describe_overlap([clean], symlink_install_live=False) == [])
     check("plugin enabled but symlink NOT live -> no stacked-install warning",
           po.describe_overlap([p], symlink_install_live=False) == [])
+
+    # The documented per-user opt-out must NOT be reported as an overlap:
+    # project scope enables, higher-precedence local scope disables.
+    proj = settings_file(tmp, "proj.json", user_on)
+    loc = settings_file(tmp, "local.json", local_off)
+    check("the documented local-scope opt-out reports no overlap",
+          po.describe_overlap([proj, loc], symlink_install_live=True) == [])
+    check("the same two files in the WRONG order would report one "
+          "(so the order is load-bearing, not decorative)",
+          len(po.describe_overlap([loc, proj], symlink_install_live=True)) == 1)
+
+    # An unreadable higher scope must not silently clear a lower one's entry.
+    check("a missing project file does not clear a user-scope true",
+          len(po.describe_overlap([proj, tmp / "absent.json"],
+                                  symlink_install_live=True)) == 1)
 
     # No readable file is reported as unexamined, never as clean.
     lines = po.describe_overlap([tmp / "absent.json"], symlink_install_live=True)

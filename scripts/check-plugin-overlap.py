@@ -12,15 +12,19 @@ design: it always exits 0, because an overlap is a configuration to tidy
 rather than a build failure, and a blocking form would break `bootstrap.sh`
 on exactly the machines it is trying to help.
 
-Settings files examined:
+Settings files examined, in ASCENDING precedence order (later wins), which
+is the order `describe_overlap` requires:
 
-  * `<consumer-dir>/settings.json` and `settings.local.json` -- the user
-    scope, where `/plugin install` writes its `enabledPlugins` entry;
-  * `./.claude/settings.json` and `settings.local.json` under the current
-    working directory -- the project scope, where a consumer repo's
-    checked-in marketplace block lives (the sparta case in ai-config#1409).
+  1. `<consumer-dir>/settings.json` -- the user scope, and the LOWEST of the
+     four, where `/plugin install` writes its `enabledPlugins` entry;
+  2. `<consumer-dir>/settings.local.json` -- not one of the four documented
+     scopes, but present on some machines; ranked just above user;
+  3. `./.claude/settings.json` -- the project scope, where a consumer repo's
+     checked-in marketplace block lives (the sparta case in ai-config#1409);
+  4. `./.claude/settings.local.json` -- the local scope, highest of these,
+     and the file a per-user opt-out belongs in.
 
-Claude Code also merges an enterprise scope this script does not look for;
+Claude Code also merges an enterprise managed scope this script cannot read;
 per the library's docstring that blind spot under-reports rather than
 inventing an overlap, and the output names the files actually read.
 """
@@ -84,6 +88,9 @@ def main() -> int:
     repo_root = Path(args.repo_root).resolve()
     project = Path(args.project_dir).resolve()
 
+    # Ascending precedence: later files override earlier ones. See the module
+    # docstring -- the user scope is the lowest, which is the counterintuitive
+    # part and the reason this list is ordered rather than merely collected.
     paths = [
         consumer_dir / "settings.json",
         consumer_dir / "settings.local.json",

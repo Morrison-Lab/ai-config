@@ -166,9 +166,29 @@ run it standalone any time to re-check a machine.
 
 A consumer repo's checked-in `.claude/settings.json` marketplace block (the
 JSON above) is correct for a teammate cloning fresh with no ai-config
-checkout, and redundant for anyone who ran `bootstrap.sh` --- the latter group
-can override it by setting `"ai-config@Morrison-Lab": false` in their own
-`~/.claude/settings.json` or the repo's `.claude/settings.local.json`.
+checkout, and redundant for anyone who ran `bootstrap.sh`.
+The latter group opts out in **`.claude/settings.local.json`**, not in
+`~/.claude/settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "ai-config@Morrison-Lab": false
+  }
+}
+```
+
+The file matters, and the intuitive choice is the wrong one.
+Claude Code resolves settings
+managed > command line > `.claude/settings.local.json` > `.claude/settings.json` > `~/.claude/settings.json`,
+so the **user** scope is the lowest of the four rather than a personal
+override --- a `false` there loses to the repo's checked-in `true`.
+`enabledPlugins` resolves by precedence rather than by union, so the `false`
+in the local file does switch the plugin off.
+(See [Claude Code settings](https://code.claude.com/docs/en/settings),
+"How scopes interact" and `enabledPlugins`; read 2026-08-12.
+A plugin force-enabled by enterprise managed settings cannot be disabled this
+way at all.)
 
 ## Use these skills with this repo's own `@claude` bot
 

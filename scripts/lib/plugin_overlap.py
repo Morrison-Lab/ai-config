@@ -33,13 +33,30 @@ file was read", because those call for opposite responses.
 
 ## Scope, stated rather than implied
 
-This inspects the settings files it is handed and no others. Claude Code
-merges enterprise, user, project, and local settings, so a plugin enabled in
-a **project** `.claude/settings.json` is invisible to a caller that passes
-only `~/.claude/settings.json`. That is a real blind spot and it fails in the
-safe direction: the check under-reports an overlap rather than inventing one.
-`describe_overlap` names the files it read so the gap is visible in the
-output instead of being a property a reader has to know.
+This inspects the settings files it is handed and no others, and it resolves
+them by Claude Code's documented precedence, which is easy to get backwards:
+
+    managed (enterprise) > command line > .claude/settings.local.json
+      > .claude/settings.json > ~/.claude/settings.json
+
+So the **user** scope is the LOWEST of the four, not a personal override of
+the repo. Setting a plugin to `false` in `~/.claude/settings.json` does not
+switch off one a checked-in `.claude/settings.json` enables; the per-user
+opt-out is `.claude/settings.local.json`.
+(<https://code.claude.com/docs/en/settings>, "How scopes interact" and
+`enabledPlugins`; read 2026-08-12.)
+
+`enabledPlugins` resolves by precedence rather than by union, so
+`resolve_enabled` treats a later explicit `false` as clearing an earlier
+`true`. Without that, this module would report an overlap for exactly the
+opt-out this repo's own README recommends.
+
+**Managed settings are not readable here.** A plugin force-enabled by
+enterprise managed settings cannot be switched off in `settings.local.json`
+at all, and this check cannot see it -- so it under-reports rather than
+inventing an overlap, which is the safe direction. `describe_overlap` names
+the files it read so the gap is visible in the output instead of being a
+property a reader has to know.
 """
 from __future__ import annotations
 
@@ -67,27 +84,64 @@ def load_settings(path: Path) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def enabled_ai_config_plugins(settings: dict) -> list[str]:
-    """Return every truthy `ai-config@*` entry in this settings dict.
+def ai_config_entries(settings: dict) -> dict[str, bool]:
+    """Return every `ai-config@*` entry in this settings dict, value included.
 
-    A list rather than a single name, deliberately: the marketplace collision
-    above is invisible to any caller that stops at the first match, and that
-    collision is one of the two defects this module reports. Order follows
-    `enabledPlugins` insertion order so the output is stable across runs.
+    Both polarities, deliberately. An explicit `false` is not the same as no
+    entry at all: Claude Code resolves `enabledPlugins` by scope precedence
+    rather than by unioning, so a `false` in a higher-precedence scope really
+    does switch off a plugin a lower one enabled. A helper that returned only
+    the truthy names could not express that, and would report an overlap for
+    the exact opt-out this repo's own README recommends.
+
+    Order follows `enabledPlugins` insertion order so output is stable.
+    """
+    plugins = settings.get("enabledPlugins")
+    if not isinstance(plugins, dict):
+        return {}
+    return {name: bool(on) for name, on in plugins.items()
+            if name.split("@", 1)[0] == PLUGIN_NAME}
+
+
+def enabled_ai_config_plugins(settings: dict) -> list[str]:
+    """Return every truthy `ai-config@*` entry in this single settings dict.
+
+    Single-scope convenience over `ai_config_entries`, kept for callers that
+    genuinely only read one file (`install-hooks.py`). For a precedence-aware
+    answer across scopes, fold with `resolve_enabled` instead.
 
     No false positives -- an entry only counts when it is truthy *and* its
     name before `@` is exactly `ai-config`.
     """
-    plugins = settings.get("enabledPlugins")
-    if not isinstance(plugins, dict):
-        return []
-    return [name for name, on in plugins.items()
-            if on and name.split("@", 1)[0] == PLUGIN_NAME]
+    return [name for name, on in ai_config_entries(settings).items() if on]
+
+
+def resolve_enabled(scopes: list[dict]) -> list[str]:
+    """Fold per-scope entries into the names that end up enabled.
+
+    `scopes` must be ordered by ASCENDING precedence, so a later dict wins.
+    Last writer per plugin name, matching Claude Code's documented order
+    (user < project < project-local); an explicit `false` late in the list
+    therefore clears an earlier `true`.
+
+    Names keep the order in which they were first seen, so a report over two
+    colliding marketplaces lists them the way the files do.
+    """
+    state: dict[str, bool] = {}
+    for settings in scopes:
+        for name, on in ai_config_entries(settings).items():
+            state[name] = on
+    return [name for name, on in state.items() if on]
 
 
 def describe_overlap(settings_paths: list[Path], *, symlink_install_live: bool,
                      ) -> list[str]:
     """Return advisory lines about stacked installs; empty when there are none.
+
+    `settings_paths` must be ordered by ASCENDING precedence -- see
+    `resolve_enabled`, which does the folding. Unreadable paths are skipped
+    rather than treated as empty scopes, so a missing project file cannot
+    clear a user-scope entry.
 
     `symlink_install_live` is the caller's answer to "does the consumer
     directory already serve these skills under their bare names", since only
@@ -100,16 +154,16 @@ def describe_overlap(settings_paths: list[Path], *, symlink_install_live: bool,
     """
     lines: list[str] = []
     read: list[Path] = []
-    enabled: list[str] = []
+    scopes: list[dict] = []
 
     for path in settings_paths:
         settings = load_settings(path)
         if settings is None:
             continue
         read.append(path)
-        for name in enabled_ai_config_plugins(settings):
-            if name not in enabled:
-                enabled.append(name)
+        scopes.append(settings)
+
+    enabled = resolve_enabled(scopes)
 
     if not read:
         # Distinguishable from "checked and clean" on purpose. Reported by the

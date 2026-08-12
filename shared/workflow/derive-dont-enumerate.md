@@ -129,6 +129,40 @@ Its PR body closed with "No other PR of mine is open, so there is no merge-order
 Ten PRs were open at merge time, eight of them under the same account.
 The post-merge sweep derived each one's file set against its own merge base and found 0 of 10 touching `shared/writing/ambiguous-reference.md` --- so the conclusion held and its stated reason did not.)
 
+## A qualifier clause is a second figure, measured somewhere else
+
+The section above governs a population nobody counted.
+This governs one that *was* counted, correctly, for the figure it was counted for --- alongside a second figure in the same sentence that was measured somewhere else.
+
+A total usually arrives with a qualifier attached: "ten open, eight of them under the same account", "forty files changed, six of them generated".
+The qualifier reads as a decomposition of the total, because that is what the grammar says, and nothing in the sentence tells a reader that the subset came from a different query than the total did.
+
+**Deriving one number in a sentence discharges the feeling of having derived the sentence.**
+That is the whole mechanism.
+The total is the figure the claim was about, so it gets the query, the timestamp, and the care.
+The qualifier is a detail added while writing, so it gets whichever number is nearest to hand --- and that number is frequently a real one, correctly derived, against a population that has since moved.
+
+Both figures are then individually defensible, which is why re-reading finds nothing.
+Only asking **which population each was measured in** separates them.
+
+[`ardi`](ardi.md)'s pre-push checklist already carries the nearest rule, requiring every number in a PR body to be re-derived by command and stating that "a base figure owes its own derivation rather than riding on the delta's".
+Read that rather than re-deriving it here.
+Two things differ.
+That rule is scoped to the **PR body**, the artifact nothing re-measures, whereas a subset figure in a shared fragment ships as prose and is read long after the tracker state it described.
+And base-versus-delta is one instance of a general shape: any two figures in one sentence can name different populations, whatever their arithmetic relationship looks like.
+
+- **Do:** run a separate query for a subset figure, and name the moment both figures were measured at.
+- **Do:** treat a qualifier clause as a second claim owing its own derivation, rather than as a decomposition of the figure it follows.
+- **Don't:** carry a subset count measured at one moment into a sentence whose total names another --- the two populations differ by whatever moved in between.
+- **Don't:** read "I derived the number in this sentence" as covering the sentence; the figure you derived is the one you were thinking about.
+
+(Morrison-Lab/ai-config#1437, 2026-08-12, review finding 1.
+The case record directly above shipped reading "Ten PRs were open at merge time, seven of them under the same account", and now reads "eight of them".
+The total was derived against #1435's merge instant, `21:50:27Z`, and was right.
+The subset was not: at that instant `d-morrison` held eight of the ten (#1393, #1411, #1413, #1417, #1420, #1421, #1422, #1436), with `claude[bot]` holding #1427 and #1434.
+Seven is the same-account count of a **different** population --- the nine PRs left after #1436 merged at `21:54:09Z`, four minutes later --- so it was a real figure, correctly derived, about a moment the sentence was not describing.
+Re-derived here from `list_pull_requests` over `created_at`/`closed_at` rather than from the reviewer's own number, per [`metacognitive-monitoring`](metacognitive-monitoring.md)'s rule that a finding's conclusion is the sound half and its particulars are not.)
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

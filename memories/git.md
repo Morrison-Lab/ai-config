@@ -237,28 +237,6 @@ by #328.)
   review correctly re-flagged it as unaddressed after an incorrect "addressed"
   reply.)
 
-## Git stash — verify supersession line-by-line, tag before dropping
-- Before dropping a stash as "already landed", verify against `origin/main`,
-  not by eyeball: extract the stash's added lines
-  (`git stash show -p 'stash@{0}' | grep '^+[^+]'` — the `[^+]` keeps the
-  `+++ b/<path>` diff headers out of the set, where they'd read as spurious
-  "missing from main" lines) and `grep -F` each one in
-  main's version of the file; for files the stash *creates*, check
-  `git cat-file -e origin/main:<path>`. A line that matches on topic but not
-  verbatim usually means main carries the **improved** review-cycle revision —
-  read both and confirm main's is a superset before calling it superseded.
-- `git stash show -p` **omits the untracked-files component.** Check
-  `git show 'stash@{0}^3'` (that parent exists only if the stash was made with
-  `-u`) before judging supersession.
-- `git stash drop` is irreversible, and Claude Code's auto-mode classifier
-  blocks it for exactly that reason — sometimes even after a general "do the
-  cleanup" go-ahead, when the stash is large. Don't fight it: run
-  `git tag backup/stash-<topic> 'stash@{0}'` first. The stash commit stays
-  reachable, the drop becomes genuinely reversible (recover with
-  `git stash apply backup/stash-<topic>`), and the retried drop passes. Tell
-  the user the tag exists; remove it with `git tag -d backup/stash-<topic>`
-  once confident.
-
 ## Windows/Git Bash: `core.fileMode=false` silently blocks executable-bit fixes
 
 On a Windows checkout with `core.fileMode=false` (common, since NTFS has no

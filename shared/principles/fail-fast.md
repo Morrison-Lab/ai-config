@@ -591,7 +591,7 @@ So one flaw is self-reporting in the first role and silent in the second.
 **The tighter guard over-corrects, and what it loses is invisible to the check
 that would look for it.**
 `grep '^+[^+]'` drops the header in a single pass, and
-[`memories/git.md`](../../memories/git.md)'s stash-supersession bullet uses it
+[`memories/git-stash.md`](../../memories/git-stash.md)'s supersession bullet uses it
 correctly --- there each added line is grepped for in `main`, so a blank line is
 noise.
 Reuse it on prose and it silently drops every added **blank** line, collapsing

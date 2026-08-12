@@ -544,25 +544,26 @@ silently overwriting them, since the review thread refers to them.)
 against `d-morrison/rpt` covered a `\docType{package}` topic, the singular
 form of a missing-topic warning, and the documented "existing settings files
 do not pick this up automatically" caveat --- confirmed by the page
-generating while `grep -c reference.html docs/index.html` returned `0`. None
-of the three were reachable from the repo's own fixture packages.)
+generating while `grep -c reference.html docs/index.html` returned `0`.
+None of the three were reachable from the repo's own fixture packages.)
 
 ## An instruction's own suggested code breaking a project convention
 
 (d-morrison/altdoc#73: the issue proposed ending a function with a bare
 trailing `hashes`, which reads as a fix for the fragility it names but is
 still an implicit return, so a statement added after it silently becomes
-the return value. The lab manual asks for an explicit `return()`
-regardless. Review caught it; the project's own stated convention would
-have, one step earlier.)
+the return value.
+The lab manual asks for an explicit `return()` regardless.
+Review caught it; the project's own stated convention would have, one step
+earlier.)
 
 ## A staging step the unit fixtures could not reach
 
 (d-morrison/altdoc#76: a guard checked for the copied logo under `docs/`,
 but the `quarto_website` path stages into `_quarto/` first, so the logo
-line was dropped on every render of the one generator the feature wired
-up. Seventeen unit assertions passed throughout; one throwaway render
-found it immediately.)
+line was dropped on every render of the one generator the feature wired up.
+Seventeen unit assertions passed throughout; one throwaway render found it
+immediately.)
 
 ## A mechanism claim whose population held no true positive
 

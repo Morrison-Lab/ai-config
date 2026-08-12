@@ -73,6 +73,11 @@ def dead_pid(bash):
     # `pid N is not a child of this shell`, rc 127.
     # (Measured 2026-08-12 in this container; PID 1 is `process_api`.)
     spawn = "sleep 30 & p=$!; kill $p 2>/dev/null; wait $p 2>/dev/null; echo $p"
+    # The retry loop is not dead code even though `wait` reaps synchronously.
+    # A PID freed by that reap can be reused before the check below runs, so
+    # `kill -0` would then succeed on an unrelated process.
+    # Retrying with a fresh PID is the cheapest way past that, and exhausting
+    # the bound raises rather than returning a live one.
     for _ in range(20):
         p = subprocess.run([bash, "-c", spawn],
                            capture_output=True, text=True, check=True)

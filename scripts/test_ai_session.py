@@ -39,6 +39,46 @@ def check(ok, label, detail=""):
         failures.append(f"{label}{(': ' + detail) if detail else ''}")
 
 
+def rewrite_record(path, **fields):
+    """Rewrite named `key=value` lines in a session record, in place.
+
+    Only keys already present are rewritten; the rest of the record is
+    preserved byte for byte apart from newline normalization.
+    """
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    out = []
+    for line in text.splitlines():
+        key = line.split("=", 1)[0]
+        out.append(f"{key}={fields[key]}" if key in fields else line)
+    path.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
+
+
+def dead_pid(bash):
+    """Return a PID that is reliably dead, by ai-session.sh's own test.
+
+    `session_liveness()` decides deadness with `kill -0`, so this asks the
+    same shell the script runs under, rather than a Python-side proxy: an
+    `os.kill` from this process cannot see a PID owned by another user, and
+    would report it dead when the script would call it alive.
+    """
+    # Spawn, kill, and `wait` inside ONE shell, so the child is reaped by the
+    # parent that owns it. Letting it exit on its own and reaping from a second
+    # shell does not work: that shell never owned the child, so `wait` is a
+    # no-op, and an orphan reparented to a PID 1 that does not reap stays a
+    # zombie -- whose process-table entry keeps `kill -0` returning 0.
+    spawn = "sleep 30 & p=$!; kill $p 2>/dev/null; wait $p 2>/dev/null; echo $p"
+    for _ in range(20):
+        p = subprocess.run([bash, "-c", spawn],
+                           capture_output=True, text=True, check=True)
+        pid = p.stdout.strip()
+        # Confirm a fresh shell agrees the PID is gone.
+        gone = subprocess.run([bash, "-c", f"kill -0 {pid} 2>/dev/null"],
+                              capture_output=True)
+        if gone.returncode != 0:
+            return pid
+    raise RuntimeError("could not obtain a reliably dead PID")
+
+
 def main() -> int:
     import tempfile
 
@@ -94,38 +134,71 @@ def main() -> int:
               "AI_SESSION_ID resolves the same grant as --id",
               f"rc={p_env.returncode} out={p_env.stdout.strip()}")
 
-        # 4. Age the heartbeat past the stale threshold. The grant is no longer
-        #    honourable -- but asking must NOT destroy it, and must say which of
-        #    the two non-active states this is.
-        text = sess.read_text(encoding="utf-8")
         old = str(int(time.time()) - 99999)
-        sess.write_text(
-            "\n".join(
-                f"heartbeat={old}" if l.startswith("heartbeat=") else
-                (f"started={old}" if l.startswith("started=") else l)
-                for l in text.splitlines()) + "\n",
-            encoding="utf-8", newline="\n")
+
+        # `is_stale()` reaches its verdict two ways, and each needs its own case
+        # or one of them never runs. It tests liveness FIRST -- a dead PID on
+        # this host is stale outright -- and consults the heartbeat only when
+        # liveness is `unknown`. Ageing the heartbeat while the recorded PID is
+        # a live process therefore proves nothing: the record is registered by
+        # whatever agent process runs the suite, so on a machine with a live
+        # `claude` ancestor the dead branch short-circuits and the aged
+        # heartbeat is never read (ai-config#1327).
+
+        # 4. A crashed session: the recorded PID is dead, and the heartbeat is
+        #    deliberately left FRESH, so only the liveness branch can make this
+        #    stale. The grant is no longer honourable -- but asking must NOT
+        #    destroy it, and must say which of the two non-active states it is.
+        rewrite_record(sess, pid=dead_pid(bash))
 
         p = run("check-mwc", "--id", sid)
-        check(p.returncode == 2, "a stale session exits 2, not 1",
+        check(p.returncode == 2, "a dead-PID session exits 2, not 1",
               f"rc={p.returncode}")
-        check("stale" in p.stdout or "dead" in p.stdout,
-              "a stale session says the session is the problem", p.stdout.strip())
+        check("reads dead" in p.stdout,
+              "a dead-PID session names the PID as the problem", p.stdout.strip())
         check("no grant recorded" not in p.stdout,
-              "a stale session is NOT reported as an absent grant", p.stdout.strip())
+              "a dead-PID session is NOT reported as an absent grant",
+              p.stdout.strip())
         check(marker.is_file(),
               "KEY: asking does not delete the marker (query stays read-only)")
         check("heartbeat" in p.stdout,
-              "a stale session names the recovery command", p.stdout.strip())
+              "a dead-PID session names the recovery command", p.stdout.strip())
 
-        # 5. Recovery: a heartbeat restores the grant, because step 4 kept it.
+        # 5. A session whose liveness cannot be judged -- no recorded PID, as a
+        #    record written where no agent process was found, or one carried in
+        #    from another host. Here the aged heartbeat is the only thing that
+        #    can make it stale, so this is the branch that runs in CI.
+        rewrite_record(sess, pid="", heartbeat=old, started=old)
+
+        p = run("check-mwc", "--id", sid)
+        check(p.returncode == 2, "an aged-heartbeat session exits 2, not 1",
+              f"rc={p.returncode}")
+        check("reads unknown" in p.stdout,
+              "an aged-heartbeat session says liveness is unknown", p.stdout.strip())
+        check("no grant recorded" not in p.stdout,
+              "an aged-heartbeat session is NOT reported as an absent grant",
+              p.stdout.strip())
+        check(marker.is_file(),
+              "KEY: an aged-heartbeat read does not delete the marker either")
+
+        # 6. Recovery: a heartbeat restores the grant, because step 5 kept it.
         run("heartbeat", "--id", sid)
         p = run("check-mwc", "--id", sid)
         check(p.returncode == 0,
               "KEY: a heartbeat restores the grant a stale read did not destroy",
               f"rc={p.returncode} out={p.stdout.strip()}")
 
-        # 6. Marker with no session record is its own state, also exit 2.
+        # 7. Liveness outranks the heartbeat, and this is the direction the two
+        #    cases above cannot pin: a live PID with a long-expired heartbeat is
+        #    NOT stale. Without it, collapsing `is_stale()` to the heartbeat
+        #    alone would still pass every other case here.
+        rewrite_record(sess, pid=str(os.getpid()), heartbeat=old, started=old)
+        p = run("check-mwc", "--id", sid)
+        check(p.returncode == 0,
+              "KEY: a live PID keeps the grant despite an expired heartbeat",
+              f"rc={p.returncode} out={p.stdout.strip()}")
+
+        # 8. Marker with no session record is its own state, also exit 2.
         # Re-established from scratch rather than inherited from step 5, so a
         # regression earlier in the file cannot truncate the run and steal the
         # attribution for what follows.
@@ -138,7 +211,7 @@ def main() -> int:
         check("no session record" in p.stdout,
               "grant with no session record says so", p.stdout.strip())
 
-        # 7. disable-mwc really does remove it -- the query being read-only must
+        # 9. disable-mwc really does remove it -- the query being read-only must
         #    not have made revocation impossible.
         run("register", "--id", sid)
         run("enable-mwc", "--id", sid)
@@ -147,21 +220,17 @@ def main() -> int:
         check(run("check-mwc", "--id", sid).returncode == 1,
               "after disable-mwc the grant is gone")
 
-        # 8. prune still sweeps a stale session's marker, so a genuinely dead
-        #    session's grant does not linger forever.
+        # 10. prune still sweeps a stale session's marker, so a genuinely dead
+        #     session's grant does not linger forever. A dead PID makes this
+        #     stale on any host, where ageing the heartbeat alone leaves it to
+        #     whether the suite's own registration found a live agent process.
         run("register", "--id", sid)
         run("enable-mwc", "--id", sid)
-        text = sess.read_text(encoding="utf-8") if sess.exists() else ""
-        sess.write_text(
-            "\n".join(
-                f"heartbeat={old}" if l.startswith("heartbeat=") else
-                (f"started={old}" if l.startswith("started=") else l)
-                for l in text.splitlines()) + "\n",
-            encoding="utf-8", newline="\n")
+        rewrite_record(sess, pid=dead_pid(bash))
         run("prune")
         check(not marker.exists(), "prune sweeps a stale session's marker")
 
-        # 9. A record that reached the registry with CRLF endings must still
+        # 11. A record that reached the registry with CRLF endings must still
         #    parse. `heartbeat=<n>\r` used to reach is_stale's arithmetic and
         #    raise "invalid arithmetic operator", which under `set -e` killed
         #    check-mwc mid-check -- so it exited 1, the code for "no grant

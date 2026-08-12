@@ -604,8 +604,8 @@ hypothesis in front of you, so name the generator before crediting it.
 
 ## A symptom that both a mechanism and its opposite predict is evidence for neither
 
-The two sections above complete a pair, and this is the third case they leave
-open.
+The two sections above are a pair, and this is the case they leave between
+them.
 "Search for the artifact" governs a question you answered by reasoning because
 you observed nothing.
 "Ask whether a candidate can produce the effect" governs a candidate a free
@@ -636,9 +636,10 @@ No test exercises a comment, so nothing in the suite can contradict it; and it
 reads as settled precisely because it successfully explains code that works,
 which is the one property a false mechanism shares with a true one whenever
 both predict the same behaviour.
-`fact-check-prose`'s design-choice rule asks whether the code implements what
-the prose claims, which is a different question and passes here: the code does
-exactly what the comment says it does, for a reason the comment gets wrong.
+[`fact-check-prose`](../writing/fact-check-prose.md)'s design-choice rule asks
+whether the code implements what the prose claims, which is a different
+question and passes here: the code does exactly what the comment says it does,
+for a reason the comment gets wrong.
 
 **Mutation is the remedy for the neighbouring case and is unavailable for this
 one.**

@@ -637,6 +637,10 @@ web/cloud session, and gha's `use-ai-config` input for the bots.
 That path has a failure mode the submodule path does not, and it is worth
 knowing because the obvious diagnosis is the wrong one.
 
+For how an `enabledPlugins` entry resolves when more than one settings scope
+names the same plugin, see
+[`claude-code-settings.md`](claude-code-settings.md).
+
 A plugin is installed as `<plugin>@<marketplace>`, and `<marketplace>` must
 match the `name` field the marketplace declares in its own
 `.claude-plugin/marketplace.json`.

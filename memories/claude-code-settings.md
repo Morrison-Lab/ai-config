@@ -1,0 +1,87 @@
+# Claude Code settings scopes and `enabledPlugins`
+
+How Claude Code resolves a setting that appears in more than one
+`settings.json`, and what that means for enabling or disabling a plugin.
+
+Satellite of [`claude-code.md`](claude-code.md), which covers the harness
+itself and the marketplace-name half of plugin installation; the scope and
+precedence rules live here.
+
+## The user scope is the LOWEST, so `~/.claude/settings.json` cannot override a repo's checked-in settings
+
+**The belief that was wrong:** that `~/.claude/settings.json` acts as a
+personal override *over* a repo's checked-in `.claude/settings.json`, so a
+user could opt out of a project-enabled plugin by writing
+`"<plugin>@<marketplace>": false` into their own user settings.
+
+**The fact that replaced it:** user settings are the **lowest** of the five
+scopes, so a `false` there loses to the project's `true`.
+The per-user opt-out for a project-enabled plugin is
+`.claude/settings.local.json`.
+
+The documented ladder, highest precedence to lowest:
+
+1. **Managed** (highest): can't be overridden by any other scope, apart from
+   the exceptions under Settings precedence
+2. **Command line arguments**: temporary session overrides
+3. **Local**: overrides project and user settings
+4. **Project**: overrides user settings
+5. **User** (lowest): applies when nothing else specifies the setting
+
+By file, that is
+`managed-settings.json` > command line > `.claude/settings.local.json` >
+`.claude/settings.json` > `~/.claude/settings.json`.
+
+The `enabledPlugins` docs state the consequence outright:
+
+> Project settings take precedence over user settings, so setting a plugin to
+> `false` in `~/.claude/settings.json` does not disable a plugin that the
+> project's `.claude/settings.json` enables.
+> To opt out of a project-enabled plugin on your machine, set it to `false` in
+> `.claude/settings.local.json` instead.
+
+Three facts follow from the same source, and each is easy to get backwards:
+
+- **`enabledPlugins` resolves by scope precedence, not by taking the union of
+  the enabled names across scopes.**
+  An explicit `false` in a higher scope genuinely disables a plugin a lower
+  scope enabled, so any tooling that unions truthy plugin names across
+  settings files reports a plugin as enabled when it is not.
+- **A plugin force-enabled by managed settings cannot be disabled this way at
+  all**: "Plugins force-enabled by managed settings cannot be disabled this
+  way, since managed settings override local settings."
+  Managed settings can also block a plugin at every scope and hide it from the
+  marketplace.
+- **An entry at any scope beats the plugin's own `defaultEnabled`, and it
+  sticks.**
+  "A plugin with no entry at any scope falls back to its `defaultEnabled`
+  value", and once an entry is written it "persists across plugin updates and
+  reinstalls, so changing `defaultEnabled` in a later release does not flip an
+  existing user."
+
+Two adjacent details worth not confusing with the above.
+Permission rules are the documented exception to the ladder, because they
+"merge across scopes rather than override".
+And `pluginConfigs` is the one plugin key that ignores project and local
+settings outright, which does **not** generalize to `enabledPlugins`: the same
+paragraph says `enabledPlugins` "still honors project and local settings".
+
+- **Do:** put a per-user plugin opt-out in `.claude/settings.local.json`, and
+  read the ladder as user-lowest.
+- **Do:** resolve a plugin's state by taking the highest scope that names it,
+  and treat an explicit `false` there as final.
+- **Don't:** expect `~/.claude/settings.json` to override a repo's checked-in
+  `.claude/settings.json` --- for `enabledPlugins` or for any other
+  precedence-resolved setting.
+- **Don't:** union enabled plugin names across scopes; that turns a
+  higher-scope `false` into a spurious `true`.
+
+(Read 2026-08-12 from <https://code.claude.com/docs/en/settings>, sections
+"How scopes interact" and `enabledPlugins`, and
+<https://code.claude.com/docs/en/plugins-reference>, "Default enablement".
+Third-party platform behaviour changes, so re-read rather than trusting this
+snapshot.
+The `.md` source of a docs page, e.g.
+`https://code.claude.com/docs/en/settings.md`, fetches in full where `WebFetch`
+on the rendered page truncates the settings table before reaching
+`enabledPlugins`.)

@@ -139,11 +139,14 @@ def main() -> int:
         # `is_stale()` reaches its verdict two ways, and each needs its own case
         # or one of them never runs. It tests liveness FIRST -- a dead PID on
         # this host is stale outright -- and consults the heartbeat only when
-        # liveness is `unknown`. Ageing the heartbeat while the recorded PID is
-        # a live process therefore proves nothing: the record is registered by
-        # whatever agent process runs the suite, so on a machine with a live
-        # `claude` ancestor the dead branch short-circuits and the aged
-        # heartbeat is never read (ai-config#1327).
+        # liveness is `unknown`. So ageing the heartbeat is not a portable way
+        # to make a session stale: the record carries whatever PID
+        # `find_agent_pid()` found, and on a host with a live `claude` ancestor
+        # that is a live PID, so `alive)` returns "not stale" and the aged
+        # heartbeat is never read. Measured: the pre-change suite passes in CI,
+        # where no such ancestor exists and the `unknown` branch runs, and fails
+        # four checks here with rc=0 where one does. The `dead)` branch ran in
+        # neither, which is what step 4 below adds (ai-config#1327).
 
         # 4. A crashed session: the recorded PID is dead, and the heartbeat is
         #    deliberately left FRESH, so only the liveness branch can make this

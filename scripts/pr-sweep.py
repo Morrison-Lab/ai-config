@@ -89,7 +89,7 @@ query($owner:String!, $name:String!, $first:Int!) {
       nodes {
         number title url isDraft updatedAt
         author { login }
-        files(first:1) { totalCount }
+        files(first:100) { totalCount nodes { path } }
         reviewThreads(first:100) { totalCount nodes { isResolved } }
         reviews(last:40) {
           nodes { author { login } state body submittedAt comments(first:1) { totalCount } }
@@ -114,6 +114,12 @@ def parse_time(value):
     if not value:
         return None
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def pr_files(pr):
+    """List of file paths changed in this PR (up to 100)."""
+    nodes = (pr.get("files") or {}).get("nodes") or []
+    return [n.get("path") for n in nodes if isinstance(n, dict) and n.get("path")]
 
 
 def head_commit(pr):
@@ -275,6 +281,8 @@ def classify(pr, now, stale_minutes):
         bucket = "stalled"
     else:
         bucket = "in-flight"
+    file_paths = pr_files(pr)
+    file_count = (pr.get("files") or {}).get("totalCount", len(file_paths))
     return {
         "number": pr.get("number"),
         "title": pr.get("title"),
@@ -282,9 +290,25 @@ def classify(pr, now, stale_minutes):
         "author": (pr.get("author") or {}).get("login"),
         "isDraft": pr.get("isDraft", False),
         "idle_minutes": round(idle, 1),
+        "file_count": file_count,
+        "files": file_paths,
         "reasons": reasons,
         "bucket": bucket,
     }
+
+
+def format_files_line(pr):
+    """Format file count and paths for display in text output."""
+    files = pr.get("files") or []
+    count = pr.get("file_count", len(files))
+    if not files and count == 0:
+        return None
+    file_list = ", ".join(files[:5])
+    if len(files) > 5:
+        file_list += f", ... (+{len(files) - 5} more)"
+    elif count > len(files):
+        file_list += f", ... (+{count - len(files)} more)"
+    return f"            files ({count}): {file_list}"
 
 
 def fetch(repo, limit):
@@ -367,11 +391,17 @@ def render(result, stale_minutes, now):
             f"{'; '.join(pr['reasons'])}"
         )
         lines.append(f"            {pr['title'][:88]}")
+        fl = format_files_line(pr)
+        if fl:
+            lines.append(fl)
     for pr in buckets["in-flight"]:
         lines.append(
             f"  in-flight #{pr['number']}  idle {pr['idle_minutes']:>6.1f}m  "
             f"{'; '.join(pr['reasons'])}"
         )
+        fl = format_files_line(pr)
+        if fl:
+            lines.append(fl)
     if buckets["clean"]:
         nums = ", ".join(f"#{p['number']}" for p in buckets["clean"])
         lines.append(f"  clean     {nums}")

@@ -60,6 +60,13 @@ def make_pr(
     draft=False,
 ):
     """Build a PR node matching the GraphQL payload shape."""
+    if isinstance(files, int):
+        file_nodes = [{"path": f"file{i + 1}.txt"} for i in range(files)]
+        file_count = files
+    else:
+        file_nodes = [{"path": f} for f in files]
+        file_count = len(files)
+
     return {
         "number": number,
         "title": f"PR {number}",
@@ -67,7 +74,10 @@ def make_pr(
         "isDraft": draft,
         "updatedAt": stamp(updated_minutes_ago),
         "author": {"login": "someone"},
-        "files": {"totalCount": files},
+        "files": {
+            "totalCount": file_count,
+            "nodes": file_nodes,
+        },
         "reviewThreads": {
             "totalCount": len(threads),
             "nodes": [{"isResolved": r} for r in threads],
@@ -353,6 +363,41 @@ check(
     "a draft with an empty diff would be flagged if examined",
     "empty-diff" in pr_sweep.findings_for(make_pr(files=0, draft=True,
                                                   reviews=[REAL_REVIEW])),
+)
+
+# --- 8. File set reporting ------------------------------------------------
+file_pr = make_pr(
+    number=30,
+    files=["scripts/pr-sweep.py", "scripts/test_pr_sweep.py"],
+    reviews=[REAL_REVIEW],
+)
+check(
+    "pr_files extracts file path list from PR node",
+    pr_sweep.pr_files(file_pr) == ["scripts/pr-sweep.py", "scripts/test_pr_sweep.py"],
+)
+
+classified = pr_sweep.classify(FINDINGS_PR_STALE, NOW, 30)
+check(
+    "classify includes file_count and files in classified dict",
+    classified.get("file_count") == 3
+    and classified.get("files") == ["file1.txt", "file2.txt", "file3.txt"],
+)
+
+stalled_rendered = pr_sweep.render(
+    {
+        "repo": "o/r",
+        "open_total": 1,
+        "returned": 1,
+        "drafts_skipped": 0,
+        "examined": 1,
+        "prs": [pr_sweep.classify(make_pr(number=40, updated_minutes_ago=90, files=["a.md", "b.md"]), NOW, 30)],
+    },
+    30,
+    NOW,
+)
+check(
+    "render formats changed files line for stalled PRs",
+    "files (2): a.md, b.md" in stalled_rendered,
 )
 
 print(f"\n{passes} passed, {failures} failed")

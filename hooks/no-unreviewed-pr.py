@@ -1656,12 +1656,13 @@ def main() -> int:
             "PR, and record the exemption so this stops asking:\n\n"
             "        gh pr edit \"<N>\" -R \"<owner>/<repo>\" "
             "--add-label no-ai-review\n\n"
-            "    Run that on its own: a label add chained AHEAD of another "
-            "command shares one exit status with it, so its outcome cannot be "
-            "attributed and the exemption is withheld.\n"
             "    where the repo honours that label, or, where it does not:\n\n"
             "        ALLOW_UNREVIEWED_REDACTION_PR=1 gh pr view \"<N>\" "
             "-R \"<owner>/<repo>\" --json number\n\n"
+            "    Run the label add on its own: chained AHEAD of another "
+            "command, it shares one exit status with that command, so its "
+            "own outcome cannot be attributed and the exemption is "
+            "withheld.\n\n"
             "Writing \"review owed\" into a recap does not discharge this."
         ),
     }))

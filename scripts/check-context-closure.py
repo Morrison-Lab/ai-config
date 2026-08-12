@@ -533,13 +533,14 @@ def render(
     return "\n".join(lines)
 
 
-def render_fragment_caps(files, root, cap):
+def render_fragment_caps(files, cap):
     """Report non-root closure files over the per-file cap.
 
     Returns `(over, text)`, where `over` is True if any fragment breaches.
 
-    The root file is excluded because `--root-char-cap` already governs it,
-    under a different limit in a different unit; double-gating one file
+    The root file is excluded -- it is the only depth-0 entry, since
+    `walk_closure` starts there -- because `--root-char-cap` already governs
+    it, under a different limit in a different unit; double-gating one file
     invites a report where the two disagree about the same path.
     """
     fragments = [(path, size) for path, size, depth in files if depth > 0]
@@ -745,7 +746,7 @@ def main(argv=None) -> int:
     )
     print(root_text)
 
-    frag_over, frag_text = render_fragment_caps(files, args.root, args.fragment_cap)
+    frag_over, frag_text = render_fragment_caps(files, args.fragment_cap)
     print(frag_text)
 
     total = sum(size for _, size, _ in files)

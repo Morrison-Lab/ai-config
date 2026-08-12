@@ -870,8 +870,7 @@ def _fc_rejects_zero():
 # different limit in a different unit. Gating it twice would let the two
 # reports disagree about one path.
 over, text = ccc.render_fragment_caps(
-    [("CLAUDE.md", 500, 0), ("shared/a.md", 10, 1)], "CLAUDE.md", 100
-)
+    [("CLAUDE.md", 500, 0), ("shared/a.md", 10, 1)], 100)
 check("the root file is exempt from the per-file cap", not over)
 check(
     "the root file is not counted among the fragments examined",
@@ -879,27 +878,25 @@ check(
 )
 
 over, text = ccc.render_fragment_caps(
-    [("CLAUDE.md", 10, 0), ("shared/a.md", 101, 1)], "CLAUDE.md", 100
-)
+    [("CLAUDE.md", 10, 0), ("shared/a.md", 101, 1)], 100)
 check("a fragment over the cap fails", over)
 check("a breach names the file", "shared/a.md" in text)
 check("a breach reports by how much", "(+1)" in text)
 
 over, text = ccc.render_fragment_caps(
-    [("CLAUDE.md", 10, 0), ("shared/a.md", 100, 1)], "CLAUDE.md", 100
-)
+    [("CLAUDE.md", 10, 0), ("shared/a.md", 100, 1)], 100)
 check("a fragment exactly at the cap passes", not over)
 
 # Reports what it examined, not only what it found: a walk that resolved no
 # fragments and a corpus with none over the cap both print zero breaches
 # otherwise, per shared/principles/fail-fast.md.
-over, text = ccc.render_fragment_caps([("CLAUDE.md", 10, 0)], "CLAUDE.md", 100)
+over, text = ccc.render_fragment_caps([("CLAUDE.md", 10, 0)], 100)
 check("no fragments still reports the examined count", not over
       and "0 fragment(s) examined" in text)
 
 over, text = ccc.render_fragment_caps(
     [("shared/a.md", 300, 1), ("shared/b.md", 200, 1), ("shared/c.md", 10, 2)],
-    "CLAUDE.md", 100,
+    100,
 )
 check("every breach is reported, not just the largest", over
       and "shared/a.md" in text and "shared/b.md" in text)

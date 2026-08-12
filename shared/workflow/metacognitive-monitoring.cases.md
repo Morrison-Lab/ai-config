@@ -372,8 +372,9 @@ Re-measured for this entry, 2026-08-12, `uname -sr` = `Linux 6.18.5-fc-v20`:
 
 So PID 1 does reap, at roughly 1.6 to 2.0 seconds, and `wait` on a non-child
 errors rather than doing nothing.
-`memories/claude-code.md`'s "`kill -0` reports an unreaped zombie as alive"
-entry, added by #1407, owns those container facts and their volatility caveat.
+A companion entry, "`kill -0` reports an unreaped zombie as alive", is proposed
+in #1407 --- once merged, it lives in `memories/claude-code.md` and owns those
+container facts and their volatility caveat.
 
 The methodological point is that **the symptom could not have told anyone which
 mechanism was operating.**

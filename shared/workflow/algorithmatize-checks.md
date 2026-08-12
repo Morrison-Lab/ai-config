@@ -154,6 +154,76 @@ the thing under examination.
 - **Don't:** treat a window inherited from an existing test as the metric's
   natural range.
 
+## A threshold pinned to a current measurement needs its rate of change checked, not just its level
+
+The section above is about a metric that will not discriminate anywhere.
+This is about a metric that discriminates fine, and a threshold defined
+*relative to it* --- a ratchet: cap the value a few hundred bytes, seconds,
+or percentage points above wherever it sits today, so the check is green on
+arrival and red on the next regression.
+
+A ratchet's whole premise is that "today's measurement" is a stable
+reference point.
+That premise is a claim about the quantity's own **rate of change**, and
+nothing about writing the ratchet tests it --- the check passes the moment
+it is written, which reads as confirmation rather than as the one case the
+premise was never asked to survive.
+
+Compare that rate against the **interval the check actually has to survive
+between measurements** --- a review round, a merge cadence, a day of
+ordinary edits elsewhere in the file.
+When the quantity moves by a meaningful fraction of the ratchet's own margin
+within that interval, the check is red on the next unrelated change, on a
+file nobody touched, for reasons the diff in front of the reviewer does not
+explain.
+That is not flakiness to route around; it is the ratchet reporting on
+whichever PR happens to land within the window, rather than on the PR that
+grew the quantity.
+
+This is the same comparison
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s "Why serial
+resolution structurally cannot converge" makes for a different pair of rates
+--- there a base branch's merge interval against a review round, here a
+measured quantity's growth against the same kind of interval --- and it is
+worth reading as one instance of a general move: **before trusting a
+threshold set relative to a snapshot, measure how fast the snapshot itself
+moves, against the interval the threshold has to hold across.**
+
+Where the two are close, a ratchet is unimplementable, not merely noisy.
+The fix is not a wider margin --- a margin sized to survive today's rate
+still expires on tomorrow's --- but a **round policy line**, stated as a
+rule a reader can hold ("no file over 100 KB") rather than derived from
+whatever the corpus happened to measure at write time, sized with enough
+runway that the interval-versus-rate comparison above no longer applies to
+it.
+[`configurable-parameters`](../coding/configurable-parameters.md) already
+argues for keeping such a line as a named, adjustable parameter rather than
+a buried literal; this adds where the **value** of that parameter should
+come from when the temptation is to derive it from a live measurement
+instead.
+
+- **Do:** before setting a threshold relative to a current measurement,
+  measure that quantity's rate of change and compare it against the
+  interval the check must survive between reads.
+- **Do:** replace an unworkable ratchet with a round policy line carrying
+  stated runway, rather than a tighter one.
+- **Don't:** read a ratchet passing at the moment it is written as evidence
+  the reference point it is pinned to is stable.
+- **Don't:** treat a check that goes red on an untouched file as flaky ---
+  read it as the reference point having moved faster than the margin.
+
+(`Morrison-Lab/ai-config#1398`: a per-fragment size cap was first designed
+as a ratchet, a few hundred bytes above the corpus's then-largest
+auto-loaded fragment. Measured over roughly two hours between filing and
+implementing, `shared/workflow/ardi.md` grew 87,448 -> 93,326 bytes and
+`shared/principles/fail-fast.md` grew 89,175 -> 91,835 bytes --- so a cap
+pinned to that day's maximum would have gone red within a day on a PR that
+never touched either file. Proposed in `Morrison-Lab/ai-config#1406`: a
+round 100,000-byte line with several KB of runway over both, its own
+rationale documented at length in the check's source rather than only
+here --- once merged, the fragment lives at
+`scripts/check-context-closure.py`.)
+
 ## Never predict which case will fail; enumerate the class
 
 The rule so far concerns checks you *perform*.

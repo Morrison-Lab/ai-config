@@ -347,3 +347,45 @@ already binds it)" and asserted the bare label with nothing following it.
 Note the shape is the two-sided qualifier error from `fail-fast.md` one level up:
 there a guard covered the before-side and missed the after-side, here a
 *premise* did, and the premise then licensed skipping the guard entirely.)
+
+## A symptom that both a mechanism and its opposite predict
+
+(Morrison-Lab/ai-config#1395 / #1407, 2026-08-12: two false mechanism claims
+landed in `scripts/test_ai_session.py` during one PR.
+The second is the one recorded above.
+
+A helper needed a reliably dead PID, so it orphaned a child, killed it, and
+polled `kill -0` until that failed.
+The loop did not terminate promptly, and a comment was written to justify the
+design around that: PID 1 in this container "does not reap", so a killed orphan
+"stays a zombie" permanently, and `wait` from a non-owning shell is "a no-op".
+
+Both halves are false, and both were decidable by one probe.
+Re-measured for this entry, 2026-08-12, `uname -sr` = `Linux 6.18.5-fc-v20`:
+
+| probe | result |
+|---|---|
+| `ps -o comm= -p 1` | `process_api` |
+| immediately after the kill | `stat=Z`, `ppid=1`, `kill -0` returns **0** |
+| `wait <pid>` from a shell that never owned it | `pid N is not a child of this shell`, rc **127** |
+| poll `kill -0` at 5 ms until it fails | reaped after 225 polls, **1573 ms** |
+
+So PID 1 does reap, at roughly 1.6 to 2.0 seconds, and `wait` on a non-child
+errors rather than doing nothing.
+`memories/claude-code.md`'s "`kill -0` reports an unreaped zombie as alive"
+entry, added by #1407, owns those container facts and their volatility caveat.
+
+The methodological point is that **the symptom could not have told anyone which
+mechanism was operating.**
+A poll loop that keeps seeing `kill -0` succeed is exactly what "PID 1 never
+reaps" predicts, and exactly what "PID 1 reaps asynchronously, about two seconds
+from now" predicts too.
+The true mechanism was the opposite in kind --- reaping happens, and the loop
+was losing a millisecond-scale race, re-losing it on each retry because every
+retry spawned a fresh PID --- and no amount of re-reading the comment, or
+re-running the failing loop, would have separated the two.
+The discriminating observation was the same one held longer.
+
+The direction of the error is the part worth carrying: the immediate look
+supported the stronger claim, permanence, and the cheaper observation was the
+one that would have refuted it.)

@@ -78,7 +78,7 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
-      - name: Measure the auto-loaded context closure (advisory) and gate its root char cap
+      - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
         # The BUDGET half reports rather than gates, and deliberately so:
         # this repo is currently ~4x the shipped budget (ai-config#897), so a
         # blocking form would be red on every PR and would train everyone to
@@ -98,6 +98,16 @@ jobs:
         # grew ~12x in a month with nothing reporting it, because a per-file
         # line count cannot see a total and the gitlink diff of a pin bump is
         # one line. A trend line on every PR is what was missing.
+        #
+        # The PER-FRAGMENT cap is the second exception, added in
+        # ai-config#1398, and gates without --strict for the same reason as
+        # the root cap: the budget above governs the closure's total and the
+        # root cap governs one file, so nothing constrained an individual
+        # @shared/... fragment and the corpus grew one justified-looking
+        # fragment at a time. The cry-wolf objection does not transfer here
+        # either -- the default is a round 100 KB policy line that no
+        # fragment currently reaches, and the run prints the examined count
+        # and every breach's headroom on each PR.
         #
         # It still exits non-zero on a dangling ANCHORED import (one written
         # on its own line), which is a defect rather than a size finding.

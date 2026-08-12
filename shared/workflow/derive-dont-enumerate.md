@@ -154,7 +154,8 @@ And base-versus-delta is one instance of a general shape: any two figures in one
 - **Do:** run a separate query for a subset figure, and name the moment both figures were measured at.
 - **Do:** treat a qualifier clause as a second claim owing its own derivation, rather than as a decomposition of the figure it follows.
 - **Don't:** carry a subset count measured at one moment into a sentence whose total names another --- the two populations differ by whatever moved in between.
-- **Don't:** read "I derived the number in this sentence" as covering the sentence; the figure you derived is the one you were thinking about.
+- **Don't:** read "I derived the number in this sentence" as covering the sentence.
+  The figure you derived is the one you were thinking about.
 
 (Morrison-Lab/ai-config#1437, 2026-08-12, review finding 1.
 The case record directly above shipped reading "Ten PRs were open at merge time, seven of them under the same account", and now reads "eight of them".

@@ -47,12 +47,38 @@ out in that clone --- so the chain enumerated two states and the real one was a
 third.
 The recipient recovered by detaching the existing checkout and using `-B`.
 
-The same block resolved the default branch with
-`DEF=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed ...)
-|| echo main`, which is the silent half.
-That ref is unset in the clones this corpus is developed in, so `DEF` came from
-the literal rather than from resolution --- right by luck.
-Derivable in any of them:
+The same block resolved the default branch with a piped
+`git symbolic-ref --short refs/remotes/origin/HEAD`, falling back to
+`|| echo main` inside the substitution.
+That ref is unset in the clones this corpus is developed in, so the fallback was
+the only thing that could have supplied a value.
+
+**It could not have.**
+An earlier version of this record said `DEF` came from the literal, right by
+luck.
+That was wrong, and wrong in the direction that made the example fit the
+argument, which is why it survived a self-review and was caught in review on
+`Morrison-Lab/ai-config#1408`.
+The `||` does sit inside the substitution here, but the pipe in front of it
+discards the failing command's status and `sed` exits 0 on empty input, so the
+fallback never fires.
+`DEF` ends up **empty**, and `git worktree add` against `origin/` then errors.
+
+Measured, 2026-08-12, with `false` standing in for the failing lookup:
+
+| form | `DEF` |
+|---|---|
+| `DEF=$(false \|\| echo main)` | `main` |
+| `DEF=$(false) \|\| echo main` | *empty* |
+| `DEF=$(false \| sed ... \|\| echo main)` | *empty* |
+| the same, under `set -o pipefail` | `main` |
+
+So the brief carried an inert fallback, and neither its author nor its recipient
+ran it.
+The recipient sidestepped it by resolving the branch with `git remote show
+origin` instead, which is why the inertness surfaced only in review.
+
+The resolution that does answer, derivable in any of these clones:
 `git symbolic-ref --short refs/remotes/origin/HEAD` exits non-zero with
 `fatal: ref refs/remotes/origin/HEAD is not a symbolic ref`, while
 `git remote show origin | sed -n 's/.*HEAD branch: //p'` returns `main`.

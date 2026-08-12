@@ -246,25 +246,41 @@ whatever the surrounding sentence says.
 So read every command in a brief as an assertion about the recipient's
 environment, and ask what would have to be true for it to run.
 
-**A `||` fallback is how such a command passes as self-establishing, and the two
-directions of fallback are not equally dangerous.**
-`DEF=$(git symbolic-ref --short refs/remotes/origin/HEAD) || echo main` reads as
-dynamic resolution, which is exactly what the disclaimer asked for.
-That expression is a guess wearing resolution's clothes: where the ref is unset
-the substitution is empty, the fallback supplies a literal, and a right answer
-arrives for a reason nothing tested --- which is
-[`fail-fast`](../principles/fail-fast.md)'s "a proxy that answers a narrower
-question passes the same way".
+**A `||` fallback is how such a command passes as self-establishing, and the
+fallback is itself an untested command.**
+A brief's author reaches for one to guarantee a value, so what it produces is
+the claim they are least likely to check --- and it is checkable in one line.
 
-Contrast a fallback that fails **loudly**.
-Two `git worktree add` forms joined by `||` also read as defensive, and both can
-rest on one false premise, so the chain enumerates two states while the real one
-is a third.
-That chain still errors at the recipient, and costs a minute.
-The silent fallback cannot be caught at all, since a guessed default and a
-resolved one produce identical output.
-A brief may therefore carry a fallback that errors, and must not carry one that
-guesses.
+The measured behaviour, which is not what the author of the brief below
+believed:
+
+| form | `DEF` |
+|---|---|
+| `DEF=$(false \|\| echo main)` | `main` |
+| `DEF=$(false) \|\| echo main` | *empty* |
+| `DEF=$(false \| sed s/x/y/ \|\| echo main)` | *empty* |
+| the same, under `set -o pipefail` | `main` |
+
+Only the first supplies the literal.
+In the second the `||` sits outside the substitution, so `echo` writes to stdout
+and nothing reaches `DEF`.
+In the third --- the form the brief actually carried --- the pipe discards the
+failing command's status, `sed` exits 0 on empty input, and the fallback never
+fires at all, which is
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md)'s "a pipe
+discards the status of everything left of it".
+
+So the fallback written to guarantee a value was **inert**, for a reason its
+author had not considered, and would have left `DEF` empty.
+The lesson is not that a guessing fallback is worse than an erroring one.
+It is that neither behaviour was established: a fallback nobody ran is a belief
+about control flow, and this one was wrong twice over.
+
+The same holds for the `git worktree add` chain beside it.
+Two forms joined by `||` read as defensive while both rested on one false
+premise, so the chain enumerated two states when the real one was a third ---
+a fallback varying on the wrong axis, which covers nothing however many
+branches it has.
 
 Resolve what a supplied command needs from a source that answers, and fail
 loudly when it does not:
@@ -276,6 +292,9 @@ DEF=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
 
 - **Do:** read every command you put in a brief as a claim about the
   recipient's environment, and either drop it or make it self-establishing.
+- **Do:** run a fallback before shipping it, and check what it assigns rather
+  than what you intended it to assign --- one line settles it, and both forms
+  above were wrong.
 - **Do:** end a resolution step with a loud failure rather than a guessed
   default, so an unmet premise stops the agent instead of reaching execution.
 - **Don't:** treat a "do not assume" sentence as covering the command beneath
@@ -283,6 +302,9 @@ DEF=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
 - **Don't:** read a `||` chain as defensive without asking whether its branches
   differ on the axis that can actually fail; two forms sharing one false premise
   cover nothing.
+- **Don't:** reason about where a `||` binds, or about whether a pipeline
+  propagates a failure --- both are one command to test and both were guessed
+  wrongly here, in a section about not guessing.
 
 See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
 "A brief's own command contradicted its own disclaimer".

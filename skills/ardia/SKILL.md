@@ -43,9 +43,9 @@ mutates a PR stays serial.
        gate (`CLAUDE.md`'s "Surface merge-order constraints", surface 3).
      - **Include a parked draft.** Real implementation on the branch, no
        live claim, and no recent activity by another actor.
-       A draft never triggers the review bot, so once its content passes
-       the repo's checks, mark it ready for review (or dispatch the review
-       explicitly) --- a clean verdict is unreachable while it stays draft.
+       The review bot skips drafts in most repos, so once its content
+       passes the repo's checks, mark it ready for review --- a clean
+       verdict is unreachable while it stays draft.
      Name each draft's disposition, and the signal that decided it, in the
      scope report, so the user can veto before the loop touches it.
    - **Only iterate PRs the user owns / is responsible for** by default. In a

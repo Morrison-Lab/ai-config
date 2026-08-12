@@ -94,8 +94,8 @@ And the mangling disguised the artifact --- an intact `+++ b/<path>` in prose
 reads as machine output and gets deleted on sight, while `++ b/<path>` reads
 as a typo or an odd bullet, so a read-through for sense passes over it.
 
-The corpus already held the mechanism, at `memories/git.md`'s
-stash-supersession bullet, which ships `grep '^+[^+]'` and names the
+The corpus already held the mechanism, at `memories/git-stash.md`'s
+supersession bullet, which ships `grep '^+[^+]'` and names the
 `+++ b/<path>` headers it excludes.
 It did not transfer, and would not have been the right guard here anyway:
 measured on git 2.50.1, `^+[^+]` drops added blank lines, so on prose it merges

@@ -69,6 +69,23 @@ Two review rounds read that body without flagging it; it surfaced only when the
 body was re-read against the diff before declaring the PR ready, which is the
 `address-every-comment` check above doing work its own rule did not anticipate.)
 
+## A read SHA can answer a different question
+
+(Morrison-Lab/ai-config#1396, 2026-08-12: the issue body read "Measured
+2026-08-12, `origin/main` at `3f8b2f1`", and `git rev-parse origin/main` had
+never been run.
+`3f8b2f1` came off a `git stash list` line produced seconds earlier ---
+`stash@{1}: WIP on main: 3f8b2f1 Add R-package test/lint/spellcheck
+verification lessons (#205)` --- which names the commit an unrelated stash was
+taken on.
+That commit is dated 2026-06-25, roughly seven weeks before the measurement it
+was being offered as the base for, and it is an ancestor of `origin/main`
+rather than its tip.
+The real tip was `b323a4fc`.
+The body has since been edited to drop the claim, though
+`gh search issues "3f8b2f1" --owner Morrison-Lab` still returns the issue, so
+the search index is what records that the string was there.)
+
 ## The read side of a push-verification comparison can lag
 
 (Morrison-Lab/ai-config#845, 2026-07-29: `git rev-parse HEAD` and

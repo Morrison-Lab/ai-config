@@ -104,10 +104,10 @@ The GitHub MCP tool surface used in remote/web sessions lives in
 
   What makes this worth recording rather than filing under "the CLI is
   missing" is **which** sessions it hits.
-  `CLAUDE.md`'s "GitHub access in remote / web sessions" section says `gh` is
-  **not installed** there, so this is the norm for a whole class of session
-  rather than a misconfiguration --- and two corpus rules name that script as
-  the instrument for deciding a PR is ready:
+  This file's own "GitHub access from bash in remote/web sessions" section
+  states that there is no `gh`/`glab` CLI in these sessions, so this is the
+  norm for a whole class of session rather than a misconfiguration --- and two
+  corpus rules name that script as the instrument for deciding a PR is ready:
   [`ardi`](../shared/workflow/ardi.md) requires it for the single-PR loop, and
   [`fully-clean`](../shared/workflow/fully-clean.md) opens by saying the two
   criteria are "verified via `python3 scripts/check-pr-fully-clean.py

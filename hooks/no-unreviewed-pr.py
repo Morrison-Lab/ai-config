@@ -1534,10 +1534,23 @@ def scan(path):
                 # its exemption is registered here, BEFORE the push arm below:
                 # the env form takes effect immediately (it depends on no API
                 # outcome), so a call that both asserts the exemption and pushes
-                # finds an empty `live` and arms nothing. The label form still
-                # waits for its own result, so a push chained into that same
-                # call can arm -- an over-warn the label's own result then
-                # retires, since _exempt drops every obligation for the PR.
+                # finds an empty `live` and arms nothing.
+                #
+                # The label form waits for its own result, and that result can
+                # only be attributed when the label add is the chain's LAST
+                # simple command. So `<label add> && git push` does NOT
+                # discharge: the push arms synchronously here, the label's
+                # result is ambiguous (elast2 False), and the guard keeps
+                # warning even though the label genuinely landed. That is the
+                # safe direction, and it is deliberately NOT fixed by dropping
+                # the `last` requirement -- doing so would read a later
+                # command's exit status as the label add's own, which is the
+                # silent-discharge class every other releasing path here
+                # blocks. Run the label add on its own, exactly as
+                # shared/workflow/pr-on-claim.md already requires of the
+                # reviewer-request POST for the same reason; the reverse
+                # ordering (`git push && <label add>`) also discharges, since
+                # the label add is last.
                 ekind, enum, erepo, elast = exempt_ident(cmd_raw)
                 if ekind == "env":
                     _exempt(obligations, live, enum, erepo)
@@ -1643,6 +1656,9 @@ def main() -> int:
             "PR, and record the exemption so this stops asking:\n\n"
             "        gh pr edit \"<N>\" -R \"<owner>/<repo>\" "
             "--add-label no-ai-review\n\n"
+            "    Run that on its own: a label add chained AHEAD of another "
+            "command shares one exit status with it, so its outcome cannot be "
+            "attributed and the exemption is withheld.\n"
             "    where the repo honours that label, or, where it does not:\n\n"
             "        ALLOW_UNREVIEWED_REDACTION_PR=1 gh pr view \"<N>\" "
             "-R \"<owner>/<repo>\" --json number\n\n"

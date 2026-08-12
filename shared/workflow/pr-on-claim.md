@@ -315,6 +315,10 @@ So hold the AI review, say so on the PR, and record the exemption where a machin
 gh pr edit "<N>" -R "<owner>/<repo>" --add-label no-ai-review
 ```
 
+Run that as its own command, for the same reason the reviewer-request POST above must be its own command.
+A label add chained ahead of anything else shares one exit status with whatever follows it, so the label genuinely lands and the guard cannot attribute the outcome --- it keeps warning.
+Chaining it *after* a push is fine, since it is then the last command.
+
 Where the repo has no such label, assert it instead, in the env-prefix form this corpus's guards already use:
 
 ```bash

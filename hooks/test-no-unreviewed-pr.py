@@ -1209,6 +1209,22 @@ case(create("c") + [bash(LABEL_CMD, tid="x"),
 # error-word or 4xx shape ("unable to add" matches nothing in RX_FAILED), so
 # only the `last` check can withhold the exemption -- the same ordering hazard
 # the draft clear above guards against.
+# The same ordering rule bites the natural way to batch the exemption with a
+# push, so both directions are pinned: chaining the label add BEFORE the push
+# does not discharge (the push arms, and the label's result is unattributable),
+# while chaining it AFTER does, since it is then last. This is why the block
+# message says to run the label add on its own. Dropping the `last` requirement
+# to make the forward ordering work would read `git push`'s exit status as the
+# label add's own -- the silent-discharge class every releasing path here
+# blocks -- so the over-warn is kept deliberately.
+case(create("c") + [bash("gh pr edit 1038 -R o/r --add-label no-ai-review "
+                         "&& git push", tid="x"), res("x", "done"),
+                    say("Labelled and pushed.")], True,
+     "a label add chained BEFORE a push does not exempt")
+case(create("c") + [bash("git push && gh pr edit 1038 -R o/r "
+                         "--add-label no-ai-review", tid="x"),
+                    res("x", "done"), say("Pushed and labelled.")], False,
+     "a label add chained AFTER a push is last, so it exempts")
 case(create("c") + [bash(LABEL_CMD + "; echo done", tid="x"),
                     res("x", "unable to add label to this PR\ndone", err=False),
                     say("Tried to label it.")], True,

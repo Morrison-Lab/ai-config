@@ -59,3 +59,24 @@ That rule is a **gate**: a fan-out across four or more verification-bearing targ
 This one is a **grant**: a single `Agent` call covering one sidecar task is cheap, needs no opt-in, and the cost it prevents is an idle parallel track rather than an overspend.
 So when a task clears that fragment's three-part bar, follow it and propose the workflow; everything below that bar is a subagent to launch now.
 
+## A brief naming specific files owes a check of open PRs' file sets, not just staleness
+
+[`check-open-prs-before-duplicating`](check-open-prs-before-duplicating.md) already requires a dupe-check before scaffolding a new tool, by keyword search over open PR titles and bodies.
+It does not cover the commoner dispatch: a brief that names specific existing files to edit, where the collision is not conceptual but literal --- another open PR touching the same paths.
+A keyword search finds nothing there, because two unrelated learnings landing in the same fragment share no vocabulary at all.
+
+`scripts/pr-sweep.py`, per [`derive-dont-enumerate`](derive-dont-enumerate.md)'s "The instrument" section, is what this corpus already reaches for before dispatching, and it answers a real question --- which PRs are stalled --- that is not the question a file-naming brief needs answered.
+Reading its output as though it covered overlap is the failure: the sweep can list a colliding PR by number, in a report you read in full, and still not tell you that PR touches the exact two files you are about to hand to a subagent.
+The count of open PRs is not their file sets.
+
+Before dispatching a brief that names specific files, run `gh pr diff <N> --name-only` (or the equivalent MCP call) against every open PR, and intersect the result with the files you are about to hand over.
+This is the same check `CLAUDE.md`'s "Surface merge-order constraints" section already requires before asserting two *existing* PRs are disjoint --- derive both sets and check the intersection, don't recall what a PR is "about".
+The increment here is *when*: before the new PR exists, not after, since a collision found before dispatch costs one query and a collision found after costs a conflict resolution.
+
+- **Do:** intersect a proposed brief's file list against every open PR's changed-file set before dispatching, not just against its staleness.
+- **Do:** treat a sweep tool's own output as answering only the question it was built to answer --- staleness is not overlap.
+- **Don't:** read "I checked the open PRs" as covering this when the check was a keyword search or a stalled-PR count.
+- **Don't:** dispatch a file-naming brief on the strength of a sweep that never printed the colliding PR's file list.
+
+(Morrison-Lab/ai-config#1413, 2026-08-12: a subagent was briefed to trim two specific files; open PR #1407 had touched those exact files sixteen minutes earlier, and a `pr-sweep.py` run had listed #1407 as in-flight without its file set ever being read. #1413 conflicted with #1407 as a result. Extending `pr-sweep.py` to print each PR's file set --- so this check needs no separate round of calls --- is filed as [#1419](https://github.com/Morrison-Lab/ai-config/issues/1419).)
+

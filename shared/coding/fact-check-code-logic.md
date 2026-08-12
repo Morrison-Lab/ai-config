@@ -267,6 +267,58 @@ surprising one, and it arrives at the moment it will be acted on.
 - **Don't:** relax the check because the match supports a decision already
   taken.
 
+## A docstring that explains why, but not how, misattributes the mechanism
+
+A docstring can be entirely correct and still hide a dead parameter, if it
+states the *reason* a behaviour holds without saying *how* the code produces
+it.
+A reader --- including the author, in self-review --- fills the gap with
+whatever is nearest at hand, and the nearest thing is usually a parameter
+sitting right there in the signature.
+
+The shape: a function takes a parameter the body never reads, and a comment
+or docstring above it explains a real, correct fact that sounds like it
+depends on that parameter.
+"The root file is excluded because `--root-char-cap` already governs it" is
+true.
+It does not say the exclusion is implemented by checking depth, so a reader
+credits the unused `root` argument with doing the excluding, when a `depth >
+0` filter elsewhere does the actual work.
+Nothing about the sentence is false, which is what makes it survive review:
+there is no wrong claim to catch, only a mechanism the sentence never names.
+
+This is not the same failure as
+[`reuse-docs-and-args.md`](reuse-docs-and-args.md)'s doc-reuse rules, which
+are about a docstring going stale relative to the code it describes.
+Here the docstring is accurate throughout --- the gap is that it explains a
+fact instead of a mechanism, and an unrelated parameter absorbs the
+explanation by proximity.
+
+The check is to ask, of every sentence justifying a behaviour, whether it
+names the line, branch, or filter that produces it.
+A sentence that would still read true with the parameter deleted is
+explaining the *why*, not the *how*, and the parameter it sits beside is a
+candidate for being unused.
+
+- **Do:** state the mechanism a docstring is invoked to justify --- the
+  actual line, branch, or filter --- not only the reason the behaviour is
+  correct.
+- **Do:** check whether a nearby parameter is actually read by the code the
+  docstring describes, whenever the docstring explains a fact rather than a
+  mechanism.
+- **Don't:** treat a docstring as covering a parameter's purpose merely
+  because it explains something true about the parameter's neighbourhood.
+- **Don't:** read "the docstring makes sense" as evidence a parameter is
+  used --- a correct sentence can justify behaviour that a different part
+  of the function actually implements.
+
+(Morrison-Lab/ai-config#1406: `render_fragment_caps(files, root, cap)`
+carried a docstring reading "The root file is excluded because
+`--root-char-cap` already governs it," and `root` was never referenced in
+the function body --- the exclusion was a `depth > 0` filter. Caught as a
+non-blocking review note; restating the docstring to name the depth filter
+made the parameter visibly redundant, and it was removed.)
+
 ## What to report
 
 For each issue found, state:

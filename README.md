@@ -181,7 +181,7 @@ The latter group opts out in **`.claude/settings.local.json`**, not in
 The file matters, and the intuitive choice is the wrong one.
 Claude Code resolves settings
 managed > command line > `.claude/settings.local.json` > `.claude/settings.json` > `~/.claude/settings.json`,
-so the **user** scope is the lowest of the four rather than a personal
+so the **user** scope is the lowest of the five rather than a personal
 override --- a `false` there loses to the repo's checked-in `true`.
 `enabledPlugins` resolves by precedence rather than by union, so the `false`
 in the local file does switch the plugin off.

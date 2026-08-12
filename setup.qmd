@@ -82,7 +82,7 @@ On a machine that ran `bootstrap.sh`, leave the plugin disabled --- including
 a consumer repo's checked-in `enabledPlugins` block, which you opt out of
 with `"ai-config@d-morrison": false` in **`.claude/settings.local.json`**.
 Not `~/.claude/settings.json`: the user scope is the *lowest* of Claude
-Code's four, so a `false` there loses to the repo's checked-in `true`
+Code's five, so a `false` there loses to the repo's checked-in `true`
 ([settings docs](https://code.claude.com/docs/en/settings)).
 Likewise enable the plugin from at most **one** marketplace:
 `Morrison-Lab/ai-config` and `d-morrison/ai-config` publish the same plugin,

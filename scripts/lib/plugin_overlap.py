@@ -39,7 +39,7 @@ them by Claude Code's documented precedence, which is easy to get backwards:
     managed (enterprise) > command line > .claude/settings.local.json
       > .claude/settings.json > ~/.claude/settings.json
 
-So the **user** scope is the LOWEST of the four, not a personal override of
+So the **user** scope is the LOWEST of the five, not a personal override of
 the repo. Setting a plugin to `false` in `~/.claude/settings.json` does not
 switch off one a checked-in `.claude/settings.json` enables; the per-user
 opt-out is `.claude/settings.local.json`.

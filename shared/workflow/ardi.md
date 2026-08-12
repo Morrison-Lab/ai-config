@@ -1428,6 +1428,51 @@ Match the environment the change will be judged in, too.
 Running with an env var set that CI does not set (or vice versa) reproduces
 a *different* configuration, and its failures and passes both mislead.
 
+**Matching the tool's VERSION is not matching its ENVIRONMENT, and when the
+tool GENERATES a file you are about to commit, the gap ships.**
+The paragraph above is about running a suite: a mismatched configuration
+misleads you about a verdict, and the cost is a wrong belief.
+A code generator run under a mismatched configuration writes a **different
+artifact**, and you commit it -- so the cost is a wrong file in the tree,
+carrying the authority of having been machine-generated.
+
+What makes it slip past is that the obvious precaution succeeds.
+Installing the exact version CI installs feels like reproducing CI, and it
+reproduces the half everyone thinks of.
+A generator's output also depends on what it can **resolve** while it runs:
+optional dependencies, plugins, a locale, a package it loads to read
+docstrings out of.
+Miss one of those and the tool does not fail --- it emits a degraded version
+of whatever it could not resolve, which is exactly the output that looks
+plausible.
+
+The tell is **an output file CI never mentions**.
+A generator run in a thinner environment usually touches a superset of what
+CI touches, since the extra file is the one it degraded.
+So compare the file *list* against the failing job's own log before comparing
+any contents, and treat a file CI did not name as evidence about your
+environment rather than about the repo.
+
+- **Do:** compare your generator's changed-file list against the CI log's, and
+  treat any extra file as an environment mismatch until explained.
+- **Do:** install the optional/dev dependency set as well as the tool, when a
+  generator loads the package to do its work.
+- **Don't:** read "I installed the same version CI installs" as having matched
+  CI --- version is one input to the output, and rarely the one that differs.
+- **Don't:** commit generated output whose diff is wider than the job you are
+  trying to satisfy reported.
+
+(`UCD-SERG/serodynamics#291`, 2026-08-12: `docs-check` reported exactly two
+changed files, `DESCRIPTION` and `NAMESPACE`.
+Re-documenting locally with roxygen2 8.1.0 --- CI's own version, from CI's own
+RSPM binary repo --- changed **three**, the extra one being
+`man/expect_snapshot_data.Rd`, because `testthat` and `rjags` sit in
+`Suggests` and were not installed, so `@inheritDotParams` could not resolve
+and roxygen emitted the topic without it.
+Committing that would have shipped a silently degraded help page.
+Installing the full `Suggests` set reproduced CI's two-file result exactly,
+with no warnings.)
+
 - **Do:** run the full suite before pushing, and state the tests/failed/
   skipped triple rather than "tests pass".
 - **Do:** set the flags that un-gate conditional skips, and re-run if the

@@ -44,6 +44,23 @@ Threshold rationale (`--budget`, default below):
   and `--bytes-per-token` are parameters rather than literals, per
   `shared/coding/configurable-parameters.md`.
 
+Threshold rationale (`--fragment-cap`, default below):
+
+  The budget above governs the closure's TOTAL, and the root cap governs one
+  file. Neither constrains an individual `@shared/...` fragment, so the
+  corpus grows one justified-looking fragment at a time with no per-file
+  owner to ask. Measured over 2026-08-10 to 08-12, `CLAUDE.md` was trimmed
+  52 KB while the total still rose 42 KB: trimming the one file anybody
+  watches did not slow the total, because the growth is distributed.
+
+  The default is a round policy line, not an aspiration and not a ratchet.
+  An aspirational cap would turn CI red immediately on several files, which
+  per `shared/workflow/algorithmatize-checks.md` trains every reader to
+  ignore it and takes the real cases with it. A ratchet a few hundred bytes
+  above the current largest fragment fails the other way: at the growth rate
+  measured while writing this, it is red within a day on a PR that never
+  touched the file. See DEFAULT_FRAGMENT_CAP_BYTES for the figures.
+
 Reports what it examined, not only what it found: a closure that resolved
 zero files must be distinguishable from one that is comfortably under
 budget, since both would otherwise print a small number and exit 0. A
@@ -112,6 +129,33 @@ DEFAULT_ROOT_CHAR_CAP = 150_000
 # observed growth this file can cross it between one session and the next,
 # and a check that only speaks once it is too late gives no room to act.
 DEFAULT_ROOT_CHAR_WARN_FRACTION = 0.90
+
+# Per-file cap on the NON-root closure files, denominated in bytes like the
+# budget. 100,000 is a round policy line rather than a ratchet, and the
+# difference was forced by measurement rather than chosen.
+#
+# The ratchet this started as -- a cap a few hundred bytes above the current
+# largest fragment -- is unimplementable here. Measured on 2026-08-12,
+# `ardi.md` grew 87,448 -> 93,326 B and `fail-fast.md` 89,175 -> 91,835 B in
+# roughly two hours, so a cap pinned to "today's largest" is red by tomorrow
+# on a PR that never touched those files. Any threshold within a day's growth
+# of the maximum is a coin flip on merge timing rather than a policy.
+#
+# So the line is round, states a rule a reader can hold ("no auto-loaded
+# fragment over 100 KB"), and leaves the two largest 6-8 KB of runway. At the
+# growth rate above that is days, not months -- which is the point rather
+# than a defect: when it fires, the answer is to split case records out to a
+# `.cases.md` companion, which several fragments already have.
+#
+# Unlike `--budget` this FAILS rather than warning, and deliberately so: a
+# ratchet that only warns is the advisory-check-nobody-reads failure
+# `shared/writing/semantic-line-breaks.md` records for `check-new-line-breaks`,
+# where a green job and a warned job look identical to anyone reading exit
+# codes. The budget can stay advisory because crossing it is a prompt to
+# decide what comes out; crossing this means one file grew past the largest
+# thing anyone had accepted, which is a decision someone should make on
+# purpose.
+DEFAULT_FRAGMENT_CAP_BYTES = 100_000
 
 # English prose runs roughly 3.5-4.5 bytes per token, so a token figure from
 # any single divisor is an estimate with about +/-15% in it. Byte counts are
@@ -489,6 +533,39 @@ def render(
     return "\n".join(lines)
 
 
+def render_fragment_caps(files, cap):
+    """Report non-root closure files over the per-file cap.
+
+    Returns `(over, text)`, where `over` is True if any fragment breaches.
+
+    The root file is excluded -- it is the only depth-0 entry, since
+    `walk_closure` starts there -- because `--root-char-cap` already governs
+    it, under a different limit in a different unit; double-gating one file
+    invites a report where the two disagree about the same path.
+    """
+    fragments = [(path, size) for path, size, depth in files if depth > 0]
+    breaches = sorted(
+        ((size, path) for path, size in fragments if size > cap), reverse=True
+    )
+    # Report what was examined, not only what was found: a walk that
+    # resolved no fragments and a corpus with none over the cap both print
+    # zero breaches otherwise, per shared/principles/fail-fast.md.
+    lines = [
+        "",
+        f"  {len(fragments)} fragment(s) examined against the "
+        f"{cap:,}-byte per-file cap; {len(breaches)} over.",
+    ]
+    for size, path in breaches:
+        lines.append(f"    {size:>8,}  (+{size - cap:,})  {path}")
+    if breaches:
+        lines.append(
+            "  Split the case records out to a `.cases.md` companion, or "
+            "raise --fragment-cap"
+        )
+        lines.append("  deliberately and say why.")
+    return bool(breaches), "\n".join(lines)
+
+
 def render_delta(before_total, after_total, bytes_per_token, rev) -> str:
     """Human-readable pin-bump delta."""
     delta = after_total - before_total
@@ -624,6 +701,15 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--fragment-cap",
+        type=positive_int,
+        default=DEFAULT_FRAGMENT_CAP_BYTES,
+        help=(
+            "per-file byte cap on non-root closure files, failing regardless "
+            f"of --strict (default: {DEFAULT_FRAGMENT_CAP_BYTES:,})"
+        ),
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="exit 1 if over budget (default: advisory, exits 0). In --compare "
@@ -659,6 +745,9 @@ def main(argv=None) -> int:
         args.root_char_warn_fraction,
     )
     print(root_text)
+
+    frag_over, frag_text = render_fragment_caps(files, args.fragment_cap)
+    print(frag_text)
 
     total = sum(size for _, size, _ in files)
     after_total = None
@@ -756,6 +845,10 @@ def main(argv=None) -> int:
         # to the harness and crossing it means the file is not fully loaded.
         # See the DEFAULT_ROOT_CHAR_CAP comment for why that failure is
         # silent everywhere else.
+        return 1
+    if frag_over:
+        # Same stance as root_over above, and NOT gated on --strict. See
+        # DEFAULT_FRAGMENT_CAP_BYTES for why this one fails rather than warns.
         return 1
     # --strict covers the compared total too. Gating only on the current
     # total would print "this bump would cross the budget" and then exit 0,

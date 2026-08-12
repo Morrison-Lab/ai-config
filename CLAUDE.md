@@ -231,12 +231,19 @@ This fires only when order changes the outcome:
 a stacked PR whose base is another open PR,
 a PR that would conflict or show a misleading diff if the other landed first,
 a migration that must precede its consumer.
-Two PRs touching disjoint files have no constraint,
+Two PRs touching disjoint files usually have no constraint,
 and saying so plainly is the right answer, not an occasion for the marker.
 But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it ---
 `gh pr diff <N> --name-only` on each PR, and confirm no path appears in both ---
 rather than recalling what each PR is "about", which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
 A follow-up PR that extends into a `shared/` (or any) file a prior PR also edited is a common collision, and the two conflict at merge time.
+**An empty intersection settles the *collision* cases above and cannot see the *dependency* ones.**
+A migration and its consumer, or a PR whose prose cites content another PR adds, are ordering constraints whose file sets never overlap ---
+so a derived intersection of zero is evidence about conflicts, not a proof that either order is safe.
+Ask separately whether one PR asserts something the other makes true.
+For a citation the better fix is to dissolve the dependency rather than sequence it,
+by phrasing it as a conditional that is accurate either way ---
+see [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md)'s cross-repo citation trap, which applies to a same-repo sibling PR unchanged.
 The rationale behind each surface lives in `memories/preferences.md`,
 alongside the rest of the taxonomy.
 

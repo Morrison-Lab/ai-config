@@ -126,7 +126,7 @@ Derive the population first, then the intersection over it, and publish both cou
 
 (Morrison-Lab/ai-config#1435, 2026-08-12.
 Its PR body closed with "No other PR of mine is open, so there is no merge-order constraint and nothing to collide with", and the review confirmed the PR clean without touching that sentence.
-Ten PRs were open at merge time, seven of them under the same account.
+Ten PRs were open at merge time, eight of them under the same account.
 The post-merge sweep derived each one's file set against its own merge base and found 0 of 10 touching `shared/writing/ambiguous-reference.md` --- so the conclusion held and its stated reason did not.)
 
 ## In review

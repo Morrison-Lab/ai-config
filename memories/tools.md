@@ -775,9 +775,9 @@ Both were quoted as evidence in a PR body.
 - A multi-sentence-line detector tested `line.count('. ') > 1`, which only
   fires at **three** sentences on a line, so every two-sentence line passed.
   It reported 0; the real count was 12.
-- A banned-punctuation scan was written as an inline heredoc, and shell
-  quoting collapsed its character class `'--""''x'` into one string
-  containing ASCII `"`, so it flagged any line with a double quote.
+- A banned-punctuation scan built its character class as `'--""''x'`, which
+  Python reads as two adjacent literals rather than one, so the class
+  silently gained ASCII `"` and flagged any line with a double quote.
   It reported a phantom hit on clean text.
 
 The two failure directions are what make this worth a rule rather than a
@@ -795,8 +795,48 @@ error underneath whatever the regex got wrong, per
 
 **When a check must be ad hoc, write it to a file rather than an inline
 heredoc.**
-Quoting is where these break, and a file removes the shell from the problem
-entirely.
+That is right for the stdin-contention entry below.
+It is **not** what fixes the charset collapse above --- a remedy keyed on the
+heredoc would leave that bug exactly where it was.
+
+**The shell is not involved.**
+A quoted heredoc delimiter (`<<'PY'`) suppresses expansion outright, and the
+same literal in a plain file, with no shell in the picture at all, produces
+the identical contamination:
+
+```python
+# mech.py, run as `python3 mech.py`
+print(sorted(hex(ord(c)) for c in set('--""''x')))   # ['0x22', '0x2d', '0x78']
+```
+
+The mechanism is **Python adjacent-string-literal concatenation**.
+`'--""''x'` is two literals rather than one: the `''` in the middle is the
+Python string closing and reopening, so the `""` between them becomes ordinary
+content and the class silently gains ASCII `"`.
+Its precondition is that those quotes were **ASCII** all along --- a literal
+built from genuine curly quotes comes back clean, all seven code points intact
+--- so this bites exactly the author who believed they were typing curly
+quotes, and moving the check into a file does not save them.
+
+**A positive control cannot catch it.**
+"Sanity-test it on an input you know should fail" exercises the direction
+where the detector must fire, and a contaminated class fires enthusiastically.
+The direction needing a control is the one where it must stay **silent**.
+Two things supply that, and neither is a positive control:
+
+- **Assert what the class must NOT contain:**
+  `assert '"' not in BANNED and "'" not in BANNED`.
+- **Print the class you actually built, as code points rather than glyphs:**
+  `{hex(ord(c)) for c in BANNED}`.
+  A contaminating character is invisible rendered and unmistakable as `0x22`.
+
+Building the class from explicit `\uXXXX` escapes removes the ambiguity at
+the source.
+
+The two directions are worth separating because they cost differently.
+A false zero reads as an all-clear and is acted on by doing nothing, while a
+false positive arrives as **work to do** on lines that were never wrong, so
+the over-firing direction spends an edit corrupting correct prose.
 
 **The maintained instrument's silence is not proof either**, for two reasons
 of its own.
@@ -811,13 +851,30 @@ Read its output, not its conclusion.
 - **Do:** run the maintained checker against your own diff before pushing,
   and quote *its* output as the verification.
 - **Do:** put an unavoidable ad-hoc check in a file, and sanity-test it on an
-  input you know should fail.
+  input you know should fail **and** one you know should pass.
+- **Do:** print a constructed character class as code points before acting on
+  a nonzero result from it.
 - **Don't:** cite a hand-rolled check's clean result in a PR body as evidence.
 - **Don't:** read an advisory check's green CI status as a verdict on content.
+- **Don't:** read a passing positive control as evidence the detector is
+  correct --- it establishes only that it can fire at all.
+- **Don't:** blame the shell for a character class that came out wrong inside
+  a heredoc; check the literal's own quoting first.
 
 (2026-07-31, [ai-config#964](https://github.com/Morrison-Lab/ai-config/pull/964):
 the review caught 8 of the 12 lines my own detector had missed, and then a
 further one that the maintained tool had missed too.)
+
+(2026-08-12, [gha#449](https://github.com/Morrison-Lab/gha/pull/449): the same
+collapse recurred, reporting 7 hits across 112 added lines of ordinary YAML,
+all of them plain ASCII quotes.
+Rebuilt by code point with both controls, the same lines reported 0, and seven
+non-problems were nearly "fixed".
+The shell-quoting cause this entry originally recorded was disproved while
+answering the review of
+[ai-config#1403](https://github.com/Morrison-Lab/ai-config/pull/1403), by
+running the literal in a plain file and inside a `<<'PY'` heredoc and getting
+identical output.)
 
 ## `cmd | python3 - <<EOF` reads the heredoc, not the pipe, so `sys.stdin` scans nothing
 
@@ -1022,6 +1079,72 @@ space/tab, and require the count to be `>= 3`.
 `strip-non-invoking-markup.sh`.
 Sibling embedding trap: a bare `---` at column 0 inside a YAML `run: |` block is
 a document separator that truncates the generated script.)
+
+## awk brace handling differs by implementation, in both directions
+
+The section above covers two gotchas that come from **embedding** an awk program
+in a single-quoted shell string.
+This one is about the awk **implementation** the machine happens to provide,
+and it is the same file's third recorded trap.
+
+`mawk` is `awk` on Debian and Ubuntu, so a script that says `awk` gets it by
+default there, and it mishandles braces in two opposite ways:
+
+- **A brace you meant literally is read as an interval.**
+  `/\^{}$/` dies with `regular expression compile failed (bad interval
+  expression)`.
+  Bracket each brace (`\^[{][}]`) to make it a literal in every awk.
+  [`memories/git.md`](git.md) records this one, in the tag-peeling one-liner
+  that needed it.
+- **An interval you meant as an interval can abort the process.**
+  On `mawk 1.3.4 20240123`, the Ubuntu 24.04 build, `/^#{1,6}([ \t]|$)/` dies
+  with `REcompile() - panic: values still on machine stack`:
+  ```console
+  $ echo '## heading' | mawk '{ if ($0 ~ /^#{1,6}([ \t]|$)/) print "M"; else print "NO-M" }'
+  REcompile() - panic:  values still on machine stack for ^#{1,6}([ \t]|$)
+  ```
+  It prints **neither** branch.
+  Bracketing does not help, because here the interval is the thing you want:
+  avoid `{m,n}` outright, with `^#+([ \t]|$)` plus a length check on the run,
+  or the unrolled `^##?#?#?#?#?([ \t]|$)`.
+
+Three things about the pair.
+
+**Neither error leads a reader to the other.**
+[`memories/git.md`](git.md) records the first direction only, inside a
+tag-peeling one-liner and indexed by the literal-brace symptom that produced
+it --- it names neither the panic nor an interval you actually want.
+So arriving with the panic finds nothing there, and arriving with the
+bad-interval error finds a note that stops at the first direction.
+That is why both directions are written out here rather than cross-referenced.
+
+**The second direction fails toward silence at the caller.**
+mawk dies rather than returning a verdict, so a script that pipes a body
+through the awk gets an empty stream and reports whatever its no-match branch
+says --- which for a matcher is `false` on every input.
+
+**CI being green says nothing about it.**
+Whichever awk GitHub's `ubuntu-latest` provides does not hit the panic, so a
+`{m,n}` can sit in a shipped script indefinitely while every run passes.
+It surfaces only where `runs-on` is a consumer-settable input, or in a
+container.
+
+(Morrison-Lab/gha#448, 2026-08-12, in `strip-non-invoking-markup.sh` again:
+the panic took `detect-review-request.sh`'s verdict with it, so its own suite
+reported `30 of 64 detect-review-request case(s) did not behave as expected`
+while `_selftest.yml` was green on `main`.)
+
+- **Do:** assume `awk` is `mawk` in any program that ships to Debian or
+  Ubuntu, and bracket every brace you mean literally (`\^[{][}]`).
+- **Do:** express a bounded repetition without `{m,n}` --- `^#+([ \t]|$)` plus
+  a length check on the run, or the unrolled `^##?#?#?#?#?([ \t]|$)` --- when
+  the awk runs anywhere you do not control.
+- **Don't:** reach for the bracketing remedy on an interval you meant as an
+  interval; that is the fix for the opposite direction, and the two errors are
+  filed apart.
+- **Don't:** read a green `ubuntu-latest` run as evidence the awk is portable
+  --- whatever awk that runner provides does not hit the panic, so the defect
+  stays latent until a consumer sets `runs-on`.
 
 ## validate-skills.py token validation
 

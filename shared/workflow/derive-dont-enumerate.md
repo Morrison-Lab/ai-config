@@ -92,6 +92,43 @@ Surface an unowned stalled PR to the human, or claim it per [`claim-pr`](claim-p
 [`pr-status-all`](../../skills/pr-status-all/SKILL.md) remains the richer per-PR dashboard.
 This is the cheap standing sweep that says where to point it.
 
+## Asserting the set is EMPTY is the enumeration that skips its own check
+
+Everything above governs a set with members: hand over the query rather than the members, and watch that the query itself is wide enough.
+A claim that the set has **no** members is the same defect, and it evades both of those remedies, because there is nothing left to derive over.
+
+`CLAUDE.md`'s merge-order section already prescribes the derivation --- "'disjoint' is a claim about their file *sets*, so derive both sets and check the intersection before asserting it".
+An intersection against an empty population is vacuously empty, so that rule reports itself discharged while never having run.
+The population claim therefore sits **upstream** of every check the corpus offers here, and it is the one claim nothing prompts you to make with a command.
+
+Two things keep it from being noticed.
+
+**The conclusion is usually correct.**
+Collisions are rare, so "nothing to collide with" is right most of the time, and being right is exactly what stops anyone examining the reason.
+That makes this the shape [`fail-fast`](../principles/fail-fast.md)'s "A proxy that answers a narrower question passes the same way" describes: a test that is usually right, for a reason it never checked.
+
+**A reviewer will not supply the missing half.**
+The premise is about the *tracker* rather than about the diff, so it sits outside what a diff review reads at all --- which is [`fully-clean`](fully-clean.md)'s ratification case one step further out.
+There a reviewer inherits the author's population and verifies its members;
+here there are no members to verify, so a clean verdict says nothing whatever about the claim.
+
+The tell is a first-person scope word: "no other PR **of mine**", "nothing else in flight", "the only open one".
+Each names a population nobody counted, and "mine" is doing silent work --- it can mean opened by this session or held by this account, and those differ by however many sessions are running.
+
+Derive the population first, then the intersection over it, and publish both counts.
+`scripts/pr-sweep.py` above already derives the live open-PR set, and it reports what it examined rather than only what it found, which is the property this case needs.
+
+- **Do:** derive the population before the intersection, and report both counts --- "10 open PRs examined, 0 touching this file" is checkable, and "no others are open" is not.
+- **Do:** say which population a scope word covers --- this session's PRs, the account's, or the repo's --- since the three differ.
+- **Don't:** assert a set is empty from recollection;
+  emptiness is the one claim that makes the derivation rule vacuous rather than merely unsupported.
+- **Don't:** read a correct conclusion as evidence the premise held --- a collision-free result is the usual case whether or not anyone counted.
+
+(Morrison-Lab/ai-config#1435, 2026-08-12.
+Its PR body closed with "No other PR of mine is open, so there is no merge-order constraint and nothing to collide with", and the review confirmed the PR clean without touching that sentence.
+Ten PRs were open at merge time, eight of them under the same account.
+The post-merge sweep derived each one's file set against its own merge base and found 0 of 10 touching `shared/writing/ambiguous-reference.md` --- so the conclusion held and its stated reason did not.)
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

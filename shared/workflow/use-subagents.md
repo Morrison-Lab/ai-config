@@ -78,5 +78,6 @@ The increment here is *when*: before the new PR exists, not after, since a colli
 - **Don't:** read "I checked the open PRs" as covering this when the check was a keyword search or a stalled-PR count.
 - **Don't:** dispatch a file-naming brief on the strength of a sweep that never printed the colliding PR's file list.
 
-(Morrison-Lab/ai-config#1413, 2026-08-12: a subagent was briefed to trim two specific files; open PR #1407 had touched those exact files sixteen minutes earlier, and a `pr-sweep.py` run had listed #1407 as in-flight without its file set ever being read. #1413 conflicted with #1407 as a result. Extending `pr-sweep.py` to print each PR's file set --- so this check needs no separate round of calls --- is filed as [#1419](https://github.com/Morrison-Lab/ai-config/issues/1419).)
+(Morrison-Lab/ai-config#1413, 2026-08-12: a subagent was briefed to trim two specific files; open PR #1407 had touched those exact files sixteen minutes earlier, and a `pr-sweep.py` run had listed #1407 as in-flight without its file set ever being read. #1413 conflicted with #1407 as a result.
+Extending `pr-sweep.py` to print each PR's file set --- so this check needs no separate round of calls --- is filed as [#1419](https://github.com/Morrison-Lab/ai-config/issues/1419).)
 

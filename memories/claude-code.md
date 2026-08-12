@@ -774,6 +774,17 @@ checks — don't rely on remembering which directory the last call left you
 in. (Session sliding the `macros` submodule pin in `d-morrison/rme` and
 `ucdavis/epi204`, 2026-07-04.)
 
+**A parallel batch is the same trap in its sharpest form.**
+Two Bash calls composed into one message read as independent,
+but they share the one persistent shell and run serially,
+so the first call's `cd` decides the second call's repo.
+A verification command labeled for repo B, batched after a sibling that
+`cd`'d to repo A, returns repo A's clean status and HEAD under repo B's
+label --- plausible output, wrong subject.
+(Post-compaction verification batch, 2026-08-12: an ai-config
+`git status` check ran in the sparta checkout this way, and its output was
+initially read as the ai-config answer.)
+
 **In an AGENT / subagent thread the cwd behavior INVERTS -- it RESETS to the
 project root between Bash calls, so a `cd` does NOT persist.**
 The main-session persistence above is a property of that tool;
@@ -1098,3 +1109,59 @@ feel current: 177 skill directories and exactly one `commands/` file
   invoke it.
 - **Don't:** cite "a command cannot bundle supporting files" as a distinction
   between two mechanisms.
+
+## `kill -0` reports an unreaped zombie as alive, so a "wait until it is gone" loop spins
+
+When a test or a helper needs a **reliably dead PID** --- to exercise a
+liveness check's dead branch, say --- the obvious construction is to spawn a
+process, kill it, and poll `kill -0` until it fails.
+That poll does not measure whether the process is dead.
+It measures whether the process has been **reaped**, and those are different
+events separated by however long the parent takes to collect the exit status.
+A killed child that nobody has waited on is a zombie, and `kill -0` succeeds
+on a zombie.
+
+The gap is set by who the parent is.
+Orphan the child first --- spawn it from a shell that then exits --- and it is
+reparented to PID 1, so the reap latency becomes a property of whatever PID 1
+happens to be in this container rather than of your code.
+
+Measured 2026-08-12, `uname -sr` = `Linux 6.18.5-fc-v20`, PID 1 =
+`process_api` (a Firecracker init, per `ps -o comm= -p 1`):
+
+| construction | result |
+|---|---|
+| orphan, kill, observe immediately | `stat=Z`, `ppid=1`, and `kill -0` returns **0** |
+| orphan, kill, poll `kill -0` until it fails | 151 to 161 polls, **1.79s to 1.95s** (3 trials) |
+| `wait <pid>` from a shell that never owned it | `wait: pid N is not a child of this shell`, rc **127**, zombie unreaped |
+| spawn, kill, and `wait` in **one** shell | `wait` returns 143, `kill -0` fails immediately, ~3ms (3 trials) |
+
+Read the second row as the correction to the intuition, in both directions.
+PID 1 here **does** reap, so the loop terminates rather than hanging forever ---
+but it burns roughly two seconds doing nothing, and during that window every
+`kill -0` answers "alive" about a process that has already died.
+A helper that treats that answer as authoritative reports a dead process as
+live, which is exactly backwards for a staleness check.
+
+The third row is the trap worth knowing separately, because `wait` looks like
+the fix and is not: it fails outright on a non-child, and reaps nothing.
+The last row is the working form --- spawn, kill, and `wait` inside a single
+shell, so that shell is the parent and the reap is synchronous.
+
+Treat PID 1's identity and its reap latency as volatile, per
+[`timestamp-volatile-claims`](../shared/writing/timestamp-volatile-claims.md):
+both are properties of this container image rather than of Linux, and a
+subreaper or a different init changes the second row's numbers or removes the
+reap entirely.
+Re-run `ps -o comm= -p 1` before relying on any of it.
+
+- **Do:** spawn, kill, and `wait` in one shell when a test needs a PID that is
+  reliably gone.
+- **Do:** bound any `kill -0` poll and treat exhausting the bound as a result,
+  not as a hang, per
+  [`fail-fast`](../shared/principles/fail-fast.md).
+- **Don't:** read `kill -0` succeeding as the process being alive --- it
+  succeeds on a zombie, which is the one state a liveness check most needs to
+  tell apart from alive.
+- **Don't:** `wait` on a PID this shell did not spawn; it exits 127 and leaves
+  the zombie in place.

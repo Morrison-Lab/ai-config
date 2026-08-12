@@ -484,3 +484,25 @@ present, and prescribes re-searching for the stable part of the concept.
 What that entry does not say, and what is specific to merge verification, is
 that the correct needle is obtainable for free from the diff --- so here the
 guess is eliminable rather than merely improvable.)
+
+## A sound checker pointed at the wrong repository
+
+(Morrison-Lab/ai-config#1327 / #1395, 2026-08-12: a pre-push semantic-line-break
+scan was run as
+`cd /home/user/gha && python3 check-new-line-breaks/check-new-line-breaks.py`,
+from a session whose review target was `Morrison-Lab/ai-config`.
+It printed `No lines missing semantic breaks.`, which was true of `gha`'s diff
+and said nothing about ai-config's.
+
+The checker was sound, correctly invoked, and given a real base ref.
+Its own scope line reads
+`Checking for missing semantic line breaks (lines added since <base_ref>)`, so
+it names the comparison and not the tree --- and `origin/main` is a valid base
+ref in both repositories, so that line is byte-identical whichever one it ran
+in.
+Re-running from the ai-config worktree was the whole fix.
+
+Note which remedy this defeats.
+The three vacuous-zero causes above all converge on printing a denominator, and
+a denominator here would have been non-zero, correct, and equally silent, since
+`gha`'s diff genuinely had lines to examine.)

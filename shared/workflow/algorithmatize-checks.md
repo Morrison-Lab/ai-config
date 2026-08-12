@@ -417,8 +417,22 @@ Remove the clause you are crediting, re-run the case it supposedly handles, and
 confirm the behaviour changes; if it does not, the credit is wrong however
 plausible the reasoning.
 
+**That remedy has a precondition worth naming, because a comment gives no sign
+of which side of it a claim sits on.**
+Mutation decides an attribution whose subject is **your own code**, since you
+can remove the part being credited.
+A comment crediting the **runtime environment** --- what the kernel, the init
+process, the shell, or the platform does --- has nothing in the diff to remove,
+so mutation cannot reach it and only measuring the environment can.
+Both are cause claims and both arrive in the same artifact, so discriminate on
+whether the subject is something you can edit;
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A symptom that both
+a mechanism and its opposite predict is evidence for neither" owns that case.
+
 - **Do:** verify a "which guard handles which case" comment by removing the
   guard and confirming the case flips, before committing the comment.
+- **Do:** measure instead of mutating when the comment credits the environment
+  rather than a clause you wrote.
 - **Do:** re-run that mutation when a reviewer disputes the attribution, rather
   than re-arguing it.
 - **Don't:** treat a guide-for-future-edits comment as exempt from

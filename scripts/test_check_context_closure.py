@@ -854,5 +854,82 @@ check(
     not over and "NOT checked" in text,
 )
 
+
+def _fc_rejects_zero():
+    """argparse exits 2 on a non-positive --fragment-cap rather than accepting it."""
+    try:
+        ccc.main(["--fragment-cap", "0"])
+    except SystemExit as exc:
+        return exc.code == 2
+    return False
+
+
+# --- render_fragment_caps ---------------------------------------------------
+
+# depth 0 is the root, which --root-char-cap already governs under a
+# different limit in a different unit. Gating it twice would let the two
+# reports disagree about one path.
+over, text = ccc.render_fragment_caps(
+    [("CLAUDE.md", 500, 0), ("shared/a.md", 10, 1)], 100)
+check("the root file is exempt from the per-file cap", not over)
+check(
+    "the root file is not counted among the fragments examined",
+    "1 fragment(s) examined" in text,
+)
+
+over, text = ccc.render_fragment_caps(
+    [("CLAUDE.md", 10, 0), ("shared/a.md", 101, 1)], 100)
+check("a fragment over the cap fails", over)
+check("a breach names the file", "shared/a.md" in text)
+check("a breach reports by how much", "(+1)" in text)
+
+over, text = ccc.render_fragment_caps(
+    [("CLAUDE.md", 10, 0), ("shared/a.md", 100, 1)], 100)
+check("a fragment exactly at the cap passes", not over)
+
+# Reports what it examined, not only what it found: a walk that resolved no
+# fragments and a corpus with none over the cap both print zero breaches
+# otherwise, per shared/principles/fail-fast.md.
+over, text = ccc.render_fragment_caps([("CLAUDE.md", 10, 0)], 100)
+check("no fragments still reports the examined count", not over
+      and "0 fragment(s) examined" in text)
+
+over, text = ccc.render_fragment_caps(
+    [("shared/a.md", 300, 1), ("shared/b.md", 200, 1), ("shared/c.md", 10, 2)],
+    100,
+)
+check("every breach is reported, not just the largest", over
+      and "shared/a.md" in text and "shared/b.md" in text)
+check("breaches are ordered largest first",
+      text.index("shared/a.md") < text.index("shared/b.md"))
+check("a fragment under the cap is not listed", "shared/c.md" not in text)
+check("the examined count covers every depth below the root",
+      "3 fragment(s) examined" in text)
+
+# The gate is NOT --strict-gated: unlike the advisory byte budget, a
+# fragment over the cap fails on its own, so a run that never passes
+# --strict still returns 1.
+with tempfile.TemporaryDirectory() as d:
+    base = Path(d)
+    (base / "CLAUDE.md").write_text("@big.md\n")
+    (base / "big.md").write_text("x" * 500)
+    check(
+        "a fragment over the cap fails without --strict",
+        ccc.main(
+            ["--base", str(base), "--budget", "100000000", "--fragment-cap", "100"]
+        ) == 1,
+    )
+    check(
+        "the same closure passes under a cap it fits",
+        ccc.main(
+            ["--base", str(base), "--budget", "100000000", "--fragment-cap", "1000"]
+        ) == 0,
+    )
+
+check(
+    "--fragment-cap rejects zero, like the other positive_int thresholds",
+    _fc_rejects_zero(),
+)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

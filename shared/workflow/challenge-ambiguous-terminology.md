@@ -53,3 +53,56 @@ established fact again --- even though the evergreen-conditional phrasing
 had already landed on `main` in the same session --- because nothing
 prompted a check of this guideline while writing a brand-new citation, only
 once a review flagged it after the fact.)
+
+**A cross-repo citation can also name the wrong repository, with nothing
+pending and nothing to wait for.**
+The trap above is about *when* a cited path exists, so its remedy is a
+merge-status check and a phrasing that survives either merge order.
+This one fires once everything has merged: the section is present, the title
+is quoted correctly, and it lives in the other repository.
+
+The setup is two repos' `CLAUDE.md` files auto-loaded at once, which is the
+normal state of a session scoped to more than one repo.
+A section title from the second one sits in context, reads as something
+already verified, and gets cited from a memory file in the first --- where a
+bare `` `CLAUDE.md` `` resolves to that repo's own.
+
+Self-review does not catch it, because the check it prompts is whether the
+section exists, and it does.
+The title was read rather than invented, so re-reading the sentence confirms
+the reading you already had.
+
+A link checker cannot catch it either, and that is the part worth knowing.
+`CLAUDE.md` exists in both repositories, so the *file* resolves and the
+*section* does not.
+A checker keyed on paths reports clean over a citation that sends a reader to
+a document with no such heading in it.
+
+The remedy is to qualify the path with its owner and repo whenever a citation
+crosses one, rather than leaning on where the reader happens to be:
+`` `Morrison-Lab/gha`'s `CLAUDE.md` ``.
+Better still, cite the nearest home instead --- a fact already restated in the
+file you are editing needs no cross-repo citation at all.
+
+- **Do:** qualify a cited path with its owner and repo whenever more than one
+  repo is loaded, however unambiguous the title reads in context.
+- **Do:** settle which repository a section lives in by grepping for the
+  heading, rather than by recalling where you read it.
+- **Don't:** read "the section exists and I quoted it correctly" as having
+  verified the citation --- that check passes on exactly this error.
+- **Don't:** rely on a link check to catch it; a filename shared between two
+  repos resolves in both.
+
+(`Morrison-Lab/ai-config#1404`, 2026-08-12: a bullet in `memories/github.md`
+cited `` `CLAUDE.md` ``'s "GitHub access in remote / web sessions" section as
+the authority for `gh` being absent from remote sessions.
+That section is real, and it lives in `Morrison-Lab/gha`'s `CLAUDE.md`, which
+was auto-loaded alongside ai-config's in the same session.
+ai-config's own `CLAUDE.md` has no such heading, so to a reader inside
+ai-config the citation names a document that does not contain it.
+Review caught it; the fix repointed the sentence at that memory file's own
+"GitHub access from bash in remote/web sessions" section, which states the
+same fact one file away rather than one repo away.
+The same wrong citation had been copied into the PR body, which no diff-grep
+reaches and which the reviewer re-verified the diff instead of, so it took a
+second fix plus a correction note recorded inside the body.)

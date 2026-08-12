@@ -476,6 +476,16 @@ So the enforceable rule is "publish the command", not "verify the number".
 - **Don't:** treat a figure already copied into a PR body, a changelog, or a
   shipped file as out of scope; those are the copies a reviewer will read.
 
+**"Stale" here means the earlier reading has been retired, which holds only
+while one instrument has a before and an after.**
+Where both revisions stay live at once --- a consumer pinning one while the
+tool's default branch carries another --- the earlier figure is not obsolete
+and the later one is not its correction.
+See
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A re-measurement
+with a different instrument is a second measurement, not a correction", which
+owns that case.
+
 ## Publishing a command is not enough; it has to be the command you ran
 
 The section above closes on "publish the command", and that rule is right.

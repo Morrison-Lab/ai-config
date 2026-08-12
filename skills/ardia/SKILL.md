@@ -35,13 +35,15 @@ mutates a PR stays serial.
      [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) opens one from an
      empty `start:` scaffold commit before any code exists --- so read each
      draft's state rather than sorting by the flag:
-     - **Skip a driven draft.** Any of these marks one: the head commit is
+     - **Skip a driven draft.**
+       Any of these marks one: the head commit is
        still the `start:` scaffold (the implementer is mid-flight), an
        unretracted "paws off" claim comment stands
        ([`claim-pr`](../../shared/workflow/claim-pr.md)), another actor
        pushed recently, or the draft is deliberately held as a merge-order
        gate (`CLAUDE.md`'s "Surface merge-order constraints", surface 3).
-     - **Include a parked draft.** Real implementation on the branch, no
+     - **Include a parked draft.**
+       Real implementation on the branch, no
        live claim, and no recent activity by another actor.
        The review bot skips drafts in most repos, so once its content
        passes the repo's checks, mark it ready for review --- a clean

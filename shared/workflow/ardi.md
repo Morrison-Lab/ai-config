@@ -654,9 +654,10 @@ silently overwriting them, since the review thread refers to them.)
 **A "Corrections to this body" entry is itself a figure in the body, so the
 next push expires it too --- and it reads as more settled than the figure it
 corrected.**
-[`address-every-comment`](address-every-comment.md) requires that table: a
-body-staleness finding is answered by editing the body **and** recording the
-correction inside it, so earlier rounds citing the old numbers stay resolvable.
+[`address-every-comment`](address-every-comment.md) is what puts one there.
+A body-staleness finding is answered by editing the body **and** recording the
+correction inside it, so earlier rounds citing the old numbers stay resolvable,
+and a "Corrections to this body" table is one form that does both at once.
 Nothing there says what becomes of the entry on the next push, and the entry is
 the artifact in the body most likely to be read as exempt.
 
@@ -687,7 +688,7 @@ gauge itself was never checked.
 Here the gauge was right and the subject moved underneath it.
 
 - **Do:** re-derive every figure a corrections entry vouches for at each push,
-  and move the entry's own SHA along with them.
+  and record the SHA the new figures were derived at alongside them.
 - **Do:** append a further numbered entry when a later push moves the figures
   again, rather than editing the previous one, so the round that expired them
   stays visible.

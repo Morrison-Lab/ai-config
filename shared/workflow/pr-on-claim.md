@@ -296,6 +296,48 @@ The sentence is the trigger to request the review now.
 - **Don't:** treat a PR's auto-triggered checks as evidence that every reviewer is engaged.
 - **Don't:** write "review owed" or "still need to request review" into a status report; go request it instead.
 
+**A REDACTION PR is the one case where requesting the reviewer is the harm, and it needs recording rather than silence.**
+Everything above assumes the reviewer's input is a diff worth reading.
+On a PR whose whole change is deleting a secret or a participant identifier, the reviewer's input **is the secret**: removing the literal is the change, so it sits on the removed side of every hunk and reaches the model whatever the merged file ends up saying.
+`ucdavis/bcs#610` is the concrete instance --- the `@claude` reviewer quoted a network user id back into a PR comment while reviewing the PR that redacted it.
+
+The carve-out is about **content**, which is what separates it from the draft one directly below.
+A draft defers review because there is nothing worth reviewing **yet**, so the deferral expires when the work does.
+A redaction PR is complete, wants a **human** reviewer, and must never reach an automated one --- and drafting it to dodge the question makes things worse, since a draft stalls its own ARDI loop.
+
+An automatic gate is not enough on its own, because this rule routes around it.
+`ucdavis/bcs#614` merged a `redaction-gate` job that skips **automatic** AI review on such a diff.
+An explicit `requested_reviewers` POST is a different path, and the gate never sees it.
+
+So hold the AI review, say so on the PR, and record the exemption where a machine can read it --- a label the repo's own review workflow honours, applied before anything else asks:
+
+```bash
+gh pr edit "<N>" -R "<owner>/<repo>" --add-label no-ai-review
+```
+
+Run that as its own command, for the same reason the reviewer-request POST above must be its own command.
+A label add chained ahead of anything else shares one exit status with whatever follows it, so the label genuinely lands and the guard cannot attribute the outcome --- it keeps warning.
+Chaining it *after* a push is fine, since it is then the last command.
+
+Where the repo has no such label, assert it instead, in the env-prefix form this corpus's guards already use:
+
+```bash
+ALLOW_UNREVIEWED_REDACTION_PR=1 gh pr view "<N>" -R "<owner>/<repo>" --json number
+```
+
+[`hooks/no-unreviewed-pr.py`](../../hooks/no-unreviewed-pr.py) reads both, so a correctly-withheld review has a discharge rather than only a refusal to repeat.
+Its exemption is per-PR rather than per-head, since the removed side still carries the literal after the next push.
+
+- **Do:** hold the automated review on a redaction PR, and record why with the label or the assertion.
+- **Do:** ask a human to review it, which is the review it actually needs.
+- **Don't:** request an AI reviewer on a diff whose removed lines are the thing being redacted --- the merged result being clean says nothing about what the reviewer read.
+- **Don't:** mark such a PR draft to stop the guard asking.
+  That misstates the reason and stalls its own review loop.
+
+(Morrison-Lab/ai-config#1392, from `ucdavis/bcs#615`, which removed 47 real participant identifiers.
+`redaction-gate` passed and `ai-review` reported `skipping`, as designed, and the guard then fired on six consecutive turns demanding a request whose only correct response was to refuse.
+Refusing did not discharge it, recording the refusal on the PR did not, and the maintainer deciding "hold, no AI reviewer" did not --- which is the shape [`algorithmatize-checks`](algorithmatize-checks.md) warns about, reached by an unusual route: the threshold was sharp and the **discharge set was incomplete**.)
+
 **Don't mark ready within seconds of the final push — the two review runs race
 and the WRONG one can get cancelled.** On repos whose review workflow runs on
 `pull_request` (`synchronize`, `ready_for_review`) with `concurrency:

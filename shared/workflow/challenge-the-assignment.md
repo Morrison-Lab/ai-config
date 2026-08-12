@@ -250,8 +250,8 @@ environment, and ask what would have to be true for it to run.
 directions of fallback are not equally dangerous.**
 `DEF=$(git symbolic-ref --short refs/remotes/origin/HEAD) || echo main` reads as
 dynamic resolution, which is exactly what the disclaimer asked for.
-It is a guess wearing resolution's clothes: where that ref is unset the
-substitution is empty, the fallback supplies a literal, and a right answer
+That expression is a guess wearing resolution's clothes: where the ref is unset
+the substitution is empty, the fallback supplies a literal, and a right answer
 arrives for a reason nothing tested --- which is
 [`fail-fast`](../principles/fail-fast.md)'s "a proxy that answers a narrower
 question passes the same way".
@@ -260,9 +260,9 @@ Contrast a fallback that fails **loudly**.
 Two `git worktree add` forms joined by `||` also read as defensive, and both can
 rest on one false premise, so the chain enumerates two states while the real one
 is a third.
-That errors at the recipient and costs a minute.
-The silent one cannot be caught at all, since a guessed default and a resolved
-one produce identical output.
+That chain still errors at the recipient, and costs a minute.
+The silent fallback cannot be caught at all, since a guessed default and a
+resolved one produce identical output.
 A brief may therefore carry a fallback that errors, and must not carry one that
 guesses.
 

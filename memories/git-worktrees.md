@@ -416,9 +416,52 @@ what governed.
 That observation does not establish *why*, and one session cannot separate the
 two candidates: a worktree-rooted session may reset where an ordinary one
 persists, or the persists claim may simply be stale.
+A third session, 2026-08-12, saw **both behaviours at once**, which rules out
+the first candidate as stated.
+It was an ordinary main session in a plain multi-repo checkout, no worktree
+anywhere.
+Several calls printed `Shell cwd was reset to /home/user`, and a
+`cd /home/user/gha` in one call nonetheless carried into the next: a Python
+edit script with no `cd` of its own, invoked immediately after, resolved a
+relative path against `/home/user/gha` rather than the repo the session had
+been editing.
+So within one session the directory both reset and persisted, and neither
+"worktree sessions reset" nor "the persists claim is stale" accounts for that
+on its own.
+Treat the behaviour as unpredictable per call rather than fixed per session,
+which is the reading all three measurements support.
+
+**The consequence in a multi-repo session is an edit landing in the wrong
+repository, and it is silent.**
+Both sibling checkouts held a file at the same relative path
+(`.github/workflows/claude-code-review.yml`), so the script opened a real
+file, of the right shape, in the wrong tree.
+Nothing about the call announces it -- the working directory is not echoed,
+and a repo-relative path is exactly what looks correct in a diff.
+
+Two habits make it fail closed rather than silently, and the second is the one
+that actually caught it:
+
+- Address files by **absolute path** in any session holding more than one
+  checkout, and prefer `git -C <path>` over `cd`, per
+  [`preferences.md`](preferences.md).
+- Make an edit script **assert its anchor before writing**.
+  A replacement keyed on exact surrounding text cannot match a different
+  repo's file, so the script aborts with no write rather than mangling
+  something.
+  Put every assert ahead of the single write at the end, so a failure leaves
+  the tree untouched.
+
+That is a specific case of [`fail-fast`](../shared/principles/fail-fast.md):
+the anchor is the check, and the ordering is what keeps its failure path from
+doing damage.
+
 Don't settle the disagreement by picking one.
-Read the `Shell cwd was reset` line in the session in front of you, which
-answers it directly and costs nothing.
+Read the `Shell cwd was reset` line, which costs nothing and answers the
+question **for the call that printed it**.
+Do not read it as settling the session: the 2026-08-12 measurement above saw
+that line on several calls and still had a `cd` carry into a later one, so its
+presence earlier in a session is not evidence about the call in front of you.
 
 So `cd /path/to/repo` is the most natural thing to type and the wrong thing to
 type: it silently selects the main checkout, which is on a different branch.

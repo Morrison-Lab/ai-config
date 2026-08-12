@@ -85,6 +85,62 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   refused every GraphQL call while `gh api user`/`gh api repos/<o>/<r>` both
   returned 200 --- a second, distinct root cause for the same
   `check-pr-fully-clean.py` failure symptom already tracked in that issue.)
+
+  **A third root cause reaches that same first call, and it is the most
+  common one: `gh` is not installed at all.**
+  The two causes above both assume a working `gh` whose *requests* are
+  refused, so both are diagnosed by reading a status code.
+  Here there is no request and no status code:
+
+  ```text
+  FileNotFoundError: [Errno 2] No such file or directory: 'gh'
+  ```
+
+  `get_pr_info()` shells out to `gh pr view <n> --json ...`, so the script
+  dies on its first call before any repo-specific logic runs --- the same
+  place, with a different exception class.
+  `command -v gh` discriminates the three in one read, and it is worth
+  running before diagnosing anything else about the script.
+
+  What makes this worth recording rather than filing under "the CLI is
+  missing" is **which** sessions it hits.
+  `CLAUDE.md`'s "GitHub access in remote / web sessions" section says `gh` is
+  **not installed** there, so this is the norm for a whole class of session
+  rather than a misconfiguration --- and two corpus rules name that script as
+  the instrument for deciding a PR is ready:
+  [`ardi`](../shared/workflow/ardi.md) requires it for the single-PR loop, and
+  [`fully-clean`](../shared/workflow/fully-clean.md) opens by saying the two
+  criteria are "verified via `python3 scripts/check-pr-fully-clean.py
+  <pr-number>`".
+  So a mandated check is simply unavailable, and nothing in either rule says
+  what to do about that.
+
+  Route around it the same way this bullet already prescribes: the GitHub MCP
+  tools, verifying by hand against
+  [`fully-clean`](../shared/workflow/fully-clean.md)'s own criteria ---
+  select verdict candidates on the `**Claude finished` body marker rather
+  than an author login, anchor on the **last** `### Verdict` heading, read
+  Copilot's posted review body rather than its check colour, and paginate the
+  check-runs endpoint.
+
+  - **Do:** run `command -v gh` before diagnosing a `check-pr-fully-clean.py`
+    failure, so a missing binary, a blocked GraphQL call, and a rate limit are
+    separated in one read.
+  - **Do:** report the script as **unavailable** in the status summary, naming
+    the MCP checks run in its place, so a reader can tell a hand verification
+    from an instrument's verdict.
+  - **Don't:** read the script's absence as licence to skip criteria 1 and 2
+    --- the criteria are the requirement, and the script is one way of
+    reaching them.
+  - **Don't:** report a PR clean without saying which instrument decided it;
+    a hand check and a script run are different evidence and should not read
+    alike.
+
+  (`Morrison-Lab/ai-config#1403`, 2026-08-12: a remote session driving that
+  PR's own check-in ran the script as instructed and got the traceback above.
+  Every criterion was then verified through `pull_request_read` and
+  `get_check_runs` instead, and the merge went ahead on that evidence --- but
+  the summary had to say the instrument was unavailable rather than clean.)
 - **The @claude review bot's author name differs by API:** its comment author is `claude[bot]` in REST (`.user.login`) but `claude` in GraphQL (`.author.login`). A watcher filtering REST comments for `.user.login == "claude"` silently finds nothing — use `"claude[bot]"`.
 - **A third variant, and it is not one repo's quirk: the review comment can
   post as `github-actions[bot]` rather than `claude`/`claude[bot]`, and the

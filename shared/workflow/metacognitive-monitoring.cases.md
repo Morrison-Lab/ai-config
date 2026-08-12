@@ -247,6 +247,68 @@ Recorded for that cluster in `ucdavis/bcs#592` / `#593`; the correction to
 the retracted figure and its retracted replacement were in different places on
 the page.)
 
+## A re-measurement with a different instrument
+
+(2026-08-12, `ucdavis/bcs#615`: a PHI-count figure was published as a
+correction when it was a second measurement.
+
+`.github/workflows/check-phi.yml` there pins
+`Morrison-Lab/gha/.github/workflows/check-phi.yml@v2`.
+`git rev-parse v2` in `gha` is `e7291ccd7171e2f0ac8eb730707ca916795e737e`,
+which is PR #445's own merge commit, while `origin/main` is
+`695fbf56cf65d7779123e24782a40d80782386e1`.
+The two differ in the operator alternation of `check-phi/check-phi.py`'s
+`_STUDY_ID_RE`: `v2` has
+`(?:\s*(?:<<-|<-|!=|==|=|:)\s*|\s+(?:eq|ne)\s+)`, and `main` adds
+`|\s+(?:not\s+)?in\s*\(\s*` from gha#454.
+
+Both revisions extracted and run whole-tree (`PHI_BASE_REF` empty) against
+clean worktrees:
+
+| detector | tree | allowlist | findings | files |
+|---|---|---|---|---|
+| `v2` | bcs `origin/main` `d638c05` | absent | 93 | 19 |
+| `main` | bcs `origin/main` `d638c05` | absent | 99 | 21 |
+| `v2` | bcs#615 head `3f529db` | real | 0 | 0 |
+| `main` | bcs#615 head `3f529db` | real | 0 | 0 |
+| `v2` | bcs#615 head `3f529db` | empty | 92 | 19 |
+| `main` | bcs#615 head `3f529db` | empty | 98 | 21 |
+
+Diffing the two annotation streams shows the whole delta is SAS's membership
+form: 6 findings, every one of them on a line matching `(?i)\bin\s*\(`, at 6
+sites across 4 files.
+The summary's file count moves 19 to 21 rather than to 23 because 2 of those 4
+files were already flagged under `v2` --- so "6 sites in 4 files" and "a
+2-file delta" are two different quantities, both correct, which is the
+labelling hazard `algorithmatize-checks` warns about arriving inside the
+evidence for this one.
+
+Neither figure retires the other.
+93 is what that repository's CI reports today, because it pins `@v2`.
+99 is what it will report once `v2` slides past gha#454.
+
+The round-4 comment nonetheless said "I earlier told the maintainer that
+`main` carried **93** findings.
+The derived figure is **99**.
+I had not run that measurement when I first stated it, and the number was
+wrong."
+Both halves are false: an earlier comment on the same PR had derived 93
+explicitly, showing `git rev-parse v2` first, and 93 remains correct for the
+pinned revision.
+
+The aggravating detail is where the qualifier survived.
+That same comment's table was correctly captioned "Measured with `gha`
+`main`'s detector", and the Correction paragraph three lines below it dropped
+the qualifier.
+The honest caption and the misleading claim were in one comment, and the
+quotable paragraph was the wrong one.
+
+Retracted in a later comment on the same PR.
+That retraction then misattributed the governing rule to `fail-fast.md`,
+corrected in a follow-up once
+`git grep -n "A correction inherits its instrument" -- shared/` was actually
+run --- which is the same read-versus-recall failure one artifact over.)
+
 ## Writing is the instrument, when the claim can be wrong
 
 (Same session: writing a docstring that had to state precisely how a correction

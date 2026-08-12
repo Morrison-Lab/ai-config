@@ -62,6 +62,13 @@ bug in the position/timestamp model this replaces:
 Obligations carry owner/repo when the transcript provides it, so the same PR
 number in two repositories is two obligations, not one.
 
+Two deferrals are legitimate, and both are recorded rather than assumed: a
+DRAFT PR (which does not trigger the review bot at all), and a REDACTION PR,
+whose diff carries the redacted literal on the removed side of every hunk so
+that requesting a reviewer is itself the exposure. See the "Redaction
+exemption" block below for that second one's two forms and why it is asserted
+rather than inferred.
+
 Fails OPEN on any parse trouble, and fires at most once per distinct message
 per transcript, so it cannot wedge a session.
 """
@@ -477,6 +484,195 @@ def probe_ident(cmd):
         if ok:
             return True, num, repo, (i == len(cmds) - 1)
     return False, None, None, False
+
+
+# --- Redaction exemption ---------------------------------------------------
+# A REDACTION PR carries the thing being redacted on the REMOVED side of every
+# hunk -- deleting the literal is the whole change -- so the reviewer's input IS
+# the secret. `ucdavis/bcs#610` records the concrete failure: the `@claude`
+# reviewer quoted a network user id back into a PR comment while reviewing the
+# PR that redacted it. `ucdavis/bcs#614` then merged a `redaction-gate` job that
+# skips AUTOMATIC AI review on such a diff -- and an explicit
+# `requested_reviewers` POST, which is exactly what this guard demands, routes
+# straight around that gate.
+#
+# Without an exemption the guard has no terminating state on such a PR
+# (ai-config#1392): refusing does not discharge it, recording the refusal on the
+# PR does not, and the maintainer deciding "hold, no AI reviewer" does not.
+# Its only discharges were a successful request -- the exposure -- and draft
+# status, which misstates the reason and stalls the PR's own ARDI loop
+# (shared/workflow/pr-on-claim.md). A guard no correct action can satisfy is one
+# its reader learns to narrate around, so the fix is a discharge path that a
+# correct action reaches.
+#
+# Detection is deliberately NOT inferred from the diff. This hook reads a
+# transcript, not a repository, so it cannot see the hunks; and a discharge is
+# the DANGEROUS direction (shared/principles/fail-fast.md), so the exemption is
+# narrow and explicit rather than guessed. Two forms, preferred first:
+#
+#   * A `no-ai-review` LABEL on the PR. This is the stronger of the two because
+#     it is a real repository artifact rather than a session's say-so, and it is
+#     load-bearing rather than a token invented for this hook: `ucdavis/bcs`'s
+#     own `ai-code-review.yml` already honours it, so applying it actually
+#     prevents the review as well as recording that it was withheld. Like every
+#     other releasing path here it discharges only on POSITIVE evidence the
+#     label landed (last/atomic, non-failed), so a repo with no such label --
+#     where `gh pr edit --add-label` errors -- gets no discharge from it.
+#   * An `ALLOW_UNREVIEWED_REDACTION_PR=1` env-assignment prefix, the shape
+#     `no-handrolled-verdict-parse.py` and `no-whole-file-punct-replace.py`
+#     already use, for a repo that has no such label. This is the "something a
+#     session can ASSERT" form, needed because on a redaction PR the correct
+#     action set and the previous discharge set were disjoint.
+EXEMPT_LABEL = "no-ai-review"
+EXEMPT_ENV = "ALLOW_UNREVIEWED_REDACTION_PR=1"
+RX_ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# The REST labels endpoint is issue-scoped even for a PR, so it needs its own
+# pattern -- RX_CMD_API matches only `pull`/`pulls` paths.
+RX_CMD_LABELS = re.compile(
+    r"repos/([\w.-]+)/([\w.-]+)/issues/(\d+)/labels", re.I)
+
+
+def _mutating_api(argv):
+    """True if a `gh api` argv performs a write.
+
+    `-X POST` is the explicit form, and it is NOT the only one: `gh api --help`
+    states that the method "is `GET` normally and `POST` if any parameters were
+    added", so `gh api .../labels -f 'labels[]=no-ai-review'` is a POST with no
+    `-X` anywhere. Requiring `-X POST` alone would miss the shape gh's own
+    examples use (`gh api repos/{owner}/{repo}/issues/123/comments -f body=...`).
+    An explicit `--method GET` sends the same parameters as a query string, so
+    it is a read and is excluded.
+    """
+    if _post_method(argv):
+        return True
+    for i, a in enumerate(argv):
+        au = a.upper()
+        if au in ("-X", "--METHOD") and i + 1 < len(argv) \
+                and argv[i + 1].upper() in ("GET", "HEAD"):
+            return False
+        if au.startswith("--METHOD=") and au.split("=", 1)[1] in ("GET", "HEAD"):
+            return False
+    return _has_flag(argv, "-f", "--raw-field", "-F", "--field")
+
+
+def _names_label(argv):
+    """True if some argv token carries EXEMPT_LABEL as a whole label name.
+
+    Whole-name matching, not a substring: a label called `no-ai-review-later`
+    is a different label, and `--add-label a,b` is one token carrying two
+    names. The value may arrive as `--add-label=x`, `labels[]=x`, or a bare
+    following token, so the token is split on both `=` and `,`.
+    """
+    for a in argv:
+        if any(part == EXEMPT_LABEL
+               for part in a.split("=")[-1].split(",")):
+            return True
+    return False
+
+
+def _pr_ident(argv):
+    """(num, repo) for any PR-naming argv: a `gh pr <verb> <N>` or an API path.
+
+    Wider than _verb_ident alone so the env-assertion form can be attached to
+    whatever read the session was going to run anyway (`gh pr view`,
+    `gh pr comment`, `gh api repos/o/r/pulls/N`), rather than to one blessed
+    verb. Identity still comes from THAT command's own argv, never from a
+    whole-string scan, so a decoy number elsewhere in the line cannot
+    misattribute the exemption.
+    """
+    num, repo = _verb_ident(argv)
+    if num is not None:
+        return num, repo
+    for t in argv:
+        n, r = _url_ident(t)
+        if n is not None:
+            return n, r or repo
+    return None, repo
+
+
+def _argv_exempt(argv):
+    """(kind, num, repo) for one simple command's argv; kind is None/label/env.
+
+    Both forms are gh-SCOPED and structural, exactly like _argv_request: the
+    label token counts only as the argument of a real label-adding invocation,
+    and the env token counts only as an actual leading VAR=VALUE assignment.
+    So a `--body "... --add-label no-ai-review ..."` explaining the exemption,
+    or a doc line quoting `ALLOW_UNREVIEWED_REDACTION_PR=1`, cannot forge one --
+    which matters more here than for most detectors, since this file, its tests,
+    and the message text below all contain both literals.
+    """
+    if not argv:
+        return None, None, None
+    # Env-assertion form: one or more leading `VAR=VALUE` tokens, one of them
+    # ours. shlex keeps an assignment as a single token, so a mention inside a
+    # quoted string arrives as part of some LARGER token and never matches the
+    # exact-equality test here.
+    i = 0
+    env_ok = False
+    while i < len(argv) and RX_ENV_ASSIGN.match(argv[i]):
+        if argv[i] == EXEMPT_ENV:
+            env_ok = True
+        i += 1
+    if env_ok:
+        num, repo = _pr_ident(argv[i:])
+        return "env", num, repo
+    # Label form: `gh pr edit <N> --add-label no-ai-review` (the label may sit
+    # in a comma-separated list), or a POST to the issue-labels endpoint.
+    if argv[0] != "gh" or len(argv) < 3:
+        return None, None, None
+    if argv[1] == "pr" and argv[2] == "edit" \
+            and _has_flag(argv[3:], "--add-label") and _names_label(argv[3:]):
+        num, repo = _verb_ident(argv)
+        return "label", num, repo
+    if argv[1] == "api" and _mutating_api(argv) and _names_label(argv):
+        for t in argv:
+            m = RX_CMD_LABELS.search(t)
+            if m:
+                return "label", m.group(3), f"{m.group(1)}/{m.group(2)}"
+    return None, None, None
+
+
+def exempt_ident(cmd):
+    """(kind, num, repo, last): does `cmd` exempt a redaction PR from review?
+
+    `last` is reported for the same reason request_ident reports it -- the
+    harness `is_error` belongs to the whole call, so it is authoritative for the
+    label form only when the label command is last. The ENV form does not
+    consult it: that assertion is lexical and depends on no API outcome, so
+    requiring the command it prefixes to succeed would make the escape hatch
+    fail for a reason unrelated to the assertion, which is how a guard with no
+    reachable discharge is reproduced one layer in.
+
+    Fails toward no-exemption on a parse error, so a malformed command never
+    discharges.
+    """
+    cmds = _simple_commands(cmd)
+    if cmds is None:
+        return None, None, None, False
+    for i, argv in enumerate(cmds):
+        kind, num, repo = _argv_exempt(argv)
+        if kind:
+            return kind, num, repo, (i == len(cmds) - 1)
+    return None, None, None, False
+
+
+def _exempt(obligations, live, num, repo):
+    """Retire EVERY outstanding obligation for an exempted PR, and stop arming.
+
+    Exemption is a property of the PR's CONTENT, not of one head: the removed
+    side of the diff still carries the redacted literal after the next push, so
+    unlike a reviewer request -- which is per-head -- this survives later pushes.
+    Hence the pop from `live`, and hence retiring every obligation for the PR
+    rather than the single best-ranked one _clear() removes. An open's
+    obligation and a push's re-armed one can both be outstanding at once, and
+    leaving one behind would reproduce the unsatisfiable state this exists to
+    end.
+    """
+    if num is None:
+        return
+    obligations[:] = [o for o in obligations
+                      if not (o["num"] == num and _repo_ok(o["repo"], repo))]
+    live.pop(num, None)
 
 
 def _argv_open(argv):
@@ -941,6 +1137,9 @@ def scan(path):
     pending_clear = {}  # tool_use_id -> (num, repo) for draft transitions
     pending_close = {}  # tool_use_id -> (num, repo) for merge/close actions
     pending_probe = {}  # tool_use_id -> (num, repo) for single-PR status reads
+    # tool_use_id -> (num, repo) for a `no-ai-review` label add, whose discharge
+    # waits on positive evidence the label actually landed.
+    pending_exempt = {}
     # transition tool_use_id -> the push tool_use_id whose arm it deferred. An
     # arm may not be cancelled by a transition that merely tried and failed.
     pending_arm = {}
@@ -1176,6 +1375,19 @@ def scan(path):
                         if plast and not failed and RX_TERMINAL_STATE.search(body):
                             _clear(obligations, pnum, prepo)
                             live.pop(pnum, None)
+                    # A `no-ai-review` label exempts a redaction PR from the
+                    # reviewer request, but only once the label has actually
+                    # landed: a repo with no such label fails the add outright
+                    # (`gh: label not found`), and a discharge on the ATTEMPT
+                    # would clear the obligation while the PR carries no
+                    # exemption at all. Same fail-safe shape as the draft and
+                    # terminal discharges above, with the broad `failed` for the
+                    # same reason -- over-warning is the safe direction here.
+                    if rid in pending_exempt:
+                        enum2, erepo2, elast2 = pending_exempt.pop(rid)
+                        if elast2 and not failed:
+                            _exempt(obligations, live, enum2 or rnum,
+                                    erepo2 or rrepo)
                     continue
 
                 if kind != "tool_use":
@@ -1318,6 +1530,19 @@ def scan(path):
                 pok, pnum, prepo, plast = probe_ident(cmd_raw)
                 if pok:
                     pending_probe[tid] = (pnum, prepo, plast)
+                # A redaction PR must not reach an automated reviewer at all, so
+                # its exemption is registered here, BEFORE the push arm below:
+                # the env form takes effect immediately (it depends on no API
+                # outcome), so a call that both asserts the exemption and pushes
+                # finds an empty `live` and arms nothing. The label form still
+                # waits for its own result, so a push chained into that same
+                # call can arm -- an over-warn the label's own result then
+                # retires, since _exempt drops every obligation for the PR.
+                ekind, enum, erepo, elast = exempt_ident(cmd_raw)
+                if ekind == "env":
+                    _exempt(obligations, live, enum, erepo)
+                elif ekind == "label":
+                    pending_exempt[tid] = (enum, erepo, elast)
                 # A push re-heads the PR, so the per-head reviewer request is
                 # owed again. Checked last: a call that both pushes and requests
                 # (`git push && gh api ... -X POST`) arms here and is discharged
@@ -1407,9 +1632,20 @@ def main() -> int:
             "    gh pr view \"<N>\" --json reviews \\\n"
             "      --jq '[.reviews[] | select(.author.login | "
             "startswith(\"copilot\"))] | length'\n\n"
-            "If the PR is deliberately a DRAFT, that is a legitimate reason to "
-            "defer -- a draft does not trigger the review bot (see "
-            "shared/workflow/pr-on-claim.md). Say so explicitly.\n\n"
+            "Two legitimate reasons to defer, and neither is silence:\n\n"
+            "  * The PR is deliberately a DRAFT -- a draft does not trigger "
+            "the review bot (see shared/workflow/pr-on-claim.md). Say so "
+            "explicitly.\n"
+            "  * The diff REDACTS a secret or a participant identifier. Then "
+            "requesting a reviewer IS the exposure: the removed side of every "
+            "hunk carries the thing being redacted, so the reviewer's input is "
+            "the secret (ucdavis/bcs#610). Hold the AI review, say so on the "
+            "PR, and record the exemption so this stops asking:\n\n"
+            "        gh pr edit \"<N>\" -R \"<owner>/<repo>\" "
+            "--add-label no-ai-review\n\n"
+            "    where the repo honours that label, or, where it does not:\n\n"
+            "        ALLOW_UNREVIEWED_REDACTION_PR=1 gh pr view \"<N>\" "
+            "-R \"<owner>/<repo>\" --json number\n\n"
             "Writing \"review owed\" into a recap does not discharge this."
         ),
     }))

@@ -69,6 +69,28 @@ Or try it interactively in any Claude Code session:
 /plugin install ai-config@d-morrison
 ```
 
+::: {.callout-warning}
+
+## Pick one install route
+
+The plugin install and the `bootstrap.sh` symlink install are
+**alternatives, not complements**: both serve the same corpus, so running
+both lists every skill twice (bare `/ardi` plus prefixed `/ai-config:ardi`)
+and blows the skill-listing context budget
+([ai-config#1409](https://github.com/Morrison-Lab/ai-config/issues/1409)).
+On a machine that ran `bootstrap.sh`, leave the plugin disabled --- including
+a consumer repo's checked-in `enabledPlugins` block, which you opt out of
+with `"ai-config@d-morrison": false` in **`.claude/settings.local.json`**.
+Not `~/.claude/settings.json`: the user scope is the *lowest* of Claude
+Code's five, so a `false` there loses to the repo's checked-in `true`
+([settings docs](https://code.claude.com/docs/en/settings)).
+Likewise enable the plugin from at most **one** marketplace:
+`Morrison-Lab/ai-config` and `d-morrison/ai-config` publish the same plugin,
+so a second entry is a no-op collision.
+`bootstrap.sh` warns about both cases via
+`scripts/check-plugin-overlap.py`.
+:::
+
 ## `@claude` bot on PRs
 
 The bot that runs `claude-code-action` on this repo's PRs reads skills from

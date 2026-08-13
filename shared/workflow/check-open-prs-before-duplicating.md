@@ -28,3 +28,67 @@ If an open PR already adds or extends the thing you were about to build,
 This is the open-PR counterpart to the branch/worktree scan: a branch can be
 unpushed and invisible to `gh pr list`, but a PR can also be pushed and
 invisible to a branch-only scan if you never fetch it. Do both checks.
+
+## Both checks come back empty when the work is already DONE
+
+The paragraph above pairs two blind spots, and both are about work **in
+flight**.
+There is a third case it does not reach, and it is the commonest reason the
+thing you are about to build already exists: the work is **finished**.
+
+Completion removes both artifacts at once.
+A merge takes the PR out of `--state open`, and the same merge auto-deletes
+the head branch in any repo configured that way.
+So for anything cleaned up on completion, **absence is the expected result of
+success** --- and a query filtered to live state inverts the signal.
+
+The error direction is the expensive one.
+It reports the work as missing, which prompts you to do it again;
+the opposite error merely prompts a redundant check.
+
+Name the whole population rather than the live slice:
+
+```bash
+gh pr list --state all --search "<keywords> in:title,body"   # did anyone already do this?
+gh pr list --state all --head "<branch>"                     # did this branch ever have a PR?
+```
+
+**Do not predict the branch name either.**
+Searching for the name you *expect* the work to be under is the same failure
+one axis over: it enumerates one guessed member instead of deriving the
+population, per
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "never predict which
+case will fail; enumerate the class".
+A search over titles and bodies finds the work whatever it was called;
+`git ls-remote origin refs/heads/<guess>` finds it only if you guessed right.
+
+- **Do:** search `--state all` before concluding that work has not been done.
+- **Do:** search on keywords rather than on a predicted branch name, so the
+  query names the population instead of one member of it.
+- **Do:** read an absent branch as "merged and cleaned up" until a query that
+  can see merged work says otherwise.
+- **Don't:** read `--state open` returning nothing as evidence that nobody did
+  this --- that is the answer a *completed* PR produces.
+- **Don't:** read `git ls-remote` returning nothing as evidence a branch was
+  never pushed;
+  a merge deletes it, which is
+  [`use-existing-pr-branch`](use-existing-pr-branch.md)'s auto-delete case
+  read in the absence direction rather than the presence one.
+
+(`Morrison-Lab/ai-config#1447`, 2026-08-13.
+A delegated agent opened [#1442](https://github.com/Morrison-Lab/ai-config/pull/1442)
+at `04:59:48Z` and it merged at `05:24:04Z`.
+Checking afterwards with this fragment's own prescribed query returned
+nothing, as did `git ls-remote` on the branch, so the work was reported lost
+and re-pushed as
+[#1444](https://github.com/Morrison-Lab/ai-config/pull/1444) at `05:31:47Z`.
+That PR merged with an empty diff ---
+`git diff --stat 29532758^1 29532758` returns nothing --- and
+[#1443](https://github.com/Morrison-Lab/ai-config/issues/1443) was filed as a
+duplicate tracking issue for work already done.
+Neither command was wrong.
+Both answered "is this in flight?" when the question was "did this happen?".
+The predicted-name half is from the immediate sequel: a second check for
+`refs/heads/ums/liveness-filter-blindspot` also returned nothing, because the
+agent had used `ums/liveness-filtered-queries`, and only a filesystem
+collision on its worktree path revealed the branch at all.)

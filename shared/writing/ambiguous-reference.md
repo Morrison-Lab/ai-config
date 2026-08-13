@@ -105,6 +105,60 @@ risk concentrates where a pronoun opens a subordinate clause
 in a sentence already naming two or more nouns.
 Read those, and leave the rest.
 
+## The most expensive place for one is a Do/Don't bullet
+
+Everything above prices an ambiguous referent as a **wrong fact** a reader
+carries away.
+In a Do/Don't bullet it costs more, because the bullet *is* the instruction.
+A pronoun landing on the wrong antecedent there does not merely mislead ---
+it prescribes the opposite action, and a bullet is the one place with no
+surrounding prose for a reader to recover the intent from.
+
+The remedy the sections above give does not fire here, which is the gap.
+"Find the nearest noun phrase and confirm it is the intended referent" is a
+check on one sentence, and a bullet pair fails as a **pair**: each half reads
+correctly alone, and only reading them against each other shows that one tells
+you to edit a thing the other tells you to leave alone.
+
+So the decisive check is free and sits in the same block: **read each bullet
+against the worked example the block cites.**
+A block that earns a Do/Don't pair almost always carries a case record, and
+that record says what somebody actually did --- so it settles what the bullet
+is supposed to prescribe, with no judgment about pronouns involved at all.
+
+The near-miss is drafting the bullets from the block's **diagnosis**
+paragraph rather than from its example.
+The diagnosis is the half freshest in mind and the half carrying the
+argument, and it describes the defect rather than the remedy --- so a bullet
+written out of its vocabulary names the defective artifact, and a pronoun
+then binds to that.
+Nothing about this feels like guessing, since the diagnosis is the block's own
+prose, correctly understood.
+
+- **Do:** read a new Do/Don't pair against the block's worked example, and
+  against each other, before pushing.
+- **Do:** name the noun in a bullet even where the prose above it has just
+  established the referent, since a bullet is read alone.
+- **Don't:** draft a bullet out of the diagnosis paragraph's vocabulary ---
+  that paragraph names the broken artifact, and the bullet is about the
+  remedy.
+- **Don't:** treat the nearest-antecedent check as sufficient for a bullet
+  pair; each half can pass it while the two contradict.
+
+(`Morrison-Lab/ai-config#1429`, 2026-08-12, review finding 1, blocking.
+`shared/workflow/ardi.md`'s "A `Corrections to this body` entry is itself a
+figure in the body" block closed with a **Do** bullet reading "re-derive every
+figure a corrections entry vouches for at each push, and move the entry's own
+SHA along with them".
+The nearest antecedent for "the entry" is the corrections entry already in the
+body, so the bullet read as an in-place SHA edit --- which the very next
+bullet forbids, asking for a further numbered entry "rather than editing the
+previous one".
+The block's own worked example settles it in the same direction:
+`Morrison-Lab/ai-config#1395` appended a fourth entry recording its second
+refresh, leaving the third entry's figures where they were.
+Fixed to "record the SHA the new figures were derived at alongside them".)
+
 ## Relationship to neighbouring rules
 
 - [`challenge-ambiguous-terminology`](../workflow/challenge-ambiguous-terminology.md)

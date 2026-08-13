@@ -238,10 +238,14 @@ the bullets in this fragment record it failing at this exact boundary.
       round just walked back is stale in the way that matters most, and
       "reconciling prose" does not feel like changing what the PR does.
       Every **number** in the body was re-*derived* by command rather than
-      re-read, with the command pasted beside it --- a wrong count reads
-      exactly as plausible as a right one, so reading is no instrument for it,
-      and a base figure owes its own derivation rather than riding on the
-      delta's.
+      re-read, run *at this push* rather than carried from the last one, with
+      the command pasted beside it --- a wrong count reads exactly as plausible
+      as a right one, so reading is no instrument for it, and a base figure
+      owes its own derivation rather than riding on the delta's.
+      "At this push" includes a push that only answers a self-review finding,
+      and it includes the figures a "Corrections to this body" entry already
+      refreshed --- that entry is a claim about the previous head, so the
+      current push is what expires it.
 - [ ] **The diff's deleted lines were read**
       (`git diff origin/main...HEAD | grep '^-'`), and each one was a decision
       rather than collateral from an edit's blast radius --- a reviewer reads
@@ -646,6 +650,55 @@ it.
 The corrected body now shows the base, head and delta per group, states the
 `ast.parse` derivation, and keeps the wrong figures on the record rather than
 silently overwriting them, since the review thread refers to them.)
+
+**A "Corrections to this body" entry is itself a figure in the body, so the
+next push expires it too --- and it reads as more settled than the figure it
+corrected.**
+[`address-every-comment`](address-every-comment.md) is what puts one there.
+A body-staleness finding is answered by editing the body **and** recording the
+correction inside it, so earlier rounds citing the old numbers stay resolvable,
+and a "Corrections to this body" table is one form that does both at once.
+Nothing there says what becomes of the entry on the next push, and the entry is
+the artifact in the body most likely to be read as exempt.
+
+Three properties make it read that way.
+It is *about* staleness, so it presents as the remedy rather than as more of
+the material the remedy applies to.
+It names the SHA its figures were derived at, which reads as a timestamp
+bounding the claim when it is really a claim about a commit the head has since
+moved past.
+And it asserts the derivation was performed --- "re-derived rather than
+adjusted" --- so it vouches for the numbers above it in a way a bare figure
+never does.
+
+So this fires on the round *after* the rule was correctly applied, which is
+what separates it from an unknown rule or a check run too early.
+The item is discharged at one push, the correction is written down, and the
+pause point then comes round again at the next push with a durable note
+asserting the figures are current.
+[`skill-checklists`](skill-checklists.md)'s "however recently you ran it,
+whenever anything has been committed or edited since" is the governing bullet;
+the increment here is that a correction note is the artifact that most makes
+re-running feel unnecessary.
+
+Distinct from
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A correction
+inherits its instrument", where the replacement figure is wrong because the
+gauge itself was never checked.
+Here the gauge was right and the subject moved underneath it.
+
+- **Do:** re-derive every figure a corrections entry vouches for at each push,
+  and record the SHA the new figures were derived at alongside them.
+- **Do:** append a further numbered entry when a later push moves the figures
+  again, rather than editing the previous one, so the round that expired them
+  stays visible.
+- **Don't:** read a corrections entry as discharging the figures it names --- it
+  is a claim about one commit, and the next push is what falsifies it.
+- **Don't:** treat having written the correction as having done the check; the
+  note is that check's output, never a substitute for re-running it.
+
+See [`ardi.cases.md`](ardi.cases.md), "A corrections entry expires with the next
+push".
 
 **The read side of that comparison can lag a push by a few seconds, so test
 the two *local* refs against each other before concluding anything failed.**

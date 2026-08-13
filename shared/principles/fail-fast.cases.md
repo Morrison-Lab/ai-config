@@ -485,6 +485,115 @@ What that entry does not say, and what is specific to merge verification, is
 that the correct needle is obtainable for free from the diff --- so here the
 guess is eliminable rather than merely improvable.)
 
+## Five instruments in one session reporting a vacuous zero
+
+(2026-08-07: five instruments in one session each returned an empty or zero
+result that was read as absence --- a cumulative delta over a per-tick-cleared
+array, a `gh pr diff --name-only` empty from API lag that returned 2 files on
+re-query, an `ls A || ls B` fallback that did not say which branch answered, a
+diff-scoped grep blind to a defect caused by a *deleted* line, and this one.
+The last was published as a false claim by a session that had, earlier that same
+day, written the vacuous-zero trap into this very file.
+Read that as the argument for the denominator being a property of the
+instrument rather than something recalled at the call site ---
+[`skill-checklists`](../workflow/skill-checklists.md) already draws exactly that
+conclusion, in its "knowing the rule is not what fails here" passage, and is the
+place to read rather than restate it.)
+
+## A 947-repo sweep that scanned nothing
+
+(2026-07-28: a 947-repo scan reported `scanned: 0`, caught only because the
+count was printed; the `chmod +x` had been in a command the permission
+classifier denied minutes earlier.
+A later run of the fixed script reported 910 of 947, which is how that same
+sweep's rate-limit truncation was found --- the 37 repos it never reached.)
+
+## Why no prefix pattern separates a diff header from its data
+
+Measured on git 2.50.1, against a commit adding `++i;`, `++ foo` and `plain`:
+
+| guard | survives |
+|---|---|
+| `grep -v '^+++'` | `plain` |
+| `grep -v '^+++ '` | `++i;`, `plain` |
+| positional | `++i;`, `++ foo`, `plain` |
+
+## The per-file precondition, caught by dogfooding the guard
+
+This is not a hypothetical: the pass that wrote this entry ran the guard over
+its own three-file diff as a dogfooding check, and got three hits --- its own
+two undropped headers plus one --- which read at first like defects in the
+files rather than in the scan.
+Per-file scanning returned 0 for every file, as did grepping the files
+directly.
+
+## What the tighter `^+[^+]` guard drops
+
+Measured on git 2.50.1 against a two-paragraph addition: `^+[^+]` returned the
+two lines of text and not the blank between them, while the positional form
+returned all three.
+
+## How far a `grep -o` pattern's own alphabet reaches into a value
+
+Measured 2026-08-09 on `ucdavis/bcs`: of 45 sites carrying a ten-character
+identifier, a pure-digit pattern matched **12**, and the remaining 33 mix
+letters and digits in positions no digit-only rule reaches.
+
+## One shared abbreviation list feeding two regex branches
+
+(Morrison-Lab/gha#425, 2026-08-05: one abbreviation list (`_ABBREV_RE`) fed two
+regex branches --- a lowercase-sentence branch and an uppercase one.
+Dropping `No` from the list fixed the lowercase branch and un-protected `No.` on
+the uppercase branch; registering every lowercase form then fixed the lowercase
+branch and leaked protection onto the uppercase one.
+Each edit traded one regression for the other until the fix became
+architectural: a second, separately-scoped pass applied only after the first
+branch ran.)
+
+## A documented enabling procedure naming one of two required steps
+
+(Morrison-Lab/gha#449, 2026-08-12: an opt-in `@claude review` dispatch was added
+for repos that disable the agent, enabled by a repository variable **and** by
+uncommenting an `issue_comment` trigger the stub ships commented out.
+Every doc site named only the variable.
+The job's `if:` requires `github.event_name == 'issue_comment'`, so following
+the docs produced a one-second run with every job skipped and nothing posted ---
+the exact silent no-op the PR existed to fix (gha#447).
+Review caught it and called it blocking-ish; the fix stated both steps at six
+sites, two more than the review had enumerated.)
+
+## A proxy check that could not discriminate the case it was run for
+
+Measured on `Morrison-Lab/ai-config`, where the two halves disagreed
+outright:
+
+| check | result |
+|---|---|
+| sampled local commit messages found on `origin/main` | 0 of 4 |
+| files those commits touched, present on `origin/main` | 4 of 4 |
+| paths on local `main` absent from `origin/main` | 0 |
+
+## An empty merge-base substitution reporting HEAD as the merge base
+
+(`Morrison-Lab/ai-config`, 2026-08-09, post-merge cleanup: local `main` and
+`origin/main` had **no merge base at all**, and
+`git log --oneline -1 $(git merge-base main origin/main)` duly printed local
+`main`'s own tip, which was read as the merge base.
+That reading implied `main` was an ancestor of `origin/main` while
+`git merge-base --is-ancestor` in the same block reported it was not.
+The same session then misattributed `$?` twice more --- once after a
+pipeline and once after a command substitution --- while dupe-checking
+whether this very entry already existed.)
+
+## A published bullet count that was stale before anyone read it
+
+Measured 2026-08-09 on `Morrison-Lab/ai-config`, that returned 3 of 5 carrying
+zero bullets.
+The sentence this replaced claimed 4 of 5, and the discrepancy is the point
+rather than a correction to file away: one merge landed between the measurement
+and the review that questioned it, so a bare count published without its command
+was stale before anyone read it.
+
 ## A sound checker pointed at the wrong repository
 
 (Morrison-Lab/ai-config#1327 / #1395, 2026-08-12: a pre-push semantic-line-break

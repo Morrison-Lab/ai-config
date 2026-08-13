@@ -487,6 +487,152 @@ for --- the shape
 narrower question passes the same way".
 Had #1358 still been open, merging #1361 would have closed it.)
 
+## A review round surfacing five findings your own conventions already covered
+
+([gha#219](https://github.com/d-morrison/gha/issues/219)/[#220](https://github.com/d-morrison/gha/pull/220): one review round surfaced five findings --- a DRY
+duplication, an incomplete-coverage doc overclaim, a wrong changelog
+category, an uncited claim, and missing test coverage for new logic --- all
+catchable this way, since each was a direct match against gha's own
+`CLAUDE.md` conventions, not new information the review surfaced.)
+
+## Two correct fixes composing into a defect neither introduces alone
+
+(Morrison-Lab/gha#440, 2026-08-09: round 1 made a notice-posting step
+best-effort (`|| echo "::warning::"`) in response to one finding, and in the
+same commit extended a collapse step's `if:` to that step's path in response to
+another.
+Each was correct.
+Together, a run whose post failed would fold the *previous* run's notice and
+post nothing, leaving the PR with a gray gate and no explanation --- the exact
+symptom the PR existed to fix, reproduced in a single run.
+Round 2 caught it; reading the two-item commit message against itself would
+have.)
+
+## Self-correcting a rationale before the reviewer re-raises it
+
+([d-morrison/rme#989](https://github.com/d-morrison/rme/pull/989) /
+[ucdavis/epi204#363](https://github.com/ucdavis/epi204/pull/363): after telling both reviewers `references.bib` didn't
+share `CLAUDE.md`'s union-merge corruption risk, a follow-up merge
+simulation showed it does --- posted the correction with repro steps on
+both PRs before either reviewer re-raised it.)
+
+## A verification table in the PR body going stale as rounds change the diff
+
+(`Morrison-Lab/ai-config#1353`, 2026-08-09, review finding 2.
+The PR body claimed the guard's suite "grew from 226 to 238 cases (12 new
+BLOCK, 10 new ALLOW)".
+Neither number was derived: the base had never been counted at all, and the
+BLOCK delta was stale from an earlier drafting round that later rounds had
+added cases past.
+The reviewer counted the `BLOCK`/`ALLOW` list lengths with `ast.parse` rather
+than trusting the file's own runner, and reported 202 to 228 at the review head
+`7d063f2`.
+Round 1's own fix then added five more regression cases, so by `2f0b697` the
+real figures were 202 to 233 list cases (BLOCK 157 to 178, +21; ALLOW 45 to 55,
++10), or 212 to 243 including the runner's ten inline checks.
+That second movement is the point rather than a footnote: the *reviewer's*
+correctly-derived count went stale within one round too, so the defect is not
+carelessness at any one desk but a figure published where nothing re-measures
+it.
+The corrected body now shows the base, head and delta per group, states the
+`ast.parse` derivation, and keeps the wrong figures on the record rather than
+silently overwriting them, since the review thread refers to them.)
+
+## Validating against a real consumer repo covers what fixtures cannot
+
+(d-morrison/altdoc#34: running the new reference-index generator
+against `d-morrison/rpt` covered a `\docType{package}` topic, the singular
+form of a missing-topic warning, and the documented "existing settings files
+do not pick this up automatically" caveat --- confirmed by the page
+generating while `grep -c reference.html docs/index.html` returned `0`.
+None of the three were reachable from the repo's own fixture packages.)
+
+## An instruction's own suggested code breaking a project convention
+
+(d-morrison/altdoc#73: the issue proposed ending a function with a bare
+trailing `hashes`, which reads as a fix for the fragility it names but is
+still an implicit return, so a statement added after it silently becomes
+the return value.
+The lab manual asks for an explicit `return()` regardless.
+Review caught it; the project's own stated convention would have, one step
+earlier.)
+
+## A staging step the unit fixtures could not reach
+
+(d-morrison/altdoc#76: a guard checked for the copied logo under `docs/`,
+but the `quarto_website` path stages into `_quarto/` first, so the logo
+line was dropped on every render of the one generator the feature wired up.
+Seventeen unit assertions passed throughout; one throwaway render found it
+immediately.)
+
+## A mechanism claim whose population held no true positive
+
+(ai-config#770, same day: a `git log -- skills/<name>` probe was said to
+separate "deleted from the repo" from "never ours" *exactly*, on the evidence
+that it reported zero false orphans.
+The repo contained no deleted-but-still-installed skill at all, so there was
+nothing for it to get wrong; and `git rev-parse --is-shallow-repository`
+returned `true`, meaning anything deleted before the shallow boundary would
+have been silently misread as harness-provided.
+The claim went into a PR reply before either check was run, and ai-config#765
+had independently reached the correct conclusion.)
+
+## Editing generated output, then being read as pollution once regenerated
+
+(Morrison-Lab/ai-config#834, same day: a fix was applied to the generated
+`tool-mappings.md`, which `sync-codex-skill-wrappers.py` then overwrote,
+failing `validate` with `stale tool-mappings.md`.
+Redoing it in `tool-mappings.yml` regenerated 175 `codex-skills/` wrappers,
+and Jules returned `VERDICT: block` twice for "bulk pollution", its second
+verdict noting it had read only a truncated diff.
+`claude-review` called the same finding a false positive at the same head.)
+
+## A generator's environment, not its version, changed the committed artifact
+
+(`UCD-SERG/serodynamics#291`, 2026-08-12: `docs-check` reported exactly two
+changed files, `DESCRIPTION` and `NAMESPACE`.
+Re-documenting locally with roxygen2 8.1.0 --- CI's own version, from CI's own
+RSPM binary repo --- changed **three**, the extra one being
+`man/expect_snapshot_data.Rd`, because `testthat` sits in `Suggests` and was
+not installed, so that file's
+`@inheritDotParams testthat::expect_snapshot_file` could not resolve and
+roxygen emitted the topic without the inherited arguments.
+`rjags` was absent too and was flagged on a different topic, which is worth
+separating: only the `testthat` gap changed a file, so the missing-package
+count and the changed-file count are not the same number.
+Committing that would have shipped a silently degraded help page.
+Installing the full `Suggests` set reproduced CI's two-file result exactly,
+with no warnings --- and the contrast between the two runs' warning output is
+itself the cheapest check that the environment is now right.)
+
+## A brand-new branch reading back at `main`'s tip, reproduced offline
+
+Reproduced in a local bare repo, where no replica and no race exists: the
+push printed `* [new branch]` and exited 0, `git ls-remote` and the tracking
+ref both read `main`'s tip, `main..<branch>` held zero commits, and
+`git push origin HEAD:refs/heads/<branch>` then reported a real range.
+That last command is a test as much as a fix, since it answers
+`Everything up-to-date` when the branch ref and `HEAD` already agree.
+
+Two things weigh against the read-side story, which an earlier draft of this
+entry weighted equally against the write-side one.
+A lagging replica cannot invent a value for a ref that never existed before,
+so its failure mode is the ref reading **absent** rather than reading one
+specific wrong commit.
+And a tracking ref is set from what the push sent, which makes its value a
+client-side fact rather than a later network read.
+
+What stays genuinely unsettled is narrower than either reading claimed: the
+branch ref's own value at push time was never recorded, so the local
+explanation is the best supported one rather than a proven one.
+Note the shape of that, since it is the failure this entry is about.
+The entry has now over-claimed twice, first asserting a write-side fault, then
+asserting a parity between two hypotheses that the record does not support
+either.
+The practical advice survives all three readings, because the
+`git ls-remote origin <branch>` and `git rev-parse HEAD <branch>` checks are
+cheap whichever is right.
+
 ## A suite whose branch coverage varies by host
 
 (Morrison-Lab/ai-config#1327 / #1395, 2026-08-12: `skills/session-lock`'s

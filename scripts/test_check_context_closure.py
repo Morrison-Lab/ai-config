@@ -882,6 +882,20 @@ over, text = ccc.render_fragment_caps(
 check("a fragment over the cap fails", over)
 check("a breach names the file", "shared/a.md" in text)
 check("a breach reports by how much", "(+1)" in text)
+# The remedy this message prescribes -- a `.cases.md` split -- is itself the
+# operation that strands positional references, and that defect is invisible
+# to every other check here. So the message that triggers the split names the
+# sweep, per shared/writing/reorganize-prose.md.
+check("a breach names the positional-reference sweep",
+      "above|below|here|earlier|later" in text)
+check("a breach names the remedy, not just the sweep",
+      "naming its subject" in text)
+# A clean run must not print the sweep, or the advice detaches from the
+# moment it applies to and becomes noise every reader learns to skip.
+_, clean_text = ccc.render_fragment_caps(
+    [("CLAUDE.md", 10, 0), ("shared/a.md", 10, 1)], 100)
+check("a clean run does not print the sweep",
+      "above|below|here|earlier|later" not in clean_text)
 
 over, text = ccc.render_fragment_caps(
     [("CLAUDE.md", 10, 0), ("shared/a.md", 100, 1)], 100)

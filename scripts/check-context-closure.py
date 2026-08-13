@@ -563,6 +563,25 @@ def render_fragment_caps(files, cap):
             "raise --fragment-cap"
         )
         lines.append("  deliberately and say why.")
+        # Naming the sweep here rather than only in prose: this message is
+        # the observable moment the split is decided, and a positional
+        # reference the split strands is invisible to every other check --
+        # its referent is context that did not move, so no diff-scoped
+        # check sees it, and it is prose rather than a link, so
+        # check-links.py cannot either. See
+        # shared/writing/reorganize-prose.md.
+        lines.append(
+            "  Then sweep both sides for positional references the split "
+            "strands:"
+        )
+        lines.append(
+            "    rg -niE '\\b(above|below|here|earlier|later)\\b' "
+            "<companion> <fragment>"
+        )
+        lines.append(
+            "  Fix each by naming its subject, not by repointing at the "
+            "other file."
+        )
     return bool(breaches), "\n".join(lines)
 
 

@@ -35,6 +35,66 @@ had propagated into issues and briefs, which is the convention-document shape
 [`challenge-the-assignment.md`](challenge-the-assignment.md) describes: no
 single reader invented it, and each one found it corroborated.)
 
+## A brief's own command contradicted its own disclaimer
+
+(2026-08-12, a brief dispatched into a `Morrison-Lab/gha` clone: the prose said
+"Do NOT assume anything about its checked-out branch or worktree layout ---
+establish your own working state", and the command block directly beneath it
+assumed both.
+Its two `git worktree add` forms, joined by `||`, differed on whether to create
+the branch or reuse it, and both failed because the branch was already checked
+out in that clone --- so the chain enumerated two states and the real one was a
+third.
+The recipient recovered by detaching the existing checkout and using `-B`.
+
+The same block resolved the default branch with a piped
+`git symbolic-ref --short refs/remotes/origin/HEAD`, falling back to
+`|| echo main` inside the substitution.
+That ref is unset in the clones this corpus is developed in, so the fallback was
+the only thing that could have supplied a value.
+
+**It could not have.**
+An earlier version of this record said `DEF` came from the literal, right by
+luck.
+That was wrong, and wrong in the direction that made the example fit the
+argument, which is why it survived a self-review and was caught in review on
+`Morrison-Lab/ai-config#1408`.
+The `||` does sit inside the substitution here, but the pipe in front of it
+discards the failing command's status and `sed` exits 0 on empty input, so the
+fallback never fires.
+`DEF` ends up **empty**, and `git worktree add` against `origin/` then errors.
+
+Measured, 2026-08-12, with `false` standing in for the failing lookup:
+
+| form | `DEF` |
+|---|---|
+| `DEF=$(false \|\| echo main)` | `main` |
+| `DEF=$(false) \|\| echo main` | *empty* |
+| `DEF=$(false \| sed ... \|\| echo main)` | *empty* |
+| the same, under `set -o pipefail` | `main` |
+
+So the brief carried an inert fallback, and neither its author nor its recipient
+ran it.
+The recipient sidestepped it by resolving the branch with `git remote show
+origin` instead, which is why the inertness surfaced only in review.
+
+The resolution that does answer, derivable in any of these clones:
+`git symbolic-ref --short refs/remotes/origin/HEAD` exits non-zero with
+`fatal: ref refs/remotes/origin/HEAD is not a symbolic ref`, while
+`git remote show origin | sed -n 's/.*HEAD branch: //p'` returns `main`.
+Measured in `/home/user/ai-config` on 2026-08-12, and the recipient reported the
+same result for the `gha` clone the brief targeted.
+
+Two further premises in the same brief were the sections above, unchanged:
+`python3 -m pytest check-phi/tests/ -q` was instructed into an environment whose
+default interpreter has no pytest module (it is a `uv tool install` at
+`/root/.local/bin/pytest`), which is the environment case; and
+`Morrison-Lab/gha#445` was described as an open issue when it is a merged pull
+request, `merged_at` 2026-08-12T07:35:21Z, which is the corpus-state case that
+one `issue_read` call would have settled.
+The recipient caught all three and reported them back, which is again the
+discretionary detector rather than a mechanism.)
+
 ## This fragment's own brief overstated coverage
 
 (2026-07-31, this fragment's own brief: it named four areas as likely

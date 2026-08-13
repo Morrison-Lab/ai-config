@@ -109,7 +109,7 @@ so every search run there would have understated coverage.
 The brief asked to be questioned, which is why this was caught; the general
 case is a brief that does not.)
 
-## A recurring brief re-asserted a blocker that had stopped being true
+## A recurring brief re-asserted a blocker nobody re-tested
 
 (Morrison-Lab/ai-config#1439, 2026-08-13: a session spent roughly 8 hours
 reporting three of its PRs blocked because no external reviewer was reachable,

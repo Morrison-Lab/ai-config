@@ -315,8 +315,14 @@ Both sections above fail because the author never derived the claim, or could
 not.
 This one fails after the derivation succeeded.
 The author ran the check, got a real result, wrote it into the brief, and then
-sent that brief again the next round and the round after, long after the result
-had stopped being true.
+sent that brief again the next round and the round after, with nothing
+re-testing it in between.
+
+Note the rule does not need to know whether the result expired or was wrong to
+begin with, and in the worked case that stayed unsettled.
+Either way the brief asserted it every round on the strength of one reading,
+and being unable to tell the two apart afterwards is itself the argument for
+re-testing.
 
 The claim type that expires is a **capability**: whether a reviewer is
 reachable, whether a token can dispatch a workflow, whether a host answers.
@@ -333,7 +339,7 @@ Author and recipient are also the same party here, which is the strongest form
 of the authority the "Why nothing prompts the check" section describes.
 
 **The sharp case is a brief that forbids the retry that would refute it.**
-A step reading "if there is still nothing, do not re-post the request" is not
+A step reading "If still nothing, do NOT re-post the request" is not
 merely a brief failing to re-check.
 It instructs the next round not to, so the falsifying action is ruled out by the
 same document that asserts the thing it would falsify.
@@ -365,7 +371,7 @@ one who has to write it that way.
   the blocker settled is what stops that rule running.
 
 See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
-"A recurring brief re-asserted a blocker that had stopped being true".
+"A recurring brief re-asserted a blocker nobody re-tested".
 
 ## Relationship to neighbouring rules
 
@@ -378,7 +384,9 @@ See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
 - [`derive-dont-enumerate`](derive-dont-enumerate.md) also tells an author to
   hand over a query rather than an assertion, for a set that can grow while
   the work runs.
-  That is staleness in something true; this is a premise that was never true.
+  There the claim was true when written and the set grew past it; here the
+  author either never derived it, could not, or derived it once and never
+  re-tested it.
 - [`grep-is-not-coverage`](grep-is-not-coverage.md) is the same failure inside
   a single step: a real result, a sound command, and a conclusion that
   overreaches it.

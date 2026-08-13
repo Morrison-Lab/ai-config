@@ -1190,7 +1190,11 @@ Its `main`-merge remedy is a sweep for hedge forms --- `still open`,
 --- so it is **structurally blind** to this case rather than merely silent on
 it: the defect lives in an *unhedged* assertion, and a sweep keyed on hedges
 has nothing to match.
-Measured on the sentence below: **0 of those 6 forms** occur in it.
+Measured on the flagged assertion,
+`which is what Morrison-Lab/ai-config#1413 then did`: **0 of those 6 forms**
+occur in it.
+The reviewer's proposed hedge contains **3 of the 6**, which is the point
+rather than a contrast --- the sweep finds the remedy and never the defect.
 
 The two timestamp-aware rules above are each one axis away.
 "Timestamp the evidence before rebutting a finding with it" governs the

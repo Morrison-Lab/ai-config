@@ -2,6 +2,9 @@ Whenever `main` has moved ahead of a PR branch you're working on, **merge
 `main` into the PR branch** before the next push or review trigger. Don't wait
 for a conflict to surface or for someone to ask.
 
+Worked-example case records for the rules below live in
+[`sync-with-main.cases.md`](sync-with-main.cases.md), moved out of the auto-loaded context.
+
 This fragment covers the single-branch-vs-`main` case. When orchestrating a
 multi-agent `ultracode` session, merges can happen at more points than that —
 see [`ultracode-merge-conflicts`](ultracode-merge-conflicts.md) for the
@@ -74,11 +77,7 @@ failure (a stale generated-tree check, a check `main` has since added or
 dropped) often isn't a real problem with your change at all, just `main`
 having moved. `git fetch origin main && git log --oneline ..origin/main`
 first; if `main` is ahead, merge it in and re-run the checks before treating
-the failure as something to fix in the diff. (`stack-prs` #359: an
-empty-commit draft PR failed `validate` on a stale `codex-skills/` generated
-tree, and the `require-changelog` job on a newly-added `CHANGELOG.md`
-requirement from PR #354 --- both were `main` having advanced past a
-checkout that predated the session, not a defect in the new skill.)
+the failure as something to fix in the diff.
 
 **The same staleness trap has a silent variant with no CI failure to flag
 it: a worktree/branch named after a PR's followup can still be based on a
@@ -94,11 +93,6 @@ or by reading the actual blob your branch would produce (`git show
 HEAD:<path>`, or the working tree itself before assuming what it contains),
 not a commit hash pulled from `--all`. If `main` has moved, merge it in
 before building further edits on the assumption the missing content exists.
-(`ai-config#637`: a worktree named `pr-636-followup-...` was cut from a
-`main` snapshot that predated #636's own merge; an edit referencing "the
-bullet above" -- added by #636 -- was written and committed before the
-bullet actually existed on the branch, caught only when `git push` reported
-`main has moved` and the subsequent merge produced a real conflict.)
 
 **A real conflict inside a file whose logic is also copied elsewhere (an
 extracted script, a doc example) needs the copy re-synced too, not just the
@@ -114,11 +108,7 @@ against the extracted copy (fixtures, unit tests), add regression coverage for
 whatever `main`'s change fixed — the merge is the natural moment to catch a
 gap the original PR's tests didn't anticipate, and to prove the new fixtures
 actually catch the regression (temporarily revert the fix, confirm the test
-fails, then restore). (gha#176: `main` landed #173's lenient verdict-matching
-fix to `claude-code-review.yml`'s inline fail-check logic while a PR extracting
-that same logic to `scripts/check-review-execution.sh` was still open; the
-conflict resolution updated the script to match verbatim and added two new
-fixtures for #173's specific fix, verified to fail against the pre-fix logic.)
+fails, then restore).
 
 **When `main` DELETES a file your branch references, resolving the marked
 conflict is not enough --- grep the whole tree for the deleted path.** Git
@@ -133,11 +123,6 @@ hit; then distinguish live references (must be fixed) from historical
 citations of the removal itself (correct as-is, leave them). This is the
 deletion counterpart to the extracted-copy case above: there the logic
 moved and a copy went stale, here it vanished and the pointers went dead.
-(ai-config#696: `main` retired `scripts/check-new-line-breaks.py` via #703
-while the PR was open. The `validate.yml` conflict was visible and
-resolved, but `scripts/check-memory-file-size.py`'s docstring cited the
-deleted script as its advisory-exit-code precedent --- a file the conflict
-never touched, caught only by grepping for the path afterward.)
 
 **A textual conflict in a skill file can be the symptom of a conceptual
 duplicate, not just competing edits to the same line.** When merging `main`
@@ -150,10 +135,7 @@ into one, redirect), or genuinely distinct (cross-link both directions so
 neither reads as an unexplained near-duplicate)? `skill-builder`'s
 in-flight-work scan only runs once, at the start; `main` can grow a
 colliding skill in the time a PR is open, so the check has to be repeated
-at merge time too. (PR #352's `check-info-quality` landed alongside `#344`'s
-independently-authored `fact-check-prose` this way --- distinct enough to
-keep both, resolved by adding an explicit boundary in each skill's
-Relationship section rather than consolidating.)
+at merge time too.
 
 **The same collision can land before you write a line, and then it produces
 no conflict at all --- just duplicated work nobody flags.**
@@ -185,15 +167,6 @@ answers for the moment it ran.
 Dropping the planned work is the cheap outcome, so record why in the issue
 and the PR body rather than deleting it silently --- otherwise the next
 person re-proposes it.
-(ai-config#774, 2026-07-28: a planned `profile-before-optimising` fragment
-was mooted by `skills/measure-performance`, which merged via #762 during the
-session and covered the same two chapters --- including the specific gap the
-fragment was meant to fill.
-It surfaced only because the new skill appeared in the session's skill list
-after a routine fast-forward; the plan had been written before it existed.
-Dropped before implementation, with the reasoning recorded in both the issue
-and the PR body, and the neighbouring fragments cross-linked to the skill
-instead.)
 
 **A routine merge from `main` can create the duplicate inside your own diff.**
 The collision above lands before you write, so the duplicate is redundant on
@@ -217,18 +190,6 @@ lines added by the merge commit.
 - **Don't:** answer by asking which branch "introduced" the duplication;
   the merge introduced the state that made both copies coexist.
 
-(Morrison-Lab/ai-config#969, 2026-08-01: #969 added
-`shared/workflow/batch-merge-and-resolve.md` with a blockquote generalizing
-that an added-lines-only instrument is unsound when a defect can be introduced
-by deleting a line.
-PR #966 independently added the same generalization to
-`shared/workflow/sync-with-main.md` and merged after #969's branch was written.
-`git show 50afe818:shared/workflow/sync-with-main.md`, normalized for
-whitespace and markup, did not contain the phrase, so the duplication did not
-exist at #969's pre-merge head.
-The round-2 merge from `main` brought #966's copy in, and the round-3 review
-correctly flagged the two uncited copies.)
-
 **Two PRs that each append a new terminal numbered subsection to the same
 file (e.g. `### 5. ...` in a `CLAUDE.md` review-guidelines list) will
 conflict on merge even when neither side's content actually disagrees.**
@@ -244,11 +205,7 @@ in the same spot after your last review round, so a PR can go from
 own diff. Before reporting a PR ready to merge, re-check with
 `git fetch origin main` plus the `git merge-tree` command from
 `resolve-conflicts`, not just a cached `mergeable` flag or an earlier green
-CI run. (gha#211: `main` merged #209's own new
-`### 5. Check for AI-generated prose tells` subsection between this PR's
-clean review and its actual merge --- `git merge-tree` surfaced a real
-conflict that neither PR's own CI nor review status had flagged, since
-neither had rerun since `main` advanced.)
+CI run.
 
 **After merging a PR that extracts an inline block into a reusable unit
 (a composite action, a shared script/function), check other open PRs that
@@ -266,13 +223,10 @@ cleanly. Re-apply the
 sibling PR's actual semantic change (not a mechanical `--theirs`) to the new
 location, verify with a direct diff that the extracted unit now differs from
 `main` by exactly that PR's intended change and nothing else, then push to
-their branch and flag what you did in a PR comment. (gha#201 extracted
-`claude-code-review.yml`'s `claude_args` block into a new
-`run-claude-review-attempt` composite action to support a retry; gha#202,
-open in parallel, edited that same inline block to allowlist `WebFetch`/
-`Bash(curl:*)`. Proactively rebasing #202 and re-applying its allowlist
-change to the new composite action --- rather than leaving its author to
-discover a conflict --- let it merge within the hour instead of stalling.)
+their branch and flag what you did in a PR comment.
+
+See [`sync-with-main.cases.md`](sync-with-main.cases.md), "Check other open
+PRs after merging an extraction".
 
 **That "push to their branch" is scoped by standing, not only by cause.**
 gha#201/#202 were CI workflow files in a repo the author drove, where a push
@@ -304,16 +258,6 @@ tool's actual constraint) and should win outright rather than mechanically
 merging fragments of both. Re-diff the PR against `origin/main` after
 resolving to confirm the PR's remaining changes are its own original scope,
 not a reintroduction of what the other, now-merged PR already added.
-(`d-morrison/altdoc#7` vs `#18`: both independently added a `jarl.toml`
-excluding the same fixture directory for the same `jarl-check` failure;
-`#18` merged first, `#7`'s merge conflicted on the new file, resolved by
-keeping `#18`'s more detailed comment and re-confirming `#7`'s diff against
-`main` was back down to just its own four files. This same "append-collision"
-pattern struck a third time one insertion point over: this bullet and the
-two above it were each added by independent PRs landing in quick succession,
-all appending after the same "PR #352's `check-info-quality`..." paragraph
---- resolved, per the guidance above, by keeping all three rather than
-picking one.)
 
 **A `dirty` `mergeable_state` on a bot-opened PR can mean a sibling PR already
 closed the same issue, not just that `main` drifted.** An issue-triggered
@@ -328,12 +272,7 @@ linked issue for **other** cross-referenced PRs/closing events --- if one
 already merged and closed it, diff the conflicting file against `main`: if
 it's the sibling PR's already-published version, keep `main`'s content and
 keep only this PR's genuinely distinct remainder (a piece the sibling PR
-never did), rather than re-adding a second copy. (`ai-config#501`: issue #500
-was independently resolved twice --- `#502` merged first, adding
-`shared/writing/math-derivation-steps.md` and closing #500, but never wiring
-it into `CLAUDE.md`; `#501` added a second copy of the same fragment plus the
-missing `CLAUDE.md` wiring. Resolved by keeping `main`'s published fragment
-and `#501`'s wiring, turning a `dirty` merge into a clean `+8/-0` diff.)
+never did), rather than re-adding a second copy.
 
 **The same parallel resolution can be a whole-file split, and then files can
 vanish from your diff with no deletion hunk to read.**
@@ -364,22 +303,6 @@ successful conflict resolution rather than as lost work.
 - **Don't:** rely on the deleted-lines sweep for this case; content that left
   the diff has no deletion hunk for that sweep to show.
 
-(Morrison-Lab/ai-config#966, merging `origin/main` after #973 landed as
-`ea11bc9a`, hit `CONFLICT (add/add)` on `memories/github-mcp-tools.md`.
-Both branches had split that file out of `memories/github.md`; the two split
-versions were byte-identical apart from #966's own 49-line addition, so keeping
-`origin/main:memories/github-mcp-tools.md` was correct.
-The final PR diff collapsed from 13 files, 1093 insertions, and 661 deletions
-to 8 files, 429 insertions, and 6 deletions.
-Five files disappeared entirely:
-`memories/claude-bot-workflows.md`, `memories/claude-code.md`,
-`shared/workflow/efficient-pr-babysitting.md`,
-`shared/workflow/fully-clean.md`, and
-`skills/purge-hallucinations/SKILL.md`.
-Each had contained only a cross-reference repointing from `memories/github.md`
-to `memories/github-mcp-tools.md`, and
-`git show origin/main:<file> | grep -c github-mcp-tools` returned `1` for each.)
-
 **When the whole PR is superseded, not just one file, the conflict is telling
 you to close it rather than resolve it.**
 The two cases above keep `main`'s version of a file a sibling PR already
@@ -396,11 +319,6 @@ preserved on `main`, not to push an empty diff to a clean verdict.
 For an ARDIA sweep this is a terminal state of its own --- see
 [`ardia`](../../skills/ardia/SKILL.md)'s `Superseded`, which also gives the
 up-front check that catches it before rounds are spent.
-(Morrison-Lab/ai-config#1188, 2026-08-06: an idle PR with a "Needs more work"
-verdict, driven toward clean, revealed on merging `origin/main` that all four
-of its `memories/preferences.md` bullets were already there in corrected form,
-landed by the already-merged #1189; resolving toward `main` would have left an
-empty diff, so the PR was superseded and the correct action was closure.)
 
 **A merge into a growing numbered list (e.g. `gha`'s `CLAUDE.md` "Code
 review guidelines" section) can produce zero blank lines between two
@@ -416,11 +334,7 @@ easy to push without noticing. `markdownlint`'s MD022
 no proximate code change to explain it. Re-run the repo's markdown lint (or
 at minimum re-read the diff around every `### N.` boundary you didn't
 personally write) after any merge that touches a shared growing list, not
-just after a merge with conflicts. (gha#208: an out-of-band merge from
-`main` --- done by a different session, not the one that opened the PR ---
-landed a new item 7 directly against the PR's own item 6 with no blank
-line; `lint-markdown`'s MD022 failed with no conflict marker anywhere in
-the diff to point at.)
+just after a merge with conflicts.
 
 **The same splice happens to LIST ITEMS, and there `markdownlint` most
 likely does NOT catch it --- so nothing turns red at all.** The case above
@@ -458,10 +372,6 @@ bulleted list, alongside the heading check above. And note that a
 *increases* the rate of this defect, since union resolves an append collision
 by keeping both sides with no conflict to review --- so confirm a detector is
 wired into CI before enabling one, not after.
-(ucdavis/bcs#422/#430, 2026-07-26: a clean three-way merge spliced one PR's
-`## Bug fixes` bullet against another's; the check above then found **four**
-pre-existing instances in the same `NEWS.md`, in a repo that had no Markdown
-linting at all.)
 
 **Run that check as a whole-file count, and compare it before and after ---
 scoping it to the lines you added cannot see this defect at all.**
@@ -518,20 +428,6 @@ are invisible to diff-scoped checking, and the merge reports success.
 - **Don't:** read a conflict-free merge as a merge that changed nothing beyond
   what the diff shows.
 
-(`ucdavis/bcs#534`, 2026-07-31: merging `main` spliced its `NEWS.md` bullet
-directly beneath the branch's own with no blank line between.
-markdownlint stayed green, since `blanks-around-lists` governs a list's
-boundaries rather than the gaps between its items.
-A pre-push check asking which flagged bullets were among the branch's added
-lines returned 0 --- `git diff -U0 origin/main...1b74899d -- NEWS.md |
-grep -c '^+\* Say that the'` --- and that zero was reported to the user as
-"none of these are mine", which was false.
-The count delta settles it: 14 spliced bullets on `origin/main`, 15 at
-`1b74899d` after the merge, 14 again at `9f5dab34` after the fix.
-Evidence filed on ucdavis/bcs#437; the `merge=union` driver proposed in
-ucdavis/bcs#438 would raise this defect's rate, so it is explicitly blocked on
-the detector landing first.)
-
 **A commit claiming "I've pulled main and resolved the merge conflicts" can be
 lying --- verify it actually merged before trusting the claim.** A genuine
 conflict-resolution commit is a merge commit (two
@@ -547,10 +443,3 @@ needed conflict resolution more than once and each attempt claimed success
 but the PR still shows `CONFLICTING`, check every "resolved conflicts" commit
 in its history this way before trying yet another resolution attempt on top
 of a foundation that was never actually re-merged.
-(`Lacaedemon/sparta#1070`, 2026-07-27: an automated PR-authoring agent pushed
-two consecutive commits both titled "Resolve merge conflicts", each claiming
-to have pulled `main`; both were single-parent commits that never touched
-`main`'s actual current state, so the PR kept showing `CONFLICTING` no matter
-how many times the agent "fixed" it. A real `git merge origin/main` --- the
-first one actually run against this branch in three attempts --- surfaced
-the genuine conflicts and resolved them for good.)

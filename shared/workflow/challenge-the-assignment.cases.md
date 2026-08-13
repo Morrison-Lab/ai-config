@@ -131,7 +131,7 @@ this corpus keeps warning against.
 
 What kept the claim alive was the session's own scheduled check-in brief, which
 restated the four gates as established fact every time it fired, and whose step
-4 read "if still nothing, do NOT re-post the request".
+4 read "If still nothing, do NOT re-post the request".
 [`self-review-fallback`](self-review-fallback.md)'s "Re-check reachability every
 round" was loaded in context throughout.
 [#902](https://github.com/Morrison-Lab/ai-config/issues/902) is the adjacent

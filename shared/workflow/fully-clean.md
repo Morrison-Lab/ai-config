@@ -732,6 +732,78 @@ whatever any SHA field says.
 See [`fully-clean.cases.md`](fully-clean.cases.md), "`pull_requests[].head.sha`
 named a commit pushed after the run started".
 
+**`check-pr-fully-clean.py` uses the same unreliable body-text surface, and
+its failure runs the other way: a genuinely clean, current verdict with no
+SHA in its prose reports as unreviewed.**
+The three blocks above are about a reader trusting a comment's own caption.
+The script has the identical instrument and the identical blind spot, moved
+into code: for an issue-comment verdict with no formal-review `oid`, its
+match requires the head SHA, full or short, to appear as a literal substring
+of the comment body, and its fail-closed branch treats an absent SHA the
+same as a wrong one --- no match, either way.
+
+That is the right call against a stale review, which is what the design is
+defending against.
+It is the wrong call against a clean one, because a findings-free verdict
+has nothing to cite: no `blob/<sha>/...` permalink, no prose reference to
+the commit, since there is no finding to anchor a citation to.
+So the failure concentrates on exactly the verdicts criterion 2 exists to
+certify --- the cleaner the review, the less likely its body names a SHA,
+and the more likely the script reports `No review comment has been posted
+evaluating HEAD SHA <sha> yet` over a PR that is in fact clean.
+
+The direction stays safe in the sense that matters.
+A stale or findings-bearing review can never match on the wrong SHA and
+pass as current, so the script cannot wave a real problem through.
+What it cannot do is confirm a genuinely current clean review, so read a
+"no review at this HEAD" result as **inconclusive**, not as a settled
+negative, before spending a re-dispatch or a self-review on it --- a
+needless re-dispatch is the expensive mistake the first block above already
+warns about, since it can cancel a review already in flight under
+`concurrency: cancel-in-progress`.
+
+Settle it in one call, using the rules two blocks above rather than the
+comment body: read the flagging run's `event`, `head_branch`, and
+`head_sha`.
+
+```bash
+gh api repos/<owner>/<repo>/actions/runs/<run-id> \
+  --jq '{event, head_branch, head_sha, created_at}'
+```
+
+A push- or pull_request-triggered run's `head_sha` is the reviewed commit
+unconditionally.
+A workflow_dispatch run's `head_sha` is reliable only when it was dispatched
+with an explicit `--ref` naming the PR branch --- confirm `head_branch`
+matches the PR's own branch, not `main` --- since a dispatch with no `--ref`
+runs against `main` by default and its `head_sha` then names that instead,
+per the `workflow_dispatch` rule two blocks above.
+
+- **Do:** read a flagging run's `event`, `head_branch`, and `head_sha`
+  before treating "no review at this HEAD" as a genuine gap.
+- **Do:** trust the script's discharge --- a clean result really is clean
+  --- and treat only its withholding as needing this extra check.
+- **Don't:** re-dispatch a review, or fall back to self-review, on this
+  signal alone when the flagging run's own metadata already shows it
+  evaluated the current head.
+- **Don't:** read a clean verdict's missing SHA as evidence the review is
+  stale; an absent SHA is what a clean review normally looks like.
+
+(`Morrison-Lab/ai-config#1213` tracks the underlying script defect, filed
+2026-08-06 against `#1207`, whose clean verdict likewise carried no SHA.
+`#1448`, 2026-08-13, is a second instance.
+Run `31673022785` was dispatched `workflow_dispatch` with
+`--ref ums/duplication-check-misses-merged` at `06:12:59Z`, 53 seconds after
+the PR's head commit.
+Its own metadata reads `head_branch: ums/duplication-check-misses-merged`
+and `head_sha: 8316d12106b9f8393832c2dd561fad2b5334ff96`, matching the PR's
+`headRefOid` exactly.
+The posted verdict was **Ready for merge**, no findings, 0
+`CHANGES_REQUESTED` reviews, 0 inline comments, and its body carried no SHA
+at all.
+`check-pr-fully-clean.py` reported `No review comment has been posted
+evaluating HEAD SHA 8316d121 yet`.)
+
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---
 including gaining its own independent addition that collides with yours

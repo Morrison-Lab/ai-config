@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Check that relative markdown links in this repo point to real files.
 
-Guards this repo's cross-referenced skills, docs, and README against broken
-relative links (e.g. a renamed or deleted target). External links (http(s),
-mailto, anchors) are skipped. Clean-room; convention noted in CREDITS.md.
+Guards this repo's cross-referenced markdown --- every tree named in
+`SCAN_GLOBS` below --- against broken relative links (e.g. a renamed or
+deleted target).
+External links (http(s), mailto, anchors) are skipped.
+Clean-room; convention noted in CREDITS.md.
 
 Exits non-zero if any relative link target is missing.
 """
@@ -24,6 +26,7 @@ SCAN_GLOBS = [
     "codex-skills/**/*.md",
     "commands/**/*.md",
     "docs/**/*.md",
+    "memories/**/*.md",
     "references/**/*.md",
     "shared/**/*.md",
     "*.md",

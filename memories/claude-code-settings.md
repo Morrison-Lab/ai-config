@@ -78,7 +78,10 @@ paragraph says `enabledPlugins` "still honors project and local settings".
 
 (Read 2026-08-12 from <https://code.claude.com/docs/en/settings>, sections
 "How scopes interact" and `enabledPlugins`, and
-<https://code.claude.com/docs/en/plugins-reference>, "Default enablement".
+<https://code.claude.com/docs/en/plugins-reference>, sections "Default
+enablement" and "User configuration" --- the `defaultEnabled` and
+persistence facts come from the first, and the "still honors project and
+local settings" sentence from the second.
 Third-party platform behaviour changes, so re-read rather than trusting this
 snapshot.
 The `.md` source of a docs page, e.g.

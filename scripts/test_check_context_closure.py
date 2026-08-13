@@ -886,8 +886,11 @@ check("a breach reports by how much", "(+1)" in text)
 # operation that strands positional references, and that defect is invisible
 # to every other check here. So the message that triggers the split names the
 # sweep, per shared/writing/reorganize-prose.md.
+# Pin the WHOLE canonical pattern, not a prefix of it: a substring
+# assertion on the leading alternatives passes against a sweep narrowed to
+# them, which is the failure forward-references.md's own section describes.
 check("a breach names the positional-reference sweep",
-      "above|below|here|earlier|later" in text)
+      r"\b(above|below|here|earlier|later)\b|this (section|file)" in text)
 check("a breach names the remedy, not just the sweep",
       "naming its subject" in text)
 # A clean run must not print the sweep, or the advice detaches from the

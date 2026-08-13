@@ -574,8 +574,15 @@ def render_fragment_caps(files, cap):
             "  Then sweep both sides for positional references the split "
             "strands:"
         )
+        # Reproduce forward-references.md's canonical pattern verbatim,
+        # `this (section|file)` included. That section's own warning is that
+        # a sweep narrowed to the wording the mover happens to recall is
+        # "far narrower than the ordinary phrasing the real danglers wear",
+        # so dropping an alternative here would commit the exact error the
+        # cited rule exists to prevent.
         lines.append(
-            "    rg -niE '\\b(above|below|here|earlier|later)\\b' "
+            "    rg -niE "
+            "'\\b(above|below|here|earlier|later)\\b|this (section|file)' "
             "<companion> <fragment>"
         )
         lines.append(

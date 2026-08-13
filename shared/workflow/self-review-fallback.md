@@ -42,6 +42,11 @@ confirm a genuine all-clear review is posted at the current head from an externa
 a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
 doesn't satisfy this once an external verdict is obtainable.
 
+**The commonest way this re-check fails is a recurring brief that already calls the reviewer unreachable.**
+A scheduled check-in restating a previous round's blocker as settled makes every later round read it as a premise,
+so this rule stays loaded and never fires.
+See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-send each round carries a measurement".
+
 **A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for.**
 A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.
 The gap is specific and predictable: a shallow self-review checks *structure* --- a dogfood back-reference, ASCII punctuation, semantic line breaks --- and skips the prose *fact-check*, so a false mechanism claim or a misattributed citation sails straight through, since a structural pass has nothing to say about either.

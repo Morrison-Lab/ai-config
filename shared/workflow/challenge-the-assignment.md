@@ -309,6 +309,64 @@ DEF=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
 See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
 "A brief's own command contradicted its own disclaimer".
 
+**A brief you re-send each round carries a measurement, and the measurement
+expires while the sentence does not.**
+Both sections above fail because the author never derived the claim, or could
+not.
+This one fails after the derivation succeeded.
+The author ran the check, got a real result, wrote it into the brief, and then
+sent that brief again the next round and the round after, long after the result
+had stopped being true.
+
+The claim type that expires is a **capability**: whether a reviewer is
+reachable, whether a token can dispatch a workflow, whether a host answers.
+Each is a property of a moment rather than of the world, so a correct reading of
+one is a timestamp with a value attached, per
+[`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).
+Restating it a round later keeps the value and drops the timestamp.
+
+Recurrence is what turns that into a premise.
+A brief restating what an earlier round established reads to every later round
+as setup rather than as a claim, so the questioning this fragment asks for never
+fires.
+Author and recipient are also the same party here, which is the strongest form
+of the authority the "Why nothing prompts the check" section describes.
+
+**The sharp case is a brief that forbids the retry that would refute it.**
+A step reading "if there is still nothing, do not re-post the request" is not
+merely a brief failing to re-check.
+It instructs the next round not to, so the falsifying action is ruled out by the
+same document that asserts the thing it would falsify.
+
+**More rules do not fix this, because the rule was already there.**
+[`self-review-fallback`](self-review-fallback.md) says to re-check reachability
+every round, and that a reviewer ineligible a few pushes ago can become
+reachable mid-session.
+That rule was loaded and was defeated by a brief restating the blocker as
+settled, so what failed was not coverage but a mechanism that suppresses
+coverage.
+Read a recurring brief as a thing capable of switching off rules you already
+hold.
+
+The remedy is to carry the query rather than its answer.
+State a blocker in a recurring brief as a command to re-run, with the time the
+last result was taken, so each round re-measures instead of inheriting.
+That is [`derive-dont-enumerate`](derive-dont-enumerate.md) applied to a
+capability rather than to a set, and it belongs here because the author is the
+one who has to write it that way.
+
+- **Do:** write a recurring brief's blockers as a command to re-run each round,
+  timestamped with when it last ran.
+- **Do:** treat a step telling the next round not to retry something as the tell
+  that the brief has closed a question it should hold open.
+- **Don't:** restate an earlier round's finding as an established gate in the
+  next round's prompt.
+- **Don't:** read a rule you already hold as protection --- a brief asserting
+  the blocker settled is what stops that rule running.
+
+See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+"A recurring brief re-asserted a blocker that had stopped being true".
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise

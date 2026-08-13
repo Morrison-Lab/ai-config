@@ -108,3 +108,32 @@ The brief also pointed at a checkout that was 37 commits behind `origin/main`,
 so every search run there would have understated coverage.
 The brief asked to be questioned, which is why this was caught; the general
 case is a brief that does not.)
+
+## A recurring brief re-asserted a blocker that had stopped being true
+
+(Morrison-Lab/ai-config#1439, 2026-08-13: a session spent roughly 8 hours
+reporting three of its PRs blocked because no external reviewer was reachable,
+citing four gates.
+One of them was "`claude-review` dispatch returns 403 (token lacks
+`actions: write`)".
+At 2026-08-13T04:11Z that exact dispatch was retried and returned HTTP 204,
+"Workflow run has been queued", producing live run 31666212015 on branch
+`ums/claude-settings-scope-precedence`.
+So the claim was false at the time of retry.
+
+Why the two attempts differed was not established, and no mechanism is named
+here.
+Three candidates went untested: the token's permissions may have changed, the
+original 403 may have been misdiagnosed, and the branch was 6 commits behind
+`main` at the first attempt and had just been merged forward at the retry.
+Recording the disagreement is the finding, and naming a cause would be the guess
+this corpus keeps warning against.
+
+What kept the claim alive was the session's own scheduled check-in brief, which
+restated the four gates as established fact every time it fired, and whose step
+4 read "if still nothing, do NOT re-post the request".
+[`self-review-fallback`](self-review-fallback.md)'s "Re-check reachability every
+round" was loaded in context throughout.
+[#902](https://github.com/Morrison-Lab/ai-config/issues/902) is the adjacent
+open issue, covering a one-shot wakeup whose named PR merged underneath it
+rather than a recurring brief carrying a capability claim forward.)

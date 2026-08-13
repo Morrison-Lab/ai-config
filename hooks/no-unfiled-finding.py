@@ -138,7 +138,7 @@ def main() -> int:
             "while feeling like the diligent act. The finding then reads as "
             "handled and nothing durable exists.\n\n"
             "Do it now, in this same message:\n\n"
-            "  1. Dupe-check:  gh issue list --state open --search '<terms>'\n"
+            "  1. Dupe-check:  gh issue list --state all --search '<terms>'\n"
             "  2. File it, or comment the new evidence onto the existing "
             "issue if one covers it\n"
             "  3. Cite the identifier the API actually returned -- never one "

@@ -8,8 +8,13 @@ opened a PR for. Check both this repo's and (when the corpus spans repos, as
 `d-morrison/ai-config`'s skills do) any sibling repos in scope:
 
 ```bash
-gh pr list --state open --search "<keywords> in:title,body"
+gh pr list --state all --search "<keywords> in:title,body"
 ```
+
+**`--state all`, not `--state open`** --- see "Both checks come back empty when
+the work is already DONE" below for why.
+The prescribed query has to carry the fix as well as the prose, or a reader
+who copies the command never reaches the explanation.
 
 In a remote/web session without `gh`, use the GitHub MCP equivalent
 (`mcp__github__list_pull_requests` / `mcp__github__search_pull_requests` —
@@ -74,6 +79,42 @@ A search over titles and bodies finds the work whatever it was called;
   a merge deletes it, which is
   [`use-existing-pr-branch`](use-existing-pr-branch.md)'s auto-delete case
   read in the absence direction rather than the presence one.
+
+**The two states are byte-identical under every liveness-filtered query, which
+is worth measuring rather than arguing.**
+Run each query against a merged branch and against one that never existed:
+
+| branch | `--state open` | `ls-remote` | `--state all` |
+|---|---|---|---|
+| `ums/relocation-dangling-refs` (merged) | 0 | 0 | `1444:MERGED,1442:MERGED` |
+| `ums/definitely-never-existed-xyz` | 0 | 0 | `[]` |
+
+Only the third column discriminates, and that is the negative control this
+whole section rests on.
+
+**Two standing remedies for a suspicious zero cannot fire here, so do not wait
+for either to save you.**
+
+Reporting the denominator is
+[`fail-fast`](../principles/fail-fast.md)'s general answer to a zero that might
+be vacuous, and here it does not discriminate: both rows above share it, since
+zero open PRs and zero refs are the true counts in each.
+The filter is applied **before** the population is formed, so a completed
+artifact sits outside what the check examined rather than inside it and
+unmatched.
+
+Re-running is the other reflex, and it makes matters **worse** rather than
+better.
+A stale query is fixed by asking again later; a liveness-filtered one grows
+*less* accurate over time, because every minute raises the chance the work
+finished and was cleaned up.
+
+**The class is wider than PRs and branches.**
+Any query scoped to a current set behaves this way: `ps` for a process that
+exited, `docker ps` without `-a`, `gh run list --status in_progress`, an
+open-file-handles check.
+Before reading an empty result as "it never happened", ask whether completion
+removes the thing being queried.
 
 (`Morrison-Lab/ai-config#1447`, 2026-08-13.
 A delegated agent opened [#1442](https://github.com/Morrison-Lab/ai-config/pull/1442)

@@ -220,6 +220,95 @@ which is the discretionary detector the bullets above say not to rely on.
 [`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries the
 measurement and the recovery.)
 
+**A prose disclaimer does not neutralize a supplied command that encodes the
+assumption it disclaims.**
+The section above prescribes naming the target and letting the agent establish
+its own state, and a brief can follow that prescription in prose and still ship
+the false premise --- because the prescription governs what the brief *says*,
+and a brief also *supplies* things.
+A runnable command is the second channel, and it is the one carrying the
+assumption.
+
+The disclaimer makes this worse rather than neutral, which is the part worth
+stating.
+The section above describes a convenience instruction that presents as a
+convenience rather than as an assertion, so nothing marks it as a claim.
+Here something does: the prose names that exact hazard, in as many words, one
+line above the command embodying it.
+That sentence is the only signal that would have sent the author looking, so
+spending it is what leaves the command reading as already checked --- the
+partial-guard trade [`fail-fast`](../principles/fail-fast.md) prices, arriving
+through the artifact written to demonstrate care.
+
+Which channel wins is not the recipient's judgment call.
+Prose is read once and a command is pasted, so the assumption reaches execution
+whatever the surrounding sentence says.
+So read every command in a brief as an assertion about the recipient's
+environment, and ask what would have to be true for it to run.
+
+**A `||` fallback is how such a command passes as self-establishing, and the
+fallback is itself an untested command.**
+A brief's author reaches for one to guarantee a value, so what it produces is
+the claim they are least likely to check --- and it is checkable in one line.
+
+The measured behaviour, which is not what the author of the brief below
+believed:
+
+| form | `DEF` |
+|---|---|
+| `DEF=$(false \|\| echo main)` | `main` |
+| `DEF=$(false) \|\| echo main` | *empty* |
+| `DEF=$(false \| sed s/x/y/ \|\| echo main)` | *empty* |
+| the same, under `set -o pipefail` | `main` |
+
+Only the first supplies the literal.
+In the second the `||` sits outside the substitution, so `echo` writes to stdout
+and nothing reaches `DEF`.
+In the third --- the form the brief actually carried --- the pipe discards the
+failing command's status, `sed` exits 0 on empty input, and the fallback never
+fires at all, which is
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md)'s "a pipe
+discards the status of everything left of it".
+
+So the fallback written to guarantee a value was **inert**, for a reason its
+author had not considered, and would have left `DEF` empty.
+The lesson is not that a guessing fallback is worse than an erroring one.
+It is that neither behaviour was established: a fallback nobody ran is a belief
+about control flow, and this one was wrong twice over.
+
+The same holds for the `git worktree add` chain beside it.
+Two forms joined by `||` read as defensive while both rested on one false
+premise, so the chain enumerated two states when the real one was a third ---
+a fallback varying on the wrong axis, which covers nothing however many
+branches it has.
+
+Resolve what a supplied command needs from a source that answers, and fail
+loudly when it does not:
+
+```bash
+DEF=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
+[ -n "$DEF" ] || { echo "cannot resolve default branch" >&2; exit 1; }
+```
+
+- **Do:** read every command you put in a brief as a claim about the
+  recipient's environment, and either drop it or make it self-establishing.
+- **Do:** run a fallback before shipping it, and check what it assigns rather
+  than what you intended it to assign --- one line settles it, and both forms
+  above were wrong.
+- **Do:** end a resolution step with a loud failure rather than a guessed
+  default, so an unmet premise stops the agent instead of reaching execution.
+- **Don't:** treat a "do not assume" sentence as covering the command beneath
+  it --- the disclaimer is spent on the reader, and the command still runs.
+- **Don't:** read a `||` chain as defensive without asking whether its branches
+  differ on the axis that can actually fail; two forms sharing one false premise
+  cover nothing.
+- **Don't:** reason about where a `||` binds, or about whether a pipeline
+  propagates a failure --- both are one command to test and both were guessed
+  wrongly here, in a section about not guessing.
+
+See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+"A brief's own command contradicted its own disclaimer".
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise

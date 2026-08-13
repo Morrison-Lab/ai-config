@@ -516,3 +516,33 @@ divergence.
 The fix was a case that registers a genuinely dead PID and leaves the heartbeat
 **fresh**, so only the liveness branch can decide it, whatever the host
 supplies.)
+
+## A corrections entry expires with the next push
+
+(`Morrison-Lab/ai-config#1395`, 2026-08-12: the PR body's derived counts went
+stale in two consecutive rounds, on the same two figures.
+
+Round 1's body stated 100 insertions and 264 lines at `4c5d71e`.
+Commit `b11fe4a9` made the real figures 106 and 270, and the body was corrected
+with a numbered `Corrections to this body` entry recording both as "re-derived
+rather than adjusted".
+Round 2's self-review finding then prompted `737b7c06`, which added a
+retry-loop rationale comment and moved the same two figures to 111 and 275 ---
+expiring the entry that had just refreshed them.
+They were re-derived only in the sweep immediately before merging, and the
+merged body carries a fourth entry recording that second refresh.
+
+The rule was not unknown, which is the point of the record.
+That fourth entry cites this fragment's own "any round that changes the diff
+expires every figure the body already states" while making the correction, so
+the round had the rule in hand and applied it once.
+What it lacked was the trigger: the pause point fired at both pushes and the
+checklist item was discharged at one of them, with a durable note in the body
+asserting the figures were current in between.
+
+Note which push did it.
+`737b7c06` answered a self-review finding rather than a reviewer's, so it did
+not feel like a round that changed anything a reviewer would re-read --- and
+its content was a comment explaining a retry loop, which is exactly the kind of
+edit that reads as not touching the diffstat.
+It changed both figures.)

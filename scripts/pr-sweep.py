@@ -57,6 +57,9 @@ from datetime import datetime, timezone
 # `shared/coding/configurable-parameters.md`.
 DEFAULT_STALE_MINUTES = 30
 
+# Maximum number of changed file paths to show individually in text output.
+MAX_FILES_SHOWN = 5
+
 # Check-run conclusions that mean the job genuinely failed. CANCELLED is
 # deliberately absent: on workflows with `concurrency: cancel-in-progress`,
 # a superseded run is cancelled as designed. SKIPPED and NEUTRAL are not
@@ -303,11 +306,9 @@ def format_files_line(pr):
     count = pr.get("file_count", len(files))
     if not files and count == 0:
         return None
-    file_list = ", ".join(files[:5])
-    if len(files) > 5:
-        file_list += f", ... (+{len(files) - 5} more)"
-    elif count > len(files):
-        file_list += f", ... (+{count - len(files)} more)"
+    file_list = ", ".join(files[:MAX_FILES_SHOWN])
+    if count > MAX_FILES_SHOWN:
+        file_list += f", ... (+{count - MAX_FILES_SHOWN} more)"
     return f"            files ({count}): {file_list}"
 
 

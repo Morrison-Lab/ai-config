@@ -400,5 +400,24 @@ check(
     "files (2): a.md, b.md" in stalled_rendered,
 )
 
+over_cap_pr = make_pr(number=50, updated_minutes_ago=90, files=100)
+over_cap_pr["files"]["totalCount"] = 150
+over_cap_rendered = pr_sweep.render(
+    {
+        "repo": "o/r",
+        "open_total": 1,
+        "returned": 1,
+        "drafts_skipped": 0,
+        "examined": 1,
+        "prs": [pr_sweep.classify(over_cap_pr, NOW, 30)],
+    },
+    30,
+    NOW,
+)
+check(
+    "render correctly calculates remaining files count when file_count exceeds fetched files list",
+    "files (150): file1.txt, file2.txt, file3.txt, file4.txt, file5.txt, ... (+145 more)" in over_cap_rendered,
+)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

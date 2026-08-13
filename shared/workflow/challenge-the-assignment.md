@@ -98,6 +98,62 @@ checkable by a reader, and a resolution to be thoughtful is not.
   presupposition, and don't stall on the choice either --- say which
   presupposition fails and what follows.
 
+## When the work itself settles the premise, run it before writing anything
+
+The check above costs a sentence, which is what makes it affordable.
+One shape makes it cost nothing at all, and it is the shape most likely to be
+skipped: an assignment to **widen an instrument's coverage**, carrying an
+incidental claim about what the widened coverage will find.
+
+The claim is unverifiable *by construction*, and the assignment says why.
+An issue reporting that a checker does not scan some tree cannot also know
+that tree is clean, because the instrument that would establish it is the
+thing being asked for.
+So its clean-state claim rests on a hand scan --- which is exactly the
+substitute the whole issue exists to retire.
+
+Two things keep it from being questioned.
+It is **incidental**: it sits beside the request rather than in it, so nothing
+about deciding to do the work requires reading it.
+And it is **reassuring** --- "a missing guard rather than an outstanding
+breakage" narrows the scope and lowers the stakes, and a premise that makes a
+task smaller draws less scrutiny than one that makes it bigger.
+
+The cost is not a wasted task, which is what "The check" above is calibrated
+for.
+The work is right either way.
+What the claim spoils is the **report**: inherit it and the PR ships framed as
+coverage-only, so a real defect the change surfaced goes out described as
+nothing found.
+
+Ordering is the whole remedy, and it is free.
+**Run the widened instrument before writing the PR body, the changelog, or the
+commit message** --- not to check the premise as a separate step, but because
+the first run answers it as a side effect.
+Then report what it actually returned.
+
+- **Do:** run a coverage-widening change and read its output before writing
+  any prose that describes what the change found.
+- **Do:** treat a defect the widened instrument surfaces as in scope, per
+  [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md) ---
+  leaving it puts the newly-added check red on the default branch.
+- **Don't:** carry an issue's "currently clean" claim into a PR body; the
+  issue could not have checked it, which is why the issue exists.
+- **Don't:** read the claim's reassuring direction as making it safer to
+  inherit --- a premise that shrinks the task is the one nobody re-derives.
+
+(`Morrison-Lab/ai-config#763` -> `#1454`, 2026-08-13: the issue reported that
+`scripts/check-links.py` did not scan `memories/`, and added "All 26 resolve
+today, so this is a missing guard rather than an outstanding breakage."
+Adding the glob and running the script found a real broken link on the first
+run --- `memories/preferences.md` pointed at `shared/workflow/ardi.md`, which
+resolves relative to that file as `memories/shared/workflow/ardi.md` and does
+not exist, while the other 80 links from `memories/` into `shared/` already
+used the `../` form.
+The issue's own repro command is the tell: it reported 683 links across 405
+files, figures only the un-widened script could produce, so the scan behind
+"all 26 resolve" was never the scan the issue was asking for.)
+
 ## The limit
 
 This is not a licence to relitigate every task before starting it, and a rule

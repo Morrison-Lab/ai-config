@@ -89,8 +89,12 @@ Run each query against a merged branch and against one that never existed:
 | `ums/relocation-dangling-refs` (merged) | 0 | 0 | `1444:MERGED,1442:MERGED` |
 | `ums/definitely-never-existed-xyz` | 0 | 0 | `[]` |
 
-Only the third column discriminates, and that is the negative control this
+Only `--state all` discriminates, and that is the negative control this
 whole section rests on.
+Name the column rather than counting to it:
+a positional reference is read against a table anyone can add a column to,
+and a reader who counts from the header lands on `ls-remote`,
+which is one of the two queries the table exists to rule out.
 
 **Two standing remedies for a suspicious zero cannot fire here, so do not wait
 for either to save you.**

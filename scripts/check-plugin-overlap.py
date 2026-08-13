@@ -16,9 +16,10 @@ Settings files examined, in ASCENDING precedence order (later wins), which
 is the order `describe_overlap` requires:
 
   1. `<consumer-dir>/settings.json` -- the user scope, the LOWEST of the
-     documented five, where `/plugin install` writes its entry;
+     five documented precedence levels, where `/plugin install` writes its
+     entry;
   2. `<consumer-dir>/settings.local.json` -- not one of the four documented
-     scopes, but present on some machines; ranked just above user;
+     scope names, but present on some machines; ranked just above user;
   3. `./.claude/settings.json` -- the project scope, where a consumer repo's
      checked-in marketplace block lives (the sparta case in ai-config#1409);
   4. `./.claude/settings.local.json` -- the local scope, highest of these,

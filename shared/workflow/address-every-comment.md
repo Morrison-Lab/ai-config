@@ -1129,6 +1129,104 @@ broken run cannot be read as a result about the forms.
 - **Don't:** compare two command spellings by typing both into the same tool,
   which is the one measurement guaranteed to make them look alike.
 
+**A finding carries a timestamp too, and its precondition can dissolve
+between the round that raised it and the round that addresses it.**
+Every check above interrogates a finding's **content** --- its literals, its
+premise, its proposed fix, its cited source, its search scope.
+All of them ask whether the finding was right.
+None asks whether it is **still** right.
+
+A finding is a measurement of the world at the moment it was raised, and
+between that moment and your fix sit a CI run, a review round, and often a
+night.
+Anything the finding depends on can move in that window: a cited PR merges, a
+quota resets, a dependency publishes, a host unblocks.
+
+Applying the finding as written is then wrong, and it is wrong in the
+direction that feels most compliant.
+Hedging a citation to "not yet merged as of this writing" asserts something
+false once the PR has merged --- and it does so **while quoting the
+reviewer's own suggested wording**, which is the form least likely to be
+questioned by you, by the next reviewer, or by anyone reading the thread.
+
+**The claim is not thereby fixed either, which is the half that is easy to
+miss.**
+When a precondition dissolves in the direction that makes your original
+sentence true, that sentence has become **accidentally true**.
+Nothing checked it; the world simply moved underneath it.
+And an accidentally-true claim is indistinguishable in the text from a
+verified one, so leaving it banks the reviewer's finding as resolved while no
+verification ever happened --- which is strictly worse than the original
+defect, because the thread now records the matter as settled.
+
+So neither disposition on the table is correct.
+Address-as-written is false, and leave-it-alone is unverified.
+The move is to **re-derive**: replace the claim with a checkable one, naming
+the event's timestamp and the figures it actually produced, each with its
+deriving command beside it, per
+[`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md).
+That is the one form that is true whichever way the gate went, and it is the
+only one a later reader can falsify.
+
+- **Do:** re-check what a finding presupposes at the moment you address it,
+  not at the moment it was raised.
+- **Do:** replace a claim whose gate has cleared with a derived one --- the
+  timestamp and the figures the event produced --- rather than hedging it or
+  leaving it.
+- **Don't:** apply a reviewer's suggested wording without re-checking what
+  that wording presupposes; a hedge is false once the thing it hedges has
+  happened.
+- **Don't:** read a claim that has become true as a claim that has been
+  checked --- nothing verified it, and the two read identically.
+
+**Four neighbours sit close enough to be mistaken for this, and the boundary
+is worth drawing because three of them fire on the same PR.**
+
+[`ardi`](ardi.md)'s "A blocker that was true when you published it can stop
+being true while the PR is open" governs a caveat **you** published, not a
+finding you received.
+Its `main`-merge remedy is a sweep for hedge forms --- `still open`,
+`not yet merged`, `once that merges`, `as of`, `will live at`, `proposed in`
+--- so it is **structurally blind** to this case rather than merely silent on
+it: the defect lives in an *unhedged* assertion, and a sweep keyed on hedges
+has nothing to match.
+Measured on the sentence below: **0 of those 6 forms** occur in it.
+
+The two timestamp-aware rules above are each one axis away.
+"Timestamp the evidence before rebutting a finding with it" governs the
+evidence you gather for a **Rebut**; this governs the precondition of an
+**Address**.
+"A bot that re-raises an item as not addressed may simply not have seen your
+reply" governs a reviewer's snapshot going stale relative to **your reply**;
+here it goes stale relative to **the world**, which no reply ordering can fix.
+
+And [`keep-checkouts-fresh`](keep-checkouts-fresh.md)'s citation convention
+--- the rule the reviewer correctly cited --- says to hedge while the gate is
+uncleared and says nothing about what to do once it clears.
+Its one sentence beginning "Once the citation does resolve" is about keeping
+a local restatement rather than a bare pointer, which is an auto-loading
+concern and not a tense one.
+
+A mechanical half exists and is not built here: scanning a PR's touched files
+for `#NNNN` citations and checking each against that PR's live state would
+catch both directions at once, the unhedged citation of an open PR and the
+stale hedge on a merged one.
+That is decidable from one API field per citation, so it belongs in an
+instrument rather than in this rule, and is tracked in
+[ai-config#1445](https://github.com/Morrison-Lab/ai-config/issues/1445).
+
+(`Morrison-Lab/ai-config#1411`, merged 2026-08-13T05:27:13Z as `3bb24610`.
+Its round-2 review, posted `2026-08-12T19:43:19Z`, correctly found the
+sentence "which is what `Morrison-Lab/ai-config#1413` **then did**" asserting
+a merge that had not happened, and proposed hedging it to "proposed in
+`#1413`, not yet merged as of this writing".
+`#1413` then merged at `2026-08-13T04:47:54Z`, and the fix landed in
+`cccb404c` at `04:50:48Z` --- under three minutes later --- so the proposed
+hedge would have been false by the time it was typed.
+The sentence was instead re-derived to name the merge time and the byte
+figures the split produced, each from `git show <sha>:<path> | wc -c`:
+`ardi.md` 98,655 to 92,734, and `fail-fast.md` 94,469 to 91,244.)
+
 **A finding built on a *negative* result -- "I searched and it isn't there"
 -- is only as strong as the paths that were searched, and the search scope
 is the part reviewers state loosest.**

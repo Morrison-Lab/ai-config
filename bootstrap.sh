@@ -170,6 +170,21 @@ if [ -f "$SCRIPT_DIR/AGENTS.md" ]; then
 fi
 
 
+# --- Stacked-install warning ---
+# The symlink install this script just made and a marketplace plugin install
+# are ALTERNATIVES, not complements: both serve the same skills, so a machine
+# with an `ai-config@*` plugin enabled lists every skill twice and blows the
+# skill-listing context budget (ai-config#1409). Advisory and best-effort --
+# a machine without python3 skips it rather than failing the bootstrap.
+if command -v python3 >/dev/null 2>&1; then
+  printf '\n--- plugin-overlap check ---\n'
+  python3 "$SCRIPT_DIR/scripts/check-plugin-overlap.py" \
+    --consumer-dir "$CLAUDE_DIR" --repo-root "$SCRIPT_DIR" \
+    || printf 'warn  check-plugin-overlap.py exited %d\n' "$?"
+else
+  printf '\nskip  plugin-overlap check (python3 not found)\n'
+fi
+
 # --- Machine-specific dotfiles ---
 # Each dotfiles/<machine>/install.sh gates on its own host and exits quietly
 # when this isn't that machine, so running them all here is safe anywhere.

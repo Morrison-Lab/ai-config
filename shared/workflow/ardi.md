@@ -461,13 +461,31 @@ issue numbers ("never name an issue number before the issue exists").
 Same defect, different artifact: an identifier guessable enough to assert
 casually, with nothing in the repository to contradict it.
 
+**Knowing the prefix genuinely does not discharge this for the full SHA a
+link wants.**
+A markdown commit link is composed with the 40-character SHA,
+and a 7-character prefix read off real `git log` output moments earlier
+supplies only 7 of them ---
+so the remaining 33 get invented at link-composition time, silently,
+while the read-never-recall check reports itself satisfied
+because the prefix genuinely was read.
+The result is a link that 404s on a commit that exists.
+Expand the prefix instead:
+`git rev-parse <short-sha>` (without `--short`) prints the full SHA;
+paste its output rather than extending the prefix by hand.
+
 - **Do:** read every SHA you cite out of `git rev-parse` or `git log`, and
   confirm it resolves before pasting it.
 - **Do:** correct a published wrong SHA with a visible note naming the real one.
 - **Don't:** write a short SHA from recollection because it looks like the
   commit you just made.
+- **Don't:** extend a genuinely-read short prefix into a full SHA by hand ---
+  the prefix discharges nothing for the 33 characters it does not contain.
 - **Don't:** expect review to catch it --- a reviewer has no reason to suspect
   a citation, and the body is not in the diff they are reading.
+
+See [`ardi.cases.md`](ardi.cases.md), "A genuinely-read prefix, extended into
+a fabricated link".
 
 **The same rule governs a merge or squash commit message, which is worse than a
 PR body on both counts the bullet above names.**

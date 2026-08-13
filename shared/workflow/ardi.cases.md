@@ -692,3 +692,19 @@ not feel like a round that changed anything a reviewer would re-read --- and
 its content was a comment explaining a retry loop, which is exactly the kind of
 edit that reads as not touching the diffstat.
 It changed both figures.)
+
+## A genuinely-read prefix, extended into a fabricated link
+
+(`Lacaedemon/sparta#1244`, 2026-08-13: a close-as-duplicate comment linked
+the sibling PR's head commit, and the short SHA `974c83b` in that link was
+genuine --- read off real `git log` output moments earlier.
+The markdown link format wanted all 40 characters, and the remaining 33 were
+typed as `b1683e2e60ae23662ce35eb46be13a8bc` where the real tail was
+`66573e699e1bba5b2b7ede09deeeec244`, so the published link 404'd on a commit
+that existed.
+Caught seconds later by self-review running `git rev-parse 974c83b`, and
+corrected with a visible follow-up comment naming the real SHA, per this
+block's own correct-visibly bullet.
+The near-miss worth the entry: the read-never-recall check reported itself
+satisfied because a SHA genuinely had been read --- just 7 characters of the
+40 the sentence asserted.)

@@ -629,8 +629,9 @@ Note the shape of that, since it is the failure this entry is about.
 The entry has now over-claimed twice, first asserting a write-side fault, then
 asserting a parity between two hypotheses that the record does not support
 either.
-The practical advice survives all three readings, because the checks below
-are cheap whichever is right.
+The practical advice survives all three readings, because the
+`git ls-remote origin <branch>` and `git rev-parse HEAD <branch>` checks are
+cheap whichever is right.
 
 ## A suite whose branch coverage varies by host
 

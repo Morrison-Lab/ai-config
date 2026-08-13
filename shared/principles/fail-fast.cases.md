@@ -505,8 +505,8 @@ place to read rather than restate it.)
 (2026-07-28: a 947-repo scan reported `scanned: 0`, caught only because the
 count was printed; the `chmod +x` had been in a command the permission
 classifier denied minutes earlier.
-A later run of the fixed script reported 910 of 947, which is how the
-rate-limit truncation above was found.)
+A later run of the fixed script reported 910 of 947, which is how that same
+sweep's rate-limit truncation was found --- the 37 repos it never reached.)
 
 ## Why no prefix pattern separates a diff header from its data
 
@@ -581,8 +581,9 @@ outright:
 `main`'s own tip, which was read as the merge base.
 That reading implied `main` was an ancestor of `origin/main` while
 `git merge-base --is-ancestor` in the same block reported it was not.
-The same session then misattributed `$?` twice more, in both forms above,
-while dupe-checking whether this very entry already existed.)
+The same session then misattributed `$?` twice more --- once after a
+pipeline and once after a command substitution --- while dupe-checking
+whether this very entry already existed.)
 
 ## A published bullet count that was stale before anyone read it
 

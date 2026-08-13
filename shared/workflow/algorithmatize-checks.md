@@ -241,8 +241,10 @@ day at the rates above.
 So the round line did not escape the rate comparison, and was never going
 to.
 What it bought was a firing with a known answer: split case records out to
-a `.cases.md` companion, which is what `Morrison-Lab/ai-config#1413` then
-did.)
+a `.cases.md` companion, which is what `Morrison-Lab/ai-config#1413` did,
+merging at `2026-08-13T04:47:54Z`.
+By then `ardi.md` had reached 98,655 bytes, leaving 1,345 of runway, and the
+split returned it to 92,734 while `fail-fast.md` went 94,469 to 91,244.)
 
 ## Never predict which case will fail; enumerate the class
 

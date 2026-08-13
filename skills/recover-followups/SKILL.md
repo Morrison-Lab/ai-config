@@ -131,9 +131,10 @@ For each candidate decide whether it's **already tracked**:
      (won't-fix / duplicate) with no merged PR → the work did **not** land →
      still **untracked** (keep it; a won't-fix close doesn't mean done).
    - doesn't exist → **dangling reference → untracked**.
-2. **No citation?** Search issues for a match, in every state --- a closed
-   issue is still evidence the item is tracked, and the bullet above already
-   says a won't-fix close does not mean done:
+2. **No citation?**
+   Search issues for a match, in every state ---
+   a closed issue is still evidence the item is tracked,
+   and step 1's bullets already say a won't-fix close does not mean done:
    ```bash
    gh issue list --state all --search "<keywords from the snippet>" \
      --json number,title,state,stateReason,url   # SEARCH_ISSUES

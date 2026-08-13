@@ -733,34 +733,50 @@ See [`fully-clean.cases.md`](fully-clean.cases.md), "`pull_requests[].head.sha`
 named a commit pushed after the run started".
 
 **`check-pr-fully-clean.py` uses the same unreliable body-text surface, and
-its failure runs the other way: a genuinely clean, current verdict with no
-SHA in its prose reports as unreviewed.**
+whichever SHA that text happens to contain --- present, absent, or wrong ---
+is incidental to which head the run actually reviewed.**
 The three blocks above are about a reader trusting a comment's own caption.
-The script has the identical instrument and the identical blind spot, moved
-into code: for an issue-comment verdict with no formal-review `oid`, its
-match requires the head SHA, full or short, to appear as a literal substring
-of the comment body, and its fail-closed branch treats an absent SHA the
-same as a wrong one --- no match, either way.
+The script has the identical instrument and a sharper version of the same
+blind spot, moved into code: for an issue-comment verdict with no
+formal-review `oid`, its match requires the head SHA, full or short, to
+appear as a literal substring of the comment body, and its fail-closed
+branch treats an absent SHA and a present-but-wrong SHA identically --- no
+match, either way.
 
 That is the right call against a stale review, which is what the design is
 defending against.
-It is the wrong call against a clean one, because a findings-free verdict
-has nothing to cite: no `blob/<sha>/...` permalink, no prose reference to
-the commit, since there is no finding to anchor a citation to.
+It is the wrong call whenever the body's SHA content has nothing to do with
+the question being asked, and that is the ordinary case rather than an edge
+one, because a hex token lands in a review body for its own reason, not to
+answer "does this evaluate HEAD."
+A findings-free verdict usually has nothing to cite at all: no
+`blob/<sha>/...` permalink, no prose reference to the commit, since there is
+no finding to anchor a citation to.
+A verdict can also discuss a commit's own message rather than its diff, and
+cite that commit's SHA while never mentioning the head --- and the cited
+commit can be an *earlier* one on the same branch, present in the body and
+simply not the one being asked about.
 So the failure concentrates on exactly the verdicts criterion 2 exists to
-certify --- the cleaner the review, the less likely its body names a SHA,
-and the more likely the script reports `No review comment has been posted
-evaluating HEAD SHA <sha> yet` over a PR that is in fact clean.
+certify: the cleaner the review, the less its body has to do with the head
+SHA at all, and the more likely the script reports `No review comment has
+been posted evaluating HEAD SHA <sha> yet` over a PR that is in fact clean.
 
 The direction stays safe in the sense that matters.
-A stale or findings-bearing review can never match on the wrong SHA and
-pass as current, so the script cannot wave a real problem through.
+A review naming the wrong head can never match the current one and pass as
+current, so the script cannot wave a real problem through.
 What it cannot do is confirm a genuinely current clean review, so read a
 "no review at this HEAD" result as **inconclusive**, not as a settled
 negative, before spending a re-dispatch or a self-review on it --- a
 needless re-dispatch is the expensive mistake the first block above already
 warns about, since it can cancel a review already in flight under
 `concurrency: cancel-in-progress`.
+
+This also rules out the fix a reader might otherwise reach for: asking
+reviewers to cite their head SHA more consistently would close the
+no-SHA cases and leave the wrong-SHA case exactly as broken, since a body
+can already cite a SHA and still be citing the wrong one.
+The only sound surface is the one the blocks above already name --- the
+run's own metadata, never the body.
 
 Settle it in one call, using the rules two blocks above rather than the
 comment body: read the flagging run's `event`, `head_branch`, and
@@ -786,23 +802,40 @@ per the `workflow_dispatch` rule two blocks above.
 - **Don't:** re-dispatch a review, or fall back to self-review, on this
   signal alone when the flagging run's own metadata already shows it
   evaluated the current head.
-- **Don't:** read a clean verdict's missing SHA as evidence the review is
-  stale; an absent SHA is what a clean review normally looks like.
+- **Don't:** read a body's SHA, present or absent, as evidence about which
+  head a review covered --- it is evidence about what the prose happened to
+  discuss.
+- **Don't:** conclude that reviewers citing their head SHA more consistently
+  would fix this; a body can already cite a SHA and still be citing the
+  wrong one.
 
 (`Morrison-Lab/ai-config#1213` tracks the underlying script defect, filed
-2026-08-06 against `#1207`, whose clean verdict likewise carried no SHA.
-`#1448`, 2026-08-13, is a second instance.
-Run `31673022785` was dispatched `workflow_dispatch` with
-`--ref ums/duplication-check-misses-merged` at `06:12:59Z`, 53 seconds after
-the PR's head commit.
+2026-08-06 against `#1207`.
+Three instances, same root cause:
+
+| PR | verdict | SHA(s) in body | head | script result |
+| --- | --- | --- | --- | --- |
+| `#1207` | clean | none | `3e702562` | no match |
+| `#1448` | clean | none | `8316d121` | no match |
+| `#1450` | clean | `2b943b1a` (an earlier commit, cited for its message, not its diff) | `f73a9a3f` | no match |
+
+`#1448`, 2026-08-13: run `31673022785` was dispatched `workflow_dispatch`
+with `--ref ums/duplication-check-misses-merged` at `06:12:59Z`, 53 seconds
+after the PR's head commit.
 Its own metadata reads `head_branch: ums/duplication-check-misses-merged`
 and `head_sha: 8316d12106b9f8393832c2dd561fad2b5334ff96`, matching the PR's
 `headRefOid` exactly.
 The posted verdict was **Ready for merge**, no findings, 0
 `CHANGES_REQUESTED` reviews, 0 inline comments, and its body carried no SHA
 at all.
-`check-pr-fully-clean.py` reported `No review comment has been posted
-evaluating HEAD SHA 8316d121 yet`.)
+
+`#1450`, 2026-08-13: the round-2 verdict, on run `31718638916`, was
+**Ready for merge**.
+Its body's only commit-shaped hex token, `2b943b1a`, names the oldest of the
+branch's three commits, cited because that commit's own message carried a
+stale count --- an observation about the commit's prose, not a reference to
+the head.
+The branch's actual head, `f73a9a3f`, appears nowhere in the body.)
 
 **A clean CI run and a clean review verdict are a snapshot, not a standing
 guarantee of mergeability.** `main` can advance after your last check ---

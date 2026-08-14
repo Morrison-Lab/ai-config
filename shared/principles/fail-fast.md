@@ -94,10 +94,10 @@ conditions](https://adv-r.hadley.nz/conditions.html#ignoring-conditions).
 
 ## When exit codes carry meaning, an error path must set its own
 
-The bullets above say to stop with a clear error rather than proceed on bad
+The "In code" bullets say to stop with a clear error rather than proceed on bad
 state.
-They are silent on **how the stop is spelled**, and in a program whose exit
-codes are part of its contract that spelling is the whole of it.
+Those bullets are silent on **how the stop is spelled**, and in a program whose
+exit codes are part of its contract that spelling is the whole of it.
 
 Python's convenience idiom is where this bites.
 `raise SystemExit("message")` --- and `sys.exit("message")` --- prints the
@@ -135,10 +135,11 @@ def die(msg: str) -> None:
 ```
 
 Then assert the **code**, not the fact of exiting.
-`assertRaises(SystemExit)` is satisfied by every value of it, so it goes green
-on precisely this collision --- the too-weak assertion
-[`fact-check-code-logic`](../coding/fact-check-code-logic.md) describes when it
-asks for a guard's own message and status rather than a bare exit code.
+`assertRaises(SystemExit)` is satisfied by every value of it, including the
+colliding one, so a suite written that way goes green on exactly this defect.
+That is an assertion whose expected value makes it unfalsifiable, which
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md) already says to
+flag in review.
 
 - **Do:** reserve a distinct status for usage and internal errors whenever any
   other status carries a verdict, and set it explicitly.

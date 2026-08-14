@@ -1050,8 +1050,8 @@ the block below says of any harness's own output.
 
 Distinguish it from the suite-level trap higher up, which is the same
 misattribution one axis over: there a *sibling test case* in the same run
-aborts first, so the catch is credited to the wrong test; here a *sibling
-mutation* in an earlier row is what the name belongs to.
+aborts first, so the catch is credited to the wrong test; here the name belongs
+to a *sibling mutation* in another row of the same matrix.
 
 - **Do:** run each mutation in its own fresh scratch directory, rather than a
   shared one restored between rows.

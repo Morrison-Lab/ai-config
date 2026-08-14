@@ -44,8 +44,34 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(errors="replace")
 
 
+# `raise SystemExit("message")` prints the message but exits **1**, which is
+# this script's "not clean" code -- so a usage or environment error would have
+# been read as a verdict about the PR. The exit code is set explicitly for that
+# reason.
+USAGE_EXIT = 2
+
+
+def die(message: str) -> None:
+    print(message, file=sys.stderr)
+    raise SystemExit(USAGE_EXIT)
+
+
 def run_cmd(cmd: List[str]) -> str:
-    res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        # A missing binary is an ENVIRONMENT failure, and it must not surface as
+        # exit 1 -- that is this script's "not clean" code, so an uninstalled
+        # `gh` would be reported as a verdict about the PR. Handled here rather
+        # than at one call site: `resolve_repo` guarded its own call while every
+        # other `gh` call still raised a raw traceback, which is the partial
+        # guard fail-fast.md describes -- the guard's presence reads as the
+        # hazard being handled everywhere. See Morrison-Lab/ai-config#1330 for
+        # the standing dependency on `gh` itself, which this does not remove.
+        die(
+            f"`{cmd[0]}` is not installed or not on PATH.\n"
+            "This script requires the GitHub CLI; -R cannot substitute for it."
+        )
     if res.returncode != 0:
         raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr}")
     return res.stdout.strip()
@@ -56,16 +82,6 @@ def run_cmd(cmd: List[str]) -> str:
 # spelling into both call sites is how the two halves came apart in the first
 # place, so a value that cannot serve both is refused rather than passed on.
 REPO_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
-
-# `raise SystemExit("message")` prints the message but exits **1**, which is
-# this script's "not clean" code -- so a usage error would have been read as a
-# verdict about the PR. The exit code is set explicitly for that reason.
-USAGE_EXIT = 2
-
-
-def die(message: str) -> None:
-    print(message, file=sys.stderr)
-    raise SystemExit(USAGE_EXIT)
 
 
 def resolve_repo(explicit: str = "") -> str:
@@ -88,7 +104,11 @@ def resolve_repo(explicit: str = "") -> str:
             repo = run_cmd(
                 ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]
             )
-        except (RuntimeError, FileNotFoundError) as exc:
+        except RuntimeError as exc:
+            # `gh` itself missing is handled in run_cmd, because -R cannot
+            # substitute for it. This branch is the narrower case where `gh`
+            # ran and could not name a repo -- not a checkout, no remote, not
+            # authenticated -- and there -R IS the right hint.
             die(
                 f"Cannot resolve the repository from the current directory: {exc}\n"
                 "Run this from inside a git checkout, or pass -R OWNER/REPO."

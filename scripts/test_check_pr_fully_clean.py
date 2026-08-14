@@ -760,6 +760,11 @@ def main() -> int:
             fn()
         except SystemExit as exc:
             return exc.code
+        except BaseException as exc:
+            # Returned rather than propagated, so a guard that stops converting
+            # an exception into an exit code FAILS this assertion instead of
+            # aborting the suite and hiding every test after it.
+            return exc
         return None
 
     with patch.object(checker, "run_cmd", boom):
@@ -771,6 +776,20 @@ def main() -> int:
         # -- the shape mismatch that lets the two halves disagree.
         check("a URL is refused rather than interpolated into the API path",
               exit_code_of(lambda: checker.resolve_repo("https://github.com/owner/name")) == 2)
+
+    # A missing `gh` must exit 2 from EVERY call site, not just the one
+    # resolve_repo happens to make. Measured live: with -R supplied,
+    # resolve_repo succeeded without needing `gh` at all, and the next call
+    # raised a raw FileNotFoundError traceback and exited 1 -- "not clean".
+    # Guarding one sibling path and leaving the others is the partial guard
+    # fail-fast.md describes, so this asserts the guard where it was absent
+    # rather than where it already existed.
+    with patch.object(checker, "subprocess") as fake_sub:
+        fake_sub.run.side_effect = FileNotFoundError(2, "No such file or directory", "gh")
+        check("a missing gh exits 2 from get_pr_info, not 1 ('not clean')",
+              exit_code_of(lambda: checker.get_pr_info("445", TEST_REPO)) == 2)
+        check("a missing gh exits 2 from check_ci_runs too",
+              exit_code_of(lambda: checker.check_ci_runs("sha123", TEST_REPO)) == 2)
 
     # Test 9: -R is parsed rather than silently ignored (#1391's repro)
     args = checker.parse_args(["445", "-R", "Morrison-Lab/gha"])

@@ -138,9 +138,18 @@ else:
         forced is not None and "invalid escape sequence" in forced[0]["stderr"],
     )
 
-    # Host-DEPENDENT, with BOTH branches pinned rather than one asserted and the
-    # other left to chance.
-    if subject is not None and subject >= (3, 12):
+    # Host-DEPENDENT, with EVERY branch pinned rather than one asserted and the
+    # rest left to chance. Three branches, not two: an unresolvable version is
+    # its own outcome, and folding it into either version branch would report a
+    # host we could not identify as a host we could.
+    if subject is None:
+        # Not a repeat of the probe check above. That one reports that the
+        # probe failed; this reports the consequence, which is that the
+        # host-dependent case went unpinned. Failing here loudly beats letting
+        # the branch silently not run, since a check that never ran and a check
+        # that passed leave the same trace in the tally.
+        check("the host-dependent warning case is pinned to a known version", False)
+    elif subject >= (3, 12):
         check(
             f"on {subject[0]}.{subject[1]} (>= 3.12) the default run shows SyntaxWarning",
             "SyntaxWarning" in two["stderr"],

@@ -976,7 +976,7 @@ section — the review bots flag every unlinked package name, one round at a tim
 In Quarto `.qmd` files, label and caption figures and tables with **div syntax**, not chunk-option syntax.
 Wrap the code chunk in a `::: {#fig-...}` / `::: {#tbl-...}` fenced div and put the caption as the last line before the closing `:::`:
 
-```
+````
 ::: {#fig-stage-at-dx}
 
 ```{r}
@@ -988,7 +988,7 @@ plot_stage_at_dx(pt_data)
 
 Stage at diagnosis by screening frequency
 :::
-```
+````
 
 Don't use the chunk options `#| label: fig-...` / `#| fig-cap: "..."` for the cross-reference id and caption.
 The div id (`#fig-`/`#tbl-`) carries the cross-reference; the chunk `label` stays a plain code label.

@@ -42,8 +42,10 @@ def checker(pr=None, repo=None):
     `repo` produces the space-separated `-R OWNER/REPO` form the script grew in
     ai-config#1391. That form is the one CHECKER_CALL had to be widened for: a
     flag whose value is a separate token used to stop the scan before the PR
-    number, so the PR went unrecorded and the guard fell back to its lenient
-    "any invocation discharges" branch.
+    number, so the PR went unrecorded and a later parse targeting that same PR
+    was BLOCKED despite the instrument having answered for it -- a
+    false-positive over-block, not a lenient discharge. The mutation case below
+    pins that direction as its before/after pair (allow -> block).
     """
     cmd = "python3 scripts/check-pr-fully-clean.py"
     if repo is not None:
@@ -118,6 +120,11 @@ CASES = [
     (INCIDENT, [checker(1257, repo="Morrison-Lab/gha")], True,
      "and the per-PR discipline survives the widening: `-R OWNER/REPO 1257` "
      "must not discharge a parse about #1278"),
+    ("jq -r '.body|test(\"Ready for merge\")' /tmp/review-body.json",
+     [checker(1278, repo="Morrison-Lab/gha")], False,
+     "the lenient no-PR-number fallback is a property of the SUSPICIOUS "
+     "command, not of what CHECKER_CALL captured -- it fires here because "
+     "this parse names no PR"),
 
     (INCIDENT, [read_checker()], True,
      "a Grep whose PATTERN is the invocation is not a run of it"),

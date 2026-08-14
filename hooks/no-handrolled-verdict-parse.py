@@ -213,11 +213,26 @@ PR_IN_COMMAND = [
 #
 # A flag may carry a SEPARATE value token (`-R OWNER/REPO 445`), not only an
 # `=`-joined one. Without the optional value the flag run stops at `-R`, the
-# `\s+(\d+)` never reaches `445`, and the PR goes unrecorded -- which drops the
-# guard to its "any invocation discharges" fallback, the lenient direction its
-# own docstring calls dangerous. `check-pr-fully-clean.py` grew exactly such a
-# flag in ai-config#1391, so this is that change's own consequence rather than
-# a hypothetical.
+# `\s+(\d+)` never reaches `445`, and the PR goes unrecorded.
+# `check-pr-fully-clean.py` grew exactly such a flag in ai-config#1391, so this
+# is that change's own consequence rather than a hypothetical.
+#
+# The direction that failure runs in is the SAFE one, and stating it precisely
+# matters because this comment exists to guide the next widening. An
+# unrecorded PR leaves `checked` empty, so a suspicious command that DOES name
+# that PR makes `targets <= checked` false and the guard BLOCKS -- a
+# false-positive over-block of work that was properly instrumented. It does
+# NOT reach the lenient `elif ran: return 0` fallback, which fires only when
+# the suspicious command itself names no PR (`targets` empty) and so does not
+# depend on what `checked_prs` captured.
+#
+# Worth fixing anyway: this is a `deny`, and the docstring above says a guard
+# that blocks work it cannot attribute is a guard that gets switched off.
+#
+# Measured, rather than reasoned: with the optional value removed, the same
+# transcript (`... -R Morrison-Lab/gha 1278`) plus a parse targeting #1278
+# goes allow -> BLOCK. The mutation case in the test file records the same
+# transition as its before/after pair.
 #
 # The value token is optional and the engine backtracks, so a valueless flag is
 # unaffected: in `--verbose 445` the optional value declines to eat `445` and

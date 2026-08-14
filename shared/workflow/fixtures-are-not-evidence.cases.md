@@ -36,6 +36,38 @@ one row per participant, and it now asserts the opposite.
 Run against `main`'s implementation, the new tests produced 9 failures across
 all six blocks that touch the behavior.)
 
+## "Which ref to restore from" --- a base-branch control that could not crash
+
+(`Morrison-Lab/ai-config#1465`, merged 2026-08-14 as `bf0d8770`.
+Round 1 of the PR (`1f304ace`) introduced a `TypeError` in
+`scripts/test_compare_shell_forms.py`: an unresolvable interpreter version left
+`subject` as `None`, and the `< 3.12` branch's f-string dereferenced it eagerly
+while building `check()`'s first argument, so the guard inside `check()` never
+ran.
+Round 2 (`9a56a128`) fixed it with a third, explicitly-failing branch.
+
+Producing the seen-to-fail evidence, the first control restored from
+`origin/main` and did **not** crash.
+`main`'s copy of the file has no `subject` variable at all, so it cannot reach
+the branch, and the run returned a plausible `19 passed, 4 failed`.
+Publishing that would have implied the crash pre-dated the PR.
+
+Measured across all three baselines, same failing case, a `PATH` carrying
+`python3` and `bash` but no bare `python`:
+
+| baseline | outcome | checks completed |
+|---|---|---|
+| `main` (pre-PR) | 19 passed, 4 failed | 23 |
+| `1f304ace` (round 1) | CRASH, `TypeError` | 7 |
+| `9a56a128` (round 2) | 19 passed, 6 failed | 25 |
+
+The checks-completed column is what makes row 2 legible: 7 against 25 is the
+skipped remainder rather than a tally of failures, and the skipped part included
+the suite's pure-classification section, which needs no subprocess and is
+otherwise entirely host-independent.
+What caught the wrong baseline was asking why the control had not crashed, since
+nothing in its output distinguished a wrong baseline from a weak test.)
+
 ## "A fixture that cannot tell the two apart" --- degenerate age coefficients
 
 (`ucdavis/bcs#534`, 2026-07-30/31: `compute_gcomp_cif_ab507bs()` evaluated the

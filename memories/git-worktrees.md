@@ -616,6 +616,9 @@ header rather than with comparing figures.)
 Every earlier section in this file assumes the peer worktree is dead.
 This one is about telling that apart from a peer worktree that only *looks*
 dead, before you edit it, delete it, or reassign its branch.
+The operative rule --- ask the agent, never infer --- is restated in
+`CLAUDE.md`'s "Subagent worktrees are assigned" section; this section carries
+the evidence and the case record behind it.
 
 `git status --short` reporting nothing uncommitted, and `git log
 origin/<branch>..HEAD` reporting nothing unpushed, both answer a question

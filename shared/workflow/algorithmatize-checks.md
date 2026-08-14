@@ -1010,6 +1010,63 @@ This is the direction that list does not carry.
   changes the working directory, the module search path, and possibly the
   interpreter, all silently.
 
+**A seventh outcome belongs to the MATRIX rather than to any mutant: a real
+failure reported under the wrong mutation's name.**
+The six above each interrogate one mutant --- did the edit apply, does it say
+what its author wrote, is its replacement independent of what it replaced, did
+it fail for its own reason.
+A matrix runs several in sequence, and sequence is a property none of those
+checks can see.
+
+Observed directly, and stated as an observation because the mechanism was never
+pinned down.
+A five-mutation matrix run in **one shared scratch directory** --- copy the
+files once, mutate, run, restore, repeat --- reported mutation M3's row as
+failing a test belonging to M2's clause.
+Two runs disagreed with it: the identical mutation run alone named the right
+test, and the harness's own mechanism reproduced in a fresh directory named the
+right test too.
+Nothing beyond that was established, so do not infer a cause from it.
+What is established is that the shared directory produced the misattribution
+and a fresh one per mutation did not.
+
+Note that every discriminator above passes here, the sixth outcome's included.
+An unmutated control was run and passed, so "a mutant that fails where its twin
+also fails has told you about the location" does not fire --- the location is
+fine and the **sequence** is not.
+The row also reported a genuine failure, so nothing keyed on *whether* a
+mutation was caught would flag it either, the block below's totals cross-check
+included.
+Only the name is wrong, and the name is the whole of what a seen-to-fail table
+publishes.
+
+The remedy is to remove the failure mode rather than to find it.
+Give each mutation its own fresh directory.
+That is one `mkdtemp` per row against an open-ended investigation into shared
+state, and it ends with the mode gone rather than explained --- which is worth
+paying for because a mutation matrix is **evidence you publish**, so a harness
+bug inside it is indistinguishable from a finding about the tests, exactly as
+the block below says of any harness's own output.
+
+Distinguish it from the suite-level trap higher up, which is the same
+misattribution one axis over: there a *sibling test case* in the same run
+aborts first, so the catch is credited to the wrong test; here a *sibling
+mutation* in an earlier row is what the name belongs to.
+
+- **Do:** run each mutation in its own fresh scratch directory, rather than a
+  shared one restored between rows.
+- **Do:** re-run a surprising row alone before believing it --- an isolated run
+  is the cheapest second opinion a matrix has.
+- **Don't:** read a matrix's per-row test names as attributable because its
+  control passed and its counts look right; misattribution moves the name and
+  leaves both intact.
+- **Don't:** spend the round diagnosing shared harness state when isolation
+  deletes the failure mode outright.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A shared scratch directory reporting one mutation's failure under another's
+name".
+
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**
 A harness bug and a real finding are indistinguishable from the harness's own

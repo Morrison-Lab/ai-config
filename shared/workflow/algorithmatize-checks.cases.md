@@ -261,6 +261,28 @@ ends; running it is what showed each form fails at one, which changes the fix --
 adding the opposite delimiter does not help, because substring overlap between
 alternatives makes string replacement the wrong instrument regardless.)
 
+## A shared scratch directory reporting one mutation's failure under another's name
+
+(`Morrison-Lab/ai-config#1462`, 2026-08-14: a five-row mutation matrix over
+`scripts/check-pr-fully-clean.py` and its suite, proving each new assertion had
+been seen to fail.
+The first harness used **one** scratch directory for the whole matrix --- copy
+the files in, mutate, run, restore, next row --- and reported row M3
+(`check_review_comments` drops `--repo`) as failing an assertion that belongs to
+row M2 (`get_pr_info` drops `--repo`).
+Two runs disagreed with it: M3 alone in a fresh directory named its own
+assertion, and the shared harness's own copy-mutate-run mechanism, re-run in a
+fresh directory, named it too.
+
+The root cause was not pursued, so nothing here should be read as a diagnosis
+of shared-directory state.
+The fix was to give every row its own `mkdtemp`, which is what the PR's
+published matrix was produced with, and each row then named its own assertion.
+Note what the misattribution left untouched: an unmutated control in a fresh
+directory passed, every row still reported a genuine non-zero failure count, and
+the mutations themselves applied, so the only wrong thing was the one field the
+matrix exists to publish.)
+
 ## There is a fourth outcome: a mutation that applies cleanly and is unfaithful
 
 (`Morrison-Lab/ai-config#1278`, 2026-08-08, round 6: a mutation meant to restore

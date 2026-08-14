@@ -261,6 +261,81 @@ ends; running it is what showed each form fails at one, which changes the fix --
 adding the opposite delimiter does not help, because substring overlap between
 alternatives makes string replacement the wrong instrument regardless.)
 
+## A mutation whose recorded direction contradicted the comment beside it
+
+(`Morrison-Lab/ai-config#1462`, 2026-08-14, review round 1, the round's only
+finding.
+The PR widened `CHECKER_CALL` in
+[`hooks/no-handrolled-verdict-parse.py`](../../hooks/no-handrolled-verdict-parse.py)
+so a flag's separate value token (`-R OWNER/REPO 445`) could not stop the scan
+before the PR number.
+Its rationale comment said the un-widened form left the PR unrecorded, "which
+drops the guard to its 'any invocation discharges' fallback, the lenient
+direction its own docstring calls dangerous".
+
+That is backwards, and the same commit already said so.
+Its `MUTANTS` entry is
+`("CHECKER_CALL admits a flag's separate value token", ..., False, True)`, and
+the harness reads that tuple as `before_want=False, after_want=True` with
+`verb = {True: "block", False: "allow"}` --- so the entry records
+**allow -> block**, the over-block direction, and it passed.
+
+The two artifacts are further apart than they look, which is the point rather
+than an excuse.
+The rationale comment is `no-handrolled-verdict-parse.py:217` and the mutation
+entry is `test-no-handrolled-verdict-parse.py:238`, so reading either file
+never brings the other into view.
+
+Re-measured here rather than taken from the review, each variant in its own
+`mkdtemp` against an unmutated control:
+
+| regex | suspicious command | verdict |
+|---|---|---|
+| widened | names PR 1278 | allow |
+| un-widened | names PR 1278 | **BLOCK** |
+| widened | names no PR | allow |
+| un-widened | names no PR | allow |
+
+The top pair reproduces the entry's `allow -> block`.
+The bottom pair isolates the mechanism: the lenient `elif ran: return 0` branch
+fires under **both** regexes, because it is reached only when `targets` is
+empty, and `targets = prs_in(cmd)` reads the **suspicious command** rather than
+anything the checker call captured.
+Un-widening shrinks `checked`, so `targets <= checked` goes false and the guard
+denies --- over-block, never fail-open.
+
+Two details worth carrying.
+The reviewer disproved the comment by citing the PR's **own mutation case**, so
+the evidence was already in the diff and no fresh experiment was needed.
+And the wrong direction was stated twice: the same claim appears in the
+`checker()` fixture's docstring at `test-no-handrolled-verdict-parse.py:45`,
+which says the PR "went unrecorded and the guard fell back to its lenient 'any
+invocation discharges' branch".
+That copy sits 193 lines above the mutation entry that refutes it, in the same
+file, so fixing only the line the review quoted would have left it standing.)
+
+## A shared scratch directory reporting one mutation's failure under another's name
+
+(`Morrison-Lab/ai-config#1462`, 2026-08-14: a five-row mutation matrix over
+`scripts/check-pr-fully-clean.py` and its suite, proving each new assertion had
+been seen to fail.
+The first harness used **one** scratch directory for the whole matrix --- copy
+the files in, mutate, run, restore, next row --- and reported row M3
+(`check_review_comments` drops `--repo`) as failing an assertion that belongs to
+row M2 (`get_pr_info` drops `--repo`).
+Two runs disagreed with it: M3 alone in a fresh directory named its own
+assertion, and the shared harness's own copy-mutate-run mechanism, re-run in a
+fresh directory, named it too.
+
+The root cause was not pursued, so nothing here should be read as a diagnosis
+of shared-directory state.
+The fix was to give every row its own `mkdtemp`, which is what the PR's
+published matrix was produced with, and each row then named its own assertion.
+Note what the misattribution left untouched: an unmutated control in a fresh
+directory passed, every row still reported a genuine non-zero failure count, and
+the mutations themselves applied, so the only wrong thing was the one field the
+matrix exists to publish.)
+
 ## There is a fourth outcome: a mutation that applies cleanly and is unfaithful
 
 (`Morrison-Lab/ai-config#1278`, 2026-08-08, round 6: a mutation meant to restore

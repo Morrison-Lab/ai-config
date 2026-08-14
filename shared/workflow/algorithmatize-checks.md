@@ -442,6 +442,59 @@ a mechanism and its opposite predict is evidence for neither" owns that case.
 - **Don't:** settle a mechanism attribution by plausible reasoning; a
   reasoned-but-wrong one reads exactly like a correct one.
 
+**Running the mutation is not the check, because the rule above asks WHETHER
+the case flips and a comment can be wrong about WHICH WAY.**
+Read the operative verbs: "confirm the behaviour **changes**", "confirming the
+case **flips**".
+Both are satisfied by any flip at all.
+So a mutation can pass green while the prose beside it asserts the opposite
+failure direction, and nothing in the round notices --- the rule was followed,
+and following it was not enough.
+
+The missing step is free, and it needs no re-derivation.
+**A mutation's recorded before/after pair is itself a statement of the failure
+direction**, already in machine-checkable form: an entry whose pair reads
+`allow -> block` says the code *with* the clause allows and the code *without*
+it refuses, so removing the clause over-blocks.
+Read that pair back against the sentence, and a contradiction is visible by
+looking.
+
+Expect the two artifacts to sit in **different files**, which is most of why
+nobody compares them.
+The prose lives beside the code it explains and the mutation lives in the test
+suite, so reading either one never brings the other into view --- and they
+still ship in the same commit, by the same author, in the same sitting, so this
+is not a stale note somebody left behind.
+The comparison has to be sought; proximity will not supply it.
+
+It matters more than an ordinary wrong sentence because
+[`fail-fast`](../principles/fail-fast.md)'s safe-versus-dangerous asymmetry is
+the thing that decides whether to accept a later request to loosen a guard.
+A comment that labels an over-block as the lenient direction inverts that
+judgment for the next editor, in the artifact written to guide them.
+
+Two practical notes.
+When a reviewer disputes an attribution, the disproof may already be sitting in
+your own diff rather than needing a fresh experiment.
+And check whether the direction claim was stated twice --- a rationale comment
+and a fixture's docstring routinely carry the same sentence, so fixing the one
+the reviewer quoted leaves the other standing, per
+[`fail-fast`](../principles/fail-fast.md)'s partial-guard rule.
+
+- **Do:** read a mutation's before/after pair back against the prose it
+  supports, in the commit that ships both.
+- **Do:** state a direction in the vocabulary the pair uses --- over-block or
+  fail-open --- so the sentence and the fixture are comparable at a glance.
+- **Do:** grep for the direction claim once one instance is wrong; it is
+  usually written down more than once.
+- **Don't:** count a green mutation as having verified the attribution --- it
+  establishes that something flipped, which is the weaker half.
+- **Don't:** reach for a fresh experiment when a reviewer disputes a direction
+  before checking whether your own fixtures already record it.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A mutation whose recorded direction contradicted the comment beside it".
+
 (Morrison-Lab/gha#425, 2026-08-05: a `check-new-line-breaks.py`
 sentence-boundary regex fix carried a comment block documenting which half of
 the regex --- the closing-character class or the lookahead --- refused which
@@ -1009,6 +1062,63 @@ This is the direction that list does not carry.
 - **Don't:** treat moving the mutant to a scratch directory as inert; it
   changes the working directory, the module search path, and possibly the
   interpreter, all silently.
+
+**A seventh outcome belongs to the MATRIX rather than to any mutant: a real
+failure reported under the wrong mutation's name.**
+The six above each interrogate one mutant --- did the edit apply, does it say
+what its author wrote, is its replacement independent of what it replaced, did
+it fail for its own reason.
+A matrix runs several in sequence, and sequence is a property none of those
+checks can see.
+
+Observed directly, and stated as an observation because the mechanism was never
+pinned down.
+A five-mutation matrix run in **one shared scratch directory** --- copy the
+files once, mutate, run, restore, repeat --- reported mutation M3's row as
+failing a test belonging to M2's clause.
+Two runs disagreed with it: the identical mutation run alone named the right
+test, and the harness's own mechanism reproduced in a fresh directory named the
+right test too.
+Nothing beyond that was established, so do not infer a cause from it.
+What is established is that the shared directory produced the misattribution
+and a fresh one per mutation did not.
+
+Note that every discriminator above passes here, the sixth outcome's included.
+An unmutated control was run and passed, so "a mutant that fails where its twin
+also fails has told you about the location" does not fire --- the location is
+fine and the **sequence** is not.
+The row also reported a genuine failure, so nothing keyed on *whether* a
+mutation was caught would flag it either, the block below's totals cross-check
+included.
+Only the name is wrong, and the name is the whole of what a seen-to-fail table
+publishes.
+
+The remedy is to remove the failure mode rather than to find it.
+Give each mutation its own fresh directory.
+That is one `mkdtemp` per row against an open-ended investigation into shared
+state, and it ends with the mode gone rather than explained --- which is worth
+paying for because a mutation matrix is **evidence you publish**, so a harness
+bug inside it is indistinguishable from a finding about the tests, exactly as
+the block below says of any harness's own output.
+
+Distinguish it from the suite-level trap higher up, which is the same
+misattribution one axis over: there a *sibling test case* in the same run
+aborts first, so the catch is credited to the wrong test; here the name belongs
+to a *sibling mutation* in another row of the same matrix.
+
+- **Do:** run each mutation in its own fresh scratch directory, rather than a
+  shared one restored between rows.
+- **Do:** re-run a surprising row alone before believing it --- an isolated run
+  is the cheapest second opinion a matrix has.
+- **Don't:** read a matrix's per-row test names as attributable because its
+  control passed and its counts look right; misattribution moves the name and
+  leaves both intact.
+- **Don't:** spend the round diagnosing shared harness state when isolation
+  deletes the failure mode outright.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A shared scratch directory reporting one mutation's failure under another's
+name".
 
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**

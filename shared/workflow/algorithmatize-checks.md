@@ -409,7 +409,7 @@ Wiring it into the pre-push sweep turns the prose rationale that motivated the t
 Then confirm it fires: reintroduce one of the entries it removed and require the audit to fail.
 
 **The audit has to enter at the instrument's own input, exactly as a negative control does.**
-"A negative control must enter at the real input" above is stated for controls, and it governs the audit for the same reason --- an audit that queries the lookup table directly rather than calling the scanner's entry point bypasses every suppression the real path applies, so it reports collisions the shipped instrument would never have raised.
+"A negative control must enter at the real input" below is stated for controls, and it governs the audit for the same reason --- an audit that queries the lookup table directly rather than calling the scanner's entry point bypasses every suppression the real path applies, so it reports collisions the shipped instrument would never have raised.
 That failure is not the uniform-verdict one above: the result **varies** with the corpus and is simply wider than the truth, so nothing about it looks broken.
 
 - **Do:** take a CI check's green on the default branch as ground truth that nothing in scope there should fire, and audit against that corpus.

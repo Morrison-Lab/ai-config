@@ -652,6 +652,22 @@ straight into a **liveness** decision is a sharper failure than feeding into
 an ordinary status recap, because the decision it distorts is exactly the one
 this section is about.
 
+**One step earlier than the timestamp: the field's own semantics are not
+established anywhere in this corpus, so a correct timestamp comparison still
+does not settle liveness on its own.**
+An `idle_notification` carries an `idleReason` such as `"available"`, and
+reading that as "this session has stopped working" is an inference this
+corpus has never verified.
+`"available"` describes a session that is not currently blocked on a tool
+call --- which is exactly what a session sitting on a backgrounded `gh run
+watch` looks like from the outside, since the watch runs and reports without
+occupying the foreground.
+So the timestamp check above can be run correctly, against a real,
+non-fabricated timestamp, and the result still says only when the notification
+was sent --- never what sending it actually meant.
+Read `idleReason` as an unglossed field rather than as a verdict, and treat a
+liveness question it seems to answer as still open.
+
 **Two more direct ways the same misreading arrives, both concluding "dead" on
 evidence that only shows "quiet right now".**
 
@@ -700,6 +716,8 @@ recovery path once it is gone.
   before concluding it is dead just because it has sat quietly.
 - **Don't:** derive an `idle_notification` staleness comparison from a
   timestamp you extrapolated rather than measured; see `#1453` for that half.
+- **Don't:** read `idleReason` as a liveness verdict; a correct timestamp
+  comparison still leaves the field's own meaning unestablished.
 - **Don't:** credit your own judgment when a tool's built-in guard is what
   actually stopped a clobber --- name the guard, so the next read of a clean
   worktree gets checked rather than trusted.
@@ -716,4 +734,15 @@ staleness guard mid-edit, because the teammate had started editing the same
 file between the read and the write.
 Later the same worktree sat with 38 uncommitted insertions for over nine
 hours with no `ListAgents` entry, was judged dead, and replied within a
-minute once asked --- it then reclaimed the PR itself.)
+minute once asked --- it then reclaimed the PR itself.
+A fourth instance came from a different source: the team-lead session's own
+review message on the PR recording all this, which read the agent writing
+this entry as idle roughly three minutes after it dispatched the review run
+that produced round 1, on the strength of an `idleReason: "available"`
+notification --- and named the notification's own semantics as unverified
+only once the writer pointed out the watch had, in fact, been running the
+whole time.
+Recorded here as evidence about the field rather than about a worktree,
+since nothing about it involved git state --- the mechanism is identical to
+the first two instances, and the correction came from a message rather than
+from a diff.)

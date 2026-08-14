@@ -137,6 +137,45 @@ which is why nothing about accepting it feels like guessing.
 - **Don't:** read a null result as "no further sites"; it means no further hit
   for that pattern, and a differently-worded instance would not have matched.
 
+**The remedy above names a search space --- "the whole diff" --- and a stack has
+one of those per branch.**
+Everything above governs the *pattern*.
+This governs the *corpus* the pattern runs over, which the remedy states in the
+singular because a session normally has one PR.
+
+Running the sweep across the PR the finding landed on is the whole of what the
+rule asks for, and it produces exactly the reply the rule endorses: the pattern
+searched, the hit count, every hit fixed.
+So the near-miss passes every check written above, and it does so while a
+sibling branch carries the same violation --- which the next round finds, on a
+PR whose review had nothing to do with the finding.
+
+The trigger is worth stating because nothing about the finding announces it.
+A reviewer reports on one PR, so the finding arrives scoped to that PR, and a
+stack is one unit of work in every way except this one.
+When a finding names a *class* rather than an occurrence --- a convention, a
+banned token, a formatting rule --- the class is a property of the work, and
+the work spans the stack.
+
+```bash
+for b in <branch-A> <branch-B>; do
+  printf '%s: ' "$b"
+  git diff "origin/main...$b" | grep -c '<fragment>'
+done
+```
+
+- **Do:** run the derived sweep over every branch in the stack, and report the
+  per-branch counts.
+- **Do:** treat a finding that names a convention as scoped to the work rather
+  than to the PR it was filed on.
+- **Don't:** read "the whole diff" as satisfied by the diff of the PR the
+  reviewer commented on --- that is one of N.
+
+(`ucdavis/bcs`, 2026-08-12: a reviewer flagged issue numbers in source comments,
+a `CLAUDE.md` violation, on the base PR of a two-PR stack.
+All three of that PR's files were swept and fixed; the stacked PR's file, which
+carried the same violation, was not in the search space and was not.)
+
 **Deriving the class is necessary and not sufficient, because you can derive the
 wrong one --- and the growth rate across rounds is what says so.**
 Everything above governs inheriting a reviewer's list instead of deriving your

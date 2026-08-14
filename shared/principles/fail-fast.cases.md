@@ -256,6 +256,28 @@ was no exclusion reason to re-run over survivors; the comment's own statement of
 the hazard was the predicate, and reading the patterns against it would have
 caught them.)
 
+## The same block, where the comment stated an exclusion criterion
+
+(`ucdavis/bcs`, 2026-08-12: a dialect word-list table carried a comment saying
+that words colliding with an R identifier are excluded "because each would be a
+false positive that blocks a push", naming `grey`/`gray` as the example.
+The table immediately beneath it held `summarise`, a dplyr verb appearing in 19
+files, plus `colour`, `labeller`, and `analyses`.
+Same author, same commit, same shape as the case above.
+
+What it adds is which of the two adjacent blocks fires.
+The case above records a comment that removed nothing, so there was no survivor
+set to sweep and the hazard sentence itself was the whole predicate.
+Here the comment states an **exclusion criterion**, so it is the
+"apply a comment's stated exclusion reason as a predicate to the members still
+present" block that governs --- and applying it was fully decidable rather than
+a matter of reading, because the repository's own green spellcheck already
+labels every in-scope word as accepted.
+See
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+"A green check on the default branch is a free labelled corpus" for the audit
+that mechanized it.)
+
 ## "Enumerate the qualifier classes by which SIDE of the phrase they sit on"
 
 (Same PR, the round that fixed the case above: review supplied three

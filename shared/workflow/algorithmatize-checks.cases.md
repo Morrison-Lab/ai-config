@@ -274,11 +274,17 @@ drops the guard to its 'any invocation discharges' fallback, the lenient
 direction its own docstring calls dangerous".
 
 That is backwards, and the same commit already said so.
-Its `MUTANTS` entry, about twenty lines away, is
+Its `MUTANTS` entry is
 `("CHECKER_CALL admits a flag's separate value token", ..., False, True)`, and
 the harness reads that tuple as `before_want=False, after_want=True` with
 `verb = {True: "block", False: "allow"}` --- so the entry records
 **allow -> block**, the over-block direction, and it passed.
+
+The two artifacts are further apart than they look, which is the point rather
+than an excuse.
+The rationale comment is `no-handrolled-verdict-parse.py:217` and the mutation
+entry is `test-no-handrolled-verdict-parse.py:238`, so reading either file
+never brings the other into view.
 
 Re-measured here rather than taken from the review, each variant in its own
 `mkdtemp` against an unmutated control:
@@ -302,9 +308,11 @@ Two details worth carrying.
 The reviewer disproved the comment by citing the PR's **own mutation case**, so
 the evidence was already in the diff and no fresh experiment was needed.
 And the wrong direction was stated twice: the same claim appears in the
-`checker()` fixture's docstring, which says the PR "went unrecorded and the
-guard fell back to its lenient 'any invocation discharges' branch" --- so
-fixing only the line the review quoted would have left the other standing.)
+`checker()` fixture's docstring at `test-no-handrolled-verdict-parse.py:45`,
+which says the PR "went unrecorded and the guard fell back to its lenient 'any
+invocation discharges' branch".
+That copy sits 193 lines above the mutation entry that refutes it, in the same
+file, so fixing only the line the review quoted would have left it standing.)
 
 ## A shared scratch directory reporting one mutation's failure under another's name
 

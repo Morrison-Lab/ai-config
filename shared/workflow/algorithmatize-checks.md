@@ -454,15 +454,18 @@ and following it was not enough.
 The missing step is free, and it needs no re-derivation.
 **A mutation's recorded before/after pair is itself a statement of the failure
 direction**, already in machine-checkable form: an entry whose pair reads
-`allow -> block` says the un-mutated clause was *permitting* something and the
-reverted code *refuses* it, which is the over-block direction.
+`allow -> block` says the code *with* the clause allows and the code *without*
+it refuses, so removing the clause over-blocks.
 Read that pair back against the sentence, and a contradiction is visible by
 looking.
 
-Note how little separates the two artifacts when this happens.
-The mutation and the comment ship in the same commit, usually within a screen
-of each other, written by the same author in the same sitting --- so this is
-not a stale note somebody left behind, and proximity is no protection.
+Expect the two artifacts to sit in **different files**, which is most of why
+nobody compares them.
+The prose lives beside the code it explains and the mutation lives in the test
+suite, so reading either one never brings the other into view --- and they
+still ship in the same commit, by the same author, in the same sitting, so this
+is not a stale note somebody left behind.
+The comparison has to be sought; proximity will not supply it.
 
 It matters more than an ordinary wrong sentence because
 [`fail-fast`](../principles/fail-fast.md)'s safe-versus-dangerous asymmetry is

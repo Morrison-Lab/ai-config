@@ -442,6 +442,56 @@ a mechanism and its opposite predict is evidence for neither" owns that case.
 - **Don't:** settle a mechanism attribution by plausible reasoning; a
   reasoned-but-wrong one reads exactly like a correct one.
 
+**Running the mutation is not the check, because the rule above asks WHETHER
+the case flips and a comment can be wrong about WHICH WAY.**
+Read the operative verbs: "confirm the behaviour **changes**", "confirming the
+case **flips**".
+Both are satisfied by any flip at all.
+So a mutation can pass green while the prose beside it asserts the opposite
+failure direction, and nothing in the round notices --- the rule was followed,
+and following it was not enough.
+
+The missing step is free, and it needs no re-derivation.
+**A mutation's recorded before/after pair is itself a statement of the failure
+direction**, already in machine-checkable form: an entry whose pair reads
+`allow -> block` says the un-mutated clause was *permitting* something and the
+reverted code *refuses* it, which is the over-block direction.
+Read that pair back against the sentence, and a contradiction is visible by
+looking.
+
+Note how little separates the two artifacts when this happens.
+The mutation and the comment ship in the same commit, usually within a screen
+of each other, written by the same author in the same sitting --- so this is
+not a stale note somebody left behind, and proximity is no protection.
+
+It matters more than an ordinary wrong sentence because
+[`fail-fast`](../principles/fail-fast.md)'s safe-versus-dangerous asymmetry is
+the thing that decides whether to accept a later request to loosen a guard.
+A comment that labels an over-block as the lenient direction inverts that
+judgment for the next editor, in the artifact written to guide them.
+
+Two practical notes.
+When a reviewer disputes an attribution, the disproof may already be sitting in
+your own diff rather than needing a fresh experiment.
+And check whether the direction claim was stated twice --- a rationale comment
+and a fixture's docstring routinely carry the same sentence, so fixing the one
+the reviewer quoted leaves the other standing, per
+[`fail-fast`](../principles/fail-fast.md)'s partial-guard rule.
+
+- **Do:** read a mutation's before/after pair back against the prose it
+  supports, in the commit that ships both.
+- **Do:** state a direction in the vocabulary the pair uses --- over-block or
+  fail-open --- so the sentence and the fixture are comparable at a glance.
+- **Do:** grep for the direction claim once one instance is wrong; it is
+  usually written down more than once.
+- **Don't:** count a green mutation as having verified the attribution --- it
+  establishes that something flipped, which is the weaker half.
+- **Don't:** reach for a fresh experiment when a reviewer disputes a direction
+  before checking whether your own fixtures already record it.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A mutation whose recorded direction contradicted the comment beside it".
+
 (Morrison-Lab/gha#425, 2026-08-05: a `check-new-line-breaks.py`
 sentence-boundary regex fix carried a comment block documenting which half of
 the regex --- the closing-character class or the lookahead --- refused which

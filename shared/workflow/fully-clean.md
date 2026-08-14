@@ -750,26 +750,43 @@ the question being asked, and that is the ordinary case rather than an edge
 one, because a hex token lands in a review body for its own reason, not to
 answer "does this evaluate HEAD."
 A findings-free verdict usually has nothing to cite at all: no
-`blob/<sha>/...` permalink, no prose reference to the commit, since there is
-no finding to anchor a citation to.
-A verdict can also discuss a commit's own message rather than its diff, and
-cite that commit's SHA while never mentioning the head --- and the cited
-commit can be an *earlier* one on the same branch, present in the body and
-simply not the one being asked about.
+`blob/<sha>/...` permalink, no prose reference to the head commit, since
+there is no finding to anchor a citation to.
+A verdict can also discuss a commit's own message rather than its diff, or
+quote a SHA the diff itself cites while verifying some other claim in the
+PR, and either way name a real commit while never mentioning the head ---
+and the SHA it lands on can be an *earlier* commit on the same branch, or a
+commit from an entirely different PR that the diff happens to reference.
 So the failure concentrates on exactly the verdicts criterion 2 exists to
 certify: the cleaner the review, the less its body has to do with the head
 SHA at all, and the more likely the script reports `No review comment has
 been posted evaluating HEAD SHA <sha> yet` over a PR that is in fact clean.
 
-The direction stays safe in the sense that matters.
-A review naming the wrong head can never match the current one and pass as
-current, so the script cannot wave a real problem through.
-What it cannot do is confirm a genuinely current clean review, so read a
-"no review at this HEAD" result as **inconclusive**, not as a settled
-negative, before spending a re-dispatch or a self-review on it --- a
-needless re-dispatch is the expensive mistake the first block above already
-warns about, since it can cancel a review already in flight under
-`concurrency: cancel-in-progress`.
+The direction is overwhelmingly the withholding one, but it is not a
+guarantee against the other, and the reason is the same substring test that
+produces the withholding: the match certifies only that a SHA string
+appears somewhere in the body, never why it is there or what the run
+actually evaluated.
+A slow review of an earlier commit that posts after a newer push can, in
+principle, still name the new head --- this repo's review jobs routinely run
+live `gh` queries as part of their own verification (a "Verification
+performed" section quoting a freshly fetched field is the common shape), so
+a review's commentary can echo the PR's *current* head even while its diff
+analysis is against an older one.
+That is the exact review-vs-push race the script's own comment names as the
+reason for the fail-closed branch, and the branch defends only against a
+*wrong* SHA blocking a match, not against a coincidentally *current* one
+passing a stale one through.
+No confirmed instance of it exists here; the argument is about the
+mechanism's soundness, not a reported failure, and finding one would need a
+systematic search this fragment has not run.
+So treat a "no review at this HEAD" result as **inconclusive**, not as a
+settled negative, and treat a clean discharge as the *likely* reading
+rather than a certified one.
+A needless re-dispatch is still the expensive mistake the first block above
+already warns about, since it can cancel a review already in flight under
+`concurrency: cancel-in-progress` --- so weigh both readings against that
+cost rather than reflexively re-checking either.
 
 This also rules out the fix a reader might otherwise reach for: asking
 reviewers to cite their head SHA more consistently would close the
@@ -797,8 +814,8 @@ per the `workflow_dispatch` rule two blocks above.
 
 - **Do:** read a flagging run's `event`, `head_branch`, and `head_sha`
   before treating "no review at this HEAD" as a genuine gap.
-- **Do:** trust the script's discharge --- a clean result really is clean
-  --- and treat only its withholding as needing this extra check.
+- **Do:** treat the script's discharge as the likely reading, since the
+  withholding direction dominates in practice, but not as a certified one.
 - **Don't:** re-dispatch a review, or fall back to self-review, on this
   signal alone when the flagging run's own metadata already shows it
   evaluated the current head.
@@ -811,7 +828,10 @@ per the `workflow_dispatch` rule two blocks above.
 
 (`Morrison-Lab/ai-config#1213` tracks the underlying script defect, filed
 2026-08-06 against `#1207`.
-Three instances, same root cause:
+Three instances, same root cause, each drawn from a **merged** PR whose head
+is therefore frozen --- adding a row for an open PR ties the row to a SHA
+that the next push retires, which is exactly the staleness this whole file
+warns against:
 
 | PR | verdict | SHA(s) in body | head | script result |
 | --- | --- | --- | --- | --- |

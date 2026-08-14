@@ -252,30 +252,18 @@ than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 
 **Both criteria are per-PR, and a stack is where that stops being automatic.**
-Everything above reads as being about "the PR" because a session normally has
-one.
-Two stacked PRs are one unit of *work* and two units of *evidence*, so every
-check here is owed twice --- and the phrase "I read the review" silently
-becomes ambiguous the moment a second PR exists.
+Everything above reads as being about "the PR" because a session normally has one.
+Two stacked PRs are one unit of *work* and two units of *evidence*, so every check here is owed twice --- and the phrase "I read the review" silently becomes ambiguous the moment a second PR exists.
 
 The failure needs no carelessness, only adjacency.
-Stacked PRs are reviewed within seconds of each other by the same reviewer,
-their comments look alike, and they are usually open in the same status sweep.
-So an impression formed from one PR's verdict transfers to the other without
-anything asserting it, and the transferred impression is *correct about a real
-review* --- just not that PR's.
+Stacked PRs are reviewed within seconds of each other by the same reviewer, their comments look alike, and they are usually open in the same status sweep.
+So an impression formed from one PR's verdict transfers to the other without anything asserting it, and the transferred impression is *correct about a real review* --- just not that PR's.
 
 Two things make it survive the round.
-A reviewer that refuses on one PR looks like an answer for the pair, whereas
-[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case already
-establishes that reviewers fail independently --- and the same independence
-holds across PRs, so one reviewer's refusal on the stacked PR says nothing
-about whether a different reviewer posted there.
-And the stacked PR is the one whose evidence gets skipped, because the base is
-what the session is attending to.
+A reviewer that refuses on one PR looks like an answer for the pair, whereas [`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case already establishes that reviewers fail independently --- and the same independence holds across PRs, so one reviewer's refusal on the stacked PR says nothing about whether a different reviewer posted there.
+And the stacked PR is the one whose evidence gets skipped, because the base is what the session is attending to.
 
-Settle it per PR, from the `**Claude finished` body marker rather than from
-recollection, and say which PR each verdict came from when reporting the pair:
+Settle it per PR, from the `**Claude finished` body marker rather than from recollection, and say which PR each verdict came from when reporting the pair:
 
 ```bash
 for n in <A> <B>; do
@@ -286,19 +274,12 @@ done
 ```
 
 - **Do:** derive a verdict per PR number, and name the PR beside each one.
-- **Do:** treat a refusal from one reviewer on one PR as evidence about that
-  reviewer on that PR, and nothing else.
-- **Don't:** report a stack's review state from a single read --- "I read the
-  review" is a per-PR claim, and the stack is what makes it read as a claim
-  about the work.
+- **Do:** treat a refusal from one reviewer on one PR as evidence about that reviewer on that PR, and nothing else.
+- **Don't:** report a stack's review state from a single read --- "I read the review" is a per-PR claim, and the stack is what makes it read as a claim about the work.
 
-(`ucdavis/bcs`, 2026-08-12: two stacked PRs were reviewed 82 seconds apart,
-`16:26:16Z` on the stacked PR and `16:27:38Z` on its base.
-The base's verdict was read, a Copilot quota refusal was seen on the stacked
-PR, and the pair was reported as one verdict plus one refusal.
-The stacked PR's own review had posted and sat unread for 12 hours; the next
-round re-raised both of its findings and noted the file was byte-identical
-across the three intervening commits.)
+(`ucdavis/bcs`, 2026-08-12: two stacked PRs were reviewed 82 seconds apart, `16:26:16Z` on the stacked PR and `16:27:38Z` on its base.
+The base's verdict was read, a Copilot quota refusal was seen on the stacked PR, and the pair was reported as one verdict plus one refusal.
+The stacked PR's own review had posted and sat unread for 12 hours; the next round re-raised both of its findings and noted the file was byte-identical across the three intervening commits.)
 
 **The disagreement is measurable, and it is not a wording problem.**
 Across 38 verdict-bearing `claude-review` comments sampled from 16 PRs,

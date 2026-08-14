@@ -181,41 +181,22 @@ the drift measured above.
 
 **A third case, distinct from either misfire above: some checks are designed to NEVER fail regardless of their own posted content, so their green color carries zero signal at all.** A CI-runner-relative benchmark check that gates a soft threshold (e.g. "regressed beyond 20% vs. baseline") may deliberately report success/pass at the GitHub-check level even when it posts a `:warning:` regression comment, precisely because the project has decided that threshold is "a human call, not an auto-block" rather than a hard gate. `gh pr checks` (or the equivalent status API) showing this check as PASS is consequently not evidence there is nothing to look at --- it only means the check ran, not that its content was clean. Read the check's own posted comment body every time, the same discipline the review-job case above already demands, but don't expect the check's pass/fail conclusion to ever flip for this class of check even on a real, large regression.
 
-**The third case has a variant whose green is not even about its own content:
-a check that reports only that a DISPATCH succeeded.**
-The benchmark case above is a check that ran the work and declined to gate on
-what it found, so reading its posted comment recovers the signal.
+**The third case has a variant whose green is not even about its own content: a check that reports only that a DISPATCH succeeded.**
+The benchmark case above is a check that ran the work and declined to gate on what it found, so reading its posted comment recovers the signal.
 A dispatcher runs no review at all.
-It selects a reviewer and fires a second workflow, and its green says that call
-returned 200 --- whether the review then starts, fails, or posts a verdict is
-recorded in a different run, which by construction cannot colour this check.
+It selects a reviewer and fires a second workflow, and its green says that call returned 200 --- whether the review then starts, fails, or posts a verdict is recorded in a different run, which by construction cannot colour this check.
 
-That makes it worse than the benchmark case on the one axis that matters for a
-reader.
-There the content is on the PR and merely ungated; here there is no content to
-read, and the check's own name usually says "review", so a status sweep that
-reports it green is reporting the truth about a step nobody cares about.
-The absence is also the ordinary steady state rather than an anomaly, per
-[`pr-on-claim`](pr-on-claim.md)'s dispatch-only section --- so nothing about a
-green dispatcher and an empty comment list looks wrong.
+That makes it worse than the benchmark case on the one axis that matters for a reader.
+There the content is on the PR and merely ungated; here there is no content to read, and the check's own name usually says "review", so a status sweep that reports it green is reporting the truth about a step nobody cares about.
+The absence is also the ordinary steady state rather than an anomaly, per [`pr-on-claim`](pr-on-claim.md)'s dispatch-only section --- so nothing about a green dispatcher and an empty comment list looks wrong.
 
-The tell is in the workflow rather than in the check: a job whose last step is
-`gh workflow run` or an `actions_run_trigger` call has told you its conclusion
-is about the trigger.
-Trace the dispatched run and read its verdict, per
-[`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)'s
-"trace the whole dispatch chain" bullet, and take the verdict from the comment
-rather than from either check.
+The tell is in the workflow rather than in the check: a job whose last step is `gh workflow run` or an `actions_run_trigger` call has told you its conclusion is about the trigger.
+Trace the dispatched run and read its verdict, per [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)'s "trace the whole dispatch chain" bullet, and take the verdict from the comment rather than from either check.
 
-- **Do:** read a check's own workflow to see whether its final act is
-  dispatching something else, before treating its green as a review result.
-- **Don't:** count a green dispatcher toward criterion 2 --- it establishes
-  that a reviewer was asked, which is the state
-  [`pr-on-claim`](pr-on-claim.md) already says never discharges the review.
+- **Do:** read a check's own workflow to see whether its final act is dispatching something else, before treating its green as a review result.
+- **Don't:** count a green dispatcher toward criterion 2 --- it establishes that a reviewer was asked, which is the state [`pr-on-claim`](pr-on-claim.md) already says never discharges the review.
 
-(`ucdavis/bcs`, 2026-08-12: `ai-review / select-and-review` read green on two
-PRs while the gemini run it had dispatched failed and no verdict existed on
-either.
+(`ucdavis/bcs`, 2026-08-12: `ai-review / select-and-review` read green on two PRs while the gemini run it had dispatched failed and no verdict existed on either.
 Filed upstream as `ucdavis/bcs#619` and `#620`.)
 
 **A fourth case: a review job can post a syntactically valid, confidently stated verdict that is nonetheless invalid because it rests on a hallucinated premise about the PR's own state --- not a stub (no verdict) and not a misfire (guard-script/check-conclusion mismatch), but a fabricated fact baked into an otherwise well-formed review.** A reviewer that infers PR state from a commit message rather than querying the PR's actual `state`/`merged` API fields can mistake a routine `Merge remote-tracking branch 'origin/main' into <PR-branch>` commit --- pushed to resolve a sync conflict on the still-open PR branch itself --- for evidence the *PR* was merged into `main`, and confidently report "PR is closed, no action taken" while never actually reviewing the diff. This reads exactly like a legitimate all-clear (a `### Verdict` section is present, the job reports success), so the stub-detection guards described in CLAUDE.md's "Do the review yourself when the @claude workflow doesn't produce a verdict" section don't catch it. Sanity-check any surprising verdict --- especially "nothing to review" or "already merged/closed" --- against the PR's real API state before trusting it, and re-trigger for a genuine review rather than accepting a verdict-shaped comment built on a false premise.

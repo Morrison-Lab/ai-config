@@ -258,7 +258,7 @@ caught them.)
 
 ## The same block, where the comment stated an exclusion criterion
 
-(`ucdavis/bcs`, 2026-08-12: a dialect word-list table carried a comment saying that words colliding with an R identifier are excluded "because each would be a false positive that blocks a push", naming `grey`/`gray` as the example.
+(`ucdavis/bcs`, 2026-08-13: a dialect word-list table carried a comment saying that words colliding with an R identifier are excluded "because each would be a false positive that blocks a push", naming `grey`/`gray` as the example.
 The table immediately beneath it held `summarise`, a dplyr verb appearing in 19 files, plus `colour`, `labeller`, and `analyses`.
 Same author, same commit, same shape as the case above.
 

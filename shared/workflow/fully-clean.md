@@ -277,7 +277,7 @@ done
 - **Do:** treat a refusal from one reviewer on one PR as evidence about that reviewer on that PR, and nothing else.
 - **Don't:** report a stack's review state from a single read --- "I read the review" is a per-PR claim, and the stack is what makes it read as a claim about the work.
 
-(`ucdavis/bcs`, 2026-08-12: two stacked PRs were reviewed 82 seconds apart, `16:26:16Z` on the stacked PR and `16:27:38Z` on its base.
+(`ucdavis/bcs`, 2026-08-13: two stacked PRs were reviewed 82 seconds apart, `16:26:16Z` on the stacked PR and `16:27:38Z` on its base.
 The base's verdict was read, a Copilot quota refusal was seen on the stacked PR, and the pair was reported as one verdict plus one refusal.
 The stacked PR's own review had posted and sat unread for 12 hours; the next round re-raised both of its findings and noted the file was byte-identical across the three intervening commits.)
 

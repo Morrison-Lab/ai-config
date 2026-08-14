@@ -159,7 +159,7 @@ done
 - **Do:** treat a finding that names a convention as scoped to the work rather than to the PR it was filed on.
 - **Don't:** read "the whole diff" as satisfied by the diff of the PR the reviewer commented on --- that is one of N.
 
-(`ucdavis/bcs`, 2026-08-12: a reviewer flagged issue numbers in source comments, a `CLAUDE.md` violation, on the base PR of a two-PR stack.
+(`ucdavis/bcs`, 2026-08-13: a reviewer flagged issue numbers in source comments, a `CLAUDE.md` violation, on the base PR of a two-PR stack.
 All three of that PR's files were swept and fixed; the stacked PR's file, which carried the same violation, was not in the search space and was not.)
 
 **Deriving the class is necessary and not sufficient, because you can derive the

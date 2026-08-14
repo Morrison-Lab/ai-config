@@ -244,6 +244,13 @@ the bullets in this fragment record it failing at this exact boundary.
       and it includes the figures a "Corrections to this body" entry already
       refreshed --- that entry is a claim about the previous head, so the
       current push is what expires it.
+      A figure whose deriving command carries a **precondition** owes one more
+      step, because deriving it freshly discharges "don't recall it" and says
+      nothing about whether the command was right for this diff: cross-check it
+      against a quantity computed by something else
+      (`git diff --shortstat` against a hand-run added-lines count), since
+      re-reading a correct-looking pipeline confirms it
+      ([`fail-fast`](../principles/fail-fast.md)).
 - [ ] **The diff's deleted lines were read**
       (`git diff origin/main...HEAD | grep '^-'`), and each one was a decision
       rather than collateral from an edit's blast radius --- a reviewer reads

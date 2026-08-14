@@ -5,6 +5,40 @@ Worked-example case records for the rules in
 auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
+## A usage error that would have been read as a verdict
+
+(`Morrison-Lab/ai-config#1462`, 2026-08-14: `scripts/check-pr-fully-clean.py`
+documents `0: fully clean` and `1: not clean` in its own docstring, and is the
+corpus's verdict authority --- [`fully-clean`](../workflow/fully-clean.md) names
+it as such, [`ardi`](../workflow/ardi.md) mandates it, and
+[`hooks/no-handrolled-verdict-parse.py`](../../hooks/no-handrolled-verdict-parse.py)
+refuses the hand-parse fallback until it has answered.
+The PR added argument parsing and a `resolve_repo()` that fails loudly rather
+than falling back to a hardcoded literal, and spelled both failures
+`raise SystemExit("msg")`.
+That exits **1**, so every usage error --- bad arguments, an unresolvable repo,
+a URL passed where `OWNER/REPO` was wanted --- would have been reported to
+every caller of the verdict authority as *this PR is not clean*.
+Caught by the author's own pre-push self-review rather than by a test, because
+the tests asserted `SystemExit` was raised and not which status it carried.
+Fixed with a `USAGE_EXIT = 2` constant and a `die()` helper, plus two tests
+asserting the code.
+
+The exit-status figures in the rule above were measured directly rather than
+recalled:
+
+```bash
+python3 -c 'raise SystemExit("some message")'; echo "rc=$?"   # some message, rc=1
+python3 -c 'import sys; sys.exit("some message")'; echo "rc=$?"  # some message, rc=1
+python3 -c 'raise SystemExit(2)'; echo "rc=$?"                # rc=2
+python3 -c 'raise SystemExit(None)'; echo "rc=$?"             # rc=0
+python3 -c 'raise SystemExit("x")' 2>/dev/null                # prints nothing: stderr
+```
+
+CPython 3.11.15.
+A non-integer that is not `None` is printed and yields 1, so the collision is
+not special to strings.)
+
 ## "In a check you run by hand" --- the swallowed grep
 
 (ai-config#754, 2026-07-28: a pre-push scan for banned punctuation used
@@ -526,6 +560,31 @@ two undropped headers plus one --- which read at first like defects in the
 files rather than in the scan.
 Per-file scanning returned 0 for every file, as did grepping the files
 directly.
+
+## A denominator three too high, from the documented remedy
+
+(`Morrison-Lab/ai-config#1462`, 2026-08-14: an execution miss rather than a
+coverage gap.
+Both halves of the rule already existed in the section above --- the positional
+`tail -n +2` remedy and the per-file precondition --- and the pre-push scan ran
+the single-pass form anyway over a **4-file** diff, reporting
+`0 hits in 297 added lines` where `git diff --shortstat` says 294.
+Three leftover `+++ b/<path>` headers, exactly `files - 1`.
+Nothing about the run announced it: the command exited 0, the hit count was
+genuinely 0, and only the denominator was wrong.
+What caught it was the cross-check, not a re-read of the pipeline.
+
+Re-measured here on a three-file range of this repo's own history, so the
+arithmetic is checkable without that PR's branch:
+
+```bash
+git diff --name-only fcc09f0~1...a47620b | wc -l          # 3
+git diff --shortstat fcc09f0~1...a47620b                  # 267 insertions
+git diff fcc09f0~1...a47620b | grep '^+' | tail -n +2 | wc -l   # 269
+```
+
+Two too high on three files.
+Looping per file and summing returns 267, matching `--shortstat`.)
 
 ## What the tighter `^+[^+]` guard drops
 

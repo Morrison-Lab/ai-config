@@ -92,6 +92,67 @@ When a specific condition genuinely should be ignored, name it ---
 See [Ignoring
 conditions](https://adv-r.hadley.nz/conditions.html#ignoring-conditions).
 
+## When exit codes carry meaning, an error path must set its own
+
+The "In code" bullets say to stop with a clear error rather than proceed on bad
+state.
+Those bullets are silent on **how the stop is spelled**, and in a program whose
+exit codes are part of its contract that spelling is the whole of it.
+
+Python's convenience idiom is where this bites.
+`raise SystemExit("message")` --- and `sys.exit("message")` --- prints the
+string to **stderr** and exits **1**, because a non-integer argument is taken
+as a message and the status falls back to 1.
+Measured on CPython 3.11.15:
+
+| call | stderr | exit status |
+|---|---|---|
+| `raise SystemExit("some message")` | `some message` | **1** |
+| `sys.exit("some message")` | `some message` | **1** |
+| `raise SystemExit(2)` | (nothing) | 2 |
+| `raise SystemExit(None)` | (nothing) | 0 |
+
+That is harmless in a script whose only contract is zero-or-nonzero.
+It is a **wrong-verdict** bug in one whose codes are semantic, because 1 is
+already spoken for.
+
+Note which way the damage runs, since it is not the usual one.
+A wrong error message misinforms a human reading the output.
+This hands a **substantive answer about the subject** to a machine that asked
+a question, in the vocabulary that program is entitled to use --- so no caller
+has any reason to doubt it, and the stderr line saying otherwise is read by
+nobody.
+
+The remedy is a named constant plus a helper, so no error path can inherit a
+default that means something else:
+
+```python
+USAGE_EXIT = 2   # distinct from 1, which this script reserves for "not clean"
+
+def die(msg: str) -> None:
+    print(msg, file=sys.stderr)
+    raise SystemExit(USAGE_EXIT)
+```
+
+Then assert the **code**, not the fact of exiting.
+`assertRaises(SystemExit)` is satisfied by every value of it, including the
+colliding one, so a suite written that way goes green on exactly this defect.
+That is an assertion whose expected value makes it unfalsifiable, which
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md) already says to
+flag in review.
+
+- **Do:** reserve a distinct status for usage and internal errors whenever any
+  other status carries a verdict, and set it explicitly.
+- **Do:** assert the exit code in the test, not merely that `SystemExit` was
+  raised.
+- **Don't:** pass a string to `SystemExit`/`sys.exit` in such a program ---
+  the message is free and the status is not.
+- **Don't:** read "it exits and prints an error" as the error path being
+  correct; the status is the part a caller acts on.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A usage error that would have
+been read as a verdict".
+
 ## In a check you run by hand
 
 The rule is easiest to break in the throwaway one-liner you write to
@@ -617,6 +678,31 @@ file separately.
 
 See [`fail-fast.cases.md`](fail-fast.cases.md),
 "The per-file precondition, caught by dogfooding the guard".
+
+**The precondition does not travel with the command, so knowing it is not
+enough.**
+The remedy ships as a copyable one-liner and the precondition ships as the
+paragraph beneath it, so what reaches the next diff is the pipeline alone.
+Nothing at the point of use asks how many files are in scope: a multi-file diff
+runs the same command, exits 0, and returns a plausible denominator that is
+`files - 1` too high.
+
+Re-reading the pipeline will not catch that, because the pipeline is correct.
+Cross-check the count against a quantity computed by something else:
+
+```bash
+git diff --shortstat origin/main...HEAD    # insertions, header-free
+```
+
+A disagreement is exactly the leftover headers.
+This is
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+"a harness needs a self-check against a quantity it did not compute" applied to
+a hand-run scan rather than to a harness --- and the reason a scope figure you
+publish owes a second **origin**, not merely a fresh derivation.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A denominator three too high,
+from the documented remedy".
 
 **What the pattern feeds decides how much this costs.**
 A too-loose pattern in a **detector** surfaces as a phantom finding, which is

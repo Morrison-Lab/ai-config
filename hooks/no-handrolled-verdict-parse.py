@@ -210,9 +210,21 @@ PR_IN_COMMAND = [
 # clean.py`, whose name carries underscores, so the hyphenated string never
 # appears in it and the lookbehind could not fire. Removed rather than shipped
 # untested (ai-config#1304, "measured-dead guard components").
+#
+# A flag may carry a SEPARATE value token (`-R OWNER/REPO 445`), not only an
+# `=`-joined one. Without the optional value the flag run stops at `-R`, the
+# `\s+(\d+)` never reaches `445`, and the PR goes unrecorded -- which drops the
+# guard to its "any invocation discharges" fallback, the lenient direction its
+# own docstring calls dangerous. `check-pr-fully-clean.py` grew exactly such a
+# flag in ai-config#1391, so this is that change's own consequence rather than
+# a hypothetical.
+#
+# The value token is optional and the engine backtracks, so a valueless flag is
+# unaffected: in `--verbose 445` the optional value declines to eat `445` and
+# the PR still matches. Measured on both forms.
 CHECKER_CALL = re.compile(
     r"(?:python3?\s+|\./)\S*check-pr-fully-clean\.py"
-    r"((?:\s+-{1,2}\S+)*\s+(\d+))?",
+    r"((?:\s+-{1,2}\S+(?:\s+[^-\s]\S*)?)*\s+(\d+))?",
     re.I,
 )
 

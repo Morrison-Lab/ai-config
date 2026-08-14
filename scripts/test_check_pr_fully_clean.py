@@ -20,8 +20,36 @@ spec = importlib.util.spec_from_file_location(
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
 
+# Deliberately NOT Morrison-Lab/ai-config. A test run against this repo's own
+# name passes under both the hardcoded and the parameterized version, so it
+# would be vacuous -- the population holds no positive instance of the class it
+# is supposed to catch (Morrison-Lab/ai-config#1243).
+TEST_REPO = "octocat/example"
+HARDCODED = "Morrison-Lab/ai-config"
+
 passes = 0
 failures = 0
+
+
+class CmdRecorder:
+    """Stand in for run_cmd, recording every argv it is handed.
+
+    The recorded argv is what makes the repo-threading testable at all: the
+    defect was in which repository a command NAMED, which no return value
+    reveals.
+    """
+
+    def __init__(self, result: str = "{}"):
+        self.result = result
+        self.calls = []
+
+    def __call__(self, cmd):
+        self.calls.append(list(cmd))
+        return self.result
+
+    @property
+    def flat(self) -> str:
+        return " ".join(" ".join(c) for c in self.calls)
 
 
 def check(name: str, condition: bool):
@@ -78,25 +106,25 @@ def main() -> int:
     # Test 1: Clean review comment returns True
     mock_clean_data = json.dumps({"comments": [clean_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_clean_data):
-        clean_ok, clean_issues = checker.check_review_comments("1167", "sha123")
+        clean_ok, clean_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("clean review comment passes check_review_comments", clean_ok and clean_issues == [])
 
     # Test 2: Findings review comment returns False
     mock_findings_data = json.dumps({"comments": [findings_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_findings_data):
-        findings_ok, findings_issues = checker.check_review_comments("1167", "sha123")
+        findings_ok, findings_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("findings review comment fails check_review_comments", not findings_ok and len(findings_issues) > 0)
 
     # Test 3: Formal review with empty comments list and CHANGES_REQUESTED state fails
     mock_formal_review_data = json.dumps({"comments": [], "reviews": [formal_changes_requested_review]})
     with patch.object(checker, "run_cmd", return_value=mock_formal_review_data):
-        formal_ok, formal_issues = checker.check_review_comments("1167", "sha123")
+        formal_ok, formal_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("formal CHANGES_REQUESTED review with empty comments fails check_review_comments", not formal_ok and len(formal_issues) > 0)
 
     # Test 4: Review with 'No major changes requested' passes check_review_comments
     mock_no_major_data = json.dumps({"comments": [no_major_changes_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_no_major_data):
-        no_major_ok, no_major_issues = checker.check_review_comments("1167", "sha123")
+        no_major_ok, no_major_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("review with 'No major changes requested' passes check_review_comments", no_major_ok and no_major_issues == [])
 
     # Test 5: Payload with None author in reviews does not raise (reaching the
@@ -106,14 +134,14 @@ def main() -> int:
     # cannot be confirmed automated, so it fails criterion 2 (fail-closed).
     mock_none_author_data = json.dumps({"comments": [], "reviews": [none_author_review]})
     with patch.object(checker, "run_cmd", return_value=mock_none_author_data):
-        none_author_ok, none_author_issues = checker.check_review_comments("1167", "sha123")
+        none_author_ok, none_author_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("None-author review handled safely and not admitted as automated",
               (not none_author_ok) and any("No automated review" in i for i in none_author_issues))
 
     # Test 6: Plain human APPROVED review without bot review fails criterion 2
     mock_human_data = json.dumps({"comments": [], "reviews": [human_approved_review]})
     with patch.object(checker, "run_cmd", return_value=mock_human_data):
-        human_ok, human_issues = checker.check_review_comments("1167", "sha123")
+        human_ok, human_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("human APPROVED review without bot review fails criterion 2", not human_ok and any("No automated review" in i for i in human_issues))
 
     # Regression: a stale review posted AFTER the commit, carrying a marker
@@ -126,7 +154,7 @@ def main() -> int:
     }
     mock_stale_data = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_stale_data):
-        stale_ok, stale_issues = checker.check_review_comments("1167", "sha123")
+        stale_ok, stale_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("stale review not referencing HEAD SHA is rejected (fail-closed)", (not stale_ok) and len(stale_issues) > 0)
 
     # Regression (round 12): a plain human formal review whose body merely
@@ -144,7 +172,7 @@ def main() -> int:
     }
     mock_hmv = json.dumps({"comments": [], "reviews": [human_marker_verdict]})
     with patch.object(checker, "run_cmd", return_value=mock_hmv):
-        hmv_ok, hmv_issues = checker.check_review_comments("1167", "sha123")
+        hmv_ok, hmv_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
             "human review whose body contains 'verdict:' does not satisfy criterion 2",
             (not hmv_ok) and any("No automated review" in i for i in hmv_issues),
@@ -159,7 +187,7 @@ def main() -> int:
     }
     mock_hmc = json.dumps({"comments": [], "reviews": [human_marker_codereview]})
     with patch.object(checker, "run_cmd", return_value=mock_hmc):
-        hmc_ok, hmc_issues = checker.check_review_comments("1167", "sha123")
+        hmc_ok, hmc_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
             "human APPROVED review whose body contains 'code review' does not satisfy criterion 2",
             (not hmc_ok) and any("No automated review" in i for i in hmc_issues),
@@ -181,7 +209,7 @@ def main() -> int:
     }
     mock_loc = json.dumps({"comments": [location_codespan_clean], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_loc):
-        loc_ok, loc_issues = checker.check_review_comments("1160", "sha123")
+        loc_ok, loc_issues = checker.check_review_comments("1160", "sha123", TEST_REPO)
         check(
             "clean verdict quoting `**Location:**` in a code span passes (#1202)",
             loc_ok and loc_issues == [],
@@ -199,7 +227,7 @@ def main() -> int:
     }
     mock_nwq = json.dumps({"comments": [needs_work_quoted_clean], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_nwq):
-        nwq_ok, nwq_issues = checker.check_review_comments("1167", "sha123")
+        nwq_ok, nwq_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
             "clean verdict quoting \"Needs more work\" in double quotes passes (#1202)",
             nwq_ok and nwq_issues == [],
@@ -218,7 +246,7 @@ def main() -> int:
     }
     mock_locreal = json.dumps({"comments": [location_real_finding], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_locreal):
-        locreal_ok, locreal_issues = checker.check_review_comments("1167", "sha123")
+        locreal_ok, locreal_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
             "real bold **Location:** finding (not quoted) still fails the check (#1202)",
             (not locreal_ok) and len(locreal_issues) > 0,
@@ -238,7 +266,7 @@ def main() -> int:
     }
     mock_qrf = json.dumps({"comments": [quoted_real_finding], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_qrf):
-        qrf_ok, qrf_issues = checker.check_review_comments("1167", "sha123")
+        qrf_ok, qrf_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check(
             "genuine **Location:** inside a double-quoted span is still detected (#1231 review)",
             (not qrf_ok) and len(qrf_issues) > 0,
@@ -530,7 +558,7 @@ def main() -> int:
         "reviews": [],
     })
     with patch.object(checker, "run_cmd", return_value=mock_1267):
-        v_ok, v_issues = checker.check_review_comments("1267", "sha123")
+        v_ok, v_issues = checker.check_review_comments("1267", "sha123", TEST_REPO)
         check(
             "POSITIVE CONTROL: verdict-less comment at HEAD does not clear an earlier "
             "'Needs more work' (#1267/#1275)",
@@ -557,7 +585,7 @@ def main() -> int:
         "reviews": [],
     })
     with patch.object(checker, "run_cmd", return_value=mock_superseded):
-        s_ok, s_issues = checker.check_review_comments("1267", "sha123")
+        s_ok, s_issues = checker.check_review_comments("1267", "sha123", TEST_REPO)
         check(
             "NEGATIVE CONTROL: a later clean verdict DOES supersede an earlier 'Needs more work'",
             s_ok and s_issues == [],
@@ -574,7 +602,7 @@ def main() -> int:
         "reviews": [],
     })
     with patch.object(checker, "run_cmd", return_value=mock_out_of_order):
-        o_ok, o_issues = checker.check_review_comments("1267", "sha123")
+        o_ok, o_issues = checker.check_review_comments("1267", "sha123", TEST_REPO)
         check(
             "latest verdict is chosen by timestamp, not by payload order",
             (not o_ok) and any("Latest verdict-bearing" in i for i in o_issues),
@@ -617,7 +645,7 @@ def main() -> int:
         "reviews": [],
     })
     with patch.object(checker, "run_cmd", return_value=mock_real):
-        r_ok, r_issues = checker.check_review_comments("1267", "sha123")
+        r_ok, r_issues = checker.check_review_comments("1267", "sha123", TEST_REPO)
         check(
             "REAL-INPUT CONTROL: #1267's actual comment shapes are admitted and "
             "criterion 4 fires on them",
@@ -632,7 +660,7 @@ def main() -> int:
         ]
     })
     with patch.object(checker, "run_cmd", return_value=mock_ci_success):
-        ci_ok, ci_issues = checker.check_ci_runs("sha123")
+        ci_ok, ci_issues = checker.check_ci_runs("sha123", TEST_REPO)
         check("completed success/skipped CI check runs pass", ci_ok and ci_issues == [])
 
     mock_ci_failure = json.dumps({
@@ -641,8 +669,120 @@ def main() -> int:
         ]
     })
     with patch.object(checker, "run_cmd", return_value=mock_ci_failure):
-        ci_ok_fail, ci_issues_fail = checker.check_ci_runs("sha123")
+        ci_ok_fail, ci_issues_fail = checker.check_ci_runs("sha123", TEST_REPO)
         check("failed CI check run fails check_ci_runs", not ci_ok_fail and len(ci_issues_fail) == 1)
+
+    # Test 7: the repository is threaded, not hardcoded (#1243, #1338, #1346, #1391)
+    #
+    # Every case below asserts on the argv the script BUILDS, because that is
+    # where the defect lived: the return values were fine, and the commands
+    # named the wrong repository.
+
+    rec = CmdRecorder(json.dumps({"check_runs": [
+        {"name": "build", "status": "completed", "conclusion": "success"}]}))
+    with patch.object(checker, "run_cmd", rec):
+        checker.check_ci_runs("sha123", TEST_REPO)
+    check(
+        "check_ci_runs queries the repo it was given, not a literal",
+        f"repos/{TEST_REPO}/commits/sha123" in rec.flat and HARDCODED not in rec.flat,
+    )
+
+    rec = CmdRecorder(json.dumps({
+        "headRefOid": "sha123", "headRefName": "b", "state": "OPEN",
+        "commits": [{"committedDate": "2026-08-14T00:00:00Z"}], "reviewDecision": "",
+    }))
+    with patch.object(checker, "run_cmd", rec):
+        checker.get_pr_info("445", TEST_REPO)
+    check(
+        "get_pr_info names the repo explicitly rather than relying on the cwd",
+        ["--repo", TEST_REPO] == rec.calls[0][rec.calls[0].index("--repo"):][:2]
+        if "--repo" in rec.calls[0] else False,
+    )
+
+    rec = CmdRecorder(json.dumps({"comments": [clean_comment], "reviews": []}))
+    with patch.object(checker, "run_cmd", rec):
+        checker.check_review_comments("445", "sha123", TEST_REPO)
+    check(
+        "check_review_comments names the repo explicitly too",
+        "--repo" in rec.calls[0] and TEST_REPO in rec.calls[0],
+    )
+
+    # The discrimination case #1391 asks for: one PR number, two repos, two
+    # different answers. Pre-fix, check_ci_runs ignored its repo entirely, so
+    # both calls returned whatever the hardcoded repo held and this failed.
+    per_repo = {
+        "owner/green": json.dumps({"check_runs": [
+            {"name": "ci", "status": "completed", "conclusion": "success"}]}),
+        "owner/red": json.dumps({"check_runs": [
+            {"name": "ci", "status": "completed", "conclusion": "failure"}]}),
+    }
+
+    def fake_by_repo(cmd):
+        joined = " ".join(cmd)
+        for name, payload in per_repo.items():
+            if f"repos/{name}/" in joined:
+                return payload
+        # A command naming neither repo (the pre-fix hardcoded path) returns an
+        # empty result rather than raising, so this case FAILS its own
+        # assertion instead of aborting the suite. A mutation that crashes the
+        # run hides every test after it, which makes the rest of the matrix
+        # unreadable.
+        return json.dumps({"check_runs": []})
+
+    with patch.object(checker, "run_cmd", fake_by_repo):
+        green_ok, _ = checker.check_ci_runs("shaX", "owner/green")
+        red_ok, red_issues = checker.check_ci_runs("shaX", "owner/red")
+    check(
+        "the same PR SHA yields per-repo verdicts, not one shared answer",
+        green_ok and not red_ok and len(red_issues) == 1,
+    )
+
+    # Test 8: resolve_repo defaults, overrides, and fails loudly
+    with patch.object(checker, "run_cmd", CmdRecorder("owner/from-cwd")):
+        check("resolve_repo defaults to the current checkout",
+              checker.resolve_repo() == "owner/from-cwd")
+        check("an explicit --repo wins over the checkout",
+              checker.resolve_repo("owner/explicit") == "owner/explicit")
+
+    def boom(cmd):
+        raise RuntimeError("not a git repository")
+
+    def exit_code_of(fn):
+        """The SystemExit code a call raises, or None if it did not exit.
+
+        The code is asserted rather than the mere fact of exiting, because
+        `raise SystemExit("msg")` exits 1 -- this script's "not clean" code --
+        so an unchecked exit would report a usage error as a verdict about the
+        PR. That distinction is stated in the module docstring, and this is
+        what keeps the statement true.
+        """
+        try:
+            fn()
+        except SystemExit as exc:
+            return exc.code
+        return None
+
+    with patch.object(checker, "run_cmd", boom):
+        check("an unresolvable repo exits 2, not 1 ('not clean')",
+              exit_code_of(checker.resolve_repo) == 2)
+
+    with patch.object(checker, "run_cmd", CmdRecorder("owner/from-cwd")):
+        # Accepted by `gh pr view --repo`, rejected by the check-runs API path
+        # -- the shape mismatch that lets the two halves disagree.
+        check("a URL is refused rather than interpolated into the API path",
+              exit_code_of(lambda: checker.resolve_repo("https://github.com/owner/name")) == 2)
+
+    # Test 9: -R is parsed rather than silently ignored (#1391's repro)
+    args = checker.parse_args(["445", "-R", "Morrison-Lab/gha"])
+    check("-R is parsed, not silently ignored",
+          args.pr_number == "445" and args.repo == "Morrison-Lab/gha")
+    check("a bare PR number still works, with no repo override",
+          checker.parse_args(["445"]).repo == "")
+
+    check("--help exits 0 instead of being read as a PR number",
+          exit_code_of(lambda: checker.parse_args(["--help"])) == 0)
+    check("a missing PR number exits 2, distinct from 'not clean'",
+          exit_code_of(lambda: checker.parse_args([])) == 2)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

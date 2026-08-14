@@ -15,16 +15,26 @@ last actual verdict was "Needs more work". Absence of a verdict is not a
 clearing: only a later CLEAN verdict supersedes an earlier not-clean one.
 See shared/workflow/fully-clean.md and Morrison-Lab/ai-config#1275.
 
+Which repository is being asked about is resolved once, at startup, and threaded
+through every `gh` call. It is NOT hardcoded: the same value reaches the PR
+lookup and the check-runs query, so the two halves cannot describe different
+repositories. Pass `-R/--repo OWNER/REPO` to target a repo other than the
+current checkout's. See Morrison-Lab/ai-config#1391.
+
 Exit codes:
 0: Fully clean (safe to end ARDI loop)
 1: Not clean (in-progress checks, failing checks, missing review, findings present,
    or a standing not-clean verdict that nothing later superseded)
+2: Called wrong, or the repository could not be resolved. Deliberately distinct
+   from 1, so "you invoked this incorrectly" is never read as "the PR is not
+   clean" (shared/principles/fail-fast.md).
 """
+import argparse
 import json
 import re
 import subprocess
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
 # cp1252, which cannot encode them -- so every run raised UnicodeEncodeError
@@ -41,8 +51,63 @@ def run_cmd(cmd: List[str]) -> str:
     return res.stdout.strip()
 
 
-def get_pr_info(pr_num: str) -> Tuple[str, str, str, str, str]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--json", "headRefOid,headRefName,state,commits,reviewDecision"])
+# `gh pr view --repo` accepts a URL as well as OWNER/REPO, while
+# `gh api repos/{repo}/...` accepts only the bare OWNER/REPO. Interpolating one
+# spelling into both call sites is how the two halves came apart in the first
+# place, so a value that cannot serve both is refused rather than passed on.
+REPO_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
+
+# `raise SystemExit("message")` prints the message but exits **1**, which is
+# this script's "not clean" code -- so a usage error would have been read as a
+# verdict about the PR. The exit code is set explicitly for that reason.
+USAGE_EXIT = 2
+
+
+def die(message: str) -> None:
+    print(message, file=sys.stderr)
+    raise SystemExit(USAGE_EXIT)
+
+
+def resolve_repo(explicit: str = "") -> str:
+    """The OWNER/REPO every `gh` call in this run will name.
+
+    Defaults to the current checkout's repository rather than to a literal.
+    Hardcoding a literal is the defect this function exists to remove: the PR
+    lookup resolved the repo from the working directory while the check-runs
+    query named `Morrison-Lab/ai-config`, so outside this repo the script read
+    the PR from one repository and its checks from another -- loudly when the
+    SHA did not exist there, and silently wrong when it did.
+
+    Exits 2 rather than falling back when the repository cannot be resolved.
+    A fallback is what made the wrong answer quiet.
+    """
+    if explicit:
+        repo, source = explicit.strip(), "--repo"
+    else:
+        try:
+            repo = run_cmd(
+                ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]
+            )
+        except (RuntimeError, FileNotFoundError) as exc:
+            die(
+                f"Cannot resolve the repository from the current directory: {exc}\n"
+                "Run this from inside a git checkout, or pass -R OWNER/REPO."
+            )
+        source = "the current checkout"
+
+    if not REPO_PATTERN.match(repo):
+        die(
+            f"Repository {repo!r} (from {source}) is not in OWNER/REPO form.\n"
+            "Pass -R OWNER/REPO -- a URL is accepted by `gh pr view` but not by "
+            "the check-runs API path, and a value that cannot serve both is what "
+            "lets the two halves disagree."
+        )
+    return repo
+
+
+def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
+    out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json",
+                   "headRefOid,headRefName,state,commits,reviewDecision"])
     data = json.loads(out)
     head_sha = data["headRefOid"]
     commits = data.get("commits", [])
@@ -53,8 +118,8 @@ def get_pr_info(pr_num: str) -> Tuple[str, str, str, str, str]:
     return head_sha, data["headRefName"], data["state"], commit_date, review_decision
 
 
-def check_ci_runs(sha: str) -> Tuple[bool, List[str]]:
-    out = run_cmd(["gh", "api", f"repos/Morrison-Lab/ai-config/commits/{sha}/check-runs?per_page=100"])
+def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
+    out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
     data = json.loads(out)
     check_runs = data.get("check_runs", [])
 
@@ -349,8 +414,8 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     return True, []
 
 
-def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> Tuple[bool, List[str]]:
-    out = run_cmd(["gh", "pr", "view", pr_num, "--json", "comments,reviews"])
+def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "") -> Tuple[bool, List[str]]:
+    out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
     data = json.loads(out)
 
     comments = data.get("comments", [])
@@ -500,19 +565,36 @@ def check_review_comments(pr_num: str, sha: str, review_decision: str = "") -> T
     return len(issues) == 0, issues
 
 
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="check-pr-fully-clean.py",
+        description="Verify that a pull request is fully clean (see shared/workflow/fully-clean.md).",
+    )
+    parser.add_argument("pr_number", help="Pull request number to check")
+    parser.add_argument(
+        "-R", "--repo", default="", metavar="OWNER/REPO",
+        help="Repository to check. Defaults to the current checkout's repository. "
+             "Previously an extra argument here was silently ignored and the "
+             "check-runs query always named Morrison-Lab/ai-config.",
+    )
+    return parser.parse_args(argv)
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 scripts/check-pr-fully-clean.py <pr-number>")
-        sys.exit(1)
+    args = parse_args()
+    pr_num = args.pr_number
+    repo = resolve_repo(args.repo)
 
-    pr_num = sys.argv[1]
-    print(f"Checking ARDI / fully-clean status for PR #{pr_num}...")
+    # The resolved repo is printed rather than assumed, so a wrong-repo reading
+    # is visible in the output instead of being inferable only from the branch
+    # name in the next line.
+    print(f"Checking ARDI / fully-clean status for {repo}#{pr_num}...")
 
-    sha, branch, state, commit_date, review_decision = get_pr_info(pr_num)
+    sha, branch, state, commit_date, review_decision = get_pr_info(pr_num, repo)
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
-    ci_ok, ci_issues = check_ci_runs(sha)
-    review_ok, review_issues = check_review_comments(pr_num, sha, review_decision)
+    ci_ok, ci_issues = check_ci_runs(sha, repo)
+    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision)
 
     all_issues = ci_issues + review_issues
 
@@ -522,7 +604,7 @@ def main():
             print(f"  - {issue}")
         sys.exit(1)
 
-    print(f"\n\u2705 PR #{pr_num} is FULLY CLEAN on HEAD {sha[:8]}!")
+    print(f"\n\u2705 {repo}#{pr_num} is FULLY CLEAN on HEAD {sha[:8]}!")
     sys.exit(0)
 
 

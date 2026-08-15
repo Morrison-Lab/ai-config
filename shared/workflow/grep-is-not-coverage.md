@@ -118,6 +118,65 @@ The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
 
+## A non-null result has the same defect, when the hits go unenumerated
+
+Everything above governs a grep that returns **nothing** and a conclusion
+drawn from that silence.
+The mirror failure returns **several** hits, and is worse in one respect: the
+result is real evidence, so nothing about it invites the suspicion an empty
+result eventually earns.
+
+The mechanism is that a dupe check asks an **existence** question --- does the
+corpus already cover this --- and a single hit answers it.
+The search therefore terminates at the first match, which feels like success
+rather than like stopping early.
+You then read that one spot, decide how to extend it, and never look at the
+second hit in the same file.
+
+Two properties make this land hardest exactly where the corpus expects a dupe
+check to run.
+A long memory file or fragment can hold **two entries on adjacent aspects of
+one concept**, written months apart, neither aware of the other.
+And the second entry is usually framed differently from the first --- a
+different content shape, a different surface, a different failure direction ---
+which is precisely why it was written separately and precisely why it does not
+read as a duplicate of the hit you already found.
+
+So the cost is not a duplicate.
+It is a **novelty claim**: you present as new something the corpus already
+partly records, and the framing has to be walked back by a reviewer who read
+further than you did.
+
+The remedy is one word in the question.
+Ask "where does the corpus cover this" rather than "does it", so the answer is
+a list rather than a boolean, and read every hit in a file before deciding
+what to add.
+Report the hit **count per file**, not just which files matched --- a file that
+matched twice for different reasons is invisible in a table that records only
+which terms hit which paths.
+
+- **Do:** enumerate every hit within a matching file, and read each one, before
+  deciding whether to extend or add.
+- **Do:** report hits per file, so a file matching twice is visible.
+- **Don't:** treat the first match in a file as the entry to extend --- it is
+  the first one your pattern happened to reach, not the most relevant.
+- **Don't:** read a non-null result as exempt from this file's rule; the
+  conclusion can overreach the evidence in either direction.
+
+(Morrison-Lab/ai-config#1469, 2026-08-15, review round 1: a dupe check before
+extending `memories/github-mcp-tools.md`'s angle-bracket-stripping entry
+printed two matches in that one file --- the placeholder entry, and a second
+one opening `- **The MCP write tools silently drop ... angle-bracket
+autolinks`.
+Cited by heading rather than by line number, since that file has grown since
+and the numbers the grep printed no longer resolve.
+The first was read and extended; the second was never opened.
+It names `update_pull_request` outright, so the new entry's claim to be adding
+"a third write surface" overstated what was new, and the reviewer caught it by
+reading further down the same file.
+The evidence was in the check's own output, which is what separates this from
+a search that was never run.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to
@@ -130,8 +189,12 @@ author something:
 - [`find-overlap`](../../skills/find-overlap/SKILL.md), whose whole premise
   is that phrase matching under-detects.
 
-In each, the null result is an input to a judgment, never the judgment
-itself.
+In each, the grep's result is an input to a judgment, never the judgment
+itself --- and that holds in both directions, since these three sites are
+also where the non-null under-read above happens.
+The incident recorded there was a `ums` step-3 dupe check, so the same list
+covers a search that found nothing and a search that found two things and
+read one.
 
 ## Relationship to other rules
 

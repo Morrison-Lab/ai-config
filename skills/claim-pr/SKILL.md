@@ -26,7 +26,10 @@ status of #Y", "explain the diff on #Z". Those don't risk a parallel session.
 ## Claim (start of session)
 
 First check whether you've already claimed it — if your (Claude's) most recent
-comment on the thread already says you're working on it, **skip** re-posting.
+comment on the thread already says you're working on it **and the claim is
+still live** (under 2 hours since the most recent push or comment on the
+thread --- see "Claim expiration" below), **skip** re-posting.
+Past 2 hours the claim has expired; re-post it before resuming.
 
 ### GitHub
 
@@ -50,6 +53,31 @@ glab mr note create <N> --message "Claude Code CLI (local session) is working on
 > GitLab MR notes are resolvable discussions by default.
 
 Then proceed with the work.
+
+## Claim expiration
+
+A claim is **live for 2 hours from the most recent push or comment** on the
+PR/issue, and **expired** past that --- in both directions:
+
+- Your own expired claim doesn't cover resuming work: post a fresh claim
+  comment first.
+- Another session's expired claim doesn't block you: post your own claim
+  (never a silent takeover), then run the branch-head check in the Notes
+  below before your first push.
+
+Check staleness with one read:
+
+```bash
+gh pr view <N> --json updatedAt --jq .updatedAt        # VIEW_PR
+gh issue view <N> --json updatedAt --jq .updatedAt     # VIEW_ISSUE
+```
+
+`updatedAt` moves on more events than pushes and comments (labels, reviews,
+body edits), so it only ever over-approximates freshness: a stale verdict
+from it is definitive, and a borderline-fresh one defaults to respecting the
+claim --- the safe direction.
+The full statement of the convention lives in
+[`claim-pr`](../../shared/workflow/claim-pr.md).
 
 ## Unclaim (end of session)
 

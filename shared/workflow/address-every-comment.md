@@ -87,6 +87,15 @@ is the reason the scope goes unquestioned.**
 - **Don't:** read a null result as "no further sites"; it means no further hit
   for that pattern, and a differently-worded instance would not have matched.
 
+**The remedy above names a search space --- "the whole diff" --- and a stack has one of those per branch.**
+
+- **Do:** run the derived sweep over every branch in the stack, and report the per-branch counts.
+- **Do:** treat a finding that names a convention as scoped to the work rather than to the PR it was filed on.
+- **Don't:** read "the whole diff" as satisfied by the diff of the PR the reviewer commented on --- that is one of N.
+
+See [`address-every-comment.cases.md`](address-every-comment.cases.md),
+"A finding's site list spans every branch in the stack".
+
 **Deriving the class is necessary and not sufficient, because you can derive the
 wrong one --- and the growth rate across rounds is what says so.**
 

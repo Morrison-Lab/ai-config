@@ -605,3 +605,8 @@ hedge would have been false by the time it was typed.
 The sentence was instead re-derived to name the merge time and the byte
 figures the split produced, each from `git show <sha>:<path> | wc -c`:
 `ardi.md` 98,655 to 92,734, and `fail-fast.md` 94,469 to 91,244.)
+
+## A finding's site list spans every branch in the stack
+
+(`ucdavis/bcs`, 2026-08-13: a reviewer flagged issue numbers in source comments, a `CLAUDE.md` violation, on the base PR of a two-PR stack.
+All three of that PR's files were swept and fixed; the stacked PR's file carried the same violation, was never in the search space, and was therefore never swept.)

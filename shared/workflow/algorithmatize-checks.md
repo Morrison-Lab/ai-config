@@ -141,6 +141,23 @@ about the subject.**
 - **Don't:** treat a harness's loud failure as evidence that it works; the safe
   direction is still the wrong answer.
 
+#### A green check on the default branch is a free labelled corpus
+
+The section above asks for "a set whose right answer you independently know", and knowing it is usually the expensive part --- someone has to label the inputs, and a hand-labelled set is small and inherits its author's blind spot.
+
+**Ship the audit as a flag on the instrument, not as a one-off script.**
+
+**The audit has to enter at the instrument's own input, exactly as a negative control does.**
+
+- **Do:** take a CI check's green on the default branch as ground truth that nothing in scope there should fire, and audit against that corpus.
+- **Do:** ship the audit as a flag on the instrument, wire it into the pre-push sweep, and see it fail on a reintroduced entry.
+- **Do:** run the audit through the instrument's own entry point with its real configuration.
+- **Don't:** read a clean audit as evidence about false negatives --- the green is one-sided.
+- **Don't:** reimplement the instrument's lookup inside the audit; that measures the table rather than the tool.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A green check on the default branch is a free labelled corpus".
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 The section above governs a comment claiming *what* a matcher matches.

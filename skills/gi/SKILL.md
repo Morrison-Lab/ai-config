@@ -51,7 +51,7 @@ Scan the issue list and rank by priority. Use these signals (in order):
 | Size/complexity (prefer issues you can complete in one session) | Tie-breaker |
 | Internal infrastructure vs feature (infra slightly preferred — see [`pr-prioritization`](../../shared/workflow/pr-prioritization.md)) | Tie-breaker |
 | Already assigned to someone else | **Skip** |
-| Issue comment says "Working on this" | **Skip** |
+| Issue comment says "Working on this" (and the claim is live --- under 2 h old) | **Skip** |
 | Open PR already exists for the issue | **Skip** |
 
 **Re-triage if helpful:** If labels are stale, missing, or inconsistent, briefly
@@ -91,7 +91,11 @@ gh issue view <N> --json comments --jq '.comments | last | .body' | cat   # READ
 ```
 
 If it contains "Working on this" / "paws off" (or an equivalent claim), skip
-the issue.
+the issue --- unless the claim has expired: no push or comment on the issue in
+over 2 hours, per [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration
+rule.
+An expired claim is taken over by posting your own claim comment, never
+silently.
 
 **(2) No open PR already references the issue:**
 

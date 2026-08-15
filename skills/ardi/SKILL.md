@@ -20,7 +20,7 @@ finding → push → post summary → re-request review → repeat until clean.
 1. **Identify and claim the PR/MR.**
 Use the current branch's open MR, or the one the user specified.
 Post a brief claim comment (`COMMENT_PR`) so a parallel `@claude` CI run or another person doesn't start a colliding session: `gh pr comment <N> --body "Driving this PR to clean --- back off until done."`
-Skip if your most recent comment already says so.
+Skip if your most recent comment already says so and is still live --- claims expire 2 hours after the most recent push or comment, and an expired one needs reasserting, per [`claim-pr`](../../shared/workflow/claim-pr.md).
 (`COMMENT_PR` and the other bracketed tokens below are abstract operation tokens --- resolve to your model's tool via [`tool-mappings.md`](../../tool-mappings.md).)
 
 2. **Read the latest review.**

@@ -304,8 +304,12 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    "A conflict your sweep found is not a conflict your merge caused".
 3. **Check claim status.**
    Read the most recent comment.
-   If it says "Working on this --- paws off" (or equivalent),
+   If it says "Working on this --- paws off" (or equivalent) and the claim is
+   still live --- a push or comment within the last 2 hours ---
    skip it --- another session owns it.
+   An expired claim (over 2 idle hours) no longer blocks; take over with a
+   fresh claim comment of your own, per
+   [`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule.
 4. **Claim it.**
    ```bash
    gh pr comment <N> --body "Working on this — paws off until I'm done."   # COMMENT_PR

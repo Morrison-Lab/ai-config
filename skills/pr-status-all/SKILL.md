@@ -83,8 +83,9 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    **When no SHA can be extracted from the body, don't fall back to trusting the timing check alone as proof of currency** -- report `unverified` (not `clean`) instead, since `committedDate` is the commit's local committer timestamp, not when GitHub received the push, and a commit authored earlier but pushed later can pass the timing check while still being newer than the review.
 >    Only once the review postdates the last commit **and** a named SHA matches -- unconditionally; no SHA named means `unverified`, not `clean`, full stop -- apply the bar for `clean`: "Looks good" / "no findings" / "approved" with zero follow-on bullets under any heading.
 >    A rebuttal the reviewer still disputes is **open**, not clean.
-> 2. **External (Copilot) reviewer verdict -- read-only, don't request one.**
->    The comment above is the `@claude` bot only; a formal Copilot review is a separate object it won't show.
+> 2. **External reviewer verdict (a formal Copilot review, or a human's formal review at the head) -- read-only, don't request one.**
+>    The comment above is the `@claude` bot only;
+>    a formal review (Copilot's or a human's) is a separate object it won't show.
 >    This step **only inspects an existing Copilot review** -- it never POSTs a review request.
 >    Requesting a review is a mutation (triggers a review job, consumes quota, can collide with a concurrent `ardi` loop), which breaks this skill's whole justification for fanning out subagents concurrently (*read-only, side-effect-free*).
 >    If no genuine verdict already exists at the current head, report that fact -- don't try to produce one; that's `ardi`'s job.
@@ -109,7 +110,21 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    PR #660 emitted `Comments suppressed due to low confidence (3)` while PRs #1029 and #1031 emit `Suppressed comments (4)`, so a literal grep for the older wording returns zero against a current body that has the block.
 >    A body-wide match over-corrects and would keep a clean PR permanently non-clean: ordinary overview prose contains the word, verified on review 4837572117, whose summary table reads "suppressed Copilot findings" outside any collapsed block.
 >    A stub-like non-answer ("ineligible", "reached their quota limit") is not a verdict either.
->    **This step cannot determine *why* no Copilot verdict exists** -- it can't tell "Copilot was never asked" from "Copilot is unreachable" from "a self-review was posted instead."
+>    **A human's formal review at the current head counts as an external verdict too** -- check for one whenever the Copilot half found no clean verdict, before settling on `no verdict at head`:
+>    ```bash
+>    gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
+>      | jq -s --arg h "$head" \
+>      '[.[][] | select(.user.type == "User" and .commit_id == $h)]
+>       | map({id, login: .user.login, state, submitted_at}) | last'
+>    ```
+>    Filter on `.user.type == "User"`, not on a login list -- a bot's REST user object carries `type: "Bot"` (measured 2026-08-15 on this repo: Copilot's review objects report `Bot`, the human reviewers' report `User`), so the type field needs no bot-login blocklist.
+>    Judge the matched review by **substance, not state**: on this repo 106 of 106 formal reviews across 60 merged PRs are `COMMENTED`, zero `APPROVED`, humans included (measured 2026-07-30 on #668), so a `state == "APPROVED"` key would never fire -- and a check that never fires is invisible, reporting `no verdict at head` on PRs a human did review.
+>    Fetch the matched review's body and its inline comments (the same comments-by-review-id query as the Copilot half, with this review's `id`) and apply the same bar:
+>    an affirmative zero-findings read means a genuine external verdict at the head;
+>    findings mean `N open`.
+>    An `APPROVED` state, where a repo's convention produces one, still qualifies -- it just cannot be the key.
+>    A human `CHANGES_REQUESTED` is item 6's job and blocks regardless of what this item finds.
+>    **This step cannot determine *why* no external verdict exists** -- it can't tell "Copilot was never asked" from "Copilot is unreachable" from "a self-review was posted instead."
 >    Don't guess; report the plain evidence-based fact (`no verdict at head`), and leave the availability/self-review judgment call to `ardi`, which actually drives the PR and can request reviews.
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); name any failing/pending
 >    check, don't just say "red".
@@ -150,7 +165,7 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    Any non-empty result **blocks** regardless of what any bot says -- only the human (or an explicit dismissal) resolves it.
 >    Return the reviewer login(s) from the array, not just a count.
 >
-> Return: PR number, CI (✅/❌-with-name/⏳), review (`clean` / `unverified` / `N open` with the headline finding / `none found` / `in-flight`), external (`clean` / `N open` / `no verdict at head`), human-blocked (`none` / `N pending` -- name the reviewer if `N` > 0), threads (`resolved` / `N open` / `N+ open (cap)`), behind-main (`up to date` / `N commits`).
+> Return: PR number, CI (✅/❌-with-name/⏳), review (`clean` / `unverified` / `N open` with the headline finding / `none found` / `in-flight`), external (`clean` / `N open` / `no verdict at head` -- naming the source, Copilot or a human login, when a verdict exists), human-blocked (`none` / `N pending` -- name the reviewer if `N` > 0), threads (`resolved` / `N open` / `N+ open (cap)`), behind-main (`up to date` / `N commits`).
 
 ### 3. Assemble (orchestrator)
 
@@ -186,9 +201,11 @@ A Markdown table, one row per open PR, with these columns:
   `in-flight` if a review run is still going **or** the latest review
   predates the latest commit (per subagent item 1's currency check) --
   either way, the current head hasn't been confirmed reviewed yet.
-- **External** -- `clean` (a genuine, non-stub Copilot verdict at the current
-  head, per subagent item 2), `N open` (findings in that verdict), or `no
-  verdict at head` (no Copilot review exists yet at the current commit).
+- **External** -- `clean` (a genuine, non-stub verdict at the current head,
+  from Copilot or from a human's formal review, per subagent item 2 -- name
+  the source), `N open` (findings in that verdict), or `no verdict at head`
+  (neither a Copilot review nor a human formal review exists at the current
+  commit).
   This step is read-only and doesn't request a review, so it can't tell
   "Copilot was never asked" from "unreachable" from "a self-review covers
   it" -- report the plain fact, don't guess at the reason.
@@ -207,7 +224,8 @@ to merge" unless it is
 everything below) *and* at least one of Review or External is `clean` at
 the current head (the canonical rule needs one genuine external verdict, not
 both -- a clean Claude verdict alone is sufficient, and so is a clean
-Copilot verdict alone; `unverified` does **not** count as clean) *and*
+Copilot verdict or a clean human formal review alone; `unverified` does
+**not** count as clean) *and*
 neither one has open findings *and* all CI
 workflows are green *and* it's not behind main *and* every inline review
 thread is resolved (the only open conversation being the final all-clear and

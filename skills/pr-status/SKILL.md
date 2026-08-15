@@ -107,10 +107,63 @@ the same PR. Use the read-only half of
 [`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body +
 inline comments at the current `commit_id` and require a zero-findings
 verdict -- but skip the `POST /requested_reviewers` call. If no genuine
-Copilot verdict exists at the current head, report `no verdict at head` and
+Copilot verdict exists at the current head, check for a human's formal
+review at the head (next subsection) before reporting `no verdict at head`;
+only when neither exists, report that and
 offer to run `ardi` (which can request one); don't request it yourself here.
 Green CI plus a clean self-review is not sufficient on its own if an
 external reviewer is reachable.
+
+### A human's formal review at the current head is an external verdict too
+
+The Copilot query above matches only Copilot's own login,
+so it cannot see a review a real person submitted through GitHub's review UI.
+Without this check, a PR a human already reviewed at the current head
+gets reported `no verdict at head` --
+the gap #668 tracks.
+Fetch the formal reviews and keep the non-bot ones at the current head
+(`READ_PR_REVIEWS`):
+
+```bash
+head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"   # VIEW_PR
+gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
+  | jq -s --arg h "$head" \
+  '[.[][] | select(.user.type == "User" and .commit_id == $h)]
+   | map({id, login: .user.login, state, submitted_at}) | last'
+```
+
+**Filter on `.user.type == "User"`, not on a login list.**
+A bot's REST user object carries `type: "Bot"`,
+so the type field separates humans from every bot
+without maintaining a login blocklist
+(measured 2026-08-15 on this repo:
+`copilot-pull-request-reviewer[bot]`'s review objects report `type: "Bot"`,
+and the human reviewers' report `type: "User"`).
+
+**Judge the matched review by its substance, not its `state`.**
+Keying on `state == "APPROVED"` reads as the obvious check
+and on this repo would never fire:
+106 of 106 formal reviews across 60 merged PRs are `COMMENTED`,
+zero `APPROVED`, humans included
+(measured 2026-07-30 on #668),
+because reviews here are posted as comments
+rather than through GitHub's approve flow.
+A check that can never fire is worse than none --
+it reports `no verdict at head` on PRs a human did review,
+and the failure is invisible,
+since a check that never fires looks the same as a repo with no human
+reviews.
+So read the matched review the way the Copilot step reads its own:
+fetch its body plus its inline comments at that `commit_id`,
+and apply the same zero-findings bar.
+A clean-by-substance human review at the current head
+is a genuine external verdict;
+one with findings is open items to report.
+An `APPROVED` state, where a repo's convention does produce one,
+still qualifies -- it just cannot be the key.
+A `CHANGES_REQUESTED` stays blocking
+via the *Check for a blocking human CHANGES_REQUESTED* section below,
+regardless of anything this subsection finds.
 
 ## Parse for findings before declaring clean
 

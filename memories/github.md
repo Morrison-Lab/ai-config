@@ -936,13 +936,14 @@ Two consequences worth knowing before diagnosing this:
   (This exact inference was made, published in a review, and had to be
   retracted --- gha#351, 2026-07-28.)
 
-`uses:` resolution is a separate question from link resolution and behaves
-differently again: Actions stopped resolving
-`uses: <old-owner>/<repo>/.github/workflows/x.yml@v2` after the same
-transfer, failing affected runs with `startup_failure` and **zero jobs**.
-Note that a run started shortly before the cutover can still succeed, so two
-attempts of the *same run* can disagree --- which is the cheapest available
-proof that the cause is environmental rather than in the diff.
+The `uses:`-resolution half of the same transfer is covered in
+`github-actions.md` ("A repo/org rename breaks Actions `uses:` refs"),
+including the trap that a tag can resolve while its own contents still name
+the old owner.
+One diagnostic belongs here because it generalizes beyond Actions: a run
+started shortly before a cutover can still succeed, so two attempts of the
+*same run* can disagree --- the cheapest available proof that a cause is
+environmental rather than in the diff.
 
 ## `gh pr create` fails on a transferred repo whose `origin` still names the old owner
 

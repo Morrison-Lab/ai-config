@@ -342,8 +342,10 @@ Note the deflating files are irrelevant to the filter's own safety --- a
 missing header drops nothing --- so the aggregate was also counting a
 quantity the question never depended on.
 The residual limit: a phantom whose text coincidentally names a changed
-file's own `b/<path>` is indistinguishable from that header by any stream
-inspection, so certainty past that point is hunk-structure parsing.
+file's own `b/<path>` --- or is literally `/dev/null`, colliding with the
+deletion-header sentinel the test skips --- is indistinguishable from a
+real header by any stream inspection, so certainty past that point is
+hunk-structure parsing.
 
 - **Do:** count added lines from `--numstat`, not from a header-stripped
   extraction.
@@ -356,7 +358,7 @@ inspection, so certainty past that point is hunk-structure parsing.
 - **Don't:** guard the header filter with a single-line pattern or an
   aggregate count --- a raw `+++ ` line matches every header pattern, and
   totals can cancel; only the per-line membership test decides it, up to
-  the coincidental-path limit above.
+  the coincidental-path and `/dev/null`-sentinel limits above.
 
 (Morrison-Lab/ai-config#1476, 2026-08-15, review round 1, finding 2: a PR
 body claimed "13 added lines" over a two-file diff whose true count was 12

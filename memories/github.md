@@ -1164,3 +1164,36 @@ the review from the agent's final message instead.
 See [`dont-reinvent-wheel.md`](../shared/principles/dont-reinvent-wheel.md)'s
 "A stale, un-migrated local copy is the least reliable place to fix a
 bug" for the broader lesson.)
+
+## A moving upstream tag can turn a consumer's default branch red with no local change
+
+A consumer pinned to a moving major tag (`...@v2`) inherits every change the
+tag's owner slides under it, so its default branch can go green-to-red
+between two consecutive commits while nothing in the repo changed that the
+failing check even looks at.
+
+Two cheap reads settle it before anyone's diff is opened.
+Check whether the **default branch itself** is red rather than only the PR,
+since a red default branch means the cause is not in any open branch.
+Then intersect the red commit's own changed-file list with the files the
+check flagged: an empty intersection points at the moving pin upstream.
+
+**The failing job's log is not the scope.**
+A checker can name only the files it stopped at rather than every file it
+would flag, so a log listing two files can understate a four-file breakage.
+Derive the affected set yourself by scanning every file carrying the
+extensions the checker covers.
+
+- **Do:** read the default branch's own status, and intersect the red
+  commit's changed files with the flagged files, before diagnosing a diff.
+- **Do:** re-derive the affected file set from the checker's own extension
+  list when planning the fix.
+- **Don't:** read a green-to-red transition as evidence the red commit caused
+  it --- a moving pin changes what runs without changing what it runs on.
+- **Don't:** treat the failing log's file list as the breakage's full scope.
+
+(2026-08-15: a consumer pinning a shared `check-non-standard-chars` workflow
+at `@v2` went red when that checker's banned-glyph set gained U+00D7.
+The red commit changed only a demo JSON and one GDScript file --- no file the
+checker scans and no workflow file --- and the log named 2 of the 4 affected
+files.)

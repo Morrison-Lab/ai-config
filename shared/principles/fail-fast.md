@@ -335,6 +335,51 @@ trusted.
   composition being appropriate --- that check passes on every instance of
   this.
 
+**The undo step is the other half, and it can finish the destruction the
+diagnostic started.**
+Everything above concerns the mutation a diagnostic performs on the way in.
+A control that writes into your working tree has a second mutating step
+nobody plans for: the revert that puts the file back.
+The natural undo is path-scoped --- `git checkout <path>` or
+`git restore <path>` --- and that reverts **everything** uncommitted in that
+path, not only the line the control injected.
+
+So a control that was itself harmless destroys uncommitted work, in the step
+whose whole purpose was to leave no trace.
+
+Two properties keep it hidden.
+The revert is silent, since `git checkout <path>` prints nothing on success,
+so nothing distinguishes reverting one injected line from reverting a file's
+entire uncommitted diff.
+And `git status` afterwards still looks plausible whenever sibling files
+carry their own uncommitted changes: the tree is still dirty, the list is
+still non-empty, and only the one file has been emptied.
+
+Three remedies, in order of preference.
+Commit or stash before running a control that writes into the tree, so the
+revert has a real baseline to return to.
+Inject into a copy outside the tree, so no revert is needed at all.
+Or undo the injection surgically, deleting the line you added, rather than
+reverting the path.
+
+- **Do:** commit or stash uncommitted work before a control writes into a
+  tracked file.
+- **Do:** undo an injection by removing what you injected, rather than by
+  reverting the path it lives in.
+- **Don't:** reach for `git checkout <path>` or `git restore <path>` to clean
+  up after a diagnostic --- it reverts every uncommitted change in that path.
+- **Don't:** read a still-dirty `git status` as evidence the revert was
+  scoped; sibling files' changes keep the list non-empty either way.
+
+(2026-08-15: testing whether a repo's `chars` check detected U+00D7 meant
+appending a literal multiplication sign to a tracked `.qmd`, re-running the
+check --- which reported PASS, a real finding --- and then reverting the file.
+The revert discarded an uncommitted fix made to that same file minutes
+earlier.
+Three sibling files kept their fixes, so `git status` still listed
+modifications and looked plausible; only re-counting the specific file caught
+it.)
+
 ## In a guard you ship: partial is worse than absent
 
 Everything above concerns a check whose failure is invisible **at runtime**,

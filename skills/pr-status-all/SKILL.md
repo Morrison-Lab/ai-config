@@ -114,11 +114,15 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    ```bash
 >    gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
 >      | jq -s --arg h "$head" \
->      '[.[][] | select(.user.type == "User" and .commit_id == $h)]
+>      '[.[][] | select(.user.type == "User" and .commit_id == $h
+>                       and .state != "DISMISSED")]
 >       | group_by(.user.login)
 >       | map(sort_by(.submitted_at) | last
 >             | {id, login: .user.login, state, submitted_at})'
 >    ```
+>    The `.state != "DISMISSED"` exclusion is load-bearing:
+>    GitHub's dismiss action flips the review's own `state` in place rather than adding a new review, and retracts neither its body nor its inline threads --
+>    so without the exclusion, a substance read would report findings an explicit dismissal already resolved (dismissal being one of the two resolution paths item 6's own prose documents).
 >    The `group_by(.user.login)` reduces **per reviewer** before taking each one's latest, mirroring item 6's reduction and for the same reason:
 >    two humans can review the same head, and a bare `| last` over the combined list would let a later clean "LGTM" from one reviewer silently drop an earlier reviewer's body-only findings
 >    (an inline finding would still surface through item 4's thread count;
@@ -131,7 +135,7 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    findings in any of them mean `N open`, whatever the other reviewers said.
 >    An `APPROVED` state, where a repo's convention produces one, still qualifies -- it just cannot be the key.
 >    A human `CHANGES_REQUESTED` is item 6's job and blocks regardless of what this item finds.
->    **This step cannot determine *why* no external verdict exists** -- it can't tell "Copilot was never asked" from "Copilot is unreachable" from "a self-review was posted instead."
+>    **This step cannot determine *why* no external verdict exists** -- for either source, it can't tell "never asked" (Copilot not requested, no human invited) from "unreachable" from "a self-review was posted instead."
 >    Don't guess; report the plain evidence-based fact (`no verdict at head`), and leave the availability/self-review judgment call to `ardi`, which actually drives the PR and can request reviews.
 > 3. **CI state** -- `gh pr checks <N>` (`PR_CHECKS`); name any failing/pending
 >    check, don't just say "red".

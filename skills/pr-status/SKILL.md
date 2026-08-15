@@ -129,11 +129,25 @@ Fetch the formal reviews and keep the non-bot ones at the current head
 head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"   # VIEW_PR
 gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
   | jq -s --arg h "$head" \
-  '[.[][] | select(.user.type == "User" and .commit_id == $h)]
+  '[.[][] | select(.user.type == "User" and .commit_id == $h
+                   and .state != "DISMISSED")]
    | group_by(.user.login)
    | map(sort_by(.submitted_at) | last
          | {id, login: .user.login, state, submitted_at})'
 ```
+
+**Exclude `DISMISSED` reviews before reading anything.**
+GitHub's dismiss action flips the review's own `state` in place
+rather than adding a new review,
+and it retracts neither the review's body nor its inline threads --
+so without the exclusion,
+a dismissed review is still its reviewer's latest at the head,
+and a substance read would report findings
+an explicit dismissal already resolved.
+Dismissal is one of the two resolution paths
+the *Check for a blocking human CHANGES_REQUESTED* section below
+already documents;
+this filter keeps the two checks consistent about it.
 
 **Reduce per reviewer, not across all reviewers at once.**
 The `group_by(.user.login)` mirrors the `CHANGES_REQUESTED` check below,

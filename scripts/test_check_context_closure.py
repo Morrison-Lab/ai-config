@@ -948,5 +948,96 @@ check(
     _fc_rejects_zero(),
 )
 
+# --- --baseline: this repo's own per-PR closure delta -----------------------
+# Distinct from --compare, which needs a submodule gitlink. The fixture is a
+# single repo with two commits, so the closure genuinely differs between the
+# baseline rev and the working tree.
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    (base / "CLAUDE.md").write_text("@frag.md\n", encoding="utf-8")
+    (base / "frag.md").write_text("short", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=base, check=True)
+    subprocess.run(["git", "commit", "-qm", "baseline"], cwd=base, check=True)
+    first = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=base, capture_output=True, text=True
+    ).stdout.strip()
+    # Grow the fragment in the working tree only; the baseline rev keeps "short".
+    (base / "frag.md").write_text("a considerably longer fragment", encoding="utf-8")
+
+    at_base, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.baseline_reader(base, first))
+    in_tree, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.local_reader(base))
+    check(
+        "baseline_reader resolves this repo's own files at the given rev",
+        sum(n for _, n, _ in at_base) < sum(n for _, n, _ in in_tree),
+    )
+    check(
+        "the import list is unchanged across revs, only weights differ",
+        [p for p, _, _ in at_base] == [p for p, _, _ in in_tree],
+    )
+
+    common = ["--base", str(base), "--budget", "100000000"]
+    check(
+        "--baseline alone is advisory and exits 0",
+        ccc.main(common + ["--baseline", first]) == 0,
+    )
+    # The growth here is len("a considerably longer fragment") - len("short") = 25.
+    check(
+        "--max-growth fails when the closure grew past the limit",
+        ccc.main(common + ["--baseline", first, "--max-growth", "10"]) == 1,
+    )
+    check(
+        "--max-growth passes when the growth fits",
+        ccc.main(common + ["--baseline", first, "--max-growth", "100"]) == 0,
+    )
+    check(
+        "--max-growth is exclusive, so a limit equal to the growth passes",
+        ccc.main(common + ["--baseline", first, "--max-growth", "25"]) == 0,
+    )
+    # The dangerous case: an unresolvable rev makes every file read as absent,
+    # so a naive implementation reports the WHOLE closure as growth. It must
+    # be a hard error instead, per fail-fast.md.
+    check(
+        "an unresolvable baseline rev is a hard error, not a huge fake delta",
+        ccc.main(common + ["--baseline", "no-such-rev-xyz"]) == 2,
+    )
+    check(
+        "--max-growth without --baseline is refused rather than silently inert",
+        ccc.main(common + ["--max-growth", "10"]) == 2,
+    )
+    # Assert the MESSAGE, not just the exit code. This fixture has no
+    # `.ai-config` gitlink, so `--compare` exits 2 on its own for an unrelated
+    # reason -- an exit-code-only check passes identically whether or not the
+    # ambiguity guard exists, which mutation testing confirmed (removing the
+    # guard changed nothing). See fail-fast.md on a check that passes by
+    # coincidental balance.
+    import contextlib as _ctx
+    from io import StringIO as _SIO
+
+    _err = _SIO()
+    with _ctx.redirect_stdout(_SIO()), _ctx.redirect_stderr(_err):
+        _rc = ccc.main(common + ["--baseline", first, "--compare", first])
+    check(
+        "--baseline with --compare is refused as ambiguous, by that guard",
+        _rc == 2 and "answer different questions" in _err.getvalue(),
+    )
+    # A self-baseline is the negative control: same tree both sides, so any
+    # non-zero delta would mean the reader is not reading what local_reader does.
+    subprocess.run(["git", "add", "-A"], cwd=base, check=True)
+    subprocess.run(["git", "commit", "-qm", "grown"], cwd=base, check=True)
+    check(
+        "a self-baseline reports zero growth under a zero limit",
+        ccc.main(common + ["--baseline", "HEAD", "--max-growth", "0"]) == 0,
+    )
+
+check(
+    "render_delta labels its rows from its arguments, not a hard-coded pair",
+    "at REV" in ccc.render_delta(10, 20, 4, "T", "at REV", "working tree")
+    and "working tree" in ccc.render_delta(10, 20, 4, "T", "at REV", "working tree"),
+)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

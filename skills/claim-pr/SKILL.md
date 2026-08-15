@@ -67,14 +67,14 @@ PR/issue, and **expired** past that --- in both directions:
 
 Check staleness with one read.
 
-### GitHub
+### GitHub --- read the last-activity timestamp
 
 ```bash
 gh pr view <N> --json updatedAt --jq .updatedAt        # VIEW_PR
 gh issue view <N> --json updatedAt --jq .updatedAt     # VIEW_ISSUE
 ```
 
-### GitLab
+### GitLab --- read the last-activity timestamp
 
 ```bash
 glab api "projects/<PROJECT_ID>/merge_requests/<MR_IID>" | jq -r .updated_at

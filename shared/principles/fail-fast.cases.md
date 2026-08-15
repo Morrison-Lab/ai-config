@@ -685,3 +685,52 @@ Note which remedy this defeats.
 The three vacuous-zero causes above all converge on printing a denominator, and
 a denominator here would have been non-zero, correct, and equally silent, since
 `gha`'s diff genuinely had lines to examine.)
+
+## A precondition that could not fire on the case it named
+
+(`Morrison-Lab/ai-config#1481`, 2026-08-15, review round 1, blocking.
+`skills/ardia/SKILL.md`'s supersession recipe extracted a PR's added lines with
+`git diff ... | grep '^+' | grep -v '^+++ '`, and its prose offered a guard:
+confirm `grep -c '^++[^+]'` returns 0 before trusting the filter, "an added
+line whose own text begins `++` is indistinguishable from a header once the
+diff's marker is prepended".
+The sentence cites this file's own "Why no prefix pattern separates a diff
+header from its data" two lines later, in support of a second prefix pattern.
+
+Reproduced on a real two-file `git diff` rather than by reasoning:
+
+| raw content | appears in the diff as | dropped by `grep -v '^+++ '` | matched by `^++[^+]` |
+| --- | --- | --- | --- |
+| `++ dangerous collision case` | `+++ dangerous collision case` | **yes, wrongly** | **no** |
+| `++i;` | `+++i;` | no | no |
+| `+1 vote` | `++1 vote` | no | **yes**, harmlessly |
+
+`git diff --numstat` reported 4 insertions, the filter emitted 3 having
+silently eaten the collision line, and the guard reported `0` throughout.
+So it was blind to the case its own sentence describes --- the third character
+of `+++ foo` is `+`, which fails `[^+]` --- and fired only on a line the filter
+already handled.
+A false all-clear, in the fail-open direction, published as a cross-check in
+the PR body.
+
+The fix removed the collision rather than detecting it, scoping the diff per
+file so each header is dropped by position:
+
+```bash
+git diff --name-only "$base" <head> | while read -r f; do
+  git diff -U0 "$base" <head> -- "$f" | grep '^+' | tail -n +2 | sed 's/^+//'
+done
+```
+
+Against the same fixture that form preserves `++ dangerous collision case`,
+leaks no headers, and yields 4 lines against `--numstat`'s 4.
+The recipe now carries that `--numstat` comparison, whose value is computed
+outside the pipeline it checks.
+
+Two things worth keeping from how it was caught.
+The reviewer verified by running the patterns rather than reading them, and
+said so, which is what made the finding checkable rather than arguable.
+And the corpus already contained the answer --- the review's own closing point
+was that this file's table "independently confirms that `grep -v '^+++ '` drops
+a raw `++ foo`-style line" --- so the defect was not missing knowledge but a
+rule cited while being broken.)

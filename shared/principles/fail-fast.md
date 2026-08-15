@@ -249,6 +249,49 @@ See [`fail-fast.cases.md`](fail-fast.cases.md),
 - **Don't:** promote a pattern written to locate something into the description
   of what it located.
 
+### Guarding an unsound pattern with a second pattern, rather than replacing it
+
+Every direction above ends by naming a pattern that cannot separate what it is
+asked to separate.
+The natural next move, once you know a filter is unsound, is to keep it and add
+a **precondition** that detects the case it gets wrong.
+That move is wrong twice over, and it feels like diligence, which is why it
+survives the reading that produced it.
+
+It is wrong because the precondition is a pattern over the same stream, so it
+inherits the ambiguity that made the first one unsound.
+And it is wrong because nobody tests a guard: the filter has visible output that
+gets eyeballed, while the guard's whole contract is to stay silent, so a
+precondition that can never fire is indistinguishable from one that fires
+correctly and finds nothing.
+It therefore fails **open**, and it publishes a clean number while doing so.
+
+The tell is a diff whose prose cites a rule saying no pattern works, in support
+of a second pattern.
+When the corpus already establishes that a class of instrument cannot decide a
+question, the response is to **replace the instrument** --- with position, with
+an independently computed quantity, with the tool's own structured output ---
+never to add a detector for its failures.
+
+Where a cross-check is genuinely wanted, take it from something that is not the
+pipeline under test: a count from `--numstat`, a total the tool itself reports,
+a figure derived by a different command.
+A second reading of the same stream is not a second opinion.
+
+- **Do:** replace an instrument a rule has already called unsound, rather than
+  guarding it.
+- **Do:** cross-check against a quantity computed outside the pipeline being
+  checked.
+- **Do:** test any guard you do write against the exact case it names, before
+  trusting a zero from it.
+- **Don't:** add a precondition over the same stream that made the first
+  pattern ambiguous --- it inherits the ambiguity and hides it behind silence.
+- **Don't:** read a guard's `0` as evidence of anything until you have seen
+  that guard produce a non-zero.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md),
+"A precondition that could not fire on the case it named".
+
 ### The third one arrives in the repair, and only on the empty input
 
 The two cases above are checks written wrong the first time.

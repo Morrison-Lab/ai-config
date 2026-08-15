@@ -11,7 +11,7 @@ project:
 
 website:
   title: "ai-config"
-  site-url: https://d-morrison.github.io/ai-config/
+  site-url: https://Morrison-Lab.github.io/ai-config/
   description: "Portable AI agent config — skills, memories, and commands synced across machines via git"
   llms-txt: true
   page-footer:

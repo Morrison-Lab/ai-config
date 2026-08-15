@@ -70,11 +70,19 @@ See ai-config#694 for the precedent.
   a tag.
   Files in the diff were unaffected, as above --- the angle-bracket form
   inside a fenced code block is correct there and should stay.
-  **A third write surface, `update_pull_request`, strips like
-  `create_pull_request` does.**
-  The entry above deliberately declines to generalize between surfaces, so the
-  per-surface table is the thing to extend rather than a rule to infer: as of
-  2026-08-15 `create_pull_request` strips, `update_pull_request` strips, and
+  **`update_pull_request` strips a short placeholder token too, which extends
+  this entry's per-surface table rather than opening a new question.**
+  Be precise about how much is new here, because the neighbouring autolinks
+  entry below already names `update_pull_request` as stripping angle-bracket
+  *spans* --- see "The MCP write tools silently drop `<https://...>`
+  angle-bracket autolinks", which covers `create_pull_request`,
+  `update_pull_request`, and `issue_write` for a full URL.
+  What that entry does not settle is the **short token** case this entry is
+  about, and the two are worth keeping apart rather than merged: they track
+  different content shapes, and this entry deliberately declines to generalize
+  between surfaces at all.
+  So the per-surface table for a short placeholder reads, as of 2026-08-15:
+  `create_pull_request` strips, `update_pull_request` strips,
   `add_issue_comment` does not.
   Editing a body is the likelier moment to meet this than creating one, because
   a correction is exactly when a command gets spelled out for a reader.

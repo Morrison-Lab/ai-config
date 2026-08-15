@@ -100,8 +100,9 @@ external reviewer becomes available again. Formal reviews (e.g. Copilot)
 don't show up in the comments query above at all -- they're a separate
 review object.
 
-**This is a status query -- inspect an existing Copilot review, don't
-request one.** Requesting a review is a mutation: it triggers a review job,
+**This is a status query -- inspect an existing Copilot or human review,
+don't request one.**
+Requesting a review is a mutation: it triggers a review job,
 consumes reviewer quota, and can collide with an active `ardi` loop driving
 the same PR. Use the read-only half of
 [`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body +
@@ -129,8 +130,23 @@ head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"   # VIEW_PR
 gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
   | jq -s --arg h "$head" \
   '[.[][] | select(.user.type == "User" and .commit_id == $h)]
-   | map({id, login: .user.login, state, submitted_at}) | last'
+   | group_by(.user.login)
+   | map(sort_by(.submitted_at) | last
+         | {id, login: .user.login, state, submitted_at})'
 ```
+
+**Reduce per reviewer, not across all reviewers at once.**
+The `group_by(.user.login)` mirrors the `CHANGES_REQUESTED` check below,
+and for the same reason:
+two humans can review the same head,
+and a bare `| last` over the combined list
+would return only the chronologically latest review --
+so a later clean "LGTM" from one reviewer
+would silently drop an earlier reviewer's body-only findings
+(inline findings would still surface through the thread count,
+but a finding stated only in a review body has no thread to catch it).
+The command returns each human reviewer's latest review at the head;
+read **every** one of them.
 
 **Filter on `.user.type == "User"`, not on a login list.**
 A bot's REST user object carries `type: "Bot"`,
@@ -140,7 +156,7 @@ without maintaining a login blocklist
 `copilot-pull-request-reviewer[bot]`'s review objects report `type: "Bot"`,
 and the human reviewers' report `type: "User"`).
 
-**Judge the matched review by its substance, not its `state`.**
+**Judge each matched review by its substance, not its `state`.**
 Keying on `state == "APPROVED"` reads as the obvious check
 and on this repo would never fire:
 106 of 106 formal reviews across 60 merged PRs are `COMMENTED`,
@@ -153,12 +169,14 @@ it reports `no verdict at head` on PRs a human did review,
 and the failure is invisible,
 since a check that never fires looks the same as a repo with no human
 reviews.
-So read the matched review the way the Copilot step reads its own:
+So read each matched review the way the Copilot step reads its own:
 fetch its body plus its inline comments at that `commit_id`,
 and apply the same zero-findings bar.
-A clean-by-substance human review at the current head
-is a genuine external verdict;
-one with findings is open items to report.
+Clean-by-substance human reviews at the current head,
+with no matched review carrying findings,
+are a genuine external verdict;
+any matched review with findings is open items to report,
+whatever the other reviewers said.
 An `APPROVED` state, where a repo's convention does produce one,
 still qualifies -- it just cannot be the key.
 A `CHANGES_REQUESTED` stays blocking

@@ -86,7 +86,7 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 > 2. **External reviewer verdict (a formal Copilot review, or a human's formal review at the head) -- read-only, don't request one.**
 >    The comment above is the `@claude` bot only;
 >    a formal review (Copilot's or a human's) is a separate object it won't show.
->    This step **only inspects an existing Copilot review** -- it never POSTs a review request.
+>    This step **only inspects existing reviews (Copilot's or a human's)** -- it never POSTs a review request.
 >    Requesting a review is a mutation (triggers a review job, consumes quota, can collide with a concurrent `ardi` loop), which breaks this skill's whole justification for fanning out subagents concurrently (*read-only, side-effect-free*).
 >    If no genuine verdict already exists at the current head, report that fact -- don't try to produce one; that's `ardi`'s job.
 >    ```bash
@@ -115,13 +115,20 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
 >      | jq -s --arg h "$head" \
 >      '[.[][] | select(.user.type == "User" and .commit_id == $h)]
->       | map({id, login: .user.login, state, submitted_at}) | last'
+>       | group_by(.user.login)
+>       | map(sort_by(.submitted_at) | last
+>             | {id, login: .user.login, state, submitted_at})'
 >    ```
+>    The `group_by(.user.login)` reduces **per reviewer** before taking each one's latest, mirroring item 6's reduction and for the same reason:
+>    two humans can review the same head, and a bare `| last` over the combined list would let a later clean "LGTM" from one reviewer silently drop an earlier reviewer's body-only findings
+>    (an inline finding would still surface through item 4's thread count;
+>    a body-only one has no thread to catch it).
+>    Read **every** review the command returns, not just the newest.
 >    Filter on `.user.type == "User"`, not on a login list -- a bot's REST user object carries `type: "Bot"` (measured 2026-08-15 on this repo: Copilot's review objects report `Bot`, the human reviewers' report `User`), so the type field needs no bot-login blocklist.
->    Judge the matched review by **substance, not state**: on this repo 106 of 106 formal reviews across 60 merged PRs are `COMMENTED`, zero `APPROVED`, humans included (measured 2026-07-30 on #668), so a `state == "APPROVED"` key would never fire -- and a check that never fires is invisible, reporting `no verdict at head` on PRs a human did review.
->    Fetch the matched review's body and its inline comments (the same comments-by-review-id query as the Copilot half, with this review's `id`) and apply the same bar:
->    an affirmative zero-findings read means a genuine external verdict at the head;
->    findings mean `N open`.
+>    Judge each matched review by **substance, not state**: on this repo 106 of 106 formal reviews across 60 merged PRs are `COMMENTED`, zero `APPROVED`, humans included (measured 2026-07-30 on #668), so a `state == "APPROVED"` key would never fire -- and a check that never fires is invisible, reporting `no verdict at head` on PRs a human did review.
+>    Fetch each matched review's body and its inline comments (the same comments-by-review-id query as the Copilot half, with that review's `id`) and apply the same bar:
+>    an affirmative zero-findings read across every matched review means a genuine external verdict at the head;
+>    findings in any of them mean `N open`, whatever the other reviewers said.
 >    An `APPROVED` state, where a repo's convention produces one, still qualifies -- it just cannot be the key.
 >    A human `CHANGES_REQUESTED` is item 6's job and blocks regardless of what this item finds.
 >    **This step cannot determine *why* no external verdict exists** -- it can't tell "Copilot was never asked" from "Copilot is unreachable" from "a self-review was posted instead."

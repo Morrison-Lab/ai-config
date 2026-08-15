@@ -511,3 +511,10 @@ zeros were being argued about as measured-dead paths, read as one more
 redundant clause.
 Mutating the call site to pass the genuinely unmasked segment instead failed
 **3**, which is the figure the PR body now reports for that clause.)
+
+## A green check on the default branch is a free labelled corpus
+
+(`ucdavis/bcs`, 2026-08-13: a dialect word-list table carried a comment saying words colliding with an R identifier are excluded "because each would be a false positive that blocks a push", and the table beneath it held `summarise` (a dplyr verb, in 19 files), `colour`, `labeller`, and `analyses`.
+`Spellcheck` is green on `main`, so every one of those was a false positive with nothing left to judge.
+Shipped as `--audit-corpus` rather than as deletions.
+Its first version queried the table directly and reported 6 collisions where 4 were real, over-reporting every word the wordlist already suppresses; the corrected version calls `scan_line()` with the real wordlist, and the correction was stated on the PR rather than the number quietly substituted.)

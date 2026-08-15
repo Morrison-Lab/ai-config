@@ -80,6 +80,15 @@ items under every heading, whatever that heading is called ---
 than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 
+**Both criteria are per-PR, and a stack is where that stops being automatic.**
+
+- **Do:** derive a verdict per PR number, and name the PR beside each one.
+- **Do:** treat a refusal from one reviewer on one PR as evidence about that reviewer on that PR, and nothing else.
+- **Don't:** report a stack's review state from a single read --- "I read the review" is a per-PR claim, and the stack is what makes it read as a claim about the work.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"Both criteria are per-PR, and a stack is where that stops being automatic".
+
 **The disagreement is measurable, and it is not a wording problem.**
 
 **A reviewer's own verification block can be wrong while its verdict is

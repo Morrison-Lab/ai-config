@@ -305,6 +305,24 @@ code is what nobody checks --- the subject under test has a suite, a reviewer,
 and a guard, while the throwaway harness written to evaluate it has none of the
 three, and is written fastest.
 
+The section above asks for "a set whose right answer you independently know", and knowing it is usually the expensive part --- someone has to label the inputs, and a hand-labelled set is small and inherits its author's blind spot.
+
+For one whole class of instrument the label comes for free, and the class is the common one: any instrument whose job is to **flag** something in text a CI check already gates.
+That check is green on the default branch, so every in-scope file there is one CI accepts --- which makes any firing on that corpus a false positive **by construction**, needing no judgment and no labelling pass at all.
+The corpus is also as large as the repository and was written by everyone who has ever committed to it, which is exactly the property the section above wants and cannot normally afford.
+
+Note it is one-sided, and say so rather than overclaiming.
+The green establishes that nothing there should fire, so it finds every false positive and no false negative --- a clean audit means the instrument does not over-report on today's corpus, and says nothing about what it misses.
+
+**Ship the audit as a flag on the instrument, not as a one-off script.**
+The whole value is that it re-runs: the table it audits will gain entries, and a check performed once is a claim about the day it ran.
+Wiring it into the pre-push sweep turns the prose rationale that motivated the table into a standing predicate, per [`deterministic-tools`](../principles/deterministic-tools.md), and it is the step that makes the difference between having audited and having a guard.
+Then confirm it fires: reintroduce one of the entries it removed and require the audit to fail.
+
+**The audit has to enter at the instrument's own input, exactly as a negative control does.**
+"A negative control must enter at the real input" below is stated for controls, and it governs the audit for the same reason --- an audit that queries the lookup table directly rather than calling the scanner's entry point bypasses every suppression the real path applies, so it reports collisions the shipped instrument would never have raised.
+That failure is not the uniform-verdict one above: the result **varies** with the corpus and is simply wider than the truth, so nothing about it looks broken.
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
 The section above governs a comment claiming *what* a matcher matches.

@@ -90,6 +90,8 @@ mutates a PR stays serial.
    Grep `origin/main` for the PR's distinctive added phrases; if they are all
    already there, the PR is `Superseded` (see step 3's terminal states) and its
    patch prep is wasted work --- flag it for closure instead.
+   Run that grep over `main`'s whole Markdown corpus rather than over the PR's
+   own file paths, for the reason step 3's terminal state gives.
 
    **The patch has to leave the worktree as an artifact, not sit in it as a
    dirty tree.**
@@ -195,6 +197,79 @@ mutates a PR stays serial.
      Recommend closure --- the content is preserved on `main` --- and name the superseding PR, rather than pushing an empty diff to clean.
      See [`sync-with-main`](../../shared/workflow/sync-with-main.md)'s duplicate-issue and whole-file-split cases, which already say to keep `main`'s version when a sibling published the same content.
      This is that judgment applied up front, at the whole-PR scale, with closure as the terminal action.
+
+     **That grep needs a search space, and the whole corpus is the right one.**
+     The prescription above says to grep `origin/main`, and does not say where
+     in it.
+     The reader supplies the narrow answer, because the PR's own file list is
+     right there: compare each added line against its counterpart in the same
+     path on `main`.
+
+     That reading under-reports whenever `main` has since **relocated** the
+     content --- a `.cases.md` or `.rationale.md` split, a rename, a section
+     moved between fragments.
+     The lines did land, somewhere else.
+     A per-file check reports them missing, so a superseded PR reads as
+     not-superseded and the sweep spends rounds driving a PR it should be
+     recommending for closure.
+
+     The error runs in the cheap direction, which is why nothing catches it.
+     It never closes a PR wrongly, it only fails to close one, so there is no
+     bad outcome to trace back and the wasted rounds look like ordinary work.
+
+     Score both scopes when they can differ, and report both:
+
+     ```bash
+     base="$(git merge-base <head> origin/main)"
+     git diff --name-only "$base" <head> | while read -r f; do
+       git diff -U0 "$base" <head> -- "$f" | grep '^+' | tail -n +2 | sed 's/^+//'
+     done
+     # per line, normalized for whitespace and inline markup, ask twice:
+     #   present in the same path on origin/main?
+     #   present anywhere in origin/main's Markdown corpus?
+     ```
+
+     Scope the diff to one file at a time, so each `+++ b/<path>` header is
+     dropped by **position** rather than by pattern.
+     Neither shortcut survives a whole-PR diff, and they fail in opposite
+     directions.
+     A single `tail -n +2` drops only the first file's header and leaves the
+     rest in the stream, where they read as content and inflate the score's
+     denominator.
+     A `grep -v '^+++ '` filter drops every header and also drops any added
+     line whose own text begins `++ `, since the diff's own marker turns it
+     into `+++ ` --- so that filter silently deletes real content, which is
+     the worse of the two.
+     No prefix pattern separates a header from its data, per
+     [`fail-fast`](../../shared/principles/fail-fast.md)'s third pattern
+     direction; per-file position does.
+
+     Cross-check the extracted line count against `git diff --numstat`'s
+     insertion column, which is computed by something other than this
+     pipeline --- a disagreement means a header leaked in or a content line
+     was swallowed, rather than anything about supersession.
+
+     - **Do:** run the supersession grep over `main`'s whole Markdown corpus,
+       not over the PR's own file paths.
+     - **Do:** report both scores when they differ, since the gap names a
+       relocation rather than missing content.
+     - **Don't:** read a per-file shortfall as evidence the content did not
+       land --- a split, a rename, or a section move produces exactly that.
+     - **Don't:** treat the PR's file list as the search space merely because
+       it is the list already in front of you.
+
+     (Morrison-Lab/ai-config#1458, 2026-08-15.
+     The same presence check, run after that PR merged to confirm its content
+     had landed, scored its pre-routing head `009fc9ef` against `origin/main`:
+     42 of 78 substantive added lines present in their own file's counterpart,
+     and 78 of 78 present somewhere in the corpus --- 45 of 89 and 89 of 89
+     counting every non-blank added line.
+     Scoring examined the 333 Markdown files outside the generated
+     `codex-skills/` mirror, of 514 tracked `.md` files in all.
+     The whole gap is `main` having absorbed PR #1468's rule/rationale split:
+     lines that head added to `shared/workflow/address-every-comment.md` now
+     live in that file's `.rationale.md` companion, so the path they were
+     added to no longer holds them.)
 
    `Escalated` and `Blocked` are disjoint by construction: the first is about the *review* deadlocking, the second about everything else.
    A PR meeting both is `Blocked`, since the external obstacle has to clear before the review matters.

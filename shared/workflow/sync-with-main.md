@@ -289,6 +289,13 @@ collapse correct.
 For each file that left the diff, compare the original head against the
 merge-base to recover what your branch intended, then confirm current `main`
 now carries that same change.
+Search `main`'s whole corpus for that change rather than the path it used to
+live at: a sibling PR that relocated the content --- a companion-file split, a
+rename, a section moved between files --- leaves it present but elsewhere, so a
+path-scoped confirmation reports it missing and invites you to re-add a copy
+`main` already has.
+[`ardia`](../../skills/ardia/SKILL.md)'s `Superseded` terminal state carries
+the measurement.
 Only after that per-file check is it safe to treat the smaller diff as a
 successful conflict resolution rather than as lost work.
 

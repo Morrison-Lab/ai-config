@@ -289,7 +289,8 @@ A sentence that would still read true with the parameter deleted is explaining t
 - **Don't:** read "the docstring makes sense" as evidence a parameter is used --- a correct sentence can justify behaviour that a different part of the function actually implements.
 
 (Morrison-Lab/ai-config#1406: `render_fragment_caps(files, root, cap)` carried a docstring reading "The root file is excluded because `--root-char-cap` already governs it," and `root` was never referenced in the function body --- the exclusion was a `depth > 0` filter.
-Caught as a non-blocking review note; restating the docstring to name the depth filter made the parameter visibly redundant, and it was removed.)
+Caught as a non-blocking review note.
+Restating the docstring to name the depth filter made the parameter visibly redundant, and it was removed.)
 
 ## What to report
 

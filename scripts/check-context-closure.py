@@ -636,16 +636,22 @@ def render_delta(
     """
     delta = after_total - before_total
     pct = (100 * delta / before_total) if before_total else 0
-    sign = "+" if delta >= 0 else ""
-    width = max(len(before_label), len(after_label), 9)
+    width = max(len(before_label), len(after_label), len("change"))
+    # The sign goes in the format spec rather than a separate string. Prefixing
+    # a manual "+" spends a column that the "-" of a negative number takes from
+    # the field itself, so the two cases came out a character apart -- and the
+    # negative case is a trim, which is exactly the run someone reads closely.
+    # `//` also floors toward negative infinity, so a shrink reported one token
+    # more than it saved; truncating toward zero keeps both directions honest.
+    delta_tok = int(delta / bytes_per_token)
     return (
         f"\n{title}:\n"
         f"    {before_label:<{width}} {before_total:>10,} B  "
         f"~{before_total // bytes_per_token:>8,} tok\n"
         f"    {after_label:<{width}} {after_total:>10,} B  "
         f"~{after_total // bytes_per_token:>8,} tok\n"
-        f"    {'change':<{width}} {sign}{delta:>9,} B  "
-        f"{sign}{delta // bytes_per_token:>8,} tok  ({sign}{pct:.0f}%)"
+        f"    {'change':<{width}} {delta:>+10,} B  "
+        f"{delta_tok:>+9,} tok  ({pct:+.0f}%)"
     )
 
 

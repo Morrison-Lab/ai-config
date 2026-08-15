@@ -221,16 +221,21 @@ mutates a PR stays serial.
 
      ```bash
      base="$(git merge-base <head> origin/main)"
-     git diff -U0 "$base" <head> | grep '^+' | tail -n +2   # the added lines
+     git diff -U0 "$base" <head> | grep '^+' | grep -v '^+++ '   # added lines
      # per line, normalized for whitespace and inline markup, ask twice:
      #   present in the same path on origin/main?
      #   present anywhere in origin/main's Markdown corpus?
      ```
 
-     The `tail -n +2` drops the diff's own `+++ b/<path>` header by position,
+     Drop the `+++ b/<path>` headers per file rather than by position.
+     A PR diff spans several files and carries one header each, so a
+     `tail -n +2` removes only the first and leaves the rest in the stream,
+     where they read as content and inflate the score's denominator.
+     Confirm `grep -c '^++[^+]'` returns 0 over the same stream before
+     trusting the header filter: an added line whose own text begins `++`
+     is indistinguishable from a header once the diff's marker is prepended,
      per [`fail-fast`](../../shared/principles/fail-fast.md)'s third pattern
-     direction --- no prefix separates that header from an added line
-     beginning `++`.
+     direction.
 
      - **Do:** run the supersession grep over `main`'s whole Markdown corpus,
        not over the PR's own file paths.

@@ -481,3 +481,40 @@ turning `c1257.json` into `57`, so every ground-truth lookup missed.
 A uniform verdict across a corpus whose members vary is the tell --- and the
 author's own framing of why it still deserved recording is that failing loudly
 is the safe direction for a broken instrument, not a correct one.)
+
+## An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
+
+(Morrison-Lab/gha#425, 2026-08-05: a `check-new-line-breaks.py`
+sentence-boundary regex fix carried a comment block documenting which half of
+the regex --- the closing-character class or the lookahead --- refused which
+construct, kept as a map for future widenings.
+Reasoned-but-wrong attributions in that block inverted the review across three
+separate rounds (2, 4, 5), each a fresh factual inversion: an ellipsis
+exclusion credited to the wrong guard, and gha#397's own history inverted from
+"added characters to fix an under-split" to "dropped characters to fix an
+over-split".
+Each was decidable in one mutation --- remove the clause, re-run the case ---
+and none was decidable by re-reading the comment.)
+
+## A mutation that substitutes a derived value measures nothing
+
+(`Morrison-Lab/ai-config#1353`, 2026-08-09, found while re-running the mutation
+matrix after review round 1 changed the clause set.
+The mutant for the payload-masked-target clause in
+`hooks/no-unauthorized-merge.py` swapped `masked_seg` for `inert_seg`.
+Those are not two independent views of the command: `inert_seg` is
+`mask_inert_quotes(masked_seg, ...)`, so it is derived from `masked_seg` and
+every forged target masked out of the one is already absent from the other.
+The mutation applied cleanly, the mutant was exactly what its author intended,
+and it failed **0** of 233 cases --- which, sitting in a column whose other
+zeros were being argued about as measured-dead paths, read as one more
+redundant clause.
+Mutating the call site to pass the genuinely unmasked segment instead failed
+**3**, which is the figure the PR body now reports for that clause.)
+
+## A green check on the default branch is a free labelled corpus
+
+(`ucdavis/bcs`, 2026-08-13: a dialect word-list table carried a comment saying words colliding with an R identifier are excluded "because each would be a false positive that blocks a push", and the table beneath it held `summarise` (a dplyr verb, in 19 files), `colour`, `labeller`, and `analyses`.
+`Spellcheck` is green on `main`, so every one of those was a false positive with nothing left to judge.
+Shipped as `--audit-corpus` rather than as deletions.
+Its first version queried the table directly and reported 6 collisions where 4 were real, over-reporting every word the wordlist already suppresses; the corrected version calls `scan_line()` with the real wordlist, and the correction was stated on the PR rather than the number quietly substituted.)

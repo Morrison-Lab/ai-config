@@ -15,7 +15,8 @@ work otherwise paused), follow up with a closing comment so the PR/issue is
 unclaimed for the next person.
 
 Skip the claim step if the most recent comment already says you are working on
-it. This applies to any task that will push commits to a PR branch or run
+it **and that claim is still live under the expiration rule below**.
+This applies to any task that will push commits to a PR branch or run
 iterative review loops. It does **not** apply to read-only inspection (showing a
 PR, checking status, explaining a diff) --- those don't risk a parallel session.
 
@@ -29,6 +30,62 @@ collision-recovery steps.)
 When starting work from an issue, follow the claim comment with an immediate
 draft PR --- see [`pr-on-claim`](pr-on-claim.md) for the mechanics. An open
 PR is a stronger "in-flight" signal than a comment alone.
+
+**A claim expires 2 hours after the most recent push or comment on the
+PR/issue --- reassert it rather than resuming under a stale one.**
+A claim comment with no expiry binds the thread indefinitely: a crashed or
+abandoned session leaves its "paws off" standing forever, and a second session
+has no rule for when the claim stops blocking.
+So the convention is time-boxed and keyed to observable activity: a claim is
+**live for 2 hours from the most recent push or comment** on the PR/issue, and
+**expired** past that.
+
+The rule cuts both ways.
+
+- **As the claimant:** resuming work after more than 2 idle hours --- no push
+  and no comment in that window --- starts with a fresh claim comment, not with
+  an edit.
+  The skip-if-already-claimed shortcut above covers only a live claim; an
+  expired claim of your own no longer covers you, because a parallel session
+  is entitled to treat it as lapsed.
+- **As a would-be second session:** another claimant's claim whose PR/issue
+  shows no push or comment in over 2 hours no longer blocks you.
+  Take over by posting your own claim comment, never by starting silently ---
+  the fresh claim is what flips the thread's state, and it is what tells the
+  stale claimant they were superseded if they return.
+  A claim's age is evidence about the *claim*, not proof the branch is quiet,
+  so the mid-task checks below --- the "already done" cross-check against the
+  PR's actual commit list, and the rejected-push tree comparison --- still
+  apply before your first push, as does the branch-head re-fetch in the
+  [`claim-pr`](../../skills/claim-pr/SKILL.md) skill's Notes.
+
+Staleness is decidable by one read rather than by judgment, per
+[`algorithmatize-checks`](algorithmatize-checks.md):
+
+```bash
+gh pr view <N> --json updatedAt --jq .updatedAt        # VIEW_PR
+gh issue view <N> --json updatedAt --jq .updatedAt     # VIEW_ISSUE
+```
+
+`updatedAt` moves on more events than pushes and comments (labels, reviews,
+body edits), so it only ever **over-approximates** freshness: a stale verdict
+from it is definitive, and a borderline-fresh one defaults to respecting the
+claim --- the safe direction, since over-respecting a dead claim costs a wait
+while under-respecting a live one costs a collision.
+
+- **Do:** post a fresh claim before resuming work when more than 2 hours have
+  passed since the most recent push or comment on the PR/issue.
+- **Do:** treat another session's claim as expired on the same 2-hour reading,
+  and post your own claim before touching anything.
+- **Don't:** read "the most recent comment already says I'm working on it" as
+  a standing skip --- that shortcut covers only a claim under 2 hours old.
+- **Don't:** start work under an expired claim, your own or anyone else's,
+  without a fresh claim comment --- a silent resumption and a silent takeover
+  collide identically.
+
+(Directive from the user, 2026-08-15: "let's set a convention that pr and
+issue claims last 2 hours from the most recent push or comment; if it's been
+longer than that, reassert your claim.")
 
 **Verify a mid-task "already done" claim against real PR state before trusting
 or redoing it.** A PR you claimed and are actively driving can still gain

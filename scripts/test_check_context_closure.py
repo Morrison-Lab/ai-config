@@ -948,186 +948,10 @@ check(
     _fc_rejects_zero(),
 )
 
-
-# --- --baseline: this repo's own closure at a rev ----------------------------
-#
-# Mode 3 (ai-config#1373). These build a real one-repo git history rather than
-# a submodule, because that is the whole distinction from --compare: there is
-# no gitlink to baseline against, which is why --compare could not answer this.
-
-
-def _baseline_repo(d):
-    """A git repo whose HEAD closure is 500 B, with the tree left dirty-able."""
-    base = Path(d)
-    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
-    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
-    subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
-    (base / "CLAUDE.md").write_text("@frag.md\n")
-    (base / "frag.md").write_text("x" * 500)
-    subprocess.run(["git", "add", "-A"], cwd=base, check=True)
-    subprocess.run(["git", "commit", "-qm", "base"], cwd=base, check=True)
-    return base
-
-
-def _delta_line(out):
-    """The `change` row of the rendered delta, or '' if none was printed."""
-    for line in out.splitlines():
-        if line.strip().startswith("change"):
-            return line
-    return ""
-
-
-# The zero control runs FIRST and deliberately: a delta instrument that always
-# reported growth would pass every one of the tests below it. This is the only
-# case that can fail if the baseline side is not really being measured.
-with tempfile.TemporaryDirectory() as d:
-    base = _baseline_repo(d)
-    out_path = base / "out.txt"
-    rc = ccc.main(["--base", str(base), "--budget", "100000000", "--baseline", "HEAD"])
-    check("--baseline against an unchanged tree exits 0", rc == 0)
-
-import io
-import contextlib
-
-
-def _run_capture(argv):
-    """main(argv) -> (exit code, stdout+stderr)."""
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
-        rc = ccc.main(argv)
-    return rc, buf.getvalue()
-
-
-with tempfile.TemporaryDirectory() as d:
-    base = _baseline_repo(d)
-    rc, out = _run_capture(
-        ["--base", str(base), "--budget", "100000000", "--baseline", "HEAD"]
-    )
-    check(
-        "an unchanged tree reports a ZERO delta, not merely a clean exit",
-        "+0 B" in _delta_line(out),
-    )
-    # The caller's own wording reaches the output. render_delta is shared with
-    # compare mode, so hard-coding compare's heading back into it would make
-    # baseline mode claim to have resolved a submodule it never looked at --
-    # the structural reuse `check-purpose-before-reusing.md` warns about. A
-    # mutation run confirmed nothing else in this suite catches that.
-    check(
-        "baseline mode states its own subject, not the pin-bump one",
-        "at HEAD" in out and "this tree" in out and "Pin-bump" not in out,
-    )
-
-with tempfile.TemporaryDirectory() as d:
-    base = _baseline_repo(d)
-    (base / "frag.md").write_text("x" * 1500)  # +1000 B in the working tree
-    rc, out = _run_capture(
-        ["--base", str(base), "--budget", "100000000", "--baseline", "HEAD"]
-    )
-    check("a grown tree reports a positive delta", "+1,000 B" in _delta_line(out))
-    check("--baseline does not change the exit code on growth", rc == 0)
-
-with tempfile.TemporaryDirectory() as d:
-    base = _baseline_repo(d)
-    (base / "frag.md").write_text("x" * 100)  # -400 B
-    rc, out = _run_capture(
-        ["--base", str(base), "--budget", "100000000", "--baseline", "HEAD"]
-    )
-    # A trim is the direction someone reads closely, and the sign lived in a
-    # separate string once, which cost the negative case a column.
-    check("a shrunken tree reports a negative delta", "-400 B" in _delta_line(out))
-
-# Column alignment, asserted against render_delta itself rather than against
-# Python's format spec -- comparing two `format()` calls would have passed no
-# matter what this file does, which is the vacuous-assertion shape
-# shared/coding/fact-check-code-logic.md warns reads as coverage.
-#
-# The claim is about the BYTE column, not the whole line. A percent field's
-# rendered width varies with its own magnitude ("+100%" against "-50%"), and no
-# width spec bounds it in general, so asserting whole-line equality would
-# assert something the format cannot guarantee -- it would hold only for the
-# pair of magnitudes chosen here, which is the vacuousness above wearing a
-# different shape. `{delta:>+10,}` does guarantee the byte column, and that is
-# the alignment the original `+   47,039` / ` -20,541` defect was about.
-_grew = _delta_line(ccc.render_delta(1000, 2000, 4, "h:", "before", "after"))
-_shrank = _delta_line(ccc.render_delta(2000, 1000, 4, "h:", "before", "after"))
-check(
-    "a positive and a negative delta end their byte column at the same offset",
-    _grew.index(" B") == _shrank.index(" B")
-    and "+1,000 B" in _grew
-    and "-1,000 B" in _shrank,
-)
-check(
-    "a shrink's token column reports the bytes saved, not one more",
-    # -1000 B at 4 B/token is -250 tok. Floor division would say -250 here but
-    # -251 for any non-multiple, so this pins truncation toward zero.
-    "-250 tok" in _delta_line(ccc.render_delta(2000, 1000, 4, "h:", "b", "a"))
-    and "-250 tok" in _delta_line(ccc.render_delta(2001, 1000, 4, "h:", "b", "a")),
-)
-
-# The load-bearing claim of the docstring: advisory means advisory. A closure
-# far over budget still exits 0 under --baseline alone, and --strict is what
-# changes that -- not the presence of a delta.
-with tempfile.TemporaryDirectory() as d:
-    base = _baseline_repo(d)
-    rc, _ = _run_capture(["--base", str(base), "--budget", "10", "--baseline", "HEAD"])
-    check("--baseline stays advisory when the closure is over budget", rc == 0)
-    rc_strict, _ = _run_capture(
-        ["--base", str(base), "--budget", "10", "--baseline", "HEAD", "--strict"]
-    )
-    check("--strict still gates the level under --baseline", rc_strict == 1)
-
-with tempfile.TemporaryDirectory() as d:
-    base = _baseline_repo(d)
-    rc, out = _run_capture(
-        ["--base", str(base), "--budget", "100000000", "--baseline", "HEAD",
-         "--compare", "HEAD"]
-    )
-    # Asserted as one claim, not two. `rc == 2` alone is not attributable here:
-    # this fixture has no `.ai-config` gitlink, so `--compare` exits 2 on its own
-    # whether or not the guard exists -- a mutation run with the guard removed
-    # still returned 2. Only the message distinguishes the guard's refusal from
-    # compare mode's unrelated one, so the exit code is checked alongside it
-    # rather than as a standalone check that would read as coverage.
-    check(
-        "--baseline and --compare together is a usage error (2), and says why",
-        rc == 2 and "measure different things" in out,
-    )
-
-with tempfile.TemporaryDirectory() as d:
-    base = _baseline_repo(d)
-    rc, out = _run_capture(
-        ["--base", str(base), "--budget", "100000000", "--baseline", "0" * 40]
-    )
-    check("an unreadable baseline rev is a usage error (2), not a size finding", rc == 2)
-    check("and it names the rev it could not read", "0" * 40 in out)
-
-# Baseline-side defects are reported, never failed on: the baseline is history,
-# and a miss there makes the delta OVER-report growth, which is the safe
-# direction for a growth watchdog.
-with tempfile.TemporaryDirectory() as d:
-    base = Path(d)
-    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
-    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
-    subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
-    (base / "CLAUDE.md").write_text("@frag.md\n@gone.md\n")
-    (base / "frag.md").write_text("x" * 500)
-    subprocess.run(["git", "add", "CLAUDE.md", "frag.md"], cwd=base, check=True)
-    subprocess.run(["git", "commit", "-qm", "dangling at baseline"], cwd=base, check=True)
-    (base / "gone.md").write_text("y" * 200)  # resolves NOW, not at HEAD
-    rc, out = _run_capture(
-        ["--base", str(base), "--budget", "100000000", "--baseline", "HEAD"]
-    )
-    check("a dangling import at the baseline does not fail the run", rc == 0)
-    check(
-        "and it is reported as a note naming the over-report",
-        "over-reports growth" in out,
-    )
-
-# --- --baseline: baseline_reader, --max-growth, and the hard-error paths ----
-# The block above covers the report itself; this one covers the reader split
-# (`~` imports come from disk, everything else from the rev) and the growth
-# gate. The fixture is a single repo with two commits, so the closure
-# genuinely differs between the baseline rev and the working tree.
+# --- --baseline: this repo's own per-PR closure delta -----------------------
+# Distinct from --compare, which needs a submodule gitlink. The fixture is a
+# single repo with two commits, so the closure genuinely differs between the
+# baseline rev and the working tree.
 
 with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
@@ -1150,6 +974,22 @@ with tempfile.TemporaryDirectory() as tmp:
         "baseline_reader resolves this repo's own files at the given rev",
         sum(n for _, n, _ in at_base) < sum(n for _, n, _ in in_tree),
     )
+    # An ABSOLUTE import points outside the repo, so no revision of this repo
+    # has a version of it and it must fall through to disk -- the same
+    # fall-through `local_reader` and `submodule_reader` already do, and the
+    # same set `resolve()` calls "already absolute". Routing it to
+    # `git show REV:/abs/path` fails outright, which reported a file that is
+    # present and unchanged as dangling and excluded its bytes from the
+    # baseline, inflating the growth by that file's full size on every run.
+    _abs = base / "outside.md"
+    _abs.write_text("z" * 300, encoding="utf-8")
+    for _spelling, _label in ((str(_abs), "/-prefixed"), ("~/.nonexistent-xyz.md", "~-prefixed")):
+        _r = ccc.baseline_reader(base, first)(_spelling)
+        _l = ccc.local_reader(base)(_spelling)
+        check(
+            f"baseline_reader routes an {_label} import to disk, like local_reader",
+            _r == _l,
+        )
     check(
         "the import list is unchanged across revs, only weights differ",
         [p for p, _, _ in at_base] == [p for p, _, _ in in_tree],
@@ -1183,6 +1023,23 @@ with tempfile.TemporaryDirectory() as tmp:
     check(
         "--max-growth without --baseline is refused rather than silently inert",
         ccc.main(common + ["--max-growth", "10"]) == 2,
+    )
+    # Assert the MESSAGE, not just the exit code. This fixture has no
+    # `.ai-config` gitlink, so `--compare` exits 2 on its own for an unrelated
+    # reason -- an exit-code-only check passes identically whether or not the
+    # ambiguity guard exists, which mutation testing confirmed (removing the
+    # guard changed nothing). "Passes by coincidental balance" is ardi.md's
+    # phrase for this; fail-fast.md covers the general shape, a check whose
+    # failure path and whose pass path produce the same observable.
+    import contextlib as _ctx
+    from io import StringIO as _SIO
+
+    _err = _SIO()
+    with _ctx.redirect_stdout(_SIO()), _ctx.redirect_stderr(_err):
+        _rc = ccc.main(common + ["--baseline", first, "--compare", first])
+    check(
+        "--baseline with --compare is refused as ambiguous, by that guard",
+        _rc == 2 and "answer different questions" in _err.getvalue(),
     )
     # A self-baseline is the negative control: same tree both sides, so any
     # non-zero delta would mean the reader is not reading what local_reader does.

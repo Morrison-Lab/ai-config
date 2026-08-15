@@ -36,3 +36,67 @@ The repo's `claude-review` workflow was failing for the same context-closure lim
 were written while still on issue #281's `chore/renv-explicit-snapshot`
 branch --- caught before pushing, but only by re-checking `git status`/`git
 diff --stat` against expectations, not because anything failed.)
+
+## Marking a draft ready is a push-landed checkpoint
+
+(Morrison-Lab/gha#427, 2026-08-06: a changelog fix was committed locally,
+self-reviewed, and the PR body updated, then `gh pr ready` ran and review was
+requested --- but `git push` never ran, so the branch head stayed at the empty
+`start:` scaffold and the reviewer reported the diff empty and the described fix
+"has not actually been committed to the branch".)
+
+## The reviewer-request POST must be the sole command in its call
+
+(Morrison-Lab/ai-config#1367, 2026-08-09: investigated after chaining `gh api ".../requested_reviewers" -X POST ... --silent && echo "requested"` in one Bash call on a `Lacaedemon/sparta` PR; the Stop hook correctly flagged it, and recovery was one extra Bash call.)
+
+## Three surfaces fail to discriminate a vanished pending request
+
+(Measured 2026-08-06 on `Morrison-Lab/ai-config`.
+The repository's only ruleset is named `main` and carries rule types
+`deletion,non_fast_forward,pull_request`, and the effective-rules endpoint
+returns zero `copilot_code_review` entries, so the org scope is covered too.
+The second query returned
+`{"total":39,"refusals":39,"substantive":0,"since_override":39,"before_incident":39,"latest":"2026-08-06T09:14:23Z"}`.
+Read `substantive: 0` as the finding, and the two timestamp aggregates as what
+rules the 2026-08-06 Actions incident out as a rival cause for *this* set, per
+`Morrison-Lab/ai-config#1223`, which owns that discrimination.
+Treat the counts themselves as volatile: the `last:60` window slides as PRs
+merge, so two runs minutes apart returned 40 and then 39 without anything about
+Copilot having changed.
+An earlier reading of this same evidence counted reviewer *logins* rather than
+review *bodies*, saw `copilot-pull-request-reviewer` as the only reviewer, and
+concluded Copilot was active here --- which inverted the finding, since every
+one of those review objects is the refusal string quoted in
+[`memories/github.md`](../../memories/github.md).
+That is the login-versus-body distinction
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case already
+warns about, met in the direction that flatters the repo.)
+
+## Requesting Copilot discharges nothing on a dispatch-only repo
+
+(`Morrison-Lab/ai-config#1235`, 2026-08-06: opened by a subagent that correctly requested Copilot, which was quota-exhausted and refused.
+The PR then read 4 check runs, 0 pending and 0 failing, with zero Claude reviews, because nothing had dispatched one.
+`claude-review.yml` there carries `workflow_dispatch` and nothing else, while `ucdavis/bcs`'s `claude-code-review.yml` carries `pull_request: [opened, synchronize, ready_for_review, reopened]` --- and the session had spent the day in the second repo, where every push fired a review and no one ever had to ask.
+`hooks/no-unreviewed-pr.py` had fired correctly on #1222 earlier in that same session and stayed silent here, discharged by the Copilot POST exactly as its contract says.
+The user's correction was "you should be requesting ai bot reviews on prs when you think they're ready", followed immediately by "(if github actions isn't triggering one for you)".
+A second correction was needed before this pass ran at all: the first response was to dispatch the missing review and carry on, where `CLAUDE.md`'s "Correcting your own understanding of a technical issue is itself a trigger" puts the pass at the correction rather than after the work the correction unblocked.)
+
+## A redaction PR must not get an AI reviewer
+
+(Morrison-Lab/ai-config#1392, from `ucdavis/bcs#615`, which removed 47 real participant identifiers.
+`redaction-gate` passed and `ai-review` reported `skipping`, as designed, and the guard then fired on six consecutive turns demanding a request whose only correct response was to refuse.
+Refusing did not discharge it, recording the refusal on the PR did not, and the maintainer deciding "hold, no AI reviewer" did not --- which is the shape [`algorithmatize-checks`](algorithmatize-checks.md) warns about, reached by an unusual route: the threshold was sharp and the **discharge set was incomplete**.)
+
+## A caller's `on:` block is not the workflow's trigger conditions
+
+(`Morrison-Lab/wai#54`, 2026-08-09: wai's `claude-code-review.yml` carries
+`types: [opened, synchronize, ready_for_review, reopened]` and no draft
+filter, which was read as this repo burning a review round on every draft
+scaffold PR.
+It does not.
+The caller is a 90-line delegation to
+`Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`, whose
+`gather-context` and review jobs both gate on
+`github.event.pull_request.draft == false` at lines 185 and 346.
+The false premise reached a UMS brief as a candidate learning and was caught
+only by cloning gha and grepping it.)

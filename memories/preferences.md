@@ -195,6 +195,7 @@
   The NEWS.md union-merge half is unaffected until a separate `news.d`-fragment capability ships (deferred, see gha#388).
   Check whether the repo you're stacking PRs in has migrated before applying the DESCRIPTION-bump advice above.
 - **Before grabbing any issue (GI/GII), check that no other session is already on it.** Two signals must BOTH be clear: (1) the issue's most recent comment does NOT contain "Working on this" or equivalent claim; (2) there is NO open PR referencing the issue --- by branch name or title, or via a cross-reference event on the issue (which covers most `#N` / `Closes #N` body mentions).
+  A claim in the most recent comment counts only while it is live --- under 2 hours since the issue's last push or comment; an older one has expired per [`claim-pr`](../shared/workflow/claim-pr.md) and is taken over with a fresh claim comment, never silently.
   If either signal fires, skip that issue --- don't open a competing PR or claim it. (Twice grabbed issues already in-flight: sparta#325 had PR #327 open; sparta#292 had PR #329 open.
   Both required closing a duplicate.)
   And once both signals are clear, **post your own claim comment the INSTANT you decide to work the issue** --- before the investigation phase (reading the body in depth, grepping, designing), not just before branching.

@@ -350,7 +350,18 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   delete unrelated `.tmp.*` files nested below `<dir>`, not just this
   script's own orphans (see the reference implementation at
   `skills/session-lock/scripts/ai-session.sh:144`, which includes both
-  flags). Separately, **`--` does not fix
+  flags). Those two flags bound depth and type, not ownership:
+  `.tmp.*` is a generic pattern, so in a directory shared with other
+  processes (bare `/tmp`, most of all) the prune can delete another
+  process's live temp files that happen to match.
+  The reference implementation is safe because its `$REG_DIR`
+  (`"$COMMON_DIR/ai-sessions"`) is reserved for that script alone.
+  Point `<dir>` at a script-reserved directory like that, or --- when the
+  directory must be shared --- put a script-specific prefix in the
+  `mktemp` template and the glob alike
+  (`.myapp.tmp.XXXXXX` → `'.myapp.tmp.*'`), so the sweep can only ever
+  match this script's own files.
+  Separately, **`--` does not fix
   this for `find`** the way it does for `mktemp`: GNU `find`'s own
   path-vs-expression parser still reads a dash-prefixed argument as an
   expression even after `--` (verified: `find -- "-weird"` fails with

@@ -156,6 +156,11 @@ Look for branch naming patterns that reference issues:
 ```
 
 If a claim comment exists within the last 24 hours → **Active**, skip.
+This window is deliberately wider than
+[`claim-pr`](../../shared/workflow/claim-pr.md)'s 2-hour claim expiration:
+that rule decides who may *start work*, where the cost of over-respecting a
+dead claim is a wait; this check gates branch *deletion*, which is
+destructive, so it errs further toward keeping.
 
 #### f. If the PR closed unmerged, diff the branch against main before believing it
 

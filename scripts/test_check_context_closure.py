@@ -974,6 +974,22 @@ with tempfile.TemporaryDirectory() as tmp:
         "baseline_reader resolves this repo's own files at the given rev",
         sum(n for _, n, _ in at_base) < sum(n for _, n, _ in in_tree),
     )
+    # An ABSOLUTE import points outside the repo, so no revision of this repo
+    # has a version of it and it must fall through to disk -- the same
+    # fall-through `local_reader` and `submodule_reader` already do, and the
+    # same set `resolve()` calls "already absolute". Routing it to
+    # `git show REV:/abs/path` fails outright, which reported a file that is
+    # present and unchanged as dangling and excluded its bytes from the
+    # baseline, inflating the growth by that file's full size on every run.
+    _abs = base / "outside.md"
+    _abs.write_text("z" * 300, encoding="utf-8")
+    for _spelling, _label in ((str(_abs), "/-prefixed"), ("~/.nonexistent-xyz.md", "~-prefixed")):
+        _r = ccc.baseline_reader(base, first)(_spelling)
+        _l = ccc.local_reader(base)(_spelling)
+        check(
+            f"baseline_reader routes an {_label} import to disk, like local_reader",
+            _r == _l,
+        )
     check(
         "the import list is unchanged across revs, only weights differ",
         [p for p, _, _ in at_base] == [p for p, _, _ in in_tree],
@@ -1012,8 +1028,9 @@ with tempfile.TemporaryDirectory() as tmp:
     # `.ai-config` gitlink, so `--compare` exits 2 on its own for an unrelated
     # reason -- an exit-code-only check passes identically whether or not the
     # ambiguity guard exists, which mutation testing confirmed (removing the
-    # guard changed nothing). See fail-fast.md on a check that passes by
-    # coincidental balance.
+    # guard changed nothing). "Passes by coincidental balance" is ardi.md's
+    # phrase for this; fail-fast.md covers the general shape, a check whose
+    # failure path and whose pass path produce the same observable.
     import contextlib as _ctx
     from io import StringIO as _SIO
 

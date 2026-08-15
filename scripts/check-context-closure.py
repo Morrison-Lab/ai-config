@@ -476,20 +476,31 @@ def submodule_reader(base: Path, submodule: str, rev: str):
 
 
 def baseline_reader(base: Path, rev: str):
-    """Read this repo's own files at `rev`, but `~` imports from disk.
+    """Read this repo's own files at `rev`, but ABSOLUTE imports from disk.
 
     The mirror of `submodule_reader` for the single-repo case: there the
     split is by path prefix because only the submodule's content moves,
-    here it is because a `~`-prefixed import points OUTSIDE the repo, so no
+    here it is because an absolute import points OUTSIDE the repo, so no
     revision of this repo has a version of it. Reading those from disk
     matches what `local_reader` does and keeps a genuinely loaded file from
     being reported as a dangling import at the baseline.
+
+    The test is `("/", "~")` rather than `"~"` alone, matching `resolve()`'s
+    own definition of "already absolute, do not join". Both other readers
+    already fall through to disk for either spelling -- `local_reader`
+    because `base / path` discards `base` when `path` is absolute, and
+    `submodule_reader` via its non-submodule catch-all. Special-casing only
+    `~` here sent a `/`-prefixed import to `git show REV:/abs/path`, which
+    git rejects outright, so a file that is present on disk and unchanged
+    from the baseline was reported dangling and its bytes were excluded
+    from the baseline total -- inflating the reported growth by that file's
+    full size on every run.
     """
     from_git = git_reader(base, rev)
     from_disk = local_reader(base)
 
     def read(path: str) -> bytes | None:
-        return from_disk(path) if path.startswith("~") else from_git(path)
+        return from_disk(path) if path.startswith(("/", "~")) else from_git(path)
 
     return read
 

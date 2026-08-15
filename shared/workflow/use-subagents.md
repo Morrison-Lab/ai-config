@@ -96,6 +96,6 @@ The increment here is *when*: before the new PR exists, not after, since a colli
 
 (Morrison-Lab/ai-config#1413, 2026-08-12: a subagent was briefed to trim two specific files.
 Open PR #1407 had touched those exact files sixteen minutes earlier, and a `pr-sweep.py` run had listed #1407 as in-flight without its file set ever being read.
-#1413 conflicted with #1407 as a result.
+The two PRs conflicted as a result.
 Extending `pr-sweep.py` to print each PR's file set --- so this check needs no separate round of calls --- was filed as [#1419](https://github.com/Morrison-Lab/ai-config/issues/1419) and shipped in [#1421](https://github.com/Morrison-Lab/ai-config/pull/1421), merged 2026-08-13T16:28:22Z, which is why the guidance above leads with the sweep rather than with a per-PR call.)
 

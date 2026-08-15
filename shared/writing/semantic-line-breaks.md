@@ -313,17 +313,34 @@ For a count, skip the extraction entirely and sum
 `git diff --numstat <base>...HEAD`'s first column, which has no headers to
 strip.
 For kept content, drop headers per file rather than by global position ---
-`grep '^+' | grep -v '^+++ '` --- which is safe whenever no added line itself
-begins with `++` (check with `grep -c '^++[^+]'` first, per the fail-fast
-caveat above; an added line starting `++` forces awk-level parsing instead).
+`grep '^+' | grep -v '^+++ '` --- which is safe exactly when every `+++ `
+line in the stream is a real header.
+The dangerous class is an added source line beginning `++ ` (two pluses
+then a space): git's own `+` prefix turns it into a raw `+++ ` line, which
+no pattern can tell from a header, per the fail-fast caveat above.
+So the precondition check is a count comparison, not a pattern:
+
+```bash
+files=$(git diff --numstat <base>...HEAD | wc -l)
+headers=$(git diff -U0 <base>...HEAD | grep '^+' | grep -c '^+++ ')
+```
+
+Equal means every `+++ ` line is one file's header and the filter drops
+exactly the headers; any inequality (either direction --- a `++ ` source
+line inflates it, a binary file deflates it) means fall back to parsing the
+diff's hunk structure instead of prefix-filtering.
 
 - **Do:** count added lines from `--numstat`, not from a header-stripped
   extraction.
-- **Do:** verify `grep -c '^++[^+]'` returns 0 before trusting a `^+++ `
-  header filter on kept content.
+- **Do:** verify the stream's `^+++ ` line count equals the diff's
+  `--numstat` file count before trusting a `^+++ ` header filter on kept
+  content, and fall back to hunk-structure parsing on any inequality.
 - **Don't:** reuse the single-`tail` pipeline on a multi-file diff when its
   output is counted or kept --- it was written for a one-file diff, and each
   extra file adds one phantom line.
+- **Don't:** guard the header filter with a pattern over single lines ---
+  the hazardous line is raw `+++ `, which is indistinguishable from a
+  header by any pattern, so only comparing counts can detect it.
 
 (Morrison-Lab/ai-config#1476, 2026-08-15, review round 1, finding 2: a PR
 body claimed "13 added lines" over a two-file diff whose true count was 12

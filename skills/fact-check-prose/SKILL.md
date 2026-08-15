@@ -17,7 +17,7 @@ allowed-tools:
 
 Prose review usually stops at style. This skill goes further: it checks
 whether the prose is actually **true** and its **logic actually holds** —
-per the standing rule in `d-morrison/ai-config`'s
+per the standing rule in `Morrison-Lab/ai-config`'s
 [`shared/writing/fact-check-prose.md`](../../shared/writing/fact-check-prose.md),
 which is the canonical statement of this policy (edit that file, not this
 skill's procedure, if the policy itself changes).

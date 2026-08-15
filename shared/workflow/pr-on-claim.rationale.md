@@ -293,7 +293,7 @@ something to assume. (d-morrison/altdoc#55, 2026-07-25: the draft's
 synchronize-triggered `review / claude-review` reported `skipped`, so marking
 ready seconds after the push was safe and the subsequent `ready_for_review`
 run posted a normal verdict.)
-`d-morrison/ai-config` behaves the same way: its draft synchronize run
+`Morrison-Lab/ai-config` behaves the same way: its draft synchronize run
 reports `review / claude-review` and `review / require-review` as `skipped`,
 so no wait is needed there either.
 (ai-config#754, 2026-07-28.)

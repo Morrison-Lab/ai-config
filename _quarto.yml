@@ -19,7 +19,7 @@ website:
   back-to-top-navigation: true
   page-navigation: true
   reader-mode: true
-  repo-url: https://github.com/d-morrison/ai-config
+  repo-url: https://github.com/Morrison-Lab/ai-config
   repo-actions: [edit, issue, source]
   navbar:
     left:
@@ -35,7 +35,7 @@ website:
         href: workflow.qmd
     right:
       - icon: github
-        href: https://github.com/d-morrison/ai-config
+        href: https://github.com/Morrison-Lab/ai-config
         aria-label: GitHub
 
 format:

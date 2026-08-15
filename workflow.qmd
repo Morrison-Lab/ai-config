@@ -83,7 +83,7 @@ At fully clean, every inline review thread is resolved. The only open
 conversation is the final all-clear exchange.
 
 See
-[`shared/workflow/fully-clean.md`](https://github.com/d-morrison/ai-config/blob/main/shared/workflow/fully-clean.md)
+[`shared/workflow/fully-clean.md`](https://github.com/Morrison-Lab/ai-config/blob/main/shared/workflow/fully-clean.md)
 for the full definition this page summarizes.
 
 **Deadlock:** if you and the reviewer can't reach consensus after a rebuttal

@@ -5,7 +5,7 @@ in-progress draft that already covers the concern.
 
 A local branch/worktree scan misses work another session already pushed and
 opened a PR for. Check both this repo's and (when the corpus spans repos, as
-`d-morrison/ai-config`'s skills do) any sibling repos in scope:
+`Morrison-Lab/ai-config`'s skills do) any sibling repos in scope:
 
 ```bash
 gh pr list --state all --search "<keywords> in:title,body"

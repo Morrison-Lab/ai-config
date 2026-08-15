@@ -810,7 +810,7 @@ See ai-config#694 for the precedent.
   introduced this entry.)
 - `d-morrison/gha`'s `CLAUDE.md` carries its own `gh`->MCP substitution table
   (the "GitHub access in remote / web sessions" section), scoped to that repo.
-  `d-morrison/ai-config` has its own cross-model registry at
+  `Morrison-Lab/ai-config` has its own cross-model registry at
   [`tool-mappings.md`](../tool-mappings.md) (generated from `tool-mappings.yml`),
   which ai-config skills can point to directly — see `CLAUDE.md`'s "Skills that
   call gh/glab" section. When a skill or doc in a **different** repo (one with

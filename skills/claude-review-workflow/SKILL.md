@@ -126,7 +126,7 @@ Pair with a `prompt-addendum` telling the reviewer to actually use the
 installed CAS for derivations/proofs, and — when the repo has a PR-preview
 deploy — to check any computed value or figure the prose describes against
 the rendered output rather than trusting the prose's own description (see
-`d-morrison/ai-config`'s `shared/writing/fact-check-prose.md` and the
+`Morrison-Lab/ai-config`'s `shared/writing/fact-check-prose.md` and the
 `fact-check-prose` skill for the full policy this operationalizes).
 
 ## Setting up in a new repo

@@ -341,7 +341,7 @@
   The `@claude` bot review caught the drift in round 1.)
 - After adding or updating skills OR memory files in the ai-config repo, always commit and push everything to origin (on the current branch if a PR is already open, or create a new branch + PR if the change is out of scope).
   Never leave ANY changes in ai-config as local-only uncommitted edits --- including memory files.
-- **AI memories, skills, and commands never stay local-only.** When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `d-morrison/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
+- **AI memories, skills, and commands never stay local-only.** When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
   A memory kept only under `~/.claude/projects/<path>/memory/` or `~/.codex/memories/` is invisible to other sessions, machines, and humans, and rots silently --- so migrate it.
   Capturing a learning isn't done until it's committed where the right audience will see it.
 - **A migrate-then-delete cleanup (copy content into a repo, THEN delete the local source) must verify the copy is both COMPLETE and CURRENT before deleting --- not just that it exists.**
@@ -349,7 +349,7 @@
   Diff each file against the merged target before deleting it.
   And fact-check the migrated CONTENT against current repo state, because copying preserves stale claims verbatim: a memory paragraph can describe a bug as still-open (naming a since-removed function) when a later PR already fixed it and closed the issue.
   (ucdavis/bcs#427, 2026-07-24: of 7 migrated memory files, 4 had newer local content the repo lacked --- one carried a superseded `--exclude=c1` policy --- and a "still-open #371" paragraph was wholly obsolete, since #377 had fixed it and closed #371. Diffed every file and checked the issue/code state before deleting the 15 local copies.)
-- In Codex sessions, treat `d-morrison/ai-config` as the canonical home for cross-project memories even if a local `~/.codex/memories/` store is present.
+- In Codex sessions, treat `Morrison-Lab/ai-config` as the canonical home for cross-project memories even if a local `~/.codex/memories/` store is present.
   The local store is not the durable source of truth; if ai-config access is missing from the environment, restore access first rather than writing the memory only locally.
 - When committing, stage the SPECIFIC files you touched --- NEVER `git add -A`.
   The working tree often holds unrelated in-flight edits (the user's own UMS/skill commits, another draft); `git add -A` silently sweeps those into your commit and onto your PR, bloating the review and extending the cycle.
@@ -906,7 +906,7 @@ safer/preferred choice merely because the repo has external consumers.
 
 ## Memory and skill storage
 - Never leave durable memories or skills as local-only files (e.g., directly under `~/.codex/`).
-- Commit cross-project memories/skills to `d-morrison/ai-config`; commit project-specific guidance to that project's own repo.
+- Commit cross-project memories/skills to `Morrison-Lab/ai-config`; commit project-specific guidance to that project's own repo.
 - If ai-config is temporarily out of scope in the current session, treat local storage as short-lived staging and hand off the required upstream PR.
 - **Never hesitate to run UMS, just run it.** Don't ask whether a pass is worth it, don't offer it as an option, and don't weigh a small increment against the cost of a PR.
   The owner has said this directly: "never hesitate to run ums, just do it."

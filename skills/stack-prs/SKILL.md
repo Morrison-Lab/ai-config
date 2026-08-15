@@ -331,7 +331,7 @@ discards the abandoned base PR's commits from a published branch.
   the base branch instead of `main`.
 - **`gii`** / **`gia`** — stack issues' PRs on a prior unmerged issue's branch
   as part of their serial loop
-  ([#123](https://github.com/d-morrison/ai-config/issues/123)); this skill is
+  ([#123](https://github.com/Morrison-Lab/ai-config/issues/123)); this skill is
   the reusable primitive they could each call instead of reimplementing the
   mechanics.
 

@@ -70,6 +70,30 @@ See ai-config#694 for the precedent.
   a tag.
   Files in the diff were unaffected, as above --- the angle-bracket form
   inside a fenced code block is correct there and should stay.
+  **A third write surface, `update_pull_request`, strips like
+  `create_pull_request` does.**
+  The entry above deliberately declines to generalize between surfaces, so the
+  per-surface table is the thing to extend rather than a rule to infer: as of
+  2026-08-15 `create_pull_request` strips, `update_pull_request` strips, and
+  `add_issue_comment` does not.
+  Editing a body is the likelier moment to meet this than creating one, because
+  a correction is exactly when a command gets spelled out for a reader.
+  **And the correction describing the loss reproduces it**, which is the part
+  worth knowing in advance: a note reading "the operands were spelled as the
+  word `head` in angle brackets" is itself a body containing that token, so it
+  is stripped too and the sentence explaining the damage arrives damaged.
+  Describe the broken form rather than quoting it, the same move
+  [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md) already
+  prescribes where quoting a column-1 `#` reproduces the heading it warns
+  about.
+  Read the stored body back after any edit that adds a command, since the write
+  call reports success either way.
+  (ai-config#1467, 2026-08-15: a merge-order paragraph documenting
+  `git diff --name-only $(git merge-base origin/main PR_HEAD)...PR_HEAD` was
+  first written with both operands in angle brackets and came back as
+  `$(git merge-base origin/main )...` with the operands gone; the correction
+  note naming them was then stripped in turn, and only a third edit describing
+  the form rather than showing it survived.)
 - **`mcp__github__actions_run_trigger` can't re-run CI jobs in these sessions —
   it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`, and
   `cancel_workflow_run` -- the whole `actions: write` family, so you can neither

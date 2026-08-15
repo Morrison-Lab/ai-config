@@ -855,14 +855,35 @@ On `shared/coding/tidy-code.md` (ai-config#476), a "Preferred" R example labeled
 The paired "Avoid" example was also contrived (a nested `eval_tidy()`/`quo()` call nobody writes, and not even equivalent inside `summarise()`'s NSE) rather than the realistic verbose form.
 Both were caught by the `@claude` review bot, not by me --- mentally (or actually) running the example against its stated claim before publishing would have caught it first.
 
-## Delegate heavy work to codex first
+## Delegate heavy work to a separately-billed CLI first --- codex, and now agy
 
-For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to the separately-billed **`codex` CLI** (ChatGPT plan) and spend its budget **before** Claude/Workflow tokens.
-Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage codex can't finish.
-Exhaust the *current ~5-hour codex usage window*, then fall back to Claude until it resets --- "codex first" means the current window, not abandoning Claude permanently.
+For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to a separately-billed agent CLI and spend that budget **before** Claude/Workflow tokens.
+Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
 This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.
-Stated 2026-07-02 ("exhaust its tokens before using our own") and reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota").
-The `delegate-to-codex` skill (alias `dtc`) operationalizes the mechanics (background runner + DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback).
+
+**There are two such budgets, and the rule is to try both before Claude's.**
+
+| CLI | plan | skill |
+|---|---|---|
+| `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
+| `agy` (Google Antigravity) | Antigravity | none yet --- see the status note below |
+
+Exhaust the *current usage window* of each --- roughly 5 hours for codex --- then fall back to Claude until it resets.
+"Delegate first" means the current window, not abandoning Claude permanently.
+`delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
+
+**`agy`'s headless mode did not work when this was written, so treat the table row as aspirational until it does.**
+Measured 2026-08-15 on `agy` 1.1.13 at `~/.local/bin/agy`, in `ucdavis/bcs`.
+`agy models` returns the model list, so the binary is installed and authenticated.
+But four `--print` invocations, with and without `--sandbox`, with and without `--disable-slash-commands`, and with an explicit `--model`, all returned session-start chatter --- a status recap naming this corpus's own `bootstrap.sh`, or documentation about `agy`'s own flags --- rather than executing the prompt.
+None read the file it was asked to read, and each exited 0, so the failure is silent to any caller keying on exit status.
+Do not write a `delegate-to-agy` skill asserting the mechanics work until one invocation is seen to return a task result.
+
+- **Do:** route heavy read/draft/verify work to `codex` first, then `agy` once its headless mode is confirmed working, and only then to Claude.
+- **Do:** re-test `agy --print` against a known ground truth before delegating to it, since it exits 0 whether or not it did the work.
+- **Don't:** read "we have agy quota" as "agy is usable" --- quota and a working headless loop are separate facts, and only the first was established here.
+
+Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota"), and widened 2026-08-15 ("in addition to codex, we have agy quota to use; try using both of those as subagents before exhausting claude quota").
 
 ## Ephemeral-session commit tension
 

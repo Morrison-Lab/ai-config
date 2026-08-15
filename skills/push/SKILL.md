@@ -67,8 +67,14 @@ gh pr view "$PR" --json comments \
   -q '.comments[] | select(.body | test("paws off"; "i")) | "\(.author.login): \(.body)"'   # READ_PR_COMMENTS
 ```
 
-If the latest "paws off" comment is from someone **other than you** and hasn't
-been unclaimed, **do not push.** Ask the user.
+If the latest "paws off" comment is from someone **other than you**, hasn't
+been unclaimed, and is still live --- the PR shows a push or comment within
+the last 2 hours, per
+[`claim-pr`](../../shared/workflow/claim-pr.md)'s expiration rule ---
+**do not push.** Ask the user.
+An expired claim (over 2 idle hours) no longer blocks on its own, but take it
+over with a fresh claim comment and run this skill's other checks (branch-head
+advance, `@claude` run in flight) before pushing.
 
 ### 4. Hold / block labels
 

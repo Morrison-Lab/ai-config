@@ -65,17 +65,26 @@ PR/issue, and **expired** past that --- in both directions:
   (never a silent takeover), then run the branch-head check in the Notes
   below before your first push.
 
-Check staleness with one read:
+Check staleness with one read.
+
+### GitHub
 
 ```bash
 gh pr view <N> --json updatedAt --jq .updatedAt        # VIEW_PR
 gh issue view <N> --json updatedAt --jq .updatedAt     # VIEW_ISSUE
 ```
 
-`updatedAt` moves on more events than pushes and comments (labels, reviews,
-body edits), so it only ever over-approximates freshness: a stale verdict
-from it is definitive, and a borderline-fresh one defaults to respecting the
-claim --- the safe direction.
+### GitLab
+
+```bash
+glab api "projects/<PROJECT_ID>/merge_requests/<MR_IID>" | jq -r .updated_at
+glab api "projects/<PROJECT_ID>/issues/<ISSUE_IID>" | jq -r .updated_at
+```
+
+On both platforms the updated-at field moves on more events than pushes and
+comments (labels, reviews, body edits), so it only ever over-approximates
+freshness: a stale verdict from it is definitive, and a borderline-fresh one
+defaults to respecting the claim --- the safe direction.
 The full statement of the convention lives in
 [`claim-pr`](../../shared/workflow/claim-pr.md).
 

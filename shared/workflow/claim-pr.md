@@ -20,6 +20,17 @@ This applies to any task that will push commits to a PR branch or run
 iterative review loops. It does **not** apply to read-only inspection (showing a
 PR, checking status, explaining a diff) --- those don't risk a parallel session.
 
+This includes a PR **you opened yourself**: in repos with an active `@claude`
+agent (`claude.yml`), the agent can push commits to your branch on PR activity
+--- e.g. merging `main` in --- and collide with your in-flight push, so claim
+early to flag the branch as actively worked. (See
+`memories/claude-bot-workflows.md`, "@claude CI action", for the
+collision-recovery steps.)
+
+When starting work from an issue, follow the claim comment with an immediate
+draft PR --- see [`pr-on-claim`](pr-on-claim.md) for the mechanics. An open
+PR is a stronger "in-flight" signal than a comment alone.
+
 **A claim expires 2 hours after the most recent push or comment on the
 PR/issue --- reassert it rather than resuming under a stale one.**
 A claim comment with no expiry binds the thread indefinitely: a crashed or
@@ -43,8 +54,10 @@ The rule cuts both ways.
   the fresh claim is what flips the thread's state, and it is what tells the
   stale claimant they were superseded if they return.
   A claim's age is evidence about the *claim*, not proof the branch is quiet,
-  so the mid-task liveness checks below (the branch-head re-fetch, the
-  rejected-push tree comparison) still apply before your first push.
+  so the mid-task checks below --- the "already done" cross-check against the
+  PR's actual commit list, and the rejected-push tree comparison --- still
+  apply before your first push, as does the branch-head re-fetch in the
+  [`claim-pr`](../../skills/claim-pr/SKILL.md) skill's Notes.
 
 Staleness is decidable by one read rather than by judgment, per
 [`algorithmatize-checks`](algorithmatize-checks.md):
@@ -73,17 +86,6 @@ while under-respecting a live one costs a collision.
 (Directive from the user, 2026-08-15: "let's set a convention that pr and
 issue claims last 2 hours from the most recent push or comment; if it's been
 longer than that, reassert your claim.")
-
-This includes a PR **you opened yourself**: in repos with an active `@claude`
-agent (`claude.yml`), the agent can push commits to your branch on PR activity
---- e.g. merging `main` in --- and collide with your in-flight push, so claim
-early to flag the branch as actively worked. (See
-`memories/claude-bot-workflows.md`, "@claude CI action", for the
-collision-recovery steps.)
-
-When starting work from an issue, follow the claim comment with an immediate
-draft PR --- see [`pr-on-claim`](pr-on-claim.md) for the mechanics. An open
-PR is a stronger "in-flight" signal than a comment alone.
 
 **Verify a mid-task "already done" claim against real PR state before trusting
 or redoing it.** A PR you claimed and are actively driving can still gain

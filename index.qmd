@@ -27,7 +27,7 @@ into `${CODEX_HOME:-$HOME/.codex}/skills`. Each wrapper reads the matching
 canonical workflow from `skills/`.
 
 **Cloud sessions (other repos)** — this repo is a
-[plugin marketplace](https://github.com/d-morrison/ai-config/blob/main/README.md#use-these-skills-in-another-repos-web-sessions-plugin-marketplace).
+[plugin marketplace](https://github.com/Morrison-Lab/ai-config/blob/main/README.md#use-these-skills-in-another-repos-web-sessions-plugin-marketplace).
 Add `enabledPlugins` to your repo's `.claude/settings.json` and skills
 load at session start, namespaced as `/ai-config:skill-name`.
 
@@ -42,4 +42,4 @@ so you can call `@claude ardi` (or any other skill) in PR comments.
 - [Agents reference](agents.qmd) — the read-only subagents skills fan
   work out to
 - [Workflow guide](workflow.qmd) — ARDI loop, issue-first, claim-PR, and more
-- [GitHub repository](https://github.com/d-morrison/ai-config) — source code
+- [GitHub repository](https://github.com/Morrison-Lab/ai-config) --- source code

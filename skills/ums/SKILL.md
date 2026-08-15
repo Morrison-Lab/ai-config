@@ -77,7 +77,7 @@ committed pass.
    - Is it already recorded? (grep before writing -- avoid duplicates)
    - Is it **cross-project or project-specific**? (`memories/preferences.md`'s
      "Memory and skill storage" rule: cross-project lessons commit to
-     `d-morrison/ai-config`; a convention/gotcha tied to one repo we own
+     `Morrison-Lab/ai-config`; a convention/gotcha tied to one repo we own
      commits to *that* repo's own agent docs instead — see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
@@ -228,7 +228,7 @@ committed pass.
    it). Query the REST API instead, whose `head` filter does honor the
    owner-qualified form:
    `gh api --method GET "repos/<upstream-owner>/<repo>/pulls" -f "head=<head-owner>:<current-branch>" -f "state=open" --jq '.[] | {number, url, state}'`
-   (for `dem-extra1/ai-config`, that is `gh api --method GET "repos/d-morrison/ai-config/pulls" -f "head=dem-extra1:<current-branch>" -f "state=open" ...`).
+   (for `dem-extra1/ai-config`, that is `gh api --method GET "repos/Morrison-Lab/ai-config/pulls" -f "head=dem-extra1:<current-branch>" -f "state=open" ...`).
    If no open PR exists and upstream is accessible, open it as a cross-fork
    PR: prepare explicit title and body first, show the draft for approval
    (per the "always show the draft before posting" rule in

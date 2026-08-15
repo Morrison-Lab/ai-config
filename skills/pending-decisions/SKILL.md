@@ -106,7 +106,7 @@ questions — reused here rather than re-derived.)
 ## Step 4 — Present one at a time
 
 Apply the "Present decisions one at a time" rule
-(proposed in [ai-config#584](https://github.com/d-morrison/ai-config/pull/584) —
+(proposed in [ai-config#584](https://github.com/Morrison-Lab/ai-config/pull/584) ---
 once merged, follow that `CLAUDE.md` section directly; until then, apply the
 same logic inline): pose only the single most pressing candidate — quote or
 paraphrase the actual question, link the issue/PR, state how many more are
@@ -138,7 +138,7 @@ across `<repos>`") rather than manufacturing a candidate to fill the report.
 - **`prompt-me` / `prompt-me-all`** — the conversation-scoped analog; this
   skill is scoped to the issue/PR tracker instead, so it survives across
   sessions and finds what a transcript-only sweep can't see.
-- **`CLAUDE.md`'s "Present decisions one at a time"** ([#584](https://github.com/d-morrison/ai-config/pull/584)) —
+- **`CLAUDE.md`'s "Present decisions one at a time"** ([#584](https://github.com/Morrison-Lab/ai-config/pull/584)) ---
   the presentation mechanic Step 4 reuses rather than redefining.
 - **`ardi` / `fully-clean` / `address-every-comment`** — the mechanisms that
   produce most Signal-1 candidates (a deadlock escalated to a human

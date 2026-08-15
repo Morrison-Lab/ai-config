@@ -105,7 +105,7 @@ For standing instructions that should always be in context:
      draft, explicit user approval), staging in local project memory
      (update `MEMORY.md` there too) until
      approved.
-   - **User-wide memory** — commit and push to `d-morrison/ai-config`
+   - **User-wide memory** --- commit and push to `Morrison-Lab/ai-config`
      (branch + PR if none is open yet).
 6. **If it's a skill (or a dedicated fan-out worker)** — hand off to
    `spot-skill-opportunities` to judge whether the pattern is genuinely

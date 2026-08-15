@@ -451,7 +451,7 @@ workflows and `anthropics/claude-code-action`) get nothing from it. The
 pattern that worked, with no workflow changes needed, on `d-morrison/rme#982`
 and `ucdavis/epi204#360`:
 
-1. `git submodule add https://github.com/d-morrison/ai-config.git .ai-config`
+1. `git submodule add https://github.com/Morrison-Lab/ai-config.git .ai-config`
    in the consumer repo.
 2. Replace any hand-copied `.claude/skills/<name>/SKILL.md` (these drift ---
    confirmed via `diff` against ai-config's canonical copy before removing)

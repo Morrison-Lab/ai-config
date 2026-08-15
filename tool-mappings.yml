@@ -207,7 +207,7 @@ operations:
   - id: DELETE_REF
     description: Delete a remote branch or tag ref.
     cli: git push origin --delete <branch> (or git push origin :refs/tags/<tag>)
-    github_mcp: (no GitHub MCP tool; use gh api -X DELETE repos/<owner>/<repo>/git/refs/heads/<branch>)
+    github_mcp: (no GitHub MCP tool; use gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/<branch>")
   - id: READ_FILE
     description: Read a file's contents from the repo.
     cli: gh api "repos/<owner>/<repo>/contents/<path>"
@@ -216,7 +216,7 @@ operations:
     description: >-
       List a branch's commits (pass the branch or ref as sha, e.g. sha=gh-pages
       to see which build a Pages branch currently serves).
-    cli: git log <branch> (or gh api repos/<owner>/<repo>/commits -f sha=<branch>)
+    cli: git log "<branch>" (or gh api "repos/<owner>/<repo>/commits" -f "sha=<branch>")
     github_mcp: mcp__github__list_commits
   - id: WRITE_FILE
     description: Create or update file(s) on a branch in a single commit.

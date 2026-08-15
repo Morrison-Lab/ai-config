@@ -705,13 +705,22 @@ Reproduced on a real two-file `git diff` rather than by reasoning:
 | `++i;` | `+++i;` | no | no |
 | `+1 vote` | `++1 vote` | no | **yes**, harmlessly |
 
-`git diff --numstat` reported 4 insertions, the filter emitted 3 having
-silently eaten the collision line, and the guard reported `0` throughout.
-So it was blind to the case its own sentence describes --- the third character
-of `+++ foo` is `+`, which fails `[^+]` --- and fired only on a line the filter
-already handled.
-A false all-clear, in the fail-open direction, published as a cross-check in
-the PR body.
+`git diff --numstat` reported 4 insertions and the filter emitted 3, having
+silently eaten the collision line.
+The guard returned **1** on that same stream --- and the line it named was
+`++1 vote`, which the filter had handled correctly.
+So it never saw the collision at all: the third character of `+++ foo` is `+`,
+which fails `[^+]`.
+
+The `0` that reached the PR body came from a different stream, and that is the
+half worth keeping.
+An ordinary diff carries no `++`-prefixed content, so the guard returns `0`
+there --- confirmed on a control commit with none.
+That is the number it returns on almost every real diff, and it is compatible
+with both "no collision was present" and "a collision was present and I cannot
+see it", because the pattern cannot express the second.
+Published as a cross-check, it was a false all-clear in the fail-open
+direction: not a wrong count, but a count of the wrong thing.
 
 The fix removed the collision rather than detecting it, scoping the diff per
 file so each header is dropped by position:

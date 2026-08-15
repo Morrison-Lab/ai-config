@@ -286,8 +286,10 @@ A second reading of the same stream is not a second opinion.
   trusting a zero from it.
 - **Don't:** add a precondition over the same stream that made the first
   pattern ambiguous --- it inherits the ambiguity and hides it behind silence.
-- **Don't:** read a guard's `0` as evidence of anything until you have seen
-  that guard produce a non-zero.
+- **Don't:** read a guard's `0` as evidence of anything until you have seen it
+  produce a non-zero **on the case it names**.
+  A non-zero on some other case is the same false comfort one step along ---
+  the guard has demonstrated it can count, and not that it can see.
 
 See [`fail-fast.cases.md`](fail-fast.cases.md),
 "A precondition that could not fire on the case it named".

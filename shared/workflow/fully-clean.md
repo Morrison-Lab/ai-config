@@ -39,6 +39,12 @@ Worked-example case records for the rules below live in
    - **Do:** take a job's real state from its `status`/`conclusion`, since the same 404 covers a still-running job and a completed-with-no-logs one.
    - **Don't:** read a 404 on the log fetch as positive evidence of a hang or a stall --- it is the opposite, evidence the job is still running.
    - **Don't:** file an issue reporting a review job as hung or "no verdict produced" while its log fetch still 404s and its status is `in_progress`.
+   - **Don't:** run the rule backwards: a log URL being **served** is not evidence the job completed.
+     The blob can exist mid-run, so a successful log fetch and a still-running job coexist
+     (measured 2026-08-15 on run 31903219396: the MCP `get_job_logs` call returned a signed
+     `logs_url` while the job's own `status` still read `in_progress` and it ran on for
+     several more minutes).
+     Completion comes from `status`/`conclusion` alone, in both directions.
 
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
    read the commit check-runs endpoint before deciding that everything has

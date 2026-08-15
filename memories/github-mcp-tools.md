@@ -70,6 +70,38 @@ See ai-config#694 for the precedent.
   a tag.
   Files in the diff were unaffected, as above --- the angle-bracket form
   inside a fenced code block is correct there and should stay.
+  **`update_pull_request` strips a short placeholder token too, which extends
+  this entry's per-surface table rather than opening a new question.**
+  Be precise about how much is new here, because the neighbouring autolinks
+  entry below already names `update_pull_request` as stripping angle-bracket
+  *spans* --- see "The MCP write tools silently drop `<https://...>`
+  angle-bracket autolinks", which covers `create_pull_request`,
+  `update_pull_request`, and `issue_write` for a full URL.
+  What that entry does not settle is the **short token** case this entry is
+  about, and the two are worth keeping apart rather than merged: they track
+  different content shapes, and this entry deliberately declines to generalize
+  between surfaces at all.
+  So the per-surface table for a short placeholder reads, as of 2026-08-15:
+  `create_pull_request` strips, `update_pull_request` strips,
+  `add_issue_comment` does not.
+  Editing a body is the likelier moment to meet this than creating one, because
+  a correction is exactly when a command gets spelled out for a reader.
+  **And the correction describing the loss reproduces it**, which is the part
+  worth knowing in advance: a note reading "the operands were spelled as the
+  word `head` in angle brackets" is itself a body containing that token, so it
+  is stripped too and the sentence explaining the damage arrives damaged.
+  Describe the broken form rather than quoting it, the same move
+  [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md) already
+  prescribes where quoting a column-1 `#` reproduces the heading it warns
+  about.
+  Read the stored body back after any edit that adds a command, since the write
+  call reports success either way.
+  (ai-config#1467, 2026-08-15: a merge-order paragraph documenting
+  `git diff --name-only $(git merge-base origin/main PR_HEAD)...PR_HEAD` was
+  first written with both operands in angle brackets and came back as
+  `$(git merge-base origin/main )...` with the operands gone; the correction
+  note naming them was then stripped in turn, and only a third edit describing
+  the form rather than showing it survived.)
 - **`mcp__github__actions_run_trigger` can't re-run CI jobs in these sessions —
   it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`, and
   `cancel_workflow_run` -- the whole `actions: write` family, so you can neither
@@ -84,7 +116,27 @@ See ai-config#694 for the precedent.
   don't expect a direct-dispatch workaround to succeed where rerun failed
   (confirmed on UCD-SERG/serodynamics#193, and again on `d-morrison/rme#1017`
   trying to dispatch `publish.yml` — same `403 Resource not accessible by
-  integration`). Prefer folding
+  integration`).
+  **`run_workflow` succeeded on `Morrison-Lab/ai-config`, 2026-08-15, so treat
+  this as per-session and per-repo rather than as a standing limit --- and
+  attempt it before reporting it blocked.**
+  Dispatching `claude-review.yml` with `ref` set to the PR branch and
+  `inputs: {"pr_number": "1469"}` returned `204 No Content`, and the run
+  genuinely started rather than merely queueing: run `31896086493`, with
+  `review / gather-context` reading `in_progress` at `16:39:08Z` seconds later.
+  That second check is the load-bearing one, since a 204 is an acknowledgement
+  and says nothing about whether a job ran.
+  **Do not generalize it to the rerun family.**
+  `rerun_failed_jobs`, `rerun_workflow_run`, and `cancel_workflow_run` were not
+  exercised in that session, so the bullet above stands unrefuted for them; what
+  changed is one method on one repo, which is the same per-surface discipline
+  the placeholder-stripping entry above insists on.
+  The general lesson is [`growth-mindset`](../shared/workflow/growth-mindset.md)'s
+  "First check the limitation is real": this was avoided for a whole session on
+  the strength of a memory bullet, and one call refuted it.
+  A recorded 403 is a measurement of a moment, so re-attempt rather than
+  inheriting it, and timestamp whatever you find.
+  Prefer folding
   the retry into a real, already-pending fix (e.g. a reviewer's requested
   wording tweak) over pushing a bare `--allow-empty` commit — same retrigger,
   no throwaway commit in history. Only use an empty commit when no real fix is

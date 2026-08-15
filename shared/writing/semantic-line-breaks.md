@@ -300,6 +300,38 @@ separates the header from an added line that itself begins with `++`, per
 It is harmless in this particular pipeline only because the trailing `^#`
 filter discards the mangled header anyway.
 
+**`tail -n +2` strips exactly one header, so on a multi-file diff the
+position trick under-corrects.**
+A diff carries one `+++ b/<path>` header per file, all of them surviving the
+`grep '^+'`, and `tail -n +2` removes only the first --- so a two-file diff
+leaves one mangled `++ b/<path>` line in the stream, and an N-file diff
+leaves N-1.
+A trailing filter (the `^#` grep above) still discards them, but a pipeline
+whose output is *counted* or *kept* silently inflates by N-1: an added-lines
+count reads one high per extra file, and the phantom line reads as content.
+For a count, skip the extraction entirely and sum
+`git diff --numstat <base>...HEAD`'s first column, which has no headers to
+strip.
+For kept content, drop headers per file rather than by global position ---
+`grep '^+' | grep -v '^+++ '` --- which is safe whenever no added line itself
+begins with `++` (check with `grep -c '^++[^+]'` first, per the fail-fast
+caveat above; an added line starting `++` forces awk-level parsing instead).
+
+- **Do:** count added lines from `--numstat`, not from a header-stripped
+  extraction.
+- **Do:** verify `grep -c '^++[^+]'` returns 0 before trusting a `^+++ `
+  header filter on kept content.
+- **Don't:** reuse the single-`tail` pipeline on a multi-file diff when its
+  output is counted or kept --- it was written for a one-file diff, and each
+  extra file adds one phantom line.
+
+(Morrison-Lab/ai-config#1476, 2026-08-15, review round 1, finding 2: a PR
+body claimed "13 added lines" over a two-file diff whose true count was 12
+--- the extraction pipeline above had left the second file's `+++` header in
+the stream, and the header was counted as an added line.
+The reviewer derived 12 from the PR's own `additions` field; `--numstat`
+confirms it.)
+
 - **Do:** scan added lines for a column-1 `#` before pushing, with the same
   after-committing, three-dot discipline the other diff-scoped scans use.
 - **Do:** reword the clause to open with a word, keeping the reference inline.

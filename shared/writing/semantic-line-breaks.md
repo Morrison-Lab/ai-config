@@ -40,11 +40,17 @@ The 60-to-80 range above is guidance for a human writing prose.
 The automated check backing it (`check-new-line-breaks`, a reusable
 workflow in [`d-morrison/gha`](https://github.com/d-morrison/gha); formerly
 ai-config's own `scripts/check-new-line-breaks.py`, retired in ai-config#703)
-tests something narrower: for each **newly added** prose line in the diff,
-it flags the line only when that line holds more than one sentence.
+tests something narrower, against each **newly added** prose line in the diff.
+Its primary rule flags a line holding more than one sentence.
+Since gha#336 it also carries a **clause** rule, on by default: a line whose
+markup-stripped text reaches 80 characters and carries a mid-line semicolon.
+Neither rule is a character count, and the clause rule is the only one that
+looks at length at all.
+
 Two consequences.
-A single long line carrying exactly one sentence passes, so the URL-inflation
-exception above needs no special casing in the check.
+A single long line carrying exactly one sentence and no mid-line semicolon
+passes, so the URL-inflation exception above still needs no special casing in
+the check.
 And a line that packs two short sentences fails even at 50 characters, which
 is the violation to actually look for before pushing.
 Fix a flagged line by breaking at the sentence boundary, not by rewrapping
@@ -53,6 +59,65 @@ the paragraph to a narrower column.
 against the wrong criterion; reading the retired script's own source settled
 it, and the real check then found 7 multi-sentence lines a length check had
 passed over.)
+
+**This repo's own reformatter is not that check, and its output can fail it.**
+`scripts/semantic-line-breaks.py` is the in-repo tool named for this
+convention, so it is the obvious thing to reach for when a line-break warning
+needs clearing.
+It is not what CI runs, and the two disagree about what a good line is.
+
+The reformatter implements one sentence per line and nothing else.
+Its own docstring says as much --- "Never break a phrase mid-way at a column
+boundary" --- so it has no width policy, and it **joins** a hand-wrapped
+sentence back into a single line however long that line becomes.
+Corpus practice is the clause-wrapped 60-to-80 range this file opens with,
+which the reformatter undoes.
+
+Nothing runs it in CI.
+`grep -rn "semantic-line-breaks.py" --include=*.yml .` returns no workflow;
+its only callers in the tree are its own test file and one docstring
+reference.
+`MD013` is off repo-wide in `.markdownlint-cli2.jsonc`, so no width gate
+exists either.
+
+Measured by copying two fragments out of `origin/main`, reformatting each
+copy with `--all`, and classifying both versions with the gate's own
+`classify_line`:
+
+| fragment (at `origin/main`) | longest line | lines over 80 | clause-flagged |
+| --- | --- | --- | --- |
+| `semantic-line-breaks.md` before | 80 | 0 | 0 |
+| `semantic-line-breaks.md` after | 387 | 97 | 10 |
+| `grep-is-not-coverage.md` before | 79 | 0 | 0 |
+| `grep-is-not-coverage.md` after | 411 | 59 | 5 |
+
+So the reformatter clears the sentence rule and manufactures clause
+violations the gate then reports, on files that had none.
+The classifier was pinned in both directions first, per
+[`fail-fast`](../principles/fail-fast.md)'s negative-control rule: it returns
+`clause` on a padded semicolon line, `sentence` on a two-sentence line, and
+`None` on a short clean one.
+
+It still finds real violations, which is what makes it worth running --- the
+same two fragments carry 5 and 0 genuine multi-sentence lines at
+`origin/main`.
+So use it as a **detector** and read its preview, which is its default when
+no `--write` is passed.
+Take the sentence splits it proposes, and break at a clause boundary yourself
+rather than accepting the joins.
+
+- **Do:** read the reformatter's preview and apply its sentence splits by
+  hand, wrapping at a clause boundary.
+- **Do:** re-run the gate after any reformat, since the joined lines are added
+  lines and the gate is diff-scoped.
+- **Don't:** treat `scripts/semantic-line-breaks.py` as the check CI runs ---
+  no workflow invokes it, and its output is not what the gate wants.
+- **Don't:** accept a join that puts a wrapped sentence back on one line; that
+  is the direction that trips the clause rule.
+
+(Morrison-Lab/ai-config, 2026-08-15, measured on this machine with the gate at
+`Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
+`_DEFAULT_CLAUSE_MIN_LENGTH` is 80.)
 
 **That check is advisory: it warns and exits 0, so a green CI job does not
 mean the diff is clean.**
@@ -201,6 +266,30 @@ Ordering is checkable, and a resolution to remember is not.
   with every edit you make.
 - **Don't:** quote a check's output in a commit message or PR body without
   re-running it at the head you are about to push.
+
+**Re-run markdownlint in that block too, even though it is not line-scoped ---
+it is the only one of these that actually reddens `validate`.**
+The rule above enumerates line-scoped checks, and a reader takes the
+enumeration as the list: this check, the banned-punctuation scan,
+`lint-changed-lines`.
+Markdownlint is not on it, because it is whole-file rather than diff-scoped,
+so nothing about the phrase "line-scoped check" reaches it.
+
+Its scope and its severity run opposite to everything else in the block, which
+is what makes the omission expensive.
+`validate.yml` runs `npx --yes markdownlint-cli2` as a plain step, so a
+non-zero exit fails the job, while `check-new-line-breaks` is the advisory one
+that warns and exits 0.
+The blocking check is therefore the one the ordering rule leaves out, and a
+reflow can introduce a rule violation none of the enumerated scans can see ---
+MD018 when a split lands an issue reference in column 1 (the section further
+down owns that collision), and MD022 when it disturbs the blank line around a
+heading.
+
+- **Do:** run markdownlint last, alongside the line-scoped checks, after every
+  diff-mutating pass.
+- **Don't:** read "line-scoped checks" as the whole re-run list --- the
+  whole-file one is the only one that can fail the build.
 
 (Morrison-Lab/ai-config#1259, 2026-08-07: `3c2cd225` moved 38 case records out
 of `CLAUDE.md`, then converted em-dashes on the diff's added lines, verified

@@ -1168,32 +1168,33 @@ bug" for the broader lesson.)
 ## A moving upstream tag can turn a consumer's default branch red with no local change
 
 A consumer pinned to a moving major tag (`...@v2`) inherits every change the
-tag's owner slides under it, so its default branch can go green-to-red
-between two consecutive commits while nothing in the repo changed that the
-failing check even looks at.
+tag's owner slides under it, so its default branch can go green-to-red between
+two consecutive commits while nothing changed that the check even looks at.
 
 Two cheap reads settle it before anyone's diff is opened.
 Check whether the **default branch itself** is red rather than only the PR,
-since a red default branch means the cause is not in any open branch.
-Then intersect the red commit's own changed-file list with the files the
-check flagged: an empty intersection points at the moving pin upstream.
+since that means the cause is not in any open branch; then intersect the red
+commit's changed files with the flagged files, where an empty intersection
+points at the moving pin upstream.
 
-**The failing job's log is not the scope.**
-A checker can name only the files it stopped at rather than every file it
-would flag, so a log listing two files can understate a four-file breakage.
-Derive the affected set yourself by scanning every file carrying the
-extensions the checker covers.
+**A tail-limited log fetch truncates the HEAD of the output**, so earlier
+findings are absent and a complete checker looks partial.
+Read the checker's own summary line, which usually states the true total, and
+compare it against the entries you can actually see.
 
-- **Do:** read the default branch's own status, and intersect the red
-  commit's changed files with the flagged files, before diagnosing a diff.
-- **Do:** re-derive the affected file set from the checker's own extension
-  list when planning the fix.
+- **Do:** read the default branch's status and intersect the red commit's
+  changed files with the flagged files, before diagnosing anyone's diff.
+- **Do:** re-derive the affected set from the checker's own extension list.
 - **Don't:** read a green-to-red transition as evidence the red commit caused
   it --- a moving pin changes what runs without changing what it runs on.
-- **Don't:** treat the failing log's file list as the breakage's full scope.
+- **Don't:** treat a tail-limited log read as the breakage's full scope.
 
 (2026-08-15: a consumer pinning a shared `check-non-standard-chars` workflow
 at `@v2` went red when that checker's banned-glyph set gained U+00D7.
 The red commit changed only a demo JSON and one GDScript file --- no file the
-checker scans and no workflow file --- and the log named 2 of the 4 affected
-files.)
+checker scans and no workflow file.
+The log itself was complete, opening `Found 19 non-standard character(s) in 4
+file(s)` and listing all four; a `tail_lines`-capped fetch showed only the last
+two, and that partial read was mistaken for the checker's own output.
+An independent scan produced the right set anyway, so the fix was correct while
+the reason given for it was not.)

@@ -189,8 +189,12 @@ author something:
 - [`find-overlap`](../../skills/find-overlap/SKILL.md), whose whole premise
   is that phrase matching under-detects.
 
-In each, the null result is an input to a judgment, never the judgment
-itself.
+In each, the grep's result is an input to a judgment, never the judgment
+itself --- and that holds in both directions, since these three sites are
+also where the non-null under-read above happens.
+The incident recorded there was a `ums` step-3 dupe check, so the same list
+covers a search that found nothing and a search that found two things and
+read one.
 
 ## Relationship to other rules
 

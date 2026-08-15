@@ -16,7 +16,7 @@ but doesn't reduce context, since imported files load at launch". Only a
 split *across* the auto-load boundary reduces loaded bytes. So the budget
 has to be closure-level.
 
-Two modes, from ai-config#1028:
+Three modes; the first two are from ai-config#1028, the third from #1373:
 
   1. **Budget** -- walk a checkout's closure and compare the total against
      `--budget`. Works for ai-config itself and for any consumer repo whose
@@ -28,6 +28,22 @@ Two modes, from ai-config#1028:
      bump is what those files weigh. Measured on `ucdavis/bcs` at a pin
      three days old, the same 33 imports had grown +62%, and nothing
      reported it -- the gitlink diff is one line.
+
+  3. **Same-repo baseline** -- with `--baseline REV`, re-measure this repo's
+     OWN closure at REV and report the delta against the working tree. Mode
+     2 cannot answer this: it varies a submodule and needs a gitlink to
+     baseline against, and ai-config has no submodule of itself, so nothing
+     reported what a given branch added to the closure. That is the gap
+     ai-config#1373's first comment names -- "the total is a sum nobody owns
+     while each fragment has an author who can be asked" -- and a per-PR
+     delta is what gives each increment an owner at the moment it lands.
+
+     Advisory by construction: it reports and never changes the exit code.
+     Gating the LEVEL is unsatisfiable while the corpus sits several times
+     over budget, and gating the DELTA would need a threshold nobody has
+     agreed -- which is the mushy threshold `algorithmatize-checks.md` says
+     trains everyone to ignore the instrument. See the `--baseline` block in
+     `main` for why baseline-side defects are reported rather than failed on.
 
 Per `shared/workflow/algorithmatize-checks.md`, "how many bytes does this
 repo load before it starts" is decidable over data already on disk, so it
@@ -592,19 +608,47 @@ def render_fragment_caps(files, cap):
     return bool(breaches), "\n".join(lines)
 
 
-def render_delta(before_total, after_total, bytes_per_token, rev) -> str:
-    """Human-readable pin-bump delta."""
+def render_delta(
+    before_total,
+    after_total,
+    bytes_per_token,
+    heading,
+    before_label,
+    after_label,
+) -> str:
+    """Human-readable before/after closure delta.
+
+    Two modes share this renderer and they have different subjects: the
+    pin-bump comparison measures one import list against two submodule
+    revisions, while `--baseline` measures this repo's own closure at a rev
+    against its working tree. So the heading and both row labels come from
+    the caller rather than being hard-coded.
+
+    Keeping one renderer keeps the arithmetic and the column formatting in a
+    single place. Keeping the *wording* out of it is the other half: a
+    hard-coded "Pin-bump delta (submodule resolved at ...)" would make the
+    baseline mode assert a purpose it does not have, which is the structural
+    reuse `shared/workflow/check-purpose-before-reusing.md` warns about --
+    same shape, wrong claim.
+    """
     delta = after_total - before_total
     pct = (100 * delta / before_total) if before_total else 0
-    sign = "+" if delta >= 0 else ""
+    width = max(len(before_label), len(after_label), len("change"))
+    # The sign goes in the format spec rather than a separate string. Prefixing
+    # a manual "+" spends a column that the "-" of a negative number takes from
+    # the field itself, so the two cases came out a character apart -- and the
+    # negative case is a trim, which is exactly the run someone reads closely.
+    # `//` also floors toward negative infinity, so a shrink reported one token
+    # more than it saved; truncating toward zero keeps both directions honest.
+    delta_tok = int(delta / bytes_per_token)
     return (
-        f"\nPin-bump delta (submodule resolved at {rev}):\n"
-        f"    current   {before_total:>10,} B  "
+        f"\n{heading}\n"
+        f"    {before_label:<{width}} {before_total:>10,} B  "
         f"~{before_total // bytes_per_token:>8,} tok\n"
-        f"    at {rev:<7} {after_total:>10,} B  "
+        f"    {after_label:<{width}} {after_total:>10,} B  "
         f"~{after_total // bytes_per_token:>8,} tok\n"
-        f"    change    {sign}{delta:>9,} B  "
-        f"{sign}{delta // bytes_per_token:>8,} tok  ({sign}{pct:.0f}%)"
+        f"    {'change':<{width}} {delta:>+10,} B  "
+        f"{delta_tok:>+9,} tok  ({pct:+.0f}%)"
     )
 
 
@@ -736,6 +780,15 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--baseline",
+        metavar="REV",
+        help="measure THIS repo's own closure at REV and report the delta "
+        "against the working tree. Distinct from --compare, which resolves "
+        "a submodule at REV; this answers 'what did this branch add to the "
+        "closure', which --compare cannot (it needs a gitlink). Advisory: "
+        "reports, never fails. See ai-config#1373.",
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="exit 1 if over budget (default: advisory, exits 0). In --compare "
@@ -743,6 +796,22 @@ def main(argv=None) -> int:
         "the budget fails even while the current pin is under it.",
     )
     args = parser.parse_args(argv)
+
+    if args.baseline and args.compare:
+        # Not merely redundant: the two measure different closures. `--compare`
+        # holds this tree fixed and varies a submodule's revision; `--baseline`
+        # varies this tree against its own history. Running both would print
+        # two deltas whose "current" sides are not the same number, which reads
+        # as one comparison and is two.
+        print(
+            "error: --baseline and --compare measure different things and "
+            "cannot be combined; pass one.",
+            file=sys.stderr,
+        )
+        # Literal 2 to match this file's other usage-error returns, which are
+        # all bare. 2 is deliberately distinct from 1, so "you invoked this
+        # incorrectly" is never read as a size finding.
+        return 2
 
     base = Path(args.base).resolve()
     files, missing, inline, ambiguous = walk_closure(args.root, local_reader(base))
@@ -777,6 +846,72 @@ def main(argv=None) -> int:
 
     total = sum(size for _, size, _ in files)
     after_total = None
+
+    if args.baseline:
+        # `--compare` cannot answer this. It re-resolves the same import list
+        # against two SUBMODULE revisions and needs a gitlink to baseline
+        # against, so in ai-config's own repo -- which has no `.ai-config`
+        # gitlink of itself -- there is nothing for it to compare. The
+        # question left unanswered was "what did this branch add", which is
+        # the one that has an owner: the total is a sum nobody owns, while a
+        # per-PR delta lands on the PR that caused it (ai-config#1373).
+        before_files, before_missing, before_inline, before_amb = walk_closure(
+            args.root, git_reader(base, args.baseline)
+        )
+        if not before_files:
+            print(
+                f"error: could not read {args.root} at {args.baseline} in "
+                f"{base}; nothing to baseline against.",
+                file=sys.stderr,
+            )
+            return 2
+        before_total = sum(size for _, size, _ in before_files)
+
+        # Baseline-side defects are REPORTED, not failed on, which is the
+        # opposite stance from `--compare`. Two reasons, and the second is
+        # the load-bearing one.
+        #
+        # The baseline is history: a dangling import at an old rev is not
+        # something the current branch can fix, so failing on it would make
+        # the tool unusable against exactly the revs you want to measure
+        # from.
+        #
+        # And the error direction is the safe one. An import that does not
+        # resolve at the baseline is not counted there, so `before_total` is
+        # low and the delta OVER-reports growth. For a growth watchdog,
+        # over-reporting is the direction that fails loudly rather than
+        # silently (shared/principles/fail-fast.md's safe/dangerous
+        # asymmetry). `--compare` errs the other way for the same reason
+        # read in mirror: there the miss is on the TARGET side, which makes
+        # a bump look favourable.
+        for path, cited_by in before_missing:
+            print(
+                f"  note [baseline {args.baseline}]: anchored @{path} did not "
+                f"resolve (cited by {cited_by}); the delta over-reports growth "
+                f"by whatever it weighed"
+            )
+        for path, cited_by in before_inline:
+            print(
+                f"  note [baseline {args.baseline}]: inline @{path} did not "
+                f"resolve (in {cited_by}; not counted)"
+            )
+        for path, n in before_amb:
+            print(
+                f"  note [baseline {args.baseline}]: {path} has {n} unclosed "
+                f"fence marker(s), so its import parse is ambiguous"
+            )
+
+        print(
+            render_delta(
+                before_total,
+                total,
+                args.bytes_per_token,
+                f"Closure delta (this tree against {args.baseline}):",
+                f"at {args.baseline}",
+                "this tree",
+            )
+        )
+
     if args.compare:
         # Baseline the CURRENT side on the parent's recorded gitlink, not on
         # the submodule's checked-out tree -- see gitlink_rev's docstring for
@@ -854,7 +989,14 @@ def main(argv=None) -> int:
                 print(f"  note [{label}]: {path} has {n} unclosed fence "
                       f"marker(s), so its import parse is ambiguous")
         print(
-            render_delta(before_total, after_total, args.bytes_per_token, args.compare)
+            render_delta(
+                before_total,
+                after_total,
+                args.bytes_per_token,
+                f"Pin-bump delta (submodule resolved at {args.compare}):",
+                "current",
+                f"at {args.compare}",
+            )
         )
         if after_total > args.budget >= before_total:
             print(f"\n  This bump would cross the {args.budget:,}-byte budget.")

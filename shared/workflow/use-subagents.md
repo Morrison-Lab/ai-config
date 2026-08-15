@@ -65,19 +65,35 @@ So when a task clears that fragment's three-part bar, follow it and propose the 
 It does not cover the commoner dispatch: a brief that names specific existing files to edit, where the collision is not conceptual but literal --- another open PR touching the same paths.
 A keyword search finds nothing there, because two unrelated learnings landing in the same fragment share no vocabulary at all.
 
-`scripts/pr-sweep.py`, per [`derive-dont-enumerate`](derive-dont-enumerate.md)'s "The instrument" section, is what this corpus already reaches for before dispatching, and it answers a real question --- which PRs are stalled --- that is not the question a file-naming brief needs answered.
-Reading its output as though it covered overlap is the failure: the sweep can list a colliding PR by number, in a report you read in full, and still not tell you that PR touches the exact two files you are about to hand to a subagent.
-The count of open PRs is not their file sets.
+`scripts/pr-sweep.py`, per [`derive-dont-enumerate`](derive-dont-enumerate.md)'s "The instrument" section, is what this corpus already reaches for before dispatching.
+Since [#1421](https://github.com/Morrison-Lab/ai-config/pull/1421) it prints each PR's file set rather than only its staleness, so the intersection this section asks for is usually one command rather than a round of per-PR calls.
 
-Before dispatching a brief that names specific files, run `gh pr diff <N> --name-only` (or the equivalent MCP call) against every open PR, and intersect the result with the files you are about to hand over.
+Read what that command actually examined, though, rather than treating it as covering every open PR.
+Three gaps remain, and each one hides exactly the collision a dispatch brief cares about:
+
+- **Drafts are skipped** unless `--include-drafts` is passed.
+  This is the sharpest of the three, because [`pr-on-claim`](pr-on-claim.md) opens a draft up front precisely to claim work in flight --- so the PRs likeliest to be actively edited are the ones a default sweep never examines.
+- **Text output truncates at `MAX_FILES_SHOWN = 5`**, appending `... (+N more)`.
+  A wider PR's remaining paths go unlisted, and one of them can be yours.
+- **The `clean` bucket prints numbers only.**
+  A `stalled` or `in-flight` PR gets a `files (N):` line; a clean one gets none in text mode.
+
+`--json` closes the second and third: it dumps the full file list for every PR examined.
+It does not close the first, since the draft skip happens in `sweep()`, upstream of both output modes.
+
+```bash
+python3 scripts/pr-sweep.py -R <owner>/<repo> --include-drafts --json
+```
+
+Then intersect that file list with the files you are about to hand over, and fall back to a per-PR `gh pr diff <N> --name-only` (or the equivalent MCP call) only for a PR the sweep reports it did not examine.
 This is the same check `CLAUDE.md`'s "Surface merge-order constraints" section already requires before asserting two *existing* PRs are disjoint --- derive both sets and check the intersection, don't recall what a PR is "about".
 The increment here is *when*: before the new PR exists, not after, since a collision found before dispatch costs one query and a collision found after costs a conflict resolution.
 
 - **Do:** intersect a proposed brief's file list against every open PR's changed-file set before dispatching, not just against its staleness.
-- **Do:** treat a sweep tool's own output as answering only the question it was built to answer --- staleness is not overlap.
+- **Do:** read what a sweep reports it examined, since the draft skip and the text-mode truncation both narrow that below "every open PR".
 - **Don't:** read "I checked the open PRs" as covering this when the check was a keyword search or a stalled-PR count.
-- **Don't:** dispatch a file-naming brief on the strength of a sweep that never printed the colliding PR's file list.
+- **Don't:** dispatch a file-naming brief on the strength of a sweep whose own output never listed the colliding PR's files.
 
 (Morrison-Lab/ai-config#1413, 2026-08-12: a subagent was briefed to trim two specific files; open PR #1407 had touched those exact files sixteen minutes earlier, and a `pr-sweep.py` run had listed #1407 as in-flight without its file set ever being read. #1413 conflicted with #1407 as a result.
-Extending `pr-sweep.py` to print each PR's file set --- so this check needs no separate round of calls --- is filed as [#1419](https://github.com/Morrison-Lab/ai-config/issues/1419).)
+Extending `pr-sweep.py` to print each PR's file set --- so this check needs no separate round of calls --- was filed as [#1419](https://github.com/Morrison-Lab/ai-config/issues/1419) and shipped in [#1421](https://github.com/Morrison-Lab/ai-config/pull/1421), merged 2026-08-13T16:28:22Z, which is why the guidance above leads with the sweep rather than with a per-PR call.)
 

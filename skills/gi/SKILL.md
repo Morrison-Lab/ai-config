@@ -63,8 +63,10 @@ without asking — but do flag it:
 
 ### 3. Select top issue automatically
 
-Pick the highest-priority issue automatically based on the triage signals in step 2 (unless the user explicitly specified an issue or candidate preference). State which issue was selected and why, then proceed directly to check in-flight status and implementation without pausing for user confirmation.
-
+Pick the highest-priority issue automatically based on the triage signals in
+step 2 (unless the user explicitly specified an issue or candidate preference).
+State which issue was selected and why, then proceed directly to check
+in-flight status and implementation without pausing for user confirmation.
 
 ### 4. Check the issue isn't already in-flight
 

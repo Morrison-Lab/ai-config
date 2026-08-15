@@ -866,22 +866,35 @@ This is a standing default across all sessions, including ultracode/Workflow fan
 | CLI | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `agy` (Google Antigravity) | Antigravity | none yet --- see the status note below |
+| `agy` (Google Antigravity) | Antigravity | none yet --- mechanics below; the skill is worth writing |
 
 Exhaust the *current usage window* of each --- roughly 5 hours for codex --- then fall back to Claude until it resets.
 "Delegate first" means the current window, not abandoning Claude permanently.
 `delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
 
-**`agy`'s headless mode did not work when this was written, so treat the table row as aspirational until it does.**
-Measured 2026-08-15 on `agy` 1.1.13 at `~/.local/bin/agy`, in `ucdavis/bcs`.
-`agy models` returns the model list, so the binary is installed and authenticated.
-But four `--print` invocations, with and without `--sandbox`, with and without `--disable-slash-commands`, and with an explicit `--model`, all returned session-start chatter --- a status recap naming this corpus's own `bootstrap.sh`, or documentation about `agy`'s own flags --- rather than executing the prompt.
-None read the file it was asked to read, and each exited 0, so the failure is silent to any caller keying on exit status.
-Do not write a `delegate-to-agy` skill asserting the mechanics work until one invocation is seen to return a task result.
+**`agy --print` takes its prompt with an EQUALS SIGN, and the space-separated form silently drops it.**
+This is the whole of what makes `agy` usable headlessly, and getting it wrong looks exactly like a broken tool:
 
-- **Do:** route heavy read/draft/verify work to `codex` first, then `agy` once its headless mode is confirmed working, and only then to Claude.
-- **Do:** re-test `agy --print` against a known ground truth before delegating to it, since it exits 0 whether or not it did the work.
-- **Don't:** read "we have agy quota" as "agy is usable" --- quota and a working headless loop are separate facts, and only the first was established here.
+```bash
+agy --print="Reply with only the word BANANA."     # -> BANANA
+agy --print "Reply with only the word BANANA."     # -> session chatter, prompt discarded
+```
+
+It is Go's `flag` package: in the second form the prompt becomes a positional argument that nothing consumes, and `agy` proceeds as though asked nothing --- returning a status recap or documentation about its own flags.
+**Both forms exit 0**, so the drop is invisible to any caller keying on exit status, which is what a delegation wrapper keys on.
+
+Measured 2026-08-15 on `agy` 1.1.13 at `~/.local/bin/agy`.
+Four space-form probes failed identically --- with and without `--sandbox`, with and without `--disable-slash-commands`, and with an explicit `--model` --- and the same failure reproduced in a bare `mktemp -d` with no repository and no ai-config present, which is what ruled out our own session-start context as the cause and pointed at the invocation.
+
+**With the equals form it genuinely does the work, and its figures still need checking.**
+Asked to read `scripts/added_lines.py` in `ucdavis/bcs`, it returned the right function name and its exact line number (`added_lines`, line 30), so it really read the file.
+It also reported the file as 74 lines where `wc -l`, `grep -c ''`, and Python's `splitlines()` all say 73.
+So a delegate having genuinely done the work does not make the figures it reports true, and any count one returns is re-derived rather than quoted --- the same standing treatment codex's output gets.
+
+- **Do:** route heavy read/draft/verify work to `codex` and `agy` before Claude, and write the prompt as `agy --print="..."`.
+- **Do:** re-verify any figure a delegate reports, since `agy` miscounted a 73-line file by one while reading it correctly.
+- **Don't:** use `agy --print "..."` with a space --- the prompt is discarded and the exit status is 0.
+- **Don't:** read "we have agy quota" as "agy is usable"; quota and a working invocation are separate facts, and the second one took five probes to establish.
 
 Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota"), and widened 2026-08-15 ("in addition to codex, we have agy quota to use; try using both of those as subagents before exhausting claude quota").
 

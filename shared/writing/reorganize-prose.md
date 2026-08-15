@@ -105,6 +105,50 @@ grants the move, it does not exempt it from what a move costs.
   after the move --- check with the project's own render or a link-check pass
   rather than assuming project-wide unique ids make this automatic.
 
+## The sweep needs a trigger, and the split now has a mechanical one
+
+Everything above says *what* a move has to preserve.
+None of it says *when* to check, and
+[`skill-checklists.md`](../workflow/skill-checklists.md) is explicit that a
+checklist with no stated pause point is read only by whoever was already
+careful.
+
+That gap used to cost little, because relocating prose was an occasional and
+deliberate act, prepared for by whoever chose it.
+It is no longer.
+`scripts/check-context-closure.py` enforces a 100,000-byte cap on every
+non-root auto-loaded fragment, and it fails rather than warns, so a fragment
+that grows past the line forces a `.cases.md` split on whoever happens to be
+editing it that day.
+The split now arrives as a red check mid-task rather than as a plan.
+
+So the observable pause point is **the cap check failing**, and that check's
+own remediation message names the sweep and the deriving command, so a mover
+meets both at the moment the split is decided rather than having to recall a
+rule in a different file.
+
+**What earns the split this treatment is that no other instrument here can
+see what it breaks.**
+The bullet above notes that line-level checks are diff-scoped, so a moved
+line is a line you just wrote.
+The complement is the half that hides the defect: the thing that line
+*refers to* is content that did **not** move, so it appears in the diff as
+unchanged context or not at all.
+A reviewer reading the diff closely therefore sees the pointer and never sees
+what it points at, and `check-links.py` is no help either, since a positional
+reference is prose rather than a link.
+
+The remedy is unchanged and already written down --- fix each hit by naming
+its referent, per
+[`forward-references.md`](forward-references.md)'s "Sweep the general
+directional pattern" section, rather than by flipping the direction or
+repointing at the file the content stayed in.
+A name survives the next reorganisation and a pointer survives only until the
+file it names moves.
+Note that this is the rule failing to *fire* rather than the rule being
+incomplete, which is why the fix is a trigger rather than another statement
+of it.
+
 ## Do and don't
 
 - **Do:** move a section, paragraph, or sentence --- within a file or across
@@ -120,6 +164,16 @@ grants the move, it does not exempt it from what a move costs.
   somewhere" --- a move that breaks a self-reference, a count-based
   back-reference, or a cross-file crossref is a defect the move introduced,
   not a pre-existing one.
+- **Do:** run the directional sweep over both the companion and the fragment
+  when a cap breach forces a `.cases.md` split, before opening the PR ---
+  the failing check is the pause point, not a topic to remember.
+- **Do:** treat a single stranded reference a reviewer names as one member of
+  a class, and derive the rest, per
+  [`address-every-comment.md`](../workflow/address-every-comment.md).
+- **Don't:** rely on reading the diff to surface a stranded reference --- the
+  moved line is in the diff and the content it refers to is not.
+- **Don't:** read a green `check-links.py` as covering this; the broken
+  pointer is prose, so no link check can reach it.
 
 ## Relationship to other rules
 
@@ -136,6 +190,26 @@ grants the move, it does not exempt it from what a move costs.
   fragment licenses.
 - [`migrate-referenced-assets.md`](../workflow/migrate-referenced-assets.md)
   is the asset-specific half of "what a move has to preserve," cited above.
+
+(`Morrison-Lab/ai-config#1413`, merged 2026-08-13 as `65d8886d`: a cap-forced
+split moved case records out of two fragments ---
+`shared/workflow/ardi.md` 98,655 to 92,734 bytes, and
+`shared/principles/fail-fast.md` 94,469 to 91,244 --- into their `.cases.md`
+companions.
+Review found one stranded positional reference, `the checks below` in
+`ardi.cases.md`, whose Do/Don't list had stayed in `ardi.md`.
+Deriving the class found two more in `fail-fast.cases.md`, both missed by the
+reviewer's enumeration: `the rate-limit truncation above` and
+`in both forms above`.
+All three carried `above` or `below`, so
+[`forward-references.md`](forward-references.md)'s general directional
+pattern would have flagged every one of them as a candidate --- the sweep was
+complete and was simply never run, which is the argument for attaching it to
+the failing check rather than restating it.
+Fixed in `fd5cd1a5` by naming each subject.
+The two fragments sat at 92,734 and 91,244 bytes on `main` as of 2026-08-13,
+against the 100,000-byte cap, so the same split recurs within days at the
+growth rate that produced this one.)
 
 (User directive, 2026-08-09: "when writing and editing prose, you can
 rearrange sections (and subsections, paragraphs, sentences, etc) of the

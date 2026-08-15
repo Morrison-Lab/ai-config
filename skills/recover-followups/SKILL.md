@@ -131,13 +131,23 @@ For each candidate decide whether it's **already tracked**:
      (won't-fix / duplicate) with no merged PR → the work did **not** land →
      still **untracked** (keep it; a won't-fix close doesn't mean done).
    - doesn't exist → **dangling reference → untracked**.
-2. **No citation?** Search open issues for a match:
+2. **No citation?**
+   Search issues for a match, in every state ---
+   a closed issue is still evidence the item is tracked,
+   and step 1's bullets already say a won't-fix close does not mean done:
    ```bash
-   gh issue list --state open --search "<keywords from the snippet>" \
-     --json number,title,url   # SEARCH_ISSUES
+   gh issue list --state all --search "<keywords from the snippet>" \
+     --json number,title,state,stateReason,url   # SEARCH_ISSUES
    ```
    - a plausible open issue exists → likely tracked, but **flag low-confidence
      matches** for the user rather than silently dropping.
+   - a plausible **closed** issue exists → disposition it by close reason
+     exactly as step 1 does: `COMPLETED` → the work landed → tracked (drop
+     it); `NOT_PLANNED` → the work did not land → still **untracked** (keep
+     it).
+     Widening the search without widening these bullets is the same defect
+     one level down: a closed match falls through to "nothing matches" and
+     gets re-filed, which is what this whole change exists to prevent.
    - nothing matches → **untracked follow-up**.
 
 ### 5. Report the untracked items

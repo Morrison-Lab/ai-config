@@ -164,6 +164,51 @@ The subset was not: at that instant `d-morrison` held eight of the ten (#1393, #
 Seven is the same-account count of a **different** population --- the nine PRs left after #1436 merged at `21:54:09Z`, four minutes later --- so it was a real figure, correctly derived, about a moment the sentence was not describing.
 Re-derived here from `list_pull_requests` over `created_at`/`closed_at` rather than from the reviewer's own number, per [`metacognitive-monitoring`](metacognitive-monitoring.md)'s rule that a finding's conclusion is the sound half and its particulars are not.)
 
+## A count and its label can disagree about whether the subject is a member
+
+The two sections above both fail somewhere in the derivation.
+One never derives the population at all.
+The other derives two figures and measures them in different places.
+This one derives correctly, once, and attaches the result to a claim about a different set.
+
+A query returns a **population**.
+A claim frequently quantifies over that population **minus the subject** --- the other PRs, the remaining files, everything else in flight.
+Nothing in the query knows you meant to exclude yourself, so its answer is right about the set it counted and wrong about the set the sentence names.
+
+**The tell is a scope word attached to a figure that came from a whole-population query.**
+"Other", "remaining", "else", "besides", "the rest".
+Each one silently subtracts the subject from the set being described, while the number beside it still includes the subject.
+
+That is also the empty-set section's tell, and the two point at opposite defects.
+There a scope word marks a population **nobody counted**, so deriving it is the whole fix.
+Here the population **was** counted, so the scope word marks a correct count of the wrong set, and the fix is a subtraction rather than a query.
+
+**Re-deriving the same total cannot catch this, which is what lets it survive a careful pass.**
+The total is not the part that is wrong.
+Running the query again returns the same number, so the check that would ordinarily settle a suspect figure confirms it instead.
+[`ardi`](ardi.md)'s pre-push requirement to re-derive every number in a PR body is satisfied in full by a re-run that changes nothing.
+So subtract the subject explicitly, or filter it out in the query, and state which population the figure counts.
+
+**The cheapest check needs no query at all.**
+A scope-word figure usually sits beside an enumeration of the same set --- a table, a list of numbers --- which is a second and independent statement of that count.
+When a body carries both, they have to agree, and a figure that disagrees with the list under it is decidable by looking.
+
+- **Do:** subtract the subject from a whole-population count before attaching a scope word to it, and name the population the figure counts.
+- **Do:** compare a scope-word figure against any enumeration of the same set beside it, since the two state one count twice.
+- **Don't:** read a re-derivation that returns the same total as confirming a figure labelled "other" --- the total is the half that was already right.
+- **Don't:** reach for the empty-set section's remedy here;
+  that one is discharged by deriving the population, and this one by subtracting from a population already derived.
+
+(Morrison-Lab/ai-config#1455, 2026-08-13, review round 1, non-blocking.
+Its "Merge order" section read "No constraint against the **5** other open PRs" and then listed four: #1452, #1422, #1420, #1393.
+The finding, verbatim: "A live count shows 5 open PRs *total* including #1455 itself, so there are 4 *other* open PRs, not 5 --- an off-by-one in the population count."
+Re-derived here from `list_pull_requests` over `created_at`/`closed_at` rather than from the reviewer's own number, per [`metacognitive-monitoring`](metacognitive-monitoring.md)'s rule that a finding's conclusion is the sound half and its particulars are not: at #1455's creation, `20:22:48Z`, the open set was #1393, #1420, #1422, #1452, and #1455 itself --- 5 total and 4 others, unchanged at the review's own `20:30:47Z`.
+
+The coincidence that hid it is worth naming, because it is what makes the re-derivation useless here.
+The figure was carried from PR #1454's body, which had read "all 5 open PRs examined" over a five-row table whose first row was `**#1454** (this)` --- correct there, as a total *including* the subject.
+That PR merged at `18:14:51Z` and #1455 opened at `20:22:48Z`, so one subject replaced another and the total stayed 5.
+Re-deriving the total at #1455's own moment therefore returns the very figure that was wrong.)
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

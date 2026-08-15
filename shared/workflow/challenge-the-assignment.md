@@ -98,6 +98,62 @@ checkable by a reader, and a resolution to be thoughtful is not.
   presupposition, and don't stall on the choice either --- say which
   presupposition fails and what follows.
 
+## When the work itself settles the premise, run it before writing anything
+
+The check above costs a sentence, which is what makes it affordable.
+One shape makes it cost nothing at all, and it is the shape most likely to be
+skipped: an assignment to **widen an instrument's coverage**, carrying an
+incidental claim about what the widened coverage will find.
+
+The claim is unverifiable *by construction*, and the assignment says why.
+An issue reporting that a checker does not scan some tree cannot also know
+that tree is clean, because the instrument that would establish it is the
+thing being asked for.
+So its clean-state claim rests on a hand scan --- which is exactly the
+substitute the whole issue exists to retire.
+
+Two things keep it from being questioned.
+It is **incidental**: it sits beside the request rather than in it, so nothing
+about deciding to do the work requires reading it.
+And it is **reassuring** --- "a missing guard rather than an outstanding
+breakage" narrows the scope and lowers the stakes, and a premise that makes a
+task smaller draws less scrutiny than one that makes it bigger.
+
+The cost is not a wasted task, which is what "The check" above is calibrated
+for.
+The work is right either way.
+What the claim spoils is the **report**: inherit it and the PR ships framed as
+coverage-only, so a real defect the change surfaced goes out described as
+nothing found.
+
+Ordering is the whole remedy, and it is free.
+**Run the widened instrument before writing the PR body, the changelog, or the
+commit message** --- not to check the premise as a separate step, but because
+the first run answers it as a side effect.
+Then report what it actually returned.
+
+- **Do:** run a coverage-widening change and read its output before writing
+  any prose that describes what the change found.
+- **Do:** treat a defect the widened instrument surfaces as in scope, per
+  [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md) ---
+  leaving it puts the newly-added check red on the default branch.
+- **Don't:** carry an issue's "currently clean" claim into a PR body; the
+  issue could not have checked it, which is why the issue exists.
+- **Don't:** read the claim's reassuring direction as making it safer to
+  inherit --- a premise that shrinks the task is the one nobody re-derives.
+
+(`Morrison-Lab/ai-config#763` -> `#1454`, 2026-08-13: the issue reported that
+`scripts/check-links.py` did not scan `memories/`, and added "All 26 resolve
+today, so this is a missing guard rather than an outstanding breakage."
+Adding the glob and running the script found a real broken link on the first
+run --- `memories/preferences.md` pointed at `shared/workflow/ardi.md`, which
+resolves relative to that file as `memories/shared/workflow/ardi.md` and does
+not exist, while the other 80 links from `memories/` into `shared/` already
+used the `../` form.
+The issue's own repro command is the tell: it reported 683 links across 405
+files, figures only the un-widened script could produce, so the scan behind
+"all 26 resolve" was never the scan the issue was asking for.)
+
 ## The limit
 
 This is not a licence to relitigate every task before starting it, and a rule
@@ -309,6 +365,70 @@ DEF=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
 See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
 "A brief's own command contradicted its own disclaimer".
 
+**A brief you re-send each round carries a measurement, and the measurement
+expires while the sentence does not.**
+Both sections above fail because the author never derived the claim, or could
+not.
+This one fails after the derivation succeeded.
+The author ran the check, got a real result, wrote it into the brief, and then
+sent that brief again the next round and the round after, with nothing
+re-testing it in between.
+
+Note the rule does not need to know whether the result expired or was wrong to
+begin with, and in the worked case that stayed unsettled.
+Either way the brief asserted it every round on the strength of one reading,
+and being unable to tell the two apart afterwards is itself the argument for
+re-testing.
+
+The claim type that expires is a **capability**: whether a reviewer is
+reachable, whether a token can dispatch a workflow, whether a host answers.
+Each is a property of a moment rather than of the world, so a correct reading of
+one is a timestamp with a value attached, per
+[`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).
+Restating it a round later keeps the value and drops the timestamp.
+
+Recurrence is what turns that into a premise.
+A brief restating what an earlier round established reads to every later round
+as setup rather than as a claim, so the questioning this fragment asks for never
+fires.
+Author and recipient are also the same party here, which is the strongest form
+of the authority the "Why nothing prompts the check" section describes.
+
+**The sharp case is a brief that forbids the retry that would refute it.**
+A step reading "If still nothing, do NOT re-post the request" is not
+merely a brief failing to re-check.
+It instructs the next round not to, so the falsifying action is ruled out by the
+same document that asserts the thing it would falsify.
+
+**More rules do not fix this, because the rule was already there.**
+[`self-review-fallback`](self-review-fallback.md) says to re-check reachability
+every round, and that a reviewer ineligible a few pushes ago can become
+reachable mid-session.
+That rule was loaded and was defeated by a brief restating the blocker as
+settled, so what failed was not coverage but a mechanism that suppresses
+coverage.
+Read a recurring brief as a thing capable of switching off rules you already
+hold.
+
+The remedy is to carry the query rather than its answer.
+State a blocker in a recurring brief as a command to re-run, with the time the
+last result was taken, so each round re-measures instead of inheriting.
+That is [`derive-dont-enumerate`](derive-dont-enumerate.md) applied to a
+capability rather than to a set, and it belongs here because the author is the
+one who has to write it that way.
+
+- **Do:** write a recurring brief's blockers as a command to re-run each round,
+  timestamped with when it last ran.
+- **Do:** treat a step telling the next round not to retry something as the tell
+  that the brief has closed a question it should hold open.
+- **Don't:** restate an earlier round's finding as an established gate in the
+  next round's prompt.
+- **Don't:** read a rule you already hold as protection --- a brief asserting
+  the blocker settled is what stops that rule running.
+
+See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+"A recurring brief re-asserted a blocker nobody re-tested".
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise
@@ -320,7 +440,9 @@ See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
 - [`derive-dont-enumerate`](derive-dont-enumerate.md) also tells an author to
   hand over a query rather than an assertion, for a set that can grow while
   the work runs.
-  That is staleness in something true; this is a premise that was never true.
+  There the claim was true when written and the set grew past it; here the
+  author either never derived it, could not, or derived it once and never
+  re-tested it.
 - [`grep-is-not-coverage`](grep-is-not-coverage.md) is the same failure inside
   a single step: a real result, a sound command, and a conclusion that
   overreaches it.

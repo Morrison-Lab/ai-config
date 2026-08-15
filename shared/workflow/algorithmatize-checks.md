@@ -154,6 +154,98 @@ the thing under examination.
 - **Don't:** treat a window inherited from an existing test as the metric's
   natural range.
 
+## A threshold pinned to a current measurement needs its rate of change checked, not just its level
+
+The section above is about a metric that will not discriminate anywhere.
+This is about a metric that discriminates fine, and a threshold defined
+*relative to it* --- a ratchet: cap the value a few hundred bytes, seconds,
+or percentage points above wherever it sits today, so the check is green on
+arrival and red on the next regression.
+
+A ratchet's whole premise is that "today's measurement" is a stable
+reference point.
+That premise is a claim about the quantity's own **rate of change**, and
+nothing about writing the ratchet tests it --- the check passes the moment
+it is written, which reads as confirmation rather than as the one case the
+premise was never asked to survive.
+
+Compare that rate against the **interval the check actually has to survive
+between measurements** --- a review round, a merge cadence, a day of
+ordinary edits elsewhere in the file.
+When the quantity moves by a meaningful fraction of the ratchet's own margin
+within that interval, the check is red on the next unrelated change, on a
+file nobody touched, for reasons the diff in front of the reviewer does not
+explain.
+That is not flakiness to route around; it is the ratchet reporting on
+whichever PR happens to land within the window, rather than on the PR that
+grew the quantity.
+
+This is the same comparison
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s "Why serial
+resolution structurally cannot converge" makes for a different pair of rates
+--- there a base branch's merge interval against a review round, here a
+measured quantity's growth against the same kind of interval --- and it is
+worth reading as one instance of a general move: **before trusting a
+threshold set relative to a snapshot, measure how fast the snapshot itself
+moves, against the interval the threshold has to hold across.**
+
+Where the two are close, a ratchet is unimplementable, not merely noisy.
+The fix is not a wider margin --- a margin sized to survive today's rate
+still expires on tomorrow's --- but a **round policy line**, stated as a
+rule a reader can hold ("no file over 100 KB") rather than derived from
+whatever the corpus happened to measure at write time.
+
+Be exact about what that buys, because the tempting overclaim is that a
+round line escapes the comparison.
+It does not.
+A round line is still a level, so the rate still eats its margin; what
+changes is that the margin is **stated and deliberate** rather than an
+artifact of when the threshold happened to be written, and that firing has
+a known response rather than reading as an arbitrary failure.
+A ratchet's margin is accidental and its firing is a surprise; a policy
+line's margin is a decision and its firing is the decision arriving.
+[`configurable-parameters`](../coding/configurable-parameters.md) already
+argues for keeping such a line as a named, adjustable parameter rather than
+a buried literal; this adds where the **value** of that parameter should
+come from when the temptation is to derive it from a live measurement
+instead.
+
+- **Do:** before setting a threshold relative to a current measurement,
+  measure that quantity's rate of change and compare it against the
+  interval the check must survive between reads.
+- **Do:** replace an unworkable ratchet with a round policy line carrying
+  stated runway, rather than a tighter one.
+- **Don't:** read a ratchet passing at the moment it is written as evidence
+  the reference point it is pinned to is stable.
+- **Don't:** treat a check that goes red on an untouched file as flaky ---
+  read it as the reference point having moved faster than the margin.
+
+(`Morrison-Lab/ai-config#1398`, 2026-08-12: a per-fragment size cap was first designed
+as a ratchet, a few hundred bytes above the corpus's then-largest
+auto-loaded fragment.
+Measured over roughly two hours between filing and
+implementing, `shared/workflow/ardi.md` grew 87,448 -> 93,326 bytes and
+`shared/principles/fail-fast.md` grew 89,175 -> 91,835 bytes --- so a cap
+pinned to that day's maximum would have gone red within a day on a PR that
+never touched either file.
+`Morrison-Lab/ai-config#1406` shipped a round 100,000-byte line with
+several KB of runway over both, adding a `--fragment-cap` flag and its
+rationale to the existing `scripts/check-context-closure.py` rather than
+documenting it only here.
+
+The sequel is the evidence for the paragraph above, and it arrived within
+the day: #1406 merged at `14:43:53Z`, `Morrison-Lab/ai-config#1407` merged
+nine minutes later carrying ordinary additions to both files, and by
+`19:20Z` `ardi.md` stood at 95,681 bytes --- 4,319 of runway left, under a
+day at the rates above.
+So the round line did not escape the rate comparison, and was never going
+to.
+What it bought was a firing with a known answer: split case records out to
+a `.cases.md` companion, which is what `Morrison-Lab/ai-config#1413` did,
+merging at `2026-08-13T04:47:54Z`.
+By then `ardi.md` had reached 98,655 bytes, leaving 1,345 of runway, and the
+split returned it to 92,734 while `fail-fast.md` went 94,469 to 91,244.)
+
 ## Never predict which case will fail; enumerate the class
 
 The rule so far concerns checks you *perform*.
@@ -349,6 +441,59 @@ a mechanism and its opposite predict is evidence for neither" owns that case.
   fact-checking because it is documentation --- it is a claim-bearing artifact.
 - **Don't:** settle a mechanism attribution by plausible reasoning; a
   reasoned-but-wrong one reads exactly like a correct one.
+
+**Running the mutation is not the check, because the rule above asks WHETHER
+the case flips and a comment can be wrong about WHICH WAY.**
+Read the operative verbs: "confirm the behaviour **changes**", "confirming the
+case **flips**".
+Both are satisfied by any flip at all.
+So a mutation can pass green while the prose beside it asserts the opposite
+failure direction, and nothing in the round notices --- the rule was followed,
+and following it was not enough.
+
+The missing step is free, and it needs no re-derivation.
+**A mutation's recorded before/after pair is itself a statement of the failure
+direction**, already in machine-checkable form: an entry whose pair reads
+`allow -> block` says the code *with* the clause allows and the code *without*
+it refuses, so removing the clause over-blocks.
+Read that pair back against the sentence, and a contradiction is visible by
+looking.
+
+Expect the two artifacts to sit in **different files**, which is most of why
+nobody compares them.
+The prose lives beside the code it explains and the mutation lives in the test
+suite, so reading either one never brings the other into view --- and they
+still ship in the same commit, by the same author, in the same sitting, so this
+is not a stale note somebody left behind.
+The comparison has to be sought; proximity will not supply it.
+
+It matters more than an ordinary wrong sentence because
+[`fail-fast`](../principles/fail-fast.md)'s safe-versus-dangerous asymmetry is
+the thing that decides whether to accept a later request to loosen a guard.
+A comment that labels an over-block as the lenient direction inverts that
+judgment for the next editor, in the artifact written to guide them.
+
+Two practical notes.
+When a reviewer disputes an attribution, the disproof may already be sitting in
+your own diff rather than needing a fresh experiment.
+And check whether the direction claim was stated twice --- a rationale comment
+and a fixture's docstring routinely carry the same sentence, so fixing the one
+the reviewer quoted leaves the other standing, per
+[`fail-fast`](../principles/fail-fast.md)'s partial-guard rule.
+
+- **Do:** read a mutation's before/after pair back against the prose it
+  supports, in the commit that ships both.
+- **Do:** state a direction in the vocabulary the pair uses --- over-block or
+  fail-open --- so the sentence and the fixture are comparable at a glance.
+- **Do:** grep for the direction claim once one instance is wrong; it is
+  usually written down more than once.
+- **Don't:** count a green mutation as having verified the attribution --- it
+  establishes that something flipped, which is the weaker half.
+- **Don't:** reach for a fresh experiment when a reviewer disputes a direction
+  before checking whether your own fixtures already record it.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A mutation whose recorded direction contradicted the comment beside it".
 
 (Morrison-Lab/gha#425, 2026-08-05: a `check-new-line-breaks.py`
 sentence-boundary regex fix carried a comment block documenting which half of
@@ -917,6 +1062,63 @@ This is the direction that list does not carry.
 - **Don't:** treat moving the mutant to a scratch directory as inert; it
   changes the working directory, the module search path, and possibly the
   interpreter, all silently.
+
+**A seventh outcome belongs to the MATRIX rather than to any mutant: a real
+failure reported under the wrong mutation's name.**
+The six above each interrogate one mutant --- did the edit apply, does it say
+what its author wrote, is its replacement independent of what it replaced, did
+it fail for its own reason.
+A matrix runs several in sequence, and sequence is a property none of those
+checks can see.
+
+Observed directly, and stated as an observation because the mechanism was never
+pinned down.
+A five-mutation matrix run in **one shared scratch directory** --- copy the
+files once, mutate, run, restore, repeat --- reported mutation M3's row as
+failing a test belonging to M2's clause.
+Two runs disagreed with it: the identical mutation run alone named the right
+test, and the harness's own mechanism reproduced in a fresh directory named the
+right test too.
+Nothing beyond that was established, so do not infer a cause from it.
+What is established is that the shared directory produced the misattribution
+and a fresh one per mutation did not.
+
+Note that every discriminator above passes here, the sixth outcome's included.
+An unmutated control was run and passed, so "a mutant that fails where its twin
+also fails has told you about the location" does not fire --- the location is
+fine and the **sequence** is not.
+The row also reported a genuine failure, so nothing keyed on *whether* a
+mutation was caught would flag it either, the block below's totals cross-check
+included.
+Only the name is wrong, and the name is the whole of what a seen-to-fail table
+publishes.
+
+The remedy is to remove the failure mode rather than to find it.
+Give each mutation its own fresh directory.
+That is one `mkdtemp` per row against an open-ended investigation into shared
+state, and it ends with the mode gone rather than explained --- which is worth
+paying for because a mutation matrix is **evidence you publish**, so a harness
+bug inside it is indistinguishable from a finding about the tests, exactly as
+the block below says of any harness's own output.
+
+Distinguish it from the suite-level trap higher up, which is the same
+misattribution one axis over: there a *sibling test case* in the same run
+aborts first, so the catch is credited to the wrong test; here the name belongs
+to a *sibling mutation* in another row of the same matrix.
+
+- **Do:** run each mutation in its own fresh scratch directory, rather than a
+  shared one restored between rows.
+- **Do:** re-run a surprising row alone before believing it --- an isolated run
+  is the cheapest second opinion a matrix has.
+- **Don't:** read a matrix's per-row test names as attributable because its
+  control passed and its counts look right; misattribution moves the name and
+  leaves both intact.
+- **Don't:** spend the round diagnosing shared harness state when isolation
+  deletes the failure mode outright.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A shared scratch directory reporting one mutation's failure under another's
+name".
 
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**

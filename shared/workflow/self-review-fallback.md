@@ -69,6 +69,14 @@ A recurring instance is a repo-level defect rather than a per-PR one, so file it
 
 See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A session that could reach none of four working reviewers".
 
+**The commonest way the re-check above fails is a recurring brief that already calls the reviewer unreachable.**
+A scheduled check-in restating a previous round's blocker as settled makes every later round read it as a premise,
+so this rule stays loaded and never fires.
+The "don't re-post a request that was skipped" instruction just above is the one most likely to harden that way,
+since it is correct about the gate and silent about the capability claim underneath it.
+Re-derive which of the two you are in each round rather than carrying the classification forward.
+See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-send each round carries a measurement".
+
 **A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for.**
 A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.
 The gap is specific and predictable: a shallow self-review checks *structure* --- a dogfood back-reference, ASCII punctuation, semantic line breaks --- and skips the prose *fact-check*, so a false mechanism claim or a misattributed citation sails straight through, since a structural pass has nothing to say about either.

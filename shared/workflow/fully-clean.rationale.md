@@ -211,6 +211,28 @@ comment is accurate throughout and the defect is in the reading.
 The verdict line answers a narrower question than the one criterion 2 asks, and
 it is the part that appears first and gets quoted into a status report.
 
+**Both criteria are per-PR, and a stack is where that stops being automatic.**
+Everything above reads as being about "the PR" because a session normally has one.
+Two stacked PRs are one unit of *work* and two units of *evidence*, so every check here is owed twice --- and the phrase "I read the review" silently becomes ambiguous the moment a second PR exists.
+
+The failure needs no carelessness, only adjacency.
+Stacked PRs are reviewed within seconds of each other by the same reviewer, their comments look alike, and they are usually open in the same status sweep.
+So an impression formed from one PR's verdict transfers to the other without anything asserting it, and the transferred impression is *correct about a real review* --- just not that PR's.
+
+Two things make it survive the round.
+A reviewer that refuses on one PR looks like an answer for the pair, whereas [`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s fifth case already establishes that reviewers fail independently --- and the same independence holds across PRs, so one reviewer's refusal on the stacked PR says nothing about whether a different reviewer posted there.
+And the stacked PR is the one whose evidence gets skipped, because the base is what the session is attending to.
+
+Settle it per PR, from the `**Claude finished` body marker rather than from recollection, and say which PR each verdict came from when reporting the pair:
+
+```bash
+for n in <A> <B>; do
+  printf '%s: ' "$n"
+  gh api "repos/<owner>/<repo>/issues/$n/comments" --paginate \
+    | jq -s '[.[][] | select(.body | startswith("**Claude finished"))] | length'
+done
+```
+
 **The disagreement is measurable, and it is not a wording problem.**
 Across 38 verdict-bearing `claude-review` comments sampled from 16 PRs,
 8 (21%) carried a verdict line that disagreed with the findings in the

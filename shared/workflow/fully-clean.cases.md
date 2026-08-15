@@ -671,3 +671,9 @@ It was merged at `23:38:12Z`, 49 minutes after the last stated verdict, and
 reverted at `23:47:50Z`.
 All four comments were posted under the author's own login, so "the PR has been
 reviewed" was true while "an independent reviewer approved it" was not.)
+
+## Both criteria are per-PR, and a stack is where that stops being automatic
+
+(`ucdavis/bcs`, 2026-08-13: two stacked PRs were reviewed 82 seconds apart, `16:26:16Z` on the stacked PR and `16:27:38Z` on its base.
+The base's verdict was read, a Copilot quota refusal was seen on the stacked PR, and the pair was reported as one verdict plus one refusal.
+The stacked PR's own review had posted and sat unread for 12 hours; the next round re-raised both of its findings and noted the file was byte-identical across the three intervening commits.)

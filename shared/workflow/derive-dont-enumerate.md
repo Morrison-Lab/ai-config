@@ -71,6 +71,43 @@ A parallel session caught that site in `c9e70fc3` --- a PR-branch commit, squash
 The alternatives were already enumerated twice in the same repository: `hooks/no-unreviewed-pr.py` matches five command forms for this one effect --- `gh pr create --reviewer/-r`, `gh pr edit --add-reviewer`, a `-X POST` to the `requested_reviewers` endpoint, and two `request_copilot_review` tool names --- and `tool-mappings.yml` is an effect-to-command registry whose `REQUEST_COPILOT_REVIEW` row carries the REST form outright.
 So the corpus's code already knew the effect had several spellings while the grep searched for one.)
 
+### An identity has textual forms the same way an effect has commands
+
+The tell above is stated for commands, and an **identity** decays the same
+way: one owner, repo, plugin, or person is written in several textual forms,
+and a sweep deriving its sites from one form cannot reach the others.
+`owner/repo` is also `owner.github.io/repo` (the separator is a dot, so no
+slash-anchored pattern can match it), also `plugin@owner` (the identity is a
+suffix), also a bare `"owner"` key in a config block (the repo half is
+absent entirely).
+A rename sweep that derives from the slash form alone reports itself
+complete over a corpus that still carries the identity three other ways.
+
+The same session that produced this section's parent case also produced two
+accepted review findings of this shape, in one afternoon:
+
+- A quoting sweep derived its sites from `cli: gh api`, a **field** spelling,
+  and missed the same command in a sibling `github_mcp:` field and embedded
+  mid-value after `git log` (Morrison-Lab/ai-config#1476, round 1: 6 sites
+  claimed, 8 real).
+- An owner-rename sweep derived from the literal `d-morrison/ai-config` and
+  missed the dead `d-morrison.github.io/ai-config` domain in `_quarto.yml`'s
+  `site-url` --- a genuinely broken reference, not mere staleness, invisible
+  to the slash form (Morrison-Lab/ai-config#1482, round 1).
+  The broken plugin refs (`ai-config@d-morrison`) and marketplace key
+  (`"d-morrison"`) had needed their own second pattern in the same sweep for
+  the same reason.
+
+So before publishing an identity sweep's site list, enumerate the identity's
+**forms** --- path, domain, ref-suffix, bare key, and whatever the ecosystem
+adds --- and run one derivation per form, reporting each pattern beside its
+count.
+
+- **Do:** list an identity's textual forms first, and derive per form.
+- **Don't:** report an identity sweep complete from the form you swept;
+  the other forms return the same confident non-empty result for whoever
+  checks them next.
+
 ## The instrument
 
 `scripts/pr-sweep.py` is this rule's deterministic half for the open-PR case.

@@ -318,29 +318,45 @@ line in the stream is a real header.
 The dangerous class is an added source line beginning `++ ` (two pluses
 then a space): git's own `+` prefix turns it into a raw `+++ ` line, which
 no pattern can tell from a header, per the fail-fast caveat above.
-So the precondition check is a count comparison, not a pattern:
+So the precondition check is a per-line membership test, not a pattern and
+not an aggregate: each `+++ ` line's target must be a changed file's
+`b/<path>` or `/dev/null`, and any other target is a phantom.
 
 ```bash
-files=$(git diff --numstat <base>...HEAD | wc -l)
-headers=$(git diff -U0 <base>...HEAD | grep '^+' | grep -c '^+++ ')
+git diff --name-only <base>...HEAD | sed 's|^|b/|' > /tmp/known
+git diff -U0 <base>...HEAD | grep '^+++ ' | sed 's/^+++ //' |
+  while read -r t; do
+    [ "$t" = /dev/null ] && continue
+    grep -qxF "$t" /tmp/known || echo "phantom: +++ $t"
+  done
 ```
 
-Equal means every `+++ ` line is one file's header and the filter drops
-exactly the headers; any inequality (either direction --- a `++ ` source
-line inflates it, a binary file deflates it) means fall back to parsing the
-diff's hunk structure instead of prefix-filtering.
+Any `phantom:` line means fall back to parsing the diff's hunk structure
+instead of prefix-filtering.
+An aggregate comparison --- the stream's `^+++ ` line count against
+`--numstat`'s file count --- cannot serve here: a header-deflating file (a
+binary, a mode-only change) and a `++ ` source line elsewhere in the same
+diff cancel, leaving the totals equal over a stream that still carries a
+phantom, while a per-item test has nothing to cancel.
+Note the deflating files are irrelevant to the filter's own safety --- a
+missing header drops nothing --- so the aggregate was also counting a
+quantity the question never depended on.
+The residual limit: a phantom whose text coincidentally names a changed
+file's own `b/<path>` is indistinguishable from that header by any stream
+inspection, so certainty past that point is hunk-structure parsing.
 
 - **Do:** count added lines from `--numstat`, not from a header-stripped
   extraction.
-- **Do:** verify the stream's `^+++ ` line count equals the diff's
-  `--numstat` file count before trusting a `^+++ ` header filter on kept
-  content, and fall back to hunk-structure parsing on any inequality.
+- **Do:** verify every `+++ ` line's target is a changed file's `b/<path>`
+  or `/dev/null` before trusting a `^+++ ` header filter on kept content,
+  and fall back to hunk-structure parsing on any phantom.
 - **Don't:** reuse the single-`tail` pipeline on a multi-file diff when its
   output is counted or kept --- it was written for a one-file diff, and each
   extra file adds one phantom line.
-- **Don't:** guard the header filter with a pattern over single lines ---
-  the hazardous line is raw `+++ `, which is indistinguishable from a
-  header by any pattern, so only comparing counts can detect it.
+- **Don't:** guard the header filter with a single-line pattern or an
+  aggregate count --- a raw `+++ ` line matches every header pattern, and
+  totals can cancel; only the per-line membership test decides it, up to
+  the coincidental-path limit above.
 
 (Morrison-Lab/ai-config#1476, 2026-08-15, review round 1, finding 2: a PR
 body claimed "13 added lines" over a two-file diff whose true count was 12

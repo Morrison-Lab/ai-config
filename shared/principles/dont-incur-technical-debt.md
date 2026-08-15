@@ -200,8 +200,8 @@ git rev-parse <merge-commit>^{tree} <branch-head>^{tree}   # equal => still chec
   match; that measurement reads two.
 
 (`Lacaedemon/sparta` #1255 -> #1256 -> #1257, 2026-08-13/15.
-#1255's central evidence was a tree-identity proof: `7ac2901`, the head its round-2
-review verified, and `d243fb0`, its final head, are both tree
+The central evidence in #1255 was a tree-identity proof: `7ac2901`, the head its
+round-2 review verified, and `d243fb0`, its final head, are both tree
 `cbfbc77f71e5ff0333434a606d240259383a9c5d`, so a bit-identity proof, an ops-counter
 table and a demo-defect scan carried across without being re-run.
 The intervening commit was a bot re-implementation, reverted --- not a rebase, which is

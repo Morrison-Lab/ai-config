@@ -221,21 +221,33 @@ mutates a PR stays serial.
 
      ```bash
      base="$(git merge-base <head> origin/main)"
-     git diff -U0 "$base" <head> | grep '^+' | grep -v '^+++ '   # added lines
+     git diff --name-only "$base" <head> | while read -r f; do
+       git diff -U0 "$base" <head> -- "$f" | grep '^+' | tail -n +2 | sed 's/^+//'
+     done
      # per line, normalized for whitespace and inline markup, ask twice:
      #   present in the same path on origin/main?
      #   present anywhere in origin/main's Markdown corpus?
      ```
 
-     Drop the `+++ b/<path>` headers per file rather than by position.
-     A PR diff spans several files and carries one header each, so a
-     `tail -n +2` removes only the first and leaves the rest in the stream,
-     where they read as content and inflate the score's denominator.
-     Confirm `grep -c '^++[^+]'` returns 0 over the same stream before
-     trusting the header filter: an added line whose own text begins `++`
-     is indistinguishable from a header once the diff's marker is prepended,
-     per [`fail-fast`](../../shared/principles/fail-fast.md)'s third pattern
-     direction.
+     Scope the diff to one file at a time, so each `+++ b/<path>` header is
+     dropped by **position** rather than by pattern.
+     Neither shortcut survives a whole-PR diff, and they fail in opposite
+     directions.
+     A single `tail -n +2` drops only the first file's header and leaves the
+     rest in the stream, where they read as content and inflate the score's
+     denominator.
+     A `grep -v '^+++ '` filter drops every header and also drops any added
+     line whose own text begins `++ `, since the diff's own marker turns it
+     into `+++ ` --- so that filter silently deletes real content, which is
+     the worse of the two.
+     No prefix pattern separates a header from its data, per
+     [`fail-fast`](../../shared/principles/fail-fast.md)'s third pattern
+     direction; per-file position does.
+
+     Cross-check the extracted line count against `git diff --numstat`'s
+     insertion column, which is computed by something other than this
+     pipeline --- a disagreement means a header leaked in or a content line
+     was swallowed, rather than anything about supersession.
 
      - **Do:** run the supersession grep over `main`'s whole Markdown corpus,
        not over the PR's own file paths.

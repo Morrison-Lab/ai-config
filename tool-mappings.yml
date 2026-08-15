@@ -62,7 +62,7 @@ operations:
     github_mcp: mcp__github__pull_request_read (method=get_comments)
   - id: READ_PR_REVIEW_COMMENTS
     description: Read a pull request's inline review-thread comments (also returns thread ids).
-    cli: gh api repos/<owner>/<repo>/pulls/<N>/comments
+    cli: gh api "repos/<owner>/<repo>/pulls/<N>/comments"
     github_mcp: mcp__github__pull_request_read (method=get_review_comments)
   - id: READ_PR_REVIEWS
     description: Read a pull request's formal reviews (state per reviewer, e.g. APPROVED / CHANGES_REQUESTED / COMMENTED).
@@ -98,7 +98,7 @@ operations:
     github_mcp: mcp__github__add_issue_comment
   - id: REPLY_REVIEW_COMMENT
     description: Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead.
-    cli: gh api -X POST repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies -F body=@<file>
+    cli: gh api -X POST "repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies" -F "body=@<file>"
     github_mcp: mcp__github__add_reply_to_pull_request_comment
   - id: RESOLVE_REVIEW_THREAD
     description: Mark an inline pull-request review thread as resolved.
@@ -126,7 +126,7 @@ operations:
     github_mcp: mcp__github__issue_read (method=get_comments)
   - id: ISSUE_LINKED_PRS
     description: List the pull requests cross-referenced from an issue's timeline (i.e. PRs that link or close it).
-    cli: gh api --paginate repos/<owner>/<repo>/issues/<N>/timeline
+    cli: gh api --paginate "repos/<owner>/<repo>/issues/<N>/timeline"
     github_mcp: (no GitHub MCP tool; approximate with SEARCH_PRS)
   - id: CREATE_ISSUE
     description: Open a new issue.
@@ -158,7 +158,7 @@ operations:
       Read a single label's name, color, and description. There is no MCP tool
       to create or update a label; use gh label create/edit, or gh api from a
       workflow.
-    cli: gh api repos/<owner>/<repo>/labels/<name>
+    cli: gh api "repos/<owner>/<repo>/labels/<name>"
     github_mcp: mcp__github__get_label
   - id: LIST_DISCUSSIONS
     description: List a repository's discussions. Readable over REST; writes are GraphQL-only.
@@ -210,7 +210,7 @@ operations:
     github_mcp: (no GitHub MCP tool; use gh api -X DELETE repos/<owner>/<repo>/git/refs/heads/<branch>)
   - id: READ_FILE
     description: Read a file's contents from the repo.
-    cli: gh api repos/<owner>/<repo>/contents/<path>
+    cli: gh api "repos/<owner>/<repo>/contents/<path>"
     github_mcp: mcp__github__get_file_contents
   - id: LIST_COMMITS
     description: >-
@@ -233,7 +233,7 @@ operations:
       projection: the endpoint returns an object rather than an array, so a
       bare `--paginate` concatenates one object per page and the result is not
       valid JSON.
-    cli: gh api repos/<owner>/<repo>/actions/secrets --paginate --jq '.secrets[]'
+    cli: gh api "repos/<owner>/<repo>/actions/secrets" --paginate --jq '.secrets[]'
     github_mcp: (no GitHub MCP tool; use gh api)
   - id: SET_SECRET
     description: >-

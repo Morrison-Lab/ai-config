@@ -157,14 +157,60 @@ Report the count, per
 A test that fails against the old code only because the function did not exist
 yet says nothing about the bug, so name those and exclude them from the count.
 
+#### Which ref to restore from, not only which file
+
+The block above answers "what to revert" as a question about which **file**.
+There is a second axis, and `origin/main` is the wrong answer to it whenever
+the regression was introduced **within the PR**, across rounds.
+
+A multi-round PR has at least two candidate baselines: the base branch, and
+the previous round's head.
+Only the second is the control for a bug the PR itself introduced, because the
+base branch may not contain the structure the test targets at all -- so
+restoring from it does not reproduce the failure, and cannot.
+
+The failure direction is what makes this worth stating.
+A base-branch control does not error.
+It returns a **plausible** result, which reads as the new test being weak
+rather than as the baseline being wrong, and nothing in the output says which
+one you are looking at.
+Published, it also misattributes the regression's provenance: a two-column
+old-versus-new table implies the bug pre-dated the PR when the PR's own first
+round created it.
+
+Note this is the exact mirror of the preceding paragraph, which is why the two
+belong together.
+There, a test fails against the old code for a reason unrelated to the bug,
+because the function did not exist yet -- a false positive that inflates the
+count.
+Here, a test passes against the old code for the same underlying reason, that
+the base branch lacks the structure under test -- a false negative that empties
+it.
+One root cause, opposite symptoms, and only the second is silent.
+
+So restore from the previous round's head, and prefer a three-way baseline
+over a two-way one: base branch, previous round, current head.
+The three-way form makes the provenance visible rather than implied, and it
+costs one extra column.
+Report the checks **completed** alongside the pass and fail counts, since a run
+that died partway reports few failures rather than many, and the completed
+count is what distinguishes a crash from a clean run.
+
 - **Do:** check what regime a fixture's data covers, against the
   specification, whenever a fix will not pass without changing that fixture.
 - **Do:** restore only the implementation, run the new tests against it, and
   report the failure count before calling the fix regression-tested.
+- **Do:** restore from the previous round's head, not the base branch, when
+  the regression was introduced within the PR.
+- **Do:** report a three-way baseline for a multi-round PR, and include the
+  checks-completed count so a crash is distinguishable from a clean run.
 - **Don't:** read a forced fixture change as a sign the fix is too invasive
   -- it is frequently evidence the fixture was wrong.
 - **Don't:** treat a long-green fixture as a specification; it records what
   the code did, not what it was supposed to do.
+- **Don't:** read a plausible result from a base-branch control as evidence
+  the new test is weak -- for an intra-PR regression that is what a wrong
+  baseline looks like, and it is indistinguishable from a real pass.
 
 ## A third direction: a fixture that cannot tell the two apart
 

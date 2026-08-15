@@ -475,6 +475,36 @@ def submodule_reader(base: Path, submodule: str, rev: str):
     return read
 
 
+def baseline_reader(base: Path, rev: str):
+    """Read this repo's own files at `rev`, but ABSOLUTE imports from disk.
+
+    The mirror of `submodule_reader` for the single-repo case: there the
+    split is by path prefix because only the submodule's content moves,
+    here it is because an absolute import points OUTSIDE the repo, so no
+    revision of this repo has a version of it. Reading those from disk
+    matches what `local_reader` does and keeps a genuinely loaded file from
+    being reported as a dangling import at the baseline.
+
+    The test is `("/", "~")` rather than `"~"` alone, matching `resolve()`'s
+    own definition of "already absolute, do not join". Both other readers
+    already fall through to disk for either spelling -- `local_reader`
+    because `base / path` discards `base` when `path` is absolute, and
+    `submodule_reader` via its non-submodule catch-all. Special-casing only
+    `~` here sent a `/`-prefixed import to `git show REV:/abs/path`, which
+    git rejects outright, so a file that is present on disk and unchanged
+    from the baseline was reported dangling and its bytes were excluded
+    from the baseline total -- inflating the reported growth by that file's
+    full size on every run.
+    """
+    from_git = git_reader(base, rev)
+    from_disk = local_reader(base)
+
+    def read(path: str) -> bytes | None:
+        return from_disk(path) if path.startswith(("/", "~")) else from_git(path)
+
+    return read
+
+
 def render(
     files, missing, unresolved_inline, ambiguous, budget, bytes_per_token, label,
     top_n=10,
@@ -592,18 +622,29 @@ def render_fragment_caps(files, cap):
     return bool(breaches), "\n".join(lines)
 
 
-def render_delta(before_total, after_total, bytes_per_token, rev) -> str:
-    """Human-readable pin-bump delta."""
+def render_delta(
+    before_total, after_total, bytes_per_token, title, before_label, after_label
+) -> str:
+    """Human-readable before/after delta.
+
+    The labels are parameters rather than literals because the two callers
+    measure opposite things and would otherwise read backwards. In pin-bump
+    mode `before` is the CURRENT pin and `after` is the target revision; in
+    baseline mode `before` is the BASE REVISION and `after` is the working
+    tree. Sharing one hard-coded pair of row labels would make one of the
+    two reports state the reverse of what it measured.
+    """
     delta = after_total - before_total
     pct = (100 * delta / before_total) if before_total else 0
     sign = "+" if delta >= 0 else ""
+    width = max(len(before_label), len(after_label), 9)
     return (
-        f"\nPin-bump delta (submodule resolved at {rev}):\n"
-        f"    current   {before_total:>10,} B  "
+        f"\n{title}:\n"
+        f"    {before_label:<{width}} {before_total:>10,} B  "
         f"~{before_total // bytes_per_token:>8,} tok\n"
-        f"    at {rev:<7} {after_total:>10,} B  "
+        f"    {after_label:<{width}} {after_total:>10,} B  "
         f"~{after_total // bytes_per_token:>8,} tok\n"
-        f"    change    {sign}{delta:>9,} B  "
+        f"    {'change':<{width}} {sign}{delta:>9,} B  "
         f"{sign}{delta // bytes_per_token:>8,} tok  ({sign}{pct:.0f}%)"
     )
 
@@ -697,6 +738,21 @@ def main(argv=None) -> int:
         "delta (the pin-bump report)",
     )
     parser.add_argument(
+        "--baseline",
+        metavar="REV",
+        help="measure this repo's OWN closure at REV too, and report what the "
+        "working tree adds (the per-PR report). Distinct from --compare, "
+        "which needs a submodule gitlink and answers a different question.",
+    )
+    parser.add_argument(
+        "--max-growth",
+        type=int,
+        metavar="BYTES",
+        help="with --baseline, exit 1 if the closure grew by more than BYTES. "
+        "Unset by default: reporting the delta is safe on, gating a build is "
+        "a policy number for the maintainer to pick.",
+    )
+    parser.add_argument(
         "--budget",
         type=positive_int,
         default=DEFAULT_BUDGET_BYTES,
@@ -744,6 +800,23 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.baseline and args.compare:
+        # They measure different closures against different references, so a
+        # combined run would print two deltas with no stated relationship and
+        # invite reading one as the other. Refuse rather than pick.
+        print(
+            "error: --baseline and --compare answer different questions "
+            "(this repo's own change vs a submodule pin bump); pass one.",
+            file=sys.stderr,
+        )
+        return 2
+    if args.max_growth is not None and not args.baseline:
+        # Otherwise the flag silently does nothing, which is the shape
+        # `fail-fast.md` warns about: a guard whose pass path and whose
+        # never-ran path look identical.
+        print("error: --max-growth requires --baseline.", file=sys.stderr)
+        return 2
+
     base = Path(args.base).resolve()
     files, missing, inline, ambiguous = walk_closure(args.root, local_reader(base))
 
@@ -777,6 +850,56 @@ def main(argv=None) -> int:
 
     total = sum(size for _, size, _ in files)
     after_total = None
+    growth_over = False
+    if args.baseline:
+        base_files, base_missing, base_inline, base_amb = walk_closure(
+            args.root, baseline_reader(base, args.baseline)
+        )
+        baseline_total = sum(size for _, size, _ in base_files)
+        if not base_files:
+            # The dangerous failure, and the reason this is a hard error
+            # rather than a zero baseline. An unresolvable rev makes every
+            # file read as absent, so the delta would report the ENTIRE
+            # closure as growth -- a confident "this PR added 1.2 MB" that
+            # is an artifact of a typo'd ref. `fail-fast.md`: a check whose
+            # failure path and pass path print the same shape is not a check.
+            print(
+                f"error: could not read {args.root} at {args.baseline}; "
+                "nothing to baseline against. Is the revision fetched and "
+                "does it contain that file?",
+                file=sys.stderr,
+            )
+            return 2
+        # The baseline is a different closure from the working tree's, so its
+        # own diagnostics have to be surfaced too -- the same reasoning the
+        # compare path applies. A fragment that was dangling at the baseline
+        # and is fixed here would otherwise silently inflate the growth.
+        for path, cited_by in base_missing:
+            print(f"  note [at {args.baseline}]: {path} did not resolve "
+                  f"(cited by {cited_by})")
+        for path, cited_by in base_inline:
+            print(f"  note [at {args.baseline}]: inline @{path} did not resolve "
+                  f"(in {cited_by}; not counted)")
+        for path, n in base_amb:
+            print(f"  note [at {args.baseline}]: {path} has {n} unclosed fence "
+                  f"marker(s), so its import parse is ambiguous")
+        print(
+            render_delta(
+                baseline_total,
+                total,
+                args.bytes_per_token,
+                f"Closure delta (this working tree against {args.baseline})",
+                f"at {args.baseline}",
+                "working tree",
+            )
+        )
+        growth = total - baseline_total
+        if args.max_growth is not None and growth > args.max_growth:
+            print(
+                f"\n  GROWTH OVER LIMIT: +{growth:,} B exceeds the "
+                f"{args.max_growth:,}-byte limit."
+            )
+            growth_over = True
     if args.compare:
         # Baseline the CURRENT side on the parent's recorded gitlink, not on
         # the submodule's checked-out tree -- see gitlink_rev's docstring for
@@ -854,7 +977,14 @@ def main(argv=None) -> int:
                 print(f"  note [{label}]: {path} has {n} unclosed fence "
                       f"marker(s), so its import parse is ambiguous")
         print(
-            render_delta(before_total, after_total, args.bytes_per_token, args.compare)
+            render_delta(
+                before_total,
+                after_total,
+                args.bytes_per_token,
+                f"Pin-bump delta (submodule resolved at {args.compare})",
+                "current",
+                f"at {args.compare}",
+            )
         )
         if after_total > args.budget >= before_total:
             print(f"\n  This bump would cross the {args.budget:,}-byte budget.")
@@ -875,6 +1005,12 @@ def main(argv=None) -> int:
     if frag_over:
         # Same stance as root_over above, and NOT gated on --strict. See
         # DEFAULT_FRAGMENT_CAP_BYTES for why this one fails rather than warns.
+        return 1
+    if growth_over:
+        # Not gated on --strict either, but for the opposite reason to the
+        # caps above: this one only fires when the operator passed an
+        # explicit --max-growth, so asking for a second flag to honour the
+        # first would make the limit silently inert.
         return 1
     # --strict covers the compared total too. Gating only on the current
     # total would print "this bump would cross the budget" and then exit 0,

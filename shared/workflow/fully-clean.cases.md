@@ -649,3 +649,25 @@ claim about mechanism instead --- and mechanism is what to reach for, since
   makes one of them stable, rather than asserting the agreement flatly.
 - **Don't:** infer from `--ref` that `pull_requests[].head.sha` is pinned; it
   pins `head_sha`, and the other field re-resolves on every read.)
+
+## Poll a job's step list, not its check-run status
+
+(`Morrison-Lab/gha#440`, 2026-08-09: a review check run read `in_progress`
+for roughly ten minutes after its job had finished every step, "Post review
+comment" included, so the verdict sat on the PR unread for that whole
+stretch.
+Twenty-one consecutive polls of the check run returned `in_progress`; one
+read of the job's step list showed `Complete job` already `completed`.)
+
+## A later comment stating no verdict does not supersede an earlier one
+
+(Morrison-Lab/ai-config#1267, 2026-08-07, reverted by #1275.
+Verified from the API rather than from the revert's own account: the PR carried
+`reviews | length` of 0, and its four comments ran
+`21:56:09Z` **Needs more work**, `22:12:47Z` no verdict, `22:49:12Z` **Needs more
+work**, `23:05:32Z` no verdict --- a long `### Verification` section ending
+"Not merging."
+It was merged at `23:38:12Z`, 49 minutes after the last stated verdict, and
+reverted at `23:47:50Z`.
+All four comments were posted under the author's own login, so "the PR has been
+reviewed" was true while "an independent reviewer approved it" was not.)

@@ -610,3 +610,139 @@ So the blind spot was self-inflicted, and the heuristic was invented to recover
 information that was being discarded on purpose --- which is a better lesson
 than the one first written down, and is why the entry now leads with reading the
 header rather than with comparing figures.)
+
+## A quiet worktree is not evidence the session working it has stopped
+
+Every earlier section in this file assumes the peer worktree is dead.
+This one is about telling that apart from a peer worktree that only *looks*
+dead, before you edit it, delete it, or reassign its branch.
+The operative rule --- ask the agent, never infer --- is restated in
+`CLAUDE.md`'s "Subagent worktrees are assigned" section; this section carries
+the evidence and the case record behind it.
+
+`git status --short` reporting nothing uncommitted, and `git log
+origin/<branch>..HEAD` reporting nothing unpushed, both answer a question
+about a **moment**: is anything sitting here right now that a snapshot would
+show.
+Neither answers "is anyone working here".
+A session between edits, or paused mid-thought, produces the identical
+snapshot to a session that finished and walked away, and nothing in either
+command distinguishes the two.
+
+`ListAgents` not naming a session is the same shape of gap, not a stronger
+signal.
+It reports what the harness currently tracks, and a session can be alive and
+simply not be one the listing surfaces --- so absence there is not proof of
+absence in fact, any more than a clean `git status` is.
+
+**The `idle_notification` timestamp check is sound in form and only as good as
+the timestamp you compare it against.**
+Comparing a teammate's last `idle_notification` against your own most recent
+message to it is the right check --- a notification timestamped before your
+last message is stale, not evidence the teammate has gone quiet since.
+But that check has an input you supply, and if the timestamp you are comparing
+against is itself invented rather than read, the comparison inherits the
+error: a fabricated "now" can make a live, recent notification look stale, and
+the conclusion --- "this session has gone quiet" --- is then built on a number
+nobody measured.
+`Morrison-Lab/ai-config#1453` owns that defect and its fix (derive every
+timestamp you reason about, don't extrapolate from one you derived earlier);
+what matters here is the interaction, not the fix: a fabricated figure feeding
+straight into a **liveness** decision is a sharper failure than feeding into
+an ordinary status recap, because the decision it distorts is exactly the one
+this section is about.
+
+**One step earlier than the timestamp: the field's own semantics are not
+established anywhere in this corpus, so a correct timestamp comparison still
+does not settle liveness on its own.**
+An `idle_notification` carries an `idleReason` such as `"available"`, and
+reading that as "this session has stopped working" is an inference this
+corpus has never verified.
+`"available"` describes a session that is not currently blocked on a tool
+call --- which is exactly what a session sitting on a backgrounded `gh run
+watch` looks like from the outside, since the watch runs and reports without
+occupying the foreground.
+So the timestamp check above can be run correctly, against a real,
+non-fabricated timestamp, and the result still says only when the notification
+was sent --- never what sending it actually meant.
+Read `idleReason` as an unglossed field rather than as a verdict, and treat a
+liveness question it seems to answer as still open.
+
+**Two more direct ways the same misreading arrives, both concluding "dead" on
+evidence that only shows "quiet right now".**
+
+- A worktree read clean via `git status --short`, with no unpushed commits and
+  no `ListAgents` entry, was judged finished, and a second session began
+  editing a file inside it.
+  The Edit tool's own read-staleness guard refused: `File has been modified
+  since read`.
+  The worktree's owner had started editing between the read and the write.
+  What actually prevented the clobber was that guard, not the judgment that
+  produced the edit attempt --- worth naming plainly, since crediting your own
+  care for a tool's backstop is how the next read of a clean worktree gets
+  trusted a little more than it should.
+- A worktree instead sat with real uncommitted work (38 insertions) for over
+  nine hours, with no `ListAgents` entry for it, and was judged dead on that
+  basis.
+  It was alive, and replied within a minute once asked directly.
+
+Both readings used the same evidence --- a snapshot plus an absent listing ---
+and reached opposite, both wrong, conclusions.
+That is the tell that the evidence does not discriminate: it produced "quiet
+but alive" and "quiet and abandoned" from the identical two facts.
+
+**Long-stalled uncommitted work in a container-local worktree is still a real
+problem, and the fix is to ask, not to infer.**
+Uncommitted state in a worktree survives nothing --- not a container
+restart, not a reclaim, not the session that made it forgetting to push.
+So a worktree sitting on real, unpushed edits for hours is genuinely worth
+resolving rather than leaving alone indefinitely.
+The tension is real: leaving it risks losing work if the container churns,
+and touching it risks clobbering work in progress.
+The resolution is not to infer an answer from indirect signals that cannot
+support one --- it is to ask the session directly (`SendMessage` to its id, or
+the equivalent for a peer Claude Code session) and act on the reply.
+One message costs a round trip.
+A clobbered edit costs another session's unpushed work outright, with no
+recovery path once it is gone.
+
+- **Do:** treat a clean, in-sync `git status` in another session's worktree as
+  a statement about that instant, never as a statement about whether anyone is
+  still working there.
+- **Do:** treat `ListAgents` not naming a session as "not tracked here", not as
+  "does not exist".
+- **Do:** ask the session directly before editing or reclaiming a worktree
+  that has sat with real uncommitted work for an extended stretch --- and
+  before concluding it is dead just because it has sat quietly.
+- **Don't:** derive an `idle_notification` staleness comparison from a
+  timestamp you extrapolated rather than measured; see `#1453` for that half.
+- **Don't:** read `idleReason` as a liveness verdict; a correct timestamp
+  comparison still leaves the field's own meaning unestablished.
+- **Don't:** credit your own judgment when a tool's built-in guard is what
+  actually stopped a clobber --- name the guard, so the next read of a clean
+  worktree gets checked rather than trusted.
+
+(`Morrison-Lab/ai-config`, 2026-08-13, in the multi-teammate session that went
+on to merge #1452 as `fcc09f00`: a dispatched teammate's `idle_notification`s
+at `16:08:59Z` and `16:10:24Z` were judged stale against status recaps timestamped
+roughly `16:13Z` and `16:20Z` --- timestamps that had themselves been
+extrapolated rather than re-derived, per `#1453`.
+Separately, that teammate's worktree read `git status --short` clean and
+in-sync, with no `ListAgents` entry, and was judged finished; editing
+`shared/workflow/fully-clean.md` inside it was refused by the Edit tool's
+staleness guard mid-edit, because the teammate had started editing the same
+file between the read and the write.
+Later the same worktree sat with 38 uncommitted insertions for over nine
+hours with no `ListAgents` entry, was judged dead, and replied within a
+minute once asked --- it then reclaimed the PR itself.
+A fourth instance came from a different source: the team-lead session's own
+review message on the PR recording all this, which read the agent writing
+this entry as idle roughly three minutes after it dispatched the review run
+that produced round 1, on the strength of an `idleReason: "available"`
+notification --- and named the notification's own semantics as unverified
+only once the writer pointed out the watch had, in fact, been running the
+whole time.
+Recorded here as evidence about the field rather than about a worktree,
+since nothing about it involved git state --- the mechanism is identical to
+the first two instances, and the correction came from a message rather than
+from a diff.)

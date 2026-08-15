@@ -452,3 +452,34 @@ The discriminating observation was the same one held longer.
 The direction of the error is the part worth carrying: the immediate look
 supported the stronger claim, permanence, and the cheaper observation was the
 one that would have refuted it.)
+
+## A retraction is only as good as the instrument's reach
+
+(`Morrison-Lab/ai-config#1281`, 2026-08-07: a review cancelled with no verdict
+was explained by `concurrency: cancel-in-progress`, correctly.
+Asked to check, the session grepped the **caller** workflow,
+`.github/workflows/claude-review.yml`, found no `concurrency` block, and
+retracted the explanation to the user as something carried over from another
+repo's setup without checking.
+That caller is 68 lines and delegates to
+`Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`, which declares
+the group at job level, line 328 of 1091, beneath a 25-line comment describing
+this exact race.
+The grep was sound and covered 68 lines of a call chain over 1150 lines long,
+so it could not have returned a hit whether or not the claim was true.
+`memories/github-actions.md`'s "A caller with no `concurrency:` block can still
+have its runs cancelled" had recorded the same fact two days earlier, from
+PR #1224, and was not consulted.)
+
+## "Unresolved between two sources" is a place to stop checking, not a finding
+
+(Morrison-Lab/ai-config#1238, 2026-08-07: a reviewer's `gh pr view --json
+comments` reported a comment's `author_association` as `COLLABORATOR`; this
+session's own tool call reported `MEMBER` for the identical comment id.
+Rather than run one more check, the memory being edited was corrected to
+state both readings as an unresolved cross-surface disagreement -- which
+was itself wrong, and became the review's next finding.
+A third check, `list_repository_collaborators`, resolved it in one call: the
+account held a direct collaborator grant, matching `COLLABORATOR` and
+explaining the `MEMBER` reading as this session's own tool's outlier.
+The "unresolved" framing cost a full review round it did not need to.)

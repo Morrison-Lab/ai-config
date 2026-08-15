@@ -115,6 +115,8 @@ The fragment above carries the mechanics, the failure modes each check catches, 
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` — get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces PT on a machine set to any other zone).
 This makes "as of when" unambiguous when the user reads the recap later.
+Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
+A single honest measurement earlier in the session is what most easily licenses an invented timestamp later, because the memory of having consulted the clock obscures that the measurement has expired.
 
 **Check the `%Z` in the output.** On Windows Git Bash the `TZ` override silently falls back to GMT (any IANA zone name does), so the command above prints GMT, not PT.
 If the suffix isn't PDT/PST, fall back to plain `date` when the machine's system zone is already Pacific.

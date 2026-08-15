@@ -18,6 +18,8 @@ In every session — at session start, and again periodically during long sessio
 ## Timestamp recaps in local time
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` — get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
+Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
+A single honest measurement earlier in the session is what most easily licenses an invented timestamp later, because the memory of having consulted the clock obscures that the measurement has expired.
 
 ## File formatting & links
 

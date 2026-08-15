@@ -108,7 +108,27 @@ See ai-config#694 for the precedent.
   don't expect a direct-dispatch workaround to succeed where rerun failed
   (confirmed on UCD-SERG/serodynamics#193, and again on `d-morrison/rme#1017`
   trying to dispatch `publish.yml` — same `403 Resource not accessible by
-  integration`). Prefer folding
+  integration`).
+  **`run_workflow` succeeded on `Morrison-Lab/ai-config`, 2026-08-15, so treat
+  this as per-session and per-repo rather than as a standing limit --- and
+  attempt it before reporting it blocked.**
+  Dispatching `claude-review.yml` with `ref` set to the PR branch and
+  `inputs: {"pr_number": "1469"}` returned `204 No Content`, and the run
+  genuinely started rather than merely queueing: run `31896086493`, with
+  `review / gather-context` reading `in_progress` at `16:39:08Z` seconds later.
+  That second check is the load-bearing one, since a 204 is an acknowledgement
+  and says nothing about whether a job ran.
+  **Do not generalize it to the rerun family.**
+  `rerun_failed_jobs`, `rerun_workflow_run`, and `cancel_workflow_run` were not
+  exercised in that session, so the bullet above stands unrefuted for them; what
+  changed is one method on one repo, which is the same per-surface discipline
+  the placeholder-stripping entry above insists on.
+  The general lesson is [`growth-mindset`](../shared/workflow/growth-mindset.md)'s
+  "First check the limitation is real": this was avoided for a whole session on
+  the strength of a memory bullet, and one call refuted it.
+  A recorded 403 is a measurement of a moment, so re-attempt rather than
+  inheriting it, and timestamp whatever you find.
+  Prefer folding
   the retry into a real, already-pending fix (e.g. a reviewer's requested
   wording tweak) over pushing a bare `--allow-empty` commit — same retrigger,
   no throwaway commit in history. Only use an empty commit when no real fix is

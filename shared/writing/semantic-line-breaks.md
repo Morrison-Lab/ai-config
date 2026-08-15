@@ -389,6 +389,73 @@ separates the header from an added line that itself begins with `++`, per
 It is harmless in this particular pipeline only because the trailing `^#`
 filter discards the mangled header anyway.
 
+**`tail -n +2` strips exactly one header, so on a multi-file diff the
+position trick under-corrects.**
+A diff carries one `+++ b/<path>` header per file, all of them surviving the
+`grep '^+'`, and `tail -n +2` removes only the first --- so a two-file diff
+leaves one mangled `++ b/<path>` line in the stream, and an N-file diff
+leaves N-1.
+A trailing filter (the `^#` grep above) still discards them, but a pipeline
+whose output is *counted* or *kept* silently inflates by N-1: an added-lines
+count reads one high per extra file, and the phantom line reads as content.
+For a count, skip the extraction entirely and sum
+`git diff --numstat <base>...HEAD`'s first column, which has no headers to
+strip.
+For kept content, drop headers per file rather than by global position ---
+`grep '^+' | grep -v '^+++ '` --- which is safe exactly when every `+++ `
+line in the stream is a real header.
+The dangerous class is an added source line beginning `++ ` (two pluses
+then a space): git's own `+` prefix turns it into a raw `+++ ` line, which
+no pattern can tell from a header, per the fail-fast caveat above.
+So the precondition check is a per-line membership test, not a pattern and
+not an aggregate: each `+++ ` line's target must be a changed file's
+`b/<path>` or `/dev/null`, and any other target is a phantom.
+
+```bash
+git diff --name-only <base>...HEAD | sed 's|^|b/|' > /tmp/known
+git diff -U0 <base>...HEAD | grep '^+++ ' | sed 's/^+++ //' |
+  while read -r t; do
+    [ "$t" = /dev/null ] && continue
+    grep -qxF "$t" /tmp/known || echo "phantom: +++ $t"
+  done
+```
+
+Any `phantom:` line means fall back to parsing the diff's hunk structure
+instead of prefix-filtering.
+An aggregate comparison --- the stream's `^+++ ` line count against
+`--numstat`'s file count --- cannot serve here: a header-deflating file (a
+binary, a mode-only change) and a `++ ` source line elsewhere in the same
+diff cancel, leaving the totals equal over a stream that still carries a
+phantom, while a per-item test has nothing to cancel.
+Note the deflating files are irrelevant to the filter's own safety --- a
+missing header drops nothing --- so the aggregate was also counting a
+quantity the question never depended on.
+The residual limit: a phantom whose text coincidentally names a changed
+file's own `b/<path>` --- or is literally `/dev/null`, colliding with the
+deletion-header sentinel the test skips --- is indistinguishable from a
+real header by any stream inspection, so certainty past that point is
+hunk-structure parsing.
+
+- **Do:** count added lines from `--numstat`, not from a header-stripped
+  extraction.
+- **Do:** verify every `+++ ` line's target is a changed file's `b/<path>`
+  or `/dev/null` before trusting a `^+++ ` header filter on kept content,
+  and fall back to hunk-structure parsing on any phantom.
+- **Don't:** reuse the single-`tail` pipeline on a multi-file diff when its
+  output is counted or kept --- it was written for a one-file diff, and each
+  extra file adds one phantom line.
+- **Don't:** guard the header filter with a single-line pattern or an
+  aggregate count --- a raw `+++ ` line matches every header pattern, and
+  totals can cancel; only the per-line membership test decides it, up to
+  the coincidental-path and `/dev/null`-sentinel limits above.
+
+(Morrison-Lab/ai-config#1476, 2026-08-15, review round 1, finding 2: a PR
+body claimed "13 added lines" over a two-file diff whose true count was 12
+--- the extraction pipeline above had left the second file's `+++` header in
+the stream, and the header was counted as an added line.
+The reviewer derived 12 from the PR's own `additions` field; `--numstat`
+confirms it.)
+
 - **Do:** scan added lines for a column-1 `#` before pushing, with the same
   after-committing, three-dot discipline the other diff-scoped scans use.
 - **Do:** reword the clause to open with a word, keeping the reference inline.

@@ -42,6 +42,41 @@ confirm a genuine all-clear review is posted at the current head from an externa
 a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
 doesn't satisfy this once an external verdict is obtainable.
 
+**"Reachable" is a property of the session as well as of the reviewer, and the second kind is not a fallback case at all.**
+Everything above treats reachability as a fact about the *reviewer* --- quota-exhausted, unlicensed, rate-limited, not configured --- so the remedy is always to re-check it later, on the reasonable assumption that whatever ails it may lift.
+There is a fourth state that wording does not reach, and it never lifts on its own: the reviewer is working perfectly, and **this session** cannot summon it.
+
+The distinction decides the disposition, which is why it is worth separating rather than folding into "unavailable".
+A reviewer that is down hands the verdict to a self-review, per this whole fragment.
+A reviewer that is up and unreachable-by-you hands it to **a human**, in one step, and a self-review substitutes for nothing --- so reporting the PR ready on one would assert an all-clear that a working reviewer was never asked for.
+
+The tell is a **permission or identity** answer rather than a capacity one:
+a `403 Resource not accessible by integration` on a dispatch (the token lacks `actions: write`),
+or a comment-triggered run reporting **skipped** rather than failed, which means its job `if:` rejected you ---
+usually an `author_association` allowlist, against a session whose comments post under a bot identity as `CONTRIBUTOR`.
+The reviewer completing on somebody else's branch the same day settles that it is up.
+
+Read the gate rather than inferring it, and note a caller that delegates via `uses:` gates in the **callee** at its pinned ref, so the caller's own `on:` block settles nothing (see [`pr-on-claim`](pr-on-claim.md)).
+One read settles the identity half:
+`gh api "repos/<owner>/<repo>/issues/comments/<id>" --jq '{user: .user.login, assoc: .author_association}'`.
+
+Then post the self-review anyway, and report the PR **blocked on an external verdict** rather than ready, naming the one action that unblocks it.
+Don't re-post a request that was skipped --- the gate that rejected it rejects the retry.
+A recurring instance is a repo-level defect rather than a per-PR one, so file it, per [`report-mistakes-proactively`](report-mistakes-proactively.md).
+
+- **Do:** classify a missing verdict as reviewer-down or session-blocked before choosing a disposition, and say which.
+- **Don't:** read a `skipped` run as a failed one, or report a PR ready on a self-review when a working reviewer is one human action away.
+
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A session that could reach none of four working reviewers".
+
+**The commonest way the re-check above fails is a recurring brief that already calls the reviewer unreachable.**
+A scheduled check-in restating a previous round's blocker as settled makes every later round read it as a premise,
+so this rule stays loaded and never fires.
+The "don't re-post a request that was skipped" instruction just above is the one most likely to harden that way,
+since it is correct about the gate and silent about the capability claim underneath it.
+Re-derive which of the two you are in each round rather than carrying the classification forward.
+See [`challenge-the-assignment`](challenge-the-assignment.md)'s "A brief you re-send each round carries a measurement".
+
 **A fallback self-review is prone to being shallow, so hold it to the same bar as the bot it stands in for.**
 A self-review you post *because* the automated reviewer was unavailable --- quota-skipped, a stub, or erroring on an infra failure --- feels like a stopgap rather than the real review, so it tends to get a shallower pass than the round deserves.
 The gap is specific and predictable: a shallow self-review checks *structure* --- a dogfood back-reference, ASCII punctuation, semantic line breaks --- and skips the prose *fact-check*, so a false mechanism claim or a misattributed citation sails straight through, since a structural pass has nothing to say about either.

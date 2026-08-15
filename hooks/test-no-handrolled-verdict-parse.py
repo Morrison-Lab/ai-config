@@ -36,9 +36,20 @@ INCIDENT = (
 INCIDENT_1257 = INCIDENT.replace("1278", "1257")
 
 
-def checker(pr=None):
-    """A transcript event: an invocation of the instrument."""
+def checker(pr=None, repo=None):
+    """A transcript event: an invocation of the instrument.
+
+    `repo` produces the space-separated `-R OWNER/REPO` form the script grew in
+    ai-config#1391. That form is the one CHECKER_CALL had to be widened for: a
+    flag whose value is a separate token used to stop the scan before the PR
+    number, so the PR went unrecorded and a later parse targeting that same PR
+    was BLOCKED despite the instrument having answered for it -- a
+    false-positive over-block, not a lenient discharge. The mutation case below
+    pins that direction as its before/after pair (allow -> block).
+    """
     cmd = "python3 scripts/check-pr-fully-clean.py"
+    if repo is not None:
+        cmd += f" -R {repo}"
     if pr is not None:
         cmd += f" {pr}"
     return {"type": "assistant", "message": {"content": [
@@ -102,6 +113,19 @@ CASES = [
      [checker(1278)], False,
      "no PR number in the command: any invocation discharges (documented "
      "leniency at the ambiguous edge)"),
+    # -- a flag whose value is a separate token (ai-config#1391's -R) --------
+    (INCIDENT, [checker(1278, repo="Morrison-Lab/gha")], False,
+     "discharged: `-R OWNER/REPO 1278` still records the PR, though the flag's "
+     "value sits between the flag and the number"),
+    (INCIDENT, [checker(1257, repo="Morrison-Lab/gha")], True,
+     "and the per-PR discipline survives the widening: `-R OWNER/REPO 1257` "
+     "must not discharge a parse about #1278"),
+    ("jq -r '.body|test(\"Ready for merge\")' /tmp/review-body.json",
+     [checker(1278, repo="Morrison-Lab/gha")], False,
+     "the lenient no-PR-number fallback is a property of the SUSPICIOUS "
+     "command, not of what CHECKER_CALL captured -- it fires here because "
+     "this parse names no PR"),
+
     (INCIDENT, [read_checker()], True,
      "a Grep whose PATTERN is the invocation is not a run of it"),
     (INCIDENT, [mention_checker()], True,
@@ -217,6 +241,11 @@ MUTANTS = [
      "gh api repos/o/r/issues/1278/comments --paginate "
      "| jq -s '[.[][] | select(.body | test(\"\\\\*\\\\*Claude finished|### Verdict\"))] "
      "| last | .body'", [], False, True),
+
+    ("CHECKER_CALL admits a flag's separate value token",
+     "(?:\\s+[^-\\s]\\S*)?",
+     "",
+     INCIDENT, [checker(1278, repo="Morrison-Lab/gha")], False, True),
 
     ("clause 4: the discharge is PER-PR",
      "        if targets <= checked:\n                return 0",

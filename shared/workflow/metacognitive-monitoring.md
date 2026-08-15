@@ -602,6 +602,76 @@ hypothesis in front of you, so name the generator before crediting it.
 - **Don't:** confuse a decidable constraint with a plausible mechanism story;
   the section above bans the second, not the first.
 
+## A symptom that both a mechanism and its opposite predict is evidence for neither
+
+The two sections above are a pair, and this is the case they leave between
+them.
+"Search for the artifact" governs a question you answered by reasoning because
+you observed nothing.
+"Ask whether a candidate can produce the effect" governs a candidate a free
+structural check rules out before any measurement.
+Here you **did** observe something, the observation is real, and it is
+consistent with the mechanism you inferred **and** with that mechanism's
+opposite --- so it settles nothing, while feeling like the evidence.
+
+The **cause** claim type above already asks what else explains an observation.
+Sharpen it into something you can fail: ask what the opposite mechanism would
+have produced, and compare that against what you saw.
+When the two predictions coincide, no amount of re-examining the observation
+separates them, and the only way forward is a **different** observation.
+
+**Inferring a permanent state from an immediate one is the commonest shape.**
+"It was still there when I looked" does not distinguish "it never goes away"
+from "it goes away in two seconds", because a single early look is exactly what
+both predict.
+The discriminating observation is usually free and is simply the same one held
+longer: extend the window, or sample until the state changes, and record how
+long that took.
+Note which direction the error runs --- an immediate look supports the
+*stronger* claim, permanence, on the *weaker* evidence.
+
+**A comment justifying a design choice is where such a claim goes unchecked
+longest.**
+No test exercises a comment, so nothing in the suite can contradict it; and it
+reads as settled precisely because it successfully explains code that works,
+which is the one property a false mechanism shares with a true one whenever
+both predict the same behaviour.
+[`fact-check-prose`](../writing/fact-check-prose.md)'s design-choice rule asks
+whether the code implements what the prose claims, which is a different
+question and passes here: the code does exactly what the comment says it does,
+for a reason the comment gets wrong.
+
+**Mutation is the remedy for the neighbouring case and is unavailable for this
+one.**
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "An attribution claim in a
+guide-for-future-edits comment is settled by mutation" governs a claim about
+which part of **your own code** produces a behaviour, and removing that part
+decides it.
+A claim about the **runtime environment** --- what the kernel, the init
+process, the shell, or the platform does --- has nothing in your code to remove,
+so mutation cannot reach it and only measuring the environment can.
+The two are easy to conflate because they arrive in the same artifact, a
+comment, and both are cause claims; the discriminator is whether the subject of
+the claim is something you can edit.
+
+- **Do:** name what the opposite mechanism would have produced, and treat a
+  matching prediction as meaning nothing has been tested yet.
+- **Do:** measure the environment directly when a comment appeals to its
+  behaviour, and timestamp the result, per
+  [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).
+- **Do:** extend the observation window before inferring that a state is
+  permanent.
+- **Don't:** read a symptom as confirming the mechanism you inferred from it
+  --- that is the same evidence twice, not a check.
+- **Don't:** reach for mutation on a claim about the runtime environment; there
+  is nothing to mutate, and finding that out reads as the claim being
+  unfalsifiable rather than as the wrong instrument.
+- **Don't:** treat a comment as fact-checked because the code it explains
+  works.
+
+See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
+"A symptom that both a mechanism and its opposite predict".
+
 ## A correction inherits its instrument, so a second reading is not a check
 
 "Illusions of knowing" above concerns a **single** reading whose scope went
@@ -798,6 +868,94 @@ A third check, `list_repository_collaborators`, resolved it in one call: the
 account held a direct collaborator grant, matching `COLLABORATOR` and
 explaining the `MEMBER` reading as this session's own tool's outlier.
 The "unresolved" framing cost a full review round it did not need to.)
+
+## A re-measurement with a different instrument is a second measurement, not a correction
+
+"A correction inherits its instrument" above governs two readings of the
+**same** instrument, and its remedy is to reach for a different source of
+truth.
+This is what happens once you take that advice and the different instrument
+returns a different number.
+
+That remedy assumes the second reading settles the question.
+It does not, because the instrument change is itself a candidate explanation
+for the difference, and frequently the whole of it.
+Where it is, the second reading supersedes nothing, and publishing it as a
+correction does something worse than leave an error standing: it reports a
+**correct** figure as an error, to everyone the first figure reached.
+
+### Sharpening that section's own test
+
+It already asks the right question and stops one word short.
+"State the mechanism that explains the change" is the test, and "a mechanism
+you cannot name is usually a gauge you did not verify" is its justification.
+The sharpening is that the mechanism has to be a mechanism **in the world**,
+not in the instrument.
+
+"It was 93, now it is 99" is not a correction, and that section says so.
+"The detector gained an `in (` alternative, which matches 6 more sites" is not
+a correction either, and this is the half that reads like one.
+It names a mechanism, it is specific, it is derived, and it accounts for the
+difference completely --- while being a fact about the ruler.
+A named instrument change is therefore the signal that you are holding **two
+measurements**, each owed to the revision that produced it, rather than a
+measurement and its repair.
+
+### Why it evades the checks
+
+Retracting your own figure is the most rigorous-feeling thing available, so
+the replacement inherits credibility the original has just lost.
+Nothing at that moment prompts the one question that separates the two cases:
+**did the quantity change, or did my ruler?**
+
+The revision usually goes unrecorded for a mundane reason rather than a
+careless one.
+A measurement is taken with whatever instrument is at hand, so which revision
+that was reads as a detail of the run rather than as part of the finding ---
+and it drops out first from the paragraph written to be quoted.
+
+### When both revisions are live, neither figure retires
+
+The commonest case has no stale reading in it at all.
+A consumer pins one revision of a tool while the tool's own default branch
+carries another, so both are running, and each answers a different question:
+what the pinned check reports **today**, and what it will report once the pin
+moves.
+Neither supersedes the other, and a reader told the first figure was an error
+stops quoting the one that describes their actual CI.
+
+So label a published figure with the revision that produced it, and publish
+both when both are live.
+
+**This is the boundary with
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "Widening an instrument
+invalidates every figure it produced".**
+That section governs an instrument **you** widen, where the earlier readings
+really are obsolete and the remedy is to re-derive every one of them in a
+single pass.
+Read literally it argues the opposite of this section, since "every number
+that detector produced is stale" is exactly what invites publishing the new
+figure as a correction.
+It holds while one instrument has a before and an after.
+It does not transfer when two revisions stay live at once, because then the
+earlier figure is not stale --- it is still the answer to a question somebody
+is asking.
+
+- **Do:** ask whether two disagreeing figures came from the same revision of
+  the instrument, before framing the later one as a correction.
+- **Do:** label a published figure with the revision that produced it, and
+  publish both when both revisions are live.
+- **Do:** require the mechanism explaining a change to be a mechanism in the
+  world --- a change in the detector explains the disagreement, not the
+  quantity.
+- **Don't:** publish a re-measurement from a different instrument as a
+  correction; that reports a correct figure as an error, to everyone the first
+  figure reached.
+- **Don't:** let a caption naming the instrument stand in for naming it in the
+  claim --- the caption is not the part that gets quoted.
+
+See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
+"A re-measurement with a different instrument".
 
 ## Writing is the instrument, when the claim can be wrong
 

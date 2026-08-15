@@ -35,6 +35,66 @@ had propagated into issues and briefs, which is the convention-document shape
 [`challenge-the-assignment.md`](challenge-the-assignment.md) describes: no
 single reader invented it, and each one found it corroborated.)
 
+## A brief's own command contradicted its own disclaimer
+
+(2026-08-12, a brief dispatched into a `Morrison-Lab/gha` clone: the prose said
+"Do NOT assume anything about its checked-out branch or worktree layout ---
+establish your own working state", and the command block directly beneath it
+assumed both.
+Its two `git worktree add` forms, joined by `||`, differed on whether to create
+the branch or reuse it, and both failed because the branch was already checked
+out in that clone --- so the chain enumerated two states and the real one was a
+third.
+The recipient recovered by detaching the existing checkout and using `-B`.
+
+The same block resolved the default branch with a piped
+`git symbolic-ref --short refs/remotes/origin/HEAD`, falling back to
+`|| echo main` inside the substitution.
+That ref is unset in the clones this corpus is developed in, so the fallback was
+the only thing that could have supplied a value.
+
+**It could not have.**
+An earlier version of this record said `DEF` came from the literal, right by
+luck.
+That was wrong, and wrong in the direction that made the example fit the
+argument, which is why it survived a self-review and was caught in review on
+`Morrison-Lab/ai-config#1408`.
+The `||` does sit inside the substitution here, but the pipe in front of it
+discards the failing command's status and `sed` exits 0 on empty input, so the
+fallback never fires.
+`DEF` ends up **empty**, and `git worktree add` against `origin/` then errors.
+
+Measured, 2026-08-12, with `false` standing in for the failing lookup:
+
+| form | `DEF` |
+|---|---|
+| `DEF=$(false \|\| echo main)` | `main` |
+| `DEF=$(false) \|\| echo main` | *empty* |
+| `DEF=$(false \| sed ... \|\| echo main)` | *empty* |
+| the same, under `set -o pipefail` | `main` |
+
+So the brief carried an inert fallback, and neither its author nor its recipient
+ran it.
+The recipient sidestepped it by resolving the branch with `git remote show
+origin` instead, which is why the inertness surfaced only in review.
+
+The resolution that does answer, derivable in any of these clones:
+`git symbolic-ref --short refs/remotes/origin/HEAD` exits non-zero with
+`fatal: ref refs/remotes/origin/HEAD is not a symbolic ref`, while
+`git remote show origin | sed -n 's/.*HEAD branch: //p'` returns `main`.
+Measured in `/home/user/ai-config` on 2026-08-12, and the recipient reported the
+same result for the `gha` clone the brief targeted.
+
+Two further premises in the same brief were the sections above, unchanged:
+`python3 -m pytest check-phi/tests/ -q` was instructed into an environment whose
+default interpreter has no pytest module (it is a `uv tool install` at
+`/root/.local/bin/pytest`), which is the environment case; and
+`Morrison-Lab/gha#445` was described as an open issue when it is a merged pull
+request, `merged_at` 2026-08-12T07:35:21Z, which is the corpus-state case that
+one `issue_read` call would have settled.
+The recipient caught all three and reported them back, which is again the
+discretionary detector rather than a mechanism.)
+
 ## This fragment's own brief overstated coverage
 
 (2026-07-31, this fragment's own brief: it named four areas as likely
@@ -48,3 +108,32 @@ The brief also pointed at a checkout that was 37 commits behind `origin/main`,
 so every search run there would have understated coverage.
 The brief asked to be questioned, which is why this was caught; the general
 case is a brief that does not.)
+
+## A recurring brief re-asserted a blocker nobody re-tested
+
+(Morrison-Lab/ai-config#1439, 2026-08-13: a session spent roughly 8 hours
+reporting three of its PRs blocked because no external reviewer was reachable,
+citing four gates.
+One of them was "`claude-review` dispatch returns 403 (token lacks
+`actions: write`)".
+At 2026-08-13T04:11Z that exact dispatch was retried and returned HTTP 204,
+"Workflow run has been queued", producing live run 31666212015 on branch
+`ums/claude-settings-scope-precedence`.
+So the claim was false at the time of retry.
+
+Why the two attempts differed was not established, and no mechanism is named
+here.
+Three candidates went untested: the token's permissions may have changed, the
+original 403 may have been misdiagnosed, and the branch was 6 commits behind
+`main` at the first attempt and had just been merged forward at the retry.
+Recording the disagreement is the finding, and naming a cause would be the guess
+this corpus keeps warning against.
+
+What kept the claim alive was the session's own scheduled check-in brief, which
+restated the four gates as established fact every time it fired, and whose step
+4 read "If still nothing, do NOT re-post the request".
+[`self-review-fallback`](self-review-fallback.md)'s "Re-check reachability every
+round" was loaded in context throughout.
+[#902](https://github.com/Morrison-Lab/ai-config/issues/902) is the adjacent
+open issue, covering a one-shot wakeup whose named PR merged underneath it
+rather than a recurring brief carrying a capability claim forward.)

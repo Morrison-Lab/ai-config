@@ -92,6 +92,67 @@ When a specific condition genuinely should be ignored, name it ---
 See [Ignoring
 conditions](https://adv-r.hadley.nz/conditions.html#ignoring-conditions).
 
+## When exit codes carry meaning, an error path must set its own
+
+The "In code" bullets say to stop with a clear error rather than proceed on bad
+state.
+Those bullets are silent on **how the stop is spelled**, and in a program whose
+exit codes are part of its contract that spelling is the whole of it.
+
+Python's convenience idiom is where this bites.
+`raise SystemExit("message")` --- and `sys.exit("message")` --- prints the
+string to **stderr** and exits **1**, because a non-integer argument is taken
+as a message and the status falls back to 1.
+Measured on CPython 3.11.15:
+
+| call | stderr | exit status |
+|---|---|---|
+| `raise SystemExit("some message")` | `some message` | **1** |
+| `sys.exit("some message")` | `some message` | **1** |
+| `raise SystemExit(2)` | (nothing) | 2 |
+| `raise SystemExit(None)` | (nothing) | 0 |
+
+That is harmless in a script whose only contract is zero-or-nonzero.
+It is a **wrong-verdict** bug in one whose codes are semantic, because 1 is
+already spoken for.
+
+Note which way the damage runs, since it is not the usual one.
+A wrong error message misinforms a human reading the output.
+This hands a **substantive answer about the subject** to a machine that asked
+a question, in the vocabulary that program is entitled to use --- so no caller
+has any reason to doubt it, and the stderr line saying otherwise is read by
+nobody.
+
+The remedy is a named constant plus a helper, so no error path can inherit a
+default that means something else:
+
+```python
+USAGE_EXIT = 2   # distinct from 1, which this script reserves for "not clean"
+
+def die(msg: str) -> None:
+    print(msg, file=sys.stderr)
+    raise SystemExit(USAGE_EXIT)
+```
+
+Then assert the **code**, not the fact of exiting.
+`assertRaises(SystemExit)` is satisfied by every value of it, including the
+colliding one, so a suite written that way goes green on exactly this defect.
+That is an assertion whose expected value makes it unfalsifiable, which
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md) already says to
+flag in review.
+
+- **Do:** reserve a distinct status for usage and internal errors whenever any
+  other status carries a verdict, and set it explicitly.
+- **Do:** assert the exit code in the test, not merely that `SystemExit` was
+  raised.
+- **Don't:** pass a string to `SystemExit`/`sys.exit` in such a program ---
+  the message is free and the status is not.
+- **Don't:** read "it exits and prints an error" as the error path being
+  correct; the status is the part a caller acts on.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A usage error that would have
+been read as a verdict".
+
 ## In a check you run by hand
 
 The rule is easiest to break in the throwaway one-liner you write to
@@ -259,18 +320,64 @@ wrong, where a bare `0` is not.
 - **Don't:** rely on the anchors-match-once check to catch a collapsed range ---
   it is aimed at the widening case and passes cleanly on this one.
 
-(2026-08-07: five instruments in one session each returned an empty or zero
-result that was read as absence --- a cumulative delta over a per-tick-cleared
-array, a `gh pr diff --name-only` empty from API lag that returned 2 files on
-re-query, an `ls A || ls B` fallback that did not say which branch answered, a
-diff-scoped grep blind to a defect caused by a *deleted* line, and this one.
-The last was published as a false claim by a session that had, earlier that same
-day, written the vacuous-zero trap into this very file.
-Read that as the argument for the denominator being a property of the
-instrument rather than something recalled at the call site ---
-[`skill-checklists`](../workflow/skill-checklists.md) already draws exactly that
-conclusion, in its "knowing the rule is not what fails here" passage, and is the
-place to read rather than restate it.)
+See [`fail-fast.cases.md`](fail-fast.cases.md), "Five instruments in one session
+reporting a vacuous zero".
+
+### A fourth cause: the check is sound, and the subject is wrong
+
+The three above all leave the instrument examining too little --- it broke, its
+input was empty, or a selection stage collapsed.
+This one examines a complete, non-empty input, correctly, and reports a true
+result about **a different subject** than the question was about.
+
+A diff-scoped checker takes its subject from the **working directory**, which is
+the one input nobody passes and nobody prints:
+
+```bash
+cd /path/to/other-repo && python3 <checker>   # true, and about the wrong repo
+```
+
+Every remedy above passes here.
+The exit status is the clean one, so an `rc=$?` test is satisfied.
+The input is neither empty nor collapsed, so a denominator comes back non-zero
+and healthy-looking --- which is the sharp part, because the denominator is the
+remedy the three cases above converge on, and it is measuring the wrong tree.
+And the scope line such a checker prints usually names the **comparison** rather
+than the **subject**: a base ref like `origin/main` resolves in both
+repositories, so the printed scope reads identically whichever one you are in.
+
+That last point is what separates this from
+[`deterministic-tools`](deterministic-tools.md)'s "Read the scope an instrument
+prints".
+There the scope line carries the answer and gets read past, so reading it is the
+fix.
+Here it is read, it is true, and it carries no information about the dimension
+that is wrong.
+
+So state the subject, not only the comparison, and prefer passing it explicitly
+over inheriting it from wherever the shell happens to be:
+
+```bash
+git -C "$repo" rev-parse --show-toplevel   # name the tree the answer is about
+```
+
+The cwd deserves that suspicion specifically because it is **carried in** rather
+than chosen: it is set by whatever ran last, so nothing about composing this
+command decided it.
+[`memories/claude-code.md`](../../memories/claude-code.md) records how it
+persists (and, in an agent thread, resets) between calls.
+
+- **Do:** print or state the subject an instrument examined --- the repository,
+  tree, or path --- alongside its finding count.
+- **Do:** pass the subject explicitly (`git -C`, an explicit path argument)
+  rather than inheriting it from the working directory.
+- **Don't:** read a clean verdict as being about the repository you have in
+  mind; a sound check reports truthfully about whatever it was pointed at.
+- **Don't:** treat a printed scope line as covering this --- naming the base ref
+  says nothing about which tree that ref was resolved in.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A sound checker pointed at the
+wrong repository".
 
 ### The narration can be the unfalsifiable part, while the check is fine
 
@@ -356,11 +463,9 @@ converts this instrument back into the thing it was built to replace.
 
 Distrust a sweep that reports zero, and distrust one whose scanned count you
 never printed.
-(2026-07-28: a 947-repo scan reported `scanned: 0`, caught only because the
-count was printed; the `chmod +x` had been in a command the permission
-classifier denied minutes earlier.
-A later run of the fixed script reported 910 of 947, which is how the
-rate-limit truncation above was found.)
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A 947-repo sweep that scanned
+nothing".
 
 #### A zero-shaped summary can be sound, and the scope line is what decides it
 
@@ -548,13 +653,9 @@ obvious repair looks like it does.
 text starts with `++`, since git prepends its marker to produce `+++i;`.
 Anchoring the trailing space, `grep -v '^+++ '`, narrows that and does not
 close it: an added line reading `++ foo` arrives as `+++ foo` and matches too.
-Measured on git 2.50.1, against a commit adding `++i;`, `++ foo` and `plain`:
 
-| guard | survives |
-|---|---|
-| `grep -v '^+++'` | `plain` |
-| `grep -v '^+++ '` | `++i;`, `plain` |
-| positional | `++i;`, `++ foo`, `plain` |
+See [`fail-fast.cases.md`](fail-fast.cases.md),
+"Why no prefix pattern separates a diff header from its data".
 
 The exact separator is **position**, not shape.
 In a single-file diff the header is the first `+`-matching line and nothing
@@ -574,12 +675,34 @@ the tool for the data directly (`git show <rev>:<path>`).
 header per file and `tail -n +2` drops only the first.
 Scope the diff to one path, or loop over `git diff --name-only` and scan each
 file separately.
-This is not a hypothetical: the pass that wrote this entry ran the guard over
-its own three-file diff as a dogfooding check, and got three hits --- its own
-two undropped headers plus one --- which read at first like defects in the
-files rather than in the scan.
-Per-file scanning returned 0 for every file, as did grepping the files
-directly.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md),
+"The per-file precondition, caught by dogfooding the guard".
+
+**The precondition does not travel with the command, so knowing it is not
+enough.**
+The remedy ships as a copyable one-liner and the precondition ships as the
+paragraph beneath it, so what reaches the next diff is the pipeline alone.
+Nothing at the point of use asks how many files are in scope: a multi-file diff
+runs the same command, exits 0, and returns a plausible denominator that is
+`files - 1` too high.
+
+Re-reading the pipeline will not catch that, because the pipeline is correct.
+Cross-check the count against a quantity computed by something else:
+
+```bash
+git diff --shortstat origin/main...HEAD    # insertions, header-free
+```
+
+A disagreement is exactly the leftover headers.
+This is
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+"a harness needs a self-check against a quantity it did not compute" applied to
+a hand-run scan rather than to a harness --- and the reason a scope figure you
+publish owes a second **origin**, not merely a fresh derivation.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A denominator three too high,
+from the documented remedy".
 
 **What the pattern feeds decides how much this costs.**
 A too-loose pattern in a **detector** surfaces as a phantom finding, which is
@@ -596,9 +719,9 @@ correctly --- there each added line is grepped for in `main`, so a blank line is
 noise.
 Reuse it on prose and it silently drops every added **blank** line, collapsing
 paragraph boundaries.
-Measured on git 2.50.1 against a two-paragraph addition: `^+[^+]` returned the
-two lines of text and not the blank between them, while the positional form
-returned all three.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md), "What the tighter `^+[^+]` guard
+drops".
 
 Carry that pair together, because a whitespace-normalizing word-level
 comparison --- the content-preservation check
@@ -659,9 +782,9 @@ have corrected the description is the one `-o` structurally cannot produce.
 
 The cost is that a rule written from that description covers only the values the
 pattern's own alphabet reaches.
-Measured 2026-08-09 on `ucdavis/bcs`: of 45 sites carrying a ten-character
-identifier, a pure-digit pattern matched **12**, and the remaining 33 mix
-letters and digits in positions no digit-only rule reaches.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md),
+"How far a `grep -o` pattern's own alphabet reaches into a value".
 
 The fix is to quote the whole value rather than the matched fragment.
 Match the delimiters --- `"[^"]*"` for a quoted literal, the full field for a
@@ -1236,14 +1359,8 @@ fixing.
 - **Don't:** assume an edit that fixes one reader of shared state leaves the
   others intact.
 
-(Morrison-Lab/gha#425, 2026-08-05: one abbreviation list (`_ABBREV_RE`) fed two
-regex branches --- a lowercase-sentence branch and an uppercase one.
-Dropping `No` from the list fixed the lowercase branch and un-protected `No.` on
-the uppercase branch; registering every lowercase form then fixed the lowercase
-branch and leaked protection onto the uppercase one.
-Each edit traded one regression for the other until the fix became
-architectural: a second, separately-scoped pass applied only after the first
-branch ran.)
+See [`fail-fast.cases.md`](fail-fast.cases.md), "One shared abbreviation list
+feeding two regex branches".
 
 **The same shape governs an INSTRUCTION, and there the missing half is a step
 rather than a site.**
@@ -1282,15 +1399,8 @@ reader with only this path in view will skip.
 - **Don't:** treat "the docs mention the trigger somewhere in this file" as the
   precondition being stated.
 
-(Morrison-Lab/gha#449, 2026-08-12: an opt-in `@claude review` dispatch was added
-for repos that disable the agent, enabled by a repository variable **and** by
-uncommenting an `issue_comment` trigger the stub ships commented out.
-Every doc site named only the variable.
-The job's `if:` requires `github.event_name == 'issue_comment'`, so following
-the docs produced a one-second run with every job skipped and nothing posted ---
-the exact silent no-op the PR existed to fix (gha#447).
-Review caught it and called it blocking-ish; the fix stated both steps at six
-sites, two more than the review had enumerated.)
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A documented enabling procedure
+naming one of two required steps".
 
 ## A guard's discharge fires on positive success, not the absence of failure
 
@@ -1567,14 +1677,8 @@ merely deleting.
 It returns zero hits in the reassuring case and the alarming case alike, so
 its answer does not discriminate between them.
 
-Measured on `Morrison-Lab/ai-config`, where the two halves disagreed
-outright:
-
-| check | result |
-|---|---|
-| sampled local commit messages found on `origin/main` | 0 of 4 |
-| files those commits touched, present on `origin/main` | 4 of 4 |
-| paths on local `main` absent from `origin/main` | 0 |
+See [`fail-fast.cases.md`](fail-fast.cases.md), "A proxy check that could not
+discriminate the case it was run for".
 
 The proxy said "orphaned"; the content had in fact landed under a rewritten
 history.
@@ -1605,14 +1709,8 @@ via `git reflog` either way.
 - **Don't:** accept a check that is right for a reason it never tested, when
   the deciding question is one command away.
 
-(`Morrison-Lab/ai-config`, 2026-08-09, post-merge cleanup: local `main` and
-`origin/main` had **no merge base at all**, and
-`git log --oneline -1 $(git merge-base main origin/main)` duly printed local
-`main`'s own tip, which was read as the merge base.
-That reading implied `main` was an ancestor of `origin/main` while
-`git merge-base --is-ancestor` in the same block reported it was not.
-The same session then misattributed `$?` twice more, in both forms above,
-while dupe-checking whether this very entry already existed.)
+See [`fail-fast.cases.md`](fail-fast.cases.md),
+"An empty merge-base substitution reporting HEAD as the merge base".
 
 **A history rewrite is the exotic cause of that zero; a squash merge is the routine one, and it makes the subject test fail by construction.**
 The case above reached its zero through a rewritten history, which is rare enough to read as a special case --- so the proxy looks weak rather than broken, and a reader can reasonably expect it to work on an ordinary repo.
@@ -1646,12 +1744,8 @@ for sha in $(git log origin/main --format=%H -5); do
 done
 ```
 
-Measured 2026-08-09 on `Morrison-Lab/ai-config`, that returned 3 of 5 carrying
-zero bullets.
-The sentence this replaced claimed 4 of 5, and the discrepancy is the point
-rather than a correction to file away: one merge landed between the measurement
-and the review that questioned it, so a bare count published without its command
-was stale before anyone read it.
+See [`fail-fast.cases.md`](fail-fast.cases.md),
+"A published bullet count that was stale before anyone read it".
 
 The unifying statement is worth carrying past this procedure.
 **Whether a change landed is decided by looking for the change.**

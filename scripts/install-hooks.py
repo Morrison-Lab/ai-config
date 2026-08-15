@@ -46,6 +46,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from plugin_overlap import enabled_ai_config_plugins  # noqa: E402
+
 REPO = Path(__file__).resolve().parent.parent
 MANIFEST = REPO / "hooks" / "hooks.json"
 
@@ -135,17 +138,13 @@ def enabled_ai_config_plugin(settings: dict) -> str | None:
 
     Best-effort by design: this inspects only the settings.json this script
     reads, so it catches the common case (plugin enabled in the same file) and
-    can miss a project-level enablement. It has no false positives -- it fires
-    only on a truthy `enabledPlugins` entry named `ai-config` (any marketplace
-    suffix). The README caveat covers what this cannot see.
+    can miss a project-level enablement. It has no false positives. The
+    matching itself lives in `scripts/lib/plugin_overlap.py`, shared with
+    `check-plugin-overlap.py`, so the two warnings cannot drift apart; the
+    README caveat covers what this cannot see.
     """
-    plugins = settings.get("enabledPlugins")
-    if not isinstance(plugins, dict):
-        return None
-    for name, on in plugins.items():
-        if on and name.split("@", 1)[0] == "ai-config":
-            return name
-    return None
+    enabled = enabled_ai_config_plugins(settings)
+    return enabled[0] if enabled else None
 
 
 def find_entry(settings: dict, entry: dict) -> dict | None:

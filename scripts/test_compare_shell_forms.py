@@ -64,6 +64,25 @@ def run_all(commands):
 FOUR = r'''python -c "print(repr('            if pat == r\"changes\\\\s+requested\\\\b\":'))"'''
 TWO = r'''python -c "print(repr('            if pat == r\"changes\\s+requested\\b\":'))"'''
 
+# Probes for the host-dependent warning case below. They are SEPARATE commands
+# rather than flags added to TWO, because TWO is the incident copied verbatim
+# and reproducing it exactly is what that case is for -- adding `-W` to it
+# would test a command nobody ran.
+PYVER_PROBE = r'''python -c "import sys; print('PYVER=%d.%d' % sys.version_info[:2])"'''
+FORCED_WARN = r'''python -W always -c "print('x\s')"'''
+
+
+def _parse_pyver(stdout):
+    """(major, minor) of the interpreter the SHELL FORMS invoke, or None."""
+    for line in stdout.splitlines():
+        if line.startswith("PYVER="):
+            try:
+                major, minor = line[len("PYVER="):].strip().split(".")
+                return int(major), int(minor)
+            except ValueError:
+                return None
+    return None
+
 results, verdict = run_all([FOUR, TWO])
 
 if results is None:
@@ -95,10 +114,54 @@ else:
         "two backslashes produce a backspace",
         r"requested\x08" in two["stdout"],
     )
+    # Which warning the interpreter emits for `\s` is a property of the HOST,
+    # not of the two shell forms this file exists to compare. Python 3.12
+    # promoted an invalid escape sequence from DeprecationWarning to
+    # SyntaxWarning, and the two differ in default visibility as well as in
+    # class: a SyntaxWarning prints on a default run, a DeprecationWarning does
+    # not. So `"SyntaxWarning" in stderr` passed on CI's pinned 3.12 and failed
+    # on any older interpreter -- the same file, the same assertions, a
+    # different branch, with nothing in the output saying so (ai-config#1382).
+    #
+    # Note the subject is the `python` the SHELL FORM invokes, which need not be
+    # the `python3` running this file, so the version is probed through the same
+    # pipeline rather than read from this process's own sys.version_info.
+    probe, _ = run_all([PYVER_PROBE])
+    subject = _parse_pyver(probe[0]["stdout"]) if probe else None
+    check("the subject interpreter's version is knowable", subject is not None)
+
+    # Host-INDEPENDENT, and the load-bearing half: whatever the class, the
+    # interpreter says the escape is invalid once warnings are made visible.
+    forced, _ = run_all([FORCED_WARN])
     check(
-        "two backslashes produce the SyntaxWarning",
-        "SyntaxWarning" in two["stderr"],
+        "the invalid escape is reported on every interpreter, once warnings show",
+        forced is not None and "invalid escape sequence" in forced[0]["stderr"],
     )
+
+    # Host-DEPENDENT, with EVERY branch pinned rather than one asserted and the
+    # rest left to chance. Three branches, not two: an unresolvable version is
+    # its own outcome, and folding it into either version branch would report a
+    # host we could not identify as a host we could.
+    if subject is None:
+        # Not a repeat of the probe check above. That one reports that the
+        # probe failed; this reports the consequence, which is that the
+        # host-dependent case went unpinned. Failing here loudly beats letting
+        # the branch silently not run, since a check that never ran and a check
+        # that passed leave the same trace in the tally.
+        check("the host-dependent warning case is pinned to a known version", False)
+    elif subject >= (3, 12):
+        check(
+            f"on {subject[0]}.{subject[1]} (>= 3.12) the default run shows SyntaxWarning",
+            "SyntaxWarning" in two["stderr"],
+        )
+    else:
+        check(
+            f"on {subject[0]}.{subject[1]} (< 3.12) it is a DeprecationWarning, "
+            "hidden on a default run",
+            "SyntaxWarning" not in two["stderr"]
+            and forced is not None
+            and "DeprecationWarning" in forced[0]["stderr"],
+        )
 
 # --- 2. An identical pair -------------------------------------------------
 # Two different spellings with the same observable behaviour must compare

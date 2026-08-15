@@ -247,6 +247,68 @@ Recorded for that cluster in `ucdavis/bcs#592` / `#593`; the correction to
 the retracted figure and its retracted replacement were in different places on
 the page.)
 
+## A re-measurement with a different instrument
+
+(2026-08-12, `ucdavis/bcs#615`: a PHI-count figure was published as a
+correction when it was a second measurement.
+
+`.github/workflows/check-phi.yml` there pins
+`Morrison-Lab/gha/.github/workflows/check-phi.yml@v2`.
+`git rev-parse v2` in `gha` is `e7291ccd7171e2f0ac8eb730707ca916795e737e`,
+which is PR #445's own merge commit, while `origin/main` is
+`695fbf56cf65d7779123e24782a40d80782386e1`.
+The two differ in the operator alternation of `check-phi/check-phi.py`'s
+`_STUDY_ID_RE`: `v2` has
+`(?:\s*(?:<<-|<-|!=|==|=|:)\s*|\s+(?:eq|ne)\s+)`, and `main` adds
+`|\s+(?:not\s+)?in\s*\(\s*` from gha#454.
+
+Both revisions extracted and run whole-tree (`PHI_BASE_REF` empty) against
+clean worktrees:
+
+| detector | tree | allowlist | findings | files |
+|---|---|---|---|---|
+| `v2` | bcs `origin/main` `d638c05` | absent | 93 | 19 |
+| `main` | bcs `origin/main` `d638c05` | absent | 99 | 21 |
+| `v2` | bcs#615 head `3f529db` | real | 0 | 0 |
+| `main` | bcs#615 head `3f529db` | real | 0 | 0 |
+| `v2` | bcs#615 head `3f529db` | empty | 92 | 19 |
+| `main` | bcs#615 head `3f529db` | empty | 98 | 21 |
+
+Diffing the two annotation streams shows the whole delta is SAS's membership
+form: 6 findings, every one of them on a line matching `(?i)\bin\s*\(`, at 6
+sites across 4 files.
+The summary's file count moves 19 to 21 rather than to 23 because 2 of those 4
+files were already flagged under `v2` --- so "6 sites in 4 files" and "a
+2-file delta" are two different quantities, both correct, which is the
+labelling hazard `algorithmatize-checks` warns about arriving inside the
+evidence for this one.
+
+Neither figure retires the other.
+93 is what that repository's CI reports today, because it pins `@v2`.
+99 is what it will report once `v2` slides past gha#454.
+
+The round-4 comment nonetheless said "I earlier told the maintainer that
+`main` carried **93** findings.
+The derived figure is **99**.
+I had not run that measurement when I first stated it, and the number was
+wrong."
+Both halves are false: an earlier comment on the same PR had derived 93
+explicitly, showing `git rev-parse v2` first, and 93 remains correct for the
+pinned revision.
+
+The aggravating detail is where the qualifier survived.
+That same comment's table was correctly captioned "Measured with `gha`
+`main`'s detector", and the Correction paragraph three lines below it dropped
+the qualifier.
+The honest caption and the misleading claim were in one comment, and the
+quotable paragraph was the wrong one.
+
+Retracted in a later comment on the same PR.
+That retraction then misattributed the governing rule to `fail-fast.md`,
+corrected in a follow-up once
+`git grep -n "A correction inherits its instrument" -- shared/` was actually
+run --- which is the same read-versus-recall failure one artifact over.)
+
 ## Writing is the instrument, when the claim can be wrong
 
 (Same session: writing a docstring that had to state precisely how a correction
@@ -347,3 +409,46 @@ already binds it)" and asserted the bare label with nothing following it.
 Note the shape is the two-sided qualifier error from `fail-fast.md` one level up:
 there a guard covered the before-side and missed the after-side, here a
 *premise* did, and the premise then licensed skipping the guard entirely.)
+
+## A symptom that both a mechanism and its opposite predict
+
+(Morrison-Lab/ai-config#1395 / #1407, 2026-08-12: two false mechanism claims
+landed in `scripts/test_ai_session.py` during one PR.
+The second is the one recorded above.
+
+A helper needed a reliably dead PID, so it orphaned a child, killed it, and
+polled `kill -0` until that failed.
+The loop did not terminate promptly, and a comment was written to justify the
+design around that: PID 1 in this container "does not reap", so a killed orphan
+"stays a zombie" permanently, and `wait` from a non-owning shell is "a no-op".
+
+Both halves are false, and both were decidable by one probe.
+Re-measured for this entry, 2026-08-12, `uname -sr` = `Linux 6.18.5-fc-v20`:
+
+| probe | result |
+|---|---|
+| `ps -o comm= -p 1` | `process_api` |
+| immediately after the kill | `stat=Z`, `ppid=1`, `kill -0` returns **0** |
+| `wait <pid>` from a shell that never owned it | `pid N is not a child of this shell`, rc **127** |
+| poll `kill -0` at 5 ms until it fails | reaped after 225 polls, **1573 ms** |
+
+So PID 1 does reap, at roughly 1.6 to 2.0 seconds, and `wait` on a non-child
+errors rather than doing nothing.
+A companion entry, "`kill -0` reports an unreaped zombie as alive", is proposed
+in #1407 --- once merged, it lives in `memories/claude-code.md` and owns those
+container facts and their volatility caveat.
+
+The methodological point is that **the symptom could not have told anyone which
+mechanism was operating.**
+A poll loop that keeps seeing `kill -0` succeed is exactly what "PID 1 never
+reaps" predicts, and exactly what "PID 1 reaps asynchronously, about two seconds
+from now" predicts too.
+The true mechanism was the opposite in kind --- reaping happens, and the loop
+was losing a millisecond-scale race, re-losing it on each retry because every
+retry spawned a fresh PID --- and no amount of re-reading the comment, or
+re-running the failing loop, would have separated the two.
+The discriminating observation was the same one held longer.
+
+The direction of the error is the part worth carrying: the immediate look
+supported the stronger claim, permanence, and the cheaper observation was the
+one that would have refuted it.)

@@ -115,6 +115,8 @@ The fragment above carries the mechanics, the failure modes each check catches, 
 
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` — get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces PT on a machine set to any other zone).
 This makes "as of when" unambiguous when the user reads the recap later.
+Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
+A single honest measurement earlier in the session is what most easily licenses an invented timestamp later, because the memory of having consulted the clock obscures that the measurement has expired.
 
 **Check the `%Z` in the output.** On Windows Git Bash the `TZ` override silently falls back to GMT (any IANA zone name does), so the command above prints GMT, not PT.
 If the suffix isn't PDT/PST, fall back to plain `date` when the machine's system zone is already Pacific.
@@ -231,12 +233,19 @@ This fires only when order changes the outcome:
 a stacked PR whose base is another open PR,
 a PR that would conflict or show a misleading diff if the other landed first,
 a migration that must precede its consumer.
-Two PRs touching disjoint files have no constraint,
+Two PRs touching disjoint files usually have no constraint,
 and saying so plainly is the right answer, not an occasion for the marker.
 But "disjoint" is a claim about their file *sets*, so derive both sets and check the intersection before asserting it ---
 `gh pr diff <N> --name-only` on each PR, and confirm no path appears in both ---
 rather than recalling what each PR is "about", which is `metacognitive-monitoring.md`'s scope-claim failure (check the population, don't recall it).
 A follow-up PR that extends into a `shared/` (or any) file a prior PR also edited is a common collision, and the two conflict at merge time.
+**An empty intersection settles the *collision* cases above and cannot see the *dependency* ones.**
+A migration and its consumer, or a PR whose prose cites content another PR adds, are ordering constraints whose file sets never overlap ---
+so a derived intersection of zero is evidence about conflicts, not a proof that either order is safe.
+Ask separately whether one PR asserts something the other makes true.
+For a citation the better fix is to dissolve the dependency rather than sequence it,
+by phrasing it as a conditional that is accurate either way ---
+see [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md)'s cross-repo citation trap, which applies to a same-repo sibling PR unchanged.
 The rationale behind each surface lives in `memories/preferences.md`,
 alongside the rest of the taxonomy.
 
@@ -576,6 +585,12 @@ Two rules, one incident, and the second is the general form of the first.
 Deciding that a particular agent does not need one is fine.
 Leaving it unmarked is what is not.
 `hooks/flag-unassigned-worktree.py` mechanizes exactly this, and warns rather than blocks.
+
+**Verify a dispatched agent's liveness before touching a worktree you did not just create --- never infer it from a snapshot.**
+A clean `git status` and an unlisted agent both describe one instant.
+Neither says whether the session working that worktree has actually stopped, and a quiet worktree can mean either "finished" or "between edits".
+Ask the agent directly (`SendMessage` to its id, or the equivalent for a peer session) before editing or reclaiming its worktree, including one that has sat quietly for hours --- a long stretch is a reason to ask sooner, not evidence of abandonment.
+[`memories/git-worktrees.md`](memories/git-worktrees.md) carries the case where both directions of that misreading --- read as live when quiet, read as dead when live --- happened to the same agent in one session.
 
 **"Stay inside the worktree it was given" holds only while the agent works in the session's own repo.**
 `isolation: "worktree"` places that worktree in the **session's primary repository**, never in a repository the brief happens to name --- so a dispatch into a different clone hands the agent a worktree of the wrong repo, and the instruction above is unfollowable as written.
@@ -963,7 +978,7 @@ section — the review bots flag every unlinked package name, one round at a tim
 In Quarto `.qmd` files, label and caption figures and tables with **div syntax**, not chunk-option syntax.
 Wrap the code chunk in a `::: {#fig-...}` / `::: {#tbl-...}` fenced div and put the caption as the last line before the closing `:::`:
 
-```
+````
 ::: {#fig-stage-at-dx}
 
 ```{r}
@@ -975,7 +990,7 @@ plot_stage_at_dx(pt_data)
 
 Stage at diagnosis by screening frequency
 :::
-```
+````
 
 Don't use the chunk options `#| label: fig-...` / `#| fig-cap: "..."` for the cross-reference id and caption.
 The div id (`#fig-`/`#tbl-`) carries the cross-reference; the chunk `label` stays a plain code label.

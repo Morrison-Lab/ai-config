@@ -327,7 +327,12 @@ on.
   are the facts the agent could not get, not the facts it will not know to
   seek.
 
-(`Morrison-Lab/ai-config#1534`, 2026-08-16: the brief carried every environment
+(2026-08-16, the brief that produced `Morrison-Lab/ai-config#1534`.
+Read that number as naming the brief's own artifact and nothing further: #1534's
+own subject is a reviewer's replacement diffstat, so a reader following it finds
+no trace of the omission described here, and no issue or PR records the incident
+itself --- this entry is the whole of it.
+The brief carried every environment
 fact the agent could not query --- clone path, `gh` absent from `PATH`,
 GitHub MCP tools as the only working client, the branch name --- and omitted the
 review-trigger class.

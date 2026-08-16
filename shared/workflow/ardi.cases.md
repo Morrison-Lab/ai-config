@@ -757,6 +757,29 @@ its content was a comment explaining a retry loop, which is exactly the kind of
 edit that reads as not touching the diffstat.
 It changed both figures.)
 
+## A whole-body staleness check that reported a correct fix as failed
+
+(`Lacaedemon/sparta#1303`, 2026-08-16: a review round moved the PR body's
+figures from `484 added` and `2723 / 2723 passing` at head `dbfe12d8` to
+`532 added` and `2725 / 2725` at `5c145fce`.
+The body was rewritten with both new figures and a `### Corrections to this
+body` entry naming the two superseded ones, which is exactly what the section
+above asks for.
+
+The post-PATCH verification then searched the whole body for each old figure
+and reported `False` for both --- reading as though the rewrite had missed
+them.
+It had not.
+The only remaining occurrences were inside the corrections entry, where they
+belong, since an entry that says what changed cannot say it without naming the
+old value.
+
+Re-run section-scoped, the same two strings were absent from the verification
+table and present in the corrections entry, which is the intended end state
+rather than a defect.
+The wrong reading was available and cheap: deleting the quoted figures would
+have silenced the check and destroyed the record the entry exists to carry.)
+
 ## A genuinely-read prefix, extended into a fabricated link
 
 (`Lacaedemon/sparta#1244`, 2026-08-13: a close-as-duplicate comment linked

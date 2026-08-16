@@ -140,8 +140,8 @@ A `grep -n` for a heading returning one line number while
 working tree is the thing to suspect, rather than either instrument.
 
 The remedy is the one "A read-only question does not license a state-mutating
-answer" already gives, reached from a different direction: materialize the ref
-into a scratch directory, rather than mutating the checkout to make the question
+answer" gives, reached from a different direction: materialize the ref into a
+scratch directory, rather than mutating the checkout to make the question
 answerable.
 
 ```bash

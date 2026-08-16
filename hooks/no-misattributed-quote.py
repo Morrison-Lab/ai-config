@@ -119,8 +119,14 @@ def strip_code(text: str) -> str:
 
 # Straight and curly double quotes.  Single quotes are deliberately excluded:
 # apostrophes make them far too noisy.
+#
+# The curly glyphs are built with `chr()` rather than written literally, so
+# this source file stays ASCII per `shared/coding/ascii-punctuation-in-source.md`
+# while the compiled pattern still matches the real characters.
+_LDQ, _RDQ, _RSQ, _EMD = chr(0x201C), chr(0x201D), chr(0x2019), chr(0x2014)
+
 _QUOTE_RX = re.compile(
-    r"[\"“]([^\"“”\n]{12,%d})[\"”]" % MAX_QUOTE_CHARS
+    '["%s]([^"%s%s\n]{12,%d})["%s]' % (_LDQ, _LDQ, _RDQ, MAX_QUOTE_CHARS, _RDQ)
 )
 
 # A repo-relative path or a bare corpus filename.
@@ -162,7 +168,8 @@ _ABSENCE_RX = re.compile(
 # residual false positive in the corpus measurement was one of these or a
 # heading.  Losing a genuine misquote worded this way is the safe direction.
 _NAMING_RX = re.compile(
-    r"^['’]?s?\s*(section|sections|rule|rules|bullet|bullets|entry|entries|"
+    "^['%s]?s?" % _RSQ +
+    r"\s*(section|sections|rule|rules|bullet|bullets|entry|entries|"
     r"trigger|triggers|block|blocks|clause|clauses|heading|headings|paragraph|"
     r"paragraphs|note|notes|line|lines|check|checks|step|steps|item|items|"
     r"case|cases|test|tests|guard|guards|hook|hooks|skill|skills|convention|"
@@ -325,12 +332,17 @@ def find_pairs(text: str):
             # opening the paragraph below it.
             if _PARA_RX.search(bridge):
                 continue
-            bare = bridge.strip(" \t\n:,.;()[]-—>*`\"'")
+            bare = bridge.strip(" \t\n:,.;()[]-" + _EMD + ">*`\"'")
             if bare and not _ATTRIB_RX.search(bridge.lower()):
                 continue
             lo = max(0, min(qs, ps) - WINDOW_PAD)
             hi = min(len(prose), max(qe, pe) + WINDOW_PAD)
-            pairs.append((ptext, qtext, prose[lo:hi]))
+            # Blank the quote out of the window before scanning it for an
+            # absence claim: the claim is made by the surrounding prose, and a
+            # quoted passage that merely CONTAINS "absent" or "does not" must
+            # not suppress its own check.
+            window = prose[lo:qs] + " " * (qe - qs) + prose[qe:hi]
+            pairs.append((ptext, qtext, window))
             if len(pairs) >= MAX_PAIRS:
                 return pairs
     return pairs

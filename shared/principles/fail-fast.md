@@ -120,6 +120,53 @@ input was empty, or a selection stage collapsed.
 See [`fail-fast.cases.md`](fail-fast.cases.md), "A sound checker pointed at the
 wrong repository".
 
+**Both remedies above assume the subject is chosen by an argument, and a
+drifted working tree chooses it silently.**
+A checkout can hold `HEAD` on one commit while its index and working tree carry
+another commit's content.
+The repository is right, the path is right, and `git -C` changes nothing --- so
+every bullet above passes while a whole-tree instrument measures a tree nobody
+asked for.
+
+What hides it is that such an instrument names no ref at all.
+It reads the working tree, so there is no argument to get wrong and nothing
+informative to print: a scope line naming the repository and the paths examined
+is accurate, and still says nothing about which commit's content sat in them.
+
+The tell is a disagreement between two reads of the same file, one scoped to a
+git object and one to the working tree.
+A `grep -n` for a heading returning one line number while
+`git show HEAD:<path> | grep -n` returns another for that same heading means the
+working tree is the thing to suspect, rather than either instrument.
+
+The remedy is the one "A read-only question does not license a state-mutating
+answer" gives, reached from a different direction: materialize the ref into a
+scratch directory, rather than mutating the checkout to make the question
+answerable.
+
+```bash
+scratch=$(mktemp -d)
+git archive HEAD | tar -x -C "$scratch"
+(cd "$scratch" && <run the instruments>)
+```
+
+Expect the figures to survive that, and do not read their survival as evidence
+the first run was sound.
+Re-running this way reproduced identical numbers, so the published counts stood
+--- but they had rested on the wrong subject until something checked, which is a
+correct conclusion drawn from a premise nobody had tested.
+
+- **Do:** compare a `git show <ref>:<path>` read against a working-tree read of
+  the same file when an instrument's numbers are load-bearing.
+- **Do:** run a whole-tree instrument over `git archive <ref> | tar -x` into a
+  scratch directory, so its subject is the ref rather than whatever the checkout
+  currently holds.
+- **Don't:** read `git -C` or an explicit path argument as settling the subject
+  --- each names a location, and a drifted working tree is wrong about the
+  content at that location.
+- **Don't:** treat matching numbers on re-measurement as retroactive evidence
+  that the first measurement was pointed at the right tree.
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass

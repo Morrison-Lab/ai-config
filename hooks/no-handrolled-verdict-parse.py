@@ -371,6 +371,8 @@ def checked_prs(path):
                         successful_calls.add(use_id)
                 elif b_type == "tool_result":
                     use_id = b.get("tool_use_id")
+                    if not use_id or use_id not in pending:
+                        continue
                     output_text = str(b.get("content") or b.get("output") or "")
                     is_failure = (
                         "is not installed or not on PATH" in output_text or
@@ -383,15 +385,10 @@ def checked_prs(path):
                         (output_text and "Checking ARDI / fully-clean status for" not in output_text)
                     )
                     if is_failure:
-                        if use_id:
-                            if use_id in pending:
-                                failed_pr = pending.pop(use_id)
-                                if failed_pr and failed_pr not in pending.values():
-                                    valid_prs.discard(failed_pr)
-                            successful_calls.discard(use_id)
-                        else:
-                            successful_calls.clear()
-                            valid_prs.clear()
+                        failed_pr = pending.pop(use_id)
+                        if failed_pr and failed_pr not in pending.values():
+                            valid_prs.discard(failed_pr)
+                        successful_calls.discard(use_id)
 
     ran = len(successful_calls) > 0
     return ran, valid_prs

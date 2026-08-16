@@ -80,6 +80,20 @@ def checker_exit2_repo_resolve(pr=None):
     ]
 
 
+def checker_with_unrelated_idless_tool_result(pr):
+    """A transcript with a successful checker call followed by an unrelated id-less tool_result."""
+    call_id = "toolu_success_9999"
+    cmd = f"python3 scripts/check-pr-fully-clean.py {pr}"
+    return [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": call_id, "name": "Bash", "input": {"command": cmd}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": call_id, "content": f"Checking ARDI / fully-clean status for Morrison-Lab/ai-config#{pr}...\nFULLY CLEAN on HEAD abcdef01!"}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "content": "total 8\ndrwxr-xr-x ... file.txt"}]}}
+    ]
+
+
 def read_checker():
     """A Grep whose PATTERN is the invocation. This is the case the tool-name
     skip exists for: the pattern carries an interpreter AND a PR number, so it
@@ -113,6 +127,8 @@ CASES = [
      "exit-2 failure (gh missing) does NOT discharge untargeted parse"),
     (INCIDENT, checker_exit2_repo_resolve(1278), True,
      "repo resolution exit-2 failure does NOT discharge guard"),
+    (INCIDENT, checker_with_unrelated_idless_tool_result(1278), False,
+     "unrelated id-less tool_result does NOT wipe recorded successful checker run"),
 
     # -- other shapes of the same parse -----------------------------------
     ("gh api repos/o/r/issues/1278/comments | grep -m1 'Ready for merge'",

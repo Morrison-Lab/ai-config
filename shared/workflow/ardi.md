@@ -343,9 +343,9 @@ Sharper still, and this is the part worth pinning: round 2 can derive the
 correct new figure and use it in its own prose while the body carries the old
 one, and flag nothing.
 The reviewer is not diffing its numbers against the body's.
-It derives fresh ones for its own purposes, so the two figures sit one round
-apart in a single comment thread, contradicting each other, with nobody
-comparing them.
+The reviewer derives fresh ones for its own purposes, so the two figures sit
+one round apart in a single comment thread, contradicting each other, with
+nobody comparing them.
 
 - **Do:** re-derive every figure in the body at each push, whatever an earlier
   round confirmed, and record the SHA the new figures were derived at.

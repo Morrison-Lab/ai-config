@@ -553,8 +553,8 @@ files, summing to 148.
 
 Commit `339645c3` then addressed both round-1 findings and widened the diff
 from three files to six.
-`git diff --numstat` over it returns `15 / 67 / 85 / 8 / 10 / 11`, summing to
-196.
+`git diff --numstat` over `339645c3` returns `15 / 67 / 85 / 8 / 10 / 11`,
+summing to 196.
 
 Round 2, posted seven minutes after round 1 at 18:11:22Z, opened by saying it
 had "re-scanned all **196** added lines across the full PR diff (all three
@@ -564,9 +564,9 @@ lines.
 So the correct figure and the stale one sat one round apart in the same comment
 thread, and the round holding the correct one never looked at the other.
 
-It was caught by the author re-reading the body at the merge gate rather than
-by either review, and the merged body records it in a "Corrections to this
-body" entry naming the same three stale values.)
+The staleness was caught by the author re-reading the body at the merge gate
+rather than by either review, and the merged body records that catch in a
+"Corrections to this body" entry naming the same three stale values.)
 
 ## Validating against a real consumer repo covers what fixtures cannot
 

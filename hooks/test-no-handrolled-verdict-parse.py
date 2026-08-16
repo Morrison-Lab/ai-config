@@ -56,6 +56,18 @@ def checker(pr=None, repo=None):
         {"type": "tool_use", "name": "Bash", "input": {"command": cmd}}]}}
 
 
+def checker_exit2(pr=None):
+    """A transcript sequence where check-pr-fully-clean.py failed with exit 2 (e.g. gh missing)."""
+    cmd = f"python3 scripts/check-pr-fully-clean.py {pr}" if pr is not None else "python3 scripts/check-pr-fully-clean.py"
+    call_id = "toolu_exit2_12345"
+    return [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": call_id, "name": "Bash", "input": {"command": cmd}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": call_id, "content": "`gh` is not installed or not on PATH.\nThis script requires the GitHub CLI; -R cannot substitute for it."}]}}
+    ]
+
+
 def read_checker():
     """A Grep whose PATTERN is the invocation. This is the case the tool-name
     skip exists for: the pattern carries an interpreter AND a PR number, so it
@@ -83,6 +95,8 @@ CASES = [
      "THE INCIDENT: verbatim capture() over #1278's comments, no instrument"),
     (INCIDENT_1257, [], True,
      "the same sweep's other PR (#1257), the false-BLOCKED direction"),
+    (INCIDENT, checker_exit2(1278), True,
+     "exit-2 failure (gh missing) does NOT discharge the guard for #1278"),
 
     # -- other shapes of the same parse -----------------------------------
     ("gh api repos/o/r/issues/1278/comments | grep -m1 'Ready for merge'",

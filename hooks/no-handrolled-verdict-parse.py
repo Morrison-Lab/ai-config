@@ -324,11 +324,16 @@ def checked_prs(path):
     """Scan the transcript for check-pr-fully-clean.py calls.
 
     Returns (ran_at_all, set_of_pr_numbers).
+    A call that failed with an environment/usage error (e.g., exit 2 because `gh`
+    is missing or invalid arguments) does NOT discharge the guard for that PR.
     """
     ran = False
     prs = set()
     if not path:
         return ran, prs
+
+    pending = {}  # tool_use_id -> pr_number
+
     with open(path, errors="ignore") as fh:
         for line in fh:
             try:
@@ -338,30 +343,43 @@ def checked_prs(path):
             blocks = (msg.get("message") or {}).get("content")
             if blocks is None:
                 blocks = msg.get("content") or []
+            if isinstance(blocks, dict):
+                blocks = [blocks]
             if not isinstance(blocks, list):
                 continue
             for b in blocks:
-                if not isinstance(b, dict) or b.get("type") != "tool_use":
+                if not isinstance(b, dict):
                     continue
-                name = (b.get("name") or "").lower()
-                # Reading the script is not running it. A `Grep` whose PATTERN
-                # is the invocation is the case that needs this: the pattern
-                # carries an interpreter, so it satisfies CHECKER_CALL exactly
-                # as a real run would.
-                #
-                # `read`/`grep`/`glob` are the names this harness actually
-                # emits, measured from a live transcript. The `view_file`
-                # family is carried from `no-stale-pr-status.py`, where it is
-                # dead for that reason -- kept only so a harness that does emit
-                # those names is covered, not because it fires here.
-                if name in ("read", "grep", "glob",
-                            "view_file", "read_file", "grep_search", "list_dir"):
-                    continue
-                blob = json.dumps(b.get("input") or {})
-                for m in CHECKER_CALL.finditer(blob):
-                    ran = True
-                    if m.group(2):
-                        prs.add(m.group(2))
+                b_type = b.get("type")
+                if b_type == "tool_use":
+                    name = (b.get("name") or "").lower()
+                    # Reading the script is not running it. A `Grep` whose PATTERN
+                    # is the invocation is the case that needs this: the pattern
+                    # carries an interpreter, so it satisfies CHECKER_CALL exactly
+                    # as a real run would.
+                    if name in ("read", "grep", "glob",
+                                "view_file", "read_file", "grep_search", "list_dir"):
+                        continue
+                    blob = json.dumps(b.get("input") or {})
+                    for m in CHECKER_CALL.finditer(blob):
+                        ran = True
+                        pr_target = m.group(2)
+                        use_id = b.get("id")
+                        if pr_target:
+                            prs.add(pr_target)
+                            if use_id:
+                                pending[use_id] = pr_target
+                elif b_type == "tool_result":
+                    use_id = b.get("tool_use_id")
+                    output_text = str(b.get("content") or b.get("output") or "")
+                    if ("is not installed or not on PATH" in output_text or
+                        "This script requires the GitHub CLI" in output_text or
+                        "usage: check-pr-fully-clean.py" in output_text):
+                        if use_id and use_id in pending:
+                            failed_pr = pending.pop(use_id)
+                            prs.discard(failed_pr)
+                        elif not pending and prs:
+                            prs.clear()
     return ran, prs
 
 

@@ -64,7 +64,16 @@ ADMISSION = re.compile(
     | i\s+(mischaracterized|misread|miscounted|misdiagnosed|misremembered)
     | i\s+(incorrectly|wrongly|falsely)\s+
         (said|claimed|stated|reported|assumed|described|characterized)
-    | correcting\s+myself
+    # Quantitative self-correction (ai-config#1210). The adverb form above
+    # requires an explicit "incorrectly"/"wrongly"; a retraction of a figure
+    # rarely carries one -- "I overstated the waste" is a first-person
+    # admission of having been wrong by any reading, and was silent.
+    # `overclaimed` needs no alternative of its own: over + claimed.
+    | i\s+(over|under)(stated|estimated|counted|reported|claimed)
+    # `myself` first, since `my\b` cannot match inside it. `the` is
+    # deliberately absent: "correcting the reviewer" is correcting SOMEONE
+    # ELSE, which the first-person rule above exists to exclude.
+    | correcting\s+(myself|my|this)\b
     | retracting\s+(my|that\s+claim)
     | i\s+(need\s+to\s+)?retract\b
     )""",

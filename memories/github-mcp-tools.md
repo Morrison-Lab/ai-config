@@ -162,10 +162,17 @@ See ai-config#694 for the precedent.
   Neither half is true, and both are the kind of claim nobody re-tests --- a
   merge authorization is expensive to obtain, so a refusal that appears to
   revoke one tends to be reported rather than retried.
-  The generalizable part is the direction, since the sibling bullet above has
-  the MCP tool 403ing where raw works.
-  Neither client is the privileged one, so a 403 naming a policy is evidence
-  about the client you used and about nothing else.
+  The generalizable part is that a 403 naming a policy is evidence about the
+  client you used and about nothing else, so re-attempt through the other one
+  before reporting the capability blocked.
+  Do **not** read the sibling bullet above as the mirror case.
+  Its 403s are MCP-side, for want of `actions: write`, and its fallbacks are a
+  push or a human rather than a raw call --- the word "raw" appears nowhere in
+  it, and the one success it records (`run_workflow` on this repo) is itself an
+  MCP success.
+  No raw-succeeds-where-MCP-403s instance is recorded here, so which client
+  wins is not established in either direction; what is established is only that
+  one client's refusal does not settle the question.
   - **Do:** re-attempt a 403'd write through the other client before reporting
     the capability blocked, whichever client you started with.
   - **Do:** read a 403 body that names a *repo* condition (branch protection,

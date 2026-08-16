@@ -69,7 +69,7 @@ mutates a PR stays serial.
      nothing-to-do pile.
      - **Do:** name such a PR's verdict as missing rather than clean, and
        dispatch a review for it --- pricing that round first, since a
-       dispatch is a real spend and several of them is several spends.
+       dispatch is a real spend and several of them are several spends.
      - **Don't:** read green checks with nothing pending as evidence a
        review passed; on a dispatch-only repo that is the steady state.
 

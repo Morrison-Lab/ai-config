@@ -321,6 +321,44 @@ over, and re-reading it cannot catch a wrong number.**
 See [`ardi.cases.md`](ardi.cases.md), "A verification table in the PR body going
 stale as rounds change the diff".
 
+**A reviewer's round-one confirmation of that table does not expire when the
+diff moves, and the confirmation is what makes the stale figure dangerous.**
+
+The rule above says the figures go stale.
+This is about the one artifact in the review record that argues they have not.
+
+Round 1 verifies the table, in detail, because a body full of derived counts is
+exactly what a first review checks, and it says so, naming each figure it
+matched.
+Round 2 does not re-verify it, because round 2 is not about the table.
+Round 2 is about whether round 1's findings were addressed, so the body sits
+outside what that round set out to read.
+
+The confirmation is therefore a claim about one head, and nothing retires it.
+An unverified table at least invites suspicion.
+A table a reviewer explicitly confirmed reads as settled by someone other than
+its author, and that reading survives every push that falsifies it.
+
+Sharper still, and this is the part worth pinning: round 2 can derive the
+correct new figure and use it in its own prose while the body carries the old
+one, and flag nothing.
+The reviewer is not diffing its numbers against the body's.
+It derives fresh ones for its own purposes, so the two figures sit one round
+apart in a single comment thread, contradicting each other, with nobody
+comparing them.
+
+- **Do:** re-derive every figure in the body at each push, whatever an earlier
+  round confirmed, and record the SHA the new figures were derived at.
+- **Do:** compare any figure a later review states in its own prose against the
+  figure the body states, and read a mismatch as the body being stale.
+- **Don't:** carry a round-one confirmation forward to a later head --- it
+  verified the diff that existed when it ran.
+- **Don't:** read a later round's clean verdict as evidence the body is still
+  accurate; that round checked the findings, not the table.
+
+See [`ardi.cases.md`](ardi.cases.md), "A round-one confirmation laundering a
+body the next round contradicts".
+
 **A "Corrections to this body" entry is itself a figure in the body, so the
 next push expires it too --- and it reads as more settled than the figure it
 corrected.**

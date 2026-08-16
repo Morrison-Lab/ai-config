@@ -538,6 +538,36 @@ The corrected body now shows the base, head and delta per group, states the
 `ast.parse` derivation, and keeps the wrong figures on the record rather than
 silently overwriting them, since the review thread refers to them.)
 
+## A round-one confirmation laundering a body the next round contradicts
+
+(`Morrison-Lab/ai-config#1522`, 2026-08-16, merged as `bc89ec93`.
+
+Round 1, posted at 18:04:08Z, verified the body's verification table in detail,
+reporting that it had "independently confirmed every reported figure --- 1646
+links/503 files (0 broken) ... and +67/+71/+10 additions per file --- all match
+the PR body precisely", and separately that it had "independently scanned the
+diff's 148 added lines".
+Every one of those figures was correct at the head it ran on, `cd8cfb03`:
+`git diff --numstat` over that commit returns `67 / 71 / 10` across three
+files, summing to 148.
+
+Commit `339645c3` then addressed both round-1 findings and widened the diff
+from three files to six.
+`git diff --numstat` over it returns `15 / 67 / 85 / 8 / 10 / 11`, summing to
+196.
+
+Round 2, posted seven minutes after round 1 at 18:11:22Z, opened by saying it
+had "re-scanned all **196** added lines across the full PR diff (all three
+commits)", found nothing new, and returned **Ready for merge**.
+The body at that moment still read 148 added lines, 1646 links, and 134 prose
+lines.
+So the correct figure and the stale one sat one round apart in the same comment
+thread, and the round holding the correct one never looked at the other.
+
+It was caught by the author re-reading the body at the merge gate rather than
+by either review, and the merged body records it in a "Corrections to this
+body" entry naming the same three stale values.)
+
 ## Validating against a real consumer repo covers what fixtures cannot
 
 (d-morrison/altdoc#34: running the new reference-index generator

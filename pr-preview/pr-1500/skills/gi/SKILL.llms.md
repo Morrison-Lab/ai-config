@@ -42,19 +42,9 @@ Scan the issue list and rank by priority. Use these signals (in order):
 
 > “Issues \#4 and \#7 both look high-priority but neither is labeled. Want me to label them before picking one, or just grab \#4 (older, looks like a bug)?”
 
-### 3. Confirm selection with user
+### 3. Select top issue automatically
 
-Present the top 1–3 candidates with a one-line summary each. Let the user pick, or proceed with \#1 if they say “just go”:
-
-> | \#  | Issue                                    | Why                  |
-> |-----|------------------------------------------|----------------------|
-> | 1   | \#12 — Fix auth timeout on slow networks | Bug, P1, oldest      |
-> | 2   | \#8 — Add retry logic to API client      | Feature, blocks \#12 |
-> | 3   | \#15 — Update docs for v3 migration      | Docs, easy win       |
->
-> I’d grab **\#12** — want me to proceed, or pick a different one?
-
-If the user already specified an issue (“gi \#12”), skip this step.
+Pick the highest-priority issue automatically based on the triage signals in step 2 (unless the user explicitly specified an issue or candidate preference). State which issue was selected and why, then proceed directly to check in-flight status and implementation without pausing for user confirmation.
 
 ### 4. Check the issue isn’t already in-flight
 

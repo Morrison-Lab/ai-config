@@ -393,7 +393,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>For each iteration:</p>
 <section id="a.-invoke-gi-grab-issue" class="level4">
 <h4 class="anchored" data-anchor-id="a.-invoke-gi-grab-issue">a. Invoke <code>gi</code> (Grab Issue)</h4>
-<p>Run the full GI procedure: 1. List open issues, triage/prioritize 2. Present top candidates — let user pick, or auto-proceed if they said “just go” / “do all” / “keep going” 3. Check history 4. Claim the issue 5. Create a branch 6. Open the draft PR up front, from an empty commit, before implementing — see <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a> 7. Implement 8. Push and mark the PR ready for review 9. ARDI to clean</p>
+<p>Run the full GI procedure: 1. List open issues, triage/prioritize 2. Select the highest-priority issue automatically from the triage signals, state which one and why, and proceed without pausing for confirmation 3. Check history 4. Claim the issue 5. Create a branch 6. Open the draft PR up front, from an empty commit, before implementing — see <a href="../../shared/workflow/pr-on-claim.md"><code>pr-on-claim</code></a> 7. Implement 8. Push and mark the PR ready for review 9. ARDI to clean</p>
 </section>
 <section id="b.-record-the-result" class="level4">
 <h4 class="anchored" data-anchor-id="b.-record-the-result">b. Record the result</h4>
@@ -496,7 +496,7 @@ Depends on: #&lt;N&gt;</code></pre></li>
 </section>
 <section id="auto-proceed-mode" class="level2">
 <h2 class="anchored" data-anchor-id="auto-proceed-mode">Auto-proceed mode</h2>
-<p>If the user says “just go”, “do all”, “work through everything”, or similar: - Skip the per-issue confirmation (“I’d grab #12 — proceed?”) - Still pause at the max-issues checkpoint - Surface and <strong>bypass</strong> a blocked or ambiguous issue — note it and skip to the next rather than halting; stop only if no independent issues remain (per the stopping conditions above)</p>
+<p>Issue selection never pauses for confirmation, per <code>gi</code>’s step 3, so there is no per-issue confirmation for “just go” to skip. What the loop still does, in every mode: - Still pause at the max-issues checkpoint - Surface and <strong>bypass</strong> a blocked or ambiguous issue — note it and skip to the next rather than halting; stop only if no independent issues remain (per the stopping conditions above)</p>
 </section>
 <section id="anti-patterns" class="level2">
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>

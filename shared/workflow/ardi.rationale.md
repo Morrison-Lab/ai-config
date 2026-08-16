@@ -1048,12 +1048,14 @@ One case with two candidate causes decides nothing either way.
 
 - **Do:** write the note, for the human reviewer, where the reasoning holds.
 - **Do:** expect to still need the rebuttal-and-hold path from
-  [`fully-clean`](fully-clean.md)'s seventh case, since nothing here shows an
-  automated reviewer reading the body at all.
+  [`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s seventh case,
+  since nothing here shows an automated reviewer reading the body at all.
 - **Don't:** claim the body is the *only* thing that can pre-empt this, or
   that the note is what cleared the block --- neither survives the timeline.
 - **Don't:** reach for the intervening commits as the explanation either;
-  that is the nondeterminism error one section over, with the sign flipped.
+  that is the nondeterminism error this file's "A symptom that stops
+  reproducing is a fix having landed" section describes, with the sign
+  flipped.
 
 **Run the whole test suite before pushing, not the files you predict the
 change touches --- and check that the ones you ran were not silently

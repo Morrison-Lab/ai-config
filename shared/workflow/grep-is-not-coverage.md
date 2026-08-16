@@ -265,7 +265,9 @@ the tree the claim is about.
 A reviewer re-runs at the head, where the PR's own additions are present --- and
 an addition can match the dupe-check pattern incidentally, so the PR falsifies
 the count its own body reports.
-Case sensitivity moves the number again, independently of the ref.
+Case sensitivity is a second axis, and it is worth stating even where it
+changes nothing: in the case below the two flag settings agree at the
+merge-base and differ at the head, so neither reading predicts the other.
 
 **So the correction is not to update the figure.**
 Raising it to match the head would make the claim *less* accurate, since the

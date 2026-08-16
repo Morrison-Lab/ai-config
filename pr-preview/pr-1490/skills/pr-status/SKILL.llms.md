@@ -57,6 +57,7 @@ The `@claude` comment above isn’t the whole picture. Per [`fully-clean.md`](..
 The Copilot query above matches only Copilot’s own login, so it cannot see a review a real person submitted through GitHub’s review UI. Without this check, a PR a human already reviewed at the current head gets reported `no verdict at head` – the gap \#668 tracks. Fetch the formal reviews and keep the non-bot ones at the current head (`READ_PR_REVIEWS`):
 
 ``` bash
+set -o pipefail
 head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"   # VIEW_PR
 gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
   | jq -s --arg h "$head" \

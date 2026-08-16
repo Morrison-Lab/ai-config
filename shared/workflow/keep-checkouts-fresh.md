@@ -116,3 +116,58 @@ In every session --- at session start, and again periodically during long sessio
    Check with `git show <pin>:<path>` (or `ls` inside the checked-out submodule) before writing the citation in present tense;
    if either gate hasn't cleared, hedge to future/conditional tense instead of asserting settled fact --- mirroring the "proposed in ai-config#N --- once merged, the fragment lives at ..." convention `gha`'s own `CLAUDE.md` already uses for citing its still-open companion PRs.
    Once the citation does resolve, keep the local **restatement** of the rule's key points alongside the citation rather than trimming to a bare pointer --- unlike a skill distributed via the Plugin Marketplace (point 4's own preamble), `.ai-config`'s `shared/`/`memories/` fragments aren't auto-loaded into agent context --- they only enter it when a `CLAUDE.md` explicitly restates or `@`-references them --- so a bare citation is invisible to an agent that doesn't take the extra step of reading the fragment on demand.
+
+## A scoped fetch refreshes only what it fetched, and prunes only that too
+
+Point 3 above prescribes `git fetch origin main` before the ancestry check, and
+that is right for the question it answers.
+It is the wrong instrument for every *other* remote-tracking ref in the
+checkout, and the way it fails is silent.
+
+`--prune` deletes only refs the fetch's own refspec covers.
+Naming a branch on the command line replaces the configured
+`+refs/heads/*:refs/remotes/origin/*` for that invocation, so a branch deleted
+upstream keeps a **stale, resolving** `refs/remotes/origin/<name>` afterwards.
+Measured on git 2.43.0, deleting `feat` upstream and then fetching from a
+second clone:
+
+```
+git fetch origin main --prune   ->  origin/feat still resolves (95f2077)
+git fetch --prune               ->  origin/feat GONE
+```
+
+**The `fetch.prune=true` config does not rescue this**, which is the part worth
+knowing, because setting it is what most people believe closes the question.
+It is consulted per invocation and bounded by that invocation's refspec, so the
+scoped fetch leaves the ref standing with the config on:
+
+```
+fetch.prune=true, git fetch origin main   ->  origin/feat still resolves
+fetch.prune=true, git fetch               ->  origin/feat GONE
+```
+
+So a stale ref survives a session that both set the config and ran a prune,
+which is a third state alongside the two
+[`memories/git.md`](../../memories/git.md)'s "Cleaning up a branch deleted on
+`origin`" section describes: not "no prune ran", but "a prune ran and did not
+cover this".
+Its `[gone]` sweep reports a false clean either way.
+
+The consequence lands on the next push.
+`git push --force-with-lease` fails with `stale info` against a branch that no
+longer exists at all --- reproduced in the same scratch repo, followed by an
+empty `git ls-remote` and a plain push reporting `* [new branch]`.
+That failure's meaning and its remedy are already recorded, so read
+[`memories/git.md`](../../memories/git.md)'s "`stale info` after `checkout -B`"
+bullet rather than re-deriving them; what this section adds is only that a
+scoped `--prune` is one of the ways you arrive there.
+
+- **Do:** run an unscoped `git fetch --prune` before relying on any
+  remote-tracking ref other than the one you just named.
+- **Do:** treat `git ls-remote --heads origin <branch>` as the authoritative
+  answer to whether a branch exists, since it consults the remote rather than a
+  local cache.
+- **Don't:** read `fetch.prune=true` as making pruning automatic --- it is
+  bounded by each invocation's refspec, so a scoped fetch prunes nothing.
+- **Don't:** count a `--prune` you ran as having pruned the ref you care about;
+  check which refspec it covered.

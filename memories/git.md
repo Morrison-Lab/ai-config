@@ -865,7 +865,11 @@ It is two, they live in different places, and only the first is a git config.
 
 **Half 1 --- the remote-tracking ref.**
 `fetch.prune=true` (or the per-remote `remote.origin.prune=true`) drops
-`refs/remotes/origin/<name>` once that branch is gone upstream.
+`refs/remotes/origin/<name>` once that branch is gone upstream, on an
+**unscoped** fetch.
+A scoped one (`git fetch origin main --prune`) prunes nothing outside its own
+refspec, config or no config, so it leaves the ref resolving --- see
+[`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md).
 It never touches a local branch.
 Verified on git 2.34.1 (2026-07-29), deleting `feat` from a second clone:
 

@@ -276,6 +276,70 @@ which is the discretionary detector the bullets above say not to rely on.
 [`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries the
 measurement and the recovery.)
 
+**A fact you leave OUT is the other failure, and it is quieter than a false one
+--- a missing premise leaves a standing rule looking satisfied.**
+Everything above governs what a brief **asserts**: verify it, or where the
+premise is not yours to verify, name a target and let the agent settle it.
+Nothing governs what a brief **omits**, and omission is the half that reaches a
+standing rule.
+A false premise usually breaks something, so it surfaces.
+A missing one changes nothing the agent can see, so the agent follows the rule
+correctly, gets a success back, and stops.
+
+The class that matters is a **repo-level** fact on which a standing rule's
+satisfiability depends.
+Note it sits outside both halves above.
+It is not an environment claim, because you *can* derive it --- it is a file in
+a repository both parties can read --- so the "not derivable, therefore name a
+target" remedy does not apply.
+And it is not a corpus-state claim you got wrong, because you never made a claim
+at all.
+
+The review-trigger class is the worked instance.
+[`pr-on-claim`](pr-on-claim.md) already says that requesting Copilot discharges
+nothing where a repo's own reviewer runs on `workflow_dispatch` alone, and that
+the `Stop` hook cannot catch it.
+That rule is written for whoever opens the PR, and it fails silently when the PR
+is opened by a dispatched agent --- not through carelessness.
+The agent follows the standing "request the external reviewer in the same
+stride" instruction, calls `request_copilot_review`, gets a success, and stops,
+because nothing in that instruction says to go read the repo's review workflow's
+`on:` block and the agent has no reason to suspect the repo is unusual.
+The PR then goes green with no reviewer having looked, which is
+indistinguishable on the board from a reviewed one.
+
+So before dispatching an agent to open a PR, state the repo's review-trigger
+class --- auto on `pull_request` versus dispatch-only --- and, when it is
+dispatch-only, the exact dispatch call, including that its `ref` must be the PR
+branch rather than the default branch.
+The general test is cheap: for each standing rule the agent will invoke, ask
+whether this repo makes it satisfiable, and supply whatever the answer depends
+on.
+
+- **Do:** state the repo's review-trigger class in any brief that will have an
+  agent open a PR, and give the dispatch call when the reviewer is
+  dispatch-only.
+- **Do:** ask which standing rules the brief's task will invoke, and supply the
+  repo-level facts their satisfiability turns on.
+- **Don't:** treat a fact as the recipient's to derive merely because it is
+  derivable --- the question is whether anything would prompt them to look.
+- **Don't:** read a brief carrying correct environment facts as complete; those
+  are the facts the agent could not get, not the facts it will not know to
+  seek.
+
+(`Morrison-Lab/ai-config#1534`, 2026-08-16: the brief carried every environment
+fact the agent could not query --- clone path, `gh` absent from `PATH`,
+GitHub MCP tools as the only working client, the branch name --- and omitted the
+review-trigger class.
+The agent requested Copilot and reported the PR ready; no review had been
+scheduled.
+It was caught only because the dispatching session read
+`.github/workflows/claude-review.yml`'s `on:` block itself and dispatched the
+run, which then returned a clean verdict.
+`Lacaedemon/sparta` fires its review automatically on `pull_request`, so the
+identical brief would have been fine there --- which is exactly why the fact is
+repo-level and has to be stated rather than assumed.)
+
 **A prose disclaimer does not neutralize a supplied command that encodes the
 assumption it disclaims.**
 The section above prescribes naming the target and letting the agent establish

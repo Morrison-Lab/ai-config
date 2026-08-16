@@ -338,6 +338,12 @@ corrected.**
 See [`ardi.cases.md`](ardi.cases.md), "A corrections entry expires with the next
 push".
 
+The one case where a figure does **not** expire is a push that leaves the tree
+unchanged --- a revert-and-restore returns the tree to an object it already had, and a
+measurement is a function of the tree rather than the commit.
+[`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md)'s
+"The one exception" section carries that mechanic, and the deferral it licenses.
+
 **The read side of that comparison can lag a push by a few seconds, so test
 the two *local* refs against each other before concluding anything failed.**
 

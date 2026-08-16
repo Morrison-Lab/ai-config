@@ -1049,11 +1049,43 @@ with tempfile.TemporaryDirectory() as tmp:
         "a self-baseline reports zero growth under a zero limit",
         ccc.main(common + ["--baseline", "HEAD", "--max-growth", "0"]) == 0,
     )
+    # The exit-code half is asserted above; per fail-fast.md, the message has
+    # to name the rev too, or a typo'd ref and a missing root file read alike.
+    _err = _SIO()
+    with _ctx.redirect_stdout(_SIO()), _ctx.redirect_stderr(_err):
+        _rc = ccc.main(common + ["--baseline", "no-such-rev-xyz"])
+    check(
+        "the unresolvable-rev error names the rev it could not read",
+        _rc == 2 and "no-such-rev-xyz" in _err.getvalue(),
+    )
 
 check(
     "render_delta labels its rows from its arguments, not a hard-coded pair",
     "at REV" in ccc.render_delta(10, 20, 4, "T", "at REV", "working tree")
     and "working tree" in ccc.render_delta(10, 20, 4, "T", "at REV", "working tree"),
+)
+
+
+def _byte_cols(text):
+    """Offsets where a row's byte column ends (the ' B' after each number)."""
+    return {line.index(" B") for line in text.splitlines() if " B" in line}
+
+
+_grow = ccc.render_delta(1000, 2000, 4, "T", "before", "after")
+_shrink = ccc.render_delta(2000, 1000, 4, "T", "before", "after")
+check(
+    "a positive and a negative delta end their byte column at the same offset",
+    # One offset within each rendering, and the same offset across the two:
+    # a manual sign prefix spends a column the '-' of a negative number takes
+    # from the field itself, so the two cases came out a character apart.
+    _byte_cols(_grow) == _byte_cols(_shrink) and len(_byte_cols(_grow)) == 1,
+)
+_save = ccc.render_delta(2001, 1000, 4, "T", "before", "after")
+check(
+    "a shrink's token column reports the bytes saved, not one more",
+    # -1001 B at 4 B/tok is 250 tokens saved; `//` floors toward negative
+    # infinity and reported 251, so a trim over-claimed its own saving.
+    "-250 tok" in _save and "-251" not in _save,
 )
 
 print(f"\n{passes} passed, {failures} failed")

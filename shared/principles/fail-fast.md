@@ -120,6 +120,53 @@ input was empty, or a selection stage collapsed.
 See [`fail-fast.cases.md`](fail-fast.cases.md), "A sound checker pointed at the
 wrong repository".
 
+**Both remedies above assume the subject is chosen by an argument, and a
+drifted working tree chooses it silently.**
+A checkout can hold `HEAD` on one commit while its index and working tree carry
+another commit's content.
+The repository is right, the path is right, and `git -C` changes nothing --- so
+every bullet above passes while a whole-tree instrument measures a tree nobody
+asked for.
+
+What hides it is that such an instrument names no ref at all.
+It reads the working tree, so there is no argument to get wrong and nothing
+informative to print: a scope line naming the repository and the paths examined
+is accurate, and still says nothing about which commit's content sat in them.
+
+The tell is a disagreement between two reads of the same file, one scoped to a
+git object and one to the working tree.
+A `grep -n` for a heading returning one line number while
+`git show HEAD:<path> | grep -n` returns another for that same heading means the
+working tree is the thing to suspect, rather than either instrument.
+
+The remedy is the one "A read-only question does not license a state-mutating
+answer" gives, reached from a different direction: materialize the ref into a
+scratch directory, rather than mutating the checkout to make the question
+answerable.
+
+```bash
+scratch=$(mktemp -d)
+git archive HEAD | tar -x -C "$scratch"
+(cd "$scratch" && <run the instruments>)
+```
+
+Expect the figures to survive that, and do not read their survival as evidence
+the first run was sound.
+Re-running this way reproduced identical numbers, so the published counts stood
+--- but they had rested on the wrong subject until something checked, which is a
+correct conclusion drawn from a premise nobody had tested.
+
+- **Do:** compare a `git show <ref>:<path>` read against a working-tree read of
+  the same file when an instrument's numbers are load-bearing.
+- **Do:** run a whole-tree instrument over `git archive <ref> | tar -x` into a
+  scratch directory, so its subject is the ref rather than whatever the checkout
+  currently holds.
+- **Don't:** read `git -C` or an explicit path argument as settling the subject
+  --- each names a location, and a drifted working tree is wrong about the
+  content at that location.
+- **Don't:** treat matching numbers on re-measurement as retroactive evidence
+  that the first measurement was pointed at the right tree.
+
 ### The narration can be the unfalsifiable part, while the check is fine
 
 Everything above concerns a command whose *output* cannot distinguish pass
@@ -249,6 +296,51 @@ See [`fail-fast.cases.md`](fail-fast.cases.md),
 - **Don't:** promote a pattern written to locate something into the description
   of what it located.
 
+### Guarding an unsound pattern with a second pattern, rather than replacing it
+
+Every direction above ends by naming a pattern that cannot separate what it is
+asked to separate.
+The natural next move, once you know a filter is unsound, is to keep it and add
+a **precondition** that detects the case it gets wrong.
+That move is wrong twice over, and it feels like diligence, which is why it
+survives the reading that produced it.
+
+It is wrong because the precondition is a pattern over the same stream, so it
+inherits the ambiguity that made the first one unsound.
+And it is wrong because nobody tests a guard: the filter has visible output that
+gets eyeballed, while the guard's whole contract is to stay silent, so a
+precondition that can never fire is indistinguishable from one that fires
+correctly and finds nothing.
+It therefore fails **open**, and it publishes a clean number while doing so.
+
+The tell is a diff whose prose cites a rule saying no pattern works, in support
+of a second pattern.
+When the corpus already establishes that a class of instrument cannot decide a
+question, the response is to **replace the instrument** --- with position, with
+an independently computed quantity, with the tool's own structured output ---
+never to add a detector for its failures.
+
+Where a cross-check is genuinely wanted, take it from something that is not the
+pipeline under test: a count from `--numstat`, a total the tool itself reports,
+a figure derived by a different command.
+A second reading of the same stream is not a second opinion.
+
+- **Do:** replace an instrument a rule has already called unsound, rather than
+  guarding it.
+- **Do:** cross-check against a quantity computed outside the pipeline being
+  checked.
+- **Do:** test any guard you do write against the exact case it names, before
+  trusting a zero from it.
+- **Don't:** add a precondition over the same stream that made the first
+  pattern ambiguous --- it inherits the ambiguity and hides it behind silence.
+- **Don't:** read a guard's `0` as evidence of anything until you have seen it
+  produce a non-zero **on the case it names**.
+  A non-zero on some other case is the same false comfort one step along ---
+  the guard has demonstrated it can count, and not that it can see.
+
+See [`fail-fast.cases.md`](fail-fast.cases.md),
+"A precondition that could not fire on the case it named".
+
 ### The third one arrives in the repair, and only on the empty input
 
 The two cases above are checks written wrong the first time.
@@ -289,6 +381,56 @@ trusted.
 - **Don't:** let each command being individually correct stand in for the
   composition being appropriate --- that check passes on every instance of
   this.
+
+**The undo step is the other half, and it can finish the destruction the
+diagnostic started.**
+Everything above concerns the mutation a diagnostic performs on the way in.
+A control that writes into your working tree has a second mutating step
+nobody plans for: the revert that puts the file back.
+The natural undo is path-scoped --- `git checkout <path>` or
+`git restore <path>` --- and that reverts **everything** uncommitted in that
+path, not only the line the control injected.
+
+So a control that was itself harmless destroys uncommitted work, in the step
+whose whole purpose was to leave no trace.
+
+Two properties keep it hidden.
+The revert reports paths rather than lines, so nothing in its output
+distinguishes reverting one injected line from reverting a file's entire
+uncommitted diff.
+`git restore FILE` prints nothing at all, and `git checkout FILE` prints only
+`Updated 1 path from the index` --- measured on git 2.43.0 --- which is
+equally true either way.
+And `git status` afterwards still looks plausible whenever sibling files
+carry their own uncommitted changes: the tree is still dirty, the list is
+still non-empty, and only the one file has been emptied.
+
+Three remedies, in order of preference.
+Commit or stash before running a control that writes into the tree, so the
+revert has a real baseline to return to.
+Inject into a copy outside the tree, so no revert is needed at all.
+Or undo the injection surgically, deleting the line you added, rather than
+reverting the path.
+
+- **Do:** commit or stash uncommitted work before a control writes into a
+  tracked file.
+- **Do:** undo an injection by removing what you injected, rather than by
+  reverting the path it lives in.
+- **Don't:** reach for `git checkout <path>` or `git restore <path>` to clean
+  up after a diagnostic --- it reverts every uncommitted change in that path.
+- **Don't:** read a still-dirty `git status` as evidence the revert was
+  scoped; sibling files' changes keep the list non-empty either way.
+- **Don't:** read `Updated 1 path from the index` as confirmation the revert
+  was narrow --- it counts paths, never lines.
+
+(2026-08-15: testing whether a repo's `chars` check detected U+00D7 meant
+appending a literal multiplication sign to a tracked `.qmd`, re-running the
+check --- which reported PASS, a real finding --- and then reverting the file.
+The revert discarded an uncommitted fix made to that same file minutes
+earlier.
+Three sibling files kept their fixes, so `git status` still listed
+modifications and looked plausible; only re-counting the specific file caught
+it.)
 
 ## In a guard you ship: partial is worse than absent
 

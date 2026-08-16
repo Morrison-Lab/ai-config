@@ -348,8 +348,9 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   `find "<dir>" -maxdepth 1 -name '.tmp.*' -type f -mmin +60 -delete` --
   without `-maxdepth 1 -type f` it recurses into subdirectories and can
   delete unrelated `.tmp.*` files nested below `<dir>`, not just this
-  script's own orphans (see the reference implementation at
-  `skills/session-lock/scripts/ai-session.sh:144`, which includes both
+  script's own orphans (see the reference implementation, the `find`
+  prune inside `prune_stale()` in
+  `skills/session-lock/scripts/ai-session.sh`, which includes both
   flags). Those two flags bound depth and type, not ownership:
   `.tmp.*` is a generic pattern, so in a directory shared with other
   processes (bare `/tmp`, most of all) the prune can delete another

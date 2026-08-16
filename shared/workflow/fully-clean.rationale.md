@@ -89,11 +89,12 @@ fragment; the fragment's copy is authoritative.
 
    **A `BlobNotFound` / HTTP 404 on the job-log fetch means the job has not completed, not that it has hung.**
    The block above says to read a run's duration from its log timestamps.
-   That remedy is unavailable while a job is still running, because there is no log to read yet: GitHub archives a job's log blob only when the job completes, so `gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs"` (and the MCP `get_job_logs`) returns `BlobNotFound` / 404 until then.
+   That remedy is usually unavailable while a job is still running, because there is usually no log to read yet: GitHub typically archives a job's log blob at completion, so `gh api "repos/<owner>/<repo>/actions/jobs/<job-id>/logs"` (and the MCP `get_job_logs`) returns `BlobNotFound` / 404 until then.
    So a 404 there is evidence the job is still going, and reading it as a hang inverts the signal.
+   The archive timing is a tendency rather than a contract, and it only supports the 404 direction: the blob can also be served mid-run (measured 2026-08-15 on run 31903219396, where `get_job_logs` returned a signed `logs_url` while the job's `status` read `in_progress`), so a served log URL is not evidence of completion either.
 
    A still-in-flight job also legitimately reads `status: in_progress` with `conclusion: null`, and neither the 404 nor that status distinguishes a normal long-running review from a genuinely stalled one.
-   Only completion settles it, or the live streaming log in the Actions UI, which is served before the blob is archived.
+   Only completion settles it, or the live streaming log in the Actions UI, which streams while the job runs regardless of when the blob gets archived.
    So do not conclude "hung" or "produced no verdict" from a 404 plus an `in_progress` status; wait for the job to finish and read the verdict it then posts.
 
    A bare 404 is ambiguous in one further way worth naming, because the two readings call for opposite responses.

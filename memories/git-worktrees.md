@@ -746,3 +746,70 @@ Recorded here as evidence about the field rather than about a worktree,
 since nothing about it involved git state --- the mechanism is identical to
 the first two instances, and the correction came from a message rather than
 from a diff.)
+
+## A subagent that has REPORTED COMPLETION can still be resumed, so its worktree is not yours to work in
+
+The section above is entirely about concluding "dead" on evidence that shows
+only "quiet" --- a clean `git status`, an absent `ListAgents` entry, an
+`idleReason` nobody has glossed.
+Its remedy is to ask the agent before touching its worktree.
+
+This is the case where the agent has answered without being asked.
+A dispatched subagent emits a completion notification, the orchestrator reads
+it, and that is a far stronger signal than any of the above: it is the agent's
+own report that it has stopped.
+It is still not terminal.
+The harness's own notification says so in as many words --- "the same task-id
+may notify more than once", because the agent can be resumed and will then
+notify again --- so a completion report bounds the past and promises nothing
+about the future.
+
+**The second-order effect is the expensive half, and it lands on the agent
+rather than on you.**
+Working in a completed agent's worktree puts your commits on its branch and in
+its reflog.
+When it resumes, it finds a commit it did not make, freshly pushed, on the PR
+it claimed --- which is exactly the signature
+[`claim-pr`](../shared/workflow/claim-pr.md)'s parallel-session check names,
+and that check is sound.
+So the agent applies a correct rule to a manufactured signal, concludes a live
+session is racing it, stops pushing, and escalates a question to a user who is
+not there.
+
+Note which way this fails.
+Nothing is corrupted and no work is lost, so there is no artifact to inspect
+afterwards --- the cost is a stalled agent and a question nobody asked for,
+which reads as the agent being cautious rather than as the orchestrator having
+manufactured its evidence.
+
+The fix is to keep the two working directories separate rather than to reason
+harder about liveness.
+Cut your own worktree off the branch and work there, and reclaim the agent's
+only after deciding it will not be resumed.
+Where you must work in its tree, say so **to the agent** before it resumes,
+since a message is the one thing that can distinguish your commit from a
+stranger's.
+
+- **Do:** cut a separate worktree for your own commits on a dispatched agent's
+  branch, rather than reusing the worktree it was given.
+- **Do:** read a completion notification as "stopped for now", the same way
+  the section above reads a quiet worktree.
+- **Do:** tell the agent when one of its branch's commits is yours, so its
+  parallel-session check has something to weigh.
+- **Don't:** treat a completion report as licence to reclaim a worktree --- it
+  is stronger evidence than silence and still not terminal.
+- **Don't:** read the resulting "a parallel session is racing me" escalation
+  as the agent malfunctioning; it is applying a correct rule to evidence you
+  created.
+
+(`Morrison-Lab/ai-config#1481`, 2026-08-15.
+A sidecar UMS agent opened the PR and reported completion.
+The orchestrator then addressed the review's one blocking finding from inside
+that agent's own worktree, committing `4d8c6c7a` and pushing it.
+The agent was resumed, found a commit it had not made --- correctly authored
+`Claude <noreply@anthropic.com>`, already pushed, present in its own reflog ---
+applied `claim-pr`'s parallel-session rule, declined to push, and asked which
+of the two sessions should keep driving.
+Its analysis was right at every step, including its verification that the
+commit it had not made was the better fix; only its premise was false, and the
+orchestrator had supplied it.)

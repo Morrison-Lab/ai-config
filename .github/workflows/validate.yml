@@ -26,6 +26,8 @@ jobs:
         run: python3 scripts/check-links.py
       - name: Check vendored drift
         run: python3 scripts/check-vendored-drift.py
+      - name: Check tui-alloc README defaults
+        run: python3 scripts/check-tui-alloc-readme.py
       - name: Check markdown (.md) style
         run: npx --yes markdownlint-cli2@0.22.1   # node is preinstalled on ubuntu runners; config in .markdownlint-cli2.jsonc
       - name: Run skills-validator tests
@@ -36,6 +38,8 @@ jobs:
         run: python3 scripts/test_slb.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
+      - name: Run tui-alloc README check tests
+        run: python3 scripts/test_check_tui_alloc_readme.py
       - name: Run near-duplicate detector tests
         # The detector itself is a find-overlap tool rather than a gate, so it
         # is not run here -- a corpus growing a near-duplicate pair is a
@@ -120,6 +124,51 @@ jobs:
         # An unresolved INLINE @token is reported but does not fail, since
         # most are prose -- see the script's docstring.
         run: python3 scripts/check-context-closure.py
+      - name: Report this PR's own context-closure delta (advisory)
+        # ai-config#1373. The step above reports the closure's LEVEL against a
+        # budget; this reports what THIS branch did to it. Those are different
+        # questions, and only the second is attributable to an author: the
+        # total is a sum nobody owns, while a delta names the PR that moved it.
+        #
+        # Advisory by construction, and deliberately not gated. A fragment that
+        # grows because it earned the words is the normal case, so failing on
+        # growth would fire on most PRs and train everyone to ignore it -- the
+        # cry-wolf failure `shared/workflow/algorithmatize-checks.md` warns
+        # about. Reporting the number where a reviewer already looks is the
+        # whole intervention.
+        #
+        # `|| true` is not swallowing a failure here: the script's own baseline
+        # mode never exits non-zero for a delta, so the only statuses it can
+        # return are usage errors (2) on a rev this runner cannot resolve --
+        # a shallow clone, a force-push -- which must not redden an unrelated
+        # PR. The delta itself is in the log either way.
+        #
+        # The base has to be fetched explicitly. `actions/checkout` above sets
+        # no `fetch-depth`, so it clones at depth 1 and `origin/<base>` does
+        # not resolve at all -- the step would print "cannot resolve" on every
+        # run and read as working. Fetching here rather than deepening the
+        # shared checkout keeps the clone cost on the one step that needs it.
+        #
+        # The rev used is echoed rather than assumed. A merge base is the right
+        # subject (it asks what this branch added), but a bounded fetch may not
+        # reach one, and the tip fallback answers a slightly different question
+        # -- it also counts whatever the base gained since this branch diverged,
+        # which reads as a shrink. Saying which one ran is what keeps the number
+        # interpretable instead of merely present.
+        run: |
+          set -uo pipefail
+          BASE="${{ github.base_ref || github.event.repository.default_branch }}"
+          git fetch --quiet --depth=50 origin "$BASE" || true
+          if REV="$(git merge-base HEAD FETCH_HEAD 2>/dev/null)"; then
+            echo "baseline: merge base with origin/$BASE ($REV)"
+          elif git rev-parse --verify --quiet FETCH_HEAD >/dev/null; then
+            REV=FETCH_HEAD
+            echo "baseline: tip of origin/$BASE (no merge base within 50 commits)"
+          else
+            echo "baseline: origin/$BASE unreachable; skipping the delta report"
+            exit 0
+          fi
+          python3 scripts/check-context-closure.py --baseline "$REV" || true
       - name: Check for oversized memory files (advisory)
         # Non-blocking (ai-config#695): memory files are read on demand, so
         # length is a real per-use cost -- but crossing the threshold is a

@@ -112,6 +112,7 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    A stub-like non-answer ("ineligible", "reached their quota limit") is not a verdict either.
 >    **A human's formal review at the current head counts as an external verdict too** -- check for one whenever the Copilot half found no clean verdict, before settling on `no verdict at head`:
 >    ```bash
+>    head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"
 >    gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
 >      | jq -s --arg h "$head" \
 >      '[.[][] | select(.user.type == "User" and .commit_id == $h
@@ -120,6 +121,8 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >       | map(sort_by(.submitted_at) | last
 >             | {id, login: .user.login, state, submitted_at})'
 >    ```
+>    The `head=` line is repeated deliberately so this block is self-contained:
+>    shell state does not persist across separate Bash invocations, and a subagent that runs each fence as its own call would otherwise pass an empty `$h` that matches no review's `commit_id` -- a silent `[]` every time, with nothing signalling the miss.
 >    The `.state != "DISMISSED"` exclusion is load-bearing:
 >    GitHub's dismiss action flips the review's own `state` in place rather than adding a new review, and retracts neither its body nor its inline threads --
 >    so without the exclusion, a substance read would report findings an explicit dismissal already resolved (dismissal being one of the two resolution paths item 6's own prose documents).

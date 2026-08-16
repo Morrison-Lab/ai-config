@@ -223,6 +223,51 @@ rather than checking only whether the rationale persuades you.
 [`fail-fast`](../principles/fail-fast.md)'s partial-guard family covers the
 shape that takes inside a predicate.
 
+**Verifying ONE particular from a report does not transfer to the one beside
+it, and a reviewer confirming the checked half launders the unchecked one.**
+The rule above says to re-derive a report's particulars.
+It does not say how many there are, and a report sentence routinely carries
+more than one.
+Checking a single particular from such a sentence produces a real derivation
+and a real answer, which is what makes the rest of the sentence feel handled:
+the diligence happened, and it attaches to whichever claim you happened to
+pick.
+
+Two neighbouring rules look like they cover this and do not, on the same
+distinction.
+The **true neighbour** effect above concerns one claim at two levels of
+specificity, where the cheap check confirms the weaker version and cannot
+discriminate.
+**Verification of the reachable half** below concerns two populations split by
+whether you can probe them at all.
+Here the particulars are independent claims rather than one claim restated,
+and both are equally reachable, one command each.
+The axis is neither specificity nor reachability but **adjacency**: they
+arrived in one sentence, so verifying either one warms the other.
+
+The second half is what makes it durable rather than merely likely.
+A reviewer asked to check the published claim confirms the half that is true,
+in as many words, and says nothing about the half it never looked at.
+That reads as corroboration of the whole sentence, so the clean verdict retires
+the suspicion instead of raising it.
+This is not the ratified-enumeration case in
+[`fully-clean`](fully-clean.md), where a reviewer inherits the author's own
+*set*; here the reviewer independently confirms a real claim, and the
+laundering comes from what happened to sit beside it.
+
+So count the independent claims before quoting a report sentence, derive each
+one you intend to publish, and read a reviewer's confirmation for which claim
+it actually names.
+
+This one is **not mechanizable**, and the limit is worth stating so nobody
+builds the guard.
+Deciding that an outgoing sentence restates an unverified particular from an
+earlier report needs content matching between the report and the artifact,
+which is semantic; any lexical proxy fires on essentially every
+dispatch-then-assert sequence, which is the mushy threshold
+[`algorithmatize-checks`](algorithmatize-checks.md) warns trains everyone to
+ignore the instrument.
+
 **A hedge you attach for one audience is owed to the other, and writing it
 once is the tell.**
 The section above governs a claim arriving *from* a subagent.

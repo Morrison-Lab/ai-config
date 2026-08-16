@@ -122,7 +122,16 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
     cat <<EOF > "$SKILLS_JSON"
 {
   "entries": [
-    { "path": "$GEMINI_DIR/skills" }
+    {
+      "path": "$GEMINI_DIR/skills",
+      "exclude": [
+        "^(address-rebut-defer|address-rebut-defer-iterate|address-rebut-defer-iterate-all|address-rebut-defer-iterate-all-edit-instructions|adr|adri|adria|ai-tells|always|benchmark)$",
+        "^(ca|cai|cb|cdu|ciq|clean|clear-all|crf|crr|cw|dc|deconflict-sessions|dependabot|done|drive|dtc|fa|fcp|ffr|find-duplicates)$",
+        "^(giardia|gis|grab-issue|grab-issues-and-iterate-all|grab-issues-in-parallel|iterate|iterate-all|macroize|maw|merge-at-will|merge-main)$",
+        "^(merge-skills|merge-when-confident|merged|model-fit|oppo|pd|perf|ph|pm|pma|prune|prune-worktrees|rc|remember|resync-branch)$",
+        "^(rescue-closed|revive-closed|rfu|rmc|send-upstream|skill-builder|start-task|style|sus|sync|ts|update-memories-and-skills)$"
+      ]
+    }
   ]
 }
 EOF

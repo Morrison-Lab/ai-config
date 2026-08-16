@@ -855,14 +855,68 @@ On `shared/coding/tidy-code.md` (ai-config#476), a "Preferred" R example labeled
 The paired "Avoid" example was also contrived (a nested `eval_tidy()`/`quo()` call nobody writes, and not even equivalent inside `summarise()`'s NSE) rather than the realistic verbose form.
 Both were caught by the `@claude` review bot, not by me --- mentally (or actually) running the example against its stated claim before publishing would have caught it first.
 
-## Delegate heavy work to codex first
+## Delegate heavy work to a separately-billed CLI first --- codex, and now agy
 
-For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to the separately-billed **`codex` CLI** (ChatGPT plan) and spend its budget **before** Claude/Workflow tokens.
-Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage codex can't finish.
-Exhaust the *current ~5-hour codex usage window*, then fall back to Claude until it resets --- "codex first" means the current window, not abandoning Claude permanently.
+For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to a separately-billed agent CLI and spend that budget **before** Claude/Workflow tokens.
+Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
 This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.
-Stated 2026-07-02 ("exhaust its tokens before using our own") and reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota").
-The `delegate-to-codex` skill (alias `dtc`) operationalizes the mechanics (background runner + DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback).
+
+**There are two such budgets, and the rule is to try both before Claude's.**
+
+| CLI | plan | skill |
+|---|---|---|
+| `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
+| `agy` (Google Antigravity) | Antigravity | none yet --- mechanics below; the skill is worth writing |
+
+Exhaust the *current usage window* of each --- roughly 5 hours for codex --- then fall back to Claude until it resets.
+"Delegate first" means the current window, not abandoning Claude permanently.
+`delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
+
+**`agy --print` CONSUMES THE NEXT TOKEN as its prompt, so a flag placed between the two becomes the prompt.**
+This is the whole of what makes `agy` usable headlessly, and getting it wrong looks exactly like a broken tool:
+
+```bash
+agy --print "Reply with only the word BANANA."                 # -> BANANA
+agy --print "Reply with only the word BANANA." --effort low    # -> BANANA
+agy --print="Reply with only the word BANANA." --effort low    # -> BANANA
+agy --print --effort low "Reply with only the word BANANA."    # -> explains what --effort does
+```
+
+That last line is the failure, and its output is the proof: the CLI answers the
+prompt `--effort`, because `--print` took `--effort` as its value and the real
+prompt fell out as an unconsumed positional.
+So the rule is about **position**, not syntax --- either keep the prompt
+immediately after `--print`, or bind it with `=` and put other flags after.
+
+**Both forms exit 0**, so the drop is invisible to any caller keying on exit status, which is what a delegation wrapper keys on.
+
+Measured 2026-08-15 and re-measured 2026-08-16, `agy` 1.1.13 at `~/.local/bin/agy`.
+Three space-form and three equals-form runs of the same prompt, with nothing between the flag and the prompt, all returned `BANANA`.
+
+**An earlier version of this entry said the equals sign was REQUIRED and blamed Go's `flag` package.**
+Both halves were wrong, and the error is worth keeping because it is a confound rather than a slip.
+Four failing probes all carried another flag between `--print` and the prompt.
+Two working ones did not, and also happened to use `=`.
+Two variables moved together and the visible one got the credit.
+Go's stdlib `flag` in fact treats `-flag value` and `-flag=value` identically for a string flag, which is what a reviewer pointed out (`Morrison-Lab/ai-config#1487`).
+
+**Its figures still need checking, whichever form you use.**
+Asked to read `scripts/added_lines.py` in `ucdavis/bcs`, it returned the right function name and its exact line number (`added_lines`, line 30), so it really read the file.
+It also reported the file as 74 lines where `wc -l`, `grep -c ''`, and Python's `splitlines()` all say 73 --- same run, 2026-08-15, same 1.1.13 binary.
+So a delegate having genuinely done the work does not make the figures it reports true, and any count one returns is re-derived rather than quoted --- the same standing treatment codex's output gets.
+
+**Two upstream bugs are real and are NOT this.**
+`google-antigravity/antigravity-cli` #76 (closed, 1.0.0) reports `--print` silently emitting nothing on a non-TTY, and #318 (open, 1.0.6) reports it hanging there.
+Neither matches the symptom above --- ours returns prompt content promptly on 1.1.13 --- but both are worth knowing before trusting a headless run, since each fails silently in its own way.
+
+- **Do:** route heavy read/draft/verify work to `codex` and `agy` before Claude, and keep the prompt immediately after `--print` or bind it with `=`.
+- **Do:** re-verify any figure a delegate reports, since `agy` miscounted a 73-line file by one while reading it correctly.
+- **Don't:** put another flag between `--print` and the prompt --- that flag becomes the prompt, and the exit status is still 0.
+- **Don't:** read "we have agy quota" as "agy is usable".
+  Quota and a working invocation are separate facts, and the second took five
+  probes plus a review round to establish.
+
+Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota"), and widened 2026-08-15 ("in addition to codex, we have agy quota to use; try using both of those as subagents before exhausting claude quota").
 
 ## Ephemeral-session commit tension
 

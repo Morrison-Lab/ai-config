@@ -119,17 +119,29 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   mkdir -p "$GEMINI_CONFIG_DIR"
   SKILLS_JSON="$GEMINI_CONFIG_DIR/skills.json"
   if [ ! -f "$SKILLS_JSON" ]; then
+    # Derive the alias set rather than hard-coding it. An alias skill declares
+    # `description: "Alias for ..."` in its frontmatter and is a thin pointer to
+    # its canonical skill, so the set is enumerable from the repo itself. A
+    # hand-maintained list drifts silently in both directions: a newly added
+    # alias eats budget until the banner returns, and a skill that stops being
+    # an alias disappears from Antigravity entirely.
+    ALIAS_PATTERNS=""
+    for _skill_dir in "$SCRIPT_DIR"/skills/*/; do
+      [ -f "$_skill_dir/SKILL.md" ] || continue
+      _skill_name=$(basename "$_skill_dir")
+      if head -8 "$_skill_dir/SKILL.md" | grep -qiE '^description: *"?Alias for'; then
+        [ -z "$ALIAS_PATTERNS" ] || ALIAS_PATTERNS="$ALIAS_PATTERNS,
+"
+        ALIAS_PATTERNS="$ALIAS_PATTERNS$(printf '        "^%s$"' "$_skill_name")"
+      fi
+    done
     cat <<EOF > "$SKILLS_JSON"
 {
   "entries": [
     {
       "path": "$GEMINI_DIR/skills",
       "exclude": [
-        "^(address-rebut-defer|address-rebut-defer-iterate|address-rebut-defer-iterate-all|address-rebut-defer-iterate-all-edit-instructions|adr|adri|adria|ai-tells|always|benchmark)$",
-        "^(ca|cai|cb|cdu|ciq|clean|clear-all|crf|crr|cw|dc|deconflict-sessions|dependabot|done|drive|dtc|fa|fcp|ffr|find-duplicates)$",
-        "^(giardia|gis|grab-issue|grab-issues-and-iterate-all|grab-issues-in-parallel|iterate|iterate-all|macroize|maw|merge-at-will|merge-main)$",
-        "^(merge-skills|merge-when-confident|merged|model-fit|oppo|pd|perf|ph|pm|pma|prune|prune-worktrees|rc|remember|resync-branch)$",
-        "^(rescue-closed|revive-closed|rfu|rmc|send-upstream|skill-builder|start-task|style|sus|sync|ts|update-memories-and-skills)$"
+$ALIAS_PATTERNS
       ]
     }
   ]

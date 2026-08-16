@@ -507,6 +507,16 @@ and a pure re-post webhook event doesn't need fresh analysis.
 
 If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the impasse — for the final call rather than looping.
 
+## Request review and drive every started PR to clean
+
+Whenever starting or creating a Pull Request:
+1. **Request review immediately**: Request review from `d-morrison` (or the repository's configured reviewers, adhering to per-repo exceptions such as `sparta` per `skills/request-pr-review/SKILL.md`).
+2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
+
+- **Do:** Request review immediately upon creating or starting any PR and run `ardi` to drive the PR to a clean review verdict with green CI.
+- **Don't:** Leave a newly created PR sitting without a requested reviewer, or stop working on a PR after creation without carrying it to clean.
+
+
 ## Keep PR branches synced with main
 
 @shared/workflow/sync-with-main.md

@@ -38,3 +38,13 @@ A single honest measurement earlier in the session is what most easily licenses 
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
   Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
   Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
+
+## Request review and drive every started PR to clean
+
+Whenever starting or creating a Pull Request:
+1. **Request review immediately**: Request review from `d-morrison` (or the repository's configured reviewers, adhering to per-repo exceptions such as `sparta` per `skills/request-pr-review/SKILL.md`).
+2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
+
+- **Do:** Request review immediately upon creating or starting any PR and run `ardi` to drive the PR to a clean review verdict with green CI.
+- **Don't:** Leave a newly created PR sitting without a requested reviewer, or stop working on a PR after creation without carrying it to clean.
+

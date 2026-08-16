@@ -263,10 +263,11 @@ This one is **not mechanizable**, and the limit is worth stating so nobody
 builds the guard.
 Deciding that an outgoing sentence restates an unverified particular from an
 earlier report needs content matching between the report and the artifact,
-which is semantic; any lexical proxy fires on essentially every
-dispatch-then-assert sequence, which is the mushy threshold
-[`algorithmatize-checks`](algorithmatize-checks.md) warns trains everyone to
-ignore the instrument.
+which is semantic.
+Any lexical proxy fires on essentially every dispatch-then-assert sequence,
+which makes it the mushy threshold
+[`algorithmatize-checks`](algorithmatize-checks.md) warns about --- the kind
+that trains everyone to ignore the instrument.
 
 **A hedge you attach for one audience is owed to the other, and writing it
 once is the tell.**

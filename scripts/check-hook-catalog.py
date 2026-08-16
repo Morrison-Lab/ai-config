@@ -64,8 +64,6 @@ README = os.path.join(ROOT, "README.md")
 # plugin-path activation, so it is registered by the follow-up after its
 # authoring PR merges.
 KNOWN_UNREGISTERED = {
-    "no-handrolled-verdict-parse.py": 1505,
-    "remind-brief-premises.py": 1505,
     "no-misattributed-quote.py": 1527,
 }
 

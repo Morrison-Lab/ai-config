@@ -306,13 +306,13 @@ the rule is consulted when it is *read* and broken when a message is
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
-| `remind-brief-premises.py` | `PreToolUse` (Agent) | **not registered ([#1505](https://github.com/Morrison-Lab/ai-config/issues/1505))** --- would remind, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
+| `remind-brief-premises.py` | `PreToolUse` (Agent) | reminds, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
 | `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
 | `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |
 | `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
 | `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
-| `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | **not registered ([#1505](https://github.com/Morrison-Lab/ai-config/issues/1505))** --- would block matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
+| `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
 | `no-unauthorized-merge.py` | `PreToolUse` (Bash) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`) unless an explicit `ALLOW_MERGE=1` assertion accompanies it |
 | `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
 | `no-misattributed-quote.py` | `Stop` | **not registered ([#1527](https://github.com/Morrison-Lab/ai-config/issues/1527))** --- would block a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
@@ -340,8 +340,7 @@ produces output, so the row becomes positive evidence for something that never
 fires.
 A hook that is deliberately documented-but-inert says **not registered** in its
 own row and sits in an explicit `KNOWN_UNREGISTERED` allowlist, so the state is
-asserted rather than merely true; the two there today are tracked in
-[#1505](https://github.com/Morrison-Lab/ai-config/issues/1505).
+asserted rather than merely true.
 
 `bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
 directory, so the scripts arrive with no extra step.

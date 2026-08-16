@@ -247,6 +247,13 @@
               "Emits only `additionalContext` and a `systemMessage`; no",
               "`permissionDecision`."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-handrolled-verdict-parse.py\"",
+            "timeout": 10,
+            "script": "no-handrolled-verdict-parse.py",
+            "why": "shared/workflow/ardi.md mandates check-pr-fully-clean.py as verdict authority. PreToolUse guard that refuses hand-rolled regex/grep verdict parses of review comments without running the script or setting ALLOW_HANDROLLED_VERDICT_PARSE=1."
           }
         ]
       },
@@ -276,6 +283,13 @@
               "_comment and README): the plugin loads it on enable, and",
               "install-hooks.py --fix registers it for a non-plugin install."
             ]
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-brief-premises.py\"",
+            "timeout": 10,
+            "script": "remind-brief-premises.py",
+            "why": "shared/workflow/challenge-the-assignment.md -- remind when an Agent brief asserts corpus state that nothing derived. Injects rather than blocks."
           }
         ]
       }

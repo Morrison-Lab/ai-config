@@ -88,12 +88,20 @@ def readme(rows, heading="## Enforcement hooks (`hooks/`)"):
     return "\n".join(body) + "\n"
 
 
-def make_repo(tmpdir, entries, rows, heading=None):
+def make_repo(tmpdir, entries, rows, heading=None, allowlisted=None):
     root = Path(tmpdir)
     (root / "scripts").mkdir()
     (root / "hooks").mkdir()
+    script_text = SCRIPT.read_text(encoding="utf-8")
+    if allowlisted is not None:
+        import re
+        assert "KNOWN_UNREGISTERED = {" in script_text, (
+            "check-hook-catalog.py shape changed; KNOWN_UNREGISTERED = { not found"
+        )
+        replacement = "KNOWN_UNREGISTERED = {\n" + "\n".join(f'    "{s}": 9999,' for s in allowlisted) + "\n}"
+        script_text = re.sub(r"KNOWN_UNREGISTERED = \{[^}]*\}", replacement, script_text)
     (root / "scripts" / "check-hook-catalog.py").write_text(
-        SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+        script_text, encoding="utf-8")
     (root / "hooks" / "hooks.json").write_text(
         hooks_json(entries), encoding="utf-8")
     kwargs = {"heading": heading} if heading else {}
@@ -108,15 +116,15 @@ def run(root):
     return proc.returncode, proc.stdout + proc.stderr
 
 
-# The two allowlisted hooks, documented with the required marker. Every fixture
-# starts from these so the allowlist checks are satisfied by default.
-ALLOW_ROWS = [(s, "PreToolUse", "Bash", "**not registered ([#1505](u))** --- would block")
-              for s in ALLOWLISTED]
+# The allowlisted hooks in the live script, documented with the required marker.
+# Every fixture starts from these so the allowlist checks are satisfied by default.
+ALLOW_ROWS = [(s, "PreToolUse", "Bash", f"**not registered ([#{issue}](u))** --- would block")
+              for s, issue in sorted(_catalog.KNOWN_UNREGISTERED.items())]
 
 
-def case(name, entries, rows, want_fail, needle=None, heading=None):
+def case(name, entries, rows, want_fail, needle=None, heading=None, allowlisted=None):
     with tempfile.TemporaryDirectory() as td:
-        root = make_repo(td, entries, rows, heading)
+        root = make_repo(td, entries, rows, heading, allowlisted)
         rc, out = run(root)
     ok = (rc != 0) if want_fail else (rc == 0)
     if ok and needle:
@@ -157,32 +165,32 @@ case("matcher mismatch fails",
      want_fail=True, needle="hooks.json binds PreToolUse (Bash)")
 
 # --- allowlist hygiene, mirroring KNOWN_UNTESTED's reverse check ----------
-# These need at least one allowlisted hook to exercise. KNOWN_UNREGISTERED is
-# meant to shrink to nothing (ai-config#1505), so they skip loudly rather than
-# silently passing once it does.
-_why = "KNOWN_UNREGISTERED is empty"
-if ALLOWLISTED:
-    case("allowlisted row without the marker fails",
-         [("a.py", "Stop", "")],
-         [("a.py", "Stop", "", "blocks x"),
-          (ALLOWLISTED[0], "PreToolUse", "Bash", "describes an active guard")]
-         + ALLOW_ROWS[1:],
-         want_fail=True, needle="reads as an active guard")
+# Always exercised by injecting a test allowlist, ensuring these checks run
+# even when KNOWN_UNREGISTERED is empty in production.
+test_allow = ["inert1.py", "inert2.py"]
+test_allow_rows = [
+    ("inert1.py", "PreToolUse", "Bash", "**not registered ([#9999](u))** --- would block"),
+    ("inert2.py", "PreToolUse", "Agent", "**not registered ([#9999](u))** --- reminds")
+]
 
-    case("allowlisted hook that is now registered fails",
-         [("a.py", "Stop", ""), (ALLOWLISTED[0], "PreToolUse", "Bash")],
-         [("a.py", "Stop", "", "blocks x")] + ALLOW_ROWS,
-         want_fail=True, needle="drop it from KNOWN_UNREGISTERED")
+case("allowlisted row without the marker fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x"),
+      ("inert1.py", "PreToolUse", "Bash", "describes an active guard"),
+      test_allow_rows[1]],
+     want_fail=True, needle="reads as an active guard", allowlisted=test_allow)
 
-    case("allowlisted hook with no README row fails",
-         [("a.py", "Stop", "")],
-         [("a.py", "Stop", "", "blocks x")] + ALLOW_ROWS[1:],
-         want_fail=True, needle="has no README row")
-else:
-    for _n in ("allowlisted row without the marker fails",
-               "allowlisted hook that is now registered fails",
-               "allowlisted hook with no README row fails"):
-        skip(_n, _why)
+case("allowlisted hook that is now registered fails",
+     [("a.py", "Stop", ""), ("inert1.py", "PreToolUse", "Bash")],
+     [("a.py", "Stop", "", "blocks x"),
+      ("inert1.py", "PreToolUse", "Bash", "**not registered ([#9999](u))** --- would block"),
+      test_allow_rows[1]],
+     want_fail=True, needle="drop it from KNOWN_UNREGISTERED", allowlisted=test_allow)
+
+case("allowlisted hook with no README row fails",
+     [("a.py", "Stop", "")],
+     [("a.py", "Stop", "", "blocks x"), test_allow_rows[1]],
+     want_fail=True, needle="has no README row", allowlisted=test_allow)
 
 # --- fail-fast: a parse that finds nothing must not pass vacuously --------
 case("missing section fails loudly",

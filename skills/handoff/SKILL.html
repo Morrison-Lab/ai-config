@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Snapshot the current work state into a project memory so the next session can pick up cleanly — branch, HEAD, unpushed commits, dirty files, running jobs (SLURM/background/CI), backups, open decisions, and the exact pick-up command sequence. Post a paused-state note on the active PR/MR if there is one. Use when ending or pausing a session, when asked to ‘handoff’, ‘leave myself notes’, ‘hand this off’, or ‘pause and save state’ — and proactively whenever pausing while a long-running job is in flight.">
+<meta name="description" content="Snapshot the current work state into a project memory so the next session can pick up cleanly — branch, HEAD, unpushed commits, dirty files, running jobs (SLURM/background/CI), backups, open decisions, and the exact pick-up command sequence. Post a paused-state note on the active PR/MR if there is one. Also retires a handoff once everything it names has resolved. Use when ending or pausing a session, when asked to ‘handoff’, ‘leave myself notes’, ‘hand this off’, or ‘pause and save state’ — and proactively whenever pausing while a long-running job is in flight. Use also when asked to ‘clear stale handoffs’, ‘retire this handoff’, ‘delete out of date handoff files’, or ‘is this handoff still current?’.">
 
 <title>skill – ai-config</title>
 <style>
@@ -353,6 +353,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#step-2-write-or-update-the-handoff-memory" id="toc-step-2-write-or-update-the-handoff-memory" class="nav-link" data-scroll-target="#step-2-write-or-update-the-handoff-memory">Step 2 — Write (or update) the handoff memory</a></li>
   <li><a href="#step-3-post-a-paused-state-note-on-the-active-prmr" id="toc-step-3-post-a-paused-state-note-on-the-active-prmr" class="nav-link" data-scroll-target="#step-3-post-a-paused-state-note-on-the-active-prmr">Step 3 — Post a paused-state note on the active PR/MR</a></li>
   <li><a href="#step-4-confirm" id="toc-step-4-confirm" class="nav-link" data-scroll-target="#step-4-confirm">Step 4 — Confirm</a></li>
+  <li><a href="#step-5-retire-a-handoff-once-its-state-is-resolved" id="toc-step-5-retire-a-handoff-once-its-state-is-resolved" class="nav-link" data-scroll-target="#step-5-retire-a-handoff-once-its-state-is-resolved">Step 5 — Retire a handoff once its state is resolved</a>
+  <ul class="collapse">
+  <li><a href="#a-handoff-written-as-a-repo-root-file-is-a-staging-hazard" id="toc-a-handoff-written-as-a-repo-root-file-is-a-staging-hazard" class="nav-link" data-scroll-target="#a-handoff-written-as-a-repo-root-file-is-a-staging-hazard">A handoff written as a repo-root file is a staging hazard</a></li>
+  </ul></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   </ul></li>
   </ul>
@@ -415,6 +419,34 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="step-4-confirm" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-confirm">Step 4 — Confirm</h2>
 <p>Give the user a compact recap: what was snapshotted, where the memory lives, the PR note link, and the one-line pick-up summary. Include a local-time stamp.</p>
+</section>
+<section id="step-5-retire-a-handoff-once-its-state-is-resolved" class="level2">
+<h2 class="anchored" data-anchor-id="step-5-retire-a-handoff-once-its-state-is-resolved">Step 5 — Retire a handoff once its state is resolved</h2>
+<p>A handoff is a <strong>snapshot with an expiry</strong>, not a durable record. Everything it carries — a branch, an unpushed commit, a running job, an open decision — either resolves or is superseded. Once all of it has, the handoff is not merely redundant. It is <strong>actively misleading</strong>, because a later reader meets it as orientation and cannot tell which parts still hold.</p>
+<p><strong>You may clear an out-of-date handoff without asking.</strong> Standing permission, given 2026-08-16. The judgment worth exercising is whether it is genuinely stale, not whether you are allowed to remove it.</p>
+<p>Staleness is derivable rather than a matter of taste, so derive it. Take every PR, issue, branch, and job id the handoff names, and check each:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-oE</span> <span class="st">'#[0-9]+'</span> <span class="op">&lt;</span>handoff<span class="op">&gt;</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span> <span class="kw">|</span> <span class="cf">while</span> <span class="bu">read</span> <span class="at">-r</span> <span class="va">n</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="bu">printf</span> <span class="st">"  %s %s\n"</span> <span class="st">"</span><span class="va">$n</span><span class="st">"</span> <span class="st">"</span><span class="va">$(</span><span class="ex">gh</span> pr view <span class="st">"</span><span class="va">${n</span><span class="op">#</span><span class="dt">\#</span><span class="va">}</span><span class="st">"</span> <span class="at">--json</span> state <span class="at">-q</span> .state <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">||</span> <span class="ex">gh</span> issue view <span class="st">"</span><span class="va">${n</span><span class="op">#</span><span class="dt">\#</span><span class="va">}</span><span class="st">"</span> <span class="at">--json</span> state <span class="at">-q</span> .state <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">||</span> <span class="bu">echo</span> <span class="st">'?'</span><span class="va">)</span><span class="st">"</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-oE</span> <span class="st">'`[a-z]+/[a-z0-9-]+`'</span> <span class="op">&lt;</span>handoff<span class="op">&gt;</span> <span class="kw">|</span> <span class="fu">tr</span> <span class="at">-d</span> <span class="st">'`'</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span> <span class="kw">|</span> <span class="cf">while</span> <span class="bu">read</span> <span class="at">-r</span> <span class="va">b</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="bu">printf</span> <span class="st">"  branch %-40s %s\n"</span> <span class="st">"</span><span class="va">$b</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"</span><span class="va">$(</span><span class="fu">git</span> ls-remote <span class="at">--heads</span> origin <span class="st">"</span><span class="va">$b</span><span class="st">"</span> <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span> <span class="kw">|</span> <span class="fu">sed</span> <span class="st">'s/^0$/GONE/;s/^1$/EXISTS/'</span><span class="va">)</span><span class="st">"</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="cf">done</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Every PR merged or closed, every branch gone, every job finished — clear it. Anything still open or still running — keep it, and say which item held it.</p>
+<p><strong>An open <em>issue</em> it references does not keep it alive.</strong> A handoff’s value is the in-flight state it captured; an issue is tracked in the tracker, which is where a reader should meet it. Judge on the in-flight items.</p>
+<section id="a-handoff-written-as-a-repo-root-file-is-a-staging-hazard" class="level3">
+<h3 class="anchored" data-anchor-id="a-handoff-written-as-a-repo-root-file-is-a-staging-hazard">A handoff written as a repo-root file is a staging hazard</h3>
+<p>The rest of this skill persists the snapshot as a <strong>project memory</strong>, which is outside the repo and cannot be committed by accident. A handoff written instead as a repo-root <code>HANDOFF-*.md</code> is untracked <strong>and</strong> usually unignored, which is precisely the combination that lets a bare <code>git add -A</code> sweep it into a PR.</p>
+<p>That is not hypothetical. It is the shape of <code>ucdavis/bcs</code>’s 2026-07-30 incident, where an untracked-and-unignored directory was staged that way and pushed a credential.</p>
+<p>So prefer the project-memory form. Where a repo-root file already exists, either retire it under the rule above or add a <code>.gitignore</code> entry — and read its contents before doing either, since a stale handoff can carry a rule the project has since <strong>reversed</strong>, which is worse than one that is merely out of date.</p>
+<ul>
+<li><strong>Do:</strong> derive staleness from the state of every item a handoff names, and clear it once they have all resolved.</li>
+<li><strong>Do:</strong> read a stale handoff before deleting it, in case it states a convention the project has since changed.</li>
+<li><strong>Don’t:</strong> keep a handoff alive because it mentions an open issue — the tracker owns that.</li>
+<li><strong>Don’t:</strong> leave a repo-root handoff untracked and unignored; that is the <code>git add -A</code> hazard, not merely clutter.</li>
+</ul>
+</section>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>

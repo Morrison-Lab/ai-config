@@ -66,6 +66,15 @@ REMIND = [
     ([txt("I mischaracterized the exposure as public.")], "mischaracterized"),
     ([txt("Retracting my earlier claim about the hook directory.")], "retracting"),
     ([txt("I incorrectly reported the PR as conflict-free.")], "incorrectly reported"),
+    # Quantitative self-corrections (ai-config#1210). The first is verbatim
+    # from the retraction in ucdavis/bcs#587 that the issue was filed over.
+    ([txt("Correcting this issue's headline figure. I overstated the waste.")],
+     "correcting this + overstated"),
+    ([txt("I overstated the waste in that estimate.")], "overstated"),
+    ([txt("I undercounted the open PRs.")], "undercounted"),
+    ([txt("I overclaimed what the measurement showed.")],
+     "overclaimed, via over + claimed"),
+    ([txt("Correcting my earlier count of the fragments.")], "correcting my"),
     ([ADMIT, tool("Edit", {"file_path": "R/foo.R"})],
      "a write that is NOT to a memory/skill path does not clear it"),
     ([tool("Edit", {"file_path": "memories/tools.md"}), ADMIT],
@@ -78,6 +87,16 @@ SILENT = [
      "correcting SOMEONE ELSE, not myself"),
     ([txt("That claim in the docs is incorrect.")], "someone else's claim"),
     ([txt("The reviewer's suggestion was mistaken.")], "reviewer was mistaken"),
+    # The boundary the widened patterns must not cross (ai-config#1210). The
+    # issue proposed `correcting\s+(my|this|the)\b`, which fires on the second
+    # of these -- its own stated must-stay-silent case -- so `the` was left
+    # out. Both directions are pinned here so a later widening cannot quietly
+    # reintroduce it.
+    ([txt("The report overstated it by a wide margin.")],
+     "SOMEONE ELSE overstated, no first-person subject"),
+    ([txt("Correcting the reviewer, who misread the diff.")],
+     "correcting SOMEONE ELSE, not myself"),
+    ([txt("The reviewer overstated the risk here.")], "reviewer overstated"),
     ([txt("The rule fires on phrases like `I was wrong` in a message.")],
      "quoting the trigger inside inline code"),
     ([txt("The user wrote:\n\n> I was wrong about that\n\nso the rule applies.")],

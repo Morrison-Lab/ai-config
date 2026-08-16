@@ -895,13 +895,14 @@ Three space-form and three equals-form runs of the same prompt, with nothing bet
 
 **An earlier version of this entry said the equals sign was REQUIRED and blamed Go's `flag` package.**
 Both halves were wrong, and the error is worth keeping because it is a confound rather than a slip.
-Four failing probes all carried another flag between `--print` and the prompt; two working ones did not, and also happened to use `=`.
+Four failing probes all carried another flag between `--print` and the prompt.
+Two working ones did not, and also happened to use `=`.
 Two variables moved together and the visible one got the credit.
 Go's stdlib `flag` in fact treats `-flag value` and `-flag=value` identically for a string flag, which is what a reviewer pointed out (`Morrison-Lab/ai-config#1487`).
 
 **Its figures still need checking, whichever form you use.**
 Asked to read `scripts/added_lines.py` in `ucdavis/bcs`, it returned the right function name and its exact line number (`added_lines`, line 30), so it really read the file.
-It also reported the file as 74 lines where `wc -l`, `grep -c ''`, and Python's `splitlines()` all say 73.
+It also reported the file as 74 lines where `wc -l`, `grep -c ''`, and Python's `splitlines()` all say 73 --- same run, 2026-08-15, same 1.1.13 binary.
 So a delegate having genuinely done the work does not make the figures it reports true, and any count one returns is re-derived rather than quoted --- the same standing treatment codex's output gets.
 
 **Two upstream bugs are real and are NOT this.**
@@ -911,7 +912,9 @@ Neither matches the symptom above --- ours returns prompt content promptly on 1.
 - **Do:** route heavy read/draft/verify work to `codex` and `agy` before Claude, and keep the prompt immediately after `--print` or bind it with `=`.
 - **Do:** re-verify any figure a delegate reports, since `agy` miscounted a 73-line file by one while reading it correctly.
 - **Don't:** put another flag between `--print` and the prompt --- that flag becomes the prompt, and the exit status is still 0.
-- **Don't:** read "we have agy quota" as "agy is usable"; quota and a working invocation are separate facts, and the second one took five probes to establish.
+- **Don't:** read "we have agy quota" as "agy is usable".
+  Quota and a working invocation are separate facts, and the second took five
+  probes plus a review round to establish.
 
 Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota"), and widened 2026-08-15 ("in addition to codex, we have agy quota to use; try using both of those as subagents before exhausting claude quota").
 

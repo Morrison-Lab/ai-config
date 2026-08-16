@@ -144,6 +144,31 @@ prose but leaving the paraphrase stale reintroduces the same wording issue
 one file over. Grep the diff for the flagged phrase before considering the
 finding closed.
 
+**A scope-widening fix makes its stale copies invisible to every diff-scoped
+sweep, so there the search space is the whole file, not the diff.**
+The whole-diff rules below are right for a fix that changes a claim's
+wording: the synced copies entered the diff when you edited them.
+A fix that *broadens* a concept's scope inverts that.
+The restatements that are now too narrow are precisely the lines the fix did
+**not** touch, so they appear in the diff as context or not at all, and an
+added-lines sweep structurally cannot see them --- it reports a confident
+zero over exactly the population the finding is about.
+Grep the whole file (and any file restating the concept) for the concept
+that widened, and read each hit against the new scope.
+
+- **Do:** after a broadening fix, sweep every restatement of the concept in
+  the whole file, not the diff's added lines.
+- **Don't:** read a clean added-lines sweep as closing a broadened-scope
+  finding --- the stale copies are unchanged lines by construction.
+
+(Morrison-Lab/ai-config#1490, 2026-08-15/16: rounds 1, 2, and 4 each found a
+sentence still Copilot-only after the surrounding passage was broadened to
+cover human reviews.
+The round-2 fix swept the diff's added lines for `Copilot` --- 17 hits, all
+legitimately Copilot-specific --- and round 4 still found an un-broadened
+copy in the `## Output` section, because that copy was an unchanged line the
+added-lines sweep could never have matched.)
+
 **When syncing copies, search the diff for the claim, not the files or symptom
 already in front of you.**
 

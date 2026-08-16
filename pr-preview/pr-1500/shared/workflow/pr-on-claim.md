@@ -69,7 +69,7 @@ merge lands.
 - **Do:** write `refs #<N>` in the claim commit and keep `Closes #<N>` in the
   PR body, so the closing claim sits on the surface you re-read each round.
 - **Do:** grep the branch's own commit messages when a PR's scope narrows ---
-  `git log origin/<default>..HEAD --format=%B | grep -niE '(clos|fix|resolv)e[sd]? #'`
+  `git log origin/<default>..HEAD --format=%B | grep -niE '(close[sd]?|fix(es|ed)?|resolve[sd]?) #'`
   --- and edit the squash body at merge time when one is already there.
 - **Don't:** treat switching the PR body to `Refs #N` as having stopped the
   auto-close; that settles one of the two surfaces GitHub reads.

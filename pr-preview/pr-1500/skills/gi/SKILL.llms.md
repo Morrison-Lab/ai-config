@@ -103,7 +103,7 @@ Branch naming: - Bug fix → `fix/<issue-slug>` - Feature → `feat/<issue-slug>
 Open the PR **immediately, before implementing**, so the open-PR signal that step 4 relies on fires right away and other sessions can see the issue is being worked (see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)). Give the branch a diff with an empty commit, push, and open a **draft** PR:
 
 ``` bash
-git commit --allow-empty -m "start: <issue title> (closes #<N>)"   # COMMIT
+git commit --allow-empty -m "start: <issue title> (refs #<N>)"   # COMMIT
 git push -u origin fix/<slug>                                      # PUSH
 
 # GitHub — draft PR

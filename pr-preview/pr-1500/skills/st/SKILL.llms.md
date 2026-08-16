@@ -81,7 +81,7 @@ git checkout -b <type>/<slug> origin/main   # CREATE_BRANCH — fix/ feat/ docs/
 - **Open the draft PR now**, before implementing — an empty commit gives the branch a diff to open against, kept as a draft so the review bot doesn’t run on an empty diff (see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)):
 
   ``` bash
-  git commit --allow-empty -m "start: <title> (closes #<N>)"   # COMMIT
+  git commit --allow-empty -m "start: <title> (refs #<N>)"   # COMMIT
   git push -u origin <type>/<slug>                              # PUSH
   gh pr create --draft --title "<title>" --body "Closes #<N>
 

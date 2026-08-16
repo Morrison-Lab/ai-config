@@ -66,6 +66,23 @@ verify your own work, because there the swallowed failure does not
 produce a wrong result -- it produces a **clean bill of health**, which
 is worse.
 
+**The failure path and the pass path print the same thing, because `||` fires
+on any non-zero status.**
+`grep` exits 1 when it searched and found nothing, and 2 or higher when it
+never ran, so `<check> || echo "clean"` reports a tool error as a pass.
+A `\x{...}` pattern above `U+00FF` is the usual way to reach that error, since
+PCRE rejects it outright under a non-UTF-8 locale.
+
+- **Do:** branch on the exit status explicitly, treating 0 as found, 1 as
+  clean, and anything else as the check having failed to run.
+- **Do:** set `LC_ALL=C.UTF-8` on a glyph scan, or write the scan in a
+  language that raises on a bad pattern.
+- **Don't:** `||`-chain a check whose success message you would act on ---
+  that spelling cannot distinguish "found nothing" from "never ran".
+- **Don't:** substitute a literal-glyph bracket for the locale fix, since
+  under a byte-wise locale `grep -P` reads it as a set of bytes and
+  over-matches.
+
 **Setting it explicitly is not the same as setting it on the right command,
 and a pipeline is where those two come apart.**
 

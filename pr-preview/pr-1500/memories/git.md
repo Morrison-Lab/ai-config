@@ -153,6 +153,21 @@
   open PR uses that branch as its base: `gh pr list --base <branch-name>`. If
   one does, omit `--delete-branch` (merge without it, or delete manually
   afterward once you've confirmed the stacked PR retargeted cleanly).
+- **Both halves of that mitigation are narrower than they read: the trigger is
+  wrong, and the remedy does not work in a repo that auto-deletes.**
+  The check
+  is gated on `--delete-branch`, so a plain squash merge fires none of it and
+  orphans the dependent anyway --- the merge base stays put, and the dependent
+  re-shows the merged content as a conflict.
+  And omitting the flag buys nothing
+  where the repo deletes merged head branches on its own, since the branch goes
+  away whatever you passed (measured on `Morrison-Lab/ai-config`, 2026-08-16:
+  five of five recently merged head branches were absent from `git ls-remote
+  --heads origin`, the sixth surviving only because an open PR still used it).
+  So run the base query before **any** merge.
+  [`shared/workflow/batch-merge-and-resolve.md`](../shared/workflow/batch-merge-and-resolve.md)'s
+  "A stacked PR is the one conflict that intersection cannot attribute" section
+  carries the derivation and the attribution rule.
 - **Recovery when it happens anyway:** the *head* branch of the closed PR
   usually still exists (only the deleted *base* branch is gone) —
   `gh pr reopen` fails once the base is gone, so instead open a **new** PR
@@ -850,7 +865,11 @@ It is two, they live in different places, and only the first is a git config.
 
 **Half 1 --- the remote-tracking ref.**
 `fetch.prune=true` (or the per-remote `remote.origin.prune=true`) drops
-`refs/remotes/origin/<name>` once that branch is gone upstream.
+`refs/remotes/origin/<name>` once that branch is gone upstream, on an
+**unscoped** fetch.
+A scoped one (`git fetch origin main --prune`) prunes nothing outside its own
+refspec, config or no config, so it leaves the ref resolving --- see
+[`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md).
 It never touches a local branch.
 Verified on git 2.34.1 (2026-07-29), deleting `feat` from a second clone:
 

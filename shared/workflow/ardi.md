@@ -182,6 +182,46 @@ introduces alone.**
 See [`ardi.cases.md`](ardi.cases.md), "Two correct fixes composing into a defect
 neither introduces alone".
 
+**A fix can also promote something already in the file to load-bearing, and the
+promoted thing is usually the least finished thing near it.**
+
+The rule above is about two of *this* round's fixes composing.
+This is one fix interacting with text that was already there: resolving a
+finding routinely moves a quantity, a symbol, or a claim from incidental to
+central, and what was tolerable while it sat in the background stops being
+tolerable once the argument rests on it.
+
+Nothing prompts the check, because the promoted text is not in the diff.
+You changed the sentence that now leans on it; you did not change it.
+So a reviewer reading the round's diff sees a clean fix, and the gap surfaces a
+round later --- the same cost the rule above names, reached by a different
+route.
+
+Two shapes, both cheap to catch at authoring time:
+
+- **A quantity the fix made central.**
+  Ask whether it now meets the bar its neighbours already meet --- a defining
+  equation where everything else has one, a citation where everything else has
+  one, a bound where everything else has one.
+- **A claim the fix falsified.**
+  A count of a list you just extended, a summary of a set you just changed, a
+  "two cases" header over three.
+  [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md)
+  owns the count case and its remedy; what belongs here is the trigger, since
+  the edit most likely to falsify such a claim is your own previous round's fix.
+
+- **Do:** after each Address, name what the fix just made load-bearing or just
+  falsified in the surrounding text, and check that thing before pushing.
+- **Do:** hold a newly promoted quantity to the completeness bar the rest of
+  its section already meets.
+- **Don't:** scope the post-fix re-read to the diff --- the promoted text is
+  unchanged by construction, so it is exactly what the diff cannot show.
+- **Don't:** leave it for the next review round; that round is then spent on
+  something this one created.
+
+See [`ardi.cases.md`](ardi.cases.md), "A fix promoting a quantity to
+load-bearing, twice in a row".
+
 **A clean verdict does not certify that your diff contains only what you
 meant, because a reviewer cannot tell an accident from a decision.**
 

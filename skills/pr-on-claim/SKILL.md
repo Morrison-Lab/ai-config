@@ -23,7 +23,7 @@ Operationalizes the strong form of the claim workflow: branch â†’ empty commit â
 ## What it does
 
 1. Fetch `origin/main` and check out a clean branch: `feat/<slug>` or `fix/<slug>` (inferred from issue title)
-2. Create an empty commit with message: `"start: <issue title> (closes #<N>)"`
+2. Create an empty commit with message: `"start: <issue title> (refs #<N>)"` --- `refs`, not `closes`, so a scope that later narrows can be corrected on the PR body, the one surface each round re-reads (see `shared/workflow/pr-on-claim.md`)
 3. Push the branch with `-u origin HEAD`
 4. Open a **draft PR** with:
    - Title: issue title (or override)

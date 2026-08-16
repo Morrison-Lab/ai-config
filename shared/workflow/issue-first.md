@@ -49,7 +49,10 @@ When it doesn't, either split the remainder into its own issue first, or
 reference the parent with `Refs #N`, which links without closing.
 
 - **Do:** split at filing time, or at the latest before the closing PR merges.
-- **Do:** use `Refs #N` when a PR advances an issue without completing it.
+- **Do:** use `Refs #N` when a PR advances an issue without completing it ---
+  and check the branch's own commit messages for a closing keyword at the same
+  time, since the body is only one of the two surfaces GitHub reads.
+  [`pr-on-claim`](pr-on-claim.md) carries that failure and its grep.
 - **Don't:** let `Closes #N` ride on an issue whose scope is wider than the
   diff.
 

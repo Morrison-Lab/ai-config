@@ -27,7 +27,7 @@ git fetch origin main -q
 git checkout -B "$BRANCH_NAME" origin/main
 
 echo "Creating empty commit..."
-git commit --allow-empty -m "start: $ISSUE_TITLE (closes #$ISSUE_NUM)"
+git commit --allow-empty -m "start: $ISSUE_TITLE (refs #$ISSUE_NUM)"
 
 echo "Pushing branch..."
 git push -u origin HEAD

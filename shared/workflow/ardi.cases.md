@@ -508,6 +508,33 @@ symptom the PR existed to fix, reproduced in a single run.
 Round 2 caught it; reading the two-item commit message against itself would
 have.)
 
+## A fix promoting a quantity to load-bearing, twice in a row
+
+(`Lacaedemon/sparta#1259`, 2026-08-15: a docs-only spec PR ran four review
+rounds, and rounds 2 and 3 each found a defect the previous round's own fix had
+created.
+
+Round 1 flagged that the diagnosis held only for a body at rest, since the
+shipped friction gate has a velocity bypass.
+The fix introduced `J_anchor` to carry the moving-body case --- which promoted
+it from an incidental symbol to the quantity the whole partition rests on, and
+it was then the one quantity in the section with no defining equation, in a
+section where every other quantity had one.
+Round 2 found exactly that.
+
+The round-2 fix added a third item to a disclaimer blockquote, falsifying the
+header four lines above it, which still read "two separate things still need
+pinning down".
+Round 3 found exactly that, and the author repaired it by deleting the count
+rather than correcting it to three, on the grounds that a fourth item was
+plausible and would falsify a corrected tally the same way.
+
+Both were cheap to catch at authoring time and cost a review round each
+instead, at \$2.90 and \$2.32 of review spend on a PR touching one Markdown
+file.
+Neither was visible in the round's own diff: `J_anchor`'s definition gap and
+the stale header were both unchanged lines.)
+
 ## Self-correcting a rationale before the reviewer re-raises it
 
 ([d-morrison/rme#989](https://github.com/d-morrison/rme/pull/989) /

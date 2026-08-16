@@ -22,12 +22,59 @@ cross-referenced **open PRs** --- the check `gi` runs before grabbing an issue.
 ```bash
 git fetch origin main -q
 git checkout -b <type>/<slug> origin/main
-git commit --allow-empty -m "start: <issue title> (closes #<N>)"
+git commit --allow-empty -m "start: <issue title> (refs #<N>)"
 git push -u origin HEAD
 gh pr create --draft --title "<title>" --body "Closes #<N>
 
 WIP --- opened up front to claim the issue; implementing now."
 ```
+
+**The claim commit says `refs`, not `closes`, and that one word is
+load-bearing.**
+
+At claim time the PR is expected to close the issue, so a closing keyword in
+the claim commit looks right and costs nothing.
+It stops being right the moment the scope narrows --- the PR turns out to be
+spec-only, or a partial fix, or the issue gets split --- and narrowing is
+common enough that the convention has to survive it.
+
+The failure is that a squash merge concatenates **every** commit message on the
+branch into the merge commit's body, so a keyword written at claim time reaches
+the default branch however the PR ended up.
+GitHub scans default-branch commit messages for closing keywords independently
+of the PR body, so a body reading `Refs #N` cannot override a commit reading
+`closes #N`.
+That defeats [`issue-first`](issue-first.md)'s own prescribed remedy for a
+narrowed scope, which is to switch the body to `Refs #N` --- correct as far as
+it goes, and silently insufficient while the claim commit still carries the
+keyword.
+
+Keeping the keyword in the **body** and out of the commit inverts the failure.
+The body still auto-closes the issue by the ordinary PR-linkage mechanism
+`issue-first` already relies on, and it is the surface [`ardi`](ardi.md)'s
+pre-push checklist re-reads every round.
+A commit message is the surface nothing re-reads, and it cannot be amended once
+it is on the default branch, so it is the wrong place for a claim that can
+expire.
+
+**The tell is a closure with no PR linkage.**
+`closed_by_pull_requests` comes back `{"total_count": 0, "references": []}`,
+because the body genuinely closes nothing, while the issue is nonetheless
+`state_reason: "completed"` at the merge timestamp with `closed_by` naming
+whoever merged.
+Read that empty array as evidence about the body alone: it is silent about what
+the branch's commit messages say, and it reads reassuringly right up until the
+merge lands.
+
+- **Do:** write `refs #<N>` in the claim commit and keep `Closes #<N>` in the
+  PR body, so the closing claim sits on the surface you re-read each round.
+- **Do:** grep the branch's own commit messages when a PR's scope narrows ---
+  `git log origin/<default>..HEAD --format=%B | grep -niE '(clos|fix|resolv)e[sd]? #'`
+  --- and edit the squash body at merge time when one is already there.
+- **Don't:** treat switching the PR body to `Refs #N` as having stopped the
+  auto-close; that settles one of the two surfaces GitHub reads.
+- **Don't:** read an empty `closed_by_pull_requests` as evidence the merge will
+  leave the issue open.
 
 **Draft, not ready-for-review --- deliberately.** A draft doesn't trigger the
 `@claude` review bot, so no review round is spent on an empty or half-finished

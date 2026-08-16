@@ -157,11 +157,12 @@ So a sibling package like `gtsummary` or `rme` whose `Remotes` string names the
 relocated package should keep the value matching its OWN unchanged pinned
 `RemoteSha` (what a genuine `renv::snapshot()` records), not be edited to point
 at the new org.
-This is distinct from the project-DESCRIPTION `Remotes:` API-resolution failure
-in [`r-cloud-sessions.md`](r-cloud-sessions.md), which is about the whole
-project's `Remotes:` being resolved against `api.github.com` at
-install/activation time rather than the per-package `Remotes` field in a
-lockfile record.
+This is distinct from the sandbox install-time failure in
+[`r-cloud-sessions.md`](r-cloud-sessions.md), which is about a GitHub
+dependency's own install channels --- tarball/clone via `github.com` or
+`codeload`, plus `api.github.com` for renv/pak --- being proxy-blocked when the
+repo isn't in the session's scope, rather than the per-package `Remotes` field
+in a lockfile record.
 
 - **Do:** leave other packages' `Remotes` strings at whatever a real snapshot
   recorded; only the top-level relocated package's `Remote*`/DESCRIPTION fields

@@ -176,10 +176,12 @@ previous section shows", "per the entry directly preceding this".
 No name is involved, so nothing about the phrasing prompts a lookup, and the
 target is usually on the same screen --- which is exactly what makes re-reading
 it feel unnecessary.
-It is the corpus's highest-frequency citation type, since these files
-cross-reference each other constantly, so a wrong one is both likely and
-invisible: a reviewer has to open the neighbour to catch it, and a reader
-almost never does.
+What makes it costly is invisibility rather than frequency: a reviewer has to
+open the neighbour to catch it, and a reader almost never does.
+(Measured on `shared/`, markdown-link citations outnumber position-referring
+phrases 823 to 225, so this is *not* the commonest citation type --- an earlier
+draft of this very entry said it was, unmeasured, and review caught it.
+The rule below is what would have caught it first.)
 
 **Check it against the instances you personally hold, not only against the
 cited text.**
@@ -213,9 +215,10 @@ shows nothing of the kind: every 403 it records is MCP-side for want of
 `actions: write`, its fallbacks are a push or a human rather than a raw call,
 its one recorded success is itself an MCP success, and `"raw" in
 sibling.lower()` is `False`.
-Worse than a mis-citation: the author's own two observations that session --- the
-merge, and a `run_workflow` dispatch --- were both MCP-succeeds/raw-403s, so the
-varying-direction claim had no supporting instance anywhere.
+Worse than a mis-citation: one instance cannot establish that a direction
+varies, and the merge was the only client split actually on record --- the
+sibling never attempts a raw call at all, so it is silent about raw rather than
+a counterexample to it.
 Withdrawn in `50aea145` in favour of stating that neither direction is
 established, which left the entry's durable half untouched.)
 

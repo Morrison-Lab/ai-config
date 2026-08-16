@@ -270,3 +270,60 @@ eyeballed once at authoring time and then trusted forever.
 - **Don't:** write a regression test whose passing is compatible with both
   implementations; per `ardi`, one that was never observed to fail is a guess
   about what it covers.
+
+## A fourth direction: the two implementations differ, and the target is still unreachable
+
+The section above ends where the two implementations agree, so the fixture
+carries no information.
+This is the case where they disagree perfectly well and the **proposed expected
+value** is still unattainable, because the metric has a floor neither of them
+sets.
+
+The shape is a reviewer's finding that is correct about the bug and supplies a
+number for the test.
+The number comes from a mental model of what the fixed code should do, and it
+omits whatever the metric already reads when the code path under test does not
+run at all.
+Both remedies above pass on it: the input varies, and the two implementations
+genuinely differ.
+The test still fails, against the fix, at a value nobody predicted.
+
+**The missing measurement is a third one, and neither of the usual two supplies
+it.**
+Buggy and fixed are the pair everyone takes.
+The **do-nothing** reading --- the same fixture with the changed path removed
+entirely, not reverted to its old behaviour but not exercised at all --- is what
+says whether the proposed target sits inside the metric's reachable range.
+Where a floor comes from some third mechanism the change never touches, that
+floor is the best the fix can possibly score, and a target below it is
+unreachable by construction.
+
+So take three readings before adopting a threshold anyone proposed, your own
+included:
+
+| reading | what it establishes |
+| --- | --- |
+| buggy | the metric moves when the defect is present |
+| fixed | the metric moves back |
+| **do-nothing** | **the floor the fix cannot beat** |
+
+Then bound the metric against a quantity derived from the fixture's own
+geometry rather than against a hand-picked constant, so the floor cannot creep
+under the threshold later.
+
+Note what this does *not* license.
+The finding is usually right, and its number usually wrong only in scale --- so
+the response is to re-derive the bound and say which reading killed the proposed
+one, never to discard the finding because its expected value did not hold up.
+That is [`address-every-comment`](address-every-comment.md)'s rule that a
+finding can be right while its suggested fix is wrong, arriving on the assertion
+rather than on the code.
+
+- **Do:** measure the do-nothing reading before adopting any proposed expected
+  value, and publish it beside the buggy and fixed ones.
+- **Do:** derive the bound from the fixture's own geometry, so a later shift in
+  the floor cannot silently satisfy it.
+- **Don't:** read "buggy and fixed differ" as evidence a proposed target between
+  them is reachable --- the floor can sit above it.
+- **Don't:** drop a finding because its number was unattainable; re-derive the
+  bound and keep the fix.

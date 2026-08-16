@@ -166,6 +166,62 @@ being generated from the *name* 'opposition research' rather than from the
 skill's actual content."
 Both were accepted and fixed.)
 
+**A sibling entry cited by POSITION rather than by name is the same defect at
+its cheapest-to-check and least-checked, because proximity reads as
+already-known.**
+The section above catches a citation whose target was chosen from a file's
+name.
+This catches one chosen from where it sits: "the sibling bullet above", "as the
+previous section shows", "per the entry directly preceding this".
+No name is involved, so nothing about the phrasing prompts a lookup, and the
+target is usually on the same screen --- which is exactly what makes re-reading
+it feel unnecessary.
+What makes it costly is invisibility rather than frequency: a reviewer has to
+open the neighbour to catch it, and a reader almost never does.
+(Measured on `shared/`, markdown-link citations outnumber position-referring
+phrases 823 to 225, so this is *not* the commonest citation type --- an earlier
+draft of this very entry said it was, unmeasured, and review caught it.
+The rule below is what would have caught it first.)
+
+**Check it against the instances you personally hold, not only against the
+cited text.**
+That is the half a grep will not supply.
+A generalizing sentence is usually written from a *sense* that some pattern
+varies, and the instances actually in hand can all point the other way --- in
+which case the claim had no supporting case at all, rather than a mis-cited
+one.
+So before writing "X varies" or "the sibling shows the reverse", enumerate the
+instances you have observed and check that at least one of them is the case you
+are claiming.
+When none is, withdraw the generalization rather than hunting for a precedent
+to prop it up: stating that a direction is *not established* is accurate, and
+the durable half of an entry rarely depends on the generalization anyway.
+
+- **Do:** re-read a sibling entry you cite by position, with the same grep you
+  would run on a file cited by name.
+- **Do:** enumerate your own observed instances before publishing a claim that
+  a pattern varies, and require one to be the case you assert.
+- **Don't:** treat adjacency as verification --- a neighbour on the same screen
+  is the citation least likely to be re-read and most likely to be assumed.
+- **Don't:** keep a generalization alive by searching for a supporting
+  precedent; withdraw it and say which direction is unestablished.
+
+(Morrison-Lab/ai-config#1506, 2026-08-16, review round 1: a new bullet in
+`memories/github-mcp-tools.md` recording that a raw merge 403s while the MCP
+merge succeeds closed with "the generalizable part is the direction, since the
+sibling bullet above has the MCP tool 403ing where raw works."
+The sibling `actions_run_trigger` bullet, forty lines up in the same file,
+shows nothing of the kind: every 403 it records is MCP-side for want of
+`actions: write`, its fallbacks are a push or a human rather than a raw call,
+its one recorded success is itself an MCP success, and `"raw" in
+sibling.lower()` is `False`.
+Worse than a mis-citation: one instance cannot establish that a direction
+varies, and the merge was the only client split actually on record --- the
+sibling never attempts a raw call at all, so it is silent about raw rather than
+a counterexample to it.
+Withdrawn in `50aea145` in favour of stating that neither direction is
+established, which left the entry's durable half untouched.)
+
 **When a reviewer calls a citation hallucinated, test it before conceding ---
 the alleged correction can be the hallucination.** A reviewer asserting what
 the "known" URL patterns or the source's "typical" phrasing are is making a

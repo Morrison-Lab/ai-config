@@ -131,6 +131,89 @@ It does not extend to structural debt, where the unit is a module and the fix
 is a migration.
 Touching a file does not make its architecture yours.
 
+## The one exception: an edit that would retire expensive evidence
+
+Everything above says a diagnosed defect inside your own diff is yours to fix now,
+and the discriminator is deliberately blunt: if the diff contains the thing you
+diagnosed, it is the scope.
+There is one case where deferring is nevertheless right, and it needs stating here
+rather than being discovered as a plausible-sounding excuse later.
+
+**The enabling fact is that a measurement is a function of the TREE, not the commit.**
+`git rev-parse <commit>^{tree}` names content rather than history, so two commits
+returning the same tree object have byte-for-byte identical checkouts, whatever their
+SHAs, their parents, or what happened in between.
+Any measurement that is a function of the working tree --- a test run, a benchmark, an
+ops table, a scan of generated output --- therefore describes both commits **exactly**,
+instead of merely being expected to still hold.
+A comparison against a base reads two trees, so it carries over only when both match.
+
+That makes a tree-identity proof a real asset, and it makes any edit to the tree a real
+cost: the edit retires the proof, trading "the same object" for the weaker "identical
+except for one comment".
+Where the defect is trivial and the evidence is expensive, paying that cost to fix the
+trivial thing is a net loss on a PR whose argument is that its measurements still apply.
+
+**Three conditions, all of them, or this is just the excuse it resembles:**
+
+- The defect is **non-behavioural** and its cost is bounded --- a weaker justification
+  for a correct constant, a stale phrase in a comment.
+  Never a wrong result.
+- The evidence is **expensive to re-run** --- a bit-identity proof over a long
+  simulation, a whole-catalog scan --- rather than a command you could simply repeat.
+  Where re-running is cheap, re-run it and make the edit; the trade only exists because
+  the evidence costs something.
+- The deferral is **filed**, per [`issue-first`](../workflow/issue-first.md).
+  "A tracking issue is not payment" above still governs: the issue records the debt, and
+  what licenses it here is the evidentiary loss, not the filing.
+
+Note the reason is **evidentiary**, where `issue-first`'s existing deferral licence is
+about **scope**.
+They are different reasons and neither implies the other.
+
+**Two checks worth running before leaning on such a proof.**
+Its mechanic already exists in this corpus for a different job:
+[`claim-pr`](../workflow/claim-pr.md) compares `HEAD^{tree}` against
+`origin/<branch>^{tree}` to decide whether a rejected push's remote commit is the *same
+merge*, and requires identical tree **and identical parents**.
+Here the parents differ by construction, so that check answers the wrong question ---
+same command, opposite premise, per
+[`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md).
+And [`memories/git.md`](../../memories/git.md) warns that a squash-merging repo leaves a
+branch SHA unreachable, which would strand the citation.
+A tree can outlive the commits that carried it, since a squash merge whose base has not
+moved produces a commit on the default branch with the same tree as the branch head ---
+but a squash after the base moved does not, so confirm rather than assume:
+
+```bash
+git rev-parse <merge-commit>^{tree} <branch-head>^{tree}   # equal => still checkable
+```
+
+- **Do:** compare tree objects before re-running a whole-tree measurement across a
+  revert, restore, or rewrite --- changed SHAs do not mean changed content.
+- **Do:** weigh an edit's evidentiary cost against the defect's, and file the deferral
+  when the evidence wins.
+- **Don't:** defer a behavioural defect on these grounds, or defer at all when the
+  evidence is cheap to re-run --- the exception is bought by the re-run cost, not by
+  owning a proof.
+- **Don't:** read "same tree" as covering a comparison against a base unless both trees
+  match; that measurement reads two.
+
+(`Lacaedemon/sparta` #1255 -> #1256 -> #1257, 2026-08-13/15.
+The central evidence in #1255 was a tree-identity proof: `7ac2901`, the head its
+round-2 review verified, and `d243fb0`, its final head, are both tree
+`cbfbc77f71e5ff0333434a606d240259383a9c5d`, so a bit-identity proof, an ops-counter
+table and a demo-defect scan carried across without being re-run.
+The intervening commit was a bot re-implementation, reverted --- not a rebase, which is
+the route this reads as needing.
+A stale phrase in a doc comment that same PR had authored was left unfixed for exactly
+the reason above and filed as #1256; #1257 then fixed it **better** than the deferred
+plan, adding a floating-point-contraction caveat for web exports that #1256 had not
+considered.
+The proof stayed checkable after the squash merge: `d8aaa03` on `main` carries the same
+tree object, though none of the three branch SHAs is an ancestor of `main`.)
+
+
 ## Duplicated logic corrupts its own tests
 
 This is a distinct failure from ordinary duplication, and the sharper half of

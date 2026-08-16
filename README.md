@@ -306,13 +306,15 @@ the rule is consulted when it is *read* and broken when a message is
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
-| `remind-brief-premises.py` | `PreToolUse` (Agent) | reminds, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
+| `remind-brief-premises.py` | `PreToolUse` (Agent) | **not registered ([#1505](https://github.com/Morrison-Lab/ai-config/issues/1505))** --- would remind, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
 | `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
 | `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |
 | `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
 | `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
-| `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
+| `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | **not registered ([#1505](https://github.com/Morrison-Lab/ai-config/issues/1505))** --- would block matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
+| `no-unauthorized-merge.py` | `PreToolUse` (Bash) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`) unless an explicit `ALLOW_MERGE=1` assertion accompanies it |
+| `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
 
 A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse
@@ -322,6 +324,23 @@ gates `validate` and pre-commit. Two hooks are untested today
 (`no-offer-to-file.py`, `inject-local-time.sh`), carried in an explicit
 `KNOWN_UNTESTED` allowlist and tracked in
 [#1080](https://github.com/Morrison-Lab/ai-config/issues/1080).
+
+That runner compares hooks against their *tests*.
+`scripts/check-hook-catalog.py` compares them against their *bindings*:
+it asserts that the table above and
+[`hooks/hooks.json`](hooks/hooks.json) name the same hooks, and that each row's
+stated event and matcher match what the manifest actually binds.
+It gates `validate` and pre-commit too.
+The two sets had drifted apart in both directions
+([#1206](https://github.com/Morrison-Lab/ai-config/issues/1206)), and the
+dangerous direction is a row for a hook that is *not* registered --- an inert
+guard and a guard with nothing to block look identical, because neither ever
+produces output, so the row becomes positive evidence for something that never
+fires.
+A hook that is deliberately documented-but-inert says **not registered** in its
+own row and sits in an explicit `KNOWN_UNREGISTERED` allowlist, so the state is
+asserted rather than merely true; the two there today are tracked in
+[#1505](https://github.com/Morrison-Lab/ai-config/issues/1505).
 
 `bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
 directory, so the scripts arrive with no extra step.

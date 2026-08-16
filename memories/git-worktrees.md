@@ -633,18 +633,34 @@ Measured on `main` at `41d82611`, with and without one worktree present:
 
 Removing the worktree returned markdownlint to 512.
 
-The three that held still are immune for reasons worth knowing, since they
-predict which of your own instruments is exposed without re-measuring each one:
+What decides exposure is **how an instrument enumerates**, and the shapes are
+worth knowing because they predict which of your own tools is affected without
+re-measuring each one.
 
-- A `git ls-files` enumeration cannot see it, because a nested worktree's files
-  are untracked in the parent index.
-  `scripts/check-memory-file-size.py` is built that way.
-- A named-directory glob never reaches it.
+Exactly one shape is exposed, which is why only one row moved:
+
+- **An unrestricted recursive glob from the repo root.**
+  `.markdownlint-cli2.jsonc` globs `**/*.md`, and its `ignores` list named
+  generated output and dependencies rather than a nested checkout.
+
+The other three rows are immune, and each for a different reason:
+
+- **A named-directory glob** never reaches it.
   `check-links.py`'s `SCAN_GLOBS` lists `skills/**/*.md`, `memories/**/*.md`,
   and their siblings, so `.claude/` sits outside its search space.
-- An unrestricted recursive glob from the repo root is the exposed shape.
-  `.markdownlint-cli2.jsonc` globs `**/*.md`, and its `ignores` list names
-  generated output and dependencies rather than a nested checkout.
+- **A closure walk from named entry points** never reaches it either.
+  `check-context-closure.py`'s `walk_closure` follows references outward from
+  its roots, so a nested checkout is reachable only if something in the closure
+  cites it, and nothing does.
+- **A fixed-file read** has nothing to enumerate at all.
+  `check-hook-catalog.py` opens `hooks/hooks.json` and `README.md` by path;
+  it globs nothing.
+
+One further immune shape is worth naming even though no row above uses it,
+since much of `scripts/` is built on it: **a `git ls-files` enumeration**
+cannot see a nested worktree, because its files are untracked in the parent
+index.
+`scripts/check-memory-file-size.py` is the example.
 
 The config fix is tracked as
 [#1511](https://github.com/Morrison-Lab/ai-config/issues/1511) and proposed in
@@ -665,7 +681,7 @@ That is the same self-inflicted blind spot recorded in "A repo script run from a
 worktree can measure the MAIN checkout", arriving through a different fault.
 
 Note the failure direction is the opposite of
-[`fail-fast`](../shared/principles/fail-fast.rationale.md)'s "A zero-shaped
+[`fail-fast`](../shared/principles/fail-fast.md)'s "A zero-shaped
 summary can be sound, and the scope line is what decides it".
 There a sound figure is wrongly retracted; here an inflated one is published
 unremarked, and the same line separates the two cases.

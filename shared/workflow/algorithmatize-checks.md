@@ -379,6 +379,28 @@ See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A shared scratch directory reporting one mutation's failure under another's
 name".
 
+**One more belongs to the matrix, and it is not an outcome but the matrix's own
+PASS CONDITION: a case that flipped for a reason other than the clause.**
+
+Every outcome above asks whether a mutation applied, was faithful, or was
+credited to the right row.
+This asks what a row has to observe before scoring itself caught, and "did any
+case fail" is the wrong answer.
+Where the clauses run in sequence rather than as one condition, an earlier
+stage can reject the case written for a later clause before that clause is
+ever reached, so mutating it changes nothing for its own case while an
+unrelated case flips and the row reports caught.
+
+- **Do:** designate, per mutation, the one case that must catch it, and score
+  the row on that case failing rather than on any case failing.
+- **Do:** read a case that survives a mutation aimed at a clause it never
+  reaches as an unmeasured clause rather than a robust one.
+- **Don't:** accept "some case flipped" as "the case written for this clause
+  flipped" --- those come apart wherever the clauses are stages.
+- **Don't:** infer coverage from a matrix whose rows all read caught; the count
+  is a fact about the rows, and only the identity check makes it one about the
+  clauses.
+
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**
 

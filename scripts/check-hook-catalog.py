@@ -50,20 +50,23 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS_JSON = os.path.join(ROOT, "hooks", "hooks.json")
 README = os.path.join(ROOT, "README.md")
 
-# Hooks documented in README but deliberately NOT registered, pending the
-# activation decision in ai-config#1505. An explicit, reviewable list -- not a
+# Hooks documented in README but deliberately NOT registered, each mapped to
+# the issue tracking its activation. An explicit, reviewable list -- not a
 # silent gap -- mirroring KNOWN_UNTESTED in scripts/test_hooks.py. This list
 # should only ever shrink: registering a hook, or dropping its README row,
 # means removing it from here.
+#
+# Keyed per entry rather than sharing one issue number, because the entries
+# are unregistered for different reasons and a reader of the printed NOTE
+# would otherwise be sent to the wrong tracker. #1505 covers two hooks that
+# were registered nowhere by oversight; #1527's hook is inert BY THE GATE,
+# since README's activation rule makes the hooks.json entry itself the
+# plugin-path activation, so it is registered by the follow-up after its
+# authoring PR merges.
 KNOWN_UNREGISTERED = {
-    "no-handrolled-verdict-parse.py",
-    "remind-brief-premises.py",
-    # Inert BY THE GATE rather than by oversight, unlike the two above:
-    # README's activation rule says the entry in hooks/hooks.json IS the
-    # activation on the plugin path, so it is registered by the follow-up
-    # after the authoring PR merges. Tracked in ai-config#1527, not #1505,
-    # whose scope is the two hooks above.
-    "no-misattributed-quote.py",
+    "no-handrolled-verdict-parse.py": 1505,
+    "remind-brief-premises.py": 1505,
+    "no-misattributed-quote.py": 1527,
 }
 
 # The README row of an allowlisted hook must contain this, so the table states
@@ -143,7 +146,7 @@ def check(reg, doc):
         if script in KNOWN_UNREGISTERED:
             if UNREGISTERED_MARKER in doc[script][2]:
                 print(f"NOTE: {script} is documented but not registered "
-                      "(known, ai-config#1505)")
+                      f"(known, ai-config#{KNOWN_UNREGISTERED[script]})")
             else:
                 print(f"FAIL: {script} is in KNOWN_UNREGISTERED but its README "
                       f"row does not say {UNREGISTERED_MARKER!r}, so the table "

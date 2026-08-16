@@ -72,7 +72,7 @@ When a long stretch of ahead-of-time-known mechanical work doesn't need the curr
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
 Two such budgets exist and the standing preference is to try both first: `codex` (ChatGPT plan, operationalized by `delegate-to-codex`) and `agy` (Google Antigravity).
 `memories/preferences.md`'s "Delegate heavy work to a separately-billed CLI first" carries the rule and the usage-window semantics.
-Read it for one mechanical detail before invoking `agy`: its prompt must be passed as `--print="..."` with an equals sign, since `--print "..."` discards the prompt and still exits 0, so a wrapper cannot tell.
+Read it for one mechanical detail before invoking `agy`: `--print` consumes the next token as its prompt, so a flag placed between the two becomes the prompt and the real one is discarded, silently and with exit 0.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**

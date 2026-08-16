@@ -315,6 +315,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | **not registered ([#1505](https://github.com/Morrison-Lab/ai-config/issues/1505))** --- would block matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
 | `no-unauthorized-merge.py` | `PreToolUse` (Bash) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`) unless an explicit `ALLOW_MERGE=1` assertion accompanies it |
 | `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
+| `no-misattributed-quote.py` | `Stop` | **not registered ([#1527](https://github.com/Morrison-Lab/ai-config/issues/1527))** --- would block a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 
 A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse

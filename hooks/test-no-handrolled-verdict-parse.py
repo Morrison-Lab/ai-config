@@ -68,6 +68,18 @@ def checker_exit2(pr=None):
     ]
 
 
+def checker_exit2_repo_resolve(pr=None):
+    """A transcript sequence where check-pr-fully-clean.py failed with exit 2 on repo resolution."""
+    cmd = f"python3 scripts/check-pr-fully-clean.py {pr}" if pr is not None else "python3 scripts/check-pr-fully-clean.py"
+    call_id = "toolu_exit2_repo_12345"
+    return [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": call_id, "name": "Bash", "input": {"command": cmd}}]}},
+        {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": call_id, "content": "Cannot resolve the repository from the current directory: fatal: not a git repository\nRun this from inside a git checkout, or pass -R OWNER/REPO."}]}}
+    ]
+
+
 def read_checker():
     """A Grep whose PATTERN is the invocation. This is the case the tool-name
     skip exists for: the pattern carries an interpreter AND a PR number, so it
@@ -99,6 +111,8 @@ CASES = [
      "exit-2 failure (gh missing) does NOT discharge the guard for #1278"),
     ("jq -r '.body|test(\"Ready for merge\")' /tmp/review-body.json", checker_exit2(1278), True,
      "exit-2 failure (gh missing) does NOT discharge untargeted parse"),
+    (INCIDENT, checker_exit2_repo_resolve(1278), True,
+     "repo resolution exit-2 failure does NOT discharge guard"),
 
     # -- other shapes of the same parse -----------------------------------
     ("gh api repos/o/r/issues/1278/comments | grep -m1 'Ready for merge'",

@@ -372,9 +372,17 @@ def checked_prs(path):
                 elif b_type == "tool_result":
                     use_id = b.get("tool_use_id")
                     output_text = str(b.get("content") or b.get("output") or "")
-                    if ("is not installed or not on PATH" in output_text or
+                    is_failure = (
+                        "is not installed or not on PATH" in output_text or
                         "This script requires the GitHub CLI" in output_text or
-                        "usage: check-pr-fully-clean.py" in output_text):
+                        "usage: check-pr-fully-clean.py" in output_text or
+                        "Cannot resolve the repository" in output_text or
+                        "is not in OWNER/REPO form" in output_text or
+                        "Traceback (most recent call last)" in output_text or
+                        "Command failed (" in output_text or
+                        (output_text and "Checking ARDI / fully-clean status for" not in output_text)
+                    )
+                    if is_failure:
                         if use_id:
                             if use_id in pending:
                                 failed_pr = pending.pop(use_id)

@@ -1253,6 +1253,80 @@ Labelling that same right-hand side `released` inverts it --- the guard would
 then discharge in exactly the three cases it must not, which is the
 silent-discharge bug this section exists to prevent.
 
+### The FIRE condition is the mirror, and it wants corroboration rather than an absence
+
+Everything above governs what RELEASES a guard, and requires positive,
+attributable success.
+A guard keyed on something being MISSING owes the same standard one step
+earlier, at what makes it fire.
+
+The reason is already written down one fragment over, for the inference rather
+than for the guard.
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md) establishes that
+a null result is a fact about the pattern you typed and not about the corpus,
+so converting one into a claim about what exists is an overreach.
+A guard that fires on an absence performs that conversion automatically, on
+every input, and does so at machine speed.
+Its false positives are therefore not incidental: they are the whole
+population of innocent reasons a phrase can be missing, and that population is
+much larger than the one case the guard was built for.
+For a quotation guard those are a reviewer's own words, an error string being
+quoted, a phrase being *proposed* rather than cited, and any external source
+--- none of which is anywhere in the corpus, so an absence test alone flags
+all of them.
+
+Requiring a second, positive finding is what makes such a guard survivable.
+The corroborating hit is also the remedy, which is why the requirement costs
+nothing in usefulness: a message reading "not in X, it is in `X.rationale.md`"
+is what stops a reader treating a moved passage as a fabricated one, and the
+absence alone could not have said it.
+
+**The measurement is what settles the direction, rather than the argument.**
+Building the corroborating search wider does not merely add noise
+proportionally, it changes the guard's character.
+Widening it from the named file's own siblings to the whole corpus took false
+positives on this repo's own prose from **4 to 44**, an order of magnitude,
+while finding nothing the sibling search had not already found --- so the wider
+form paid ten times the noise for zero additional catches.
+That is [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+corpus-audit rule doing the deciding: run the instrument over the real inputs
+it will meet, and read the count rather than reasoning about the shape.
+
+**This does not contradict the release rule directly above, and the two look
+identical, which is why the distinction is worth stating.**
+That rule governs the RELEASE, where accepting weaker evidence opens a silent
+fail-open --- and its own Don't warns against trading a safe-direction
+over-warn for fewer nags.
+Read literally and out of context, that Don't argues against narrowing any
+fire condition to reduce noise, which is exactly the design decision above.
+
+The two are not the same move.
+A weakened discharge makes the guard **quiet when it should speak**, and the
+failure is invisible, because an unfired guard and a satisfied one print the
+same nothing.
+A narrowed fire condition makes it **speak less often**, and what it spends is
+false negatives on a class you can name and measure.
+For a reminder guard that is the cheap direction, since an over-firing
+reminder is self-defeating rather than merely annoying: a guard everyone
+learns to ignore protects nothing, which is the objection
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "Limits"
+already raises against an instrument with a mushy threshold that misfires.
+
+(`Morrison-Lab/ai-config#1528`, 2026-08-16.
+The guard fires only when the quoted phrase is absent from the file it is
+attributed to **and** present in that file's `.rationale.md` or `.cases.md`
+sibling.
+A corpus-wide fallback for the second half was built, measured, and dropped on
+the 4-to-44 figure above.
+False positives after the narrowing were 0 on both corpora it was measured
+against: 0 fires across 388 tracked files, and 6 fires across 261 real PR
+bodies, comments and issue bodies totalling 932k characters, every one of the
+6 a true positive.
+Three of those are genuine misattributions and three are citations that were
+correct when written and went stale when #1468 moved the passage --- which is
+the same defect from the reader's side, and is why the sibling hit rather than
+the absence is what the message has to carry.)
+
 ## An empty substitution changes what the command operates on
 
 Every case in "In a check you run by hand" above is a check whose failure

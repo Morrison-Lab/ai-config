@@ -640,6 +640,31 @@ attributes success to the specific step it cares about.
 - **Don't:** trade a safe-direction over-warn for fewer nags --- that is the
   move that grows a silent-discharge hole.
 
+### The FIRE condition is the mirror, and it wants corroboration rather than an absence
+
+Everything above governs what RELEASES a guard.
+A guard keyed on something being MISSING owes the same standard one step
+earlier, at what makes it fire, since a fire condition satisfied by a null
+result inherits
+[`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s overreach
+wholesale.
+
+**This does not contradict the Don't directly above, and the two look
+identical, which is why the distinction is worth stating.**
+That one governs the RELEASE, where weaker evidence opens a silent fail-open.
+Narrowing a FIRE condition spends false negatives instead, which for a
+reminder guard is the cheap direction.
+
+- **Do:** require a positive corroborating finding before a guard keyed on an
+  absence fires, and put that finding in the message it emits.
+- **Do:** measure the false-positive count both ways against the corpus the
+  guard will actually run on, rather than arguing the direction.
+- **Don't:** fire on a null result alone --- that is a claim about the query,
+  not about the world.
+- **Don't:** read the release rule above as forbidding a narrowed fire
+  condition; it governs discharging on weak evidence, not triggering on
+  strong.
+
 ## An empty substitution changes what the command operates on
 
 Every case in "In a check you run by hand" above is a check whose failure

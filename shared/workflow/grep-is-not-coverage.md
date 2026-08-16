@@ -253,6 +253,69 @@ reading further down the same file.
 The evidence was in the check's own output, which is what separates this from
 a search that was never run.)
 
+## A published count needs the ref and the flags it was measured with
+
+The section above governs reading a dupe check's hits.
+This governs **reporting** its count, and it needs no misreading at all: the
+count is right, the reviewer's re-run is right, and they differ because the two
+runs measured different trees.
+
+A dupe check asks what the corpus held **before** this PR, so the merge-base is
+the tree the claim is about.
+A reviewer re-runs at the head, where the PR's own additions are present --- and
+an addition can match the dupe-check pattern incidentally, so the PR falsifies
+the count its own body reports.
+Case sensitivity moves the number again, independently of the ref.
+
+**So the correction is not to update the figure.**
+Raising it to match the head would make the claim *less* accurate, since the
+extra hit is text this PR added rather than coverage the check should have
+found.
+What is missing is the **ref** and the **flags**, and stating both settles the
+disagreement while leaving every number as it was.
+
+Distinct from
+[`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md)'s
+count-above-a-block rule, whose subject sits in the same file and whose remedy
+is an `awk`-bracketed re-derivation.
+Here the subject is a query over several files, the count lives in a PR body,
+and what falsifies it is the diff itself.
+[`ardi`](ardi.md) already requires re-deriving every number in the body by
+command; the increment is that a diff-relative count has no single right answer
+until the ref is named.
+
+- **Do:** publish the ref, the flags, and the paths beside a dupe-check count,
+  rather than the count alone.
+- **Do:** measure a dupe check at the merge-base, since that is the tree an
+  "already covered" claim is about.
+- **Don't:** re-run at the head and "correct" the body to match --- that imports
+  your own additions into a claim about what preceded them.
+- **Don't:** read a reviewer's differing count as a disagreement about the
+  corpus until you have checked whether it is a disagreement about the tree.
+
+(Morrison-Lab/ai-config#1536, 2026-08-16, review round 1: the body reported its
+dupe check as "6 hits, all in the sections above", and the reviewer re-ran the
+same query and got **7**, filing it as a non-blocking miscount.
+The query was `calibrat|against the real corpus|real corpus|false positive` over
+`shared/workflow/algorithmatize-checks.{md,rationale.md}` and
+`shared/principles/fail-fast.{md,rationale.md}`.
+Re-derived, every figure was correct about a different tree:
+
+| tree | flags | hits |
+| --- | --- | ---: |
+| merge-base `f6805489` | case-sensitive | 6 |
+| merge-base `f6805489` | `-i` | 6 |
+| head `ab88c2b7` | case-sensitive | 7 |
+| head `ab88c2b7` | `-i` | 8 |
+
+The seventh hit is `Its false positives are therefore not incidental` and the
+eighth is `False positives after the narrowing were 0`, both `+` lines of that
+PR's own diff in `shared/principles/fail-fast.rationale.md`.
+The reviewer had itself noted the extra match was "inside this same PR's own new
+FIRE-condition addition", so both parties held the evidence and neither drew the
+conclusion that the count needed a ref rather than a correction.
+The fix stated the ref and the flags and changed no number.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

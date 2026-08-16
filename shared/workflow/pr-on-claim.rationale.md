@@ -283,7 +283,7 @@ conclusion on the push's own run before marking ready:
 Read it with `gh pr checks <N>`, or `pull_request_read` `get_check_runs` in a
 session without `gh` (see [`tool-mappings.md`](../../tool-mappings.md)).
 Mind the casing split
-[`fully-clean.rationale`](fully-clean.rationale.md) warns about: REST
+[`fully-clean.rationale.md`](fully-clean.rationale.md) warns about: REST
 returns lowercase `status`/`conclusion` (`completed`, `skipped`), while
 `gh pr checks`/GraphQL return uppercase `state` values.
 

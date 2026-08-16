@@ -861,3 +861,56 @@ See ai-config#694 for the precedent.
   where the table actually lives. (Caught in ai-config#137 review: the gip
   skill referenced a table ai-config didn't have at the time; ai-config#327
   later added `tool-mappings.md` to close that gap.)
+- **The raw REST API and the `mcp__github__*` tools can be gated
+  independently, per ORG --- so a REST `403` is not evidence the repo is
+  unreachable.**
+  [`github.md`](github.md)'s "GitHub access from bash in remote/web sessions"
+  section is right that REST from bash can be scope-limited rather than
+  absent, and it used to add that switching to the MCP tools "does not get
+  around a `403`" because they share one repo list.
+  That held in the session that wrote it and does not hold generally.
+  Measured 2026-08-16, three calls in one command from one session:
+
+  | call | result |
+  | --- | --- |
+  | `GET /repos/Lacaedemon/sparta/pulls/1303` | `200` |
+  | `GET /repos/Morrison-Lab/ai-config/pulls/1538` | `403` |
+  | `GET /user` | `200`, `login: dem-extra1` |
+
+  The MCP tools reached `Morrison-Lab/ai-config` throughout the same minutes
+  --- reading its checks, its review threads, and merging a PR there --- so
+  the two surfaces genuinely disagreed about one org rather than one being
+  stale.
+
+  **Read the `403` body, because the two denials have different remedies and
+  only one of them is `add_repo`.**
+  The per-repo denial that section documents says "Use add_repo to request
+  access".
+  This one says "GitHub access is not enabled for this session.
+  An org admin must connect the Claude GitHub App for this organization",
+  which is an org-level app connection --- nothing a session can grant
+  itself, and nothing `add_repo` addresses.
+  So a session can hold full MCP access to an org whose REST path is closed,
+  which is exactly the shape that makes "the API is unreachable" the wrong
+  conclusion to draw from a single `curl`.
+
+  The practical consequence is which client to build a workflow on.
+  Anything that must edit a PR body from the raw API --- the marker-preserving
+  PATCH that `Lacaedemon/sparta`'s own memory prescribes, since the MCP read
+  strips HTML comments --- works only where REST is open for that org, and
+  has to be re-checked per org rather than per session.
+
+  Note also that `GET /user` answered `dem-extra1` here, which is the `gh`-CLI
+  row of sparta's own identity table rather than the `d-morrison` row that
+  table records for a raw-API read.
+  That is the table behaving as its own caveat says: the rows are per-session
+  measurements, so re-measure rather than carrying one across.
+
+  - **Do:** try the MCP tool after a raw-REST `403`, and read the `403` body
+    before deciding what the denial is.
+  - **Do:** treat "which client can reach this org" as a per-org question you
+    measure, not a session-wide property.
+  - **Don't:** read a REST `403` as the repo being out of scope; the MCP
+    tools may have it, and `add_repo` may be the wrong remedy entirely.
+  - **Don't:** commit a workflow to the raw-API path for an org without
+    checking that path answers for that org first.

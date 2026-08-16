@@ -99,6 +99,18 @@ points at the deviation the agent flagged.**
 - **Don't:** generalize this into distrusting subagents; the rule picks which
   **half** of a report to re-derive, not whether to use one.
 
+**Verifying ONE particular from a report does not transfer to the one beside
+it, and a reviewer confirming the checked half launders the unchecked one.**
+
+- **Do:** count the independent claims in a report sentence before quoting it,
+  and derive each one you intend to publish.
+- **Do:** re-read a reviewer's confirmation for which claim it actually names,
+  since it confirms the half you verified and is silent on its neighbour.
+- **Don't:** let a real derivation against one particular stand in for the
+  particular next to it --- adjacency in one sentence is not evidence.
+- **Don't:** reach for the true-neighbour or reachable-half rules here; both
+  particulars are independent, and both were one command away.
+
 **A hedge you attach for one audience is owed to the other, and writing it
 once is the tell.**
 

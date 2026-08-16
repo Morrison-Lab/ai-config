@@ -11,6 +11,7 @@ catch gets a case here that exits non-zero, and the "vacuous parse" pair covers
 the way this particular check could silently pass forever -- a README whose
 table shape changed would otherwise make every set comparison compare nothing.
 """
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -19,13 +20,24 @@ from pathlib import Path
 SCRIPT = Path(__file__).parent / "check-hook-catalog.py"
 ROOT = Path(__file__).parent.parent
 
-# Mirrors KNOWN_UNREGISTERED in the script under test. Fixtures must account
-# for these two, since the script fails an allowlisted hook that has no README
-# row -- so a "clean" fixture has to document them.
-ALLOWLISTED = ["no-handrolled-verdict-parse.py", "remind-brief-premises.py"]
+# Read KNOWN_UNREGISTERED from the script itself rather than restating it. A
+# second hand-maintained copy goes stale the moment the allowlist changes --
+# which ai-config#1505 exists to make happen -- and the fixtures below would
+# then fail for a reason unrelated to whatever that change was.
+#
+# Only the FIXTURES derive from it. Every assertion keys on the script's own
+# output strings, so this cannot become the case where a test's fixture and
+# its expectation move together and a wrong constant satisfies both
+# (`shared/principles/dont-incur-technical-debt.md`). The last case is
+# anchored outside the constant entirely: it runs against the live repo.
+_spec = importlib.util.spec_from_file_location("check_hook_catalog", SCRIPT)
+_catalog = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_catalog)
+ALLOWLISTED = sorted(_catalog.KNOWN_UNREGISTERED)
 
 passes = 0
 failures = 0
+skipped = 0
 
 
 def check(name, condition):
@@ -36,6 +48,13 @@ def check(name, condition):
     else:
         print(f"FAIL: {name}")
         failures += 1
+
+
+def skip(name, why):
+    """Record a case that could not run, so a vacuous pass stays visible."""
+    global skipped
+    print(f"SKIP: {name} ({why})")
+    skipped += 1
 
 
 def hooks_json(entries):
@@ -138,24 +157,32 @@ case("matcher mismatch fails",
      want_fail=True, needle="hooks.json binds PreToolUse (Bash)")
 
 # --- allowlist hygiene, mirroring KNOWN_UNTESTED's reverse check ----------
-case("allowlisted row without the marker fails",
-     [("a.py", "Stop", "")],
-     [("a.py", "Stop", "", "blocks x"),
-      (ALLOWLISTED[0], "PreToolUse", "Bash", "blocks a verdict parse"),
-      (ALLOWLISTED[1], "PreToolUse", "Agent", "**not registered** --- reminds")],
-     want_fail=True, needle="reads as an active guard")
+# These need at least one allowlisted hook to exercise. KNOWN_UNREGISTERED is
+# meant to shrink to nothing (ai-config#1505), so they skip loudly rather than
+# silently passing once it does.
+_why = "KNOWN_UNREGISTERED is empty"
+if ALLOWLISTED:
+    case("allowlisted row without the marker fails",
+         [("a.py", "Stop", "")],
+         [("a.py", "Stop", "", "blocks x"),
+          (ALLOWLISTED[0], "PreToolUse", "Bash", "describes an active guard")]
+         + ALLOW_ROWS[1:],
+         want_fail=True, needle="reads as an active guard")
 
-case("allowlisted hook that is now registered fails",
-     [("a.py", "Stop", ""), (ALLOWLISTED[0], "PreToolUse", "Bash")],
-     [("a.py", "Stop", "", "blocks x"),
-      (ALLOWLISTED[0], "PreToolUse", "Bash", "blocks a verdict parse"),
-      ALLOW_ROWS[1]],
-     want_fail=True, needle="drop it from KNOWN_UNREGISTERED")
+    case("allowlisted hook that is now registered fails",
+         [("a.py", "Stop", ""), (ALLOWLISTED[0], "PreToolUse", "Bash")],
+         [("a.py", "Stop", "", "blocks x")] + ALLOW_ROWS,
+         want_fail=True, needle="drop it from KNOWN_UNREGISTERED")
 
-case("allowlisted hook with no README row fails",
-     [("a.py", "Stop", "")],
-     [("a.py", "Stop", "", "blocks x"), ALLOW_ROWS[1]],
-     want_fail=True, needle="has no README row")
+    case("allowlisted hook with no README row fails",
+         [("a.py", "Stop", "")],
+         [("a.py", "Stop", "", "blocks x")] + ALLOW_ROWS[1:],
+         want_fail=True, needle="has no README row")
+else:
+    for _n in ("allowlisted row without the marker fails",
+               "allowlisted hook that is now registered fails",
+               "allowlisted hook with no README row fails"):
+        skip(_n, _why)
 
 # --- fail-fast: a parse that finds nothing must not pass vacuously --------
 case("missing section fails loudly",
@@ -182,5 +209,6 @@ check("the real repo's catalog is consistent", proc.returncode == 0)
 if proc.returncode != 0:
     print(proc.stdout + proc.stderr)
 
-print(f"\n{passes} passed, {failures} failed")
+print(f"\n{passes} passed, {failures} failed, {skipped} skipped "
+      f"({len(ALLOWLISTED)} hook(s) in KNOWN_UNREGISTERED)")
 sys.exit(1 if failures else 0)

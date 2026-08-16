@@ -194,6 +194,20 @@ branch as caused by you whatever the intersection says.
 [`cascade`](../../skills/cascade/SKILL.md) is the remediation once it has
 happened.
 
+**This is the merging party's half of a mechanism the corpus already covers
+from the other side.**
+[`use-existing-pr-branch`](use-existing-pr-branch.md)'s "A stacked PR reaches
+that bloated state with no push of yours at all" section describes the same
+squash-and-retarget from inside the **dependent** PR's own session, and owns
+the recovery: read the diff and commit counts rather than resolving the
+conflicts, since re-litigating already-merged content is what the apparent
+conflict invites.
+Neither section subsumes the other, and the split is the point --- one is a
+pre-merge obligation on a party who will never see the symptom, the other is a
+post-hoc recovery by the party who does.
+Read that section when a PR of yours goes dirty for no reason you can find, and
+this one before merging anything.
+
 - **Do:** run `gh pr list --base <branch>` before merging any PR, not only one
   you are about to merge with `--delete-branch`.
 - **Do:** exempt a PR stacked on your merged branch from the deleted-or-renamed

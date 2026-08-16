@@ -36,8 +36,8 @@ For each iteration:
 
 Run the full GI procedure:
 1. List open issues, triage/prioritize
-2. Present top candidates — let user pick, or auto-proceed if they said
-   "just go" / "do all" / "keep going"
+2. Select the highest-priority issue automatically from the triage signals,
+   state which one and why, and proceed without pausing for confirmation
 3. Check history
 4. Claim the issue
 5. Create a branch
@@ -182,8 +182,9 @@ When the loop ends, print a summary:
 
 ## Auto-proceed mode
 
-If the user says "just go", "do all", "work through everything", or similar:
-- Skip the per-issue confirmation ("I'd grab #12 — proceed?")
+Issue selection never pauses for confirmation, per `gi`'s step 3, so there is
+no per-issue confirmation for "just go" to skip.
+What the loop still does, in every mode:
 - Still pause at the max-issues checkpoint
 - Surface and **bypass** a blocked or ambiguous issue — note it and skip to the
   next rather than halting; stop only if no independent issues remain (per the

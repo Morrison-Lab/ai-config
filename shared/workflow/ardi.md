@@ -32,11 +32,53 @@ that terminal state.**
 
 - **Do:** finish pushing, then dispatch once, and name in the status report which run you are waiting on.
 - **Do:** pass `--ref <PR-branch>` on every dispatch, so the review's check runs attach to the PR head.
-- **Do:** diagnose a missing verdict by reading the run, since a cancelled dispatched run leaves no trace on the PR at all.
+- **Do:** diagnose a missing verdict by reading the run, since a cancelled dispatched run leaves no trace on the PR's check-run list.
 - **Don't:** dispatch per push --- each one cancels the last, and the round spends review time producing nothing.
 - **Don't:** re-dispatch reflexively when a verdict is missing.
   If one is in flight, the retry cancels it.
 - **Don't:** read a green, nothing-pending PR as reviewed on such a repo --- that is also what an invisible cancelled gate looks like.
+
+**A cancelled run is invisible to a session READING the PR and loud to one
+SUBSCRIBED to it, and the second is the dangerous direction.**
+
+The bullet above is scoped to the check-run list deliberately.
+GitHub lists check runs for the **head commit**, so a run cancelled after the
+head moved leaves a `require-review` failure hanging off the superseded SHA,
+where a session reading the PR will not find it.
+
+The webhook stream is a different surface and it does not filter that way.
+The cancel fires a `check_run.completed` with `conclusion: failure`, so a
+session subscribed to PR activity is woken by a red **required** check on its
+own PR.
+
+That inverts the risk the bullet above describes.
+An invisible failure costs you a verdict you thought you had, and you find out
+by looking.
+A visible failure on a superseded commit costs more, because the drive-to-green
+posture says not to end a CI-failure wake without pushing a fix or replying
+with a blocker --- so the reflex is to fix, against a commit that is no longer
+in the PR's timeline.
+At best that is wasted work.
+At worst you change the current head on the authority of a red check that was
+never about it.
+
+One field decides it, and it is the field
+[`fully-clean`](fully-clean.md) already names for the neighbouring problem:
+compare the event's own `head_sha` against the PR's current head.
+Equal means act.
+Unequal means confirm a run is live at the real head, and leave the diff alone.
+
+- **Do:** compare a CI-failure event's `head_sha` against the PR's current head
+  before diagnosing anything.
+- **Do:** reply naming the superseded SHA rather than staying silent, so the
+  wake is visibly dispositioned rather than dropped.
+- **Don't:** read "leaves no trace on the PR" as covering the webhook stream
+  --- it describes the check-run list, which is filtered by head commit.
+- **Don't:** push a fix in response to a red check whose `head_sha` is not the
+  head; the check is not about the code you would be changing.
+
+See [`ardi.cases.md`](ardi.cases.md), "A cancelled dispatch that fired a
+failure webhook against the superseded SHA".
 
 See [`ardi.cases.md`](ardi.cases.md), "A per-push dispatch cancels its own review, invisibly".
 

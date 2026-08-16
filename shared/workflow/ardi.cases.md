@@ -458,6 +458,40 @@ while the recovery command in `skills/ardi/SKILL.md` and `memories/preferences.m
 carried it --- so the routine path used every round lacked the fix that the
 rarely-taken path had.)
 
+## A cancelled dispatch that fired a failure webhook against the superseded SHA
+
+(`Morrison-Lab/ai-config#1526`, 2026-08-16: a review was dispatched with
+`--ref` at `1847c964`, a subagent then pushed a `main` merge and a
+pronoun-fix commit, and the run was cancelled deliberately because it was
+reading a commit that was no longer the head.
+The run object is what settled that, rather than the elapsed time:
+
+```
+run 31964345687   event: workflow_dispatch   head_sha: 1847c964
+pull_requests[0].head.sha: b8a9cb45
+```
+
+Both halves of the visibility question were then observed within one event.
+`pull_request_read` `get_check_runs` returned 7 runs, every one of them for the
+new head, with the failed `require-review` absent --- so the sibling case above
+is right that a cancelled run is invisible to a session reading the PR.
+The cancel nonetheless fired a `check_run.completed` carrying
+`conclusion: failure`, `check: review / require-review`, and
+`head_sha: 1847c964f458eabeac64002354bd8379567351a1`, waking the subscribed
+session with a red required check on its own PR.
+
+Note the two runs differ in why the SHA was wrong, which is why this is a
+distinct case rather than the sibling restated.
+There the dispatch omitted `--ref`, so the run never pointed at the PR at all.
+Here `--ref` was passed and correct, and the branch simply moved between the
+dispatch and the cancel --- so the defect survives the sibling's own fix.
+
+The cancel itself was the right call, on
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s criterion that
+whether to cancel a slow review turns on whether the head has moved rather
+than on how long it has run.
+Re-dispatching at the real head produced a clean verdict at `eaf052d9`.)
+
 ## An invented `Closes` in a merge commit message
 
 (`Morrison-Lab/ai-config#1361`, 2026-08-09: the squash commit `62ea72b3` ends

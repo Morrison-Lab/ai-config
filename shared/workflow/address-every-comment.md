@@ -423,6 +423,38 @@ replacement before adopting it.**
 - **Don't:** use word overlap and same-day timing as a substitute for source
   history.
 
+**The same check one artifact over: a reviewer's replacement DIFFSTAT is a
+factual claim too, and the usual way it goes wrong is summing per-commit
+churn rather than diffing the merge base.**
+
+A branch that edits the same lines across review rounds accumulates churn.
+Round 1 adds a line and round 2 rewrites it, so a per-commit sum counts that
+line twice and reports a deletion the merge-base diff never sees.
+The inflation is therefore worst on exactly the branches most likely to carry
+a verification table worth checking, which are the multi-round ones.
+
+What makes this cost more than one wrong number is that
+[`ardi`](ardi.md)'s pre-push checklist already requires every figure in a PR
+body to be re-derived by command at each push.
+A reviewer supplying replacement figures looks like that derivation having
+been done for you, so the natural move is to paste them straight in.
+That substitutes an unverified figure for a stale one and leaves the body
+just as wrong, while feeling like the finding was addressed.
+
+- **Do:** re-derive a reviewer's replacement figures with
+  `git diff --numstat <merge-base> <head>` before pasting them into a PR body.
+- **Do:** cross-check against GitHub's own `additions`/`deletions` fields,
+  which are computed against the merge base and so agree with that command.
+- **Don't:** treat a reviewer's supplied figures as discharging the re-derive
+  requirement --- a correct finding about staleness says nothing about the
+  replacement's accuracy.
+- **Don't:** sum per-commit `--numstat` to get a branch's diffstat.
+  On a multi-round branch that double-counts rewritten lines and reports
+  deletions the merge base never sees.
+
+See [`address-every-comment.cases.md`](address-every-comment.cases.md),
+"A reviewer's replacement diffstat summed per-commit churn".
+
 **The highest-yield version of that check: when a comment names an edge case
 in its own prose and also supplies a fix, run the fix against that edge
 case.**

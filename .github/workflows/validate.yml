@@ -88,6 +88,18 @@ jobs:
         # with its subject AND flags any hook missing a test (ai-config#1080),
         # so a tested guard cannot regress and an untested one cannot hide.
         run: python3 scripts/test_hooks.py
+      - name: Check the hook catalog against hooks.json
+        # test_hooks.py above compares hooks against their TESTS. Nothing
+        # compared them against their BINDINGS or against the README table a
+        # human reads, so those drifted apart in both directions
+        # (ai-config#1206) -- and the drift grew by one entry in the ten days
+        # between the issue being filed and fixed, which is why this gates
+        # rather than being reconciled once. The dangerous direction is a
+        # README row for an unregistered hook: an inert guard and a guard with
+        # nothing to block look identical, since neither ever produces output.
+        run: python3 scripts/check-hook-catalog.py
+      - name: Run hook-catalog check tests
+        run: python3 scripts/test_check_hook_catalog.py
       - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
         # The BUDGET half reports rather than gates, and deliberately so:
         # this repo is currently ~4x the shipped budget (ai-config#897), so a

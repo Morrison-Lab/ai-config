@@ -90,15 +90,15 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   common one: `gh` is not installed at all.**
   The two causes above both assume a working `gh` whose *requests* are
   refused, so both are diagnosed by reading a status code.
-  Here there is no request and no status code:
+  Here there is no request, and since #1462 (2026-08-14) no traceback:
 
   ```text
-  FileNotFoundError: [Errno 2] No such file or directory: 'gh'
+  `gh` is not installed or not on PATH.
+  This script requires the GitHub CLI; -R cannot substitute for it.
   ```
 
-  `get_pr_info()` shells out to `gh pr view <n> --json ...`, so the script
-  dies on its first call before any repo-specific logic runs --- the same
-  place, with a different exception class.
+  It exits **2**, never 1 --- 1 is this script's "not clean" code, so a missing
+  binary would otherwise read as a verdict rather than an environment failure.
   `command -v gh` discriminates the three in one read, and it is worth
   running before diagnosing anything else about the script.
 

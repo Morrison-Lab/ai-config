@@ -288,9 +288,15 @@ That one says re-derive, because the right tree kept moving.
 This one says the right tree does **not** move --- a dupe check's tree is fixed
 at the merge-base by what the claim is about --- so re-deriving at the head
 answers a different question rather than a fresher version of the same one.
-[`ardi`](ardi.md) already requires re-deriving every number in the body by
-command; the increment is that a diff-relative count has no single right answer
-until the ref is named.
+[`ardi`](ardi.md)'s pre-push checklist already requires every number in the body
+to be "re-derived by command rather than re-read, run at this push rather than
+carried from the last one".
+Read literally that is right, and read quickly it points the wrong way here: "at
+this push" is about not carrying a **stale** figure forward, and a dupe-check
+count is one you *should* carry, because the merge-base it was measured at has
+not moved.
+Re-run it each push if you like --- against the merge-base, not against the tree
+the push produced.
 
 - **Do:** publish the ref, the flags, and the paths beside a dupe-check count,
   rather than the count alone.

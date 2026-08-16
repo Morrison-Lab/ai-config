@@ -69,6 +69,81 @@ for one spelling is not evidence the concept is absent".
 Read that rather than re-deriving them; this fragment is about the inference
 drawn from the null result, not about the query that produced it.
 
+## Name the mechanism in the query, not the remedy you are about to prescribe
+
+The section above improves how a query *matches*, and it assumes the query
+already names the right concept.
+Choosing which concept to name is a separate step, and it is the one that goes
+wrong when the search is a dupe check for something you are about to write.
+
+By then you already know the **remedy** you intend to prescribe, so the
+remedy's words are the ones at hand.
+The **mechanism** --- the thing that actually happens, which the entry is
+about --- is the part you would have to stop and name.
+So the query that forms itself is the remedy's, and that is the one query
+guaranteed to miss the entry you most need to find.
+A sibling written from the other side of the same mechanism prescribes a
+**different** remedy, so it shares none of your vocabulary while being about
+the identical thing.
+
+That section's own advice to search by topic rather than only by phrase does
+help here, and it stops one step short.
+"Topic" is precisely what this failure gets wrong: while you are about to
+write the remedy, the remedy *feels* like the topic.
+The increment is naming which topic, not remembering to have one.
+
+**Nothing about the result betrays it, and re-running the query more
+carefully returns the same zero.**
+This is not the wrong-spelling or line-break case
+[`memories/debugging.md`](../../memories/debugging.md) covers, where a pattern
+fails to match text that is genuinely present.
+Here the pattern is correct and the grep works.
+The remedy's words really are absent from the sibling entry, so there is no
+matching bug to find and no better-constructed version of the same query that
+would have hit it.
+The command is sound, the null is true, and only the concept was wrong.
+
+The corpus's usual escape hatch does not reach it either.
+[`challenge-redundant-content`](challenge-redundant-content.md) says to prefer
+`scripts/find-near-duplicates.py` over literal grep, and that instrument does
+score whole texts rather than one query --- but it enumerates its corpus with
+`git ls-files`, so it compares **tracked** units against each other.
+An entry that is not written yet has no text to shingle, so the instrument
+cannot be pointed at it.
+
+The substitution is one question, asked before the query is typed:
+**what happens**, rather than **what I will tell people to do about it**.
+Write the mechanism's nouns and verbs down first.
+They are usually three or four words, and having to name them is the whole
+cost.
+
+- **Do:** derive the query from the mechanism the entry is about, and name
+  that mechanism explicitly before searching.
+- **Do:** report the mechanism terms searched alongside the remedy terms, so a
+  reader can see which concept the null result is about.
+- **Don't:** grep the vocabulary of the fix you are about to prescribe --- an
+  entry prescribing a different fix for the same mechanism cannot match it.
+- **Don't:** read a correctly-constructed query's zero as covering the
+  concept; a sound query can be sound about the wrong thing.
+
+(Morrison-Lab/ai-config#1522, 2026-08-16, review round 1: the PR added a
+section on a squash merge orphaning a stacked PR, and its dupe check grepped
+`"before merg|merging|check.*open"` --- the vocabulary of the fix it was about
+to prescribe, which was to run `gh pr list --base` before merging.
+It never searched the mechanism: squash, retarget, orphaned base, stacked.
+`shared/workflow/use-existing-pr-branch.md`'s "A stacked PR reaches that
+bloated state with no push of yours at all, and it announces itself as a merge
+conflict" section was already on `main`, covering that same mechanism from the
+dependent PR's side and prescribing a post-hoc rebuild rather than a pre-merge
+check --- so it shared none of the remedy's vocabulary.
+The reviewer named the cause in as many words, saying the cross-link "would
+likely have surfaced during this PR's own dupe-check (which only grepped ...
+and never searched for the underlying squash/retarget mechanism itself)".
+The two sections stayed separate under that fragment's litmus test, since
+consolidating would lose the split between a pre-merge obligation and a
+post-hoc recovery.
+What the missed search cost was the cross-link, added in round 2.)
+
 ## Searching the wrong corpus is the same error with no grep in it
 
 Everything above assumes a grep ran and came back empty.

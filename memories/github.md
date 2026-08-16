@@ -629,10 +629,10 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     The consequence bullet below, that a background Monitor cannot poll PR
     state, rests on the same assumption and deserves the same re-check before
     you rely on it either way.
-  - **For a repo outside the scope, `mcp__github__*` is not a fallback either
-    --- but git operations are.**
-    The scope limits the MCP tools to the same repo list, so switching to them
-    does not get around a `403`.
+  - **A repo the REST API refuses may still be reachable through
+    `mcp__github__*` --- measure both surfaces rather than assuming one scope.**
+    They shared a scope in the session that wrote this and did not in a later
+    one; see [`github-mcp-tools.md`](github-mcp-tools.md)'s org-gate entry.
     `git ls-remote https://github.com/<owner>/<repo>` works against any public
     repo whatever the scope is, because it is a git operation and the proxy
     passes those through unchanged.

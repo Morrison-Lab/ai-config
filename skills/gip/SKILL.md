@@ -155,7 +155,7 @@ and the default branch for each issue:
 >    (see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)). Give the branch
 >    a diff with an empty commit, push, and open a **draft** PR into
 >    `<default-branch>` referencing `Closes #<N>`:
->    `git commit --allow-empty -m "start: <title> (closes #<N>)"`, then
+>    `git commit --allow-empty -m "start: <title> (refs #<N>)"`, then
 >    `git push -u origin HEAD` (retry with backoff on a network error), then
 >    `gh pr create --draft …` (or `mcp__github__create_pull_request` with
 >    `draft: true`). A draft doesn't trigger the review bot on an empty diff.

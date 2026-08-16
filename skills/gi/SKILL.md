@@ -146,7 +146,7 @@ worked (see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)). Give the
 branch a diff with an empty commit, push, and open a **draft** PR:
 
 ```bash
-git commit --allow-empty -m "start: <issue title> (closes #<N>)"   # COMMIT
+git commit --allow-empty -m "start: <issue title> (refs #<N>)"   # COMMIT
 git push -u origin fix/<slug>                                      # PUSH
 
 # GitHub — draft PR

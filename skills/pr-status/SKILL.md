@@ -126,6 +126,7 @@ Fetch the formal reviews and keep the non-bot ones at the current head
 (`READ_PR_REVIEWS`):
 
 ```bash
+set -o pipefail
 head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"   # VIEW_PR
 gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
   | jq -s --arg h "$head" \

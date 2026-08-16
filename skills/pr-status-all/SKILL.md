@@ -112,6 +112,7 @@ owner/repo once with `gh repo view --json owner,name --jq '"\(.owner.login)/\(.n
 >    A stub-like non-answer ("ineligible", "reached their quota limit") is not a verdict either.
 >    **A human's formal review at the current head counts as an external verdict too** -- check for one whenever the Copilot half found no clean verdict, before settling on `no verdict at head`:
 >    ```bash
+>    set -o pipefail
 >    head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"
 >    gh api "repos/<owner>/<repo>/pulls/<N>/reviews" --paginate \
 >      | jq -s --arg h "$head" \
@@ -221,8 +222,9 @@ A Markdown table, one row per open PR, with these columns:
   (neither a Copilot review nor a human formal review exists at the current
   commit).
   This step is read-only and doesn't request a review, so it can't tell
-  "Copilot was never asked" from "unreachable" from "a self-review covers
-  it" -- report the plain fact, don't guess at the reason.
+  "never asked" (Copilot not requested, no human invited) from
+  "unreachable" from "a self-review covers it" -- report the plain fact,
+  don't guess at the reason.
 - **Human** -- `none` (no blocking human review) or `N pending` (name the
   reviewer login(s)) per subagent item 6. This overrides everything else --
   a `CHANGES_REQUESTED` review blocks regardless of any bot's verdict.

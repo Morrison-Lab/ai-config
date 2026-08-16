@@ -34,13 +34,33 @@
     "MD012": false  // no-multiple-blanks
   },
 
-  // Lint source markdown only; skip generated output and dependencies.
+  // Lint source markdown only; skip generated output, dependencies, and other
+  // checkouts of this same repo.
   "globs": ["**/*.md"],
   "ignores": [
     "codex-skills/**",   // generated from skills/ by sync-codex-skill-wrappers.py
     "**/node_modules/**",
     "docs/**",           // built site output
     "_site/**",
-    ".quarto/**"
+    ".quarto/**",
+
+    // Agent worktrees (ai-config#1511). `isolation: "worktree"` on an Agent
+    // call puts a full second checkout under `.claude/worktrees/`, INSIDE the
+    // globbed tree, so each live worktree added ~695 files to the scan -- its
+    // own 514 markdown files plus the 181 its `.claude/skills` symlink pulls
+    // in, and its `codex-skills/` escapes the root-anchored ignore above.
+    // Measured: 512 files with none live, 1207 with one.
+    //
+    // Two ways that hurt. The reported file count is the denominator
+    // `shared/principles/fail-fast.md` asks every check to publish, so it goes
+    // silently wrong. And pre-commit runs this with `always_run: true`, so a
+    // worktree holding another branch can fail the commit on the branch you
+    // are actually on, naming a file your diff never touched. CI never sees
+    // it: a fresh checkout has no worktrees.
+    //
+    // `**/` so a worktree nested inside a worktree is covered too. Scoped to
+    // `worktrees/` rather than `.claude/`, which holds real source
+    // (`.claude/agents/*.md`) that must stay linted.
+    "**/.claude/worktrees/**"
   ]
 }

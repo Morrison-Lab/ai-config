@@ -289,6 +289,14 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    git diff --name-status -M "$merge^1" "$merge" | grep -E '^(D|R)'
    ```
    A conflicting path in neither set is drift --- skip it.
+   **One exception, and it is the conflict this merge most certainly caused:**
+   a PR **stacked** on the branch you just merged conflicts on the paths that
+   merge modified and added, never on the ones it deleted or renamed, so the
+   intersection is empty and this step would skip it.
+   Check `gh pr list --base <merged-branch>` before merging, treat any PR it
+   returns as caused by you whatever the intersection says, and reach for
+   [`cascade`](../cascade/SKILL.md) rather than resolving the conflicts
+   line by line.
    The `git diff` form is used because it is correct for **both** merge
    styles, which `git show` is not.
    A squash merge is an ordinary single-parent commit, so
@@ -301,7 +309,8 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    repo merges, which is not a property of the commit in front of you;
    naming `^1` explicitly removes the question.
    See [`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md),
-   "A conflict your sweep found is not a conflict your merge caused".
+   "A conflict your sweep found is not a conflict your merge caused"
+   and "A stacked PR is the one conflict that intersection cannot attribute".
 3. **Check claim status.**
    Read the most recent comment.
    If it says "Working on this --- paws off" (or equivalent) and the claim is

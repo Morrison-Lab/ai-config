@@ -58,6 +58,12 @@ README = os.path.join(ROOT, "README.md")
 KNOWN_UNREGISTERED = {
     "no-handrolled-verdict-parse.py",
     "remind-brief-premises.py",
+    # Inert BY THE GATE rather than by oversight, unlike the two above:
+    # README's activation rule says the entry in hooks/hooks.json IS the
+    # activation on the plugin path, so it is registered by the follow-up
+    # after the authoring PR merges. Tracked in ai-config#1527, not #1505,
+    # whose scope is the two hooks above.
+    "no-misattributed-quote.py",
 }
 
 # The README row of an allowlisted hook must contain this, so the table states

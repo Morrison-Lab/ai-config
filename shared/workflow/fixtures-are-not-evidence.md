@@ -327,18 +327,3 @@ rather than on the code.
   them is reachable --- the floor can sit above it.
 - **Don't:** drop a finding because its number was unattainable; re-derive the
   bound and keep the fix.
-
-(`Lacaedemon/sparta` PR #1282, 2026-08-16: a review found that
-`Unit._apply_square_slot_reflection` double-applied a depth reflection on the
-out-of-sync rebuild path, and proposed a regression test asserting `moved == 4`.
-The finding was correct and the number unreachable.
-Measured over a 60-man, 8-file square at 9.0 wu pitch, `moved` counting men
-displaced more than half a pitch: buggy 58, fixed 51, and **the same fixture
-with no reform at all, 51** --- because
-`UnitFormation.pair_slots_by_lateral_file` is order-preserving rather than
-identity-preserving and churns 51 of 60 on a partial-rank square with nothing
-else changing.
-So no implementation of the fix could ever have scored 4.
-The shipped test bounds *mean travel* against the block's own depth span
-instead, and mutation-verified at `[30.74] expected to be < than [21.0]` with the
-guard removed.)

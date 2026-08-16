@@ -348,9 +348,12 @@ So a control that was itself harmless destroys uncommitted work, in the step
 whose whole purpose was to leave no trace.
 
 Two properties keep it hidden.
-The revert is silent, since `git checkout <path>` prints nothing on success,
-so nothing distinguishes reverting one injected line from reverting a file's
-entire uncommitted diff.
+The revert reports paths rather than lines, so nothing in its output
+distinguishes reverting one injected line from reverting a file's entire
+uncommitted diff.
+`git restore FILE` prints nothing at all, and `git checkout FILE` prints only
+`Updated 1 path from the index` --- measured on git 2.43.0 --- which is
+equally true either way.
 And `git status` afterwards still looks plausible whenever sibling files
 carry their own uncommitted changes: the tree is still dirty, the list is
 still non-empty, and only the one file has been emptied.
@@ -370,6 +373,8 @@ reverting the path.
   up after a diagnostic --- it reverts every uncommitted change in that path.
 - **Don't:** read a still-dirty `git status` as evidence the revert was
   scoped; sibling files' changes keep the list non-empty either way.
+- **Don't:** read `Updated 1 path from the index` as confirmation the revert
+  was narrow --- it counts paths, never lines.
 
 (2026-08-15: testing whether a repo's `chars` check detected U+00D7 meant
 appending a literal multiplication sign to a tracked `.qmd`, re-running the

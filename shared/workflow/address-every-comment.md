@@ -311,17 +311,19 @@ The failure direction is the expensive one.
 A verbatim phrase that *is* present reports absent, so the natural response is
 to re-add content that was never missing.
 
-Widening the class is the wrong repair, and this file says why one paragraph up:
-enumerating which markup to strip "is the wrong shape, not merely an incomplete
-list".
-Adding `#` to `[\`*_\s]` also strips a `#` a phrase legitimately contains --- an
-issue reference, a colour literal, a quoted shell comment --- so the normalizer
-starts erasing content in order to find it.
+Widening the class is the wrong repair, and the Do/Don't block one paragraph up
+already says so: **don't** enumerate which markup to strip and treat that list
+as the fix.
+The rationale companion puts it more sharply --- "Enumerating is the wrong
+shape, not merely an incomplete list."
+Adding `#` to ``[\`*_\s]`` also strips a `#` a phrase legitimately contains ---
+an issue reference, a colour literal, a quoted shell comment --- so the
+normalizer starts erasing content in order to find it.
 
 Strip the leader **per line, anchored**, before collapsing whitespace:
 
 ```python
-strip_leader = lambda s: re.sub(r"(?m)^\s*(##|#|//|--)\s?", "", s)
+strip_leader = lambda s: re.sub(r"(?m)^[ \t]*(##|#|//|--)(?=[ \t]|$)[ \t]?", "", s)
 norm = lambda s: re.sub(r"[\`*_\s]+", " ", strip_leader(s))
 norm(needle) in norm(haystack)
 ```
@@ -330,10 +332,23 @@ The anchor is what keeps this from being the wider-class move.
 `^` under the `(?m)` flag confines the strip to a position the medium owns, so a
 `#` inside a line is untouched.
 
+The lookahead is load-bearing rather than decorative, and dropping it
+reintroduces the exact defect this section removes.
+A bare optional separator (`\s?`) lets the pattern strip any line-initial `#` or
+`--` whatever follows it: the `#` of a wrapped `#1257` reference, and --- worse
+in a corpus that writes them constantly --- a line-initial `---`, which is left
+as a stray `- `.
+Requiring the separator to be present, or the line to end there, leaves both
+intact while still stripping `## text`, `-- text`, and a bare `##`.
+Prefer `[ \t]` over `\s` for that separator, since `\s` matches the newline and
+would join the stripped line to the next one.
+
 - **Do:** strip a line-comment leader with an anchored per-line pattern before
   whitespace collapse, whenever the haystack is source code.
 - **Do:** apply that strip to both sides --- this adds a stage, it does not
   replace the symmetry rule above.
+- **Do:** require the leader to be followed by whitespace or a line end, so a
+  line-initial `#1257` or `---` survives the strip.
 - **Don't:** add `#`, `/`, or `-` to the inline-markup character class; that
   strips them wherever they appear, including inside the content you are
   searching for.

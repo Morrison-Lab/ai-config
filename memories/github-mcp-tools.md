@@ -9,12 +9,19 @@ Split out of `github.md` pre-emptively at 1199 lines, just under
 above 1200 lines, so the file never actually tripped it.
 See ai-config#694 for the precedent.
 
-- In remote/web sessions the authenticated GitHub identity is the repo owner
-  (`d-morrison`), so requesting `d-morrison` as a PR reviewer fails with
-  `422 Review cannot be requested from pull request author`. Harmless — the PR
-  is still created; the reviewer just isn't added. Don't treat the 422 as a
-  failure to retry (it's expected per the standing request-pr-review rule when
-  the author == the requested reviewer).
+- In remote/web sessions the authenticated GitHub identity **can be** the repo
+  owner (`d-morrison`), in which case requesting `d-morrison` as a PR reviewer
+  fails with `422 Review cannot be requested from pull request author`.
+  Harmless --- the PR is still created; the reviewer just isn't added. Don't
+  treat the 422 as a failure to retry (it's expected per the standing
+  request-pr-review rule when the author == the requested reviewer).
+  **Do not read that as a standing property of remote sessions**, which is how
+  this bullet read before it was caveated: identity varies by container and by
+  client, so a container where an MCP write is attributed to `dem-extra1`
+  instead accepts the same request with a `201`. See "A per-client identity
+  table is a CONTAINER measurement" below for the measurement, and settle it
+  by the attributed author of a write you actually made rather than from this
+  bullet.
 - `gh` is NOT available in these sessions — use the `mcp__github__*` tools for
   all GitHub interactions (PRs, issues, comments, reviews). CI status is always
   available via `mcp__github__pull_request_read` (`get_check_runs` / `get_status`)
@@ -900,11 +907,14 @@ See ai-config#694 for the precedent.
   strips HTML comments --- works only where REST is open for that org, and
   has to be re-checked per org rather than per session.
 
-  Note also that `GET /user` answered `dem-extra1` here, which is the `gh`-CLI
-  row of sparta's own identity table rather than the `d-morrison` row that
-  table records for a raw-API read.
-  That is the table behaving as its own caveat says: the rows are per-session
-  measurements, so re-measure rather than carrying one across.
+  Note also that `GET /user` answered `dem-extra1` here, where sparta's entry
+  records `d-morrison` for that same raw-API read.
+  Read that against the table carefully: the table's rows are WRITES, so its
+  raw-API row is `claude[bot]`, and the `d-morrison` figure for a raw-API read
+  lives in that entry's prose instead --- which is the disagreement it cites
+  as its reason for ruling `GET /user` out as an identity signal at all.
+  That is the entry behaving as its own caveat says: the measurements are
+  per-session, so re-measure rather than carrying one across.
 
   - **Do:** try the MCP tool after a raw-REST `403`, and read the `403` body
     before deciding what the denial is.
@@ -914,3 +924,56 @@ See ai-config#694 for the precedent.
     tools may have it, and `add_repo` may be the wrong remedy entirely.
   - **Don't:** commit a workflow to the raw-API path for an org without
     checking that path answers for that org first.
+- **A per-client identity table is a CONTAINER measurement, so its rows do not
+  travel --- and the row that disagrees is the WRITE row, which is the one the
+  table itself says to trust.**
+  `Lacaedemon/sparta`'s `.claude/memories/sparta.md` carries an identity table
+  under "A session writes under TWO identities here", mapping each client to
+  the login its writes are attributed to: MCP tools to `d-morrison`, the raw
+  API to `claude[bot]`, and the `gh` CLI to `dem-extra1`.
+  Its framing is already careful --- "the client makes the identity, not the
+  session", and do not generalize a row to a client you did not measure.
+  What it lacks is a second data point showing which axis actually varies.
+
+  The entry above notes that `GET /user` answered `dem-extra1` rather than the
+  table's raw-API row, and correctly declines to make much of it, because that
+  same sparta entry rules a `GET /user` probe out as an identity signal.
+  The measurement below is not rulable out on those grounds, because it is
+  exactly the signal that entry names as the reliable one: **the attributed
+  author of a write you actually made.**
+
+  Measured 2026-08-16, in this container:
+
+  | write | client | `user.login` |
+  | --- | --- | --- |
+  | `Morrison-Lab/ai-config#1539` opened | `mcp__github__create_pull_request` | `dem-extra1` |
+
+  The table predicts `d-morrison` for that client and got `dem-extra1`, on the
+  one surface the sparta entry names as reliable.
+  So the varying axis is the **container**, not only the client, and a row
+  read out of that table is a measurement with an expiry rather than a lookup.
+
+  **The practical cost is a skipped reviewer request, which is why this is
+  worth more than a footnote.**
+  That same sparta entry records, correctly for its own container, that
+  requesting `d-morrison` on a `d-morrison`-authored PR returns `422`, since
+  GitHub rejects a review request naming the PR's own author --- and tells you
+  not to spend a round diagnosing it.
+  Carried into a container where MCP writes as `dem-extra1`, that reads as
+  "the reviewer request will be rejected", and the natural response is to skip
+  it.
+  Measured instead, on `Lacaedemon/sparta#1303` (author `dem-extra1`):
+  `POST .../pulls/1303/requested_reviewers` with `d-morrison` returned **201**.
+  The `422` is a fact about the author-equals-reviewer collision, not about the
+  client --- so it fires only when the container's own MCP identity happens to
+  be the reviewer you are requesting.
+
+  - **Do:** re-derive the identity by reading `user.login` on a write you just
+    made, per that entry's own rule, rather than reading its table.
+  - **Do:** attempt the reviewer request and read the status; a `201` and a
+    `422` are one call apart and the wrong guess costs a review.
+  - **Don't:** carry an identity row from another repo's memory, or from
+    another container, into a claim about this one.
+  - **Don't:** read the `422` as a property of the MCP client --- it is the
+    author-equals-reviewer collision, and it does not arise when the two
+    logins differ.

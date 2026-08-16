@@ -1,1 +1,0 @@
-Sitemap: https://Morrison-Lab.github.io/ai-config/sitemap.xml

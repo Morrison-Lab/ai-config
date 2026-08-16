@@ -191,7 +191,7 @@ A guard you cannot explain skipping is one you skipped by not looking.
 (Morrison-Lab/ai-config#1490, 2026-08-15/16: a human-review query was added
 beside two siblings --- the Copilot query and the `CHANGES_REQUESTED` check
 --- in `pr-status`/`pr-status-all`.
-Five of the PR's nine review findings were guards those siblings already
+Four of the PR's eight review findings were guards those siblings already
 carried, restored one round at a time: the per-reviewer
 `group_by(.user.login)` reduction (round 1), the `DISMISSED` carve-out
 (round 2), the self-contained `head=` fence (round 3), and

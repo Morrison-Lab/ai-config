@@ -1022,10 +1022,38 @@ A one-line source change can rewrite hundreds of files, and a reviewer
 working from a truncated diff sees only the generated bulk --- so the finding
 comes back as "revert the unintended changes", where complying would break
 the very check that demanded them.
-The PR body is the only place that can pre-empt this, since it is what a
-reviewer reads before the diff.
-Lead with the ratio and a per-path table marking each path generated or
+Say so in the PR body, which is what a reviewer reads before the diff: lead
+with the ratio and a per-path table marking each path generated or
 hand-written.
+
+**Do not read that as a fix the cited case establishes, and note that the
+obvious wrong reading is the opposite of the true one.**
+The reasoning is sound for a human, who does read the body.
+For an automated reviewer working from a truncated diff it is a guess, and
+the case cannot settle it, because the body rewrite did not land alone.
+
+The timestamps are what decide this, and they were misread once already ---
+[#837](https://github.com/Morrison-Lab/ai-config/issues/837) filed this entry
+as an overclaim on the grounds that the mitigation was in place for a block
+that followed it, which the record does not show.
+On #834 both blocks precede the rewrite: `01:33:07Z`, then `01:35:23Z`
+carrying the truncated-diff note, with the rewrite announced at `01:37:01Z`.
+The next verdict after it was `approve`, at `01:50:49Z`.
+
+So the evidence runs mildly *for* the mitigation and still cannot isolate it.
+The approving review began at `01:46:19Z`, twelve seconds after `9f0d7a1`
+changed content, so a body rewrite and a content change both sit between the
+last block and the approve.
+One case with two candidate causes decides nothing either way.
+
+- **Do:** write the note, for the human reviewer, where the reasoning holds.
+- **Do:** expect to still need the rebuttal-and-hold path from
+  [`fully-clean`](fully-clean.md)'s seventh case, since nothing here shows an
+  automated reviewer reading the body at all.
+- **Don't:** claim the body is the *only* thing that can pre-empt this, or
+  that the note is what cleared the block --- neither survives the timeline.
+- **Don't:** reach for the intervening commits as the explanation either;
+  that is the nondeterminism error one section over, with the sign flipped.
 
 **Run the whole test suite before pushing, not the files you predict the
 change touches --- and check that the ones you ran were not silently

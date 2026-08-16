@@ -9,12 +9,19 @@ Split out of `github.md` pre-emptively at 1199 lines, just under
 above 1200 lines, so the file never actually tripped it.
 See ai-config#694 for the precedent.
 
-- In remote/web sessions the authenticated GitHub identity is the repo owner
-  (`d-morrison`), so requesting `d-morrison` as a PR reviewer fails with
-  `422 Review cannot be requested from pull request author`. Harmless — the PR
-  is still created; the reviewer just isn't added. Don't treat the 422 as a
-  failure to retry (it's expected per the standing request-pr-review rule when
-  the author == the requested reviewer).
+- In remote/web sessions the authenticated GitHub identity **can be** the repo
+  owner (`d-morrison`), in which case requesting `d-morrison` as a PR reviewer
+  fails with `422 Review cannot be requested from pull request author`.
+  Harmless --- the PR is still created; the reviewer just isn't added. Don't
+  treat the 422 as a failure to retry (it's expected per the standing
+  request-pr-review rule when the author == the requested reviewer).
+  **Do not read that as a standing property of remote sessions**, which is how
+  this bullet read before it was caveated: identity varies by container and by
+  client, so a container where an MCP write is attributed to `dem-extra1`
+  instead accepts the same request with a `201`. See "A per-client identity
+  table is a CONTAINER measurement" below for the measurement, and settle it
+  by the attributed author of a write you actually made rather than from this
+  bullet.
 - `gh` is NOT available in these sessions — use the `mcp__github__*` tools for
   all GitHub interactions (PRs, issues, comments, reviews). CI status is always
   available via `mcp__github__pull_request_read` (`get_check_runs` / `get_status`)
@@ -900,11 +907,14 @@ See ai-config#694 for the precedent.
   strips HTML comments --- works only where REST is open for that org, and
   has to be re-checked per org rather than per session.
 
-  Note also that `GET /user` answered `dem-extra1` here, which is the `gh`-CLI
-  row of sparta's own identity table rather than the `d-morrison` row that
-  table records for a raw-API read.
-  That is the table behaving as its own caveat says: the rows are per-session
-  measurements, so re-measure rather than carrying one across.
+  Note also that `GET /user` answered `dem-extra1` here, where sparta's entry
+  records `d-morrison` for that same raw-API read.
+  Read that against the table carefully: the table's rows are WRITES, so its
+  raw-API row is `claude[bot]`, and the `d-morrison` figure for a raw-API read
+  lives in that entry's prose instead --- which is the disagreement it cites
+  as its reason for ruling `GET /user` out as an identity signal at all.
+  That is the entry behaving as its own caveat says: the measurements are
+  per-session, so re-measure rather than carrying one across.
 
   - **Do:** try the MCP tool after a raw-REST `403`, and read the `403` body
     before deciding what the denial is.
@@ -939,7 +949,7 @@ See ai-config#694 for the precedent.
   | `Morrison-Lab/ai-config#1539` opened | `mcp__github__create_pull_request` | `dem-extra1` |
 
   The table predicts `d-morrison` for that client and got `dem-extra1`, on the
-  one surface it says to believe.
+  one surface the sparta entry names as reliable.
   So the varying axis is the **container**, not only the client, and a row
   read out of that table is a measurement with an expiry rather than a lookup.
 

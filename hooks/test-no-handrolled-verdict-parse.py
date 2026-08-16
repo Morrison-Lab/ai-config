@@ -97,6 +97,8 @@ CASES = [
      "the same sweep's other PR (#1257), the false-BLOCKED direction"),
     (INCIDENT, checker_exit2(1278), True,
      "exit-2 failure (gh missing) does NOT discharge the guard for #1278"),
+    ("jq -r '.body|test(\"Ready for merge\")' /tmp/review-body.json", checker_exit2(1278), True,
+     "exit-2 failure (gh missing) does NOT discharge untargeted parse"),
 
     # -- other shapes of the same parse -----------------------------------
     ("gh api repos/o/r/issues/1278/comments | grep -m1 'Ready for merge'",

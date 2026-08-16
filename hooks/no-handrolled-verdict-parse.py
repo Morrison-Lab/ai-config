@@ -323,19 +323,20 @@ def prs_in(cmd):
 def checked_prs(path):
     """Scan the transcript for check-pr-fully-clean.py calls.
 
-    Returns (ran_at_all, set_of_pr_numbers).
+    Returns (ran_at_all_successfully, set_of_valid_pr_numbers).
     A call that failed with an environment/usage error (e.g., exit 2 because `gh`
-    is missing or invalid arguments) does NOT discharge the guard for that PR.
+    is missing or invalid arguments) does NOT discharge the guard, either for a
+    specific PR or for an untargeted parse.
     """
-    ran = False
-    prs = set()
     if not path:
-        return ran, prs
+        return False, set()
 
     pending = {}  # tool_use_id -> pr_number
+    valid_prs = set()
+    successful_calls = set()
 
     with open(path, errors="ignore") as fh:
-        for line in fh:
+        for idx, line in enumerate(fh):
             try:
                 msg = json.loads(line)
             except Exception:
@@ -362,25 +363,30 @@ def checked_prs(path):
                         continue
                     blob = json.dumps(b.get("input") or {})
                     for m in CHECKER_CALL.finditer(blob):
-                        ran = True
                         pr_target = m.group(2)
-                        use_id = b.get("id")
+                        use_id = b.get("id") or f"call_{idx}"
+                        pending[use_id] = pr_target
                         if pr_target:
-                            prs.add(pr_target)
-                            if use_id:
-                                pending[use_id] = pr_target
+                            valid_prs.add(pr_target)
+                        successful_calls.add(use_id)
                 elif b_type == "tool_result":
                     use_id = b.get("tool_use_id")
                     output_text = str(b.get("content") or b.get("output") or "")
                     if ("is not installed or not on PATH" in output_text or
                         "This script requires the GitHub CLI" in output_text or
                         "usage: check-pr-fully-clean.py" in output_text):
-                        if use_id and use_id in pending:
-                            failed_pr = pending.pop(use_id)
-                            prs.discard(failed_pr)
-                        elif not pending and prs:
-                            prs.clear()
-    return ran, prs
+                        if use_id:
+                            if use_id in pending:
+                                failed_pr = pending.pop(use_id)
+                                if failed_pr and failed_pr not in pending.values():
+                                    valid_prs.discard(failed_pr)
+                            successful_calls.discard(use_id)
+                        else:
+                            successful_calls.clear()
+                            valid_prs.clear()
+
+    ran = len(successful_calls) > 0
+    return ran, valid_prs
 
 
 def main() -> int:

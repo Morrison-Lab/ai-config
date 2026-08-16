@@ -152,6 +152,91 @@ disrupt.
   It happens to work on a squash merge, which is what makes reaching for it
   unreliable rather than simply wrong.
 
+## A stacked PR is the one conflict that intersection cannot attribute
+
+The section above is right about drift and blind in exactly one case, and it
+is the case where the merge is unambiguously at fault.
+A PR **stacked** on the PR you just merged conflicts on the paths that merge
+**modified and added**, never on the ones it deleted or renamed.
+So the intersection comes back empty, the rule reports drift, and the one hit
+in the sweep your merge definitely caused is the one it tells you to skip.
+
+The mechanism is the squash.
+A squash merge writes a single new commit on the base branch, so the merged
+PR's own branch commits never become ancestors of it.
+A PR stacked on that branch therefore keeps its old merge base, and its diff
+re-shows the merged content as though it were new.
+Nothing in that requires a deletion or a rename, which is why a
+deleted-or-renamed path set is the wrong instrument for it.
+
+**The pre-merge check already exists and is scoped to the wrong trigger.**
+[`memories/git.md`](../../memories/git.md) and
+[`stack-prs`](../../skills/stack-prs/SKILL.md) both prescribe
+`gh pr list --base <branch>` before merging, and both gate it on
+`gh pr merge --delete-branch`, whose harm is the dependent PR being
+auto-**closed**.
+A plain squash merge passes no such flag, so neither rule fires, and the
+dependent is orphaned regardless.
+Omitting the flag does not help either in a repo that deletes merged head
+branches on its own, since the branch goes away whatever you passed.
+
+**The asymmetry is what makes this a rule rather than a call for more care.**
+The merging party holds the information and pays none of the cost: the
+dependent declares the dependency in its own body, and its base ref names the
+branch.
+The dependent's owner pays all of it and cannot prevent it.
+`CLAUDE.md`'s three merge-order surfaces all sit on the **dependent** PR, so
+not one of them is visible from the PR being merged.
+
+So run the base query before **any** merge rather than before a
+`--delete-branch` one, and treat a conflicting PR whose base was your merged
+branch as caused by you whatever the intersection says.
+[`cascade`](../../skills/cascade/SKILL.md) is the remediation once it has
+happened.
+
+**This is the merging party's half of a mechanism the corpus already covers
+from the other side.**
+[`use-existing-pr-branch`](use-existing-pr-branch.md)'s "A stacked PR reaches
+that bloated state with no push of yours at all" section describes the same
+squash-and-retarget from inside the **dependent** PR's own session, and owns
+the recovery: read the diff and commit counts rather than resolving the
+conflicts, since re-litigating already-merged content is what the apparent
+conflict invites.
+Neither section subsumes the other, and the split is the point --- one is a
+pre-merge obligation on a party who will never see the symptom, the other is a
+post-hoc recovery by the party who does.
+Read that section when a PR of yours goes dirty for no reason you can find, and
+this one before merging anything.
+
+- **Do:** run `gh pr list --base <branch>` before merging any PR, not only one
+  you are about to merge with `--delete-branch`.
+- **Do:** exempt a PR stacked on your merged branch from the deleted-or-renamed
+  intersection, since a squash orphans it without deleting anything.
+- **Don't:** read an empty intersection as drift when the conflicting PR's base
+  was the branch you just merged.
+- **Don't:** rely on the merge-order surfaces to warn you --- every one of them
+  sits on the dependent PR, which the merging party is not reading.
+
+(Morrison-Lab/ai-config, 2026-08-16: PR #1504 was squash-merged as `41d82611`
+with no check for dependents.
+PR #1507 was stacked on its branch and said so in its own body.
+The squash left `git merge-base --is-ancestor` reporting `#1504`'s branch tip
+as unreachable from `main`, so `#1507`'s merge base stayed at `4a1e317b`, and
+`git merge-tree` over that base reported 10 conflict markers where it had
+reported none.
+The attribution set is what settles the rule:
+`git diff --name-status -M 41d82611^ 41d82611 | grep -E '^(D|R)' | wc -l`
+returns 0, while `#1507` conflicts on `README.md`,
+`scripts/check-hook-catalog.py`, and `scripts/test_check_hook_catalog.py` ---
+paths that squash recorded as `M`, `A`, and `A`.
+The remedy the existing rules prescribe was also inoperative: five of five
+recently merged head branches whose PRs had closed were gone from
+`git ls-remote --heads origin`, the sixth surviving only because an open PR
+still used it, so this repo deletes merged head branches whatever
+`--delete-branch` says.
+The dependent was retargeted rather than closed, so the harm was the orphaned
+base rather than the closure the existing rules guard against.)
+
 ## Independent per-PR checking cannot see pair collisions
 
 Every PR can be individually clean against `main` while two of them conflict

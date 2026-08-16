@@ -160,6 +160,73 @@ Read that evidence rather than accepting its presence: a quoted run that
 exits cleanly is the vacuous-control shape above, not a proof, so the
 failing output has to look *different* from the passing output.
 
+### A test gated on a production constant loses coverage when that constant moves
+
+Everything above concerns an assertion that cannot fail **today**.
+This one asserts perfectly well today and stops running later, because its
+**applicability** was derived from a production value rather than from the
+property under test.
+
+The shape is a guard around the case rather than inside it:
+
+```python
+ALLOWLISTED = set(prod.KNOWN_UNREGISTERED)   # sourced from the real constant
+
+if ALLOWLISTED:
+    check_every_entry_is_still_unregistered()
+    check_no_entry_is_stale()
+```
+
+That is right while the constant has members, and the constant is usually one
+declared to shrink --- an allowlist, a deprecation set, a known-failures list,
+whose own comment says it should only ever get smaller.
+So the coverage disappears **exactly when the feature is next edited**, since
+emptying the constant is the edit everyone is working toward.
+
+Two things separate this from the vacuous assertion above.
+Its failure is in the **future** rather than at authoring time, so no
+mutation, no negative control, and no failing-run evidence taken today can
+show it --- every one of those checks passes, correctly, on a populated
+constant.
+And it degrades to a **skip** rather than to a false pass, which reads as
+information rather than as a gap: a suite reporting `2 skipped` looks like it
+is telling you something, and what it is telling you is that the code path is
+now exercised by nothing.
+
+Inject a synthetic value so the case always runs, and keep one case against
+the real constant so the two questions stay separate:
+
+```python
+def test_allowlist_hygiene_synthetic():
+    check_every_entry_is_still_unregistered({"fake-entry"})   # always runs
+
+def test_allowlist_hygiene_live():
+    check_every_entry_is_still_unregistered(prod.KNOWN_UNREGISTERED)
+```
+
+The synthetic case tests the **logic**, which does not depend on how many
+entries production currently has.
+The live case tests the **corpus**, and is allowed to be vacuous once the
+constant empties, because that is the state it exists to confirm.
+
+- **Do:** derive a test's applicability from the property under test, and feed
+  the production constant in as data rather than as a gate.
+- **Do:** ask, of any `if <constant>:` wrapping a test body, what the suite
+  covers once that constant reaches its intended value.
+- **Don't:** read a skip as coverage --- it reports that the case did not run,
+  which is the same outcome as not having written it.
+- **Don't:** treat a passing mutation test as clearing this; a populated
+  constant makes every check today report correctly.
+
+(Morrison-Lab/ai-config#1507, 2026-08-16: three allowlist-hygiene cases in
+`scripts/test_check_hook_catalog.py` ran under `if ALLOWLISTED:`, sourcing
+`ALLOWLISTED` from the script's real `KNOWN_UNREGISTERED`, whose own comment
+says it "should only ever shrink".
+A reviewer caught that emptying it --- the declared goal --- would silently
+retire all three.
+Tracked as
+[#1519](https://github.com/Morrison-Lab/ai-config/issues/1519).)
+
 ### Mutate the fix, not only the test
 
 The rule above says a regression test must be seen to fail.

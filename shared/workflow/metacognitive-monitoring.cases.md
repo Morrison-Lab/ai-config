@@ -93,6 +93,33 @@ A search at the time found the general rule cited but never written:
 unfakeable asks` rule", and `unfakeable` occurs nowhere else in the corpus, so
 only that rule's commit-SHA instance had ever been recorded.)
 
+## Verifying ONE particular from a report does not transfer to the one beside it
+
+(`Lacaedemon/sparta` #1281, 2026-08-16: an exploration subagent's report opened
+a session with "`_default_loadout()` --- `scripts/Battle.gd:829-836` (four
+entries: Spearmen, Infantry, Archers, Cavalry)".
+Two independent particulars, one sentence.
+The entry count was checked directly and found to be five, with two
+byte-identical `Cavalry` entries, a real derivation returning a real answer.
+The docstring claim was never checked, and "five entries, not the four types its
+docstring describes" was published in that PR's body, inventing a contradiction
+between the code and a comment nobody had read.
+`scripts/Battle.gd:781` opens "The default battle loadout: spearmen, infantry,
+archers, cavalry, cavalry", and `git log -S` dates that wording to #478, so the
+docstring had never been wrong.
+
+Both halves were one `sed` away, which rules out the reachable-half reading,
+and they were separate claims rather than one claim restated, which rules out
+the true-neighbour reading.
+What carried the error was that they shared a sentence.
+
+The review then confirmed the verified half in as many words, "the 'two
+byte-identical Cavalry entries' claim is exactly what's in
+`Battle._default_loadout()` today", which is true and silent on the docstring.
+The clean verdict consequently read as corroborating the whole sentence.
+Caught only when a later UMS pass re-derived the docstring claim while writing
+the artifact-level entry, and reported the brief's own premise as false.)
+
 ## A hedge you attach for one audience is owed to the other
 
 (Morrison-Lab/ai-config#1299, 2026-08-08: a timing relationship measured on that

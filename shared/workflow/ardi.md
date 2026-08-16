@@ -418,6 +418,43 @@ corrected.**
 See [`ardi.cases.md`](ardi.cases.md), "A corrections entry expires with the next
 push".
 
+**Verifying that a stale figure is gone needs a SECTION-scoped search, because
+the corrections entry legitimately quotes it.**
+
+The two rules above compose into a check that cannot discriminate.
+The table must stop claiming the superseded figure, and the corrections entry
+must quote that same figure in order to say what changed --- so the string is
+still in the body after a fully correct fix, and a whole-body search for it
+reports that fix as having failed.
+
+That is a check whose pass path and failure path look alike, which
+[`fail-fast`](../principles/fail-fast.md) says is not yet a check.
+It also fails in the direction that invites damage: the natural response to a
+"still present" hit is to delete the quotation, which is the one part of the
+entry carrying the record.
+
+Scope the search to the section that makes the claim, and assert the
+corrections entry in the opposite direction:
+
+```python
+ver  = body[body.find("## Verification"):body.find("### Corrections")]
+corr = body[body.find("### Corrections"):]
+assert "484 added" not in ver    # the table no longer claims it
+assert "484 added" in corr       # the entry still records what changed
+```
+
+- **Do:** scope a staleness check to the section that makes the claim, and
+  assert separately that the corrections entry still quotes the old figure.
+- **Do:** write the two assertions in opposite directions, so a deleted
+  quotation fails as loudly as an uncorrected table.
+- **Don't:** search the whole body for the superseded figure --- a correct fix
+  leaves it present, so that search reports every correct outcome as a failure.
+- **Don't:** answer a "still present" hit by removing the quotation from the
+  corrections entry; that quotation is the record the entry exists to carry.
+
+See [`ardi.cases.md`](ardi.cases.md), "A whole-body staleness check that
+reported a correct fix as failed".
+
 The one case where a figure does **not** expire is a push that leaves the tree
 unchanged --- a revert-and-restore returns the tree to an object it already had, and a
 measurement is a function of the tree rather than the commit.

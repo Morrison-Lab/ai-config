@@ -20,6 +20,7 @@ SCRIPT = ROOT / "dotfiles/shiva/bin/tui-alloc"
 README = ROOT / "dotfiles/shiva/config/tui-alloc/README.md"
 
 failures = []
+total = 0
 
 
 def run(script: Path, readme: Path) -> subprocess.CompletedProcess:
@@ -30,6 +31,8 @@ def run(script: Path, readme: Path) -> subprocess.CompletedProcess:
 
 
 def check(name: str, cond: bool, detail: str = "") -> None:
+    global total
+    total += 1
     status = "ok" if cond else "FAIL"
     print(f"{status:4} {name}" + (f" -- {detail}" if not cond else ""))
     if not cond:
@@ -121,8 +124,7 @@ def main() -> None:
         check("comment example is not read as the flag",
               r.returncode == 0, f"rc={r.returncode} out={r.stdout!r}")
 
-    n = 14
-    print(f"{n - len(failures)}/{n} checks passed")
+    print(f"{total - len(failures)}/{total} checks passed")
     if failures:
         sys.exit(1)
 

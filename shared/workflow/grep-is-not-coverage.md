@@ -142,7 +142,8 @@ and never searched for the underlying squash/retarget mechanism itself)".
 The two sections stayed separate under that fragment's litmus test, since
 consolidating would lose the split between a pre-merge obligation and a
 post-hoc recovery.
-What the missed search cost was the cross-link, added in round 2.)
+What the missed search cost was the cross-link, which round 1 had to raise as
+a finding and which landed in the fix commit answering it.)
 
 ## Searching the wrong corpus is the same error with no grep in it
 

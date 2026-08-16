@@ -914,3 +914,56 @@ See ai-config#694 for the precedent.
     tools may have it, and `add_repo` may be the wrong remedy entirely.
   - **Don't:** commit a workflow to the raw-API path for an org without
     checking that path answers for that org first.
+- **A per-client identity table is a CONTAINER measurement, so its rows do not
+  travel --- and the row that disagrees is the WRITE row, which is the one the
+  table itself says to trust.**
+  `Lacaedemon/sparta`'s `.claude/memories/sparta.md` carries an identity table
+  under "A session writes under TWO identities here", mapping each client to
+  the login its writes are attributed to: MCP tools to `d-morrison`, the raw
+  API to `claude[bot]`, and the `gh` CLI to `dem-extra1`.
+  Its framing is already careful --- "the client makes the identity, not the
+  session", and do not generalize a row to a client you did not measure.
+  What it lacks is a second data point showing which axis actually varies.
+
+  The entry above notes that `GET /user` answered `dem-extra1` rather than the
+  table's raw-API row, and correctly declines to make much of it, because that
+  same sparta entry rules a `GET /user` probe out as an identity signal.
+  The measurement below is not rulable out on those grounds, because it is
+  exactly the signal that entry names as the reliable one: **the attributed
+  author of a write you actually made.**
+
+  Measured 2026-08-16, in this container:
+
+  | write | client | `user.login` |
+  | --- | --- | --- |
+  | `Morrison-Lab/ai-config#1539` opened | `mcp__github__create_pull_request` | `dem-extra1` |
+
+  The table predicts `d-morrison` for that client and got `dem-extra1`, on the
+  one surface it says to believe.
+  So the varying axis is the **container**, not only the client, and a row
+  read out of that table is a measurement with an expiry rather than a lookup.
+
+  **The practical cost is a skipped reviewer request, which is why this is
+  worth more than a footnote.**
+  That same sparta entry records, correctly for its own container, that
+  requesting `d-morrison` on a `d-morrison`-authored PR returns `422`, since
+  GitHub rejects a review request naming the PR's own author --- and tells you
+  not to spend a round diagnosing it.
+  Carried into a container where MCP writes as `dem-extra1`, that reads as
+  "the reviewer request will be rejected", and the natural response is to skip
+  it.
+  Measured instead, on `Lacaedemon/sparta#1303` (author `dem-extra1`):
+  `POST .../pulls/1303/requested_reviewers` with `d-morrison` returned **201**.
+  The `422` is a fact about the author-equals-reviewer collision, not about the
+  client --- so it fires only when the container's own MCP identity happens to
+  be the reviewer you are requesting.
+
+  - **Do:** re-derive the identity by reading `user.login` on a write you just
+    made, per that entry's own rule, rather than reading its table.
+  - **Do:** attempt the reviewer request and read the status; a `201` and a
+    `422` are one call apart and the wrong guess costs a review.
+  - **Don't:** carry an identity row from another repo's memory, or from
+    another container, into a claim about this one.
+  - **Don't:** read the `422` as a property of the MCP client --- it is the
+    author-equals-reviewer collision, and it does not arise when the two
+    logins differ.

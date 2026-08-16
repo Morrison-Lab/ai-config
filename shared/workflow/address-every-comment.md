@@ -292,6 +292,65 @@ the text, or the fix produces a third false negative of its own.**
 - **Don't:** test a raw search term against normalized text, however plain
   the term looks.
 
+**Symmetry is necessary and not sufficient once the haystack is source code,
+because a line-comment leader is inserted by the medium rather than by the
+author.**
+The rule above governs inline markup --- backticks, asterisks, underscores ---
+which an author types *inside* a phrase, so stripping it with a character class
+is the right shape.
+A `##`, `#`, `//`, or `--` leader differs in two ways that each defeat that
+class.
+It appears at a **line start** rather than mid-token, so it interrupts a phrase
+only where the phrase happens to wrap.
+And `#` is not in the class at all, so applying the same normalizer to both
+sides leaves it in the haystack and absent from the needle --- which is exactly
+the asymmetry the rule was written to remove, arriving through a character
+nobody enumerated.
+
+The failure direction is the expensive one.
+A verbatim phrase that *is* present reports absent, so the natural response is
+to re-add content that was never missing.
+
+Widening the class is the wrong repair, and this file says why one paragraph up:
+enumerating which markup to strip "is the wrong shape, not merely an incomplete
+list".
+Adding `#` to `[\`*_\s]` also strips a `#` a phrase legitimately contains --- an
+issue reference, a colour literal, a quoted shell comment --- so the normalizer
+starts erasing content in order to find it.
+
+Strip the leader **per line, anchored**, before collapsing whitespace:
+
+```python
+strip_leader = lambda s: re.sub(r"(?m)^\s*(##|#|//|--)\s?", "", s)
+norm = lambda s: re.sub(r"[\`*_\s]+", " ", strip_leader(s))
+norm(needle) in norm(haystack)
+```
+
+The anchor is what keeps this from being the wider-class move.
+`^` under the `(?m)` flag confines the strip to a position the medium owns, so a
+`#` inside a line is untouched.
+
+- **Do:** strip a line-comment leader with an anchored per-line pattern before
+  whitespace collapse, whenever the haystack is source code.
+- **Do:** apply that strip to both sides --- this adds a stage, it does not
+  replace the symmetry rule above.
+- **Don't:** add `#`, `/`, or `-` to the inline-markup character class; that
+  strips them wherever they appear, including inside the content you are
+  searching for.
+- **Don't:** read an absent verdict against a source file as evidence the phrase
+  is missing until the leader has been accounted for.
+
+(2026-08-16, verifying `Lacaedemon/sparta` PR #1257 after merge: a probe
+checking that two merged doc-comment phrases had landed on `main` reported both
+missing.
+Both were present.
+Each phrase wraps across lines in `scripts/SoldierEnemyContact.gd`, and every
+continuation line opens with GDScript's `##` doc-comment leader, so the haystack
+carried `## ` mid-phrase where the needle carried a space.
+The normalizer was applied to both sides, exactly as the rule above requires,
+and `#` is not in its character class --- so the symmetry held and the check
+still failed.)
+
 **A flagged item that came in via a `main`-sync merge, not your own diff, is still a Defer --- just one where the follow-up is fixing it on `main` directly, not filing a per-PR issue.** This is not the ARD skill's "Acknowledge" disposition: `skills/ard/SKILL.md` reserves Acknowledge for praise or a no-ask observation, and explicitly warns against stretching it to dodge a real finding --- a redundant config line a reviewer flags is a real finding with an implied fix request, so it needs a real disposition, not a label that means "no change requested." When a reviewer flags something (a redundant config line, a stale pattern) inside a file your branch only touches because you merged `main` in to resolve a conflict, check provenance before fixing it: `git log`/`git blame` the flagged line, or just compare against `origin/main`'s current content. If it's identical to `main`, "fixing" it on your branch alone doesn't fix anything --- it just makes your branch disagree with `main` on unrelated content the next person to touch that file will have to reconcile again. Reply agreeing the finding is correct but out of scope for this PR, and leave it for whoever owns that file's actual content to fix on `main` directly --- no follow-up issue needed, since the fix target is `main` itself, not this PR's own change.
 
 **This generalizes to a skill's own inline restatement of a fragment it

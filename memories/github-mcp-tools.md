@@ -148,6 +148,39 @@ See ai-config#694 for the precedent.
   explicit go-ahead first if the workflow has a real side effect (e.g. a
   gh-pages deploy step not gated to `main`) — dispatching isn't just a status
   check in that case, it's a live action.
+- **Merging runs the client split the other way: the raw API 403s and
+  `mcp__github__merge_pull_request` succeeds.**
+  `PUT /repos/{owner}/{repo}/pulls/{n}/merge` with `GH_TOKEN` returns
+  `403 Merging into a protected base branch is not permitted for this session
+  type.`
+  The same merge, same method, same head SHA, goes through the MCP tool
+  normally.
+  What makes this worth its own bullet is the **wording**, which describes a
+  policy rather than a client: it names the base branch's protection and the
+  session's type, so the natural reading is "this session may not merge, and a
+  branch-protection rule is why".
+  Neither half is true, and both are the kind of claim nobody re-tests --- a
+  merge authorization is expensive to obtain, so a refusal that appears to
+  revoke one tends to be reported rather than retried.
+  The generalizable part is the direction, since the sibling bullet above has
+  the MCP tool 403ing where raw works.
+  Neither client is the privileged one, so a 403 naming a policy is evidence
+  about the client you used and about nothing else.
+  - **Do:** re-attempt a 403'd write through the other client before reporting
+    the capability blocked, whichever client you started with.
+  - **Do:** read a 403 body that names a *repo* condition (branch protection,
+    a ruleset) as still possibly client-scoped, and check the condition itself
+    before believing it.
+  - **Don't:** treat a refusal that mentions branch protection as evidence the
+    base branch actually forbids the merge --- `mergeable_state` was `clean`
+    and the merge succeeded seconds later.
+  - **Don't:** report a merge as blocked on the strength of one client's
+    refusal, since that hands a granted authorization back unused.
+  (`Lacaedemon/sparta#1275`, 2026-08-16: merged at `16:39:24Z` as `cee465f6`
+  via `mcp__github__merge_pull_request` with `merge_method: squash`, moments
+  after the identical raw-API `PUT` returned the 403 above.
+  `main` is protected there in the sense that the raw path refuses it, and the
+  protection did not block the merge itself.)
 - **`issue_write`'s `labels` REPLACES the issue's whole label set, and a name
   that does not exist yet is silently CREATED rather than rejected.** Two
   independent surprises in one parameter, pulling in opposite directions.

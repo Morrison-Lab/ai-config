@@ -280,6 +280,14 @@ count-above-a-block rule, whose subject sits in the same file and whose remedy
 is an `awk`-bracketed re-derivation.
 Here the subject is a query over several files, the count lives in a PR body,
 and what falsifies it is the diff itself.
+
+Distinct too from the nearest sibling, in
+[`ardi.cases.md`](ardi.cases.md), where a figure "correct at the head it ran on"
+went stale because a later commit moved the head.
+That one says re-derive, because the right tree kept moving.
+This one says the right tree does **not** move --- a dupe check's tree is fixed
+at the merge-base by what the claim is about --- so re-deriving at the head
+answers a different question rather than a fresher version of the same one.
 [`ardi`](ardi.md) already requires re-deriving every number in the body by
 command; the increment is that a diff-relative count has no single right answer
 until the ref is named.

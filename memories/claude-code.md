@@ -34,6 +34,28 @@
   Advanced R serves `function-operators.html` from `Function-operators.Rmd`, so the obvious raw URL 404s and the capitalized one returns the chapter.
   Retry with the repo's own capitalization before concluding the source lives at some other path.
   (ai-config#760, 2026-07-28: `adv-r.hadley.nz` 403'd through the proxy, and the first raw attempt 404'd purely on the leading capital.)
+- **Reddit is the inverse of the pattern above: the rendered HTML serves, and
+  the machine-readable form 403s.**
+  Every other entry in this section reaches for a site's *source* when the
+  rendered page refuses, so the instinct on a Reddit URL is to append `.json`
+  or switch to `api.reddit.com` --- the two documented ways to get structured
+  post and comment data.
+  Both return 403 to an unauthenticated datacenter client, and adding
+  `api.reddit.com` to an egress allowlist does not help, since the refusal is
+  Reddit's rather than the proxy's.
+  `old.reddit.com/r/<sub>/comments/<id>/` HTML fetches fine and carries the
+  post body and its comment tree, so read that and stop looking for a
+  structured endpoint.
+  Screenshots stay unreadable either way, so a post whose substance is in an
+  image is only partly recoverable --- say so rather than reporting the post as
+  read.
+  (2026-08-16, reading three r/ClaudeCode and r/ClaudeAI workflow posts for
+  ai-config#1563: the `.json` paths and `api.reddit.com` each 403'd, old.reddit
+  HTML worked, and post 1's heartbeat config and post 3's dashboard images were
+  never legible.
+  Note `skills/opposition-research/SKILL.md` names "the Reddit `.json`
+  endpoints" as a data source, which holds for a session that can authenticate
+  and not for this one.)
 - **`docs.github.com` itself can be blocked outright by a remote session's
   network policy** (proxy 403 on every page, and `api.github.com` too —
   both at the curl/WebFetch level; the GitHub MCP tools route through

@@ -5,7 +5,7 @@ Worked-example case records for the rules below live in
 
 <!--
 Some sections below pull their body from a fragment in `shared/` via Claude
-Code's `@path` import (e.g. `@shared/writing/plain-prose.md`). Those fragments
+Code's `@path` import (e.g. `@shared/workflow/run-ums-proactively.md`). Those fragments
 are the single source of truth for guidance shared with the UCD-SERG lab manual,
 which transcludes the same files. Edit the fragment, not the inlined copy, and
 keep fragments ASCII (write `---` for em-dashes) so the manual's character check

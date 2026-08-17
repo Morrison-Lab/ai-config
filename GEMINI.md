@@ -41,10 +41,11 @@ A single honest measurement earlier in the session is what most easily licenses 
 
 ## Request review and drive every started PR to clean
 
-Whenever starting or creating a Pull Request:
-1. **Request review immediately**: Request review from `d-morrison` (or the repository's configured reviewers, adhering to per-repo exceptions such as `sparta` per `skills/request-pr-review/SKILL.md`).
+Whenever starting or working on a Pull Request:
+1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment or `@agy review` / dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
+3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 
-- **Do:** Request review immediately upon creating or starting any PR and run `ardi` to drive the PR to a clean review verdict with green CI.
-- **Don't:** Leave a newly created PR sitting without a requested reviewer, or stop working on a PR after creation without carrying it to clean.
+- **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
 

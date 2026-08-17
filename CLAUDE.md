@@ -109,7 +109,7 @@ Fold a finished session's notebook into durable memory (or prune it) during UMS 
 
 ## Keep ai-config and repo checkouts fresh
 
-@shared/workflow/keep-checkouts-fresh.md
+[`shared/workflow/keep-checkouts-fresh.md`](shared/workflow/keep-checkouts-fresh.md)
 
 Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the `~/.claude` consumer copies (symlinks versus Windows real-copies versus a shadowed-container split, verified with `check-install.py` and `install-hooks.py`), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
 The fragment above carries the mechanics, the failure modes each check catches, and the case records.
@@ -463,7 +463,7 @@ the PR is the reviewable unit and the durable visible record of the work.
 
 ## Use the existing PR branch, not the harness-specified branch
 
-@shared/workflow/use-existing-pr-branch.md
+[`shared/workflow/use-existing-pr-branch.md`](shared/workflow/use-existing-pr-branch.md)
 
 ## Skills that call gh/glab: fall back to tool-mappings.md in remote sessions
 
@@ -552,7 +552,7 @@ Escalate a deadlock via the `request-pr-review` skill (human reviewer `d-morriso
 
 ## Always run ARDI on PRs you touch
 
-@shared/workflow/ardi.md
+[`shared/workflow/ardi.md`](shared/workflow/ardi.md)
 
 The `ardi` / `iterate` skill family runs this loop. (See *What "fully clean" means* above; the mechanics for each step are in the sections around here.)
 
@@ -587,23 +587,24 @@ and a pure re-post webhook event doesn't need fresh analysis.
 
 ## Address every in-scope review comment, even non-blockers
 
-@shared/workflow/address-every-comment.md
+[`shared/workflow/address-every-comment.md`](shared/workflow/address-every-comment.md)
 
-If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the impasse — for the final call rather than looping.
+If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request human review via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer <reviewer>`) and `@`-mention them with the impasse — for the final call rather than looping.
 
 ## Request review and drive every started PR to clean
 
-Whenever starting or creating a Pull Request:
-1. **Request review immediately**: Request review from `d-morrison` (or the repository's configured reviewers, adhering to per-repo exceptions such as `sparta` per `skills/request-pr-review/SKILL.md`).
+Whenever starting or working on a Pull Request:
+1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment or `@agy review` / dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
+3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 
-- **Do:** Request review immediately upon creating or starting any PR and run `ardi` to drive the PR to a clean review verdict with green CI.
-- **Don't:** Leave a newly created PR sitting without a requested reviewer, or stop working on a PR after creation without carrying it to clean.
+- **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
 
 
 ## Keep PR branches synced with main
 
-@shared/workflow/sync-with-main.md
+[`shared/workflow/sync-with-main.md`](shared/workflow/sync-with-main.md)
 
 (Another instance of **never assume; always verify** — `git fetch` to check main's actual position instead of assuming the branch is current.
 The `sync-pr-branch` / `merge-main` skill runs this.)
@@ -614,7 +615,7 @@ The section above is one branch against `main`.
 When **several** open PRs need syncing or conflict resolution, do them together in one pass rather than chasing each one's conflict flag as it appears.
 The batch pass is the default, not a recovery step for when serial chasing has already failed.
 
-@shared/workflow/batch-merge-and-resolve.md
+[`shared/workflow/batch-merge-and-resolve.md`](shared/workflow/batch-merge-and-resolve.md)
 
 The key points, restated here because a bare pointer is invisible to a consumer that doesn't load the fragment:
 
@@ -672,7 +673,7 @@ The failure is invisible by construction, which is why it needs a rule rather th
 Every agent does its job correctly on the list it was given, so the items that appear *between* the lists are covered by nobody, and no artifact reports it --- coverage is a property of the set rather than of any member.
 `scripts/pr-sweep.py` is the deterministic half for open PRs, and reports what it examined rather than only what it found.
 
-@shared/workflow/derive-dont-enumerate.md
+[`shared/workflow/derive-dont-enumerate.md`](shared/workflow/derive-dont-enumerate.md)
 
 ## Subagent worktrees are assigned, and an incident never silently repeals a decision
 
@@ -748,7 +749,7 @@ When you catch yourself (or a reviewer) re-deriving numbers by hand, or
 eyeballing an artifact for a property with a numeric definition, that check
 wants to be an instrument --- see the fragment for the procedure and tells.
 
-@shared/workflow/algorithmatize-checks.md
+[`shared/workflow/algorithmatize-checks.md`](shared/workflow/algorithmatize-checks.md)
 
 ## Deterministic tools over model judgment: write yourself out of a job
 
@@ -806,7 +807,7 @@ happened anyway, the finding is about the checklist, not only the incident.
 Don't checklist-ize skills that are mostly design judgment, exploratory
 research, or one-off improvisation.
 
-@shared/workflow/skill-checklists.md
+[`shared/workflow/skill-checklists.md`](shared/workflow/skill-checklists.md)
 
 ## Never pattern-match blindly: check the purpose transfers
 
@@ -825,7 +826,7 @@ reusing something you just verified feels like consistency rather than like
 assuming --- which inverts the scrutiny the situation warrants.
 This is not an argument against reuse; it is the check that makes reuse safe.
 
-@shared/workflow/check-purpose-before-reusing.md
+[`shared/workflow/check-purpose-before-reusing.md`](shared/workflow/check-purpose-before-reusing.md)
 
 ## Avoid false dichotomies
 
@@ -862,7 +863,7 @@ what else explains it, and an unexamined **default** gets named and decided.
 An answer that arrived with no deliberation owes an alternative you can name
 and reject.
 
-@shared/workflow/metacognitive-monitoring.md
+[`shared/workflow/metacognitive-monitoring.md`](shared/workflow/metacognitive-monitoring.md)
 
 ## Question the assignment, not only the claims
 
@@ -889,7 +890,7 @@ location, a site count --- run the deriving query and paste it beside the
 claim, rather than leaving the recipient's discretionary premise check as the
 only detector.
 
-@shared/workflow/challenge-the-assignment.md
+[`shared/workflow/challenge-the-assignment.md`](shared/workflow/challenge-the-assignment.md)
 
 ## Check for merge conflicts on every merge in an ultracode session
 
@@ -929,7 +930,7 @@ The fragment also covers the case where duplicated logic corrupts its own tests 
 Detect bad state early and stop with a clear error rather than proceeding on it; never swallow an error into a silent fallback (a bare `except:`, a `tryCatch` returning `NULL`, a shell `|| true`), and make any genuinely wanted fallback explicit, bounded, and observable.
 Apply this in review too: error handling that hides failure is a review finding, the same weight as any other standing review check.
 
-@shared/principles/fail-fast.md
+[`shared/principles/fail-fast.md`](shared/principles/fail-fast.md)
 
 ## Coding: KISS is the umbrella principle
 
@@ -994,7 +995,7 @@ Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding a
 ## Coding: `set -e` is not uniform; tolerate expected non-zero exits explicitly
 
 <!-- Not yet shared with the lab manual; edit shared/coding/errexit-is-not-uniform.md, not here. -->
-@shared/coding/errexit-is-not-uniform.md
+[`shared/coding/errexit-is-not-uniform.md`](shared/coding/errexit-is-not-uniform.md)
 
 ## Coding: avoid hard-coding data with an external source of truth
 
@@ -1061,7 +1062,7 @@ Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, along
 
 ## Writing style: semantic line breaks in prose
 
-@shared/writing/semantic-line-breaks.md
+[`shared/writing/semantic-line-breaks.md`](shared/writing/semantic-line-breaks.md)
 
 ## Quarto: link packages on first mention
 
@@ -1111,7 +1112,7 @@ The rule above catches redundant content once it is written.
 This one catches the belief that produces it: a phrase grep returning nothing is not evidence the corpus lacks a concept, because grep matches strings while coverage is a claim about ideas.
 Report the query and its result, not the conclusion.
 
-@shared/workflow/grep-is-not-coverage.md
+[`shared/workflow/grep-is-not-coverage.md`](shared/workflow/grep-is-not-coverage.md)
 
 Fires wherever a search decides whether to author something new --- `skill-builder`'s step 0, `ums`'s step 3, and `find-overlap`, whose own instrument scores this repo's canonical same-idea pair at 0.019 phrase similarity.
 
@@ -1126,11 +1127,11 @@ The `find-ai-tells` skill (alias `ai-tells`) runs this same catalog on demand ag
 
 ## Writing style: cite sources thoroughly
 
-@shared/writing/citations.md
+[`shared/writing/citations.md`](shared/writing/citations.md)
 
 ## Fact-check prose and internal reasoning in review
 
-@shared/writing/fact-check-prose.md
+[`shared/writing/fact-check-prose.md`](shared/writing/fact-check-prose.md)
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches prose, apply this policy in addition to the normal review — those skills don't name it internally, but this CLAUDE.md directive governs regardless.
 
@@ -1147,7 +1148,7 @@ re-verify it.
 
 ## Writing style: math --- include every step; keep each equation simple
 
-@shared/writing/math-derivation-steps.md
+[`shared/writing/math-derivation-steps.md`](shared/writing/math-derivation-steps.md)
 
 Two axes.
 *Between* displayed lines, write out every step, and flag gaps in review.
@@ -1210,7 +1211,7 @@ Fixing isn't mechanical substitution: a real dataset's effect size is often much
 ## Fact-check code logic and math in review
 
 <!-- Not yet shared with the lab manual; edit shared/coding/fact-check-code-logic.md, not here. -->
-@shared/coding/fact-check-code-logic.md
+[`shared/coding/fact-check-code-logic.md`](shared/coding/fact-check-code-logic.md)
 
 The code counterpart to the prose fact-check above --- catches strategic
 mistakes (wrong algorithm or approach), tactical mistakes (wrong

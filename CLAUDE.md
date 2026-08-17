@@ -505,17 +505,17 @@ and a pure re-post webhook event doesn't need fresh analysis.
 
 [`shared/workflow/address-every-comment.md`](shared/workflow/address-every-comment.md)
 
-If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the impasse — for the final call rather than looping.
+If you and the reviewer reach an impasse on a single item (your rebuttal didn't convince them and their re-raise didn't convince you), escalate that item to a **human reviewer** — request human review via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer <reviewer>`) and `@`-mention them with the impasse — for the final call rather than looping.
 
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
 1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment or `@agy review` / dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
-2. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (`d-morrison`, or configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
+2. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 3. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
 
-- **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review (`d-morrison`) only after the AI review is clean/approved (or upon an impasse).
-- **Don't:** Request human review (`d-morrison`) when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
+- **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
 
 
 ## Keep PR branches synced with main

@@ -99,6 +99,8 @@ When the loop ends, print a summary:
     2. [#31](url) — feat: retry logic (stacked on #30)
     3. [#32](url) — docs: v3 migration guide
 
+    **Stopping Point**: All 3 issues completed / backlog clear. Clean stopping point reached.
+
 ## Relationship to other skills
 
 - **`gip`** — the **parallel** counterpart: when a batch of issues is provably independent (no stacking dependency, no file overlap), `gip` lifts that subset out and works it concurrently in worktree-isolated subagents instead of serially. This loop stays serial for everything `gip` can’t prove independent.

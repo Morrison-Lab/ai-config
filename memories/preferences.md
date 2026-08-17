@@ -91,6 +91,9 @@
   The one exception is `Lacaedemon/sparta`, which never requests him, on PR
   creation or on deadlock escalation alike.
   Every other repo is unchanged, `Morrison-Lab/ai-config` included.
+- **In `ai-config` (and any repo where reviews don't auto-trigger on PR creation), ALWAYS summon `@claude review` / dispatch `claude-review.yml` immediately after creating a PR.**
+  `ai-config` never auto-reviews on PR creation or push (see `memories/claude-bot-workflows.md`).
+  Do not wait to be asked "did you request claude review?", and never post a self-generated review summary comment to satisfy `check-pr-fully-clean.py` instead of running an authentic `@claude` review. (User correction, 2026-08-16.)
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --
   create, push, and open the feature PR first. The PR must expose the exact SHA

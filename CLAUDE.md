@@ -218,13 +218,22 @@ indistinguishable from a turn where nothing happened.
 That makes silence worse than a terse reply: a short line reports a result,
 while no line reports nothing and reads as a stall.
 
-Three moments produce the empty turn, and none of them feels like withholding:
+Four moments produce the empty turn, and none of them feels like withholding:
 
 - **After an interruption.**
   The work completed, the reporting did not, and resuming feels like the
   request is already satisfied.
   Report what finished, in the past tense, rather than assuming the tool
   results were visible.
+- **On resuming from a context-window summary.**
+  The sharpest of the four, and the one that produced every observed
+  recurrence.
+  A summary reads like a report --- it is written in the past tense, it
+  enumerates what was done, and it is the first thing in the new window ---
+  so the work it describes feels already reported to the user.
+  It was not.
+  The user saw the work itself and never saw the summary, which exists for
+  you rather than for them.
 - **A no-change background tick.**
   A scheduled check-in that finds nothing still gets one line.
   "Nothing changed" and "the loop died" are the same observation otherwise,
@@ -241,6 +250,8 @@ Re-arm as instructed and still emit the one line.
 - **Do:** report completed work after an interruption, since the user saw none
   of it.
 - **Do:** give a no-change tick a single line that says so.
+- **Do:** treat a context-window summary as material for you rather than as a
+  report already delivered.
 - **Don't:** reply `No response requested.`, or any equivalent placeholder that
   occupies the reply without carrying information.
 - **Don't:** read a harness instruction to stay silent as overriding this.
@@ -256,7 +267,29 @@ at length and never its existence.
 `without messaging the user` also returned 0, which is how the conflicting
 instruction was identified as the harness's own wake boilerplate rather than
 ours.
-Tracked as ai-config#1568.)
+Tracked as ai-config#1568.
+
+**Third occurrence, 2026-08-17, recorded here rather than as a sibling entry**,
+per "Record both the pattern and the anti-pattern" above and the
+recurrence bullet in [`ums`](skills/ums/SKILL.md).
+All three fell in one session, each on resuming after a context-window
+summary, which is why that moment is now named in the list above --- the
+original entry's three moments did not cover it, so the rule was loaded and
+matched nothing.
+
+That count meets
+[`deterministic-tools`](shared/principles/deterministic-tools.md)'s
+third-occurrence bar, and the condition is lexically decidable over one
+artifact, so the rule now ships a guard: `hooks/no-placeholder-reply.py`
+blocks a reply whose **whole** stripped message is a placeholder.
+Whole-message anchoring rather than substring, because this corpus quotes the
+banned string constantly --- this very paragraph does --- so a substring
+matcher would block every reply that cites the rule it enforces.
+The line it draws is between a claim about the **request**, which reports
+nothing, and a claim about the **work**: `Nothing to report.` and
+`No change.` are deliberately not matched, since a no-change tick is
+behaviour this section requires.
+Tracked as ai-config#1579.)
 
 ## Surface merge-order constraints
 

@@ -536,3 +536,68 @@ local rendered tree, where the fix is a re-render rather than a wait.
   failed; a build predating the fix looks exactly like that.
 - **Don't:** treat a preview comment's timestamp, or the mere existence of a
   deployed page, as saying which commit it was built from.
+
+## A block presented as program output is a claim, so capture it rather than composing it
+
+A fenced block introduced as what a command prints is a factual claim about
+behaviour, and it earns the same check as any other.
+The usual way it goes wrong is that it was **composed** from convention rather
+than **captured** from a run: you know roughly what the tool says, you know
+what error output generally looks like, and you type the block.
+
+The invented element is almost always **added detail shaped like
+boilerplate** --- a severity tag, a timestamp field, a leading `$`, an exit
+line --- rather than a wrong message.
+That is what makes it survive review.
+Every part a reader would think to check is correct: the wording is the
+wording, the flags are the flags, the advice is the advice.
+What is wrong is a decoration nobody reads as a claim, because it looks like
+the format rather than like content.
+
+Note this is not the fixture case.
+[`fixtures-are-not-evidence`](../workflow/fixtures-are-not-evidence.md) governs
+reasoning **from** a repo artifact **back to** the real system, and its remedy
+is to consult the real artifact instead.
+Here there is no artifact at all --- the block was written from memory of a
+genre, and the real output was one command away the whole time.
+
+It also propagates, which raises the cost past one wrong line.
+Sample output is written once and pasted into every surface that explains the
+feature --- a README, a PR body, an issue, a changelog entry --- so the fix has
+to sweep all of them rather than the one a reviewer named, per
+[`address-every-comment`](../workflow/address-every-comment.md)'s rule on
+deriving a finding's site list.
+
+The remedy costs one command, and it is the same shape
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md) prescribes for
+publishing a command you ran: run the thing, paste what it printed, and
+compare it against what you were about to write.
+Where the real output cannot be produced --- an error path you cannot trigger,
+a machine you do not have --- read the code that emits it and quote the format
+string, rather than reconstructing the line from what such lines usually look
+like.
+
+- **Do:** run the command and paste what it actually printed, whenever a block
+  is introduced as program output.
+- **Do:** read the emitting code's own format string when the output cannot be
+  produced, and say that is what you did.
+- **Do:** grep every surface carrying the same block once one copy is found
+  wrong --- sample output is pasted, so it is rarely wrong in one place.
+- **Don't:** add a severity tag, prefix, or field because output of that kind
+  usually has one; that decoration is the part most likely to be invented and
+  least likely to be checked.
+- **Don't:** treat a block as verified because its message text is right ---
+  the wording is the half you remembered correctly.
+
+(`Lacaedemon/sparta#1305`, 2026-08-17, review round 1: `tools/README.md` and
+the PR body both carried a sample block showing the new Godot version check's
+failure output with an `[ERR]` prefix on each line.
+`check.sh`'s `err()` is `printf '%s%s%s\n' "$C_RED" "$1" "$C_RESET" >&2` ---
+ANSI color only, no text severity tag, and no severity tag anywhere in the
+script.
+The four message lines were verbatim correct; only the invented prefix was
+wrong, and it appeared in two places, so the fix swept both.
+This entry's own first draft then quoted that `err()` line as
+`printf '%s\n' "$*" >&2`, composed from memory rather than read from the
+script --- caught in this fragment's own review, the failure mode illustrating
+itself.)

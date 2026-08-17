@@ -99,8 +99,18 @@ standing yes (see `preferences.md`).
 # MERGE_PR — remote/web (GitHub MCP):
 #   mcp__github__merge_pull_request  merge_method=squash  commit_title=…  commit_message=…
 # local:
-gh pr merge <N> --squash --subject "<title>" --body "<accurate summary; Closes #N>"
+gh pr merge <N> -R <owner>/<repo> --squash --subject "<title>" --body "<accurate summary; Closes #N>"
 ```
+
+**The `-R` is load-bearing, not tidiness --- a bare `gh pr merge <N>` refuses even from inside the repo it would merge into.**
+Two `PreToolUse` guards gate the command, and with no session grant in play the bare form trips both.
+`hooks/require-gh-repo-flag.py` blocks any mutating repo-scoped `gh` command without `-R` regardless of any grant, and `hooks/no-unauthorized-merge.py` reads the merge's target repository off the **command text only**, never off the working directory --- so a merge naming no repo has no derivable target for the standing `Morrison-Lab/ai-config` grant to attach to.
+Naming the repo is what makes that grant applicable, and it is the whole difference between the two commands.
+
+An active `/mwc` is the exception to the second guard and not to the first: the session grant is keyed on a marker file in the current checkout rather than on the command's target, so it clears `no-unauthorized-merge.py` for a bare merge --- and `require-gh-repo-flag.py` refuses it anyway.
+Write the `-R` either way.
+
+See [`mwc`](../mwc/SKILL.md), "Three things the standing grant deliberately does not cover", for the guard's own reasoning.
 
 In remote/web sessions, load the merge tool's schema with `ToolSearch`
 (`select:mcp__github__merge_pull_request`) before the first call to confirm the

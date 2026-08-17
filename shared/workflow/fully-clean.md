@@ -125,6 +125,15 @@ So when Claude is reachable, its verdict is the one to report on:
   know which agent answered, and on a selector-based setup the agent is chosen
   at random.
 
+This is a different question from how much two reviewers **agreeing** is worth,
+which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
+settles: there, same-vendor agreement measures a shared blind spot, and a
+cross-vendor split is a prompt to check the item yourself.
+That section weighs corroboration; this one names whose approval is terminal.
+They compose --- a cross-vendor reviewer is still worth chasing, and its clean
+verdict still is not the one a PR is reported ready on while Claude is
+reachable.
+
 Where Claude is genuinely unreachable --- quota-skipped, a stub with no stated
 verdict, or not configured --- fall back per
 [`self-review-fallback`](self-review-fallback.md), which already governs that

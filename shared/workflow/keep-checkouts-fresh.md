@@ -68,7 +68,7 @@ In every session --- at session start, and again periodically during long sessio
    **A container with no `settings.json` at all is the degenerate case, and it arms nothing --- so every guard in this corpus is inert there, not just a drifted one.**
    The paragraphs above describe registration *drift*: a `settings.json` that exists and lacks some binding, which `install-hooks.py` reports and `--fix` repairs.
    A remote/web container can ship `~/.claude` with **no `settings.json` and no `settings.local.json` at all**, which is the same failure with the count at zero.
-   Nothing about it announces itself, for the reason line 48 already gives: an unregistered guard and a guard with nothing to block look identical.
+   Nothing about it announces itself, for the reason the file-versus-binding distinction above already gives: an unregistered guard and a guard with nothing to block look identical.
    What differs is the blast radius --- drift disarms the hooks added since someone last ran the binder, while an absent file disarms all of them, including the one built for the mistake you are about to make.
    One read settles it, and it is cheaper than either instrument:
    ```bash

@@ -321,3 +321,153 @@ at the run level while both of their jobs --- `validate` and
 what makes the recovery re-measurable after the fact.
 The check-run-mirrors-job claim was confirmed directly on head `73a4b3b7`,
 where both jobs and both check runs report `success` under the same names.)
+
+## An API outage is not an Actions outage, and it presents as the opposite shape
+
+Everything above describes an **Actions** incident, whose signature the first
+section states outright: checks are **absent** rather than failing, because the
+workflows never start.
+
+A GitHub **API** outage inverts that signature completely.
+Actions is healthy, so runners spin up, jobs start on schedule, and steps
+execute --- and then any step that calls `api.github.com` fails with `HTTP 503`.
+The result is a full check list where jobs report `failure` at ordinary-looking
+steps, which is the shape this file's opening paragraph tells you an outage
+does *not* have.
+
+So the detection heuristic above --- plural, repo-wide, **absent** checks ---
+returns a false negative here, and it does so while reading as a positive
+diagnosis: the checks are all present, so the reader concludes correctly that
+this is not an Actions incident, and then incorrectly that it is therefore a
+per-PR problem.
+
+The discriminator is the **error text inside the failing step**, not the shape
+of the check list.
+A `503` from `api.github.com` names the platform in the one place a per-PR
+cause cannot reach.
+
+### The prescribed instrument may be unreachable from the session
+
+The status-page recipe above is the right first move and it can simply fail.
+An agent session behind an egress proxy may be refused outright:
+
+```console
+$ curl -s https://www.githubstatus.com/api/v2/summary.json
+curl: (56) CONNECT tunnel failed, response 403
+```
+
+That is a property of the session's network, not evidence about GitHub, and
+retrying it is wasted.
+When the status page is unreachable, the failing step's own log is the
+remaining instrument, so read it rather than concluding nothing can be known.
+
+### A session-side API call is not a probe of the runner's API access
+
+The tempting substitute is to call the API from the session --- an MCP read, a
+`pull_request_read` --- and infer the platform's health from whether it
+answers.
+It does not transfer.
+The session and the runner are different clients on different networks with
+different credentials, and a session's MCP reads can succeed continuously
+while every runner's `gh` call returns `503`.
+
+Only the negative direction is sound.
+A session-side failure is evidence of a problem somewhere; a session-side
+success is evidence about the session alone.
+
+### Probing by dispatch is cheap when the outage is total and expensive when it is partial
+
+This refines the existing "**Don't:** retry a workflow dispatch or wait on CI
+during a declared **Actions** outage; the incident's own updates say when jobs
+will run again" bullet, which is right for the incident it names and wrong
+here.
+
+Quoted in full deliberately.
+An earlier draft of this paragraph paraphrased it as "a declared outage",
+dropping the word **Actions** --- in a section whose entire purpose is to
+separate an Actions outage from an API one, so the paraphrase erased the
+distinction it was written to draw and left the original bullet looking as
+though it already covered both.
+
+A review workflow that calls the API in an **early guard step** fails closed
+within seconds, long before any billable model step runs, so a dispatch during
+a **total** API outage costs approximately nothing and is the cheapest
+available probe.
+The expensive case is the **partial** recovery: the guard passes, the review
+runs to completion, and the final post-the-comment step then `503`s --- burning
+a full round and losing the verdict it just produced.
+
+You cannot tell which regime you are in before dispatching, which is the whole
+difficulty.
+What follows is not "never probe" but "probe, and expect the cost to be
+bimodal": re-dispatch freely while the guard is still failing early, and treat
+the first run that clears the guard as the one that might cost a full round.
+
+- **Do:** read the failing step's own log for a `503` naming `api.github.com`
+  before diagnosing a full-but-failing check list per-PR.
+- **Do:** treat a `CONNECT tunnel failed` from the status page as a fact about
+  the session's egress, and fall back to the job log.
+- **Do:** re-dispatch cheaply while the failure is still landing in an early
+  guard step.
+- **Don't:** read absent-versus-present checks as settling whether a platform
+  incident is under way --- an API outage produces present, failing ones.
+- **Don't:** offer a session-side API success as evidence the runners can reach
+  the API.
+- **Don't:** carry a tool-availability finding forward across rounds; per
+  [`challenge-the-assignment`](../shared/workflow/challenge-the-assignment.md)'s
+  "A brief you re-send each round carries a measurement", re-derive it, since a
+  tool that failed during the outage answers normally afterward.
+
+(2026-08-17, `Morrison-Lab/ai-config` PR #1584.
+Every figure below is derived from `list_workflow_runs` on `claude-review.yml`
+filtered to the PR's branch, plus each failing job's own `steps[]`, rather than
+from recollection --- see the correction at the end for why that distinction is
+the case record's main lesson.
+
+| run | dispatched | head | `gather-context` | `claude-review` | failed at |
+| --- | --- | --- | --- | --- | --- |
+| 32048542962 | 17:02:43Z | `e5b948f1` | success | success | --- verdict posted |
+| 32049426027 | 17:14:15Z | `82c434f4` | success | failure | step 20 |
+| 32050823564 | 17:33:00Z | `a35b7d72` | success | failure | step 20 |
+| 32053702550 | 18:11:17Z | `a35b7d72` | **failure** | skipped | guard, step 2 |
+| 32058414399 | 19:05:28Z | `a35b7d72` | success | success | --- verdict posted |
+
+**Three** dispatches lost a verdict, between 17:14Z and 18:12Z.
+Two of them are the expensive regime: step 11, "Run Claude Code Review",
+succeeded --- 3m25s and 3m50s respectively --- and step 20, "Post review
+comment", then failed within a second, so a complete review existed and was
+discarded.
+The third is the cheap regime: `gather-context`'s step 2, the fork/Dependabot
+guard, failed in **one second**, and the whole job in four, well before any
+model step.
+`review / require-review` went red on all three, and on 32050823564 step 24,
+"Re-assign reviewers after Claude finishes", failed too, dropping the pending
+review request.
+
+The outage deepened rather than merely persisting: partial, partial, total,
+then clear.
+Recovery was abrupt --- at 19:05:44Z the guard passed, `claude-review` ran
+3m34s, and the verdict posted at 19:09:14Z for **$5.02**.
+The follow-up review on PR #1595 cost **$4.80**, so a lost step-20 round is
+worth roughly five dollars, not the twelve this session had been assuming.
+
+`https://www.githubstatus.com/` was unreachable from the session throughout ---
+`CONNECT tunnel failed, response 403` --- while the session's own GitHub MCP
+reads answered normally, which is what made a session-side probe look
+informative and left the outage's scope unmeasured for three rounds.
+
+**The correction is the part worth keeping.**
+This record's first draft said five dispatches were lost, that rounds 2 to 4
+failed at step 20, and that the guard "passed for the first time since round 1"
+at recovery.
+A reviewer caught that the last two of those contradict each other --- a run
+cannot reach step 20 without its `gather-context` having passed --- and
+deriving the timeline to repair the contradiction showed the count was wrong as
+well, which no reading of the prose could have revealed.
+The numbers came from a check-in brief this session had written and re-sent
+each round, so they had been restated often enough to feel measured.
+They were not: `get_check_runs` on the PR shows only the runs at its *current*
+head, so the two earlier heads' runs were never in view, and the brief's
+round-numbering was invented to fill the gap.
+`list_workflow_runs` filtered by branch is the query that answers it, and it
+takes one call.)

@@ -16,7 +16,7 @@ notification.
 
 ## When to run
 
-- Immediately after `gh pr create` succeeds, in the same response.
+- After completing all code pushes for the round, when the PR is ready for review (not when first opened and empty).
 - When the user asks you to "request review" on an existing PR.
 
 ## Command

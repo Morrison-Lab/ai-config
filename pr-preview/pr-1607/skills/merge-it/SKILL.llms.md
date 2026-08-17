@@ -62,6 +62,6 @@ Run the `post-merge` skill (invoke it by name) for the rest: tidy the local bran
 - ❌ Letting the squash commit inherit a stale PR description — pass an accurate title/body when the body no longer matches the final diff.
 - ❌ Confusing “merge it” (merge the PR) with “merge main” (sync the branch).
 - ❌ `git branch -D` (force) in the tidy without checking why `-d` refused.
-- ❌ Stopping at a post-merge summary table when the merge completes the session’s work queue without emitting the explicit stopping-point signal (*“This session is at a good stopping point.”*) required by `wrap-up`.
+- ❌ Stopping at a post-merge summary table without emitting an explicit stopping-point statement (stating whether or not a clean stopping point was reached) per `wrap-up`’s closing checklist.
 
 Back to top

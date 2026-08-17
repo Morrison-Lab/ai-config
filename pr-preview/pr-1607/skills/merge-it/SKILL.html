@@ -435,7 +435,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>❌ Letting the squash commit inherit a stale PR description — pass an accurate title/body when the body no longer matches the final diff.</li>
 <li>❌ Confusing “merge it” (merge the PR) with “merge main” (sync the branch).</li>
 <li>❌ <code>git branch -D</code> (force) in the tidy without checking why <code>-d</code> refused.</li>
-<li>❌ Stopping at a post-merge summary table when the merge completes the session’s work queue without emitting the explicit stopping-point signal (<em>“This session is at a good stopping point.”</em>) required by <code>wrap-up</code>.</li>
+<li>❌ Stopping at a post-merge summary table without emitting an explicit stopping-point statement (stating whether or not a clean stopping point was reached) per <code>wrap-up</code>’s closing checklist.</li>
 </ul>
 
 

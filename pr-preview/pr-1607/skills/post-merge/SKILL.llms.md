@@ -338,7 +338,7 @@ Every deferred item has a filed follow-up issue.
 
 Then a linked summary: the merged PR, the auto-closed issue, any deferred follow-up issues, what UMS updated, and a Pacific-time timestamp (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces PT on a machine set to any other zone).
 
-**Session stopping point signal:** When this post-merge wrap-up completes the session’s work (e.g. after merging the final feature PR or its UMS follow-up PR), finish the report with an explicit stopping-point statement (e.g. *“This session is at a good stopping point.”*) per `wrap-up`’s closing checklist, rather than ending on a silent trailing summary table.
+**Session stopping point signal:** When this post-merge wrap-up completes the session’s work **and no PR this session opened or pushed to remains unmerged** (typically after the UMS follow-up PR itself merges — note step 4 normally opens one), finish the report with an explicit stopping-point statement (e.g. *“This session is at a good stopping point.”*) per `wrap-up`’s closing checklist. If a UMS follow-up PR or another task remains open, state explicitly that the session is not at a clean stopping point and name what is open.
 
 ## Relationship to other skills
 

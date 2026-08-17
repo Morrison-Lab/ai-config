@@ -106,7 +106,7 @@ The first bullet of the three above closes with "so this costs nothing in practi
 That claim is about **design cost** --- requiring an explicit target adds no burden the corpus was not already imposing --- and it is correct.
 What it does not say is what the *operator* sees, which is where the real cost lands.
 
-Both guards deny the bare form, with different messages, and the one surfaced is not necessarily the one that names the fix.
+With no session grant in play, both guards deny the bare form, with different messages, and the one surfaced is not necessarily the one that names the fix.
 Measured 2026-08-17, feeding each hook the exact payload for fully-clean PR #1598:
 
 | command | `require-gh-repo-flag.py` | `no-unauthorized-merge.py` |

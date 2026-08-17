@@ -1007,10 +1007,11 @@ See ai-config#694 for the precedent.
   into a fact about the *route* --- `issue_read` `get_comments` on `#1578`
   returned the same 404, which is the reading that stopped the investigation
   going one PR deeper.
-  This is [`fail-fast`](../shared/principles/fail-fast.md)'s negative-control
-  rule with the polarity reversed: there a control establishes that a detector
-  can report a finding, and here it establishes that a failure is not about the
-  subject.
+  This is
+  [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)'s
+  "A negative control must enter at the real input" rule with the polarity
+  reversed: there a control establishes that a detector can report a finding,
+  and here it establishes that a failure is not about the subject.
 
   **The consequence is a routing fact rather than a blocker.**
   `subscribe_pr_activity`'s webhook stream carried the full

@@ -690,13 +690,13 @@ A one-file `NEWS.md` deduplication, reviewed by two agents at the same commit
 | 01:52:23 | Antigravity | `The changes are clean, accurate, and completely satisfy the PR requirements. **LGTM.**` |
 | 01:56:22 | Claude | `**Needs more work** --- one verified factual-accuracy issue` |
 
-The finding Claude raised was real and checkable, not a matter of taste. The
-PR's own `NEWS.md` bullet asserted that a form the removed changelog copy
+The finding Claude raised was real and checkable, not a matter of taste.
+The PR's own `NEWS.md` bullet asserted that a form the removed changelog copy
 documented was "not one the code accepts", and the code accepts it:
 `data-raw/slurm-validation.R:35` rebinds the constant to that method's scalar
 before use, `:51` passes that scalar on, and `R/slurm_seeds_for_chunk.R:9`
-documents the parameter as a scalar. All three lines were verified against
-source before the finding was accepted.
+documents the parameter as a scalar.
+All three lines were verified against source before the finding was accepted.
 
 Two things make the case worth keeping.
 
@@ -707,10 +707,11 @@ That is the same shape recorded at `ucdavis/bcs#622`, where an Antigravity
 review approved a report whose grep had errored, which is why the rule treats
 it as recurring rather than as one bad run.
 
-And nothing on the PR page distinguished the two. Both agents post as
-`github-actions[bot]`, both produced a summary with analysis and a positive
-closing line, and the review-gate check was green throughout. Only reading the
-bodies separates them.
+And nothing on the PR page distinguished the two.
+Both agents post as `github-actions[bot]`, both produced a summary with
+analysis and a positive closing line, and the review-gate check was green
+throughout.
+Only reading the bodies separates them.
 
 The fix landed in `8cf34dce` and Claude's next round at that head returned
 `Ready for merge`, having re-verified both cited source facts itself.)

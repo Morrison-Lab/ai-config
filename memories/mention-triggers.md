@@ -8,10 +8,18 @@ Backticks, a code span, a code fence, a heading, and plainly descriptive
 framing all leave the mention live.
 
 [`claude-bot-workflows.md`](claude-bot-workflows.md) owns that mechanism and
-the incident history: the canonical statement, the five numbered instances
-under "@claude CI action", the `@v1`-versus-`@v2` pin analysis for gha#342's
+the incident history: the canonical statement, the five numbered instances in
+its CI-action section, the `@v1`-versus-`@v2` pin analysis for gha#342's
 markup stripper, and the fact that a fired run cannot be called back.
 Read it for any of those.
+
+Note how that sentence cites the section: by description, not by its verbatim
+title, which carries the mention.
+The one occurrence left in this file is the gate expression above, where the
+literal string is the subject.
+Citing by description is the corpus's own advice, and dogfooding it here costs
+nothing --- a reader who copies a sentence out of this file into a PR comment
+should not thereby dispatch a run.
 
 This file exists for what that history could not fix by being written down
 again.

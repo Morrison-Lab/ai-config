@@ -321,3 +321,109 @@ at the run level while both of their jobs --- `validate` and
 what makes the recovery re-measurable after the fact.
 The check-run-mirrors-job claim was confirmed directly on head `73a4b3b7`,
 where both jobs and both check runs report `success` under the same names.)
+
+## An API outage is not an Actions outage, and it presents as the opposite shape
+
+Everything above describes an **Actions** incident, whose signature the first
+section states outright: checks are **absent** rather than failing, because the
+workflows never start.
+
+A GitHub **API** outage inverts that signature completely.
+Actions is healthy, so runners spin up, jobs start on schedule, and steps
+execute --- and then any step that calls `api.github.com` fails with `HTTP 503`.
+The result is a full check list where jobs report `failure` at ordinary-looking
+steps, which is the shape this file's opening paragraph tells you an outage
+does *not* have.
+
+So the detection heuristic above --- plural, repo-wide, **absent** checks ---
+returns a false negative here, and it does so while reading as a positive
+diagnosis: the checks are all present, so the reader concludes correctly that
+this is not an Actions incident, and then incorrectly that it is therefore a
+per-PR problem.
+
+The discriminator is the **error text inside the failing step**, not the shape
+of the check list.
+A `503` from `api.github.com` names the platform in the one place a per-PR
+cause cannot reach.
+
+### The prescribed instrument may be unreachable from the session
+
+The status-page recipe above is the right first move and it can simply fail.
+An agent session behind an egress proxy may be refused outright:
+
+```console
+$ curl -s https://www.githubstatus.com/api/v2/summary.json
+curl: (56) CONNECT tunnel failed, response 403
+```
+
+That is a property of the session's network, not evidence about GitHub, and
+retrying it is wasted.
+When the status page is unreachable, the failing step's own log is the
+remaining instrument, so read it rather than concluding nothing can be known.
+
+### A session-side API call is not a probe of the runner's API access
+
+The tempting substitute is to call the API from the session --- an MCP read, a
+`pull_request_read` --- and infer the platform's health from whether it
+answers.
+It does not transfer.
+The session and the runner are different clients on different networks with
+different credentials, and a session's MCP reads can succeed continuously
+while every runner's `gh` call returns `503`.
+
+Only the negative direction is sound.
+A session-side failure is evidence of a problem somewhere; a session-side
+success is evidence about the session alone.
+
+### Probing by dispatch is cheap when the outage is total and expensive when it is partial
+
+This refines the existing "do not retry a workflow dispatch during a declared
+outage" bullet, which is right for an Actions incident and wrong here.
+
+A review workflow that calls the API in an **early guard step** fails closed
+within seconds, long before any billable model step runs, so a dispatch during
+a **total** API outage costs approximately nothing and is the cheapest
+available probe.
+The expensive case is the **partial** recovery: the guard passes, the review
+runs to completion, and the final post-the-comment step then `503`s --- burning
+a full round and losing the verdict it just produced.
+
+You cannot tell which regime you are in before dispatching, which is the whole
+difficulty.
+What follows is not "never probe" but "probe, and expect the cost to be
+bimodal": re-dispatch freely while the guard is still failing early, and treat
+the first run that clears the guard as the one that might cost a full round.
+
+- **Do:** read the failing step's own log for a `503` naming `api.github.com`
+  before diagnosing a full-but-failing check list per-PR.
+- **Do:** treat a `CONNECT tunnel failed` from the status page as a fact about
+  the session's egress, and fall back to the job log.
+- **Do:** re-dispatch cheaply while the failure is still landing in an early
+  guard step.
+- **Don't:** read absent-versus-present checks as settling whether a platform
+  incident is under way --- an API outage produces present, failing ones.
+- **Don't:** offer a session-side API success as evidence the runners can reach
+  the API.
+- **Don't:** carry a tool-availability finding forward across rounds; per
+  [`challenge-the-assignment`](../shared/workflow/challenge-the-assignment.md)'s
+  "A brief you re-send each round carries a measurement", re-derive it, since a
+  tool that failed during the outage answers normally afterward.
+
+(2026-08-17, `Morrison-Lab/ai-config` PR #1584.
+Five consecutive `claude-review` dispatches lost their verdict between roughly
+17:37Z and 18:12Z.
+Rounds 2 to 4 reached step 20, "Post review comment", and `503`d there after
+the review had already been produced; rounds 5 and 6 failed earlier, in
+`gather-context`, whose fork guard calls `gh pr view` first and so failed
+closed in four seconds.
+`https://www.githubstatus.com/` was unreachable from the session for the whole
+period --- `CONNECT tunnel failed, response 403` --- while the session's own
+GitHub MCP reads answered normally throughout, which is what made the
+session-side probe look informative and was the reason the outage's scope went
+unmeasured for several rounds.
+Recovery was abrupt: at 19:05:44Z `gather-context` passed for the first time
+since round 1, `claude-review` ran 3m34s, and the verdict posted at 19:09:14Z
+for $5.02, against roughly $12 assumed per lost round.
+`get_reviews`, recorded mid-outage as returning 404 in this session and carried
+forward in four successive check-in briefs as an environment property, returned
+`[]` normally once the outage cleared.)

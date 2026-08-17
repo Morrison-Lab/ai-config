@@ -102,7 +102,7 @@ command cannot see.
 
 ### A bare `gh pr merge <N>` refuses, and the refusal may diagnose the wrong thing
 
-The first bullet of the three above closes with "so this costs nothing in practice".
+The uncovered case named above as "a merge with no repo named in the command" closes with "so this costs nothing in practice".
 That claim is about **design cost** --- requiring an explicit target adds no burden the corpus was not already imposing --- and it is correct.
 What it does not say is what the *operator* sees, which is where the real cost lands.
 

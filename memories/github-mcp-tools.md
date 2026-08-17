@@ -1056,8 +1056,8 @@ See ai-config#694 for the precedent.
 
 - **`pull_request_read` `get_files` is a fourth REST-backed route that 404s,
   and local git is the working fallback rather than another API call.**
-  The table above lists `get_comments`, `get_reviews`, and `issue_read`
-  `get_comments`.
+  The REST-versus-GraphQL table above lists `get_comments`, `get_reviews`, and
+  `issue_read` `get_comments`.
   `get_files` behaves identically: 404 for all four PRs tried (#1566, #1576,
   #1580, #1581) in the same container where the GraphQL-backed reads succeeded
   minutes earlier.
@@ -1118,8 +1118,8 @@ See ai-config#694 for the precedent.
   - **Don't:** lower `per_page` in the hope of fitting the response; three was
     already 111,922 characters.
 
-- **The `tail_lines` window is narrower than the bullet above implies, and it
-  excludes the tool's own default.**
+- **The `tail_lines` window is narrower than the defaults-to-500 bullet above
+  implies, and it excludes that default itself.**
   Measured against two `claude-review` jobs: `120` returns workflow plumbing
   only, while `300` returns 54,182 characters, `600` returns 77,823, and
   `3000` returns 171,956 --- each of the last three rejected by the response

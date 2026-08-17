@@ -301,7 +301,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unauthorized-merge.py\"",
             "timeout": 10,
             "script": "no-unauthorized-merge.py",
-            "why": "cai 2026-08-04 'I want a mechanistic prohibition, not just a guideline' -- mechanistically blocks unauthorized GitHub MCP PR merge operations (mcp__github__merge_pull_request, mcp__github__enable_pr_auto_merge, etc.) at the PreToolUse boundary unless explicit permission is present."
+            "why": "cai 2026-08-04 'I want a mechanistic prohibition, not just a guideline' -- mechanistically blocks unauthorized GitHub MCP PR merge operations (mcp__github__merge_pull_request and defensive auto-merge tool variants) at the PreToolUse boundary unless explicit permission is present."
           }
         ]
       }

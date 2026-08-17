@@ -66,8 +66,11 @@ from pathlib import Path
 # Same link-graph vocabulary as scripts/check-links.py, so the two agree on
 # what counts as a relative link.
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
 INLINE = re.compile(r"`[^`]*`")
+
+# A fenced-code opener: up to three spaces of indent, then a run of three or
+# more backticks or tildes, then an optional info string.
+FENCE_LINE = re.compile(r"^ {0,3}(?P<run>`{3,}|~{3,})(?P<info>.*)$")
 
 # A Claude Code auto-load import: `@` in the first column, then a path.  These
 # are how CLAUDE.md pulls in shared/ fragments, and they are invisible to LINK.
@@ -123,9 +126,48 @@ def _clean_target(target: str) -> str | None:
     return path_part
 
 
+def strip_fences(text: str) -> str:
+    """Blank out fenced code blocks, scanning line by line.
+
+    A whole-document regex like ```` ```.*?``` ```` cannot do this: it pairs
+    backtick runs across the file, so a four-backtick fence wrapping an inner
+    three-backtick block (CLAUDE.md's Quarto div example) throws every later
+    region out of phase and swallows real content.  CommonMark's own rule is
+    positional -- an opener is up to three spaces of indent then three or more
+    backticks or tildes, and its closer is the same character, at least as
+    long, with no info string -- so scan for it that way.
+    """
+    out: list[str] = []
+    fence_char: str | None = None
+    fence_len = 0
+    for line in text.split("\n"):
+        match = FENCE_LINE.match(line)
+        if fence_char is None:
+            # An opener's info string may not contain a backtick fence's own
+            # delimiter, so ``` ```a`b ``` is ordinary text rather than a fence.
+            if match and not (match["run"][0] == "`" and "`" in match["info"]):
+                fence_char = match["run"][0]
+                fence_len = len(match["run"])
+                out.append("")
+                continue
+            out.append(line)
+            continue
+        closes = (
+            match is not None
+            and match["run"][0] == fence_char
+            and len(match["run"]) >= fence_len
+            and not match["info"].strip()
+        )
+        out.append("")
+        if closes:
+            fence_char = None
+            fence_len = 0
+    return "\n".join(out)
+
+
 def link_targets(text: str) -> list[str]:
     """Relative markdown-link targets in `text`, ignoring code."""
-    stripped = INLINE.sub("", FENCE.sub("", text))
+    stripped = INLINE.sub("", strip_fences(text))
     targets = []
     for target in LINK.findall(stripped):
         cleaned = _clean_target(target)
@@ -141,7 +183,7 @@ def import_targets(text: str) -> list[str]:
     ones, since the harness loads the target into context unconditionally
     rather than leaving a reader to follow it.
     """
-    stripped = INLINE.sub("", FENCE.sub("", text))
+    stripped = INLINE.sub("", strip_fences(text))
     targets = []
     for target in AUTOLOAD.findall(stripped):
         cleaned = _clean_target(target)

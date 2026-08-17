@@ -209,6 +209,40 @@ check(
     csr.reference_targets("[x](a.md)\n@b.md\n") == ["a.md", "b.md"],
 )
 
+# A four-backtick fence legally wraps an inner three-backtick block, which is
+# exactly what CLAUDE.md's Quarto div-syntax example does.  A whole-document
+# ```` ```.*?``` ```` regex pairs backtick runs across the file rather than
+# tracking open/close positionally, so it consumes the outer fence's opener
+# together with the inner one, leaves the outer closer to pair with the next
+# real fence, and swallows every reference in between.  Both call sites are
+# asserted because each strips fences separately.
+NESTED_FENCE = (
+    "# Doc\n\n"
+    "````\n"
+    "```{r}\n"
+    "````\n\n"
+    "@shared/real.md\n\n"
+    "[a link](shared/other.md)\n\n"
+    "```bash\n"
+    "echo hi\n"
+    "```\n"
+)
+check(
+    "an import after a four-backtick fence survives",
+    csr.import_targets(NESTED_FENCE) == ["shared/real.md"],
+)
+check(
+    "a link after a four-backtick fence survives",
+    csr.link_targets(NESTED_FENCE) == ["shared/other.md"],
+)
+check(
+    # Non-discriminating against the pre-fix whole-document regex, measured:
+    # its `~~~.*?~~~` alternative already paired these two tildes.  Kept as a
+    # property test of the positional matcher's same-character rule.
+    "a tilde fence is not closed by a backtick run",
+    csr.link_targets("~~~\n[x](a.md)\n```\n~~~\n[y](b.md)\n") == ["b.md"],
+)
+
 # --- generated files are exempt from the orphan bucket, and reported -------
 
 GENERATED = "This is a generated Codex wrapper around the canonical skill.\n"

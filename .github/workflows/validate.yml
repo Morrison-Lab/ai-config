@@ -188,6 +188,28 @@ jobs:
         # unrelated PR. See the script's docstring for the threshold's
         # rationale.
         run: python3 scripts/check-memory-file-size.py
+      - name: Run stale-record check tests
+        run: python3 scripts/test_check_stale_records.py
+      - name: Check for stale and orphaned records (advisory)
+        # ai-config#1544. Non-blocking, and for two separate reasons.
+        #
+        # The ORPHAN bucket is a reading prompt rather than a defect: a
+        # markdown file with no inbound link or import is usually a session
+        # notebook or a handoff doc whose content has been folded elsewhere,
+        # and deciding that is a judgment call. Gating on it would fire on
+        # every PR that adds a genuinely new top-level document.
+        #
+        # The AGE bucket cannot gate here at all, and the script says so in
+        # its own output rather than reporting a silent zero. Ages come from
+        # `git log`, and `actions/checkout` above clones at depth 1, so every
+        # file reads as no older than the shallowest fetched commit -- the
+        # bucket is a fact about the clone rather than about the corpus. It
+        # is emitted as `age_informative: false` in --json.
+        #
+        # The value here is the same as the context-closure step's: the
+        # NUMBERS in the log on each run, and specifically the orphan list,
+        # which is a link-graph fact the shallow clone does not affect.
+        run: python3 scripts/check-stale-records.py
       - name: Check Quarto (.qmd) prose style
         uses: Morrison-Lab/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
 

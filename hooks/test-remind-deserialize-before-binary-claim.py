@@ -284,7 +284,7 @@ def run(records):
             [sys.executable, HOOK],
             input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True,
-            env=dict(os.environ, TMPDIR=tmp),
+            env=dict(os.environ, TMPDIR=tmp, TEMP=tmp, TMP=tmp),
         )
         return proc
     finally:
@@ -317,7 +317,7 @@ try:
     with open(same, "w") as fh:
         for r in (NAME_ONLY, INCIDENT):
             fh.write(json.dumps(r) + "\n")
-    env = dict(os.environ, TMPDIR=shared)
+    env = dict(os.environ, TMPDIR=shared, TEMP=shared, TMP=shared)
     payload = json.dumps({"transcript_path": same})
     out = [
         subprocess.run([sys.executable, HOOK], input=payload, capture_output=True,
@@ -353,6 +353,7 @@ if not os.path.isfile(SIBLING):
     )
 
 boundary = tempfile.mkdtemp()
+sibling_tmp = tempfile.mkdtemp()
 try:
     tp = os.path.join(boundary, "t.jsonl")
     with open(tp, "w") as fh:
@@ -361,11 +362,11 @@ try:
     payload = json.dumps({"transcript_path": tp})
     mine = subprocess.run(
         [sys.executable, HOOK], input=payload, capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=boundary),
+        env=dict(os.environ, TMPDIR=boundary, TEMP=boundary, TMP=boundary),
     )
     theirs = subprocess.run(
         [sys.executable, SIBLING], input=payload, capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+        env=dict(os.environ, TMPDIR=sibling_tmp, TEMP=sibling_tmp, TMP=sibling_tmp),
     )
     results.append(("REMIND" if mine.stdout.strip() else "silent", "silent",
                     "BOUNDARY: this guard is silent on a working-tree "
@@ -375,6 +376,7 @@ try:
                     "transcript, so the case is delegated, not dropped"))
 finally:
     shutil.rmtree(boundary, ignore_errors=True)
+    shutil.rmtree(sibling_tmp, ignore_errors=True)
 
 # A malformed transcript must fail open and silent, not crash.
 bad = tempfile.mkdtemp()
@@ -384,7 +386,7 @@ try:
         fh.write("{not json at all\n")
     proc = subprocess.run(
         [sys.executable, HOOK], input=json.dumps({"transcript_path": p}),
-        capture_output=True, text=True, env=dict(os.environ, TMPDIR=bad),
+        capture_output=True, text=True, env=dict(os.environ, TMPDIR=bad, TEMP=bad, TMP=bad),
     )
     results.append(("REMIND" if proc.stdout.strip() else "silent", "silent",
                     "malformed transcript fails open and silent"))

@@ -241,6 +241,26 @@ The refspec form is safe by construction, refusing a non-fast-forward rather tha
 
 (`ucdavis/bcs#536`, 2026-08-02: `git checkout main` aborted on a modified `renv.lock`, which looked like the diverged case. Local `main` was 54 behind and 0 ahead, and the file was byte-identical between HEAD and `origin/main` — it differed only from the 54-commit-stale `main`. `git fetch origin main:main` fast-forwarded the ref and the switch then succeeded with the local edit intact; skipping the pull as the bullet below prescribes would have left `main` 54 commits behind.)
 
+**Before `-D`, compare the LOCAL branch against the MERGED head — step 1 confirmed the PR merged, which is not the same claim.** The `-D` guidance below rests on step 1: the PR is merged, so forcing is safe. That reasoning covers the commit the PR *merged*, and `-D` deletes whatever the **local ref** points at, which can be a different commit.
+
+The gap opens without anyone doing anything unusual. A `main`-merge pushed to the branch after the PR merged, a bot commit, or your own unpushed work all leave the local ref ahead of the merged head, and the `-d` refusal a squash repo produces is identical either way — so the refusal carries no information about which case you are in, and the natural next step is the `-D` the text below authorizes.
+
+One comparison settles it, and it costs nothing:
+
+``` bash
+merged=$(gh pr view <N> --json headRefOid --jq .headRefOid)   # VIEW_PR
+git log --oneline "$merged".."<branch>"    # empty => the ref is the merged head
+```
+
+A non-empty list is not automatically a problem — a merge commit whose every input is already on `main` is safe to discard — but it is a question, and it has to be answered before the delete rather than after. Read the subjects: anything authored, rather than a merge or a revert of already-landed work, means the branch carries something the PR did not.
+
+- **Do:** compare the local ref against the PR’s merged head before `-D`, and read the extra commits’ subjects when they differ.
+- **Do:** name the branch’s SHA in the report when it differed from the merged head, so the discrepancy is visible rather than absorbed.
+- **Don’t:** read step 1’s merge confirmation as covering the local ref — it is a claim about the PR’s head, and `-D` acts on yours.
+- **Don’t:** infer from a `-d` refusal which case you are in; a squash repo refuses for every branch regardless.
+
+(`Morrison-Lab/ai-config#1566`, 2026-08-17: the PR merged at head `0a297637`, and the local branch stood at `ad3b7640`, which `git branch -D` duly printed while deleting it. `git log 0a297637..ad3b7640` lists nine commits — a `main` merge plus eight commits from `main`, including the four merge commits for this session’s own PRs. Nothing authored, so nothing was lost; the point is that the check ran afterwards, prompted by reading the delete output, rather than before.)
+
 **Diverged main checkout (`ahead` and `behind` both non-zero):** `git pull --ff-only` fails when the main checkout has local commits from a concurrent session that hasn’t been pushed. Don’t force-merge or reset their work — skip the pull and delete the branch only. The branch deletion is what matters; another session will pull main when it’s ready. If `git branch -d` refuses because local `main` doesn’t yet include the merge (diverged HEAD, remote branch already deleted), use `git branch -D` — step 1 already confirmed the PR is merged, so the force-delete is safe here.
 
 For a repo-wide sweep of *all* dead worktrees (not just this PR’s), run `clean-worktrees` (`cw`).
@@ -320,6 +340,7 @@ Then a linked summary: the merged PR, the auto-closed issue, any deferred follow
 
 - ❌ Deleting the branch before confirming the merge actually landed.
 - ❌ Reaching for `git branch -D` (force) without checking why `-d` refused.
+- ❌ Running `-D` without comparing the local ref against the PR’s merged head — step 1 confirms the PR merged, and `-D` deletes whatever your local branch points at, which can be a different commit.
 - ❌ Force-pulling or resetting a diverged main checkout — the divergence may be another session’s in-progress work. Skip the pull; don’t clobber it.
 - ❌ Skipping UMS on a normal PR — the just-merged PR is exactly when the lessons are freshest.
 - ❌ Recursing UMS on a UMS PR — running UMS again when the just-merged PR was itself the learnings PR, restating lessons it already banked (see step 4’s guard). The chain has to terminate somewhere.

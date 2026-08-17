@@ -75,6 +75,10 @@ See ai-config#694 for the precedent.
   The mitigation is unchanged and cheap: spell a placeholder in caps
   (`BRANCH`, `GHA-CHECKOUT`, `BASE`) in any body, where nothing can read it as
   a tag.
+  A shell variable is the better form when the body is showing a command a
+  reader will run: `$PR` survived a `create_pull_request` body intact on
+  2026-08-17, and unlike a caps placeholder it leaves the command executable
+  once the variable is set, rather than leaving a token to hand-substitute.
   Files in the diff were unaffected, as above --- the angle-bracket form
   inside a fenced code block is correct there and should stay.
   **`update_pull_request` strips a short placeholder token too, which extends
@@ -1054,9 +1058,12 @@ See ai-config#694 for the precedent.
   and local git is the working fallback rather than another API call.**
   The table above lists `get_comments`, `get_reviews`, and `issue_read`
   `get_comments`.
-  `get_files` behaves identically: 404 for all five PRs tried (#1547, #1566,
-  #1576, #1580, #1581) in the same container where the GraphQL-backed reads
-  succeeded minutes earlier.
+  `get_files` behaves identically: 404 for all four PRs tried (#1566, #1576,
+  #1580, #1581) in the same container where the GraphQL-backed reads succeeded
+  minutes earlier.
+  Keep a number out of that list unless it is a PR --- `get_files` against an
+  issue number 404s whatever the route does, so it cannot witness a route
+  defect.
 
   That matters most for the merge-order check `CLAUDE.md` requires before
   asserting two PRs are disjoint, since deriving a PR's file set is exactly
@@ -1097,19 +1104,6 @@ See ai-config#694 for the precedent.
   - **Don't:** retry a 404 or a 403 --- one is a broken route and the other is
     a policy denial.
 
-- **Angle-bracket stripping reaches inside fenced code blocks, not only inline
-  code spans.**
-  A `$PR`-style shell variable survives a `create_pull_request` body intact; a
-  placeholder written as a bare letter wrapped in angle brackets does not,
-  even inside triple backticks.
-  Recorded because it hit #1581's own body twice --- once in the sweep command
-  above, and again in the bullet documenting that first instance, which lost
-  the bracketed placeholder it was quoting and left an empty code span behind.
-
-  - **Do:** write a shell variable, or name the placeholder in words, when a
-    body has to show a command with a substitutable argument.
-  - **Don't:** assume a fenced block protects angle brackets; it does not.
-
 - **Two shapes to expect when reading workflow runs through the MCP tools.**
   `actions_list` `list_workflow_runs` exceeds the response token limit even at
   `per_page: 3` --- measured at 111,922 characters --- and spills to a scratch
@@ -1124,12 +1118,23 @@ See ai-config#694 for the precedent.
   - **Don't:** lower `per_page` in the hope of fitting the response; three was
     already 111,922 characters.
 
-- **The `tail_lines` window is narrower than the bullet above implies: 600 also
-  overflows.**
-  Measured against one `claude-review` job whose log is 1630 lines: `120`
-  returns workflow plumbing only, `600` returns 77,823 characters and is
-  rejected by the response token limit, and `3000` returns 171,956 and is
-  rejected likewise.
-  So the usable band sits between the default 500 and 600 for a log of that
-  size, which is too narrow to aim at reliably --- read a verdict from the
-  webhook or a review comment instead of from the log.
+- **The `tail_lines` window is narrower than the bullet above implies, and it
+  excludes the tool's own default.**
+  Measured against two `claude-review` jobs: `120` returns workflow plumbing
+  only, while `300` returns 54,182 characters, `600` returns 77,823, and
+  `3000` returns 171,956 --- each of the last three rejected by the response
+  token limit.
+
+  So the usable band sits somewhere between 120 and 300 for a log of that
+  size, which puts the default of 500 outside it.
+  That last step is a deduction rather than a measurement, and a safe one:
+  `tail_lines` returns the last N lines, so a larger N yields a superset and
+  cannot come back smaller than 300's 54,182 characters.
+  A band that narrow is not worth aiming at either, since its upper edge moves
+  with a log length you do not know before fetching.
+
+  - **Do:** read a verdict from the webhook stream or a posted review comment,
+    and keep `get_job_logs` for one step's error text once you know which step
+    failed.
+  - **Don't:** tune `tail_lines` toward the default hoping the response will
+    fit --- 300 already overflows, so 500 cannot.

@@ -3,8 +3,8 @@
 
 Prohibits commands or MCP tool calls attempting to merge PRs/MRs (e.g. `gh pr merge`,
 `glab mr merge`, `gh api .../merge`, `glab api .../merge`, GraphQL `mergePullRequest` /
-`enablePullRequestAutoMerge`, or GitHub MCP `mcp__github__merge_pull_request` /
-`mcp__github__enable_pr_auto_merge` / `mcp__github__enable_pull_request_auto_merge`)
+`enablePullRequestAutoMerge`, or GitHub MCP `mcp__github__merge_pull_request` and
+defensive auto-merge tool variants)
 unless explicit authorization is present via ALLOW_MERGE=1, --allow-merge, active /mwc,
 or standing per-repository grant.
 

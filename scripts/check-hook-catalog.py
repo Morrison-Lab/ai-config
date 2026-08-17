@@ -79,7 +79,7 @@ SECTION_HEADING = "## Enforcement hooks"
 # | `name.py` | `Event` (Matcher) | prose |   -- matcher is optional.
 ROW = re.compile(
     r"^\|\s*`(?P<script>[A-Za-z0-9._-]+\.(?:py|sh))`\s*"
-    r"\|\s*`(?P<event>[A-Za-z]+)`\s*(?:\((?P<matcher>[A-Za-z0-9_*, -]+)\))?\s*"
+    r"\|\s*`(?P<event>[A-Za-z]+)`\s*(?:\((?P<matcher>[A-Za-z0-9_.*, -]+)\))?\s*"
     r"\|(?P<rest>.*)\|\s*$"
 )
 

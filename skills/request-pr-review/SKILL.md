@@ -16,7 +16,7 @@ notification.
 
 ## When to run
 
-- After completing all code pushes for the round, when the PR is ready for review (not when first opened and empty).
+- After completing code pushes for the round AND after the AI review produces a clean/approved verdict (or upon a review deadlock), per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
 - When the user asks you to "request review" on an existing PR.
 
 ## Command

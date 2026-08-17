@@ -186,3 +186,10 @@ The user ran `/reload-plugins`.
 No user correction was given --- the finding is inferred from the incident.
 Verified against the scripts rather than recalled: the docstrings quoted above, `classify()`'s existence test, and the note's placement inside the non-`--fix` branch.)
 
+## Hook matchers use JavaScript regular expressions, NOT shell globs
+
+Hook matchers in `hooks/hooks.json` containing characters outside `[A-Za-z0-9_\- ,|]` are evaluated as JavaScript regexes (`RegExp.prototype.test()`).
+
+- **Correct syntax:** Use `"mcp__github__.*"` (JavaScript regex syntax) to match all tools from the `mcp__github__` MCP server prefix.
+- **Incorrect syntax:** Do not use `"mcp__github__*"` (shell glob syntax), which evaluates as regex matching `mcp__github` followed by 0 or more `_` characters.
+- **Catalog validator:** `scripts/check-hook-catalog.py` parses compound matcher entries (e.g. `PreToolUse (Bash, mcp__github__.*)`) using `ROW` regex matcher class `[A-Za-z0-9_.*, -]` and aggregates multiple matcher groups for the same script and event.

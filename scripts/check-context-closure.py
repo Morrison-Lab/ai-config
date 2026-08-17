@@ -91,6 +91,7 @@ number (ai-config#897, #1258).
 from __future__ import annotations
 
 import argparse
+import os
 import posixpath
 import re
 import subprocess
@@ -500,7 +501,7 @@ def baseline_reader(base: Path, rev: str):
     from_disk = local_reader(base)
 
     def read(path: str) -> bytes | None:
-        return from_disk(path) if path.startswith(("/", "~")) else from_git(path)
+        return from_disk(path) if (path.startswith(("/", "~")) or os.path.isabs(path)) else from_git(path)
 
     return read
 

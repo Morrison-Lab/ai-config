@@ -737,9 +737,9 @@ Run directly, the checker reported:
 | #1566 | `Latest verdict-bearing review statement ... is NOT clean` |
 | #1575 | `No automated review comments or reviews found` |
 
-#1566 is the one that settles it as a defect rather than noise: a **blocking**
+The case that settles it as a defect rather than noise is #1566: a **blocking**
 finding, reported to a human as clean.
-#1575 had **zero** verdict comments and was reported clean, which is the
+And #1575 had **zero** verdict comments and was reported clean, which is the
 `else`-branch failure at its plainest --- nothing to match, so the match
 failed, so the branch fired.
 
@@ -840,7 +840,7 @@ memory note read "hard-codes `Morrison-Lab/ai-config`, ignores `-R`", which
 `1c052457` ("resolve the repo instead of hardcoding it", #1462) had already
 retired.
 The script's own docstring says `-R` works.
-So this is [`fail-fast`](../principles/fail-fast.md)'s "a sound checker pointed
-at the wrong subject": a correct instrument returning a truthful answer about a
+So this is [`fail-fast`](../principles/fail-fast.md)'s "A sound checker pointed
+at the wrong repository": a correct instrument returning a truthful answer about a
 repository nobody asked about, with the subject never printed alongside the
 verdict.)

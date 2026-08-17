@@ -325,9 +325,12 @@ network blip in a polling loop, all report a PR as having gone not-clean.
 That is the mirror of the grep bug above, which failed toward clean; this one
 fails toward alarm, and both are a two-branch reading of a three-branch answer.
 
-This is [`fail-fast`](../principles/fail-fast.md)'s "0, 1, and anything else
-are three answers and not two", which applies to a purpose-built checker
-exactly as it does to `grep`.
+This is the rule
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md) states as 0, 1,
+and anything else being three answers and not two --- itself a paraphrase of
+[`fail-fast`](../principles/fail-fast.md)'s hand-check guidance to treat 0 as
+found, 1 as clean, and anything else as the check having failed to run.
+It applies to a purpose-built checker exactly as it does to `grep`.
 
 **But `2` does not cover every non-verdict, so the three-way read is necessary
 and still not sufficient.**
@@ -354,10 +357,16 @@ that checkout.
 So read the status, and read all three of it:
 
 ```bash
-python3 scripts/check-pr-fully-clean.py "$n" >/tmp/fc.txt 2>&1; rc=$?
+python3 scripts/check-pr-fully-clean.py "$n" -R "$OWNER/$REPO" >/tmp/fc.txt 2>&1
+rc=$?
 case $rc in
   0) echo "#$n CLEAN" ;;
-  1) echo "#$n NOT clean"; cat /tmp/fc.txt ;;
+  1) if grep -q '^  - ' /tmp/fc.txt; then
+       echo "#$n NOT clean"; cat /tmp/fc.txt
+     else
+       echo "#$n CHECK CRASHED (rc=1, no finding bullets) -- not a verdict"
+       tail -3 /tmp/fc.txt
+     fi ;;
   *) echo "#$n CHECK FAILED (rc=$rc) -- not a verdict"; cat /tmp/fc.txt ;;
 esac
 ```

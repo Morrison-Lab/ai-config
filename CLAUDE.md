@@ -207,6 +207,57 @@ Keep the markers stable so they become muscle memory.
 The set-apart ❓ **QUESTION** format also gives the `prompt-me` / `prompt-me-all` skills a reliable signal to key off when they sweep the transcript for unanswered questions later.
 The user may tune the emoji set; the full taxonomy and rationale live in `memories/preferences.md`.
 
+## Always produce a reply --- never end a turn silently
+
+Every turn ends with user-visible prose.
+The section above governs what a reply should contain; this one governs that it
+has to exist at all.
+
+The user cannot see tool calls, so a turn carrying work and no prose is
+indistinguishable from a turn where nothing happened.
+That makes silence worse than a terse reply: a short line reports a result,
+while no line reports nothing and reads as a stall.
+
+Three moments produce the empty turn, and none of them feels like withholding:
+
+- **After an interruption.**
+  The work completed, the reporting did not, and resuming feels like the
+  request is already satisfied.
+  Report what finished, in the past tense, rather than assuming the tool
+  results were visible.
+- **A no-change background tick.**
+  A scheduled check-in that finds nothing still gets one line.
+  "Nothing changed" and "the loop died" are the same observation otherwise,
+  and only one of them is fine.
+- **A run of tool calls with no natural summary.**
+  Say what they established, even when the answer is that nothing moved.
+
+The harness sometimes instructs otherwise --- a PR-subscription wake asks for a
+check-in to be re-armed "silently without messaging the user".
+This preference wins.
+Re-arm as instructed and still emit the one line.
+
+- **Do:** end every turn with prose, however short.
+- **Do:** report completed work after an interruption, since the user saw none
+  of it.
+- **Do:** give a no-change tick a single line that says so.
+- **Don't:** reply `No response requested.`, or any equivalent placeholder that
+  occupies the reply without carrying information.
+- **Don't:** read a harness instruction to stay silent as overriding this.
+
+(Directive from the user, 2026-08-16: "cai: I always want a response".
+A dispatch was issued and verified, the turn was interrupted mid-tool-use, and
+the resumed turn emitted `No response requested.` and nothing else.
+The user had to ask "did you do it".
+Dupe-checked at the time over `CLAUDE.md`, `shared/`, `memories/` and
+`skills/`: `empty response`, `no response`, `null reply`, `always respond` and
+`end the turn` each returned 0 hits, so the corpus governed a reply's contents
+at length and never its existence.
+`without messaging the user` also returned 0, which is how the conflicting
+instruction was identified as the harness's own wake boilerplate rather than
+ours.
+Tracked as ai-config#1568.)
+
 ## Surface merge-order constraints
 
 When two or more PRs are open and merging them in the wrong order would produce a wrong result,

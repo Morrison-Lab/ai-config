@@ -20,6 +20,9 @@ import tempfile
 
 HOOK = sys.argv[1]
 
+# Payloads a fire produced that the harness would discard; see run().
+SHAPE_ERRORS = []
+
 DATE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "TZ=America/Los_Angeles date \"+%Y-%m-%d %H:%M %Z\""}}]}}
@@ -118,11 +121,61 @@ def run(events):
         capture_output=True, text=True,
     ).stdout.strip()
     os.remove(path)
-    return bool(out)
+    if not out:
+        return False
+    # `bool(out)` alone would score any output as a fire, including output the
+    # harness discards. A `Stop` hook's `reason` is read only alongside
+    # `"decision": "block"`, so a warn-only hook emitting `reason` by itself is
+    # a silent no-op -- valid JSON that reaches nobody. Requiring the field
+    # that actually surfaces is what makes a "fires" result mean the warning
+    # was delivered. (ai-config#1566 review round 1: the hook shipped with
+    # `reason` and these tests passed anyway, because they only asked whether
+    # anything was printed.)
+    payload = json.loads(out)
+    surfaced = payload.get("systemMessage") or (
+        payload.get("decision") == "block" and payload.get("reason"))
+    if not surfaced:
+        # Recorded rather than raised: an assert here aborts the matrix at the
+        # first fire case and masks every case after it, which is the
+        # early-abort failure the corpus warns about. The run still fails --
+        # main() reports SHAPE_ERRORS -- and the remaining cases still report.
+        SHAPE_ERRORS.append(sorted(payload))
+    return True
+
+
+def check_output_shape():
+    """The finding from review round 1, as its own explicit case.
+
+    Kept separate from CASES because it asserts the *shape* of the payload
+    rather than whether the guard fired, and because a reader scanning the
+    matrix should see it named.
+    """
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in (DATE, say("earlier"), say("UPDATE -- 19:24 PDT")):
+            fh.write(json.dumps(e) + "\n")
+    for f in os.listdir(tempfile.gettempdir()):
+        if f.startswith(".claude-clock-claim-"):
+            try:
+                os.remove(os.path.join(tempfile.gettempdir(), f))
+            except OSError:
+                pass
+    out = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": path}),
+        capture_output=True, text=True,
+    ).stdout.strip()
+    os.remove(path)
+    payload = json.loads(out) if out else {}
+    ok = bool(payload.get("systemMessage"))
+    print(f"{'ok  ' if ok else 'FAIL'}  "
+          f"payload keys={sorted(payload)}  "
+          "the warning is emitted in a field the harness surfaces")
+    return 0 if ok else 1
 
 
 def main():
-    failures = 0
+    failures = check_output_shape()
     for events, want, label in CASES:
         got = run(events)
         ok = got == want
@@ -130,6 +183,10 @@ def main():
             failures += 1
         print(f"{'ok  ' if ok else 'FAIL'}  fire={got!s:5} want={want!s:5}  {label}")
     print(f"\n{len(CASES) - failures}/{len(CASES)} passed")
+    if SHAPE_ERRORS:
+        print(f"FAIL  {len(SHAPE_ERRORS)} fire(s) emitted a payload the harness "
+              f"would discard: {SHAPE_ERRORS[0]}")
+        failures += 1
     return 1 if failures else 0
 
 

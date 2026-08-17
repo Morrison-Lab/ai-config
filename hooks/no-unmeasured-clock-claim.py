@@ -155,8 +155,15 @@ def main() -> int:
     except Exception:
         pass
 
+    # `systemMessage`, not `reason`. A `Stop` hook's `reason` is read only
+    # alongside `"decision": "block"`, so a warn-only hook emitting `reason`
+    # alone prints valid JSON that reaches nobody -- a detector that fires
+    # silently, which is indistinguishable from one that never fires at all.
+    # Every warn-only hook in this repo emits `systemMessage` for exactly that
+    # reason; see `flag-unassigned-worktree.py` and
+    # `flag-unchained-branch-switch.py`.
     print(json.dumps({
-        "reason": (
+        "systemMessage": (
             f"Your message states a Pacific clock time -- "
             f"\"{hit.group(0).strip()}\" -- and no clock read appears in this "
             "transcript since your previous message.\n\n"

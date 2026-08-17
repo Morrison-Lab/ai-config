@@ -802,4 +802,45 @@ And the second bug was introduced **by the fix for the first**, in the same
 session, by someone who had just written the entry above.
 That is what argues the remedy has to name all three codes rather than
 contrast "status" with "prose": the contrast is what made a two-branch reading
-feel like compliance.)
+feel like compliance.
+
+**Correction, measured after the above was written: the `rc != 0` reading was
+not the whole of it, and the transient-failure diagnosis was wrong.**
+The non-zero was **deterministic**, and it was `1` rather than `2`.
+The poller ran from the session's cwd --- a checkout of a *different*
+repository --- and `check-pr-fully-clean.py` resolves the repo from the working
+directory unless `-R/--repo` is given, so every poll asked the wrong repo about
+these PR numbers:
+
+```
+RuntimeError: Command failed (gh pr view 1561 --repo ucdavis/bcs ...):
+GraphQL: Could not resolve to a PullRequest with the number of 1561.
+```
+
+Measured three ways, same PR, same moment:
+
+| invocation | exit | result |
+| --- | ---: | --- |
+| from the other repo's cwd, no `-R` | 1 | traceback |
+| from the other repo's cwd, `-R Morrison-Lab/ai-config` | 0 | FULLY CLEAN |
+| from the ai-config cwd | 0 | FULLY CLEAN |
+
+Three things follow, and each corrects something stated above or nearby.
+
+`USAGE_EXIT = 2` covers the paths `die()` handles.
+An **unhandled exception exits 1**, so a crash is indistinguishable from a
+verdict by status alone --- which means the three-way read this entry
+prescribes is necessary and not sufficient.
+
+The `rc >= 2` branch written to catch "the check failed" was therefore
+**unreachable for the failure it was written for**.
+
+And the belief that sent the poller there was stale rather than absent: a
+memory note read "hard-codes `Morrison-Lab/ai-config`, ignores `-R`", which
+`1c052457` ("resolve the repo instead of hardcoding it", #1462) had already
+retired.
+The script's own docstring says `-R` works.
+So this is [`fail-fast`](../principles/fail-fast.md)'s "a sound checker pointed
+at the wrong subject": a correct instrument returning a truthful answer about a
+repository nobody asked about, with the subject never printed alongside the
+verdict.)

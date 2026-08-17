@@ -329,6 +329,28 @@ This is [`fail-fast`](../principles/fail-fast.md)'s "0, 1, and anything else
 are three answers and not two", which applies to a purpose-built checker
 exactly as it does to `grep`.
 
+**But `2` does not cover every non-verdict, so the three-way read is necessary
+and still not sufficient.**
+`USAGE_EXIT = 2` is raised by `die()`, on the paths the script anticipated.
+An **unhandled exception** exits **1** --- the code reserved for "not clean" ---
+so a crash is indistinguishable from a verdict by status alone.
+Measured: run from a checkout of the wrong repo, the script raises
+`RuntimeError: Command failed (gh pr view ...)` and exits 1.
+
+That is why the status read has to be paired with a look at the output rather
+than replacing it.
+A genuine not-clean prints `  - ` finding bullets; a crash prints a traceback.
+One `grep -q '^  - '` separates them, and unlike the phrase search above it is
+keyed on the report's *structure* rather than on its wording.
+
+**The wrong-repo case is the one to expect**, because the script resolves the
+repo from the **current working directory** unless `-R/--repo` is passed.
+A background poller inherits the session's cwd, which on a multi-repo session
+is routinely not the repo the PR lives in --- so the same command answers
+correctly by hand and crashes in the loop.
+Pass `-R OWNER/REPO` explicitly in anything that is not a one-off typed inside
+that checkout.
+
 So read the status, and read all three of it:
 
 ```bash
@@ -347,9 +369,15 @@ esac
   still apply.
 - **Don't:** grep a purpose-built checker's output for a phrase --- its prose
   is a human-facing report, not an API.
+- **Do:** pass `-R OWNER/REPO` from any poller or script, since the repo comes
+  from the working directory otherwise and a background loop inherits whatever
+  cwd the session happened to be in.
 - **Don't:** collapse the status to a boolean either; `rc != 0` reports a
   broken check as a regressed PR, which is the same conflation wearing the
   remedy's clothes.
+- **Don't:** read `1` as a verdict without checking the output has finding
+  bullets --- an unhandled exception exits 1 too, so `2` is not the only
+  non-verdict code.
 - **Don't:** read "I called the right instrument" as having consumed it; the
   bypass guard fires on the call, and nothing fires on the misreading.
 

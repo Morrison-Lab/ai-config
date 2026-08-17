@@ -42,9 +42,9 @@ A single honest measurement earlier in the session is what most easily licenses 
 ## Request review and drive every started PR to clean
 
 Whenever starting or creating a Pull Request:
-1. **Request review immediately**: Request review from `d-morrison` (or the repository's configured reviewers, adhering to per-repo exceptions such as `sparta` per `skills/request-pr-review/SKILL.md`).
+1. **Request review immediately**: Request review from `d-morrison` (or the repository's configured reviewers, adhering to per-repo exceptions such as `sparta` per `skills/request-pr-review/SKILL.md`) **and** request an AI review (`@claude review` comment or `@agy review` / dispatch `claude-review.yml`).
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
 
-- **Do:** Request review immediately upon creating or starting any PR and run `ardi` to drive the PR to a clean review verdict with green CI.
-- **Don't:** Leave a newly created PR sitting without a requested reviewer, or stop working on a PR after creation without carrying it to clean.
+- **Do:** Request human review (`d-morrison`) and trigger an AI review (`@claude review`) immediately upon creating or starting any PR, then run `ardi` to drive the PR to a clean review verdict with green CI.
+- **Don't:** Leave a newly created PR sitting without requested reviewers (human or AI), or stop working on a PR after creation without carrying it to clean.
 

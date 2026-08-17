@@ -28,6 +28,7 @@ notification.
 ```sh
 gh api -X POST repos/<owner>/<repo>/pulls/<num>/requested_reviewers \
   -f "reviewers[]=d-morrison"
+gh pr comment <num> --body "@claude review"
 ```
 
 You can get `<owner>/<repo>` from `gh repo view --json nameWithOwner -q .nameWithOwner`

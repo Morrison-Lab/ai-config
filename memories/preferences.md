@@ -522,6 +522,7 @@
 - Some skills are platform/global --- present in the Claude Code skill registry but with NO local `skills/<name>/` directory (e.g. `deep-research`).
   Cross-references to them are valid.
   Automated reviewers (Copilot, the `@claude` bot) may wrongly flag such a reference as a "non-existent skill"; check the available-skills list presented to the agent (the Claude Code skill registry) before treating a skill cross-ref as a broken link, then rebut the false positive. (ai-config#120 flagged it 4x.)
+- Always request an AI review immediately upon PR creation. In addition to requesting human reviewers (`d-morrison`), post an `@claude review` comment or trigger `@agy review` / `claude-review.yml` immediately after `gh pr create` so AI review workflows are dispatched alongside human review requests.
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
   On workflows with `concurrency: cancel-in-progress` (d-morrison/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.

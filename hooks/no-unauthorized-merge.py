@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: mechanistically prohibit PR/MR merge commands.
+"""PreToolUse guard: mechanistically prohibit PR/MR merge commands and MCP merge tools.
 
-Prohibits commands attempting to merge PRs/MRs (e.g. `gh pr merge`, `glab mr merge`,
-`gh api .../merge`, `glab api .../merge`, or GraphQL `mergePullRequest` / `enablePullRequestAutoMerge`)
-unless explicit authorization is present via ALLOW_MERGE=1 or --allow-merge.
+Prohibits commands or MCP tool calls attempting to merge PRs/MRs (e.g. `gh pr merge`,
+`glab mr merge`, `gh api .../merge`, `glab api .../merge`, GraphQL `mergePullRequest` /
+`enablePullRequestAutoMerge`, or GitHub MCP `mcp__github__merge_pull_request` /
+`mcp__github__enable_pr_auto_merge` / `mcp__github__enable_pull_request_auto_merge`)
+unless explicit authorization is present via ALLOW_MERGE=1, --allow-merge, active /mwc,
+or standing per-repository grant.
 
 Three authorization paths, narrowest last: the per-command ALLOW_MERGE=1 /
 --allow-merge override, an active session `/mwc` grant, and a STANDING
@@ -833,6 +836,35 @@ def offending(command: str, payload: dict | None = None):
     return None
 
 
+def is_mcp_merge_tool(tool_name: str) -> bool:
+    if not tool_name:
+        return False
+    name = tool_name.lower()
+    return bool(re.search(r"(?:^|__)(?:merge_pull_request|(?:enable|disable)_(?:pull_request_)?auto_merge)$", name))
+
+
+def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
+    tool_input = payload.get("tool_input") or {}
+    tool_name = payload.get("tool_name") or "mcp__github__merge_pull_request"
+
+    if tool_input.get("allow_merge") in (1, "1", True) or tool_input.get("ALLOW_MERGE") in (1, "1", True):
+        return None
+
+    if check_mwc_active(payload):
+        return None
+
+    owner = tool_input.get("owner")
+    repo = tool_input.get("repo")
+    if isinstance(owner, str) and isinstance(repo, str) and owner.strip() and repo.strip():
+        target = f"{owner.strip()}/{repo.strip()}".lower()
+        if target in STANDING_MERGE_GRANT_REPOS:
+            return None
+
+    pull_num = tool_input.get("pull_number") or tool_input.get("pullNumber") or tool_input.get("number") or ""
+    segment = f"{tool_name}(owner='{owner}', repo='{repo}', pull='{pull_num}')"
+    return tool_name, segment
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -840,18 +872,24 @@ def main() -> int:
         print(f"no-unauthorized-merge: unreadable hook input ({exc})", file=sys.stderr)
         return 0
 
-    if payload.get("tool_name") != "Bash":
+    tool_name = payload.get("tool_name") or ""
+    hit = None
+
+    if tool_name == "Bash":
+        command = (payload.get("tool_input") or {}).get("command") or ""
+        hit = offending(command, payload)
+    elif is_mcp_merge_tool(tool_name):
+        hit = check_mcp_merge(payload)
+    else:
         return 0
 
-    command = (payload.get("tool_input") or {}).get("command") or ""
-    hit = offending(command, payload)
     if not hit:
         return 0
 
     label, segment = hit
     reason = (
         f"MECHANISTIC PROHIBITION: `{label}` is strictly blocked without explicit permission.\n\n"
-        f"    Offending command segment: {segment}\n\n"
+        f"    Offending call/segment: {segment}\n\n"
         "AI agents are mechanistically forbidden from merging PRs/MRs unless explicitly instructed "
         "by the user, executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc), or "
         "merging a PR whose target repo carries a standing grant (see STANDING_MERGE_GRANT_REPOS)."

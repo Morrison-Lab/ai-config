@@ -79,7 +79,7 @@ SECTION_HEADING = "## Enforcement hooks"
 # | `name.py` | `Event` (Matcher) | prose |   -- matcher is optional.
 ROW = re.compile(
     r"^\|\s*`(?P<script>[A-Za-z0-9._-]+\.(?:py|sh))`\s*"
-    r"\|\s*`(?P<event>[A-Za-z]+)`\s*(?:\((?P<matcher>[A-Za-z]+)\))?\s*"
+    r"\|\s*`(?P<event>[A-Za-z]+)`\s*(?:\((?P<matcher>[A-Za-z0-9_*, -]+)\))?\s*"
     r"\|(?P<rest>.*)\|\s*$"
 )
 
@@ -95,7 +95,15 @@ def registered():
             for entry in group.get("hooks", []):
                 script = entry.get("script")
                 if script:
-                    out[script] = (event, matcher)
+                    if script in out:
+                        prev_event, prev_matcher = out[script]
+                        if prev_event == event:
+                            matchers = [m for m in (prev_matcher, matcher) if m]
+                            out[script] = (event, ", ".join(matchers))
+                        else:
+                            out[script] = (event, matcher)
+                    else:
+                        out[script] = (event, matcher)
     return out
 
 

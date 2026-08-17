@@ -556,6 +556,50 @@ wrong += (not _ok)
 print(f"  {'allow' if _ok else 'WRONG':<6} "
       f"a mismatched-length executor subject falls back instead of indexing")
 
-total = len(BLOCK) + len(ALLOW) + 10
+def verdict_mcp(tool_name: str, tool_input: dict, env: dict = None, extra: dict = None) -> str:
+    payload = {"tool_name": tool_name, "tool_input": tool_input}
+    payload.update(extra or {})
+    p = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    if p.returncode != 0:
+        sys.exit(f"FATAL: hook exited {p.returncode} on MCP {tool_name!r}\n{p.stderr.strip()}")
+    return "BLOCK" if '"permissionDecision": "deny"' in p.stdout else "allow"
+
+MCP_BLOCK = [
+    ("mcp__github__merge_pull_request", {"owner": "Other-Owner", "repo": "ai-config", "pull_number": 123}, "MCP merge_pull_request for ungranted repo"),
+    ("mcp__github__merge_pull_request", {}, "MCP merge_pull_request without owner/repo"),
+    ("mcp__github__enable_pr_auto_merge", {"owner": "Other-Owner", "repo": "ai-config", "pull_number": 123}, "MCP enable_pr_auto_merge for ungranted repo"),
+    ("mcp__github__enable_pull_request_auto_merge", {"owner": "Other-Owner", "repo": "ai-config", "pull_number": 123}, "MCP enable_pull_request_auto_merge for ungranted repo"),
+    ("mcp__github__disable_pr_auto_merge", {"owner": "Other-Owner", "repo": "ai-config", "pull_number": 123}, "MCP disable_pr_auto_merge for ungranted repo"),
+    ("mcp__github__disable_pull_request_auto_merge", {"owner": "Other-Owner", "repo": "ai-config", "pull_number": 123}, "MCP disable_pull_request_auto_merge for ungranted repo"),
+]
+
+MCP_ALLOW = [
+    ("mcp__github__merge_pull_request", {"owner": "Morrison-Lab", "repo": "ai-config", "pull_number": 123}, "MCP merge_pull_request for standing grant repo"),
+    ("mcp__github__merge_pull_request", {"owner": "morrison-lab", "repo": "ai-config", "pull_number": 123}, "MCP merge_pull_request for standing grant repo (lowercase)"),
+    ("mcp__github__merge_pull_request", {"owner": "Other-Owner", "repo": "ai-config", "pull_number": 123, "allow_merge": "1"}, "MCP merge_pull_request with allow_merge override"),
+    ("mcp__github__enable_pr_auto_merge", {"owner": "Morrison-Lab", "repo": "ai-config", "pull_number": 123}, "MCP enable_pr_auto_merge for standing grant repo"),
+    ("mcp__github__get_file_contents", {"owner": "Other-Owner", "repo": "ai-config", "path": "README.md"}, "non-merge MCP tool get_file_contents"),
+    ("mcp__github__update_pull_request", {"owner": "Other-Owner", "repo": "ai-config", "pull_number": 123, "state": "closed"}, "non-merge MCP tool update_pull_request"),
+]
+
+print("\nMCP should BLOCK:")
+for tool_name, tool_input, desc in MCP_BLOCK:
+    v = verdict_mcp(tool_name, tool_input)
+    wrong += (v != "BLOCK")
+    print(f"  {v:<6} {desc}")
+
+print("\nMCP should ALLOW:")
+for tool_name, tool_input, desc in MCP_ALLOW:
+    v = verdict_mcp(tool_name, tool_input)
+    wrong += (v != "allow")
+    print(f"  {v:<6} {desc}")
+
+total = len(BLOCK) + len(ALLOW) + len(MCP_BLOCK) + len(MCP_ALLOW) + 10
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

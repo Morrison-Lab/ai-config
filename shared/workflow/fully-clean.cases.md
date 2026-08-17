@@ -677,3 +677,170 @@ reviewed" was true while "an independent reviewer approved it" was not.)
 (`ucdavis/bcs`, 2026-08-13: two stacked PRs were reviewed 82 seconds apart, `16:26:16Z` on the stacked PR and `16:27:38Z` on its base.
 The base's verdict was read, a Copilot quota refusal was seen on the stacked PR, and the pair was reported as one verdict plus one refusal.
 The stacked PR's own review had posted and sat unread for 12 hours; the next round re-raised both of its findings and noted the file was byte-identical across the three intervening commits.)
+
+## Two agents, one head, opposite verdicts
+
+(`ucdavis/bcs#632`, 2026-08-16.
+A one-file `NEWS.md` deduplication, reviewed by two agents at the same commit
+`3fd3089e`, minutes apart:
+
+| time (UTC) | agent | verdict |
+| --- | --- | --- |
+| 01:37:51 | Antigravity | positive, opening with `Encountered an internal error in running grep command.` |
+| 01:52:23 | Antigravity | `The changes are clean, accurate, and completely satisfy the PR requirements. **LGTM.**` |
+| 01:56:22 | Claude | `**Needs more work** --- one verified factual-accuracy issue` |
+
+The finding Claude raised was real and checkable, not a matter of taste.
+The PR's own `NEWS.md` bullet asserted that a form the removed changelog copy
+documented was "not one the code accepts", and the code accepts it:
+`data-raw/slurm-validation.R:35` rebinds the constant to that method's scalar
+before use, `:51` passes that scalar on, and `R/slurm_seeds_for_chunk.R:9`
+documents the parameter as a scalar.
+All three lines were verified against source before the finding was accepted.
+
+Two things make the case worth keeping.
+
+The defect was **an inaccurate claim in a PR whose entire purpose was fixing an
+inaccurate claim**, so a reviewer reading for factual accuracy is exactly what
+it needed --- and the agent that approved it had just said its own grep failed.
+That is the same shape recorded at `ucdavis/bcs#622`, where an Antigravity
+review approved a report whose grep had errored, which is why the rule treats
+it as recurring rather than as one bad run.
+
+And nothing on the PR page distinguished the two.
+Both agents post as `github-actions[bot]`, both produced a summary with
+analysis and a positive closing line, and the review-gate check was green
+throughout.
+Only reading the bodies separates them.
+
+The fix landed in `8cf34dce` and Claude's next round at that head returned
+`Ready for merge`, having re-verified both cited source facts itself.)
+
+## Three PRs reported clean by grepping the checker's own output
+
+(`Morrison-Lab/ai-config` #1561 / #1566 / #1575, 2026-08-16.
+A background monitor polled all three with the right instrument and decided
+what it said with a string match:
+
+```bash
+out=$(python3 scripts/check-pr-fully-clean.py "$n" 2>&1)
+if echo "$out" | grep -q 'NOT fully clean'; then allclean=0
+else echo "ai-config#$n is FULLY CLEAN"; fi
+```
+
+It announced all three clean, twice, and none of them was.
+Run directly, the checker reported:
+
+| PR | actual state |
+| --- | --- |
+| #1561 | verdict was at the pre-sync head |
+| #1566 | `Latest verdict-bearing review statement ... is NOT clean` |
+| #1575 | `No automated review comments or reviews found` |
+
+The case that settles it as a defect rather than noise is #1566: a **blocking**
+finding, reported to a human as clean.
+And #1575 had **zero** verdict comments and was reported clean, which is the
+`else`-branch failure at its plainest --- nothing to match, so the match
+failed, so the branch fired.
+
+Two details worth keeping.
+
+The bypass guard could not fire.
+`no-handrolled-verdict-parse.py` blocks matching a verdict phrase against a
+PR's *review comments* when the checker has not answered, and here the checker
+had answered --- the monitor called it correctly, on the right PR, every time.
+The defect was entirely in reading the reply.
+
+And the session that wrote the monitor had, minutes earlier, committed a rule
+that final approval comes from Claude at the current head, and a hook whose
+purpose is catching unverified claims about state.
+Neither reached the monitor, because both govern what you *assert* and this was
+a fault in what you *measured*.)
+
+## The same conflation in the fix: `rc != 0` reported three clean PRs as regressed
+
+(`Morrison-Lab/ai-config` #1561 / #1566 / #1575, 2026-08-16, roughly an hour
+after the case above and in the same session.
+
+The grep was replaced with a status read, and the status was read as a boolean:
+
+```bash
+python3 scripts/check-pr-fully-clean.py "$n" >/dev/null 2>&1 \
+  || echo "REGRESSED: ai-config#$n no longer clean"
+```
+
+That fired on all three, twice.
+All three were clean at the time and clean afterwards, verified by running the
+checker directly.
+
+The contract it discarded is three-valued, and measured rather than assumed:
+
+| invocation | exit |
+| --- | ---: |
+| a clean PR | 0 |
+| a not-clean PR | 1 |
+| no argument (usage error) | 2 |
+
+`scripts/check-pr-fully-clean.py:47-51` says why the third exists: `raise
+SystemExit("message")` would exit 1, "which is this script's 'not clean' code
+--- so a usage or environment error would have been read as a verdict about the
+PR.
+The exit code is set explicitly for that reason."
+So the script anticipated exactly this conflation and provided the code needed
+to avoid it, and the consumer collapsed it anyway.
+
+Two things make the pair worth recording together rather than folding into one
+entry.
+
+The **direction inverted**.
+The grep failed toward clean and hid a blocking finding; the boolean status
+fails toward alarm and manufactures regressions.
+A reader who takes only "read the exit status" from the first case lands
+directly in the second.
+
+And the second bug was introduced **by the fix for the first**, in the same
+session, by someone who had just written the entry above.
+That is what argues the remedy has to name all three codes rather than
+contrast "status" with "prose": the contrast is what made a two-branch reading
+feel like compliance.
+
+**Correction, measured after the above was written: the `rc != 0` reading was
+not the whole of it, and the transient-failure diagnosis was wrong.**
+The non-zero was **deterministic**, and it was `1` rather than `2`.
+The poller ran from the session's cwd --- a checkout of a *different*
+repository --- and `check-pr-fully-clean.py` resolves the repo from the working
+directory unless `-R/--repo` is given, so every poll asked the wrong repo about
+these PR numbers:
+
+```
+RuntimeError: Command failed (gh pr view 1561 --repo ucdavis/bcs ...):
+GraphQL: Could not resolve to a PullRequest with the number of 1561.
+```
+
+Measured three ways, same PR, same moment:
+
+| invocation | exit | result |
+| --- | ---: | --- |
+| from the other repo's cwd, no `-R` | 1 | traceback |
+| from the other repo's cwd, `-R Morrison-Lab/ai-config` | 0 | FULLY CLEAN |
+| from the ai-config cwd | 0 | FULLY CLEAN |
+
+Three things follow, and each corrects something stated above or nearby.
+
+`USAGE_EXIT = 2` covers the paths `die()` handles.
+An **unhandled exception exits 1**, so a crash is indistinguishable from a
+verdict by status alone --- which means the three-way read this entry
+prescribes is necessary and not sufficient.
+
+The `rc >= 2` branch written to catch "the check failed" was therefore
+**unreachable for the failure it was written for**.
+
+And the belief that sent the poller there was stale rather than absent: a
+memory note read "hard-codes `Morrison-Lab/ai-config`, ignores `-R`", which
+`1c052457` ("resolve the repo instead of hardcoding it", #1462) had already
+retired.
+The script's own docstring says `-R` works.
+So this is [`fail-fast`](../principles/fail-fast.md)'s "A sound checker pointed
+at the wrong repository": a correct instrument returning a truthful answer about a
+repository nobody asked about, with the subject never printed alongside the
+verdict.)

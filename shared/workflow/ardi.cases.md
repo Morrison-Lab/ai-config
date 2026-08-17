@@ -795,3 +795,43 @@ block's own correct-visibly bullet.
 The near-miss worth the entry: the read-never-recall check reported itself
 satisfied because a SHA genuinely had been read --- just 7 characters of the
 40 the sentence asserted.)
+
+## A trust-gate fix that revealed a tool-name mismatch behind it
+
+(`ucdavis/bcs#620` / `Morrison-Lab/gha#463`, 2026-08-16.
+`gemini-code-review` had failed 7 of 7 runs on `ucdavis/bcs`, and the captured
+error was read as a startup banner.
+The real last line of that capture named its own cause:
+`Gemini CLI is not running in a trusted directory`.
+`Morrison-Lab/gha` set `GEMINI_CLI_TRUST_WORKSPACE: 'true'` in `1c270f2f` on
+2026-08-15 and slid `v2` the same day.
+
+A review dispatched after the slide **failed again**, which reads at first as
+the diagnosis having been wrong.
+It was not.
+The two runs used different dependency versions, and comparing the errors
+rather than the outcomes settles it in one read:
+
+| run | `referenced_workflows[].sha` | env var | error |
+| --- | --- | --- | --- |
+| 2026-08-14 | `695fbf56` | absent | `not running in a trusted directory` |
+| 2026-08-16 | `3ee5a0b8` | present | `FatalTurnLimitedError`, code 53 |
+
+The second cause was structural and had been unobservable while the first
+stood: the CLI registers the MCP tools as `mcp_github_pull_request_read`,
+while the reusable workflow's prompt names them bare as `pull_request_read`.
+Gemini tried four spellings, found none, fell back to `run_shell_command`,
+was denied eight times by `settings.tools.core`, and exhausted
+`model.maxSessionTurns: 25`.
+So the turn limit is the symptom rather than the cause, and raising it would
+buy more failed tool calls.
+
+Two things the case turns on.
+The pre-fix run is not evidence about the fix --- reading
+`referenced_workflows[].sha` per run, rather than the current `v2` tag, is
+what establishes that, per
+[`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)'s mirror-direction
+section.
+And the earlier hypothesis was tested by dispatching a real review rather than
+inferred from the upstream commit having landed, which is the only reason the
+second cause was found at all.)

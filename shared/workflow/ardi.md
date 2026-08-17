@@ -26,6 +26,39 @@ that terminal state.**
 - **Don't:** let a verdict from an earlier head stand because the repo's trigger class was already known.
   Knowing it is not the same as acting on it each round.
 
+**Dispatching needs no permission, so do not ask about the spend.**
+
+The rule above is about the mechanism and says nothing about authorization,
+which leaves a session free to know it and still stall --- by reasoning that a
+review round costs money and the spend is the maintainer's call.
+That sounds like restraint and is indistinguishable from it from the inside.
+
+The asymmetry runs the other way.
+A green, unreviewed PR is **parked, not clean**, so declining to dispatch does
+not save a round; it holds the PR in a state that reads as finished and is not.
+The stall also spends the user's attention every time, which is the thing the
+review loop exists to conserve.
+
+So dispatch when the round is ready, and put the run in the status report
+rather than the question.
+
+- **Do:** dispatch the review yourself once the round's last push has landed,
+  on any repo whose reviewer is dispatch-only.
+- **Do:** name the run you are waiting on, so the report carries a fact rather
+  than a request.
+- **Don't:** write "spending a round is the maintainer's call" into a status
+  report, or hold a ready PR pending a spend question.
+- **Don't:** read this as a general spending grant --- it covers scheduling a
+  review, and merging is still [`mwc`](../../skills/mwc/SKILL.md)'s to govern.
+
+(Directive from the user, 2026-08-16: "always dispatch".
+Three PRs reached green CI on a `workflow_dispatch`-only repo in one session,
+and each time the session asked before dispatching, citing rounds that had
+billed \$12.14, \$10.37 and \$12.44 against a monthly limit already reached.
+Both earlier dispatches came back `Needs more work`, one with a blocking
+correctness bug, so the round was not a formality.
+Tracked as ai-config#1571.)
+
 **Dispatch once, after the round's LAST push --- a per-push rhythm cancels its own reviews.**
 
 **Dispatch with `--ref <PR-branch>`, or the resulting failure is invisible on the PR.**

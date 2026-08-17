@@ -977,3 +977,75 @@ See ai-config#694 for the precedent.
   - **Don't:** read the `422` as a property of the MCP client --- it is the
     author-equals-reviewer collision, and it does not arise when the two
     logins differ.
+
+- **The REST-backed reads can 404 while the GraphQL-backed ones succeed in the
+  same container, against the same PR --- so a review verdict can be
+  unreachable by every API route the session has and still arrive by webhook.**
+  Measured 2026-08-17 against `Morrison-Lab/ai-config#1580`, all in one
+  session, minutes apart:
+
+  | call | backing | result |
+  | --- | --- | --- |
+  | `pull_request_read` `get_comments` | REST | **404** |
+  | `pull_request_read` `get_reviews` | REST | **404** |
+  | `issue_read` `get_comments` | REST | **404** |
+  | `pull_request_read` `get_review_comments` | GraphQL | 200, `totalCount: 0` |
+  | `pull_request_read` `get` | --- | 200 |
+  | `pull_request_read` `get_check_runs` | --- | 200, 8 runs |
+  | `get_job_logs` | --- | 200 |
+  | raw `curl` to `api.github.com/.../issues/1580/comments` | REST | **403** |
+
+  The 403 is the org-policy denial this file records elsewhere --- `GitHub
+  access is not enabled for this session. An org admin must connect the Claude
+  GitHub App for this organization.` --- so it is a policy refusal rather than a
+  transient error, and retrying it is wasted.
+
+  **Run the negative control before diagnosing the PR.**
+  The first 404 reads as a fact about `#1580`: a permissions oddity, a
+  transferred issue, a deleted comment.
+  Repeating the identical call against a **different** PR is what converts it
+  into a fact about the *route* --- `issue_read` `get_comments` on `#1578`
+  returned the same 404, which is the reading that stopped the investigation
+  going one PR deeper.
+  This is
+  [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)'s
+  "A negative control must enter at the real input" rule with the polarity
+  reversed: there a control establishes that a detector can report a finding,
+  and here it establishes that a failure is not about the subject.
+
+  **The consequence is a routing fact rather than a blocker.**
+  `subscribe_pr_activity`'s webhook stream carried the full
+  `**Claude finished review**` body, including the `### Verdict`, while no
+  available read route would return it --- so on a PR you are subscribed to,
+  the wake envelope is a first-class surface for the verdict, not merely a
+  notification that one exists.
+  `CLAUDE.md`'s standing instruction to subscribe to every PR you open is what
+  made that surface available; a session that had skipped it would have had no
+  route at all.
+
+  - **Do:** re-run a 404-ing read against a second PR before concluding
+    anything about the first.
+  - **Do:** read the verdict out of the subscription wake when the comment
+    routes refuse, rather than treating the PR as unreadable.
+  - **Don't:** read a REST-route 404 as covering the GraphQL-backed reads ---
+    `get_review_comments`, `get`, and `get_check_runs` answered normally in the
+    same minute.
+  - **Don't:** retry the raw-API 403; it names an org-admin action, so nothing
+    this session does changes it.
+
+- **`get_job_logs`' `tail_lines` defaults to 500, and both directions off that
+  default fail differently.**
+  Passing `tail_lines: 200` under-fetches --- *below* the tool's own default,
+  which is the tell that the number was chosen rather than derived --- and on a
+  `claude-review` job the trailing 200 lines are workflow plumbing, so the
+  verdict text is not in them.
+  Correcting to `tail_lines: 3000` then exceeded the response token limit
+  outright: 171,956 characters, rejected and spilled to a scratch file whose
+  single-line-per-record shape defeats `Read`'s `offset`/`limit` chunking, so
+  recovering it needs character-range slicing rather than a re-read.
+
+  So the two failures bracket a window rather than pointing the same way, and
+  neither announces which side you are on.
+  Read the default as the starting point and widen once, and treat a
+  size-limit rejection as a prompt to find a different surface rather than to
+  keep halving --- here the webhook above delivered the same content in full.

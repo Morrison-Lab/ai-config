@@ -239,6 +239,46 @@ one.**
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 "A symptom that both a mechanism and its opposite predict".
 
+## Read the artifact that failed, not the one beside it
+
+The section above governs a symptom that two opposite mechanisms both predict.
+This governs a cause read off the **wrong artifact** entirely --- the failing
+step's neighbour, the sibling job, the log line above the error.
+
+The pull is structural rather than careless.
+A failure is usually surrounded by context cheaper to reach than the failure
+itself: a neighbouring step's env block prints in full where the failing step's
+own output needs another fetch, so the adjacent artifact is what you meet
+first.
+And it frequently contains something anomalous, because a neighbour of a broken
+thing is often a little odd for its own reasons --- which reads as
+corroboration rather than as coincidence.
+
+What makes this worse than an ordinary guess is that the resulting claim
+carries a specific, checkable-looking particular lifted from a real artifact.
+"The PR-number variable was empty" is not vague.
+It names a variable, a value, and a place it was observed, so it survives
+scrutiny a vaguer guess would not --- and every one of those particulars is
+true of a step that did not fail.
+
+One question settles it, asked before the claim is written: **is this
+observation from the thing that failed?**
+Where it is not, the claim is a hypothesis rather than a finding, and it stays
+labelled one until the failing artifact's own output is read.
+
+- **Do:** read the failing step's own output before naming a cause, however
+  suggestive a neighbour's looks.
+- **Do:** label a cause drawn from adjacent evidence as a hypothesis, and name
+  the artifact it came from.
+- **Don't:** treat an anomaly in a sibling artifact as the cause of a failure
+  in this one --- proximity is not evidence.
+- **Don't:** read a specific-sounding particular as verification; the
+  specificity is inherited from the artifact you did read, not from the one you
+  are explaining.
+
+See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
+"A cause read off the step next to the one that failed".
+
 ## A correction inherits its instrument, so a second reading is not a check
 
 "Illusions of knowing" above concerns a **single** reading whose scope went

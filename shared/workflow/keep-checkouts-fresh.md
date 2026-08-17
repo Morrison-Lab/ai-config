@@ -65,6 +65,25 @@ In every session --- at session start, and again periodically during long sessio
    A stale `check-install.py` run reports suspect numbers.
    A stale `install-hooks.py` run reads an old `hooks/hooks.json`, finds every hook it knows about already bound, and prints `All hooks registered.` --- a positive all-clear over hooks it cannot see.
    Pull first, then measure, and treat the examined count as the thing to read: it is the manifest's size, so a number below the current hook count means the checkout is behind rather than the machine being clean.
+   **A container with no `settings.json` at all is the degenerate case, and it arms nothing --- so every guard in this corpus is inert there, not just a drifted one.**
+   The paragraphs above describe registration *drift*: a `settings.json` that exists and lacks some binding, which `install-hooks.py` reports and `--fix` repairs.
+   A remote/web container can ship `~/.claude` with **no `settings.json` and no `settings.local.json` at all**, which is the same failure with the count at zero.
+   Nothing about it announces itself, for the reason the file-versus-binding distinction above already gives: an unregistered guard and a guard with nothing to block look identical.
+   What differs is the blast radius --- drift disarms the hooks added since someone last ran the binder, while an absent file disarms all of them, including the one built for the mistake you are about to make.
+   One read settles it, and it is cheaper than either instrument:
+   ```bash
+   for p in ~/.claude/settings.json ~/.claude/settings.local.json; do
+     [ -f "$p" ] && echo "$p exists" || echo "$p ABSENT"
+   done
+   ```
+   Read this as a fact about the **session**, not about the corpus.
+   The guards are merged and correct.
+   They simply are not running, so anything they would have caught is back to being your own responsibility.
+   That is [`deterministic-tools`](../principles/deterministic-tools.md)'s constraint failing open rather than its goal failing --- the instrument exists, and the environment is not consuming it.
+   - **Do:** check whether either settings file exists before relying on any hook, and say plainly in a status report that the guards are inert when they are.
+   - **Don't:** treat a merged guard as an active one.
+     Merging places a file, and only a binding in `settings.json` makes it fire.
+
    - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
    - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`
    - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.

@@ -531,6 +531,7 @@
   `gh run list` reports `main` as the branch for every dispatched review.
   Always pass `--ref`: a dispatch without it runs against the default branch, so the run's check runs land on `main`'s tip rather than the PR head --- which leaves the PR's own review check stale and makes a check-runs query at that head a vacuous all-clear about whether a review is in flight.
   See [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy".
+- During ARDI loops: when waiting for long-running review workflows (`claude-review.yml`, `@claude` review, or CI checks), set a background timer (`schedule` tool with `DurationSeconds=180` or `300`) before ending the turn so you automatically wake up to check for review completion rather than sitting idle until the next user message.
 - During ARDI loops: always ANTICIPATE what the reviewer will flag next and fix those issues preemptively in the same commit.
   Don't wait for each round to surface issues one at a time --- read the code holistically, think about what patterns the reviewer has flagged in prior rounds (documentation gaps, coupling without cross-references, missing edge-case guards, inconsistent accounting), and fix analogous issues elsewhere in the same file before pushing.
   The goal is to minimize back-and-forth rounds.

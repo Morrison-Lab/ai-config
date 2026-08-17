@@ -840,7 +840,7 @@ def is_mcp_merge_tool(tool_name: str) -> bool:
     if not tool_name:
         return False
     name = tool_name.lower()
-    return bool(re.search(r"(?:^|__)(?:merge_pull_request|(?:enable|disable)_(?:pull_request_)?auto_merge)$", name))
+    return bool(re.search(r"(?:^|__)(?:merge_pull_request|(?:enable|disable)_(?:pull_request_|pr_)?auto_merge)$", name))
 
 
 def check_mcp_merge(payload: dict) -> tuple[str, str] | None:

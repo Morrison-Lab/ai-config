@@ -281,7 +281,7 @@ def run(records):
             for r in records:
                 fh.write(json.dumps(r) + "\n")
         proc = subprocess.run(
-            ["python3", HOOK],
+            [sys.executable, HOOK],
             input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True,
             env=dict(os.environ, TMPDIR=tmp),
@@ -320,7 +320,7 @@ try:
     env = dict(os.environ, TMPDIR=shared)
     payload = json.dumps({"transcript_path": same})
     out = [
-        subprocess.run(["python3", HOOK], input=payload, capture_output=True,
+        subprocess.run([sys.executable, HOOK], input=payload, capture_output=True,
                        text=True, env=env).stdout.strip()
         for _ in range(2)
     ]
@@ -360,11 +360,11 @@ try:
             fh.write(json.dumps(r) + "\n")
     payload = json.dumps({"transcript_path": tp})
     mine = subprocess.run(
-        ["python3", HOOK], input=payload, capture_output=True, text=True,
+        [sys.executable, HOOK], input=payload, capture_output=True, text=True,
         env=dict(os.environ, TMPDIR=boundary),
     )
     theirs = subprocess.run(
-        ["python3", SIBLING], input=payload, capture_output=True, text=True,
+        [sys.executable, SIBLING], input=payload, capture_output=True, text=True,
         env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
     )
     results.append(("REMIND" if mine.stdout.strip() else "silent", "silent",
@@ -383,7 +383,7 @@ try:
     with open(p, "w") as fh:
         fh.write("{not json at all\n")
     proc = subprocess.run(
-        ["python3", HOOK], input=json.dumps({"transcript_path": p}),
+        [sys.executable, HOOK], input=json.dumps({"transcript_path": p}),
         capture_output=True, text=True, env=dict(os.environ, TMPDIR=bad),
     )
     results.append(("REMIND" if proc.stdout.strip() else "silent", "silent",

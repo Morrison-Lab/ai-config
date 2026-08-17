@@ -86,6 +86,64 @@ items under every heading, whatever that heading is called ---
 than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 
+**Final approval comes from Claude where Claude is reachable.**
+Another agent's clean verdict clears CI's review gate; it does not clear
+criterion 2 on its own.
+
+This is a directive rather than a derivation, so treat it as a standing
+preference and not as a claim about any agent's general competence.
+What it settles is which verdict a PR is reported **ready** on.
+
+The reason it needs stating is that the two are indistinguishable from the PR
+page.
+Every agent posts the same shape --- a summary, some analysis, a positive
+closing line --- so a findings-free report reads as approval whichever agent
+produced it, and the review-gate check goes green either way.
+
+Two failure modes make the preference concrete, and both have recurred:
+
+- **A clean verdict over tooling that errored.**
+  A report can open by saying its own grep failed and then approve on the
+  strength of the analysis that grep was supposed to support.
+  The error line sits above the verdict, so it reads as a caveat rather than as
+  the verdict's foundation collapsing.
+- **A clean verdict at a head another agent finds a real defect in.**
+  Not a difference of opinion about a nit --- a checkable factual error, at the
+  same commit, that the clean verdict passed over.
+
+So when Claude is reachable, its verdict is the one to report on:
+
+- **Do:** dispatch a Claude review and wait for its verdict before reporting a
+  PR ready, whatever another agent has already said.
+- **Do:** name which agent produced the verdict you are reporting, so "clean"
+  is attributable rather than anonymous.
+- **Do:** treat another agent's findings as real findings --- this ranks whose
+  *approval* is final, not whose objections count.
+- **Don't:** report a PR ready on a non-Claude clean verdict while Claude is
+  reachable, however thorough that report reads.
+- **Don't:** read a green review-gate check as settling this; the gate does not
+  know which agent answered, and on a selector-based setup the agent is chosen
+  at random.
+
+This is a different question from how much two reviewers **agreeing** is worth,
+which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
+settles: there, same-vendor agreement measures a shared blind spot, and a
+cross-vendor split is a prompt to check the item yourself.
+That section weighs corroboration; this one names whose approval is terminal.
+They compose --- a cross-vendor reviewer is still worth chasing, and its clean
+verdict still is not the one a PR is reported ready on while Claude is
+reachable.
+
+Where Claude is genuinely unreachable --- quota-skipped, a stub with no stated
+verdict, or not configured --- fall back per
+[`self-review-fallback`](self-review-fallback.md), which already governs that
+case.
+Another agent's clean verdict is worth more than nothing there, and it is still
+not Claude's; say which one you have.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"Two agents, one head, opposite verdicts".
+
 **Both criteria are per-PR, and a stack is where that stops being automatic.**
 
 - **Do:** derive a verdict per PR number, and name the PR beside each one.

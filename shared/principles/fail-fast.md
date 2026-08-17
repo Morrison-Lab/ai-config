@@ -313,6 +313,53 @@ See [`fail-fast.cases.md`](fail-fast.cases.md),
 - **Don't:** promote a pattern written to locate something into the description
   of what it located.
 
+### An anchor that forbids indentation is a narrowing nobody decided
+
+The too-narrow direction above is a pattern that misses a **wrapped** or
+**re-serialized** occurrence.
+A leading `^` misses an **indented** one, and that deserves separating because
+the narrowing is invisible in the pattern's own text: `^\| ` reads as "a table
+row", and what it means is "a table row starting in column 1".
+
+Markdown is where this bites hardest, since a table, a fence, or a nested list
+is indented by the structure around it rather than by anyone's choice.
+So a pattern anchored for a top-level occurrence returns a confident zero over
+a file full of the thing it is looking for --- and unlike the wrapped-phrase
+case, nothing about the source text looks unusual enough to prompt a re-check.
+
+The failure direction is the expensive one, and it is the one the
+known-positive rule above exists for: a zero reads as **absent**, which
+licenses a claim about the corpus rather than about the query.
+
+Allow the indentation rather than dropping the anchor.
+An unanchored pattern matches mid-line occurrences the anchor was there to
+exclude, so `^\s*` is the fix and bare removal is not:
+
+```bash
+grep -cE '^\|'    file.md   # 0  --- top-level rows only
+grep -cE '^\s*\|' file.md   # 23 --- what is actually in the file
+```
+
+- **Do:** write `^\s*` rather than `^` whenever the thing matched can sit
+  inside a list, a blockquote, or another block.
+- **Do:** re-check a zero whose conclusion surprises you, since surprise is
+  the only signal this failure emits.
+- **Don't:** read a zero from a column-anchored pattern as a fact about the
+  file --- it is a fact about column 1.
+- **Don't:** answer it by deleting the anchor; that trades a false negative
+  for the false positives the anchor was preventing.
+
+(`Morrison-Lab/ai-config#1583`, 2026-08-17: checking whether a positional
+reference "the table above" had a referent, `grep -n '^| '` over
+`memories/github-mcp-tools.md` returned nothing, and the conclusion drawn was
+that the file contained no table at all --- which would have made the
+reference dangling rather than merely fragile.
+`grep -nE '^\s*\|'` finds 23 table lines across four blocks, the nearest at
+lines 991-1000, so the reference resolved correctly.
+The tables are indented because they sit inside bullets.
+Caught only because "this file has no table" was surprising enough to re-run,
+which is not a mechanism.)
+
 ### Guarding an unsound pattern with a second pattern, rather than replacing it
 
 Every direction above ends by naming a pattern that cannot separate what it is

@@ -9,7 +9,8 @@
   If state is MERGED, trigger post-merge instead of reporting CI details. (Learned on ucdavis/bcs#266.)
   Same principle for tool availability: before telling a user a capability doesn't exist in the current session (e.g. "no `subscribe_pr_activity` tool here"), run a live check (`ToolSearch`, or the equivalent discovery mechanism) rather than reciting what a memory entry or a prior session documented --- a local CLI session's tool roster isn't fixed, and reciting stale documentation as current fact is the exact failure this rule exists to prevent. (Sparta gii-ffdb93 session, 2026-07-14: initially told the user no GitHub MCP server was available in local sessions based on documented prior-session behavior, without running `ToolSearch` first.
   The user's pushback "can't you use the GitHub mcp server?" was the correct challenge, and a live check would have shown the tool was in fact reachable --- that check should have been run before stating unavailability as fact, not after being questioned.)
-- **ARDI Loop Foreground Verification**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn; see [`shared/workflow/ardi.md`](shared/workflow/ardi.md) for the mandatory foreground-only polling rule.
+- **ARDI Loop Foreground Verification**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn;
+  see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for the mandatory foreground-only polling rule.
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
@@ -194,6 +195,7 @@
   The NEWS.md union-merge half is unaffected until a separate `news.d`-fragment capability ships (deferred, see gha#388).
   Check whether the repo you're stacking PRs in has migrated before applying the DESCRIPTION-bump advice above.
 - **Before grabbing any issue (GI/GII), check that no other session is already on it.** Two signals must BOTH be clear: (1) the issue's most recent comment does NOT contain "Working on this" or equivalent claim; (2) there is NO open PR referencing the issue --- by branch name or title, or via a cross-reference event on the issue (which covers most `#N` / `Closes #N` body mentions).
+  A claim in the most recent comment counts only while it is live --- under 2 hours since the issue's last push or comment; an older one has expired per [`claim-pr`](../shared/workflow/claim-pr.md) and is taken over with a fresh claim comment, never silently.
   If either signal fires, skip that issue --- don't open a competing PR or claim it. (Twice grabbed issues already in-flight: sparta#325 had PR #327 open; sparta#292 had PR #329 open.
   Both required closing a duplicate.)
   And once both signals are clear, **post your own claim comment the INSTANT you decide to work the issue** --- before the investigation phase (reading the body in depth, grepping, designing), not just before branching.
@@ -339,7 +341,7 @@
   The `@claude` bot review caught the drift in round 1.)
 - After adding or updating skills OR memory files in the ai-config repo, always commit and push everything to origin (on the current branch if a PR is already open, or create a new branch + PR if the change is out of scope).
   Never leave ANY changes in ai-config as local-only uncommitted edits --- including memory files.
-- **AI memories, skills, and commands never stay local-only.** When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `d-morrison/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
+- **AI memories, skills, and commands never stay local-only.** When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
   A memory kept only under `~/.claude/projects/<path>/memory/` or `~/.codex/memories/` is invisible to other sessions, machines, and humans, and rots silently --- so migrate it.
   Capturing a learning isn't done until it's committed where the right audience will see it.
 - **A migrate-then-delete cleanup (copy content into a repo, THEN delete the local source) must verify the copy is both COMPLETE and CURRENT before deleting --- not just that it exists.**
@@ -347,7 +349,7 @@
   Diff each file against the merged target before deleting it.
   And fact-check the migrated CONTENT against current repo state, because copying preserves stale claims verbatim: a memory paragraph can describe a bug as still-open (naming a since-removed function) when a later PR already fixed it and closed the issue.
   (ucdavis/bcs#427, 2026-07-24: of 7 migrated memory files, 4 had newer local content the repo lacked --- one carried a superseded `--exclude=c1` policy --- and a "still-open #371" paragraph was wholly obsolete, since #377 had fixed it and closed #371. Diffed every file and checked the issue/code state before deleting the 15 local copies.)
-- In Codex sessions, treat `d-morrison/ai-config` as the canonical home for cross-project memories even if a local `~/.codex/memories/` store is present.
+- In Codex sessions, treat `Morrison-Lab/ai-config` as the canonical home for cross-project memories even if a local `~/.codex/memories/` store is present.
   The local store is not the durable source of truth; if ai-config access is missing from the environment, restore access first rather than writing the memory only locally.
 - When committing, stage the SPECIFIC files you touched --- NEVER `git add -A`.
   The working tree often holds unrelated in-flight edits (the user's own UMS/skill commits, another draft); `git add -A` silently sweeps those into your commit and onto your PR, bloating the review and extending the cycle.
@@ -724,6 +726,13 @@
 - Before trusting a subagent's claim that it pushed a specific fix commit, independently verify the SHA actually reached the remote --- `gh pr view <N> --json headRefOid` (or `git ls-remote origin <branch>`) compared against the claimed SHA --- rather than trusting narrative confidence in the report.
   A subagent reported "both fixed, pushed in f7d5c60" with full circumstantial detail (file names, line numbers, a plausible-sounding diff); the commit was never actually on the remote branch, and only an independent PR-state check caught it before it was reported upstream as done.
   This is the commit-SHA-specific instance of the standing "verify agent reports with unfakeable asks" rule --- the unfakeable ask here is the remote ref itself, not more narrative.
+- **The mirror failure runs the other way: a subagent's own failure/transport notification (`API Error: Connection closed mid-response`, an `idle_notification` warning the response may be incomplete) reports the status of its LAST turn, not the durability of whatever it already pushed --- don't repeat that framing to the user as "the work is lost."**
+  An agent died mid-response after already pushing six commits to the PR branch, marking the PR ready, and dispatching its review.
+  The notification was read as settled fact and relayed to the user as "its edit is gone with the container", when the remote was actually six commits ahead of the orchestrator's own stale worktree (whose one local commit was a superseded earlier attempt).
+  Before concluding anything from a died-mid-response notification, fetch the branch and diff both directions against what you hold --- `git fetch origin <branch> -q`, then `git log --oneline HEAD..origin/<branch>` for what it pushed that you lack and `origin/<branch>..HEAD` for what you hold that it superseded.
+  Then read each further question off the surface that actually answers it, rather than off one convenient call: `gh pr diff <N> --name-only` for whether the branch carries a non-empty diff, `gh pr view <N> --json isDraft` for ready-versus-draft, and `gh pr checks <N>` or `gh pr view <N> --json reviews,reviewRequests` for whether a review was ever dispatched.
+  `isDraft` and `headRefOid` say nothing about review dispatch, and a bullet whose whole point is unfakeable verification commands is the worst place to imply otherwise --- a reader following it would believe they had confirmed something they had not, which is the false-state-claim failure this bullet is about.
+  This is why "push early" (CLAUDE.md's "Assign the worktree on the `Agent` call" section) matters beyond surviving a reclaimed worktree: the notification cannot see what was already pushed, so pushing early is what a dying agent's work actually survives on, and reporting loss without checking is a false claim about state, not a cautious one.
 - The "re-check the actual latest review before reporting PR status" discipline (CLAUDE.md) has to be spelled out in a dispatched subagent's own brief, not assumed --- a subagent doing PR work is just as prone to citing a stale review round from earlier in its own context as the conductor is to citing a cached one.
   A subagent tasked with demo-only polish on an already-"Ready for merge" PR reported back that the PR had "a real blocking bug" from an early review round --- the bug had been fixed and reconfirmed clean across three later rounds, all visible in the same comment thread the subagent had already read, but it apparently anchored on the first (superseded) finding instead of the PR's actual current state.
   An independent recheck (`gh pr view <N> --json comments` sorted by time, reading the *last* substantive review) caught it before the false claim propagated further.
@@ -846,14 +855,68 @@ On `shared/coding/tidy-code.md` (ai-config#476), a "Preferred" R example labeled
 The paired "Avoid" example was also contrived (a nested `eval_tidy()`/`quo()` call nobody writes, and not even equivalent inside `summarise()`'s NSE) rather than the realistic verbose form.
 Both were caught by the `@claude` review bot, not by me --- mentally (or actually) running the example against its stated claim before publishing would have caught it first.
 
-## Delegate heavy work to codex first
+## Delegate heavy work to a separately-billed CLI first --- codex, and now agy
 
-For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to the separately-billed **`codex` CLI** (ChatGPT plan) and spend its budget **before** Claude/Workflow tokens.
-Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage codex can't finish.
-Exhaust the *current ~5-hour codex usage window*, then fall back to Claude until it resets --- "codex first" means the current window, not abandoning Claude permanently.
+For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to a separately-billed agent CLI and spend that budget **before** Claude/Workflow tokens.
+Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
 This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.
-Stated 2026-07-02 ("exhaust its tokens before using our own") and reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota").
-The `delegate-to-codex` skill (alias `dtc`) operationalizes the mechanics (background runner + DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback).
+
+**There are two such budgets, and the rule is to try both before Claude's.**
+
+| CLI | plan | skill |
+|---|---|---|
+| `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
+| `agy` (Google Antigravity) | Antigravity | none yet --- mechanics below; the skill is worth writing |
+
+Exhaust the *current usage window* of each --- roughly 5 hours for codex --- then fall back to Claude until it resets.
+"Delegate first" means the current window, not abandoning Claude permanently.
+`delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
+
+**`agy --print` CONSUMES THE NEXT TOKEN as its prompt, so a flag placed between the two becomes the prompt.**
+This is the whole of what makes `agy` usable headlessly, and getting it wrong looks exactly like a broken tool:
+
+```bash
+agy --print "Reply with only the word BANANA."                 # -> BANANA
+agy --print "Reply with only the word BANANA." --effort low    # -> BANANA
+agy --print="Reply with only the word BANANA." --effort low    # -> BANANA
+agy --print --effort low "Reply with only the word BANANA."    # -> explains what --effort does
+```
+
+That last line is the failure, and its output is the proof: the CLI answers the
+prompt `--effort`, because `--print` took `--effort` as its value and the real
+prompt fell out as an unconsumed positional.
+So the rule is about **position**, not syntax --- either keep the prompt
+immediately after `--print`, or bind it with `=` and put other flags after.
+
+**Both forms exit 0**, so the drop is invisible to any caller keying on exit status, which is what a delegation wrapper keys on.
+
+Measured 2026-08-15 and re-measured 2026-08-16, `agy` 1.1.13 at `~/.local/bin/agy`.
+Three space-form and three equals-form runs of the same prompt, with nothing between the flag and the prompt, all returned `BANANA`.
+
+**An earlier version of this entry said the equals sign was REQUIRED and blamed Go's `flag` package.**
+Both halves were wrong, and the error is worth keeping because it is a confound rather than a slip.
+Four failing probes all carried another flag between `--print` and the prompt.
+Two working ones did not, and also happened to use `=`.
+Two variables moved together and the visible one got the credit.
+Go's stdlib `flag` in fact treats `-flag value` and `-flag=value` identically for a string flag, which is what a reviewer pointed out (`Morrison-Lab/ai-config#1487`).
+
+**Its figures still need checking, whichever form you use.**
+Asked to read `scripts/added_lines.py` in `ucdavis/bcs`, it returned the right function name and its exact line number (`added_lines`, line 30), so it really read the file.
+It also reported the file as 74 lines where `wc -l`, `grep -c ''`, and Python's `splitlines()` all say 73 --- same run, 2026-08-15, same 1.1.13 binary.
+So a delegate having genuinely done the work does not make the figures it reports true, and any count one returns is re-derived rather than quoted --- the same standing treatment codex's output gets.
+
+**Two upstream bugs are real and are NOT this.**
+`google-antigravity/antigravity-cli` #76 (closed, 1.0.0) reports `--print` silently emitting nothing on a non-TTY, and #318 (open, 1.0.6) reports it hanging there.
+Neither matches the symptom above --- ours returns prompt content promptly on 1.1.13 --- but both are worth knowing before trusting a headless run, since each fails silently in its own way.
+
+- **Do:** route heavy read/draft/verify work to `codex` and `agy` before Claude, and keep the prompt immediately after `--print` or bind it with `=`.
+- **Do:** re-verify any figure a delegate reports, since `agy` miscounted a 73-line file by one while reading it correctly.
+- **Don't:** put another flag between `--print` and the prompt --- that flag becomes the prompt, and the exit status is still 0.
+- **Don't:** read "we have agy quota" as "agy is usable".
+  Quota and a working invocation are separate facts, and the second took five
+  probes plus a review round to establish.
+
+Stated 2026-07-02 ("exhaust its tokens before using our own"), reaffirmed 2026-07-06 ("always use codex first (until we hit the 5-hour limits) before using up claude quota"), and widened 2026-08-15 ("in addition to codex, we have agy quota to use; try using both of those as subagents before exhausting claude quota").
 
 ## Ephemeral-session commit tension
 
@@ -897,7 +960,7 @@ safer/preferred choice merely because the repo has external consumers.
 
 ## Memory and skill storage
 - Never leave durable memories or skills as local-only files (e.g., directly under `~/.codex/`).
-- Commit cross-project memories/skills to `d-morrison/ai-config`; commit project-specific guidance to that project's own repo.
+- Commit cross-project memories/skills to `Morrison-Lab/ai-config`; commit project-specific guidance to that project's own repo.
 - If ai-config is temporarily out of scope in the current session, treat local storage as short-lived staging and hand off the required upstream PR.
 - **Never hesitate to run UMS, just run it.** Don't ask whether a pass is worth it, don't offer it as an option, and don't weigh a small increment against the cost of a PR.
   The owner has said this directly: "never hesitate to run ums, just do it."

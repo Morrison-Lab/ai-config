@@ -95,6 +95,42 @@ In `.qmd`/`.md` prose, `\uXXXX` is not interpreted by Pandoc and renders
 literally: use a math span (`$\times$`), an HTML entity (`&times;`), or
 reword to avoid the glyph.
 
+**The Edit tool cannot perform that substitution, so build the character with
+`chr()` rather than trying to type its escape.**
+Putting the literal glyph in `old_string` and its own `\uXXXX` escape in
+`new_string` is refused outright, with `old_string and new_string are exactly
+the same`: the escape has been decoded to the character by the time the two
+sides are compared, so the edit is a no-op.
+Where the escape names a *different* character the edit succeeds and writes
+that character, so the six literal characters never reach the file either way.
+Read the refusal as this mechanism rather than as the stale read or the
+transcription typo that the same message usually means.
+
+The workaround introduces no escape sequence at all: build the character at
+runtime and interpolate it, as `LDQ, EMD = chr(0x201C), chr(0x2014)`.
+`hooks/no-misattributed-quote.py` does exactly this for the four glyphs its
+regexes must match, which is what keeps the hook's own source ASCII.
+Where a literal escape sequence really is the wanted content, write the file
+from a script rather than through an edit.
+
+**Which layer decodes it is not settled, and this probe cannot settle it.**
+Separating "the tool decodes both parameters" from "the transport decodes such
+an escape in any tool parameter" would mean measuring an escaping layer
+through itself, which
+[`address-every-comment`](../workflow/address-every-comment.md) already rules
+out for the shell case and for the same reason.
+So record the behaviour and leave the mechanism open.
+
+- **Do:** build a needed non-ASCII character from `chr(0x2014)` when an edit
+  has to introduce one into ASCII source.
+- **Do:** name a code point as `U+2014` in prose, since a concrete `\uXXXX`
+  written into an edit lands in the file as the glyph it names --- which is
+  the violation this whole rule exists to prevent.
+- **Don't:** try to convert a glyph into its own escape with an edit; it
+  refuses as a no-op, and the refusal is not the stale read it resembles.
+- **Don't:** report which layer decoded it --- the probe travels the layer it
+  would be measuring.
+
 Apply it when writing and when reviewing a diff: a raw em-dash in a roxygen
 block, a `.qmd`, or a `.md` doc is a review finding, regardless of whether
 this particular file is one a CI check currently scans.

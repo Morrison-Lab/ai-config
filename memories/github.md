@@ -85,6 +85,62 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   refused every GraphQL call while `gh api user`/`gh api repos/<o>/<r>` both
   returned 200 --- a second, distinct root cause for the same
   `check-pr-fully-clean.py` failure symptom already tracked in that issue.)
+
+  **A third root cause reaches that same first call, and it is the most
+  common one: `gh` is not installed at all.**
+  The two causes above both assume a working `gh` whose *requests* are
+  refused, so both are diagnosed by reading a status code.
+  Here there is no request, and since #1462 (2026-08-14) no traceback:
+
+  ```text
+  `gh` is not installed or not on PATH.
+  This script requires the GitHub CLI; -R cannot substitute for it.
+  ```
+
+  It exits **2**, never 1 --- 1 is this script's "not clean" code, so a missing
+  binary would otherwise read as a verdict rather than an environment failure.
+  `command -v gh` discriminates the three in one read, and it is worth
+  running before diagnosing anything else about the script.
+
+  What makes this worth recording rather than filing under "the CLI is
+  missing" is **which** sessions it hits.
+  This file's own "GitHub access from bash in remote/web sessions" section
+  states that there is no `gh`/`glab` CLI in these sessions, so this is the
+  norm for a whole class of session rather than a misconfiguration --- and two
+  corpus rules name that script as the instrument for deciding a PR is ready:
+  [`ardi`](../shared/workflow/ardi.md) requires it for the single-PR loop, and
+  [`fully-clean`](../shared/workflow/fully-clean.md) opens by saying the two
+  criteria are "verified via `python3 scripts/check-pr-fully-clean.py
+  <pr-number>`".
+  So a mandated check is simply unavailable, and nothing in either rule says
+  what to do about that.
+
+  Route around it the same way this bullet already prescribes: the GitHub MCP
+  tools, verifying by hand against
+  [`fully-clean`](../shared/workflow/fully-clean.md)'s own criteria ---
+  select verdict candidates on the `**Claude finished` body marker rather
+  than an author login, anchor on the **last** `### Verdict` heading, read
+  Copilot's posted review body rather than its check colour, and paginate the
+  check-runs endpoint.
+
+  - **Do:** run `command -v gh` before diagnosing a `check-pr-fully-clean.py`
+    failure, so a missing binary, a blocked GraphQL call, and a rate limit are
+    separated in one read.
+  - **Do:** report the script as **unavailable** in the status summary, naming
+    the MCP checks run in its place, so a reader can tell a hand verification
+    from an instrument's verdict.
+  - **Don't:** read the script's absence as licence to skip criteria 1 and 2
+    --- the criteria are the requirement, and the script is one way of
+    reaching them.
+  - **Don't:** report a PR clean without saying which instrument decided it;
+    a hand check and a script run are different evidence and should not read
+    alike.
+
+  (`Morrison-Lab/ai-config#1403`, 2026-08-12: a remote session driving that
+  PR's own check-in ran the script as instructed and got the traceback above.
+  Every criterion was then verified through `pull_request_read` and
+  `get_check_runs` instead, and the merge went ahead on that evidence --- but
+  the summary had to say the instrument was unavailable rather than clean.)
 - **The @claude review bot's author name differs by API:** its comment author is `claude[bot]` in REST (`.user.login`) but `claude` in GraphQL (`.author.login`). A watcher filtering REST comments for `.user.login == "claude"` silently finds nothing — use `"claude[bot]"`.
 - **A third variant, and it is not one repo's quirk: the review comment can
   post as `github-actions[bot]` rather than `claude`/`claude[bot]`, and the
@@ -112,7 +168,11 @@ The GitHub MCP tool surface used in remote/web sessions lives in
   `select(.user.login | test("claude"))` both came up empty; the actual review
   comments were under `github-actions[bot]`.)
 - **Polling for the bot's verdict: match `Claude finished`, don't exclude a placeholder.** While a run is underway, the bot's comment holds an in-progress placeholder whose wording *varies between runs* ("### Review in progress …", "Claude Code is working…"), so a watcher that exits when comments exist, or when one known placeholder phrase disappears, fires early on the next differently-worded placeholder. Completed runs (review and agent alike) start the body with `**Claude finished`. **Filter on that body marker, not on an author login** --- the login itself varies by repo (see the `github-actions[bot]` variant in the bullet above), so a login-only filter can come up empty even once a review has posted.
-  - **When re-triggering a run on a thread that already has a completed `**Claude finished` comment from an earlier run, also scope the filter to comments newer than a baseline ID captured before the trigger** --- otherwise the poll matches the *prior* run's already-finished comment immediately and never actually waits for the new one. **`gh api`'s own `--jq` flag has no way to inject a variable (no `--argjson`) and only fetches the first REST page (30 comments) unless told to paginate, and `--paginate`'s `--slurp` companion flag is rejected outright when combined with `--jq`** --- pipe the raw paginated output into standalone `jq -s` instead, which supports both. **Enable `pipefail` in each shell process that runs one of these pipelines** so an upstream `gh api` failure does not get masked by a successful downstream `jq`:
+  - **When re-triggering a run on a thread that already has a completed `**Claude finished` comment from an earlier run, also scope the filter to comments newer than a baseline ID captured before the trigger** --- otherwise the poll matches the *prior* run's already-finished comment immediately and never actually waits for the new one.
+    **`gh api`'s own `--jq` flag has no way to inject a variable (neither `--arg` nor `--argjson`), and reaching for one fails in the shape of an empty result**: `gh` parses the unknown flag and its value as extra positionals, so `gh api <endpoint> --jq --arg h "$SHA" '<expr>'` exits 1 with an empty **stdout** and `accepts 1 arg(s), received 4` on **stderr** (measured on `gh` 2.92.0, 2026-08-13).
+    Inside a `$(...)` whose stderr is not being watched --- a "reviews at the current head" query, say --- that reads as "no reviews exist" rather than as a broken command, which is why the remedy below is worth taking rather than retrying the flag.
+    It **also only fetches the first REST page (30 comments) unless told to paginate, and `--paginate`'s `--slurp` companion flag is rejected outright when combined with `--jq`** --- pipe the raw paginated output into standalone `jq -s` instead, which supports both.
+    **Enable `pipefail` in each shell process that runs one of these pipelines** so an upstream `gh api` failure does not get masked by a successful downstream `jq`:
     ```bash
     set -o pipefail
     BASELINE=$(gh api repos/<o>/<r>/issues/<N>/comments --paginate | jq -s '[.[][] | .id] | max // 0')
@@ -569,10 +629,10 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     The consequence bullet below, that a background Monitor cannot poll PR
     state, rests on the same assumption and deserves the same re-check before
     you rely on it either way.
-  - **For a repo outside the scope, `mcp__github__*` is not a fallback either
-    --- but git operations are.**
-    The scope limits the MCP tools to the same repo list, so switching to them
-    does not get around a `403`.
+  - **A repo the REST API refuses may still be reachable through
+    `mcp__github__*` --- measure both surfaces rather than assuming one scope.**
+    They shared a scope in the session that wrote this and did not in a later
+    one; see [`github-mcp-tools.md`](github-mcp-tools.md)'s org-gate entry.
     `git ls-remote https://github.com/<owner>/<repo>` works against any public
     repo whatever the scope is, because it is a git operation and the proxy
     passes those through unchanged.
@@ -876,13 +936,14 @@ Two consequences worth knowing before diagnosing this:
   (This exact inference was made, published in a review, and had to be
   retracted --- gha#351, 2026-07-28.)
 
-`uses:` resolution is a separate question from link resolution and behaves
-differently again: Actions stopped resolving
-`uses: <old-owner>/<repo>/.github/workflows/x.yml@v2` after the same
-transfer, failing affected runs with `startup_failure` and **zero jobs**.
-Note that a run started shortly before the cutover can still succeed, so two
-attempts of the *same run* can disagree --- which is the cheapest available
-proof that the cause is environmental rather than in the diff.
+The `uses:`-resolution half of the same transfer is covered in
+`github-actions.md` ("A repo/org rename breaks Actions `uses:` refs"),
+including the trap that a tag can resolve while its own contents still name
+the old owner.
+One diagnostic belongs here because it generalizes beyond Actions: a run
+started shortly before a cutover can still succeed, so two attempts of the
+*same run* can disagree --- the cheapest available proof that a cause is
+environmental rather than in the diff.
 
 ## `gh pr create` fails on a transferred repo whose `origin` still names the old owner
 
@@ -1103,3 +1164,37 @@ the review from the agent's final message instead.
 See [`dont-reinvent-wheel.md`](../shared/principles/dont-reinvent-wheel.md)'s
 "A stale, un-migrated local copy is the least reliable place to fix a
 bug" for the broader lesson.)
+
+## A moving upstream tag can turn a consumer's default branch red with no local change
+
+A consumer pinned to a moving major tag (`...@v2`) inherits every change the
+tag's owner slides under it, so its default branch can go green-to-red between
+two consecutive commits while nothing changed that the check even looks at.
+
+Two cheap reads settle it before anyone's diff is opened.
+Check whether the **default branch itself** is red rather than only the PR,
+since that means the cause is not in any open branch; then intersect the red
+commit's changed files with the flagged files, where an empty intersection
+points at the moving pin upstream.
+
+**A tail-limited log fetch truncates the beginning of the output**, so earlier
+findings are absent and a complete checker looks partial.
+Read the checker's own summary line, which usually states the true total.
+
+- **Do:** read the default branch's status and intersect the red commit's
+  changed files with the flagged files, before diagnosing anyone's diff.
+- **Do:** compare a checker's stated total against the entries a fetch
+  returned, and re-derive the affected set from its own extension list.
+- **Don't:** read a green-to-red transition as evidence the red commit caused
+  it --- a moving pin changes what runs without changing what it runs on.
+- **Don't:** treat a tail-limited log read as the breakage's full scope.
+
+(2026-08-15: a consumer pinning a shared `check-non-standard-chars` workflow
+at `@v2` went red when that checker's banned-glyph set gained U+00D7.
+The red commit changed only a demo JSON and one GDScript file --- no file the
+checker scans and no workflow file.
+The log itself was complete, opening `Found 19 non-standard character(s) in 4
+file(s)` and listing all four; a `tail_lines`-capped fetch showed only the last
+two, and that partial read was mistaken for the checker's own output.
+An independent scan produced the right set anyway, so the fix was correct while
+the reason given for it was not.)

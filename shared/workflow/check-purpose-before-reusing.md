@@ -157,6 +157,48 @@ the false negative is usually unrecoverable, which settles it.
 - **Don't:** read composing an existing helper as exempt from this check ---
   reuse is where the direction gets chosen without being decided.
 
+## The mirror failure: a new check beside a sibling inherits none of its guards
+
+Everything above prices reuse that should not have happened.
+The mirror is reuse that should have and did not:
+authoring a check, query, or command block **beside an existing sibling**
+that does the same kind of job,
+and writing the minimal version instead of mining the sibling's guards.
+
+A sibling check encodes the domain's already-discovered failure modes.
+Its extra clauses are not style --- each one is a fix somebody already paid
+for, frequently with its own verified rationale sitting right next to it.
+A minimal parallel check re-opens every one of those holes at once,
+and nothing flags it,
+because a new block that works on the happy path reads as complete.
+
+The check is mechanical:
+**diff the new block against its sibling clause by clause,
+and for every guard the sibling carries,
+either transfer it or state why it does not apply.**
+A guard you cannot explain skipping is one you skipped by not looking.
+
+- **Do:** enumerate the sibling's guards --- its filters, reductions,
+  state carve-outs, `set -o pipefail`, self-containment --- and account for
+  each in the new block before pushing.
+- **Do:** state beside the new block why an inherited-looking guard is
+  absent, when it genuinely does not transfer.
+- **Don't:** write the minimal parallel check and let review restore parity
+  one guard per round.
+- **Don't:** read "my new block works" as evidence it is finished --- the
+  sibling's guards exist for the inputs the happy path never shows.
+
+(Morrison-Lab/ai-config#1490, 2026-08-15/16: a human-review query was added
+beside two siblings --- the Copilot query and the `CHANGES_REQUESTED` check
+--- in `pr-status`/`pr-status-all`.
+Four of the PR's eight review findings were guards those siblings already
+carried, restored one round at a time: the per-reviewer
+`group_by(.user.login)` reduction (round 1), the `DISMISSED` carve-out
+(round 2), the self-contained `head=` fence (round 3), and
+`set -o pipefail` (round 4).
+Each sibling guard had its own documented rationale one screen away when the
+minimal query was written.)
+
 ## Reusing a CLAIM: its truth conditions travel with the question, not the sentence
 
 Every section above reuses a **structure** --- a template, a directory tree, a

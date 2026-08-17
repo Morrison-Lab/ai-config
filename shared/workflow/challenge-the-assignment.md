@@ -98,6 +98,62 @@ checkable by a reader, and a resolution to be thoughtful is not.
   presupposition, and don't stall on the choice either --- say which
   presupposition fails and what follows.
 
+## When the work itself settles the premise, run it before writing anything
+
+The check above costs a sentence, which is what makes it affordable.
+One shape makes it cost nothing at all, and it is the shape most likely to be
+skipped: an assignment to **widen an instrument's coverage**, carrying an
+incidental claim about what the widened coverage will find.
+
+The claim is unverifiable *by construction*, and the assignment says why.
+An issue reporting that a checker does not scan some tree cannot also know
+that tree is clean, because the instrument that would establish it is the
+thing being asked for.
+So its clean-state claim rests on a hand scan --- which is exactly the
+substitute the whole issue exists to retire.
+
+Two things keep it from being questioned.
+It is **incidental**: it sits beside the request rather than in it, so nothing
+about deciding to do the work requires reading it.
+And it is **reassuring** --- "a missing guard rather than an outstanding
+breakage" narrows the scope and lowers the stakes, and a premise that makes a
+task smaller draws less scrutiny than one that makes it bigger.
+
+The cost is not a wasted task, which is what "The check" above is calibrated
+for.
+The work is right either way.
+What the claim spoils is the **report**: inherit it and the PR ships framed as
+coverage-only, so a real defect the change surfaced goes out described as
+nothing found.
+
+Ordering is the whole remedy, and it is free.
+**Run the widened instrument before writing the PR body, the changelog, or the
+commit message** --- not to check the premise as a separate step, but because
+the first run answers it as a side effect.
+Then report what it actually returned.
+
+- **Do:** run a coverage-widening change and read its output before writing
+  any prose that describes what the change found.
+- **Do:** treat a defect the widened instrument surfaces as in scope, per
+  [`dont-incur-technical-debt`](../principles/dont-incur-technical-debt.md) ---
+  leaving it puts the newly-added check red on the default branch.
+- **Don't:** carry an issue's "currently clean" claim into a PR body; the
+  issue could not have checked it, which is why the issue exists.
+- **Don't:** read the claim's reassuring direction as making it safer to
+  inherit --- a premise that shrinks the task is the one nobody re-derives.
+
+(`Morrison-Lab/ai-config#763` -> `#1454`, 2026-08-13: the issue reported that
+`scripts/check-links.py` did not scan `memories/`, and added "All 26 resolve
+today, so this is a missing guard rather than an outstanding breakage."
+Adding the glob and running the script found a real broken link on the first
+run --- `memories/preferences.md` pointed at `shared/workflow/ardi.md`, which
+resolves relative to that file as `memories/shared/workflow/ardi.md` and does
+not exist, while the other 80 links from `memories/` into `shared/` already
+used the `../` form.
+The issue's own repro command is the tell: it reported 683 links across 405
+files, figures only the un-widened script could produce, so the scan behind
+"all 26 resolve" was never the scan the issue was asking for.)
+
 ## The limit
 
 This is not a licence to relitigate every task before starting it, and a rule
@@ -220,6 +276,228 @@ which is the discretionary detector the bullets above say not to rely on.
 [`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries the
 measurement and the recovery.)
 
+**A fact you leave OUT is the other failure, and it is quieter than a false one
+--- a missing premise leaves a standing rule looking satisfied.**
+Everything above governs what a brief **asserts**: verify it, or where the
+premise is not yours to verify, name a target and let the agent settle it.
+Nothing governs what a brief **omits**, and omission is the half that reaches a
+standing rule.
+A false premise usually breaks something, so it surfaces.
+A missing one changes nothing the agent can see, so the agent follows the rule
+correctly, gets a success back, and stops.
+
+The class that matters is a **repo-level** fact on which a standing rule's
+satisfiability depends.
+Note it sits outside both halves above.
+It is not an environment claim, because you *can* derive it --- it is a file in
+a repository both parties can read --- so the "not derivable, therefore name a
+target" remedy does not apply.
+And it is not a corpus-state claim you got wrong, because you never made a claim
+at all.
+
+The review-trigger class is the worked instance.
+[`pr-on-claim`](pr-on-claim.md) already says that requesting Copilot discharges
+nothing where a repo's own reviewer runs on `workflow_dispatch` alone, and that
+the `Stop` hook cannot catch it.
+That rule is written for whoever opens the PR, and it fails silently when the PR
+is opened by a dispatched agent --- not through carelessness.
+The agent follows the standing "request the external reviewer in the same
+stride" instruction, calls `request_copilot_review`, gets a success, and stops,
+because nothing in that instruction says to go read the repo's review workflow's
+`on:` block and the agent has no reason to suspect the repo is unusual.
+The PR then goes green with no reviewer having looked, which is
+indistinguishable on the board from a reviewed one.
+
+So before dispatching an agent to open a PR, state the repo's review-trigger
+class --- auto on `pull_request` versus dispatch-only --- and, when it is
+dispatch-only, the exact dispatch call, including that its `ref` must be the PR
+branch rather than the default branch.
+The general test is cheap: for each standing rule the agent will invoke, ask
+whether this repo makes it satisfiable, and supply whatever the answer depends
+on.
+
+- **Do:** state the repo's review-trigger class in any brief that will have an
+  agent open a PR, and give the dispatch call when the reviewer is
+  dispatch-only.
+- **Do:** ask which standing rules the brief's task will invoke, and supply the
+  repo-level facts their satisfiability turns on.
+- **Don't:** treat a fact as the recipient's to derive merely because it is
+  derivable --- the question is whether anything would prompt them to look.
+- **Don't:** read a brief carrying correct environment facts as complete; those
+  are the facts the agent could not get, not the facts it will not know to
+  seek.
+
+(2026-08-16, the brief that produced `Morrison-Lab/ai-config#1534`.
+Read that number as naming the brief's own artifact and nothing further: #1534's
+own subject is a reviewer's replacement diffstat, so a reader following it finds
+no trace of the omission described here, and no issue or PR records the incident
+itself --- this entry is the whole of it.
+The brief carried every environment
+fact the agent could not query --- clone path, `gh` absent from `PATH`,
+GitHub MCP tools as the only working client, the branch name --- and omitted the
+review-trigger class.
+The agent requested Copilot and reported the PR ready; no review had been
+scheduled.
+It was caught only because the dispatching session read
+`.github/workflows/claude-review.yml`'s `on:` block itself and dispatched the
+run, which then returned a clean verdict.
+`Lacaedemon/sparta` fires its review automatically on `pull_request`, so the
+identical brief would have been fine there --- which is exactly why the fact is
+repo-level and has to be stated rather than assumed.)
+
+**A prose disclaimer does not neutralize a supplied command that encodes the
+assumption it disclaims.**
+The section above prescribes naming the target and letting the agent establish
+its own state, and a brief can follow that prescription in prose and still ship
+the false premise --- because the prescription governs what the brief *says*,
+and a brief also *supplies* things.
+A runnable command is the second channel, and it is the one carrying the
+assumption.
+
+The disclaimer makes this worse rather than neutral, which is the part worth
+stating.
+The section above describes a convenience instruction that presents as a
+convenience rather than as an assertion, so nothing marks it as a claim.
+Here something does: the prose names that exact hazard, in as many words, one
+line above the command embodying it.
+That sentence is the only signal that would have sent the author looking, so
+spending it is what leaves the command reading as already checked --- the
+partial-guard trade [`fail-fast`](../principles/fail-fast.md) prices, arriving
+through the artifact written to demonstrate care.
+
+Which channel wins is not the recipient's judgment call.
+Prose is read once and a command is pasted, so the assumption reaches execution
+whatever the surrounding sentence says.
+So read every command in a brief as an assertion about the recipient's
+environment, and ask what would have to be true for it to run.
+
+**A `||` fallback is how such a command passes as self-establishing, and the
+fallback is itself an untested command.**
+A brief's author reaches for one to guarantee a value, so what it produces is
+the claim they are least likely to check --- and it is checkable in one line.
+
+The measured behaviour, which is not what the author of the brief below
+believed:
+
+| form | `DEF` |
+|---|---|
+| `DEF=$(false \|\| echo main)` | `main` |
+| `DEF=$(false) \|\| echo main` | *empty* |
+| `DEF=$(false \| sed s/x/y/ \|\| echo main)` | *empty* |
+| the same, under `set -o pipefail` | `main` |
+
+Only the first supplies the literal.
+In the second the `||` sits outside the substitution, so `echo` writes to stdout
+and nothing reaches `DEF`.
+In the third --- the form the brief actually carried --- the pipe discards the
+failing command's status, `sed` exits 0 on empty input, and the fallback never
+fires at all, which is
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md)'s "a pipe
+discards the status of everything left of it".
+
+So the fallback written to guarantee a value was **inert**, for a reason its
+author had not considered, and would have left `DEF` empty.
+The lesson is not that a guessing fallback is worse than an erroring one.
+It is that neither behaviour was established: a fallback nobody ran is a belief
+about control flow, and this one was wrong twice over.
+
+The same holds for the `git worktree add` chain beside it.
+Two forms joined by `||` read as defensive while both rested on one false
+premise, so the chain enumerated two states when the real one was a third ---
+a fallback varying on the wrong axis, which covers nothing however many
+branches it has.
+
+Resolve what a supplied command needs from a source that answers, and fail
+loudly when it does not:
+
+```bash
+DEF=$(git remote show origin | sed -n 's/.*HEAD branch: //p')
+[ -n "$DEF" ] || { echo "cannot resolve default branch" >&2; exit 1; }
+```
+
+- **Do:** read every command you put in a brief as a claim about the
+  recipient's environment, and either drop it or make it self-establishing.
+- **Do:** run a fallback before shipping it, and check what it assigns rather
+  than what you intended it to assign --- one line settles it, and both forms
+  above were wrong.
+- **Do:** end a resolution step with a loud failure rather than a guessed
+  default, so an unmet premise stops the agent instead of reaching execution.
+- **Don't:** treat a "do not assume" sentence as covering the command beneath
+  it --- the disclaimer is spent on the reader, and the command still runs.
+- **Don't:** read a `||` chain as defensive without asking whether its branches
+  differ on the axis that can actually fail; two forms sharing one false premise
+  cover nothing.
+- **Don't:** reason about where a `||` binds, or about whether a pipeline
+  propagates a failure --- both are one command to test and both were guessed
+  wrongly here, in a section about not guessing.
+
+See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+"A brief's own command contradicted its own disclaimer".
+
+**A brief you re-send each round carries a measurement, and the measurement
+expires while the sentence does not.**
+Both sections above fail because the author never derived the claim, or could
+not.
+This one fails after the derivation succeeded.
+The author ran the check, got a real result, wrote it into the brief, and then
+sent that brief again the next round and the round after, with nothing
+re-testing it in between.
+
+Note the rule does not need to know whether the result expired or was wrong to
+begin with, and in the worked case that stayed unsettled.
+Either way the brief asserted it every round on the strength of one reading,
+and being unable to tell the two apart afterwards is itself the argument for
+re-testing.
+
+The claim type that expires is a **capability**: whether a reviewer is
+reachable, whether a token can dispatch a workflow, whether a host answers.
+Each is a property of a moment rather than of the world, so a correct reading of
+one is a timestamp with a value attached, per
+[`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).
+Restating it a round later keeps the value and drops the timestamp.
+
+Recurrence is what turns that into a premise.
+A brief restating what an earlier round established reads to every later round
+as setup rather than as a claim, so the questioning this fragment asks for never
+fires.
+Author and recipient are also the same party here, which is the strongest form
+of the authority the "Why nothing prompts the check" section describes.
+
+**The sharp case is a brief that forbids the retry that would refute it.**
+A step reading "If still nothing, do NOT re-post the request" is not
+merely a brief failing to re-check.
+It instructs the next round not to, so the falsifying action is ruled out by the
+same document that asserts the thing it would falsify.
+
+**More rules do not fix this, because the rule was already there.**
+[`self-review-fallback`](self-review-fallback.md) says to re-check reachability
+every round, and that a reviewer ineligible a few pushes ago can become
+reachable mid-session.
+That rule was loaded and was defeated by a brief restating the blocker as
+settled, so what failed was not coverage but a mechanism that suppresses
+coverage.
+Read a recurring brief as a thing capable of switching off rules you already
+hold.
+
+The remedy is to carry the query rather than its answer.
+State a blocker in a recurring brief as a command to re-run, with the time the
+last result was taken, so each round re-measures instead of inheriting.
+That is [`derive-dont-enumerate`](derive-dont-enumerate.md) applied to a
+capability rather than to a set, and it belongs here because the author is the
+one who has to write it that way.
+
+- **Do:** write a recurring brief's blockers as a command to re-run each round,
+  timestamped with when it last ran.
+- **Do:** treat a step telling the next round not to retry something as the tell
+  that the brief has closed a question it should hold open.
+- **Don't:** restate an earlier round's finding as an established gate in the
+  next round's prompt.
+- **Don't:** read a rule you already hold as protection --- a brief asserting
+  the blocker settled is what stops that rule running.
+
+See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+"A recurring brief re-asserted a blocker nobody re-tested".
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise
@@ -231,7 +509,9 @@ measurement and the recovery.)
 - [`derive-dont-enumerate`](derive-dont-enumerate.md) also tells an author to
   hand over a query rather than an assertion, for a set that can grow while
   the work runs.
-  That is staleness in something true; this is a premise that was never true.
+  There the claim was true when written and the set grew past it; here the
+  author either never derived it, could not, or derived it once and never
+  re-tested it.
 - [`grep-is-not-coverage`](grep-is-not-coverage.md) is the same failure inside
   a single step: a real result, a sound command, and a conclusion that
   overreaches it.

@@ -9,12 +9,19 @@ Split out of `github.md` pre-emptively at 1199 lines, just under
 above 1200 lines, so the file never actually tripped it.
 See ai-config#694 for the precedent.
 
-- In remote/web sessions the authenticated GitHub identity is the repo owner
-  (`d-morrison`), so requesting `d-morrison` as a PR reviewer fails with
-  `422 Review cannot be requested from pull request author`. Harmless — the PR
-  is still created; the reviewer just isn't added. Don't treat the 422 as a
-  failure to retry (it's expected per the standing request-pr-review rule when
-  the author == the requested reviewer).
+- In remote/web sessions the authenticated GitHub identity **can be** the repo
+  owner (`d-morrison`), in which case requesting `d-morrison` as a PR reviewer
+  fails with `422 Review cannot be requested from pull request author`.
+  Harmless --- the PR is still created; the reviewer just isn't added. Don't
+  treat the 422 as a failure to retry (it's expected per the standing
+  request-pr-review rule when the author == the requested reviewer).
+  **Do not read that as a standing property of remote sessions**, which is how
+  this bullet read before it was caveated: identity varies by container and by
+  client, so a container where an MCP write is attributed to `dem-extra1`
+  instead accepts the same request with a `201`. See "A per-client identity
+  table is a CONTAINER measurement" below for the measurement, and settle it
+  by the attributed author of a write you actually made rather than from this
+  bullet.
 - `gh` is NOT available in these sessions — use the `mcp__github__*` tools for
   all GitHub interactions (PRs, issues, comments, reviews). CI status is always
   available via `mcp__github__pull_request_read` (`get_check_runs` / `get_status`)
@@ -70,6 +77,38 @@ See ai-config#694 for the precedent.
   a tag.
   Files in the diff were unaffected, as above --- the angle-bracket form
   inside a fenced code block is correct there and should stay.
+  **`update_pull_request` strips a short placeholder token too, which extends
+  this entry's per-surface table rather than opening a new question.**
+  Be precise about how much is new here, because the neighbouring autolinks
+  entry below already names `update_pull_request` as stripping angle-bracket
+  *spans* --- see "The MCP write tools silently drop `<https://...>`
+  angle-bracket autolinks", which covers `create_pull_request`,
+  `update_pull_request`, and `issue_write` for a full URL.
+  What that entry does not settle is the **short token** case this entry is
+  about, and the two are worth keeping apart rather than merged: they track
+  different content shapes, and this entry deliberately declines to generalize
+  between surfaces at all.
+  So the per-surface table for a short placeholder reads, as of 2026-08-15:
+  `create_pull_request` strips, `update_pull_request` strips,
+  `add_issue_comment` does not.
+  Editing a body is the likelier moment to meet this than creating one, because
+  a correction is exactly when a command gets spelled out for a reader.
+  **And the correction describing the loss reproduces it**, which is the part
+  worth knowing in advance: a note reading "the operands were spelled as the
+  word `head` in angle brackets" is itself a body containing that token, so it
+  is stripped too and the sentence explaining the damage arrives damaged.
+  Describe the broken form rather than quoting it, the same move
+  [`semantic-line-breaks`](../shared/writing/semantic-line-breaks.md) already
+  prescribes where quoting a column-1 `#` reproduces the heading it warns
+  about.
+  Read the stored body back after any edit that adds a command, since the write
+  call reports success either way.
+  (ai-config#1467, 2026-08-15: a merge-order paragraph documenting
+  `git diff --name-only $(git merge-base origin/main PR_HEAD)...PR_HEAD` was
+  first written with both operands in angle brackets and came back as
+  `$(git merge-base origin/main )...` with the operands gone; the correction
+  note naming them was then stripped in turn, and only a third edit describing
+  the form rather than showing it survived.)
 - **`mcp__github__actions_run_trigger` can't re-run CI jobs in these sessions —
   it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`, and
   `cancel_workflow_run` -- the whole `actions: write` family, so you can neither
@@ -84,7 +123,27 @@ See ai-config#694 for the precedent.
   don't expect a direct-dispatch workaround to succeed where rerun failed
   (confirmed on UCD-SERG/serodynamics#193, and again on `d-morrison/rme#1017`
   trying to dispatch `publish.yml` — same `403 Resource not accessible by
-  integration`). Prefer folding
+  integration`).
+  **`run_workflow` succeeded on `Morrison-Lab/ai-config`, 2026-08-15, so treat
+  this as per-session and per-repo rather than as a standing limit --- and
+  attempt it before reporting it blocked.**
+  Dispatching `claude-review.yml` with `ref` set to the PR branch and
+  `inputs: {"pr_number": "1469"}` returned `204 No Content`, and the run
+  genuinely started rather than merely queueing: run `31896086493`, with
+  `review / gather-context` reading `in_progress` at `16:39:08Z` seconds later.
+  That second check is the load-bearing one, since a 204 is an acknowledgement
+  and says nothing about whether a job ran.
+  **Do not generalize it to the rerun family.**
+  `rerun_failed_jobs`, `rerun_workflow_run`, and `cancel_workflow_run` were not
+  exercised in that session, so the bullet above stands unrefuted for them; what
+  changed is one method on one repo, which is the same per-surface discipline
+  the placeholder-stripping entry above insists on.
+  The general lesson is [`growth-mindset`](../shared/workflow/growth-mindset.md)'s
+  "First check the limitation is real": this was avoided for a whole session on
+  the strength of a memory bullet, and one call refuted it.
+  A recorded 403 is a measurement of a moment, so re-attempt rather than
+  inheriting it, and timestamp whatever you find.
+  Prefer folding
   the retry into a real, already-pending fix (e.g. a reviewer's requested
   wording tweak) over pushing a bare `--allow-empty` commit — same retrigger,
   no throwaway commit in history. Only use an empty commit when no real fix is
@@ -96,6 +155,46 @@ See ai-config#694 for the precedent.
   explicit go-ahead first if the workflow has a real side effect (e.g. a
   gh-pages deploy step not gated to `main`) — dispatching isn't just a status
   check in that case, it's a live action.
+- **Merging runs the client split the other way: the raw API 403s and
+  `mcp__github__merge_pull_request` succeeds.**
+  `PUT /repos/{owner}/{repo}/pulls/{n}/merge` with `GH_TOKEN` returns
+  `403 Merging into a protected base branch is not permitted for this session
+  type.`
+  The same merge, same method, same head SHA, goes through the MCP tool
+  normally.
+  What makes this worth its own bullet is the **wording**, which describes a
+  policy rather than a client: it names the base branch's protection and the
+  session's type, so the natural reading is "this session may not merge, and a
+  branch-protection rule is why".
+  Neither half is true, and both are the kind of claim nobody re-tests --- a
+  merge authorization is expensive to obtain, so a refusal that appears to
+  revoke one tends to be reported rather than retried.
+  The generalizable part is that a 403 naming a policy is evidence about the
+  client you used and about nothing else, so re-attempt through the other one
+  before reporting the capability blocked.
+  Do **not** read the sibling bullet above as the mirror case.
+  Its 403s are MCP-side, for want of `actions: write`, and its fallbacks are a
+  push or a human rather than a raw call --- the word "raw" appears nowhere in
+  it, and the one success it records (`run_workflow` on this repo) is itself an
+  MCP success.
+  No raw-succeeds-where-MCP-403s instance is recorded here, so which client
+  wins is not established in either direction; what is established is only that
+  one client's refusal does not settle the question.
+  - **Do:** re-attempt a 403'd write through the other client before reporting
+    the capability blocked, whichever client you started with.
+  - **Do:** read a 403 body that names a *repo* condition (branch protection,
+    a ruleset) as still possibly client-scoped, and check the condition itself
+    before believing it.
+  - **Don't:** treat a refusal that mentions branch protection as evidence the
+    base branch actually forbids the merge --- `mergeable_state` was `clean`
+    and the merge succeeded seconds later.
+  - **Don't:** report a merge as blocked on the strength of one client's
+    refusal, since that hands a granted authorization back unused.
+  (`Lacaedemon/sparta#1275`, 2026-08-16: merged at `16:39:24Z` as `cee465f6`
+  via `mcp__github__merge_pull_request` with `merge_method: squash`, moments
+  after the identical raw-API `PUT` returned the 403 above.
+  `main` is protected there in the sense that the raw path refuses it, and the
+  protection did not block the merge itself.)
 - **`issue_write`'s `labels` REPLACES the issue's whole label set, and a name
   that does not exist yet is silently CREATED rather than rejected.** Two
   independent surprises in one parameter, pulling in opposite directions.
@@ -758,7 +857,7 @@ See ai-config#694 for the precedent.
   introduced this entry.)
 - `d-morrison/gha`'s `CLAUDE.md` carries its own `gh`->MCP substitution table
   (the "GitHub access in remote / web sessions" section), scoped to that repo.
-  `d-morrison/ai-config` has its own cross-model registry at
+  `Morrison-Lab/ai-config` has its own cross-model registry at
   [`tool-mappings.md`](../tool-mappings.md) (generated from `tool-mappings.yml`),
   which ai-config skills can point to directly — see `CLAUDE.md`'s "Skills that
   call gh/glab" section. When a skill or doc in a **different** repo (one with
@@ -769,3 +868,112 @@ See ai-config#694 for the precedent.
   where the table actually lives. (Caught in ai-config#137 review: the gip
   skill referenced a table ai-config didn't have at the time; ai-config#327
   later added `tool-mappings.md` to close that gap.)
+- **The raw REST API and the `mcp__github__*` tools can be gated
+  independently, per ORG --- so a REST `403` is not evidence the repo is
+  unreachable.**
+  [`github.md`](github.md)'s "GitHub access from bash in remote/web sessions"
+  section is right that REST from bash can be scope-limited rather than
+  absent, and it used to add that switching to the MCP tools "does not get
+  around a `403`" because they share one repo list.
+  That held in the session that wrote it and does not hold generally.
+  Measured 2026-08-16, three calls in one command from one session:
+
+  | call | result |
+  | --- | --- |
+  | `GET /repos/Lacaedemon/sparta/pulls/1303` | `200` |
+  | `GET /repos/Morrison-Lab/ai-config/pulls/1538` | `403` |
+  | `GET /user` | `200`, `login: dem-extra1` |
+
+  The MCP tools reached `Morrison-Lab/ai-config` throughout the same minutes
+  --- reading its checks, its review threads, and merging a PR there --- so
+  the two surfaces genuinely disagreed about one org rather than one being
+  stale.
+
+  **Read the `403` body, because the two denials have different remedies and
+  only one of them is `add_repo`.**
+  The per-repo denial that section documents says "Use add_repo to request
+  access".
+  This one says "GitHub access is not enabled for this session.
+  An org admin must connect the Claude GitHub App for this organization",
+  which is an org-level app connection --- nothing a session can grant
+  itself, and nothing `add_repo` addresses.
+  So a session can hold full MCP access to an org whose REST path is closed,
+  which is exactly the shape that makes "the API is unreachable" the wrong
+  conclusion to draw from a single `curl`.
+
+  The practical consequence is which client to build a workflow on.
+  Anything that must edit a PR body from the raw API --- the marker-preserving
+  PATCH that `Lacaedemon/sparta`'s own memory prescribes, since the MCP read
+  strips HTML comments --- works only where REST is open for that org, and
+  has to be re-checked per org rather than per session.
+
+  Note also that `GET /user` answered `dem-extra1` here, where sparta's entry
+  records `d-morrison` for that same raw-API read.
+  Read that against the table carefully: the table's rows are WRITES, so its
+  raw-API row is `claude[bot]`, and the `d-morrison` figure for a raw-API read
+  lives in that entry's prose instead --- which is the disagreement it cites
+  as its reason for ruling `GET /user` out as an identity signal at all.
+  That is the entry behaving as its own caveat says: the measurements are
+  per-session, so re-measure rather than carrying one across.
+
+  - **Do:** try the MCP tool after a raw-REST `403`, and read the `403` body
+    before deciding what the denial is.
+  - **Do:** treat "which client can reach this org" as a per-org question you
+    measure, not a session-wide property.
+  - **Don't:** read a REST `403` as the repo being out of scope; the MCP
+    tools may have it, and `add_repo` may be the wrong remedy entirely.
+  - **Don't:** commit a workflow to the raw-API path for an org without
+    checking that path answers for that org first.
+- **A per-client identity table is a CONTAINER measurement, so its rows do not
+  travel --- and the row that disagrees is the WRITE row, which is the one the
+  table itself says to trust.**
+  `Lacaedemon/sparta`'s `.claude/memories/sparta.md` carries an identity table
+  under "A session writes under TWO identities here", mapping each client to
+  the login its writes are attributed to: MCP tools to `d-morrison`, the raw
+  API to `claude[bot]`, and the `gh` CLI to `dem-extra1`.
+  Its framing is already careful --- "the client makes the identity, not the
+  session", and do not generalize a row to a client you did not measure.
+  What it lacks is a second data point showing which axis actually varies.
+
+  The entry above notes that `GET /user` answered `dem-extra1` rather than the
+  table's raw-API row, and correctly declines to make much of it, because that
+  same sparta entry rules a `GET /user` probe out as an identity signal.
+  The measurement below is not rulable out on those grounds, because it is
+  exactly the signal that entry names as the reliable one: **the attributed
+  author of a write you actually made.**
+
+  Measured 2026-08-16, in this container:
+
+  | write | client | `user.login` |
+  | --- | --- | --- |
+  | `Morrison-Lab/ai-config#1539` opened | `mcp__github__create_pull_request` | `dem-extra1` |
+
+  The table predicts `d-morrison` for that client and got `dem-extra1`, on the
+  one surface the sparta entry names as reliable.
+  So the varying axis is the **container**, not only the client, and a row
+  read out of that table is a measurement with an expiry rather than a lookup.
+
+  **The practical cost is a skipped reviewer request, which is why this is
+  worth more than a footnote.**
+  That same sparta entry records, correctly for its own container, that
+  requesting `d-morrison` on a `d-morrison`-authored PR returns `422`, since
+  GitHub rejects a review request naming the PR's own author --- and tells you
+  not to spend a round diagnosing it.
+  Carried into a container where MCP writes as `dem-extra1`, that reads as
+  "the reviewer request will be rejected", and the natural response is to skip
+  it.
+  Measured instead, on `Lacaedemon/sparta#1303` (author `dem-extra1`):
+  `POST .../pulls/1303/requested_reviewers` with `d-morrison` returned **201**.
+  The `422` is a fact about the author-equals-reviewer collision, not about the
+  client --- so it fires only when the container's own MCP identity happens to
+  be the reviewer you are requesting.
+
+  - **Do:** re-derive the identity by reading `user.login` on a write you just
+    made, per that entry's own rule, rather than reading its table.
+  - **Do:** attempt the reviewer request and read the status; a `201` and a
+    `422` are one call apart and the wrong guess costs a review.
+  - **Don't:** carry an identity row from another repo's memory, or from
+    another container, into a claim about this one.
+  - **Don't:** read the `422` as a property of the MCP client --- it is the
+    author-equals-reviewer collision, and it does not arise when the two
+    logins differ.

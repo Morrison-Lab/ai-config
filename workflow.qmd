@@ -33,7 +33,9 @@ gh pr comment <N> --body "Working on this --- paws off until I'm done."
 After the session ends (PR merged, paused, or closed), follow up with a
 closing comment so the PR is unclaimed for the next person.
 
-Skip the claim step if the most recent comment already claims it.
+Skip the claim step if the most recent comment already claims it and the
+claim is still live --- claims expire 2 hours after the most recent push or
+comment, and need reasserting past that.
 Read-only inspection (checking status, explaining a diff) doesn't need a claim.
 
 The [`claim-pr`](skills/claim-pr/SKILL.md) skill handles the exact
@@ -81,7 +83,7 @@ At fully clean, every inline review thread is resolved. The only open
 conversation is the final all-clear exchange.
 
 See
-[`shared/workflow/fully-clean.md`](https://github.com/d-morrison/ai-config/blob/main/shared/workflow/fully-clean.md)
+[`shared/workflow/fully-clean.md`](https://github.com/Morrison-Lab/ai-config/blob/main/shared/workflow/fully-clean.md)
 for the full definition this page summarizes.
 
 **Deadlock:** if you and the reviewer can't reach consensus after a rebuttal

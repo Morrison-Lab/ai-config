@@ -11,7 +11,7 @@ project:
 
 website:
   title: "ai-config"
-  site-url: https://d-morrison.github.io/ai-config/
+  site-url: https://Morrison-Lab.github.io/ai-config/
   description: "Portable AI agent config — skills, memories, and commands synced across machines via git"
   llms-txt: true
   page-footer:
@@ -19,7 +19,7 @@ website:
   back-to-top-navigation: true
   page-navigation: true
   reader-mode: true
-  repo-url: https://github.com/d-morrison/ai-config
+  repo-url: https://github.com/Morrison-Lab/ai-config
   repo-actions: [edit, issue, source]
   navbar:
     left:
@@ -35,7 +35,7 @@ website:
         href: workflow.qmd
     right:
       - icon: github
-        href: https://github.com/d-morrison/ai-config
+        href: https://github.com/Morrison-Lab/ai-config
         aria-label: GitHub
 
 format:

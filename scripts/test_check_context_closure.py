@@ -854,5 +854,239 @@ check(
     not over and "NOT checked" in text,
 )
 
+
+def _fc_rejects_zero():
+    """argparse exits 2 on a non-positive --fragment-cap rather than accepting it."""
+    try:
+        ccc.main(["--fragment-cap", "0"])
+    except SystemExit as exc:
+        return exc.code == 2
+    return False
+
+
+# --- render_fragment_caps ---------------------------------------------------
+
+# depth 0 is the root, which --root-char-cap already governs under a
+# different limit in a different unit. Gating it twice would let the two
+# reports disagree about one path.
+over, text = ccc.render_fragment_caps(
+    [("CLAUDE.md", 500, 0), ("shared/a.md", 10, 1)], 100)
+check("the root file is exempt from the per-file cap", not over)
+check(
+    "the root file is not counted among the fragments examined",
+    "1 fragment(s) examined" in text,
+)
+
+over, text = ccc.render_fragment_caps(
+    [("CLAUDE.md", 10, 0), ("shared/a.md", 101, 1)], 100)
+check("a fragment over the cap fails", over)
+check("a breach names the file", "shared/a.md" in text)
+check("a breach reports by how much", "(+1)" in text)
+# The remedy this message prescribes -- a `.cases.md` split -- is itself the
+# operation that strands positional references, and that defect is invisible
+# to every other check here. So the message that triggers the split names the
+# sweep, per shared/writing/reorganize-prose.md.
+# Pin the WHOLE canonical pattern, not a prefix of it: a substring
+# assertion on the leading alternatives passes against a sweep narrowed to
+# them, which is the failure forward-references.md's own section describes.
+check("a breach names the positional-reference sweep",
+      r"\b(above|below|here|earlier|later)\b|this (section|file)" in text)
+check("a breach names the remedy, not just the sweep",
+      "naming its subject" in text)
+# A clean run must not print the sweep, or the advice detaches from the
+# moment it applies to and becomes noise every reader learns to skip.
+_, clean_text = ccc.render_fragment_caps(
+    [("CLAUDE.md", 10, 0), ("shared/a.md", 10, 1)], 100)
+check("a clean run does not print the sweep",
+      "above|below|here|earlier|later" not in clean_text)
+
+over, text = ccc.render_fragment_caps(
+    [("CLAUDE.md", 10, 0), ("shared/a.md", 100, 1)], 100)
+check("a fragment exactly at the cap passes", not over)
+
+# Reports what it examined, not only what it found: a walk that resolved no
+# fragments and a corpus with none over the cap both print zero breaches
+# otherwise, per shared/principles/fail-fast.md.
+over, text = ccc.render_fragment_caps([("CLAUDE.md", 10, 0)], 100)
+check("no fragments still reports the examined count", not over
+      and "0 fragment(s) examined" in text)
+
+over, text = ccc.render_fragment_caps(
+    [("shared/a.md", 300, 1), ("shared/b.md", 200, 1), ("shared/c.md", 10, 2)],
+    100,
+)
+check("every breach is reported, not just the largest", over
+      and "shared/a.md" in text and "shared/b.md" in text)
+check("breaches are ordered largest first",
+      text.index("shared/a.md") < text.index("shared/b.md"))
+check("a fragment under the cap is not listed", "shared/c.md" not in text)
+check("the examined count covers every depth below the root",
+      "3 fragment(s) examined" in text)
+
+# The gate is NOT --strict-gated: unlike the advisory byte budget, a
+# fragment over the cap fails on its own, so a run that never passes
+# --strict still returns 1.
+with tempfile.TemporaryDirectory() as d:
+    base = Path(d)
+    (base / "CLAUDE.md").write_text("@big.md\n")
+    (base / "big.md").write_text("x" * 500)
+    check(
+        "a fragment over the cap fails without --strict",
+        ccc.main(
+            ["--base", str(base), "--budget", "100000000", "--fragment-cap", "100"]
+        ) == 1,
+    )
+    check(
+        "the same closure passes under a cap it fits",
+        ccc.main(
+            ["--base", str(base), "--budget", "100000000", "--fragment-cap", "1000"]
+        ) == 0,
+    )
+
+check(
+    "--fragment-cap rejects zero, like the other positive_int thresholds",
+    _fc_rejects_zero(),
+)
+
+# --- --baseline: this repo's own per-PR closure delta -----------------------
+# Distinct from --compare, which needs a submodule gitlink. The fixture is a
+# single repo with two commits, so the closure genuinely differs between the
+# baseline rev and the working tree.
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    (base / "CLAUDE.md").write_text("@frag.md\n", encoding="utf-8")
+    (base / "frag.md").write_text("short", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=base, check=True)
+    subprocess.run(["git", "commit", "-qm", "baseline"], cwd=base, check=True)
+    first = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=base, capture_output=True, text=True
+    ).stdout.strip()
+    # Grow the fragment in the working tree only; the baseline rev keeps "short".
+    (base / "frag.md").write_text("a considerably longer fragment", encoding="utf-8")
+
+    at_base, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.baseline_reader(base, first))
+    in_tree, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.local_reader(base))
+    check(
+        "baseline_reader resolves this repo's own files at the given rev",
+        sum(n for _, n, _ in at_base) < sum(n for _, n, _ in in_tree),
+    )
+    # An ABSOLUTE import points outside the repo, so no revision of this repo
+    # has a version of it and it must fall through to disk -- the same
+    # fall-through `local_reader` and `submodule_reader` already do, and the
+    # same set `resolve()` calls "already absolute". Routing it to
+    # `git show REV:/abs/path` fails outright, which reported a file that is
+    # present and unchanged as dangling and excluded its bytes from the
+    # baseline, inflating the growth by that file's full size on every run.
+    _abs = base / "outside.md"
+    _abs.write_text("z" * 300, encoding="utf-8")
+    for _spelling, _label in ((str(_abs), "/-prefixed"), ("~/.nonexistent-xyz.md", "~-prefixed")):
+        _r = ccc.baseline_reader(base, first)(_spelling)
+        _l = ccc.local_reader(base)(_spelling)
+        check(
+            f"baseline_reader routes an {_label} import to disk, like local_reader",
+            _r == _l,
+        )
+    check(
+        "the import list is unchanged across revs, only weights differ",
+        [p for p, _, _ in at_base] == [p for p, _, _ in in_tree],
+    )
+
+    common = ["--base", str(base), "--budget", "100000000"]
+    check(
+        "--baseline alone is advisory and exits 0",
+        ccc.main(common + ["--baseline", first]) == 0,
+    )
+    # The growth here is len("a considerably longer fragment") - len("short") = 25.
+    check(
+        "--max-growth fails when the closure grew past the limit",
+        ccc.main(common + ["--baseline", first, "--max-growth", "10"]) == 1,
+    )
+    check(
+        "--max-growth passes when the growth fits",
+        ccc.main(common + ["--baseline", first, "--max-growth", "100"]) == 0,
+    )
+    check(
+        "--max-growth is exclusive, so a limit equal to the growth passes",
+        ccc.main(common + ["--baseline", first, "--max-growth", "25"]) == 0,
+    )
+    # The dangerous case: an unresolvable rev makes every file read as absent,
+    # so a naive implementation reports the WHOLE closure as growth. It must
+    # be a hard error instead, per fail-fast.md.
+    check(
+        "an unresolvable baseline rev is a hard error, not a huge fake delta",
+        ccc.main(common + ["--baseline", "no-such-rev-xyz"]) == 2,
+    )
+    check(
+        "--max-growth without --baseline is refused rather than silently inert",
+        ccc.main(common + ["--max-growth", "10"]) == 2,
+    )
+    # Assert the MESSAGE, not just the exit code. This fixture has no
+    # `.ai-config` gitlink, so `--compare` exits 2 on its own for an unrelated
+    # reason -- an exit-code-only check passes identically whether or not the
+    # ambiguity guard exists, which mutation testing confirmed (removing the
+    # guard changed nothing). "Passes by coincidental balance" is ardi.md's
+    # phrase for this; fail-fast.md covers the general shape, a check whose
+    # failure path and whose pass path produce the same observable.
+    import contextlib as _ctx
+    from io import StringIO as _SIO
+
+    _err = _SIO()
+    with _ctx.redirect_stdout(_SIO()), _ctx.redirect_stderr(_err):
+        _rc = ccc.main(common + ["--baseline", first, "--compare", first])
+    check(
+        "--baseline with --compare is refused as ambiguous, by that guard",
+        _rc == 2 and "answer different questions" in _err.getvalue(),
+    )
+    # A self-baseline is the negative control: same tree both sides, so any
+    # non-zero delta would mean the reader is not reading what local_reader does.
+    subprocess.run(["git", "add", "-A"], cwd=base, check=True)
+    subprocess.run(["git", "commit", "-qm", "grown"], cwd=base, check=True)
+    check(
+        "a self-baseline reports zero growth under a zero limit",
+        ccc.main(common + ["--baseline", "HEAD", "--max-growth", "0"]) == 0,
+    )
+    # The exit-code half is asserted above; per fail-fast.md, the message has
+    # to name the rev too, or a typo'd ref and a missing root file read alike.
+    _err = _SIO()
+    with _ctx.redirect_stdout(_SIO()), _ctx.redirect_stderr(_err):
+        _rc = ccc.main(common + ["--baseline", "no-such-rev-xyz"])
+    check(
+        "the unresolvable-rev error names the rev it could not read",
+        _rc == 2 and "no-such-rev-xyz" in _err.getvalue(),
+    )
+
+check(
+    "render_delta labels its rows from its arguments, not a hard-coded pair",
+    "at REV" in ccc.render_delta(10, 20, 4, "T", "at REV", "working tree")
+    and "working tree" in ccc.render_delta(10, 20, 4, "T", "at REV", "working tree"),
+)
+
+
+def _byte_cols(text):
+    """Offsets where a row's byte column ends (the ' B' after each number)."""
+    return {line.index(" B") for line in text.splitlines() if " B" in line}
+
+
+_grow = ccc.render_delta(1000, 2000, 4, "T", "before", "after")
+_shrink = ccc.render_delta(2000, 1000, 4, "T", "before", "after")
+check(
+    "a positive and a negative delta end their byte column at the same offset",
+    # One offset within each rendering, and the same offset across the two:
+    # a manual sign prefix spends a column the '-' of a negative number takes
+    # from the field itself, so the two cases came out a character apart.
+    _byte_cols(_grow) == _byte_cols(_shrink) and len(_byte_cols(_grow)) == 1,
+)
+_save = ccc.render_delta(2001, 1000, 4, "T", "before", "after")
+check(
+    "a shrink's token column reports the bytes saved, not one more",
+    # -1001 B at 4 B/tok is 250 tokens saved; `//` floors toward negative
+    # infinity and reported 251, so a trim over-claimed its own saving.
+    "-250 tok" in _save and "-251" not in _save,
+)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

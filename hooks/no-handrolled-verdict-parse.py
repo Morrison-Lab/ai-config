@@ -210,9 +210,36 @@ PR_IN_COMMAND = [
 # clean.py`, whose name carries underscores, so the hyphenated string never
 # appears in it and the lookbehind could not fire. Removed rather than shipped
 # untested (ai-config#1304, "measured-dead guard components").
+#
+# A flag may carry a SEPARATE value token (`-R OWNER/REPO 445`), not only an
+# `=`-joined one. Without the optional value the flag run stops at `-R`, the
+# `\s+(\d+)` never reaches `445`, and the PR goes unrecorded.
+# `check-pr-fully-clean.py` grew exactly such a flag in ai-config#1391, so this
+# is that change's own consequence rather than a hypothetical.
+#
+# The direction that failure runs in is the SAFE one, and stating it precisely
+# matters because this comment exists to guide the next widening. An
+# unrecorded PR leaves `checked` empty, so a suspicious command that DOES name
+# that PR makes `targets <= checked` false and the guard BLOCKS -- a
+# false-positive over-block of work that was properly instrumented. It does
+# NOT reach the lenient `elif ran: return 0` fallback, which fires only when
+# the suspicious command itself names no PR (`targets` empty) and so does not
+# depend on what `checked_prs` captured.
+#
+# Worth fixing anyway: this is a `deny`, and the docstring above says a guard
+# that blocks work it cannot attribute is a guard that gets switched off.
+#
+# Measured, rather than reasoned: with the optional value removed, the same
+# transcript (`... -R Morrison-Lab/gha 1278`) plus a parse targeting #1278
+# goes allow -> BLOCK. The mutation case in the test file records the same
+# transition as its before/after pair.
+#
+# The value token is optional and the engine backtracks, so a valueless flag is
+# unaffected: in `--verbose 445` the optional value declines to eat `445` and
+# the PR still matches. Measured on both forms.
 CHECKER_CALL = re.compile(
     r"(?:python3?\s+|\./)\S*check-pr-fully-clean\.py"
-    r"((?:\s+-{1,2}\S+)*\s+(\d+))?",
+    r"((?:\s+-{1,2}\S+(?:\s+[^-\s]\S*)?)*\s+(\d+))?",
     re.I,
 )
 
@@ -296,14 +323,20 @@ def prs_in(cmd):
 def checked_prs(path):
     """Scan the transcript for check-pr-fully-clean.py calls.
 
-    Returns (ran_at_all, set_of_pr_numbers).
+    Returns (ran_at_all_successfully, set_of_valid_pr_numbers).
+    A call that failed with an environment/usage error (e.g., exit 2 because `gh`
+    is missing or invalid arguments) does NOT discharge the guard, either for a
+    specific PR or for an untargeted parse.
     """
-    ran = False
-    prs = set()
     if not path:
-        return ran, prs
+        return False, set()
+
+    pending = {}  # tool_use_id -> pr_number
+    valid_prs = set()
+    successful_calls = set()
+
     with open(path, errors="ignore") as fh:
-        for line in fh:
+        for idx, line in enumerate(fh):
             try:
                 msg = json.loads(line)
             except Exception:
@@ -311,31 +344,54 @@ def checked_prs(path):
             blocks = (msg.get("message") or {}).get("content")
             if blocks is None:
                 blocks = msg.get("content") or []
+            if isinstance(blocks, dict):
+                blocks = [blocks]
             if not isinstance(blocks, list):
                 continue
             for b in blocks:
-                if not isinstance(b, dict) or b.get("type") != "tool_use":
+                if not isinstance(b, dict):
                     continue
-                name = (b.get("name") or "").lower()
-                # Reading the script is not running it. A `Grep` whose PATTERN
-                # is the invocation is the case that needs this: the pattern
-                # carries an interpreter, so it satisfies CHECKER_CALL exactly
-                # as a real run would.
-                #
-                # `read`/`grep`/`glob` are the names this harness actually
-                # emits, measured from a live transcript. The `view_file`
-                # family is carried from `no-stale-pr-status.py`, where it is
-                # dead for that reason -- kept only so a harness that does emit
-                # those names is covered, not because it fires here.
-                if name in ("read", "grep", "glob",
-                            "view_file", "read_file", "grep_search", "list_dir"):
-                    continue
-                blob = json.dumps(b.get("input") or {})
-                for m in CHECKER_CALL.finditer(blob):
-                    ran = True
-                    if m.group(2):
-                        prs.add(m.group(2))
-    return ran, prs
+                b_type = b.get("type")
+                if b_type == "tool_use":
+                    name = (b.get("name") or "").lower()
+                    # Reading the script is not running it. A `Grep` whose PATTERN
+                    # is the invocation is the case that needs this: the pattern
+                    # carries an interpreter, so it satisfies CHECKER_CALL exactly
+                    # as a real run would.
+                    if name in ("read", "grep", "glob",
+                                "view_file", "read_file", "grep_search", "list_dir"):
+                        continue
+                    blob = json.dumps(b.get("input") or {})
+                    for m in CHECKER_CALL.finditer(blob):
+                        pr_target = m.group(2)
+                        use_id = b.get("id") or f"call_{idx}"
+                        pending[use_id] = pr_target
+                        if pr_target:
+                            valid_prs.add(pr_target)
+                        successful_calls.add(use_id)
+                elif b_type == "tool_result":
+                    use_id = b.get("tool_use_id")
+                    if not use_id or use_id not in pending:
+                        continue
+                    output_text = str(b.get("content") or b.get("output") or "")
+                    is_failure = (
+                        "is not installed or not on PATH" in output_text or
+                        "This script requires the GitHub CLI" in output_text or
+                        "usage: check-pr-fully-clean.py" in output_text or
+                        "Cannot resolve the repository" in output_text or
+                        "is not in OWNER/REPO form" in output_text or
+                        "Traceback (most recent call last)" in output_text or
+                        "Command failed (" in output_text or
+                        (output_text and "Checking ARDI / fully-clean status for" not in output_text)
+                    )
+                    if is_failure:
+                        failed_pr = pending.pop(use_id)
+                        if failed_pr and failed_pr not in pending.values():
+                            valid_prs.discard(failed_pr)
+                        successful_calls.discard(use_id)
+
+    ran = len(successful_calls) > 0
+    return ran, valid_prs
 
 
 def main() -> int:

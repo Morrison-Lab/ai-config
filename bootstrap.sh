@@ -119,10 +119,31 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   mkdir -p "$GEMINI_CONFIG_DIR"
   SKILLS_JSON="$GEMINI_CONFIG_DIR/skills.json"
   if [ ! -f "$SKILLS_JSON" ]; then
+    # Derive the alias set rather than hard-coding it. An alias skill declares
+    # `description: "Alias for ..."` in its frontmatter and is a thin pointer to
+    # its canonical skill, so the set is enumerable from the repo itself. A
+    # hand-maintained list drifts silently in both directions: a newly added
+    # alias eats budget until the banner returns, and a skill that stops being
+    # an alias disappears from Antigravity entirely.
+    ALIAS_PATTERNS=""
+    for _skill_dir in "$SCRIPT_DIR"/skills/*/; do
+      [ -f "$_skill_dir/SKILL.md" ] || continue
+      _skill_name=$(basename "$_skill_dir")
+      if head -8 "$_skill_dir/SKILL.md" | grep -qiE '^description: *"?Alias for'; then
+        [ -z "$ALIAS_PATTERNS" ] || ALIAS_PATTERNS="$ALIAS_PATTERNS,
+"
+        ALIAS_PATTERNS="$ALIAS_PATTERNS$(printf '        "^%s$"' "$_skill_name")"
+      fi
+    done
     cat <<EOF > "$SKILLS_JSON"
 {
   "entries": [
-    { "path": "$GEMINI_DIR/skills" }
+    {
+      "path": "$GEMINI_DIR/skills",
+      "exclude": [
+$ALIAS_PATTERNS
+      ]
+    }
   ]
 }
 EOF
@@ -169,6 +190,21 @@ if [ -f "$SCRIPT_DIR/AGENTS.md" ]; then
   link_one "$SCRIPT_DIR/AGENTS.md" "$GEMINI_CONFIG_DIR/AGENTS.md"
 fi
 
+
+# --- Stacked-install warning ---
+# The symlink install this script just made and a marketplace plugin install
+# are ALTERNATIVES, not complements: both serve the same skills, so a machine
+# with an `ai-config@*` plugin enabled lists every skill twice and blows the
+# skill-listing context budget (ai-config#1409). Advisory and best-effort --
+# a machine without python3 skips it rather than failing the bootstrap.
+if command -v python3 >/dev/null 2>&1; then
+  printf '\n--- plugin-overlap check ---\n'
+  python3 "$SCRIPT_DIR/scripts/check-plugin-overlap.py" \
+    --consumer-dir "$CLAUDE_DIR" --repo-root "$SCRIPT_DIR" \
+    || printf 'warn  check-plugin-overlap.py exited %d\n' "$?"
+else
+  printf '\nskip  plugin-overlap check (python3 not found)\n'
+fi
 
 # --- Machine-specific dotfiles ---
 # Each dotfiles/<machine>/install.sh gates on its own host and exits quietly

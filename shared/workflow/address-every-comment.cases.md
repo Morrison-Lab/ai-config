@@ -221,6 +221,32 @@ That was the wrong default and the wrong file: #951 did not touch
 identified #947 as the source for the default half, while #955 supplied the
 handed-premise half in the same fragment.)
 
+## "A reviewer's replacement diffstat summed per-commit churn"
+
+(Morrison-Lab/ai-config#1517, 2026-08-16: a round-2 review correctly found the
+PR body's verification table stale, since its figures had been measured at
+`0fff7765`, before the round-1 fix commit.
+It supplied 81 added and 7 removed as the replacement.
+The real figures are 74 and 0.
+
+Summing `git show --numstat` over the branch's two non-merge commits
+reproduces the reviewer's numbers exactly, which is what identifies the
+method rather than merely contradicting the result:
+
+| commit | added | removed |
+| --- | --- | --- |
+| `0fff7765` | 59 | 0 |
+| `3b5feead` | 22 | 7 |
+| summed | **81** | **7** |
+
+`git diff --numstat 0fff7765^ 3b5feead -- shared/workflow/address-every-comment.md`
+returns `74  0`, and the GitHub API's own `additions` field on the PR reads 74.
+Each of the 7 lines `3b5feead` deletes is absent from the file at the merge
+base and present after `0fff7765`, so every deletion removes a line the branch
+itself had added.
+They cancel against the merge base, which is why the net carries no removals
+at all and the reviewer's 7 is churn rather than a net figure.)
+
 ## "The highest-yield version of that check" --- edge case named in the same comment
 
 (Morrison-Lab/ai-config#868, 2026-07-30: a review correctly found that
@@ -567,3 +593,46 @@ question has no fixed vocabulary.
   evidence the class is exhausted --- here, the grep-based fix applied after
   round 1 still left two more rounds' worth of instances for reviewers to
   find, each worded differently enough that the grep never touched it.
+
+## The unit of repair is the figure, across every artifact carrying the twin
+
+(`Lacaedemon/sparta#1222` and `#1225`, both 2026-08-07, both touching exactly
+`.claude/memories/sparta.md` and `test/unit/test_residual_melee_swirl_battle.gd`
+--- the twin pair.
+Three misses in one PR lineage: #1222 round 2 fixed a reconciliation in one file
+only; #1225 round 1 fixed the test header and left the memory copy; and within
+that same PR a second wrong figure one sentence away kept its wrong attribution,
+in a paragraph that edit had itself reflowed.)
+
+## A body-staleness finding is answered by editing the body
+
+(Morrison-Lab/ai-config#1384, 2026-08-10.
+An earlier finding in the same PR was answered with a comment-only correction,
+reasoned from the risk of drift in rewriting a long body assembled across
+several rounds.
+That reasoning was sound about the risk and wrong about the outcome.
+The next round re-read the body and raised three stale figures --- a prose
+figure its own commit `7fe25776` had corrected, plus a line count and a
+diffstat --- and the fix was a body edit carrying a `Corrections to this body`
+table, which round 3 then confirmed resolved and cited by name.
+The three rounds cost `$11.1760`, `$8.4658`, and `$4.5018`; the last is the
+confirming round.)
+
+## A finding's precondition can dissolve before you address it
+
+(`Morrison-Lab/ai-config#1411`, merged 2026-08-13T05:27:13Z as `3bb24610`.
+Its round-2 review, posted `2026-08-12T19:43:19Z`, correctly found the
+sentence "which is what `Morrison-Lab/ai-config#1413` **then did**" asserting
+a merge that had not happened, and proposed hedging it to "proposed in
+`#1413`, not yet merged as of this writing".
+`#1413` then merged at `2026-08-13T04:47:54Z`, and the fix landed in
+`cccb404c` at `04:50:48Z` --- under three minutes later --- so the proposed
+hedge would have been false by the time it was typed.
+The sentence was instead re-derived to name the merge time and the byte
+figures the split produced, each from `git show <sha>:<path> | wc -c`:
+`ardi.md` 98,655 to 92,734, and `fail-fast.md` 94,469 to 91,244.)
+
+## A finding's site list spans every branch in the stack
+
+(`ucdavis/bcs`, 2026-08-13: a reviewer flagged issue numbers in source comments, a `CLAUDE.md` violation, on the base PR of a two-PR stack.
+All three of that PR's files were swept and fixed; the stacked PR's file carried the same violation, was never in the search space, and was therefore never swept.)

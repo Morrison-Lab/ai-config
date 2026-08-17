@@ -176,6 +176,17 @@ So run `gh pr list --base <base-branch>` before merging, and omit
 `--delete-branch` whenever it returns anything.
 Delete the branch by hand once the dependent PR has visibly retargeted.
 
+**Run that query before every merge, not only a `--delete-branch` one, and do
+not count on omitting the flag.**
+A plain squash merge orphans a dependent with no branch deletion involved: the
+dependent keeps its old merge base and re-shows the merged content as a
+conflict.
+And a repo configured to delete merged head branches does so whatever flag you
+passed, so omitting it changes nothing there.
+[`batch-merge-and-resolve`](../../shared/workflow/batch-merge-and-resolve.md)'s
+"A stacked PR is the one conflict that intersection cannot attribute" section
+carries the measurement and the attribution rule.
+
 If it closes anyway, the head branch survives, and restoring the base is a
 better recovery than opening a replacement PR --- it keeps the PR number, its
 comment thread, and its review verdicts:
@@ -331,7 +342,7 @@ discards the abandoned base PR's commits from a published branch.
   the base branch instead of `main`.
 - **`gii`** / **`gia`** — stack issues' PRs on a prior unmerged issue's branch
   as part of their serial loop
-  ([#123](https://github.com/d-morrison/ai-config/issues/123)); this skill is
+  ([#123](https://github.com/Morrison-Lab/ai-config/issues/123)); this skill is
   the reusable primitive they could each call instead of reimplementing the
   mechanics.
 

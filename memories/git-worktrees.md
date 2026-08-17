@@ -416,9 +416,52 @@ what governed.
 That observation does not establish *why*, and one session cannot separate the
 two candidates: a worktree-rooted session may reset where an ordinary one
 persists, or the persists claim may simply be stale.
+A third session, 2026-08-12, saw **both behaviours at once**, which rules out
+the first candidate as stated.
+It was an ordinary main session in a plain multi-repo checkout, no worktree
+anywhere.
+Several calls printed `Shell cwd was reset to /home/user`, and a
+`cd /home/user/gha` in one call nonetheless carried into the next: a Python
+edit script with no `cd` of its own, invoked immediately after, resolved a
+relative path against `/home/user/gha` rather than the repo the session had
+been editing.
+So within one session the directory both reset and persisted, and neither
+"worktree sessions reset" nor "the persists claim is stale" accounts for that
+on its own.
+Treat the behaviour as unpredictable per call rather than fixed per session,
+which is the reading all three measurements support.
+
+**The consequence in a multi-repo session is an edit landing in the wrong
+repository, and it is silent.**
+Both sibling checkouts held a file at the same relative path
+(`.github/workflows/claude-code-review.yml`), so the script opened a real
+file, of the right shape, in the wrong tree.
+Nothing about the call announces it -- the working directory is not echoed,
+and a repo-relative path is exactly what looks correct in a diff.
+
+Two habits make it fail closed rather than silently, and the second is the one
+that actually caught it:
+
+- Address files by **absolute path** in any session holding more than one
+  checkout, and prefer `git -C <path>` over `cd`, per
+  [`preferences.md`](preferences.md).
+- Make an edit script **assert its anchor before writing**.
+  A replacement keyed on exact surrounding text cannot match a different
+  repo's file, so the script aborts with no write rather than mangling
+  something.
+  Put every assert ahead of the single write at the end, so a failure leaves
+  the tree untouched.
+
+That is a specific case of [`fail-fast`](../shared/principles/fail-fast.md):
+the anchor is the check, and the ordering is what keeps its failure path from
+doing damage.
+
 Don't settle the disagreement by picking one.
-Read the `Shell cwd was reset` line in the session in front of you, which
-answers it directly and costs nothing.
+Read the `Shell cwd was reset` line, which costs nothing and answers the
+question **for the call that printed it**.
+Do not read it as settling the session: the 2026-08-12 measurement above saw
+that line on several calls and still had a `cd` carry into a later one, so its
+presence earlier in a session is not evidence about the call in front of you.
 
 So `cd /path/to/repo` is the most natural thing to type and the wrong thing to
 type: it silently selects the main checkout, which is on a different branch.
@@ -567,3 +610,302 @@ So the blind spot was self-inflicted, and the heuristic was invented to recover
 information that was being discarded on purpose --- which is a better lesson
 than the one first written down, and is why the entry now leads with reading the
 header rather than with comparing figures.)
+
+## A nested worktree inflates a whole-tree instrument, because the worktree lives INSIDE the repo
+
+"A repo script run from a worktree can measure the MAIN checkout" above is the
+case where an instrument reads a **different** tree than the one you stand in.
+This is the mirror: the instrument reads **your** tree, correctly, plus a second
+copy of the corpus nested inside it.
+`isolation: "worktree"` on an `Agent` call places that worktree at
+`<repo>/.claude/worktrees/agent-<id>`, so while the agent is live the repository
+physically contains another branch's checkout of every file.
+
+Whether an instrument notices depends on how it enumerates files.
+Measured on `main` at `41d82611`, with and without one worktree present:
+
+| instrument | no worktree | one worktree present |
+| --- | --- | --- |
+| `npx markdownlint-cli2` | `Linting: 512 files` | `Linting: 1207 files` |
+| `scripts/check-links.py` | 503 files | 503 files |
+| `scripts/check-context-closure.py` | 80 fragments | 80 fragments |
+| `scripts/check-hook-catalog.py` | 18 / 20 | 18 / 20 |
+
+Removing the worktree returned markdownlint to 512.
+
+What decides exposure is **how an instrument enumerates**, and the shapes are
+worth knowing because they predict which of your own tools is affected without
+re-measuring each one.
+
+Exactly one shape is exposed, which is why only one row moved:
+
+- **An unrestricted recursive glob from the repo root.**
+  `.markdownlint-cli2.jsonc` globs `**/*.md`, and its `ignores` list named
+  generated output and dependencies rather than a nested checkout.
+
+The other three rows are immune, and each for a different reason:
+
+- **A named-directory glob** never reaches it.
+  `check-links.py`'s `SCAN_GLOBS` lists `skills/**/*.md`, `memories/**/*.md`,
+  and their siblings, so `.claude/` sits outside its search space.
+- **A closure walk from named entry points** never reaches it either.
+  `check-context-closure.py`'s `walk_closure` follows references outward from
+  its roots, so a nested checkout is reachable only if something in the closure
+  cites it, and nothing does.
+- **A fixed-file read** has nothing to enumerate at all.
+  `check-hook-catalog.py` opens `hooks/hooks.json` and `README.md` by path;
+  it globs nothing.
+
+One further immune shape is worth naming even though no row above uses it,
+since much of `scripts/` is built on it: **a `git ls-files` enumeration**
+cannot see a nested worktree, because its files are untracked in the parent
+index.
+`scripts/check-memory-file-size.py` is the example.
+
+The config fix is tracked as
+[#1511](https://github.com/Morrison-Lab/ai-config/issues/1511) and proposed in
+[#1513](https://github.com/Morrison-Lab/ai-config/pull/1513), and is not what
+this entry is about.
+That PR's own `ignores` comment carries the breakdown of the 1207 --- the
+worktree's markdown, the files its `.claude/skills` symlink pulls in, and its
+`codex-skills/` escaping the root-anchored ignore --- so read the count's
+composition there rather than here.
+The enumeration question outlives that fix, since any tool added later that
+globs the repo root inherits the same exposure.
+
+**Nothing in the output flags the change.**
+`Summary: 0 issues in 0 files` is identical either way, so the inflation lives
+entirely in the `Linting:` line --- and a reader who pipes to `tail` to shorten
+the output keeps the summary and drops exactly that line.
+That is the same self-inflicted blind spot recorded in "A repo script run from a
+worktree can measure the MAIN checkout", arriving through a different fault.
+
+Note the failure direction is the opposite of
+[`fail-fast`](../shared/principles/fail-fast.md)'s "A zero-shaped
+summary can be sound, and the scope line is what decides it".
+There a sound figure is wrongly retracted; here an inflated one is published
+unremarked, and the same line separates the two cases.
+
+So **run `git worktree list` before publishing a whole-tree figure**.
+More than one row means the scan may have covered another branch's copy of the
+corpus, so the figure describes a tree nobody asked about.
+`git archive HEAD | tar -x` into a scratch directory settles it outright ---
+[`fail-fast`](../shared/principles/fail-fast.md) already prescribes that for a
+drifted working tree, and an archive of `HEAD` carries no untracked nested
+checkout either.
+
+A second consequence is a hook rather than a figure.
+A pre-commit hook running such a tool with `always_run: true` scans the nested
+checkout too, so it can fail on a file from a branch you are not on, in a commit
+that does not touch it.
+
+- **Do:** run `git worktree list` before quoting a whole-tree count.
+- **Do:** ask how an instrument enumerates --- `git ls-files`, named
+  directories, or a root glob --- before assuming it is immune.
+- **Don't:** read a stable `Summary:` line as evidence the scope was stable;
+  the scope sits on the line above it.
+- **Don't:** trust a whole-tree figure measured while a subagent was live,
+  including one you published earlier in the same session.
+
+## A quiet worktree is not evidence the session working it has stopped
+
+Every earlier section in this file assumes the peer worktree is dead.
+This one is about telling that apart from a peer worktree that only *looks*
+dead, before you edit it, delete it, or reassign its branch.
+The operative rule --- ask the agent, never infer --- is restated in
+`CLAUDE.md`'s "Subagent worktrees are assigned" section; this section carries
+the evidence and the case record behind it.
+
+`git status --short` reporting nothing uncommitted, and `git log
+origin/<branch>..HEAD` reporting nothing unpushed, both answer a question
+about a **moment**: is anything sitting here right now that a snapshot would
+show.
+Neither answers "is anyone working here".
+A session between edits, or paused mid-thought, produces the identical
+snapshot to a session that finished and walked away, and nothing in either
+command distinguishes the two.
+
+`ListAgents` not naming a session is the same shape of gap, not a stronger
+signal.
+It reports what the harness currently tracks, and a session can be alive and
+simply not be one the listing surfaces --- so absence there is not proof of
+absence in fact, any more than a clean `git status` is.
+
+**The `idle_notification` timestamp check is sound in form and only as good as
+the timestamp you compare it against.**
+Comparing a teammate's last `idle_notification` against your own most recent
+message to it is the right check --- a notification timestamped before your
+last message is stale, not evidence the teammate has gone quiet since.
+But that check has an input you supply, and if the timestamp you are comparing
+against is itself invented rather than read, the comparison inherits the
+error: a fabricated "now" can make a live, recent notification look stale, and
+the conclusion --- "this session has gone quiet" --- is then built on a number
+nobody measured.
+`Morrison-Lab/ai-config#1453` owns that defect and its fix (derive every
+timestamp you reason about, don't extrapolate from one you derived earlier);
+what matters here is the interaction, not the fix: a fabricated figure feeding
+straight into a **liveness** decision is a sharper failure than feeding into
+an ordinary status recap, because the decision it distorts is exactly the one
+this section is about.
+
+**One step earlier than the timestamp: the field's own semantics are not
+established anywhere in this corpus, so a correct timestamp comparison still
+does not settle liveness on its own.**
+An `idle_notification` carries an `idleReason` such as `"available"`, and
+reading that as "this session has stopped working" is an inference this
+corpus has never verified.
+`"available"` describes a session that is not currently blocked on a tool
+call --- which is exactly what a session sitting on a backgrounded `gh run
+watch` looks like from the outside, since the watch runs and reports without
+occupying the foreground.
+So the timestamp check above can be run correctly, against a real,
+non-fabricated timestamp, and the result still says only when the notification
+was sent --- never what sending it actually meant.
+Read `idleReason` as an unglossed field rather than as a verdict, and treat a
+liveness question it seems to answer as still open.
+
+**Two more direct ways the same misreading arrives, both concluding "dead" on
+evidence that only shows "quiet right now".**
+
+- A worktree read clean via `git status --short`, with no unpushed commits and
+  no `ListAgents` entry, was judged finished, and a second session began
+  editing a file inside it.
+  The Edit tool's own read-staleness guard refused: `File has been modified
+  since read`.
+  The worktree's owner had started editing between the read and the write.
+  What actually prevented the clobber was that guard, not the judgment that
+  produced the edit attempt --- worth naming plainly, since crediting your own
+  care for a tool's backstop is how the next read of a clean worktree gets
+  trusted a little more than it should.
+- A worktree instead sat with real uncommitted work (38 insertions) for over
+  nine hours, with no `ListAgents` entry for it, and was judged dead on that
+  basis.
+  It was alive, and replied within a minute once asked directly.
+
+Both readings used the same evidence --- a snapshot plus an absent listing ---
+and reached opposite, both wrong, conclusions.
+That is the tell that the evidence does not discriminate: it produced "quiet
+but alive" and "quiet and abandoned" from the identical two facts.
+
+**Long-stalled uncommitted work in a container-local worktree is still a real
+problem, and the fix is to ask, not to infer.**
+Uncommitted state in a worktree survives nothing --- not a container
+restart, not a reclaim, not the session that made it forgetting to push.
+So a worktree sitting on real, unpushed edits for hours is genuinely worth
+resolving rather than leaving alone indefinitely.
+The tension is real: leaving it risks losing work if the container churns,
+and touching it risks clobbering work in progress.
+The resolution is not to infer an answer from indirect signals that cannot
+support one --- it is to ask the session directly (`SendMessage` to its id, or
+the equivalent for a peer Claude Code session) and act on the reply.
+One message costs a round trip.
+A clobbered edit costs another session's unpushed work outright, with no
+recovery path once it is gone.
+
+- **Do:** treat a clean, in-sync `git status` in another session's worktree as
+  a statement about that instant, never as a statement about whether anyone is
+  still working there.
+- **Do:** treat `ListAgents` not naming a session as "not tracked here", not as
+  "does not exist".
+- **Do:** ask the session directly before editing or reclaiming a worktree
+  that has sat with real uncommitted work for an extended stretch --- and
+  before concluding it is dead just because it has sat quietly.
+- **Don't:** derive an `idle_notification` staleness comparison from a
+  timestamp you extrapolated rather than measured; see `#1453` for that half.
+- **Don't:** read `idleReason` as a liveness verdict; a correct timestamp
+  comparison still leaves the field's own meaning unestablished.
+- **Don't:** credit your own judgment when a tool's built-in guard is what
+  actually stopped a clobber --- name the guard, so the next read of a clean
+  worktree gets checked rather than trusted.
+
+(`Morrison-Lab/ai-config`, 2026-08-13, in the multi-teammate session that went
+on to merge #1452 as `fcc09f00`: a dispatched teammate's `idle_notification`s
+at `16:08:59Z` and `16:10:24Z` were judged stale against status recaps timestamped
+roughly `16:13Z` and `16:20Z` --- timestamps that had themselves been
+extrapolated rather than re-derived, per `#1453`.
+Separately, that teammate's worktree read `git status --short` clean and
+in-sync, with no `ListAgents` entry, and was judged finished; editing
+`shared/workflow/fully-clean.md` inside it was refused by the Edit tool's
+staleness guard mid-edit, because the teammate had started editing the same
+file between the read and the write.
+Later the same worktree sat with 38 uncommitted insertions for over nine
+hours with no `ListAgents` entry, was judged dead, and replied within a
+minute once asked --- it then reclaimed the PR itself.
+A fourth instance came from a different source: the team-lead session's own
+review message on the PR recording all this, which read the agent writing
+this entry as idle roughly three minutes after it dispatched the review run
+that produced round 1, on the strength of an `idleReason: "available"`
+notification --- and named the notification's own semantics as unverified
+only once the writer pointed out the watch had, in fact, been running the
+whole time.
+Recorded here as evidence about the field rather than about a worktree,
+since nothing about it involved git state --- the mechanism is identical to
+the first two instances, and the correction came from a message rather than
+from a diff.)
+
+## A subagent that has REPORTED COMPLETION can still be resumed, so its worktree is not yours to work in
+
+The section above is entirely about concluding "dead" on evidence that shows
+only "quiet" --- a clean `git status`, an absent `ListAgents` entry, an
+`idleReason` nobody has glossed.
+Its remedy is to ask the agent before touching its worktree.
+
+This is the case where the agent has answered without being asked.
+A dispatched subagent emits a completion notification, the orchestrator reads
+it, and that is a far stronger signal than any of the above: it is the agent's
+own report that it has stopped.
+It is still not terminal.
+The harness's own notification says so in as many words --- "the same task-id
+may notify more than once", because the agent can be resumed and will then
+notify again --- so a completion report bounds the past and promises nothing
+about the future.
+
+**The second-order effect is the expensive half, and it lands on the agent
+rather than on you.**
+Working in a completed agent's worktree puts your commits on its branch and in
+its reflog.
+When it resumes, it finds a commit it did not make, freshly pushed, on the PR
+it claimed --- which is exactly the signature
+[`claim-pr`](../shared/workflow/claim-pr.md)'s parallel-session check names,
+and that check is sound.
+So the agent applies a correct rule to a manufactured signal, concludes a live
+session is racing it, stops pushing, and escalates a question to a user who is
+not there.
+
+Note which way this fails.
+Nothing is corrupted and no work is lost, so there is no artifact to inspect
+afterwards --- the cost is a stalled agent and a question nobody asked for,
+which reads as the agent being cautious rather than as the orchestrator having
+manufactured its evidence.
+
+The fix is to keep the two working directories separate rather than to reason
+harder about liveness.
+Cut your own worktree off the branch and work there, and reclaim the agent's
+only after deciding it will not be resumed.
+Where you must work in its tree, say so **to the agent** before it resumes,
+since a message is the one thing that can distinguish your commit from a
+stranger's.
+
+- **Do:** cut a separate worktree for your own commits on a dispatched agent's
+  branch, rather than reusing the worktree it was given.
+- **Do:** read a completion notification as "stopped for now", the same way
+  the section above reads a quiet worktree.
+- **Do:** tell the agent when one of its branch's commits is yours, so its
+  parallel-session check has something to weigh.
+- **Don't:** treat a completion report as licence to reclaim a worktree --- it
+  is stronger evidence than silence and still not terminal.
+- **Don't:** read the resulting "a parallel session is racing me" escalation
+  as the agent malfunctioning; it is applying a correct rule to evidence you
+  created.
+
+(`Morrison-Lab/ai-config#1481`, 2026-08-15.
+A sidecar UMS agent opened the PR and reported completion.
+The orchestrator then addressed the review's one blocking finding from inside
+that agent's own worktree, committing `4d8c6c7a` and pushing it.
+The agent was resumed, found a commit it had not made --- correctly authored
+`Claude <noreply@anthropic.com>`, already pushed, present in its own reflog ---
+applied `claim-pr`'s parallel-session rule, declined to push, and asked which
+of the two sessions should keep driving.
+Its analysis was right at every step, including its verification that the
+commit it had not made was the better fix; only its premise was false, and the
+orchestrator had supplied it.)

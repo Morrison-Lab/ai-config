@@ -141,6 +141,55 @@ session (or prefix with `claude ` to run them in a terminal):
 No `version` is pinned, so every commit to this repo counts as a new version —
 sessions with marketplace auto-update pick up the latest automatically.
 
+### The plugin install and the symlink install are alternatives, not complements
+
+Both routes serve the same corpus,
+so a machine that ran `bootstrap.sh` (bare names, `/ardi`) **and** enables an
+`ai-config@*` plugin (prefixed names, `/ai-config:ardi`) lists every skill
+twice.
+The skill listing is budgeted at roughly 1% of the context window,
+and past that budget descriptions are truncated and skill routing degrades ---
+measured ~3.8x over budget on one doubly-installed machine (ai-config#1409).
+Pick one route.
+On a `bootstrap.sh` machine, leave the plugin disabled;
+the symlinked copy already serves every skill.
+
+The same goes for enabling the plugin from **more than one marketplace**:
+both `Morrison-Lab/ai-config` and `d-morrison/ai-config` publish a plugin
+named `ai-config` from the same repo, so only one entry can own the
+`ai-config:` namespace and the rest are no-op collisions.
+Enable at most one.
+
+`bootstrap.sh` runs `scripts/check-plugin-overlap.py` at the end of an
+install and warns when it detects either overlap;
+run it standalone any time to re-check a machine.
+
+A consumer repo's checked-in `.claude/settings.json` marketplace block (the
+JSON above) is correct for a teammate cloning fresh with no ai-config
+checkout, and redundant for anyone who ran `bootstrap.sh`.
+The latter group opts out in **`.claude/settings.local.json`**, not in
+`~/.claude/settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "ai-config@Morrison-Lab": false
+  }
+}
+```
+
+The file matters, and the intuitive choice is the wrong one.
+Claude Code resolves settings
+managed > command line > `.claude/settings.local.json` > `.claude/settings.json` > `~/.claude/settings.json`,
+so the **user** scope is the lowest of the five rather than a personal
+override --- a `false` there loses to the repo's checked-in `true`.
+`enabledPlugins` resolves by precedence rather than by union, so the `false`
+in the local file does switch the plugin off.
+(See [Claude Code settings](https://code.claude.com/docs/en/settings),
+"How scopes interact" and `enabledPlugins`; read 2026-08-12.
+A plugin force-enabled by enterprise managed settings cannot be disabled this
+way at all.)
+
 ## Use these skills with this repo's own `@claude` bot
 
 The two mechanisms above cover the **CLI** (`~/.claude/skills` via `bootstrap.sh`)
@@ -255,7 +304,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit` | reminds, never blocks, that an admitted mistake owes a *mechanism*, not just a note |
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
-| `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since |
+| `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
 | `remind-brief-premises.py` | `PreToolUse` (Agent) | reminds, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
@@ -264,6 +313,9 @@ the rule is consulted when it is *read* and broken when a message is
 | `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
 | `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
 | `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
+| `no-unauthorized-merge.py` | `PreToolUse` (Bash) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`) unless an explicit `ALLOW_MERGE=1` assertion accompanies it |
+| `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
+| `no-misattributed-quote.py` | `Stop` | **not registered ([#1527](https://github.com/Morrison-Lab/ai-config/issues/1527))** --- would block a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 
 A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse
@@ -273,6 +325,22 @@ gates `validate` and pre-commit. Two hooks are untested today
 (`no-offer-to-file.py`, `inject-local-time.sh`), carried in an explicit
 `KNOWN_UNTESTED` allowlist and tracked in
 [#1080](https://github.com/Morrison-Lab/ai-config/issues/1080).
+
+That runner compares hooks against their *tests*.
+`scripts/check-hook-catalog.py` compares them against their *bindings*:
+it asserts that the table above and
+[`hooks/hooks.json`](hooks/hooks.json) name the same hooks, and that each row's
+stated event and matcher match what the manifest actually binds.
+It gates `validate` and pre-commit too.
+The two sets had drifted apart in both directions
+([#1206](https://github.com/Morrison-Lab/ai-config/issues/1206)), and the
+dangerous direction is a row for a hook that is *not* registered --- an inert
+guard and a guard with nothing to block look identical, because neither ever
+produces output, so the row becomes positive evidence for something that never
+fires.
+A hook that is deliberately documented-but-inert says **not registered** in its
+own row and sits in an explicit `KNOWN_UNREGISTERED` allowlist, so the state is
+asserted rather than merely true.
 
 `bootstrap.sh` symlinks `hooks/` into `~/.claude` like any other top-level
 directory, so the scripts arrive with no extra step.

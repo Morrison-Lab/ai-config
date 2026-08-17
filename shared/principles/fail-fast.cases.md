@@ -5,6 +5,40 @@ Worked-example case records for the rules in
 auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
+## A usage error that would have been read as a verdict
+
+(`Morrison-Lab/ai-config#1462`, 2026-08-14: `scripts/check-pr-fully-clean.py`
+documents `0: fully clean` and `1: not clean` in its own docstring, and is the
+corpus's verdict authority --- [`fully-clean`](../workflow/fully-clean.md) names
+it as such, [`ardi`](../workflow/ardi.md) mandates it, and
+[`hooks/no-handrolled-verdict-parse.py`](../../hooks/no-handrolled-verdict-parse.py)
+refuses the hand-parse fallback until it has answered.
+The PR added argument parsing and a `resolve_repo()` that fails loudly rather
+than falling back to a hardcoded literal, and spelled both failures
+`raise SystemExit("msg")`.
+That exits **1**, so every usage error --- bad arguments, an unresolvable repo,
+a URL passed where `OWNER/REPO` was wanted --- would have been reported to
+every caller of the verdict authority as *this PR is not clean*.
+Caught by the author's own pre-push self-review rather than by a test, because
+the tests asserted `SystemExit` was raised and not which status it carried.
+Fixed with a `USAGE_EXIT = 2` constant and a `die()` helper, plus two tests
+asserting the code.
+
+The exit-status figures in the rule above were measured directly rather than
+recalled:
+
+```bash
+python3 -c 'raise SystemExit("some message")'; echo "rc=$?"   # some message, rc=1
+python3 -c 'import sys; sys.exit("some message")'; echo "rc=$?"  # some message, rc=1
+python3 -c 'raise SystemExit(2)'; echo "rc=$?"                # rc=2
+python3 -c 'raise SystemExit(None)'; echo "rc=$?"             # rc=0
+python3 -c 'raise SystemExit("x")' 2>/dev/null                # prints nothing: stderr
+```
+
+CPython 3.11.15.
+A non-integer that is not `None` is printed and yields 1, so the collision is
+not special to strings.)
+
 ## "In a check you run by hand" --- the swallowed grep
 
 (ai-config#754, 2026-07-28: a pre-push scan for banned punctuation used
@@ -94,8 +128,8 @@ And the mangling disguised the artifact --- an intact `+++ b/<path>` in prose
 reads as machine output and gets deleted on sight, while `++ b/<path>` reads
 as a typo or an odd bullet, so a read-through for sense passes over it.
 
-The corpus already held the mechanism, at `memories/git.md`'s
-stash-supersession bullet, which ships `grep '^+[^+]'` and names the
+The corpus already held the mechanism, at `memories/git-stash.md`'s
+supersession bullet, which ships `grep '^+[^+]'` and names the
 `+++ b/<path>` headers it excludes.
 It did not transfer, and would not have been the right guard here anyway:
 measured on git 2.50.1, `^+[^+]` drops added blank lines, so on prose it merges
@@ -255,6 +289,17 @@ Unlike the `grep` word-boundary case above, nothing had been removed, so there
 was no exclusion reason to re-run over survivors; the comment's own statement of
 the hazard was the predicate, and reading the patterns against it would have
 caught them.)
+
+## The same block, where the comment stated an exclusion criterion
+
+(`ucdavis/bcs`, 2026-08-13: a dialect word-list table carried a comment saying that words colliding with an R identifier are excluded "because each would be a false positive that blocks a push", naming `grey`/`gray` as the example.
+The table immediately beneath it held `summarise`, a dplyr verb appearing in 19 files, plus `colour`, `labeller`, and `analyses`.
+Same author, same commit, same shape as the case above.
+
+What it adds is which of the two adjacent blocks fires.
+The case above records a comment that removed nothing, so there was no survivor set to sweep and the hazard sentence itself was the whole predicate.
+Here the comment states an **exclusion criterion**, so it is the "apply a comment's stated exclusion reason as a predicate to the members still present" block that governs --- and applying it was fully decidable rather than a matter of reading, because the repository's own green spellcheck already labels every in-scope word as accepted.
+See [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s "A green check on the default branch is a free labelled corpus" for the audit that mechanized it.)
 
 ## "Enumerate the qualifier classes by which SIDE of the phrase they sit on"
 
@@ -484,3 +529,217 @@ present, and prescribes re-searching for the stable part of the concept.
 What that entry does not say, and what is specific to merge verification, is
 that the correct needle is obtainable for free from the diff --- so here the
 guess is eliminable rather than merely improvable.)
+
+## Five instruments in one session reporting a vacuous zero
+
+(2026-08-07: five instruments in one session each returned an empty or zero
+result that was read as absence --- a cumulative delta over a per-tick-cleared
+array, a `gh pr diff --name-only` empty from API lag that returned 2 files on
+re-query, an `ls A || ls B` fallback that did not say which branch answered, a
+diff-scoped grep blind to a defect caused by a *deleted* line, and this one.
+The last was published as a false claim by a session that had, earlier that same
+day, written the vacuous-zero trap into this very file.
+Read that as the argument for the denominator being a property of the
+instrument rather than something recalled at the call site ---
+[`skill-checklists`](../workflow/skill-checklists.md) already draws exactly that
+conclusion, in its "knowing the rule is not what fails here" passage, and is the
+place to read rather than restate it.)
+
+## A 947-repo sweep that scanned nothing
+
+(2026-07-28: a 947-repo scan reported `scanned: 0`, caught only because the
+count was printed; the `chmod +x` had been in a command the permission
+classifier denied minutes earlier.
+A later run of the fixed script reported 910 of 947, which is how that same
+sweep's rate-limit truncation was found --- the 37 repos it never reached.)
+
+## Why no prefix pattern separates a diff header from its data
+
+Measured on git 2.50.1, against a commit adding `++i;`, `++ foo` and `plain`:
+
+| guard | survives |
+|---|---|
+| `grep -v '^+++'` | `plain` |
+| `grep -v '^+++ '` | `++i;`, `plain` |
+| positional | `++i;`, `++ foo`, `plain` |
+
+## The per-file precondition, caught by dogfooding the guard
+
+This is not a hypothetical: the pass that wrote this entry ran the guard over
+its own three-file diff as a dogfooding check, and got three hits --- its own
+two undropped headers plus one --- which read at first like defects in the
+files rather than in the scan.
+Per-file scanning returned 0 for every file, as did grepping the files
+directly.
+
+## A denominator three too high, from the documented remedy
+
+(`Morrison-Lab/ai-config#1462`, 2026-08-14: an execution miss rather than a
+coverage gap.
+Both halves of the rule already existed in the section above --- the positional
+`tail -n +2` remedy and the per-file precondition --- and the pre-push scan ran
+the single-pass form anyway over a **4-file** diff, reporting
+`0 hits in 297 added lines` where `git diff --shortstat` says 294.
+Three leftover `+++ b/<path>` headers, exactly `files - 1`.
+Nothing about the run announced it: the command exited 0, the hit count was
+genuinely 0, and only the denominator was wrong.
+What caught it was the cross-check, not a re-read of the pipeline.
+
+Re-measured here on a three-file range of this repo's own history, so the
+arithmetic is checkable without that PR's branch:
+
+```bash
+git diff --name-only fcc09f0~1...a47620b | wc -l          # 3
+git diff --shortstat fcc09f0~1...a47620b                  # 267 insertions
+git diff fcc09f0~1...a47620b | grep '^+' | tail -n +2 | wc -l   # 269
+```
+
+Two too high on three files.
+Looping per file and summing returns 267, matching `--shortstat`.)
+
+## What the tighter `^+[^+]` guard drops
+
+Measured on git 2.50.1 against a two-paragraph addition: `^+[^+]` returned the
+two lines of text and not the blank between them, while the positional form
+returned all three.
+
+## How far a `grep -o` pattern's own alphabet reaches into a value
+
+Measured 2026-08-09 on `ucdavis/bcs`: of 45 sites carrying a ten-character
+identifier, a pure-digit pattern matched **12**, and the remaining 33 mix
+letters and digits in positions no digit-only rule reaches.
+
+## One shared abbreviation list feeding two regex branches
+
+(Morrison-Lab/gha#425, 2026-08-05: one abbreviation list (`_ABBREV_RE`) fed two
+regex branches --- a lowercase-sentence branch and an uppercase one.
+Dropping `No` from the list fixed the lowercase branch and un-protected `No.` on
+the uppercase branch; registering every lowercase form then fixed the lowercase
+branch and leaked protection onto the uppercase one.
+Each edit traded one regression for the other until the fix became
+architectural: a second, separately-scoped pass applied only after the first
+branch ran.)
+
+## A documented enabling procedure naming one of two required steps
+
+(Morrison-Lab/gha#449, 2026-08-12: an opt-in `@claude review` dispatch was added
+for repos that disable the agent, enabled by a repository variable **and** by
+uncommenting an `issue_comment` trigger the stub ships commented out.
+Every doc site named only the variable.
+The job's `if:` requires `github.event_name == 'issue_comment'`, so following
+the docs produced a one-second run with every job skipped and nothing posted ---
+the exact silent no-op the PR existed to fix (gha#447).
+Review caught it and called it blocking-ish; the fix stated both steps at six
+sites, two more than the review had enumerated.)
+
+## A proxy check that could not discriminate the case it was run for
+
+Measured on `Morrison-Lab/ai-config`, where the two halves disagreed
+outright:
+
+| check | result |
+|---|---|
+| sampled local commit messages found on `origin/main` | 0 of 4 |
+| files those commits touched, present on `origin/main` | 4 of 4 |
+| paths on local `main` absent from `origin/main` | 0 |
+
+## An empty merge-base substitution reporting HEAD as the merge base
+
+(`Morrison-Lab/ai-config`, 2026-08-09, post-merge cleanup: local `main` and
+`origin/main` had **no merge base at all**, and
+`git log --oneline -1 $(git merge-base main origin/main)` duly printed local
+`main`'s own tip, which was read as the merge base.
+That reading implied `main` was an ancestor of `origin/main` while
+`git merge-base --is-ancestor` in the same block reported it was not.
+The same session then misattributed `$?` twice more --- once after a
+pipeline and once after a command substitution --- while dupe-checking
+whether this very entry already existed.)
+
+## A published bullet count that was stale before anyone read it
+
+Measured 2026-08-09 on `Morrison-Lab/ai-config`, that returned 3 of 5 carrying
+zero bullets.
+The sentence this replaced claimed 4 of 5, and the discrepancy is the point
+rather than a correction to file away: one merge landed between the measurement
+and the review that questioned it, so a bare count published without its command
+was stale before anyone read it.
+
+## A sound checker pointed at the wrong repository
+
+(Morrison-Lab/ai-config#1327 / #1395, 2026-08-12: a pre-push semantic-line-break
+scan was run as
+`cd /home/user/gha && python3 check-new-line-breaks/check-new-line-breaks.py`,
+from a session whose review target was `Morrison-Lab/ai-config`.
+It printed `No lines missing semantic breaks.`, which was true of `gha`'s diff
+and said nothing about ai-config's.
+
+The checker was sound, correctly invoked, and given a real base ref.
+Its own scope line reads
+`Checking for missing semantic line breaks (lines added since <base_ref>)`, so
+it names the comparison and not the tree --- and `origin/main` is a valid base
+ref in both repositories, so that line is byte-identical whichever one it ran
+in.
+Re-running from the ai-config worktree was the whole fix.
+
+Note which remedy this defeats.
+The three vacuous-zero causes above all converge on printing a denominator, and
+a denominator here would have been non-zero, correct, and equally silent, since
+`gha`'s diff genuinely had lines to examine.)
+
+## A precondition that could not fire on the case it named
+
+(`Morrison-Lab/ai-config#1481`, 2026-08-15, review round 1, blocking.
+`skills/ardia/SKILL.md`'s supersession recipe extracted a PR's added lines with
+`git diff ... | grep '^+' | grep -v '^+++ '`, and its prose offered a guard:
+confirm `grep -c '^++[^+]'` returns 0 before trusting the filter, "an added
+line whose own text begins `++` is indistinguishable from a header once the
+diff's marker is prepended".
+The sentence cites this file's own "Why no prefix pattern separates a diff
+header from its data" two lines later, in support of a second prefix pattern.
+
+Reproduced on a real two-file `git diff` rather than by reasoning:
+
+| raw content | appears in the diff as | dropped by `grep -v '^+++ '` | matched by `^++[^+]` |
+| --- | --- | --- | --- |
+| `++ dangerous collision case` | `+++ dangerous collision case` | **yes, wrongly** | **no** |
+| `++i;` | `+++i;` | no | no |
+| `+1 vote` | `++1 vote` | no | **yes**, harmlessly |
+
+`git diff --numstat` reported 4 insertions and the filter emitted 3, having
+silently eaten the collision line.
+The guard returned **1** on that same stream --- and the line it named was
+`++1 vote`, which the filter had handled correctly.
+So it never saw the collision at all: the third character of `+++ foo` is `+`,
+which fails `[^+]`.
+
+The `0` that reached the PR body came from a different stream, and that is the
+half worth keeping.
+An ordinary diff carries no `++`-prefixed content, so the guard returns `0`
+there --- confirmed on a control commit with none.
+That is the number it returns on almost every real diff, and it is compatible
+with both "no collision was present" and "a collision was present and I cannot
+see it", because the pattern cannot express the second.
+Published as a cross-check, it was a false all-clear in the fail-open
+direction: not a wrong count, but a count of the wrong thing.
+
+The fix removed the collision rather than detecting it, scoping the diff per
+file so each header is dropped by position:
+
+```bash
+git diff --name-only "$base" <head> | while read -r f; do
+  git diff -U0 "$base" <head> -- "$f" | grep '^+' | tail -n +2 | sed 's/^+//'
+done
+```
+
+Against the same fixture that form preserves `++ dangerous collision case`,
+leaks no headers, and yields 4 lines against `--numstat`'s 4.
+The recipe now carries that `--numstat` comparison, whose value is computed
+outside the pipeline it checks.
+
+Two things worth keeping from how it was caught.
+The reviewer verified by running the patterns rather than reading them, and
+said so, which is what made the finding checkable rather than arguable.
+And the corpus already contained the answer --- the review's own closing point
+was that this file's table "independently confirms that `grep -v '^+++ '` drops
+a raw `++ foo`-style line" --- so the defect was not missing knowledge but a
+rule cited while being broken.)

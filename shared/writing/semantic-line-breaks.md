@@ -40,11 +40,17 @@ The 60-to-80 range above is guidance for a human writing prose.
 The automated check backing it (`check-new-line-breaks`, a reusable
 workflow in [`d-morrison/gha`](https://github.com/d-morrison/gha); formerly
 ai-config's own `scripts/check-new-line-breaks.py`, retired in ai-config#703)
-tests something narrower: for each **newly added** prose line in the diff,
-it flags the line only when that line holds more than one sentence.
+tests something narrower, against each **newly added** prose line in the diff.
+Its primary rule flags a line holding more than one sentence.
+Since gha#336 it also carries a **clause** rule, on by default: a line whose
+markup-stripped text reaches 80 characters and carries a mid-line semicolon.
+Neither rule is a character count, and the clause rule is the only one that
+looks at length at all.
+
 Two consequences.
-A single long line carrying exactly one sentence passes, so the URL-inflation
-exception above needs no special casing in the check.
+A single long line carrying exactly one sentence and no mid-line semicolon
+passes, so the URL-inflation exception above still needs no special casing in
+the check.
 And a line that packs two short sentences fails even at 50 characters, which
 is the violation to actually look for before pushing.
 Fix a flagged line by breaking at the sentence boundary, not by rewrapping
@@ -53,6 +59,65 @@ the paragraph to a narrower column.
 against the wrong criterion; reading the retired script's own source settled
 it, and the real check then found 7 multi-sentence lines a length check had
 passed over.)
+
+**This repo's own reformatter is not that check, and its output can fail it.**
+`scripts/semantic-line-breaks.py` is the in-repo tool named for this
+convention, so it is the obvious thing to reach for when a line-break warning
+needs clearing.
+It is not what CI runs, and the two disagree about what a good line is.
+
+The reformatter implements one sentence per line and nothing else.
+Its own docstring says as much --- "Never break a phrase mid-way at a column
+boundary" --- so it has no width policy, and it **joins** a hand-wrapped
+sentence back into a single line however long that line becomes.
+Corpus practice is the clause-wrapped 60-to-80 range this file opens with,
+which the reformatter undoes.
+
+Nothing runs it in CI.
+`grep -rn "semantic-line-breaks.py" --include=*.yml .` returns no workflow;
+its only callers in the tree are its own test file and one docstring
+reference.
+`MD013` is off repo-wide in `.markdownlint-cli2.jsonc`, so no width gate
+exists either.
+
+Measured by copying two fragments out of `origin/main`, reformatting each
+copy with `--all`, and classifying both versions with the gate's own
+`classify_line`:
+
+| fragment (at `origin/main`) | longest line | lines over 80 | clause-flagged |
+| --- | --- | --- | --- |
+| `semantic-line-breaks.md` before | 80 | 0 | 0 |
+| `semantic-line-breaks.md` after | 387 | 97 | 10 |
+| `grep-is-not-coverage.md` before | 79 | 0 | 0 |
+| `grep-is-not-coverage.md` after | 411 | 59 | 5 |
+
+So the reformatter clears the sentence rule and manufactures clause
+violations the gate then reports, on files that had none.
+The classifier was pinned in both directions first, per
+[`fail-fast`](../principles/fail-fast.md)'s negative-control rule: it returns
+`clause` on a padded semicolon line, `sentence` on a two-sentence line, and
+`None` on a short clean one.
+
+It still finds real violations, which is what makes it worth running --- the
+same two fragments carry 5 and 0 genuine multi-sentence lines at
+`origin/main`.
+So use it as a **detector** and read its preview, which is its default when
+no `--write` is passed.
+Take the sentence splits it proposes, and break at a clause boundary yourself
+rather than accepting the joins.
+
+- **Do:** read the reformatter's preview and apply its sentence splits by
+  hand, wrapping at a clause boundary.
+- **Do:** re-run the gate after any reformat, since the joined lines are added
+  lines and the gate is diff-scoped.
+- **Don't:** treat `scripts/semantic-line-breaks.py` as the check CI runs ---
+  no workflow invokes it, and its output is not what the gate wants.
+- **Don't:** accept a join that puts a wrapped sentence back on one line; that
+  is the direction that trips the clause rule.
+
+(Morrison-Lab/ai-config, 2026-08-15, measured on this machine with the gate at
+`Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
+`_DEFAULT_CLAUSE_MIN_LENGTH` is 80.)
 
 **That check is advisory: it warns and exits 0, so a green CI job does not
 mean the diff is clean.**
@@ -202,6 +267,30 @@ Ordering is checkable, and a resolution to remember is not.
 - **Don't:** quote a check's output in a commit message or PR body without
   re-running it at the head you are about to push.
 
+**Re-run markdownlint in that block too, even though it is not line-scoped ---
+it is the only one of these that actually reddens `validate`.**
+The rule above enumerates line-scoped checks, and a reader takes the
+enumeration as the list: this check, the banned-punctuation scan,
+`lint-changed-lines`.
+Markdownlint is not on it, because it is whole-file rather than diff-scoped,
+so nothing about the phrase "line-scoped check" reaches it.
+
+Its scope and its severity run opposite to everything else in the block, which
+is what makes the omission expensive.
+`validate.yml` runs `npx --yes markdownlint-cli2` as a plain step, so a
+non-zero exit fails the job, while `check-new-line-breaks` is the advisory one
+that warns and exits 0.
+The blocking check is therefore the one the ordering rule leaves out, and a
+reflow can introduce a rule violation none of the enumerated scans can see ---
+MD018 when a split lands an issue reference in column 1 (the section further
+down owns that collision), and MD022 when it disturbs the blank line around a
+heading.
+
+- **Do:** run markdownlint last, alongside the line-scoped checks, after every
+  diff-mutating pass.
+- **Don't:** read "line-scoped checks" as the whole re-run list --- the
+  whole-file one is the only one that can fail the build.
+
 (Morrison-Lab/ai-config#1259, 2026-08-07: `3c2cd225` moved 38 case records out
 of `CLAUDE.md`, then converted em-dashes on the diff's added lines, verified
 with `git diff | grep -c` for banned glyphs at 0, then reflowed long lines to
@@ -268,6 +357,60 @@ halves.
 fragments dropped its leading `- ` and rewrote an em dash as `---`.
 The check reported the result clean; the word diff found both.)
 
+**A third blind spot, and the one that survives running the diff both ways: a
+defect BOTH sides share.**
+The two above are differences the normalization cannot represent.
+This one is a defect the normalization deliberately ERASES, so the comparison is
+not merely silent about it --- it is silent in both directions at once, and the
+both-ways rule just above buys nothing against it.
+
+The reasoning is short.
+A both-sides comparison validates the TRANSFORMATION, never the INPUT.
+Whatever class of difference the normalization exists to ignore, whitespace and
+inline markup here, is exactly the class it cannot report --- and a flaw already
+present in the ORIGINAL text falls in that class as readily as one the reflow
+would have introduced.
+The check then passes with a reassuringly specific word count, and the defect
+ships untouched.
+
+The worked shape is a hyphenated compound the author split across a line break,
+`close-` ending one line and `order foot.` opening the next.
+Collapsing `\s+` to a single space turns the pre-reflow and the post-reflow text
+alike into `close- order foot.`, so the word lists match exactly and the check
+reports nothing lost and nothing added, while both versions render that stray
+space.
+
+So pair the transformation check with one aimed at the INPUT.
+For a reflow the cheap one is a scan for a line ending in a hyphen, anchored on
+an alphanumeric so this corpus's own `---` convention does not flood it:
+
+```bash
+grep -rnE '[[:alnum:]]-$' shared/
+```
+
+Run it against the PRE-reflow text as well, since its whole point is to judge
+text the comparison has already agreed with itself about.
+Do not answer this by widening the normalization instead, per
+[`address-every-comment`](../workflow/address-every-comment.md)'s rule that
+extending a normalizer can break a term the previous version matched.
+
+- **Do:** name the class of difference a normalization erases, and add a check
+  aimed at that class over the input.
+- **Do:** run the input-side check on the pre-reflow text too --- a defect the
+  comparison cannot see is one it never had an opinion about.
+- **Don't:** read "identical, N words, nothing lost or added" as a statement
+  about the text; it is a statement about the edit.
+- **Don't:** widen the normalization to swallow such a defect --- that degrades
+  the comparison it exists to make.
+
+(2026-08-16: a design-doc reflow was verified this way and reported "identical,
+6498 words, nothing lost or added", while `close-` / `order foot.` sat split
+across a line break in both versions; it was caught by eye, reading the
+reflowed output.
+The detector above, run over `shared/` at `41d82611`, returns exactly four
+pre-existing instances and no false positives from the `---` convention, so the
+class is live in this corpus and the scan is precise enough to act on.)
+
 **Breaking a line just before an issue reference turns it into a malformed
 heading.**
 This corpus writes `#NNNN` references constantly and mandates one clause per
@@ -299,6 +442,73 @@ separates the header from an added line that itself begins with `++`, per
 [`fail-fast`](../principles/fail-fast.md)'s third direction.
 It is harmless in this particular pipeline only because the trailing `^#`
 filter discards the mangled header anyway.
+
+**`tail -n +2` strips exactly one header, so on a multi-file diff the
+position trick under-corrects.**
+A diff carries one `+++ b/<path>` header per file, all of them surviving the
+`grep '^+'`, and `tail -n +2` removes only the first --- so a two-file diff
+leaves one mangled `++ b/<path>` line in the stream, and an N-file diff
+leaves N-1.
+A trailing filter (the `^#` grep above) still discards them, but a pipeline
+whose output is *counted* or *kept* silently inflates by N-1: an added-lines
+count reads one high per extra file, and the phantom line reads as content.
+For a count, skip the extraction entirely and sum
+`git diff --numstat <base>...HEAD`'s first column, which has no headers to
+strip.
+For kept content, drop headers per file rather than by global position ---
+`grep '^+' | grep -v '^+++ '` --- which is safe exactly when every `+++ `
+line in the stream is a real header.
+The dangerous class is an added source line beginning `++ ` (two pluses
+then a space): git's own `+` prefix turns it into a raw `+++ ` line, which
+no pattern can tell from a header, per the fail-fast caveat above.
+So the precondition check is a per-line membership test, not a pattern and
+not an aggregate: each `+++ ` line's target must be a changed file's
+`b/<path>` or `/dev/null`, and any other target is a phantom.
+
+```bash
+git diff --name-only <base>...HEAD | sed 's|^|b/|' > /tmp/known
+git diff -U0 <base>...HEAD | grep '^+++ ' | sed 's/^+++ //' |
+  while read -r t; do
+    [ "$t" = /dev/null ] && continue
+    grep -qxF "$t" /tmp/known || echo "phantom: +++ $t"
+  done
+```
+
+Any `phantom:` line means fall back to parsing the diff's hunk structure
+instead of prefix-filtering.
+An aggregate comparison --- the stream's `^+++ ` line count against
+`--numstat`'s file count --- cannot serve here: a header-deflating file (a
+binary, a mode-only change) and a `++ ` source line elsewhere in the same
+diff cancel, leaving the totals equal over a stream that still carries a
+phantom, while a per-item test has nothing to cancel.
+Note the deflating files are irrelevant to the filter's own safety --- a
+missing header drops nothing --- so the aggregate was also counting a
+quantity the question never depended on.
+The residual limit: a phantom whose text coincidentally names a changed
+file's own `b/<path>` --- or is literally `/dev/null`, colliding with the
+deletion-header sentinel the test skips --- is indistinguishable from a
+real header by any stream inspection, so certainty past that point is
+hunk-structure parsing.
+
+- **Do:** count added lines from `--numstat`, not from a header-stripped
+  extraction.
+- **Do:** verify every `+++ ` line's target is a changed file's `b/<path>`
+  or `/dev/null` before trusting a `^+++ ` header filter on kept content,
+  and fall back to hunk-structure parsing on any phantom.
+- **Don't:** reuse the single-`tail` pipeline on a multi-file diff when its
+  output is counted or kept --- it was written for a one-file diff, and each
+  extra file adds one phantom line.
+- **Don't:** guard the header filter with a single-line pattern or an
+  aggregate count --- a raw `+++ ` line matches every header pattern, and
+  totals can cancel; only the per-line membership test decides it, up to
+  the coincidental-path and `/dev/null`-sentinel limits above.
+
+(Morrison-Lab/ai-config#1476, 2026-08-15, review round 1, finding 2: a PR
+body claimed "13 added lines" over a two-file diff whose true count was 12
+--- the extraction pipeline above had left the second file's `+++` header in
+the stream, and the header was counted as an added line.
+The reviewer derived 12 from the PR's own `additions` field; `--numstat`
+confirms it.)
 
 - **Do:** scan added lines for a column-1 `#` before pushing, with the same
   after-committing, three-dot discipline the other diff-scoped scans use.

@@ -69,6 +69,23 @@ Two review rounds read that body without flagging it; it surfaced only when the
 body was re-read against the diff before declaring the PR ready, which is the
 `address-every-comment` check above doing work its own rule did not anticipate.)
 
+## A read SHA can answer a different question
+
+(Morrison-Lab/ai-config#1396, 2026-08-12: the issue body read "Measured
+2026-08-12, `origin/main` at `3f8b2f1`", and `git rev-parse origin/main` had
+never been run.
+`3f8b2f1` came off a `git stash list` line produced seconds earlier ---
+`stash@{1}: WIP on main: 3f8b2f1 Add R-package test/lint/spellcheck
+verification lessons (#205)` --- which names the commit an unrelated stash was
+taken on.
+That commit is dated 2026-06-25, roughly seven weeks before the measurement it
+was being offered as the base for, and it is an ancestor of `origin/main`
+rather than its tip.
+The real tip was `b323a4fc`.
+The body has since been edited to drop the claim, though
+`gh search issues "3f8b2f1" --owner Morrison-Lab` still returns the issue, so
+the search index is what records that the string was there.)
+
 ## The read side of a push-verification comparison can lag
 
 (Morrison-Lab/ai-config#845, 2026-07-29: `git rev-parse HEAD` and
@@ -441,6 +458,40 @@ while the recovery command in `skills/ardi/SKILL.md` and `memories/preferences.m
 carried it --- so the routine path used every round lacked the fix that the
 rarely-taken path had.)
 
+## A cancelled dispatch that fired a failure webhook against the superseded SHA
+
+(`Morrison-Lab/ai-config#1526`, 2026-08-16: a review was dispatched with
+`--ref` at `1847c964`, a subagent then pushed a `main` merge and a
+pronoun-fix commit, and the run was cancelled deliberately because it was
+reading a commit that was no longer the head.
+The run object is what settled that, rather than the elapsed time:
+
+```
+run 31964345687   event: workflow_dispatch   head_sha: 1847c964
+pull_requests[0].head.sha: b8a9cb45
+```
+
+Both halves of the visibility question were then observed within one event.
+`pull_request_read` `get_check_runs` returned 7 runs, every one of them for the
+new head, with the failed `require-review` absent --- so the sibling case above
+is right that a cancelled run is invisible to a session reading the PR.
+The cancel nonetheless fired a `check_run.completed` carrying
+`conclusion: failure`, `check: review / require-review`, and
+`head_sha: 1847c964f458eabeac64002354bd8379567351a1`, waking the subscribed
+session with a red required check on its own PR.
+
+Note the two runs differ in why the SHA was wrong, which is why this is a
+distinct case rather than the sibling restated.
+There the dispatch omitted `--ref`, so the run never pointed at the PR at all.
+Here `--ref` was passed and correct, and the branch simply moved between the
+dispatch and the cancel --- so the defect survives the sibling's own fix.
+
+The cancel itself was the right call, on
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s criterion that
+whether to cancel a slow review turns on whether the head has moved rather
+than on how long it has run.
+Re-dispatching at the real head produced a clean verdict at `eaf052d9`.)
+
 ## An invented `Closes` in a merge commit message
 
 (`Morrison-Lab/ai-config#1361`, 2026-08-09: the squash commit `62ea72b3` ends
@@ -469,3 +520,278 @@ for --- the shape
 [`fail-fast`](../principles/fail-fast.md) records as "a proxy that answers a
 narrower question passes the same way".
 Had #1358 still been open, merging #1361 would have closed it.)
+
+## A review round surfacing five findings your own conventions already covered
+
+([gha#219](https://github.com/d-morrison/gha/issues/219)/[#220](https://github.com/d-morrison/gha/pull/220): one review round surfaced five findings --- a DRY
+duplication, an incomplete-coverage doc overclaim, a wrong changelog
+category, an uncited claim, and missing test coverage for new logic --- all
+catchable this way, since each was a direct match against gha's own
+`CLAUDE.md` conventions, not new information the review surfaced.)
+
+## Two correct fixes composing into a defect neither introduces alone
+
+(Morrison-Lab/gha#440, 2026-08-09: round 1 made a notice-posting step
+best-effort (`|| echo "::warning::"`) in response to one finding, and in the
+same commit extended a collapse step's `if:` to that step's path in response to
+another.
+Each was correct.
+Together, a run whose post failed would fold the *previous* run's notice and
+post nothing, leaving the PR with a gray gate and no explanation --- the exact
+symptom the PR existed to fix, reproduced in a single run.
+Round 2 caught it; reading the two-item commit message against itself would
+have.)
+
+## Self-correcting a rationale before the reviewer re-raises it
+
+([d-morrison/rme#989](https://github.com/d-morrison/rme/pull/989) /
+[ucdavis/epi204#363](https://github.com/ucdavis/epi204/pull/363): after telling both reviewers `references.bib` didn't
+share `CLAUDE.md`'s union-merge corruption risk, a follow-up merge
+simulation showed it does --- posted the correction with repro steps on
+both PRs before either reviewer re-raised it.)
+
+## A verification table in the PR body going stale as rounds change the diff
+
+(`Morrison-Lab/ai-config#1353`, 2026-08-09, review finding 2.
+The PR body claimed the guard's suite "grew from 226 to 238 cases (12 new
+BLOCK, 10 new ALLOW)".
+Neither number was derived: the base had never been counted at all, and the
+BLOCK delta was stale from an earlier drafting round that later rounds had
+added cases past.
+The reviewer counted the `BLOCK`/`ALLOW` list lengths with `ast.parse` rather
+than trusting the file's own runner, and reported 202 to 228 at the review head
+`7d063f2`.
+Round 1's own fix then added five more regression cases, so by `2f0b697` the
+real figures were 202 to 233 list cases (BLOCK 157 to 178, +21; ALLOW 45 to 55,
++10), or 212 to 243 including the runner's ten inline checks.
+That second movement is the point rather than a footnote: the *reviewer's*
+correctly-derived count went stale within one round too, so the defect is not
+carelessness at any one desk but a figure published where nothing re-measures
+it.
+The corrected body now shows the base, head and delta per group, states the
+`ast.parse` derivation, and keeps the wrong figures on the record rather than
+silently overwriting them, since the review thread refers to them.)
+
+## A round-one confirmation laundering a body the next round contradicts
+
+(`Morrison-Lab/ai-config#1522`, 2026-08-16, merged as `bc89ec93`.
+
+Round 1, posted at 18:04:08Z, verified the body's verification table in detail,
+reporting that it had "independently confirmed every reported figure --- 1646
+links/503 files (0 broken) ... and +67/+71/+10 additions per file --- all match
+the PR body precisely", and separately that it had "independently scanned the
+diff's 148 added lines".
+Every one of those figures was correct at the head it ran on, `cd8cfb03`:
+`git diff --numstat` over that commit returns `67 / 71 / 10` across three
+files, summing to 148.
+
+Commit `339645c3` then addressed both round-1 findings and widened the diff
+from three files to six.
+`git diff --numstat` over `339645c3` returns `15 / 67 / 85 / 8 / 10 / 11`,
+summing to 196.
+
+Round 2, posted seven minutes after round 1 at 18:11:22Z, opened by saying it
+had "re-scanned all **196** added lines across the full PR diff (all three
+commits)", found nothing new, and returned **Ready for merge**.
+The body at that moment still read 148 added lines, 1646 links, and 134 prose
+lines.
+So the correct figure and the stale one sat one round apart in the same comment
+thread, and the round holding the correct one never looked at the other.
+
+The staleness was caught by the author re-reading the body at the merge gate
+rather than by either review, and the merged body records that catch in a
+"Corrections to this body" entry naming the same three stale values.)
+
+## Validating against a real consumer repo covers what fixtures cannot
+
+(d-morrison/altdoc#34: running the new reference-index generator
+against `d-morrison/rpt` covered a `\docType{package}` topic, the singular
+form of a missing-topic warning, and the documented "existing settings files
+do not pick this up automatically" caveat --- confirmed by the page
+generating while `grep -c reference.html docs/index.html` returned `0`.
+None of the three were reachable from the repo's own fixture packages.)
+
+## An instruction's own suggested code breaking a project convention
+
+(d-morrison/altdoc#73: the issue proposed ending a function with a bare
+trailing `hashes`, which reads as a fix for the fragility it names but is
+still an implicit return, so a statement added after it silently becomes
+the return value.
+The lab manual asks for an explicit `return()` regardless.
+Review caught it; the project's own stated convention would have, one step
+earlier.)
+
+## A staging step the unit fixtures could not reach
+
+(d-morrison/altdoc#76: a guard checked for the copied logo under `docs/`,
+but the `quarto_website` path stages into `_quarto/` first, so the logo
+line was dropped on every render of the one generator the feature wired up.
+Seventeen unit assertions passed throughout; one throwaway render found it
+immediately.)
+
+## A mechanism claim whose population held no true positive
+
+(ai-config#770, same day: a `git log -- skills/<name>` probe was said to
+separate "deleted from the repo" from "never ours" *exactly*, on the evidence
+that it reported zero false orphans.
+The repo contained no deleted-but-still-installed skill at all, so there was
+nothing for it to get wrong; and `git rev-parse --is-shallow-repository`
+returned `true`, meaning anything deleted before the shallow boundary would
+have been silently misread as harness-provided.
+The claim went into a PR reply before either check was run, and ai-config#765
+had independently reached the correct conclusion.)
+
+## Editing generated output, then being read as pollution once regenerated
+
+(Morrison-Lab/ai-config#834, same day: a fix was applied to the generated
+`tool-mappings.md`, which `sync-codex-skill-wrappers.py` then overwrote,
+failing `validate` with `stale tool-mappings.md`.
+Redoing it in `tool-mappings.yml` regenerated 175 `codex-skills/` wrappers,
+and Jules returned `VERDICT: block` twice for "bulk pollution", its second
+verdict noting it had read only a truncated diff.
+`claude-review` called the same finding a false positive at the same head.)
+
+## A generator's environment, not its version, changed the committed artifact
+
+(`UCD-SERG/serodynamics#291`, 2026-08-12: `docs-check` reported exactly two
+changed files, `DESCRIPTION` and `NAMESPACE`.
+Re-documenting locally with roxygen2 8.1.0 --- CI's own version, from CI's own
+RSPM binary repo --- changed **three**, the extra one being
+`man/expect_snapshot_data.Rd`, because `testthat` sits in `Suggests` and was
+not installed, so that file's
+`@inheritDotParams testthat::expect_snapshot_file` could not resolve and
+roxygen emitted the topic without the inherited arguments.
+`rjags` was absent too and was flagged on a different topic, which is worth
+separating: only the `testthat` gap changed a file, so the missing-package
+count and the changed-file count are not the same number.
+Committing that would have shipped a silently degraded help page.
+Installing the full `Suggests` set reproduced CI's two-file result exactly,
+with no warnings --- and the contrast between the two runs' warning output is
+itself the cheapest check that the environment is now right.)
+
+## A brand-new branch reading back at `main`'s tip, reproduced offline
+
+Reproduced in a local bare repo, where no replica and no race exists: the
+push printed `* [new branch]` and exited 0, `git ls-remote` and the tracking
+ref both read `main`'s tip, `main..<branch>` held zero commits, and
+`git push origin HEAD:refs/heads/<branch>` then reported a real range.
+That last command is a test as much as a fix, since it answers
+`Everything up-to-date` when the branch ref and `HEAD` already agree.
+
+Two things weigh against the read-side story, which an earlier draft of this
+entry weighted equally against the write-side one.
+A lagging replica cannot invent a value for a ref that never existed before,
+so its failure mode is the ref reading **absent** rather than reading one
+specific wrong commit.
+And a tracking ref is set from what the push sent, which makes its value a
+client-side fact rather than a later network read.
+
+What stays genuinely unsettled is narrower than either reading claimed: the
+branch ref's own value at push time was never recorded, so the local
+explanation is the best supported one rather than a proven one.
+Note the shape of that, since it is the failure this entry is about.
+The entry has now over-claimed twice, first asserting a write-side fault, then
+asserting a parity between two hypotheses that the record does not support
+either.
+The practical advice survives all three readings, because the
+`git ls-remote origin <branch>` and `git rev-parse HEAD <branch>` checks are
+cheap whichever is right.
+
+## A suite whose branch coverage varies by host
+
+(Morrison-Lab/ai-config#1327 / #1395, 2026-08-12: `skills/session-lock`'s
+`is_stale()` tests `session_liveness()` first and consults the heartbeat only
+when liveness reads `unknown`, so which of its three branches a test reaches
+depends on whether the machine running the test has a live `claude` process in
+its ancestry.
+`scripts/test_ai_session.py` ages a session's heartbeat to make it stale, which
+works only on the `unknown` branch.
+
+Measured on a host where it does not.
+`find_agent_pid` returned PID 513 with `comm=claude`, so a registered record
+carries a live PID, `session_liveness()` returns `alive`, and `is_stale()`
+returns not-stale without reading the heartbeat at all.
+Running the pre-change suite there --- `python3 scripts/test_ai_session.py` at
+`e448b8ec` --- printed `4 FAILED`, among them
+`a stale session exits 2, not 1: rc=0`.
+The same file passes in CI, where no such ancestor exists.
+
+So one environment exercised `unknown)`, the other exercised `alive)`, and the
+`dead)` branch --- the one a crashed session actually takes --- was exercised
+by neither.
+Nothing was skipped in either run, so the skip count gave no sign that the two
+runs had traversed different code.
+The **failed** counts did differ, 4 against 0, and that is what surfaced the
+divergence.
+The fix was a case that registers a genuinely dead PID and leaves the heartbeat
+**fresh**, so only the liveness branch can decide it, whatever the host
+supplies.)
+
+## A corrections entry expires with the next push
+
+(`Morrison-Lab/ai-config#1395`, 2026-08-12: the PR body's derived counts went
+stale in two consecutive rounds, on the same two figures.
+
+Round 1's body stated 100 insertions and 264 lines at `4c5d71e`.
+Commit `b11fe4a9` made the real figures 106 and 270, and the body was corrected
+with a numbered `Corrections to this body` entry recording both as "re-derived
+rather than adjusted".
+Round 2's self-review finding then prompted `737b7c06`, which added a
+retry-loop rationale comment and moved the same two figures to 111 and 275 ---
+expiring the entry that had just refreshed them.
+They were re-derived only in the sweep immediately before merging, and the
+merged body carries a fourth entry recording that second refresh.
+
+The rule was not unknown, which is the point of the record.
+That fourth entry cites this fragment's own "any round that changes the diff
+expires every figure the body already states" while making the correction, so
+the round had the rule in hand and applied it once.
+What it lacked was the trigger: the pause point fired at both pushes and the
+checklist item was discharged at one of them, with a durable note in the body
+asserting the figures were current in between.
+
+Note which push did it.
+`737b7c06` answered a self-review finding rather than a reviewer's, so it did
+not feel like a round that changed anything a reviewer would re-read --- and
+its content was a comment explaining a retry loop, which is exactly the kind of
+edit that reads as not touching the diffstat.
+It changed both figures.)
+
+## A whole-body staleness check that reported a correct fix as failed
+
+(`Lacaedemon/sparta#1303`, 2026-08-16: a review round moved the PR body's
+figures from `484 added` and `2723 / 2723 passing` at head `dbfe12d8` to
+`532 added` and `2725 / 2725` at `5c145fce`.
+The body was rewritten with both new figures and a `### Corrections to this
+body` entry naming the two superseded ones, which is exactly what the section
+above asks for.
+
+The post-PATCH verification then searched the whole body for each old figure
+and reported `False` for both --- reading as though the rewrite had missed
+them.
+It had not.
+The only remaining occurrences were inside the corrections entry, where they
+belong, since an entry that says what changed cannot say it without naming the
+old value.
+
+Re-run section-scoped, the same two strings were absent from the verification
+table and present in the corrections entry, which is the intended end state
+rather than a defect.
+The wrong reading was available and cheap: deleting the quoted figures would
+have silenced the check and destroyed the record the entry exists to carry.)
+
+## A genuinely-read prefix, extended into a fabricated link
+
+(`Lacaedemon/sparta#1244`, 2026-08-13: a close-as-duplicate comment linked
+the sibling PR's head commit, and the short SHA `974c83b` in that link was
+genuine --- read off real `git log` output moments earlier.
+The markdown link format wanted all 40 characters, and the remaining 33 were
+typed as `b1683e2e60ae23662ce35eb46be13a8bc` where the real tail was
+`66573e699e1bba5b2b7ede09deeeec244`, so the published link 404'd on a commit
+that existed.
+Caught seconds later by self-review running `git rev-parse 974c83b`, and
+corrected with a visible follow-up comment naming the real SHA, per this
+block's own correct-visibly bullet.
+The near-miss worth the entry: the read-never-recall check reported itself
+satisfied because a SHA genuinely had been read --- just 7 characters of the
+40 the sentence asserted.)

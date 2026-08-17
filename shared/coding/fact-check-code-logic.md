@@ -160,6 +160,73 @@ Read that evidence rather than accepting its presence: a quoted run that
 exits cleanly is the vacuous-control shape above, not a proof, so the
 failing output has to look *different* from the passing output.
 
+### A test gated on a production constant loses coverage when that constant moves
+
+Everything above concerns an assertion that cannot fail **today**.
+This one asserts perfectly well today and stops running later, because its
+**applicability** was derived from a production value rather than from the
+property under test.
+
+The shape is a guard around the case rather than inside it:
+
+```python
+ALLOWLISTED = set(prod.KNOWN_UNREGISTERED)   # sourced from the real constant
+
+if ALLOWLISTED:
+    check_every_entry_is_still_unregistered()
+    check_no_entry_is_stale()
+```
+
+That is right while the constant has members, and the constant is usually one
+declared to shrink --- an allowlist, a deprecation set, a known-failures list,
+whose own comment says it should only ever get smaller.
+So the coverage disappears **exactly when the feature is next edited**, since
+emptying the constant is the edit everyone is working toward.
+
+Two things separate this from the vacuous assertion above.
+Its failure is in the **future** rather than at authoring time, so no
+mutation, no negative control, and no failing-run evidence taken today can
+show it --- every one of those checks passes, correctly, on a populated
+constant.
+And it degrades to a **skip** rather than to a false pass, which reads as
+information rather than as a gap: a suite reporting `2 skipped` looks like it
+is telling you something, and what it is telling you is that the code path is
+now exercised by nothing.
+
+Inject a synthetic value so the case always runs, and keep one case against
+the real constant so the two questions stay separate:
+
+```python
+def test_allowlist_hygiene_synthetic():
+    check_every_entry_is_still_unregistered({"fake-entry"})   # always runs
+
+def test_allowlist_hygiene_live():
+    check_every_entry_is_still_unregistered(prod.KNOWN_UNREGISTERED)
+```
+
+The synthetic case tests the **logic**, which does not depend on how many
+entries production currently has.
+The live case tests the **corpus**, and is allowed to be vacuous once the
+constant empties, because that is the state it exists to confirm.
+
+- **Do:** derive a test's applicability from the property under test, and feed
+  the production constant in as data rather than as a gate.
+- **Do:** ask, of any `if <constant>:` wrapping a test body, what the suite
+  covers once that constant reaches its intended value.
+- **Don't:** read a skip as coverage --- it reports that the case did not run,
+  which is the same outcome as not having written it.
+- **Don't:** treat a passing mutation test as clearing this; a populated
+  constant makes every check today report correctly.
+
+(Morrison-Lab/ai-config#1507, 2026-08-16: three allowlist-hygiene cases in
+`scripts/test_check_hook_catalog.py` ran under `if ALLOWLISTED:`, sourcing
+`ALLOWLISTED` from the script's real `KNOWN_UNREGISTERED`, whose own comment
+says it "should only ever shrink".
+A reviewer caught that emptying it --- the declared goal --- would silently
+retire all three.
+Tracked as
+[#1519](https://github.com/Morrison-Lab/ai-config/issues/1519).)
+
 ### Mutate the fix, not only the test
 
 The rule above says a regression test must be seen to fail.
@@ -266,6 +333,31 @@ surprising one, and it arrives at the moment it will be acted on.
   appears in both.
 - **Don't:** relax the check because the match supports a decision already
   taken.
+
+## A docstring that explains why, but not how, misattributes the mechanism
+
+A docstring can be entirely correct and still hide a dead parameter, if it states the *reason* a behaviour holds without saying *how* the code produces it.
+A reader --- including the author, in self-review --- fills the gap with whatever is nearest at hand, and the nearest thing is usually a parameter sitting right there in the signature.
+
+The shape: a function takes a parameter the body never reads, and a comment or docstring above it explains a real, correct fact that sounds like it depends on that parameter.
+"The root file is excluded because `--root-char-cap` already governs it" is true.
+It does not say the exclusion is implemented by checking depth, so a reader credits the unused `root` argument with doing the excluding, when a `depth > 0` filter elsewhere does the actual work.
+Nothing about the sentence is false, which is what makes it survive review: there is no wrong claim to catch, only a mechanism the sentence never names.
+
+This is not the same failure as [`reuse-docs-and-args.md`](reuse-docs-and-args.md)'s doc-reuse rules, which are about a docstring going stale relative to the code it describes.
+Here the docstring is accurate throughout --- the gap is that it explains a fact instead of a mechanism, and an unrelated parameter absorbs the explanation by proximity.
+
+The check is to ask, of every sentence justifying a behaviour, whether it names the line, branch, or filter that produces it.
+A sentence that would still read true with the parameter deleted is explaining the *why*, not the *how*, and the parameter it sits beside is a candidate for being unused.
+
+- **Do:** state the mechanism a docstring is invoked to justify --- the actual line, branch, or filter --- not only the reason the behaviour is correct.
+- **Do:** check whether a nearby parameter is actually read by the code the docstring describes, whenever the docstring explains a fact rather than a mechanism.
+- **Don't:** treat a docstring as covering a parameter's purpose merely because it explains something true about the parameter's neighbourhood.
+- **Don't:** read "the docstring makes sense" as evidence a parameter is used --- a correct sentence can justify behaviour that a different part of the function actually implements.
+
+(Morrison-Lab/ai-config#1406: `render_fragment_caps(files, root, cap)` carried a docstring reading "The root file is excluded because `--root-char-cap` already governs it," and `root` was never referenced in the function body --- the exclusion was a `depth > 0` filter.
+Caught as a non-blocking review note.
+Restating the docstring to name the depth filter made the parameter visibly redundant, and it was removed.)
 
 ## What to report
 

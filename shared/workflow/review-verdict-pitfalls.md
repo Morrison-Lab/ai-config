@@ -181,6 +181,24 @@ the drift measured above.
 
 **A third case, distinct from either misfire above: some checks are designed to NEVER fail regardless of their own posted content, so their green color carries zero signal at all.** A CI-runner-relative benchmark check that gates a soft threshold (e.g. "regressed beyond 20% vs. baseline") may deliberately report success/pass at the GitHub-check level even when it posts a `:warning:` regression comment, precisely because the project has decided that threshold is "a human call, not an auto-block" rather than a hard gate. `gh pr checks` (or the equivalent status API) showing this check as PASS is consequently not evidence there is nothing to look at --- it only means the check ran, not that its content was clean. Read the check's own posted comment body every time, the same discipline the review-job case above already demands, but don't expect the check's pass/fail conclusion to ever flip for this class of check even on a real, large regression.
 
+**The third case has a variant whose green is not even about its own content: a check that reports only that a DISPATCH succeeded.**
+The benchmark case above is a check that ran the work and declined to gate on what it found, so reading its posted comment recovers the signal.
+A dispatcher runs no review at all.
+It selects a reviewer and fires a second workflow, and its green says that call returned 200 --- whether the review then starts, fails, or posts a verdict is recorded in a different run, which by construction cannot colour this check.
+
+That makes it worse than the benchmark case on the one axis that matters for a reader.
+There the content is on the PR and merely ungated; here there is no content to read, and the check's own name usually says "review", so a status sweep that reports it green is reporting the truth about a step nobody cares about.
+The absence is also the ordinary steady state rather than an anomaly, per [`pr-on-claim`](pr-on-claim.md)'s dispatch-only section --- so nothing about a green dispatcher and an empty comment list looks wrong.
+
+The tell is in the workflow rather than in the check: a job whose last step is `gh workflow run` or an `actions_run_trigger` call has told you its conclusion is about the trigger.
+Trace the dispatched run and read its verdict, per [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)'s "trace the whole dispatch chain" bullet, and take the verdict from the comment rather than from either check.
+
+- **Do:** read a check's own workflow to see whether its final act is dispatching something else, before treating its green as a review result.
+- **Don't:** count a green dispatcher toward criterion 2 --- it establishes that a reviewer was asked, which is the state [`pr-on-claim`](pr-on-claim.md) already says never discharges the review.
+
+(`ucdavis/bcs`, 2026-08-13: `ai-review / select-and-review` read green on two PRs while the gemini run it had dispatched failed and no verdict existed on either.
+Filed upstream as `ucdavis/bcs#619` and `#620`.)
+
 **A fourth case: a review job can post a syntactically valid, confidently stated verdict that is nonetheless invalid because it rests on a hallucinated premise about the PR's own state --- not a stub (no verdict) and not a misfire (guard-script/check-conclusion mismatch), but a fabricated fact baked into an otherwise well-formed review.** A reviewer that infers PR state from a commit message rather than querying the PR's actual `state`/`merged` API fields can mistake a routine `Merge remote-tracking branch 'origin/main' into <PR-branch>` commit --- pushed to resolve a sync conflict on the still-open PR branch itself --- for evidence the *PR* was merged into `main`, and confidently report "PR is closed, no action taken" while never actually reviewing the diff. This reads exactly like a legitimate all-clear (a `### Verdict` section is present, the job reports success), so the stub-detection guards described in CLAUDE.md's "Do the review yourself when the @claude workflow doesn't produce a verdict" section don't catch it. Sanity-check any surprising verdict --- especially "nothing to review" or "already merged/closed" --- against the PR's real API state before trusting it, and re-trigger for a genuine review rather than accepting a verdict-shaped comment built on a false premise.
 
 **A fifth case, and the one that decides what "reachable" means in criterion 2 of [`fully-clean.md`](fully-clean.md): an external reviewer can decline to review at all, posting a refusal in the shape of a review.**
@@ -1076,3 +1094,113 @@ Run `31234176429` is the second row, and its `head_branch` reads
 where `gh run list`'s branch column does attribute a dispatched run --- so
 passing the ref repairs the actor-indexed view and the artifact-indexed one
 together.)
+
+**Whether to cancel a slow review turns on whether the head has moved, not on
+how slow it is.**
+Every entry above governs a run that has already **ended** --- errored,
+stubbed, refused, or been cancelled by something else.
+A run still in flight and simply taking a long time is a different decision,
+and the difference is that nothing has gone wrong yet: no error, no missing
+verdict, nothing to diagnose.
+The only question is whether to keep waiting, and duration is the tempting
+criterion for it.
+
+Duration is the wrong criterion, and the right one is already written down.
+[`fully-clean`](fully-clean.md)'s criterion 2 requires a verdict to sit at the
+**current head**, so the question to ask is **whether the verdict would still
+be usable if it arrived** --- which the head settles, and settles cheaply:
+
+- **The head moved after the run started.**
+  Its verdict cannot satisfy the current-head criterion whatever it says, so a
+  fresh dispatch is owed regardless.
+  Cancelling therefore forfeits only that run's findings, and waiting buys a
+  verdict you would have to discard anyway.
+- **The head has not moved.**
+  A verdict that arrives is valid, so cancelling discards it outright and buys
+  nothing but a second full review.
+
+Note this is decidable rather than a matter of judgment: one read of the PR's
+commit timestamps against the run's `run_started_at` answers it, which is what
+a duration threshold can never be.
+
+**Don't substitute a runtime baseline for that question, because the baseline
+goes stale --- and a run past the old maximum is evidence of exactly that.**
+The argument for a threshold is that a run far past this workflow's usual
+runtime is probably stuck.
+It is at least as likely that the usual runtime has changed, and nothing
+distinguishes the two from the run in front of you.
+Measured on one workflow in one repo, the successful runs preceding the first
+long one ran a 3.0-to-19.4-minute spread; the same afternoon produced two
+successful runs at 35.8 and 27.6 minutes, 1.8x and 1.4x that maximum.
+Both would have failed any threshold drawn from the history available when
+they started.
+
+A **neighbours** check --- did runs starting just before and just after this
+one complete normally --- is genuine evidence of a per-run anomaly, and is
+worth running.
+Treat it as suggestive rather than deciding, since a slow-but-healthy run has
+fast neighbours too.
+
+**Price the round before cancelling it, because a review is the most expensive
+thing on the PR.**
+[`efficient-pr-babysitting`](efficient-pr-babysitting.md) argues for batching
+pushes on CI minutes and on the review-round race, and both are real.
+The direct cost is larger than either: on the run measured below, one review
+round billed **$42.92**, against **$5.91** for the confirming re-review of the
+same PR --- a factor of 7.3.
+So a cancellation taken to avoid waiting is not free, and the slowest run is
+liable to be the one that costs most to repeat.
+
+Why some runs ran long is **unexplained**, and is deliberately left that way
+here.
+Four durations with no tested hypothesis do not support a mechanism, and
+naming one would license a threshold through the back door.
+
+- **Do:** compare the PR's latest commit timestamp against the run's
+  `run_started_at`, and let that decide whether to cancel.
+- **Do:** cancel promptly once the head has moved, since that run's verdict is
+  already unusable and a dispatch is owed either way.
+- **Do:** read a run past the historical maximum as evidence the baseline may
+  be stale, and say which of the two readings you acted on.
+- **Don't:** cancel a run whose head has not moved --- a verdict that arrives
+  is valid, and discarding it costs a full round.
+- **Don't:** draw a duration threshold from this workflow's own history; two
+  runs here cleared the prior maximum by 1.8x and completed successfully.
+- **Don't:** report a neighbours check as having established that a run is
+  stuck.
+
+(`Morrison-Lab/ai-config`, measured 2026-08-12, two runs of `claude-review.yml`
+about an hour apart, same repo and same workflow.
+
+| PR | run | head during the run | duration | action | outcome |
+| --- | --- | --- | --- | --- | --- |
+| #1395 | `31603739873` | **moved**, `4c5d71e6` -> `b11fe4a9` at `14:10:50Z` | 43.6 min | cancelled | correct; its verdict was already unusable |
+| #1407 | `31604997356` | stable at `205967ad` | 35.8 min | held | correct; completed with two real findings, both confirmed fixed |
+
+The run on #1395 started at `13:52:47Z` against `4c5d71e6`, and commit
+`b11fe4a9` landed 18 minutes later, so the run spent its second half reviewing a commit
+that was no longer the head.
+The in-flight note on #1407 reasoned partly from a baseline --- "a median of
+7.0 and a max of 19.4 minutes" --- and reached the right answer for the better
+stated reason beside it, that "this head has not moved, so a verdict that does
+arrive is valid at the current head and cancelling would discard it".
+
+Durations are `updated_at - run_started_at` over the workflow's last 30 runs,
+which is an upper bound on completion rather than `completed_at`; on the
+slow run it overshoots the verdict comment's own timestamp by 16 seconds.
+
+```bash
+gh api "repos/Morrison-Lab/ai-config/actions/workflows/claude-review.yml/runs?per_page=30" \
+  --jq '.workflow_runs[] | select(.conclusion=="success")
+        | "\(.run_started_at) \(((.updated_at|fromdateiso8601)
+          - (.run_started_at|fromdateiso8601))/60|floor) min \(.head_branch)"'
+```
+
+Over the 13 successful runs preceding `31603739873` that returns min 3.0,
+median 7.6, max 19.4 minutes.
+The two that cleared it are `31604997356` at 35.8 and `31606598676` at 27.6,
+both `success`.
+That slow run had neighbours at 9.0 and 11.7 minutes, both successful, so a
+neighbours check would have called it anomalous.
+The two costs are read from the PR's own cost comments, `$42.9192` on
+`31604997356` and `$5.9109` on `31608602196`.)

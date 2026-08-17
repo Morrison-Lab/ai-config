@@ -29,11 +29,55 @@ mutates a PR stays serial.
    in the JSON — `glab mr list` alone does not expose these fields.
    State the scope rules when you report, so the user can
    correct:
-   - **Skip drafts** by default (`isDraft: true`) — they aren't ready for the
-     clean-verdict bar. Include one only if the user explicitly asks.
+   - **Include drafts** (`isDraft: true`) unless another agent is actively
+     driving one.
+     A draft is the corpus's own in-flight claim signal ---
+     [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) opens one from an
+     empty `start:` scaffold commit before any code exists --- so read each
+     draft's state rather than sorting by the flag:
+     - **Skip a driven draft.**
+       Any of these marks one: the head commit is
+       still the `start:` scaffold (the implementer is mid-flight), a
+       still-live "paws off" claim comment stands (claims expire after 2
+       hours with no push or comment ---
+       [`claim-pr`](../../shared/workflow/claim-pr.md)), another actor
+       pushed recently, or the draft is deliberately held as a merge-order
+       gate (`CLAUDE.md`'s "Surface merge-order constraints", surface 3).
+     - **Include a parked draft.**
+       Real implementation on the branch, no
+       live claim, and no recent activity by another actor.
+       The review bot skips drafts in most repos, so once its content
+       passes the repo's checks, mark it ready for review --- a clean
+       verdict is unreachable while it stays draft.
+     Name each draft's disposition, and the signal that decided it, in the
+     scope report, so the user can veto before the loop touches it.
    - **Only iterate PRs the user owns / is responsible for** by default. In a
      shared repo, don't start review loops (which push commits) on other
      people's PRs unless told to. If unsure who owns what, ask first.
+   - **A green PR with no review check run is parked, not finished.**
+     On a repo whose review workflow is `workflow_dispatch`-only, nothing
+     fires on push, so a PR nobody ever reviewed presents exactly like one
+     that passed: every check green, nothing pending.
+     The tell is an **absence**, so no check state carries it, and the
+     sweep's own triage is where that absence has to be caught.
+     Read the review workflow's `on:` block once per repo, then treat "zero
+     review check runs on the head" as its own triage outcome.
+     `pull_request_read` `get_check_runs` answers it per PR.
+     [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)'s dispatch-only
+     section covers the single-PR case; the increment here is that a sweep
+     classifying many PRs at once will otherwise sort these into the
+     nothing-to-do pile.
+     - **Do:** name such a PR's verdict as missing rather than clean, and
+       dispatch a review for it --- pricing that round first, since a
+       dispatch is a real spend and several of them is several spends.
+     - **Don't:** read green checks with nothing pending as evidence a
+       review passed; on a dispatch-only repo that is the steady state.
+
+     (`Morrison-Lab/ai-config`, 2026-08-16: an `ardia` sweep found #1500 and
+     #1509 parked 4h and 2h19m, both all-green with no verdict, because that
+     repo's `claude-review.yml` carries no `pull_request` trigger.
+     Both had never been reviewed; the dispatched rounds then returned
+     "Needs more work" on each, with a blocking correctness bug in #1509.)
    - If the list is empty, say so and stop — nothing to do.
 
    **Detect and sort stacked PRs.** Check each PR's `baseRefName`. If any PR's
@@ -70,6 +114,8 @@ mutates a PR stays serial.
    Grep `origin/main` for the PR's distinctive added phrases; if they are all
    already there, the PR is `Superseded` (see step 3's terminal states) and its
    patch prep is wasted work --- flag it for closure instead.
+   Run that grep over `main`'s whole Markdown corpus rather than over the PR's
+   own file paths, for the reason step 3's terminal state gives.
 
    **The patch has to leave the worktree as an artifact, not sit in it as a
    dirty tree.**
@@ -175,6 +221,79 @@ mutates a PR stays serial.
      Recommend closure --- the content is preserved on `main` --- and name the superseding PR, rather than pushing an empty diff to clean.
      See [`sync-with-main`](../../shared/workflow/sync-with-main.md)'s duplicate-issue and whole-file-split cases, which already say to keep `main`'s version when a sibling published the same content.
      This is that judgment applied up front, at the whole-PR scale, with closure as the terminal action.
+
+     **That grep needs a search space, and the whole corpus is the right one.**
+     The prescription above says to grep `origin/main`, and does not say where
+     in it.
+     The reader supplies the narrow answer, because the PR's own file list is
+     right there: compare each added line against its counterpart in the same
+     path on `main`.
+
+     That reading under-reports whenever `main` has since **relocated** the
+     content --- a `.cases.md` or `.rationale.md` split, a rename, a section
+     moved between fragments.
+     The lines did land, somewhere else.
+     A per-file check reports them missing, so a superseded PR reads as
+     not-superseded and the sweep spends rounds driving a PR it should be
+     recommending for closure.
+
+     The error runs in the cheap direction, which is why nothing catches it.
+     It never closes a PR wrongly, it only fails to close one, so there is no
+     bad outcome to trace back and the wasted rounds look like ordinary work.
+
+     Score both scopes when they can differ, and report both:
+
+     ```bash
+     base="$(git merge-base <head> origin/main)"
+     git diff --name-only "$base" <head> | while read -r f; do
+       git diff -U0 "$base" <head> -- "$f" | grep '^+' | tail -n +2 | sed 's/^+//'
+     done
+     # per line, normalized for whitespace and inline markup, ask twice:
+     #   present in the same path on origin/main?
+     #   present anywhere in origin/main's Markdown corpus?
+     ```
+
+     Scope the diff to one file at a time, so each `+++ b/<path>` header is
+     dropped by **position** rather than by pattern.
+     Neither shortcut survives a whole-PR diff, and they fail in opposite
+     directions.
+     A single `tail -n +2` drops only the first file's header and leaves the
+     rest in the stream, where they read as content and inflate the score's
+     denominator.
+     A `grep -v '^+++ '` filter drops every header and also drops any added
+     line whose own text begins `++ `, since the diff's own marker turns it
+     into `+++ ` --- so that filter silently deletes real content, which is
+     the worse of the two.
+     No prefix pattern separates a header from its data, per
+     [`fail-fast`](../../shared/principles/fail-fast.md)'s third pattern
+     direction; per-file position does.
+
+     Cross-check the extracted line count against `git diff --numstat`'s
+     insertion column, which is computed by something other than this
+     pipeline --- a disagreement means a header leaked in or a content line
+     was swallowed, rather than anything about supersession.
+
+     - **Do:** run the supersession grep over `main`'s whole Markdown corpus,
+       not over the PR's own file paths.
+     - **Do:** report both scores when they differ, since the gap names a
+       relocation rather than missing content.
+     - **Don't:** read a per-file shortfall as evidence the content did not
+       land --- a split, a rename, or a section move produces exactly that.
+     - **Don't:** treat the PR's file list as the search space merely because
+       it is the list already in front of you.
+
+     (Morrison-Lab/ai-config#1458, 2026-08-15.
+     The same presence check, run after that PR merged to confirm its content
+     had landed, scored its pre-routing head `009fc9ef` against `origin/main`:
+     42 of 78 substantive added lines present in their own file's counterpart,
+     and 78 of 78 present somewhere in the corpus --- 45 of 89 and 89 of 89
+     counting every non-blank added line.
+     Scoring examined the 333 Markdown files outside the generated
+     `codex-skills/` mirror, of 514 tracked `.md` files in all.
+     The whole gap is `main` having absorbed PR #1468's rule/rationale split:
+     lines that head added to `shared/workflow/address-every-comment.md` now
+     live in that file's `.rationale.md` companion, so the path they were
+     added to no longer holds them.)
 
    `Escalated` and `Blocked` are disjoint by construction: the first is about the *review* deadlocking, the second about everything else.
    A PR meeting both is `Blocked`, since the external obstacle has to clear before the review matters.

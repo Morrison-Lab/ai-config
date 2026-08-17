@@ -71,6 +71,43 @@ A parallel session caught that site in `c9e70fc3` --- a PR-branch commit, squash
 The alternatives were already enumerated twice in the same repository: `hooks/no-unreviewed-pr.py` matches five command forms for this one effect --- `gh pr create --reviewer/-r`, `gh pr edit --add-reviewer`, a `-X POST` to the `requested_reviewers` endpoint, and two `request_copilot_review` tool names --- and `tool-mappings.yml` is an effect-to-command registry whose `REQUEST_COPILOT_REVIEW` row carries the REST form outright.
 So the corpus's code already knew the effect had several spellings while the grep searched for one.)
 
+### An identity has textual forms the same way an effect has commands
+
+The tell above is stated for commands, and an **identity** decays the same
+way: one owner, repo, plugin, or person is written in several textual forms,
+and a sweep deriving its sites from one form cannot reach the others.
+`owner/repo` is also `owner.github.io/repo` (the separator is a dot, so no
+slash-anchored pattern can match it), also `plugin@owner` (the identity is a
+suffix), also a bare `"owner"` key in a config block (the repo half is
+absent entirely).
+A rename sweep that derives from the slash form alone reports itself
+complete over a corpus that still carries the identity three other ways.
+
+The same session that produced this section's parent case also produced two
+accepted review findings of this shape, in one afternoon:
+
+- A quoting sweep derived its sites from `cli: gh api`, a **field** spelling,
+  and missed the same command in a sibling `github_mcp:` field and embedded
+  mid-value after `git log` (Morrison-Lab/ai-config#1476, round 1: 6 sites
+  claimed, 8 real).
+- An owner-rename sweep derived from the literal `d-morrison/ai-config` and
+  missed the dead `d-morrison.github.io/ai-config` domain in `_quarto.yml`'s
+  `site-url` --- a genuinely broken reference, not mere staleness, invisible
+  to the slash form (Morrison-Lab/ai-config#1482, round 1).
+  The broken plugin refs (`ai-config@d-morrison`) and marketplace key
+  (`"d-morrison"`) had needed their own second pattern in the same sweep for
+  the same reason.
+
+So before publishing an identity sweep's site list, enumerate the identity's
+**forms** --- path, domain, ref-suffix, bare key, and whatever the ecosystem
+adds --- and run one derivation per form, reporting each pattern beside its
+count.
+
+- **Do:** list an identity's textual forms first, and derive per form.
+- **Don't:** report an identity sweep complete from the form you swept;
+  the other forms return the same confident non-empty result for whoever
+  checks them next.
+
 ## The instrument
 
 `scripts/pr-sweep.py` is this rule's deterministic half for the open-PR case.
@@ -91,6 +128,123 @@ Surface an unowned stalled PR to the human, or claim it per [`claim-pr`](claim-p
 
 [`pr-status-all`](../../skills/pr-status-all/SKILL.md) remains the richer per-PR dashboard.
 This is the cheap standing sweep that says where to point it.
+
+## Asserting the set is EMPTY is the enumeration that skips its own check
+
+Everything above governs a set with members: hand over the query rather than the members, and watch that the query itself is wide enough.
+A claim that the set has **no** members is the same defect, and it evades both of those remedies, because there is nothing left to derive over.
+
+`CLAUDE.md`'s merge-order section already prescribes the derivation --- "'disjoint' is a claim about their file *sets*, so derive both sets and check the intersection before asserting it".
+An intersection against an empty population is vacuously empty, so that rule reports itself discharged while never having run.
+The population claim therefore sits **upstream** of every check the corpus offers here, and it is the one claim nothing prompts you to make with a command.
+
+Two things keep it from being noticed.
+
+**The conclusion is usually correct.**
+Collisions are rare, so "nothing to collide with" is right most of the time, and being right is exactly what stops anyone examining the reason.
+That makes this the shape [`fail-fast`](../principles/fail-fast.md)'s "A proxy that answers a narrower question passes the same way" describes: a test that is usually right, for a reason it never checked.
+
+**A reviewer will not supply the missing half.**
+The premise is about the *tracker* rather than about the diff, so it sits outside what a diff review reads at all --- which is [`fully-clean`](fully-clean.md)'s ratification case one step further out.
+There a reviewer inherits the author's population and verifies its members;
+here there are no members to verify, so a clean verdict says nothing whatever about the claim.
+
+The tell is a first-person scope word: "no other PR **of mine**", "nothing else in flight", "the only open one".
+Each names a population nobody counted, and "mine" is doing silent work --- it can mean opened by this session or held by this account, and those differ by however many sessions are running.
+
+Derive the population first, then the intersection over it, and publish both counts.
+`scripts/pr-sweep.py` above already derives the live open-PR set, and it reports what it examined rather than only what it found, which is the property this case needs.
+
+- **Do:** derive the population before the intersection, and report both counts --- "10 open PRs examined, 0 touching this file" is checkable, and "no others are open" is not.
+- **Do:** say which population a scope word covers --- this session's PRs, the account's, or the repo's --- since the three differ.
+- **Don't:** assert a set is empty from recollection;
+  emptiness is the one claim that makes the derivation rule vacuous rather than merely unsupported.
+- **Don't:** read a correct conclusion as evidence the premise held --- a collision-free result is the usual case whether or not anyone counted.
+
+(Morrison-Lab/ai-config#1435, 2026-08-12.
+Its PR body closed with "No other PR of mine is open, so there is no merge-order constraint and nothing to collide with", and the review confirmed the PR clean without touching that sentence.
+Ten PRs were open at merge time, eight of them under the same account.
+The post-merge sweep derived each one's file set against its own merge base and found 0 of 10 touching `shared/writing/ambiguous-reference.md` --- so the conclusion held and its stated reason did not.)
+
+## A qualifier clause is a second figure, measured somewhere else
+
+The section above governs a population nobody counted.
+This governs one that *was* counted, correctly, for the figure it was counted for --- alongside a second figure in the same sentence that was measured somewhere else.
+
+A total usually arrives with a qualifier attached: "ten open, eight of them under the same account", "forty files changed, six of them generated".
+The qualifier reads as a decomposition of the total, because that is what the grammar says, and nothing in the sentence tells a reader that the subset came from a different query than the total did.
+
+**Deriving one number in a sentence discharges the feeling of having derived the sentence.**
+That is the whole mechanism.
+The total is the figure the claim was about, so it gets the query, the timestamp, and the care.
+The qualifier is a detail added while writing, so it gets whichever number is nearest to hand --- and that number is frequently a real one, correctly derived, against a population that has since moved.
+
+Both figures are then individually defensible, which is why re-reading finds nothing.
+Only asking **which population each was measured in** separates them.
+
+[`ardi`](ardi.md)'s pre-push checklist already carries the nearest rule, requiring every number in a PR body to be re-derived by command and stating that "a base figure owes its own derivation rather than riding on the delta's".
+Read that rather than re-deriving it here.
+Two things differ.
+That rule is scoped to the **PR body**, the artifact nothing re-measures, whereas a subset figure in a shared fragment ships as prose and is read long after the tracker state it described.
+And base-versus-delta is one instance of a general shape: any two figures in one sentence can name different populations, whatever their arithmetic relationship looks like.
+
+- **Do:** run a separate query for a subset figure, and name the moment both figures were measured at.
+- **Do:** treat a qualifier clause as a second claim owing its own derivation, rather than as a decomposition of the figure it follows.
+- **Don't:** carry a subset count measured at one moment into a sentence whose total names another --- the two populations differ by whatever moved in between.
+- **Don't:** read "I derived the number in this sentence" as covering the sentence.
+  The figure you derived is the one you were thinking about.
+
+(Morrison-Lab/ai-config#1437, 2026-08-12, review finding 1.
+The case record directly above shipped reading "Ten PRs were open at merge time, seven of them under the same account", and now reads "eight of them".
+The total was derived against #1435's merge instant, `21:50:27Z`, and was right.
+The subset was not: at that instant `d-morrison` held eight of the ten (#1393, #1411, #1413, #1417, #1420, #1421, #1422, #1436), with `claude[bot]` holding #1427 and #1434.
+Seven is the same-account count of a **different** population --- the nine PRs left after #1436 merged at `21:54:09Z`, four minutes later --- so it was a real figure, correctly derived, about a moment the sentence was not describing.
+Re-derived here from `list_pull_requests` over `created_at`/`closed_at` rather than from the reviewer's own number, per [`metacognitive-monitoring`](metacognitive-monitoring.md)'s rule that a finding's conclusion is the sound half and its particulars are not.)
+
+## A count and its label can disagree about whether the subject is a member
+
+The two sections above both fail somewhere in the derivation.
+One never derives the population at all.
+The other derives two figures and measures them in different places.
+This one derives correctly, once, and attaches the result to a claim about a different set.
+
+A query returns a **population**.
+A claim frequently quantifies over that population **minus the subject** --- the other PRs, the remaining files, everything else in flight.
+Nothing in the query knows you meant to exclude yourself, so its answer is right about the set it counted and wrong about the set the sentence names.
+
+**The tell is a scope word attached to a figure that came from a whole-population query.**
+"Other", "remaining", "else", "besides", "the rest".
+Each one silently subtracts the subject from the set being described, while the number beside it still includes the subject.
+
+That is also the empty-set section's tell, and the two point at opposite defects.
+There a scope word marks a population **nobody counted**, so deriving it is the whole fix.
+Here the population **was** counted, so the scope word marks a correct count of the wrong set, and the fix is a subtraction rather than a query.
+
+**Re-deriving the same total cannot catch this, which is what lets it survive a careful pass.**
+The total is not the part that is wrong.
+Running the query again returns the same number, so the check that would ordinarily settle a suspect figure confirms it instead.
+[`ardi`](ardi.md)'s pre-push requirement to re-derive every number in a PR body is satisfied in full by a re-run that changes nothing.
+So subtract the subject explicitly, or filter it out in the query, and state which population the figure counts.
+
+**The cheapest check needs no query at all.**
+A scope-word figure usually sits beside an enumeration of the same set --- a table, a list of numbers --- which is a second and independent statement of that count.
+When a body carries both, they have to agree, and a figure that disagrees with the list under it is decidable by looking.
+
+- **Do:** subtract the subject from a whole-population count before attaching a scope word to it, and name the population the figure counts.
+- **Do:** compare a scope-word figure against any enumeration of the same set beside it, since the two state one count twice.
+- **Don't:** read a re-derivation that returns the same total as confirming a figure labelled "other" --- the total is the half that was already right.
+- **Don't:** reach for the empty-set section's remedy here;
+  that one is discharged by deriving the population, and this one by subtracting from a population already derived.
+
+(Morrison-Lab/ai-config#1455, 2026-08-13, review round 1, non-blocking.
+Its "Merge order" section read "No constraint against the **5** other open PRs" and then listed four: #1452, #1422, #1420, #1393.
+The finding, verbatim: "A live count shows 5 open PRs *total* including #1455 itself, so there are 4 *other* open PRs, not 5 --- an off-by-one in the population count."
+Re-derived here from `list_pull_requests` over `created_at`/`closed_at` rather than from the reviewer's own number, per [`metacognitive-monitoring`](metacognitive-monitoring.md)'s rule that a finding's conclusion is the sound half and its particulars are not: at #1455's creation, `20:22:48Z`, the open set was #1393, #1420, #1422, #1452, and #1455 itself --- 5 total and 4 others, unchanged at the review's own `20:30:47Z`.
+
+The coincidence that hid it is worth naming, because it is what makes the re-derivation useless here.
+The figure was carried from PR #1454's body, which had read "all 5 open PRs examined" over a five-row table whose first row was `**#1454** (this)` --- correct there, as a total *including* the subject.
+That PR merged at `18:14:51Z` and #1455 opened at `20:22:48Z`, so one subject replaced another and the total stayed 5.
+Re-deriving the total at #1455's own moment therefore returns the very figure that was wrong.)
 
 ## In review
 

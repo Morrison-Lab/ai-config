@@ -7,7 +7,7 @@ title: "Setup"
 **Requirements:** git, [Claude Code CLI](https://claude.ai/code), and/or Codex.
 
 ```sh
-git clone https://github.com/d-morrison/ai-config.git ~/ai-config
+git clone https://github.com/Morrison-Lab/ai-config.git ~/ai-config
 bash ~/ai-config/bootstrap.sh
 ```
 
@@ -39,7 +39,7 @@ and is idempotent.
 
 The hook also installs **Julia** (via `juliaup`) on first start, if allowed by
 the environment's network policy. See
-[`docs/julia-setup.md`](https://github.com/d-morrison/ai-config/blob/main/docs/julia-setup.md).
+[`docs/julia-setup.md`](https://github.com/Morrison-Lab/ai-config/blob/main/docs/julia-setup.md).
 
 ## Plugin marketplace — other repos
 
@@ -49,12 +49,12 @@ this to that repo's `.claude/settings.json`:
 ```json
 {
   "extraKnownMarketplaces": {
-    "d-morrison": {
-      "source": { "source": "github", "repo": "d-morrison/ai-config" }
+    "Morrison-Lab": {
+      "source": { "source": "github", "repo": "Morrison-Lab/ai-config" }
     }
   },
   "enabledPlugins": {
-    "ai-config@d-morrison": true
+    "ai-config@Morrison-Lab": true
   }
 }
 ```
@@ -65,9 +65,31 @@ Claude Code installs the plugin at session start. Skills are namespaced:
 Or try it interactively in any Claude Code session:
 
 ```text
-/plugin marketplace add d-morrison/ai-config
-/plugin install ai-config@d-morrison
+/plugin marketplace add Morrison-Lab/ai-config
+/plugin install ai-config@Morrison-Lab
 ```
+
+::: {.callout-warning}
+
+## Pick one install route
+
+The plugin install and the `bootstrap.sh` symlink install are
+**alternatives, not complements**: both serve the same corpus, so running
+both lists every skill twice (bare `/ardi` plus prefixed `/ai-config:ardi`)
+and blows the skill-listing context budget
+([ai-config#1409](https://github.com/Morrison-Lab/ai-config/issues/1409)).
+On a machine that ran `bootstrap.sh`, leave the plugin disabled --- including
+a consumer repo's checked-in `enabledPlugins` block, which you opt out of
+with `"ai-config@Morrison-Lab": false` in **`.claude/settings.local.json`**.
+Not `~/.claude/settings.json`: the user scope is the *lowest* of Claude
+Code's five, so a `false` there loses to the repo's checked-in `true`
+([settings docs](https://code.claude.com/docs/en/settings)).
+Likewise enable the plugin from at most **one** marketplace:
+`Morrison-Lab/ai-config` and `d-morrison/ai-config` publish the same plugin,
+so a second entry is a no-op collision.
+`bootstrap.sh` warns about both cases via
+`scripts/check-plugin-overlap.py`.
+:::
 
 ## `@claude` bot on PRs
 
@@ -82,4 +104,4 @@ When several AI sessions share one local checkout, they can clobber each other.
 The `session-lock` skill (alias `deconflict-sessions`) keeps a machine-local
 registry of active sessions under `.git/ai-sessions/`. Sessions can refuse to
 share a working tree and isolate into a `git worktree`. See
-[`docs/local-session-deconfliction.md`](https://github.com/d-morrison/ai-config/blob/main/docs/local-session-deconfliction.md).
+[`docs/local-session-deconfliction.md`](https://github.com/Morrison-Lab/ai-config/blob/main/docs/local-session-deconfliction.md).

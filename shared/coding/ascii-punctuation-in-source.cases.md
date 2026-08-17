@@ -74,3 +74,24 @@ touched 663 removed lines across the three files against an expected ~50 ---
 caught by `git diff --stat` before pushing, reverted with
 `git checkout -- <files>`, and redone with anchored, uniqueness-asserted
 substitutions for only the 8 flagged lines.)
+
+## The Edit tool cannot replace a glyph with its own escape
+
+(Morrison-Lab/ai-config#1528, 2026-08-16: the hook that PR added needs four
+non-ASCII glyphs in its regexes, and an attempt to write them as escapes ran
+into the refusal above.
+Three probes, on a throwaway file:
+
+1. `old_string` the literal glyph, `new_string` the same glyph's own escape ---
+   refused with `old_string and new_string are exactly the same`, so the two
+   sides had compared equal.
+2. `old_string` the literal glyph, `new_string` an escape naming a *different*
+   character --- succeeded, and the file on disk held that character rather
+   than the six literal characters, so the escape was decoded before the write.
+3. `old_string` an escape, against a file holding that same escape as six
+   literal characters --- matched, which a decoded `old_string` could not have
+   done.
+
+Probes 1 and 2 fix the behaviour; probe 3 is why the mechanism is left open,
+since it contradicts the reading probes 1 and 2 suggest.
+The hook ships the `chr(0x201C)` form instead, and its own source is ASCII.)

@@ -759,6 +759,9 @@ follow-up issues, what UMS updated, and a Pacific-time timestamp
 (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces
 PT on a machine set to any other zone).
 
+**Session stopping point signal:**
+When this post-merge wrap-up completes the session's work (e.g. after merging the final feature PR or its UMS follow-up PR), finish the report with an explicit stopping-point statement (e.g. *"This session is at a good stopping point."*) per `wrap-up`'s closing checklist, rather than ending on a silent trailing summary table.
+
 ## Relationship to other skills
 
 - **`wrap-up`** — session-level bookend; also embeds UMS. `post-merge` is the

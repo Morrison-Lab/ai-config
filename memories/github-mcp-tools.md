@@ -1049,3 +1049,87 @@ See ai-config#694 for the precedent.
   Read the default as the starting point and widen once, and treat a
   size-limit rejection as a prompt to find a different surface rather than to
   keep halving --- here the webhook above delivered the same content in full.
+
+- **`pull_request_read` `get_files` is a fourth REST-backed route that 404s,
+  and local git is the working fallback rather than another API call.**
+  The table above lists `get_comments`, `get_reviews`, and `issue_read`
+  `get_comments`.
+  `get_files` behaves identically: 404 for all five PRs tried (#1547, #1566,
+  #1576, #1580, #1581) in the same container where the GraphQL-backed reads
+  succeeded minutes earlier.
+
+  That matters most for the merge-order check `CLAUDE.md` requires before
+  asserting two PRs are disjoint, since deriving a PR's file set is exactly
+  what `get_files` exists for.
+  `scripts/pr-sweep.py` cannot stand in here either --- it shells out to `gh`,
+  which is absent from this environment --- so derive the sets from sweep refs
+  instead:
+
+  ```bash
+  git fetch origin "+refs/pull/*/head:refs/sweep/pr/*" -q
+  git diff --name-only "$(git merge-base origin/main refs/sweep/pr/$PR)" refs/sweep/pr/$PR
+  ```
+
+  - **Do:** fall back to local sweep refs for a file set, and say in the PR
+    body that the API route was unavailable.
+  - **Don't:** read a `get_files` 404 as a fact about the PR; it is the same
+    route defect the three reads above show.
+
+- **A 503 is transient and worth retrying, unlike the 404 and the 403 ---
+  three distinct failure classes that a single "the API is broken" reading
+  conflates.**
+  `503 No server is currently available to service your request` arrived twice
+  in a row on `issue_read` `get` for #1547 and succeeded on the third attempt,
+  and once on `merge_pull_request` for #1581, succeeding on an immediate
+  identical retry.
+  So it fires on reads and on writes alike, and a merge that 503s has not
+  necessarily failed to merge --- re-read the PR's `merged` field before
+  assuming either outcome.
+
+  The other two are not retryable at all.
+  A 404 on the REST-backed routes above is a route defect, so every retry
+  returns it.
+  The raw-REST 403 names an org-admin action, so nothing this session does
+  changes it.
+
+  - **Do:** retry a 503 immediately, and verify the resulting state rather
+    than the call's status when the call was a write.
+  - **Don't:** retry a 404 or a 403 --- one is a broken route and the other is
+    a policy denial.
+
+- **Angle-bracket stripping reaches inside fenced code blocks, not only inline
+  code spans.**
+  A `$PR`-style shell variable survives a `create_pull_request` body intact; a
+  placeholder written as a bare letter wrapped in angle brackets does not,
+  even inside triple backticks.
+  Recorded because it hit #1581's own body twice --- once in the sweep command
+  above, and again in the bullet documenting that first instance, which lost
+  the bracketed placeholder it was quoting and left an empty code span behind.
+
+  - **Do:** write a shell variable, or name the placeholder in words, when a
+    body has to show a command with a substitutable argument.
+  - **Don't:** assume a fenced block protects angle brackets; it does not.
+
+- **Two shapes to expect when reading workflow runs through the MCP tools.**
+  `actions_list` `list_workflow_runs` exceeds the response token limit even at
+  `per_page: 3` --- measured at 111,922 characters --- and spills to a scratch
+  file whose single-line payload defeats `Read`'s `offset`/`limit`, so it needs
+  character-range slicing to recover.
+  And a `queued` run object carries no `conclusion` key at all, absent rather
+  than null, so iterating runs needs `r.get('conclusion', '-')` rather than
+  `r['conclusion']`.
+
+  - **Do:** reach for `get_check_runs` on a specific head before listing runs,
+    and use `.get()` on any field a non-terminal run may not carry.
+  - **Don't:** lower `per_page` in the hope of fitting the response; three was
+    already 111,922 characters.
+
+- **The `tail_lines` window is narrower than the bullet above implies: 600 also
+  overflows.**
+  Measured against one `claude-review` job whose log is 1630 lines: `120`
+  returns workflow plumbing only, `600` returns 77,823 characters and is
+  rejected by the response token limit, and `3000` returns 171,956 and is
+  rejected likewise.
+  So the usable band sits between the default 500 and 600 for a log of that
+  size, which is too narrow to aim at reliably --- read a verdict from the
+  webhook or a review comment instead of from the log.

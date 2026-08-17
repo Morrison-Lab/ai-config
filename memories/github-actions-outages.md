@@ -377,8 +377,17 @@ success is evidence about the session alone.
 
 ### Probing by dispatch is cheap when the outage is total and expensive when it is partial
 
-This refines the existing "do not retry a workflow dispatch during a declared
-outage" bullet, which is right for an Actions incident and wrong here.
+This refines the existing "**Don't:** retry a workflow dispatch or wait on CI
+during a declared **Actions** outage; the incident's own updates say when jobs
+will run again" bullet, which is right for the incident it names and wrong
+here.
+
+Quoted in full deliberately.
+An earlier draft of this paragraph paraphrased it as "a declared outage",
+dropping the word **Actions** --- in a section whose entire purpose is to
+separate an Actions outage from an API one, so the paraphrase erased the
+distinction it was written to draw and left the original bullet looking as
+though it already covered both.
 
 A review workflow that calls the API in an **early guard step** fails closed
 within seconds, long before any billable model step runs, so a dispatch during
@@ -410,20 +419,55 @@ the first run that clears the guard as the one that might cost a full round.
   tool that failed during the outage answers normally afterward.
 
 (2026-08-17, `Morrison-Lab/ai-config` PR #1584.
-Five consecutive `claude-review` dispatches lost their verdict between roughly
-17:37Z and 18:12Z.
-Rounds 2 to 4 reached step 20, "Post review comment", and `503`d there after
-the review had already been produced; rounds 5 and 6 failed earlier, in
-`gather-context`, whose fork guard calls `gh pr view` first and so failed
-closed in four seconds.
-`https://www.githubstatus.com/` was unreachable from the session for the whole
-period --- `CONNECT tunnel failed, response 403` --- while the session's own
-GitHub MCP reads answered normally throughout, which is what made the
-session-side probe look informative and was the reason the outage's scope went
-unmeasured for several rounds.
-Recovery was abrupt: at 19:05:44Z `gather-context` passed for the first time
-since round 1, `claude-review` ran 3m34s, and the verdict posted at 19:09:14Z
-for $5.02, against roughly $12 assumed per lost round.
-`get_reviews`, recorded mid-outage as returning 404 in this session and carried
-forward in four successive check-in briefs as an environment property, returned
-`[]` normally once the outage cleared.)
+Every figure below is derived from `list_workflow_runs` on `claude-review.yml`
+filtered to the PR's branch, plus each failing job's own `steps[]`, rather than
+from recollection --- see the correction at the end for why that distinction is
+the case record's main lesson.
+
+| run | dispatched | head | `gather-context` | `claude-review` | failed at |
+| --- | --- | --- | --- | --- | --- |
+| 32048542962 | 17:02:43Z | `e5b948f1` | success | success | --- verdict posted |
+| 32049426027 | 17:14:15Z | `82c434f4` | success | failure | step 20 |
+| 32050823564 | 17:33:00Z | `a35b7d72` | success | failure | step 20 |
+| 32053702550 | 18:11:17Z | `a35b7d72` | **failure** | skipped | guard, step 2 |
+| 32058414399 | 19:05:28Z | `a35b7d72` | success | success | --- verdict posted |
+
+**Three** dispatches lost a verdict, between 17:14Z and 18:12Z.
+Two of them are the expensive regime: step 11, "Run Claude Code Review",
+succeeded --- 3m25s and 3m50s respectively --- and step 20, "Post review
+comment", then failed within a second, so a complete review existed and was
+discarded.
+The third is the cheap regime: `gather-context`'s step 2, the fork/Dependabot
+guard, failed in **one second**, and the whole job in four, well before any
+model step.
+`review / require-review` went red on all three, and on 32050823564 step 24,
+"Re-assign reviewers after Claude finishes", failed too, dropping the pending
+review request.
+
+The outage deepened rather than merely persisting: partial, partial, total,
+then clear.
+Recovery was abrupt --- at 19:05:44Z the guard passed, `claude-review` ran
+3m34s, and the verdict posted at 19:09:14Z for **$5.02**.
+The follow-up review on PR #1595 cost **$4.80**, so a lost step-20 round is
+worth roughly five dollars, not the twelve this session had been assuming.
+
+`https://www.githubstatus.com/` was unreachable from the session throughout ---
+`CONNECT tunnel failed, response 403` --- while the session's own GitHub MCP
+reads answered normally, which is what made a session-side probe look
+informative and left the outage's scope unmeasured for three rounds.
+
+**The correction is the part worth keeping.**
+This record's first draft said five dispatches were lost, that rounds 2 to 4
+failed at step 20, and that the guard "passed for the first time since round 1"
+at recovery.
+A reviewer caught that the last two of those contradict each other --- a run
+cannot reach step 20 without its `gather-context` having passed --- and
+deriving the timeline to repair the contradiction showed the count was wrong as
+well, which no reading of the prose could have revealed.
+The numbers came from a check-in brief this session had written and re-sent
+each round, so they had been restated often enough to feel measured.
+They were not: `get_check_runs` on the PR shows only the runs at its *current*
+head, so the two earlier heads' runs were never in view, and the brief's
+round-numbering was invented to fill the gap.
+`list_workflow_runs` filtered by branch is the query that answers it, and it
+takes one call.)

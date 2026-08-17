@@ -76,17 +76,19 @@ file's punctuation and the specific stray symbols named above (the
 multiplication sign, U+00D7) ASCII anyway.
 Treat adding or extending the repo's non-ASCII check to also scan `.md` as
 the enforcement follow-up: a repo with no such check yet needs to add one, and
-a repo whose check already scans `.R`/`.qmd` needs to extend it. For
-`d-morrison/gha`'s `check-non-standard-chars` specifically, the follow-up
-also needs to ensure its glyph set covers all four named glyphs (en/em-dash,
-curly quotes, multiplication sign), not just `.md` scanning -- its
-`NON_STANDARD_CHARS` set has no U+00D7 entry, and its `extensions` list is
-hard-coded to `['.qmd', '.R']`, both still true on 2026-08-10.
-Both gaps are tracked in gha#322, whose proposed scope also makes that
-extension list a configurable input rather than a hard-coded literal, so a
-consumer can narrow or widen it without forking the script.
-Cite that issue rather than re-deriving the gaps: a follow-up named in prose
-with no tracker reads as untracked, and settling it is one search.
+a repo whose check already scans `.R`/`.qmd` needs to extend it.
+For `Morrison-Lab/gha`'s `check-non-standard-chars` specifically, that follow-up is tracked in gha#322, which is now **partly done**.
+
+Both halves were re-measured on 2026-08-17, by reading `check-non-standard-chars/check-non-standard-chars.py` at the `v2` tag --- the ref consumers actually pin --- and they now differ:
+
+- **The glyph set is complete, as of 2026-08-17.**
+  `NON_STANDARD_CHARS` carries all seven glyphs this rule bans: the four curly quotes, the en-dash, the em-dash, and `'\u00d7': 'Multiplication sign'`, whose own source comment reads "Added in gha#322".
+  An earlier version of this paragraph said the set had no U+00D7 entry, and that has been false since roughly 2026-08-15.
+- **The extension list is still hard-coded**, also re-measured 2026-08-17: `extensions = ['.qmd', '.R']` remains a literal, so `.md` is still unscanned and a consumer still cannot narrow or widen the list without forking the script.
+
+So gha#322's remaining scope is `.md` scanning and making that list a configurable input, per [`configurable-parameters`](configurable-parameters.md).
+Cite that issue rather than re-deriving the gap: a follow-up named in prose with no tracker reads as untracked, and settling it is one search.
+
 When the glyph must appear in rendered output, keep the source ASCII in a
 context-appropriate way.
 In an R or Python string literal (a status message, a plot label), use the
@@ -94,6 +96,40 @@ In an R or Python string literal (a status message, a plot label), use the
 In `.qmd`/`.md` prose, `\uXXXX` is not interpreted by Pandoc and renders
 literally: use a math span (`$\times$`), an HTML entity (`&times;`), or
 reword to avoid the glyph.
+
+**A passing glyph check is not an ASCII certificate.**
+A green `check-non-standard-chars` is evidence about the seven code points in its set, and about nothing else in the file.
+
+That reading is easy to slide past now precisely *because* the gap above closed.
+The checker's set and this rule's banned list agree exactly, so the check finally means what the rule says --- which makes it tempting to read a pass as "this file is clean" rather than as "this file is free of those seven glyphs".
+Every other non-ASCII code point is outside both, by design: this rule bans six symbols plus the multiplication sign and explicitly leaves an accented name or a quoted foreign term alone.
+So the checker is not deficient here, and a pass still settles far less than it appears to.
+
+Measured 2026-08-17 on `UCD-SERG/lab-manual` PR #461, run 32071165557, job `check-chars / check-chars`, against `coding-practices/benchmarking.qmd` at commit `60b5136`.
+The checker reported `Found 1 non-standard character(s) in 1 file(s)`.
+An independent scan of the same file at the same commit found **four** distinct non-ASCII code points at **nine** sites:
+
+| code point | name | sites | in the checker's set |
+| --- | --- | --- | --- |
+| U+00B2 | SUPERSCRIPT TWO | 2 | no |
+| U+00B5 | MICRO SIGN | 2 | no |
+| U+00D7 | MULTIPLICATION SIGN | 1 | yes |
+| U+2192 | RIGHTWARDS ARROW | 4 | no |
+
+One of nine sites was reported, and that is the checker working correctly.
+Derive the population yourself when the question is whether a file is ASCII, rather than reading it off a check built to answer a narrower question.
+
+The duration is the part worth carrying.
+That multiplication sign has been in the file since commit `0030720` (2026-01-27), and the check reported green over it for roughly seven months, until the instrument's glyph set changed.
+A repo can therefore carry a real violation indefinitely while its check stays green, so a clean history of that check is not evidence the rule was being followed.
+
+The converse --- a check that starts failing on a file no PR touched, which is a signal to look at the checker's version before hunting for a new violation --- is already recorded in [`memories/github.md`](../../memories/github.md)'s "A moving upstream tag can turn a consumer's default branch red with no local change" section, from this same incident family.
+Read it there rather than re-deriving it here.
+
+- **Do:** read a green glyph check as covering its own glyph set, and say which set when reporting the result.
+- **Do:** scan for the whole non-ASCII population yourself when the claim you are about to make is that a file is ASCII.
+- **Don't:** report a file, a diff, or a repo as ASCII-clean on the strength of a passing `check-non-standard-chars` run.
+- **Don't:** read a long green history of that check as evidence no violation was present --- it went green over this one for about seven months.
 
 **The Edit tool cannot perform that substitution, so build the character with
 `chr()` rather than trying to type its escape.**

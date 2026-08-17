@@ -311,23 +311,45 @@ The report reads as the instrument's verdict rather than as your reading of it,
 so "the checker says clean" is what reaches the human --- and nothing in that
 sentence exposes that a `grep` stood between the two.
 
-The remedy is the shorter spelling:
+**The status is three-valued, and collapsing it to a boolean is the same
+mistake one layer further in.**
+`check-pr-fully-clean.py` exits **0** clean, **1** not clean, and **2** for a
+usage or environment error.
+That third code is deliberate --- its own source says `USAGE_EXIT = 2` exists
+so "a usage or environment error would have been read as a verdict about the
+PR" --- so `if ! checker; then not_clean` throws away the distinction the
+script went out of its way to provide.
+
+The cost is a **false regression**: a transient `gh` failure, a rate limit, a
+network blip in a polling loop, all report a PR as having gone not-clean.
+That is the mirror of the grep bug above, which failed toward clean; this one
+fails toward alarm, and both are a two-branch reading of a three-branch answer.
+
+This is [`fail-fast`](../principles/fail-fast.md)'s "0, 1, and anything else
+are three answers and not two", which applies to a purpose-built checker
+exactly as it does to `grep`.
+
+So read the status, and read all three of it:
 
 ```bash
-if python3 scripts/check-pr-fully-clean.py "$n" >/dev/null 2>&1; then
-  echo "#$n CLEAN"
-else
-  echo "#$n NOT clean"; python3 scripts/check-pr-fully-clean.py "$n"
-fi
+python3 scripts/check-pr-fully-clean.py "$n" >/tmp/fc.txt 2>&1; rc=$?
+case $rc in
+  0) echo "#$n CLEAN" ;;
+  1) echo "#$n NOT clean"; cat /tmp/fc.txt ;;
+  *) echo "#$n CHECK FAILED (rc=$rc) -- not a verdict"; cat /tmp/fc.txt ;;
+esac
 ```
 
-- **Do:** branch on the checker's exit status, and print its output only to
-  explain a non-zero.
+- **Do:** branch on the checker's exit status, treating 0 as clean, 1 as a
+  verdict of not-clean, and anything else as the check having failed to answer.
 - **Do:** re-verify the agent and the head yourself before reporting ready,
   since the exit status is necessary and this file's own SHA-surface caveats
   still apply.
 - **Don't:** grep a purpose-built checker's output for a phrase --- its prose
   is a human-facing report, not an API.
+- **Don't:** collapse the status to a boolean either; `rc != 0` reports a
+  broken check as a regressed PR, which is the same conflation wearing the
+  remedy's clothes.
 - **Don't:** read "I called the right instrument" as having consumed it; the
   bypass guard fires on the call, and nothing fires on the misreading.
 

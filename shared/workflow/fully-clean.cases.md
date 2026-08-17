@@ -756,3 +756,50 @@ that final approval comes from Claude at the current head, and a hook whose
 purpose is catching unverified claims about state.
 Neither reached the monitor, because both govern what you *assert* and this was
 a fault in what you *measured*.)
+
+## The same conflation in the fix: `rc != 0` reported three clean PRs as regressed
+
+(`Morrison-Lab/ai-config` #1561 / #1566 / #1575, 2026-08-16, roughly an hour
+after the case above and in the same session.
+
+The grep was replaced with a status read, and the status was read as a boolean:
+
+```bash
+python3 scripts/check-pr-fully-clean.py "$n" >/dev/null 2>&1 \
+  || echo "REGRESSED: ai-config#$n no longer clean"
+```
+
+That fired on all three, twice.
+All three were clean at the time and clean afterwards, verified by running the
+checker directly.
+
+The contract it discarded is three-valued, and measured rather than assumed:
+
+| invocation | exit |
+| --- | ---: |
+| a clean PR | 0 |
+| a not-clean PR | 1 |
+| no argument (usage error) | 2 |
+
+`scripts/check-pr-fully-clean.py:47-51` says why the third exists: `raise
+SystemExit("message")` would exit 1, "which is this script's 'not clean' code
+--- so a usage or environment error would have been read as a verdict about the
+PR.
+The exit code is set explicitly for that reason."
+So the script anticipated exactly this conflation and provided the code needed
+to avoid it, and the consumer collapsed it anyway.
+
+Two things make the pair worth recording together rather than folding into one
+entry.
+
+The **direction inverted**.
+The grep failed toward clean and hid a blocking finding; the boolean status
+fails toward alarm and manufactures regressions.
+A reader who takes only "read the exit status" from the first case lands
+directly in the second.
+
+And the second bug was introduced **by the fix for the first**, in the same
+session, by someone who had just written the entry above.
+That is what argues the remedy has to name all three codes rather than
+contrast "status" with "prose": the contrast is what made a two-branch reading
+feel like compliance.)

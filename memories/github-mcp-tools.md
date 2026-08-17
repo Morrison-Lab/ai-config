@@ -75,6 +75,10 @@ See ai-config#694 for the precedent.
   The mitigation is unchanged and cheap: spell a placeholder in caps
   (`BRANCH`, `GHA-CHECKOUT`, `BASE`) in any body, where nothing can read it as
   a tag.
+  A shell variable is the better form when the body is showing a command a
+  reader will run: `$PR` survived a `create_pull_request` body intact on
+  2026-08-17, and unlike a caps placeholder it leaves the command executable
+  once the variable is set, rather than leaving a token to hand-substitute.
   Files in the diff were unaffected, as above --- the angle-bracket form
   inside a fenced code block is correct there and should stay.
   **`update_pull_request` strips a short placeholder token too, which extends
@@ -1049,3 +1053,88 @@ See ai-config#694 for the precedent.
   Read the default as the starting point and widen once, and treat a
   size-limit rejection as a prompt to find a different surface rather than to
   keep halving --- here the webhook above delivered the same content in full.
+
+- **`pull_request_read` `get_files` is a fourth REST-backed route that 404s,
+  and local git is the working fallback rather than another API call.**
+  The REST-versus-GraphQL table above lists `get_comments`, `get_reviews`, and
+  `issue_read` `get_comments`.
+  `get_files` behaves identically: 404 for all four PRs tried (#1566, #1576,
+  #1580, #1581) in the same container where the GraphQL-backed reads succeeded
+  minutes earlier.
+  Keep a number out of that list unless it is a PR --- `get_files` against an
+  issue number 404s whatever the route does, so it cannot witness a route
+  defect.
+
+  That matters most for the merge-order check `CLAUDE.md` requires before
+  asserting two PRs are disjoint, since deriving a PR's file set is exactly
+  what `get_files` exists for.
+  `scripts/pr-sweep.py` cannot stand in here either --- it shells out to `gh`,
+  which is absent from this environment --- so derive the sets from sweep refs
+  instead:
+
+  ```bash
+  git fetch origin "+refs/pull/*/head:refs/sweep/pr/*" -q
+  git diff --name-only "$(git merge-base origin/main refs/sweep/pr/$PR)" refs/sweep/pr/$PR
+  ```
+
+  - **Do:** fall back to local sweep refs for a file set, and say in the PR
+    body that the API route was unavailable.
+  - **Don't:** read a `get_files` 404 as a fact about the PR; it is the same
+    route defect the three reads above show.
+
+- **A 503 is transient and worth retrying, unlike the 404 and the 403 ---
+  three distinct failure classes that a single "the API is broken" reading
+  conflates.**
+  `503 No server is currently available to service your request` arrived twice
+  in a row on `issue_read` `get` for #1547 and succeeded on the third attempt,
+  and once on `merge_pull_request` for #1581, succeeding on an immediate
+  identical retry.
+  So it fires on reads and on writes alike, and a merge that 503s has not
+  necessarily failed to merge --- re-read the PR's `merged` field before
+  assuming either outcome.
+
+  The other two are not retryable at all.
+  A 404 on the REST-backed routes above is a route defect, so every retry
+  returns it.
+  The raw-REST 403 names an org-admin action, so nothing this session does
+  changes it.
+
+  - **Do:** retry a 503 immediately, and verify the resulting state rather
+    than the call's status when the call was a write.
+  - **Don't:** retry a 404 or a 403 --- one is a broken route and the other is
+    a policy denial.
+
+- **Two shapes to expect when reading workflow runs through the MCP tools.**
+  `actions_list` `list_workflow_runs` exceeds the response token limit even at
+  `per_page: 3` --- measured at 111,922 characters --- and spills to a scratch
+  file whose single-line payload defeats `Read`'s `offset`/`limit`, so it needs
+  character-range slicing to recover.
+  And a `queued` run object carries no `conclusion` key at all, absent rather
+  than null, so iterating runs needs `r.get('conclusion', '-')` rather than
+  `r['conclusion']`.
+
+  - **Do:** reach for `get_check_runs` on a specific head before listing runs,
+    and use `.get()` on any field a non-terminal run may not carry.
+  - **Don't:** lower `per_page` in the hope of fitting the response; three was
+    already 111,922 characters.
+
+- **The `tail_lines` window is narrower than the defaults-to-500 bullet above
+  implies, and it excludes that default itself.**
+  Measured against two `claude-review` jobs: `120` returns workflow plumbing
+  only, while `300` returns 54,182 characters, `600` returns 77,823, and
+  `3000` returns 171,956 --- each of the last three rejected by the response
+  token limit.
+
+  So the usable band sits somewhere between 120 and 300 for a log of that
+  size, which puts the default of 500 outside it.
+  That last step is a deduction rather than a measurement, and a safe one:
+  `tail_lines` returns the last N lines, so a larger N yields a superset and
+  cannot come back smaller than 300's 54,182 characters.
+  A band that narrow is not worth aiming at either, since its upper edge moves
+  with a log length you do not know before fetching.
+
+  - **Do:** read a verdict from the webhook stream or a posted review comment,
+    and keep `get_job_logs` for one step's error text once you know which step
+    failed.
+  - **Don't:** tune `tail_lines` toward the default hoping the response will
+    fit --- 300 already overflows, so 500 cannot.

@@ -100,6 +100,37 @@ covers the one-off case from inside the command text, and an env-settable
 allowlist would widen a security guard from ambient state a reader of the
 command cannot see.
 
+### A bare `gh pr merge <N>` refuses, and the refusal may diagnose the wrong thing
+
+The first bullet of the three above closes with "so this costs nothing in practice".
+That claim is about **design cost** --- requiring an explicit target adds no burden the corpus was not already imposing --- and it is correct.
+What it does not say is what the *operator* sees, which is where the real cost lands.
+
+Both guards deny the bare form, with different messages, and the one surfaced is not necessarily the one that names the fix.
+Measured 2026-08-17, feeding each hook the exact payload for fully-clean PR #1598:
+
+| command | `require-gh-repo-flag.py` | `no-unauthorized-merge.py` |
+| :--- | :--- | :--- |
+| `gh pr merge 1598 --squash --delete-branch` | deny --- names the missing `-R`, gives the fix | deny --- names permission and `STANDING_MERGE_GRANT_REPOS` |
+| `gh pr merge 1598 -R Morrison-Lab/ai-config --squash --delete-branch` | allow (has `-R`) | allow (exit 0) |
+
+Nothing about the two commands differs except the explicit `-R`.
+
+The session that hit this saw `no-unauthorized-merge.py`'s message, which talks about permission and the standing grant and says nothing about a missing flag.
+So the natural readings are "the grant lapsed", "this PR does not qualify", or "the hook is broken" --- and each sends you somewhere useless: re-reading the grant, re-running `check-pr-fully-clean.py`, or inspecting the hook.
+The fix is one flag.
+
+Which of the two messages a session sees is harness behaviour rather than anything these hooks decide, so treat the observation above as one reading and not as a rule about ordering.
+Either message is possible; only one of them is self-diagnosing.
+
+It is worst exactly where it is most likely.
+A session working *in* the ai-config checkout has the least reason to name the repo, because every other `gh` command in that directory infers it correctly --- so the habit that works everywhere else is the one that fails here.
+
+- **Do:** write `-R Morrison-Lab/ai-config` into the merge command, since the grant attaches to the target named in the command text and to nothing else.
+- **Do:** re-issue with `-R` as the first response to any merge refusal in a repo that carries a grant, before investigating anything.
+- **Don't:** read the refusal as the grant not applying, the PR not qualifying, or the hook being broken --- the commonest cause is an underspecified command, and none of those three readings is checkable against it.
+- **Don't:** infer the target from the working directory the way the rest of `gh` does; that is precisely the inference the guard refuses to make.
+
 ## Session Lock & Hook Integration
 
 `no-unauthorized-merge.py` enforces the baseline merge prohibition at the `PreToolUse` hook level,

@@ -835,12 +835,12 @@ execute in the WRONG repository.
 from being in a main session.
 Read the printed `Shell cwd was reset` line, per [`git-worktrees.md`](git-worktrees.md).
 That line is not guaranteed: an MCP disconnect and reconnect can reset a main
-session's cwd with nothing printed, leaving a relative-path command failing
-`No such file or directory` as the only tell --- which reads as a missing file
-rather than a wrong directory, so re-run with an absolute path before believing
-the file is gone.
-(2026-08-16, ai-config: `sed -n '393p' memories/github.md` and
-`git diff origin/main...HEAD` both failed that way, and both worked under `cd`.)
+session's cwd with nothing printed, leaving a failing relative-path command as
+the only tell --- worded differently by each tool.
+`sed`'s `No such file or directory` names a file, so it reads as the file being
+missing rather than the directory being wrong --- re-run under `cd` first.
+(2026-08-16, ai-config: `sed -n '393p' memories/github.md` produced exactly that
+message, `git diff origin/main...HEAD` a different one, and both worked under `cd`.)
 
 (2026-08-03: `cd /tmp/rpt-test && cat > .github/workflows/... && git commit &&
 git push` ran in the `gha` repo -- clobbering a workflow file on a stray branch

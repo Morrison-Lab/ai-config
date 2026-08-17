@@ -319,6 +319,34 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-placeholder-reply.py` | `Stop` | blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement), anchored on the whole message since this corpus quotes the banned string constantly, and deliberately silent on a claim about the *work* (`Nothing to report.`), which the same rule requires |
 | `no-misattributed-quote.py` | `Stop` | **not registered ([#1527](https://github.com/Morrison-Lab/ai-config/issues/1527))** --- would block a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 
+### Writing a warn-only hook: emit `systemMessage`, not `reason`
+
+A `Stop` hook's `reason` is read **only** alongside `"decision": "block"`.
+So a hook meant to *warn* rather than block, emitting `reason` by itself,
+prints valid JSON that reaches nobody --- a detector that fires silently, which
+is indistinguishable from one that never fires.
+That is the worst possible defect for a guard, and nothing catches it: the
+hook runs, exits 0, and its tests pass if they only assert that *something* was
+printed.
+
+Warn-only hooks here emit `systemMessage` (the `PreToolUse` ones pair it with
+`hookSpecificOutput.additionalContext`); the four blocking `Stop` hooks pair
+`reason` with `decision`.
+The trap is that a blocking hook is the natural model to copy, and it uses
+`reason` correctly.
+
+So when adding a warn-only hook:
+
+- emit `systemMessage`, and confirm by reading the printed payload rather than
+  by checking that output is non-empty
+- have its test assert the payload **shape** --- `bool(out)` cannot tell a
+  surfaced warning from a discarded one
+- mutation-check it: revert `systemMessage` to `reason` and require the suite to
+  fail
+
+No check enforces this yet; the condition is decidable and is tracked in
+[#1582](https://github.com/Morrison-Lab/ai-config/issues/1582).
+
 A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse
 direction --- it enumerates the hooks and flags any that lack a test --- so a

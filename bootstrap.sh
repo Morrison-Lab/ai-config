@@ -119,10 +119,31 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   mkdir -p "$GEMINI_CONFIG_DIR"
   SKILLS_JSON="$GEMINI_CONFIG_DIR/skills.json"
   if [ ! -f "$SKILLS_JSON" ]; then
+    # Derive the alias set rather than hard-coding it. An alias skill declares
+    # `description: "Alias for ..."` in its frontmatter and is a thin pointer to
+    # its canonical skill, so the set is enumerable from the repo itself. A
+    # hand-maintained list drifts silently in both directions: a newly added
+    # alias eats budget until the banner returns, and a skill that stops being
+    # an alias disappears from Antigravity entirely.
+    ALIAS_PATTERNS=""
+    for _skill_dir in "$SCRIPT_DIR"/skills/*/; do
+      [ -f "$_skill_dir/SKILL.md" ] || continue
+      _skill_name=$(basename "$_skill_dir")
+      if head -8 "$_skill_dir/SKILL.md" | grep -qiE '^description: *"?Alias for'; then
+        [ -z "$ALIAS_PATTERNS" ] || ALIAS_PATTERNS="$ALIAS_PATTERNS,
+"
+        ALIAS_PATTERNS="$ALIAS_PATTERNS$(printf '        "^%s$"' "$_skill_name")"
+      fi
+    done
     cat <<EOF > "$SKILLS_JSON"
 {
   "entries": [
-    { "path": "$GEMINI_DIR/skills" }
+    {
+      "path": "$GEMINI_DIR/skills",
+      "exclude": [
+$ALIAS_PATTERNS
+      ]
+    }
   ]
 }
 EOF

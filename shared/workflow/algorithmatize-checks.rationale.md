@@ -885,6 +885,56 @@ misattribution one axis over: there a *sibling test case* in the same run
 aborts first, so the catch is credited to the wrong test; here the name belongs
 to a *sibling mutation* in another row of the same matrix.
 
+**One more belongs to the matrix, and it is not an outcome but the matrix's own
+PASS CONDITION: a case that flipped for a reason other than the clause.**
+Every outcome above asks whether a mutation applied, was faithful, or was
+credited to the right row.
+This asks what a row has to observe before scoring itself caught, and "did any
+case fail" is the wrong answer.
+
+The three remedies already on this page all shape the mutation or the input,
+and none of them checks what the row concluded.
+The suite-level trap says to aim the fault where the deterministic cases cannot
+reach it.
+The AND-clause rule says to construct an input where only the target clause
+keeps the result correct.
+The harness rule says to assert the artifact actually changed.
+A matrix can satisfy all three and still score a row on the wrong case,
+because every one of them is a precondition and none is an acceptance test.
+
+**The gap opens wherever the clauses are STAGES rather than conjuncts, which
+the AND-clause rule does not reach.**
+That rule assumes the clauses are evaluated together, so an input reaching the
+guard reaches every clause.
+A staged matcher rejects a case at the first stage that fails, so a case
+written for a late clause can be dropped early and never exercise the clause at
+all.
+Mutating that clause then changes nothing for its own case, while an unrelated
+case flips for its own unrelated reason and the row reports caught.
+
+The distinguishing feature is that this failure **inflates** the matrix.
+An unmeasured clause reads as a measured one, so the matrix's own summary line
+argues that coverage is complete, which is the one claim it cannot support.
+That puts it alongside the inapplicable-mutation case rather than beside an
+ordinary miss: both convert an absence of evidence into a positive report, and
+both are the [`fail-fast`](../principles/fail-fast.md) figure where a check's
+failure path and its pass path print the same thing.
+
+The fix is one assertion per row and costs nothing to run: name the case that
+must catch this mutation, and fail the row when a different case is the one
+that flipped.
+It is also self-diagnosing, since the row that fails names the case that was
+supposed to catch it, which is exactly the case whose construction is wrong.
+
+(`Morrison-Lab/ai-config#1528`, 2026-08-16, a `Stop` guard for a quoted phrase
+attributed to a file that does not contain it.
+The first draft of its test suite reported every clause caught.
+Adding the per-mutation named case turned **7 of 11 clauses** from caught to
+unmeasured: their cases were being rejected at the attribution-cue stage,
+several clauses before the one each was written for.
+The cases were rebuilt around the matrix rather than the matrix relaxed, and
+the merged suite runs 16 cases against 12 clause mutations.)
+
 **Generalize past mutation: a harness needs a self-check against a quantity it
 did not compute.**
 A harness bug and a real finding are indistinguishable from the harness's own

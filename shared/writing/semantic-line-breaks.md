@@ -357,6 +357,60 @@ halves.
 fragments dropped its leading `- ` and rewrote an em dash as `---`.
 The check reported the result clean; the word diff found both.)
 
+**A third blind spot, and the one that survives running the diff both ways: a
+defect BOTH sides share.**
+The two above are differences the normalization cannot represent.
+This one is a defect the normalization deliberately ERASES, so the comparison is
+not merely silent about it --- it is silent in both directions at once, and the
+both-ways rule just above buys nothing against it.
+
+The reasoning is short.
+A both-sides comparison validates the TRANSFORMATION, never the INPUT.
+Whatever class of difference the normalization exists to ignore, whitespace and
+inline markup here, is exactly the class it cannot report --- and a flaw already
+present in the ORIGINAL text falls in that class as readily as one the reflow
+would have introduced.
+The check then passes with a reassuringly specific word count, and the defect
+ships untouched.
+
+The worked shape is a hyphenated compound the author split across a line break,
+`close-` ending one line and `order foot.` opening the next.
+Collapsing `\s+` to a single space turns the pre-reflow and the post-reflow text
+alike into `close- order foot.`, so the word lists match exactly and the check
+reports nothing lost and nothing added, while both versions render that stray
+space.
+
+So pair the transformation check with one aimed at the INPUT.
+For a reflow the cheap one is a scan for a line ending in a hyphen, anchored on
+an alphanumeric so this corpus's own `---` convention does not flood it:
+
+```bash
+grep -rnE '[[:alnum:]]-$' shared/
+```
+
+Run it against the PRE-reflow text as well, since its whole point is to judge
+text the comparison has already agreed with itself about.
+Do not answer this by widening the normalization instead, per
+[`address-every-comment`](../workflow/address-every-comment.md)'s rule that
+extending a normalizer can break a term the previous version matched.
+
+- **Do:** name the class of difference a normalization erases, and add a check
+  aimed at that class over the input.
+- **Do:** run the input-side check on the pre-reflow text too --- a defect the
+  comparison cannot see is one it never had an opinion about.
+- **Don't:** read "identical, N words, nothing lost or added" as a statement
+  about the text; it is a statement about the edit.
+- **Don't:** widen the normalization to swallow such a defect --- that degrades
+  the comparison it exists to make.
+
+(2026-08-16: a design-doc reflow was verified this way and reported "identical,
+6498 words, nothing lost or added", while `close-` / `order foot.` sat split
+across a line break in both versions; it was caught by eye, reading the
+reflowed output.
+The detector above, run over `shared/` at `41d82611`, returns exactly four
+pre-existing instances and no false positives from the `---` convention, so the
+class is live in this corpus and the scan is precise enough to act on.)
+
 **Breaking a line just before an issue reference turns it into a malformed
 heading.**
 This corpus writes `#NNNN` references constantly and mandates one clause per

@@ -32,11 +32,53 @@ that terminal state.**
 
 - **Do:** finish pushing, then dispatch once, and name in the status report which run you are waiting on.
 - **Do:** pass `--ref <PR-branch>` on every dispatch, so the review's check runs attach to the PR head.
-- **Do:** diagnose a missing verdict by reading the run, since a cancelled dispatched run leaves no trace on the PR at all.
+- **Do:** diagnose a missing verdict by reading the run, since a cancelled dispatched run leaves no trace on the PR's check-run list.
 - **Don't:** dispatch per push --- each one cancels the last, and the round spends review time producing nothing.
 - **Don't:** re-dispatch reflexively when a verdict is missing.
   If one is in flight, the retry cancels it.
 - **Don't:** read a green, nothing-pending PR as reviewed on such a repo --- that is also what an invisible cancelled gate looks like.
+
+**A cancelled run is invisible to a session READING the PR and loud to one
+SUBSCRIBED to it, and the second is the dangerous direction.**
+
+The bullet above is scoped to the check-run list deliberately.
+GitHub lists check runs for the **head commit**, so a run cancelled after the
+head moved leaves a `require-review` failure hanging off the superseded SHA,
+where a session reading the PR will not find it.
+
+The webhook stream is a different surface and it does not filter that way.
+The cancel fires a `check_run.completed` with `conclusion: failure`, so a
+session subscribed to PR activity is woken by a red **required** check on its
+own PR.
+
+That inverts the risk the bullet above describes.
+An invisible failure costs you a verdict you thought you had, and you find out
+by looking.
+A visible failure on a superseded commit costs more, because the drive-to-green
+posture says not to end a CI-failure wake without pushing a fix or replying
+with a blocker --- so the reflex is to fix, against a commit that is no longer
+in the PR's timeline.
+At best that is wasted work.
+At worst you change the current head on the authority of a red check that was
+never about it.
+
+One field decides it, and it is the field
+[`fully-clean`](fully-clean.md) already names for the neighbouring problem:
+compare the event's own `head_sha` against the PR's current head.
+Equal means act.
+Unequal means confirm a run is live at the real head, and leave the diff alone.
+
+- **Do:** compare a CI-failure event's `head_sha` against the PR's current head
+  before diagnosing anything.
+- **Do:** reply naming the superseded SHA rather than staying silent, so the
+  wake is visibly dispositioned rather than dropped.
+- **Don't:** read "leaves no trace on the PR" as covering the webhook stream
+  --- it describes the check-run list, which is filtered by head commit.
+- **Don't:** push a fix in response to a red check whose `head_sha` is not the
+  head; the check is not about the code you would be changing.
+
+See [`ardi.cases.md`](ardi.cases.md), "A cancelled dispatch that fired a
+failure webhook against the superseded SHA".
 
 See [`ardi.cases.md`](ardi.cases.md), "A per-push dispatch cancels its own review, invisibly".
 
@@ -361,6 +403,44 @@ over, and re-reading it cannot catch a wrong number.**
 See [`ardi.cases.md`](ardi.cases.md), "A verification table in the PR body going
 stale as rounds change the diff".
 
+**A reviewer's round-one confirmation of that table does not expire when the
+diff moves, and the confirmation is what makes the stale figure dangerous.**
+
+The rule above says the figures go stale.
+This is about the one artifact in the review record that argues they have not.
+
+Round 1 verifies the table, in detail, because a body full of derived counts is
+exactly what a first review checks, and it says so, naming each figure it
+matched.
+Round 2 does not re-verify it, because round 2 is not about the table.
+Round 2 is about whether round 1's findings were addressed, so the body sits
+outside what that round set out to read.
+
+The confirmation is therefore a claim about one head, and nothing retires it.
+An unverified table at least invites suspicion.
+A table a reviewer explicitly confirmed reads as settled by someone other than
+its author, and that reading survives every push that falsifies it.
+
+Sharper still, and this is the part worth pinning: round 2 can derive the
+correct new figure and use it in its own prose while the body carries the old
+one, and flag nothing.
+The reviewer is not diffing its numbers against the body's.
+The reviewer derives fresh ones for its own purposes, so the two figures sit
+one round apart in a single comment thread, contradicting each other, with
+nobody comparing them.
+
+- **Do:** re-derive every figure in the body at each push, whatever an earlier
+  round confirmed, and record the SHA the new figures were derived at.
+- **Do:** compare any figure a later review states in its own prose against the
+  figure the body states, and read a mismatch as the body being stale.
+- **Don't:** carry a round-one confirmation forward to a later head --- it
+  verified the diff that existed when it ran.
+- **Don't:** read a later round's clean verdict as evidence the body is still
+  accurate; that round checked the findings, not the table.
+
+See [`ardi.cases.md`](ardi.cases.md), "A round-one confirmation laundering a
+body the next round contradicts".
+
 **A "Corrections to this body" entry is itself a figure in the body, so the
 next push expires it too --- and it reads as more settled than the figure it
 corrected.**
@@ -377,6 +457,43 @@ corrected.**
 
 See [`ardi.cases.md`](ardi.cases.md), "A corrections entry expires with the next
 push".
+
+**Verifying that a stale figure is gone needs a SECTION-scoped search, because
+the corrections entry legitimately quotes it.**
+
+The two rules above compose into a check that cannot discriminate.
+The table must stop claiming the superseded figure, and the corrections entry
+must quote that same figure in order to say what changed --- so the string is
+still in the body after a fully correct fix, and a whole-body search for it
+reports that fix as having failed.
+
+That is a check whose pass path and failure path look alike, which
+[`fail-fast`](../principles/fail-fast.md) says is not yet a check.
+It also fails in the direction that invites damage: the natural response to a
+"still present" hit is to delete the quotation, which is the one part of the
+entry carrying the record.
+
+Scope the search to the section that makes the claim, and assert the
+corrections entry in the opposite direction:
+
+```python
+ver  = body[body.find("## Verification"):body.find("### Corrections")]
+corr = body[body.find("### Corrections"):]
+assert "484 added" not in ver    # the table no longer claims it
+assert "484 added" in corr       # the entry still records what changed
+```
+
+- **Do:** scope a staleness check to the section that makes the claim, and
+  assert separately that the corrections entry still quotes the old figure.
+- **Do:** write the two assertions in opposite directions, so a deleted
+  quotation fails as loudly as an uncorrected table.
+- **Don't:** search the whole body for the superseded figure --- a correct fix
+  leaves it present, so that search reports every correct outcome as a failure.
+- **Don't:** answer a "still present" hit by removing the quotation from the
+  corrections entry; that quotation is the record the entry exists to carry.
+
+See [`ardi.cases.md`](ardi.cases.md), "A whole-body staleness check that
+reported a correct fix as failed".
 
 The one case where a figure does **not** expire is a push that leaves the tree
 unchanged --- a revert-and-restore returns the tree to an object it already had, and a

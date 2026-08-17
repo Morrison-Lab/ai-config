@@ -221,6 +221,32 @@ That was the wrong default and the wrong file: #951 did not touch
 identified #947 as the source for the default half, while #955 supplied the
 handed-premise half in the same fragment.)
 
+## "A reviewer's replacement diffstat summed per-commit churn"
+
+(Morrison-Lab/ai-config#1517, 2026-08-16: a round-2 review correctly found the
+PR body's verification table stale, since its figures had been measured at
+`0fff7765`, before the round-1 fix commit.
+It supplied 81 added and 7 removed as the replacement.
+The real figures are 74 and 0.
+
+Summing `git show --numstat` over the branch's two non-merge commits
+reproduces the reviewer's numbers exactly, which is what identifies the
+method rather than merely contradicting the result:
+
+| commit | added | removed |
+| --- | --- | --- |
+| `0fff7765` | 59 | 0 |
+| `3b5feead` | 22 | 7 |
+| summed | **81** | **7** |
+
+`git diff --numstat 0fff7765^ 3b5feead -- shared/workflow/address-every-comment.md`
+returns `74  0`, and the GitHub API's own `additions` field on the PR reads 74.
+Each of the 7 lines `3b5feead` deletes is absent from the file at the merge
+base and present after `0fff7765`, so every deletion removes a line the branch
+itself had added.
+They cancel against the merge base, which is why the net carries no removals
+at all and the reviewer's 7 is churn rather than a net figure.)
+
 ## "The highest-yield version of that check" --- edge case named in the same comment
 
 (Morrison-Lab/ai-config#868, 2026-07-30: a review correctly found that

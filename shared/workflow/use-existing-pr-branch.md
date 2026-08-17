@@ -88,6 +88,14 @@ If the branch's own PR already merged, don't build on top of it --- start clean:
 If you've already pushed a bloated diff, the same fix applies retroactively: rebuild the branch from `origin/main` plus a cherry-pick of the new work, then `git push --force-with-lease`. (Seen on gha#161 → gha#162 and ai-config#344 → ai-config#354, both squash-merged.)
 
 **A stacked PR reaches that bloated state with no push of yours at all, and it announces itself as a merge conflict.**
+The preventable half of this sits on the other party, in
+[`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s "A stacked PR is the
+one conflict that intersection cannot attribute" section --- run
+`gh pr list --base <branch>` before merging *anything*, since a plain squash
+orphans a dependent with no deletion or rename for an attribution sweep to
+find.
+This section is what the dependent's own session does once that did not
+happen.
 The rule above is written around an action you take: you add commits to a stale branch, so the check fires when you are about to commit.
 A PR stacked on another PR's branch needs nothing from you.
 When the base PR squash-merges, GitHub **auto-retargets** the stacked PR to `main`.

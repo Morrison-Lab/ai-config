@@ -458,6 +458,40 @@ while the recovery command in `skills/ardi/SKILL.md` and `memories/preferences.m
 carried it --- so the routine path used every round lacked the fix that the
 rarely-taken path had.)
 
+## A cancelled dispatch that fired a failure webhook against the superseded SHA
+
+(`Morrison-Lab/ai-config#1526`, 2026-08-16: a review was dispatched with
+`--ref` at `1847c964`, a subagent then pushed a `main` merge and a
+pronoun-fix commit, and the run was cancelled deliberately because it was
+reading a commit that was no longer the head.
+The run object is what settled that, rather than the elapsed time:
+
+```
+run 31964345687   event: workflow_dispatch   head_sha: 1847c964
+pull_requests[0].head.sha: b8a9cb45
+```
+
+Both halves of the visibility question were then observed within one event.
+`pull_request_read` `get_check_runs` returned 7 runs, every one of them for the
+new head, with the failed `require-review` absent --- so the sibling case above
+is right that a cancelled run is invisible to a session reading the PR.
+The cancel nonetheless fired a `check_run.completed` carrying
+`conclusion: failure`, `check: review / require-review`, and
+`head_sha: 1847c964f458eabeac64002354bd8379567351a1`, waking the subscribed
+session with a red required check on its own PR.
+
+Note the two runs differ in why the SHA was wrong, which is why this is a
+distinct case rather than the sibling restated.
+There the dispatch omitted `--ref`, so the run never pointed at the PR at all.
+Here `--ref` was passed and correct, and the branch simply moved between the
+dispatch and the cancel --- so the defect survives the sibling's own fix.
+
+The cancel itself was the right call, on
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md)'s criterion that
+whether to cancel a slow review turns on whether the head has moved rather
+than on how long it has run.
+Re-dispatching at the real head produced a clean verdict at `eaf052d9`.)
+
 ## An invented `Closes` in a merge commit message
 
 (`Morrison-Lab/ai-config#1361`, 2026-08-09: the squash commit `62ea72b3` ends
@@ -564,6 +598,36 @@ it.
 The corrected body now shows the base, head and delta per group, states the
 `ast.parse` derivation, and keeps the wrong figures on the record rather than
 silently overwriting them, since the review thread refers to them.)
+
+## A round-one confirmation laundering a body the next round contradicts
+
+(`Morrison-Lab/ai-config#1522`, 2026-08-16, merged as `bc89ec93`.
+
+Round 1, posted at 18:04:08Z, verified the body's verification table in detail,
+reporting that it had "independently confirmed every reported figure --- 1646
+links/503 files (0 broken) ... and +67/+71/+10 additions per file --- all match
+the PR body precisely", and separately that it had "independently scanned the
+diff's 148 added lines".
+Every one of those figures was correct at the head it ran on, `cd8cfb03`:
+`git diff --numstat` over that commit returns `67 / 71 / 10` across three
+files, summing to 148.
+
+Commit `339645c3` then addressed both round-1 findings and widened the diff
+from three files to six.
+`git diff --numstat` over `339645c3` returns `15 / 67 / 85 / 8 / 10 / 11`,
+summing to 196.
+
+Round 2, posted seven minutes after round 1 at 18:11:22Z, opened by saying it
+had "re-scanned all **196** added lines across the full PR diff (all three
+commits)", found nothing new, and returned **Ready for merge**.
+The body at that moment still read 148 added lines, 1646 links, and 134 prose
+lines.
+So the correct figure and the stale one sat one round apart in the same comment
+thread, and the round holding the correct one never looked at the other.
+
+The staleness was caught by the author re-reading the body at the merge gate
+rather than by either review, and the merged body records that catch in a
+"Corrections to this body" entry naming the same three stale values.)
 
 ## Validating against a real consumer repo covers what fixtures cannot
 
@@ -719,6 +783,29 @@ not feel like a round that changed anything a reviewer would re-read --- and
 its content was a comment explaining a retry loop, which is exactly the kind of
 edit that reads as not touching the diffstat.
 It changed both figures.)
+
+## A whole-body staleness check that reported a correct fix as failed
+
+(`Lacaedemon/sparta#1303`, 2026-08-16: a review round moved the PR body's
+figures from `484 added` and `2723 / 2723 passing` at head `dbfe12d8` to
+`532 added` and `2725 / 2725` at `5c145fce`.
+The body was rewritten with both new figures and a `### Corrections to this
+body` entry naming the two superseded ones, which is exactly what the section
+above asks for.
+
+The post-PATCH verification then searched the whole body for each old figure
+and reported `False` for both --- reading as though the rewrite had missed
+them.
+It had not.
+The only remaining occurrences were inside the corrections entry, where they
+belong, since an entry that says what changed cannot say it without naming the
+old value.
+
+Re-run section-scoped, the same two strings were absent from the verification
+table and present in the corrections entry, which is the intended end state
+rather than a defect.
+The wrong reading was available and cheap: deleting the quoted figures would
+have silenced the check and destroyed the record the entry exists to carry.)
 
 ## A genuinely-read prefix, extended into a fabricated link
 

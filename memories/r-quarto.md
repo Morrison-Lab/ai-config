@@ -98,6 +98,112 @@ and redo it by hand. (UCD-SERG/lab-manual#381: `lint-project` failed on
 `cyclocomp_linter is disabled due to lack of the cyclocomp package`; the
 snapshot approach was tried first and reverted before the hand-edit.)
 
+## renv.lock --- repointing an existing GitHub package's org (relocation)
+
+Distinct from the "adding a package" case above: here a package the lockfile
+already pins is still installed, but its GitHub repo moved orgs (e.g.
+`cards`/`cardx` from `insightsengineering` to `pharmaverse`), so the pinned
+`RemoteSha` no longer resolves and CI's `renv::restore()` fails on the dead ref.
+The instinct is a minimal hand-edit repointing `RemoteUsername` and
+`RemoteSha` to the new org's repo, and it is not enough.
+
+**Every DESCRIPTION-derived field in the record drifts when `RemoteSha`
+changes, not just the two you meant to touch.**
+A GitHub lockfile record is snapshotted from the DESCRIPTION at the pinned
+commit, so `Version`, `Authors@R`, `Description`, `Imports`, `URL`,
+`BugReports`, `Config/Needs/website`, and `Config/roxygen2/version` (upstream
+had replaced `RoxygenNote` with the latter) can all differ at the new SHA ---
+plus the derived `Author` field, which is expanded from `Authors@R`.
+Repointing only `RemoteUsername`/`RemoteSha` leaves the record internally
+inconsistent: it claims a commit whose real metadata it no longer matches.
+
+The robust fix is `renv::restore()` then `renv::snapshot()`, which re-derives
+every field from the actually-installed package --- **but only where the
+environment can fully restore the lockfile's existing package set**, which is
+exactly the precondition the "do NOT run snapshot in a sandboxed/offline
+container" warning above protects.
+So the two rules compose: restore-then-snapshot on a full dev machine, and the
+surgical hand-edit as the sandbox fallback.
+To verify a hand-edit is drift-free without a full restore, fetch
+`https://raw.githubusercontent.com/<org>/<repo>/<sha>/DESCRIPTION` and diff each
+field against the record, **excluding the install-time-only fields** `Author`,
+`Maintainer`, and `Remote*` (absent from an upstream DESCRIPTION), then confirm
+`renv::lockfile_read()` still parses the result.
+
+- **Do:** prefer `renv::restore()` + `renv::snapshot()` on any machine that can
+  restore the full package set, and fall back to a hand-edit only where it
+  cannot.
+- **Do:** sync every DESCRIPTION-derived field against the raw DESCRIPTION at
+  the new pinned SHA, then confirm `renv::lockfile_read()` parses.
+- **Don't:** repoint only `RemoteUsername`/`RemoteSha` and treat the record as
+  fixed --- the SHA change silently invalidates every field the DESCRIPTION
+  owns.
+- **Don't:** diff `Author`/`Maintainer`/`Remote*` against the upstream
+  DESCRIPTION; those are install-time-only and absent there.
+
+**A lockfile record's `Remotes` field is INERT during `renv::restore()`, so do
+not hand-repoint the `Remotes` strings of OTHER packages that reference the
+relocated one.**
+Verified against renv 1.2.4 source (`renv_retrieve_successful`): restore reads
+a downloaded package's remotes from the tarball's own DESCRIPTION
+(`desc <- renv_description_read(path); remotes <- desc$Remotes`), never from the
+lockfile record.
+Resolution is wrapped in `catch()` (`renv_retrieve_remotes_impl_one` warns
+`failed to resolve remote '%s'; skipping` and returns, never errors), and a
+package that already has a non-plain lockfile record ---
+`!identical(record, list(Package = package, Source = "Repository"))` --- is
+skipped outright.
+So a sibling package like `gtsummary` or `rme` whose `Remotes` string names the
+relocated package should keep the value matching its OWN unchanged pinned
+`RemoteSha` (what a genuine `renv::snapshot()` records), not be edited to point
+at the new org.
+This is distinct from the sandbox install-time failure in
+[`r-cloud-sessions.md`](r-cloud-sessions.md), which is about a GitHub
+dependency's own install channels --- tarball/clone via `github.com` or
+`codeload`, plus `api.github.com` for renv/pak --- being proxy-blocked when the
+repo isn't in the session's scope, rather than the per-package `Remotes` field
+in a lockfile record.
+
+- **Do:** leave other packages' `Remotes` strings at whatever a real snapshot
+  recorded; only the top-level relocated package's `Remote*`/DESCRIPTION fields
+  change.
+- **Don't:** cascade the org rename into every `Remotes` string that mentions
+  the package --- those are inert on restore, and a hand-repoint just
+  introduces a claim no real snapshot would make.
+
+**Regenerate the derived `Author` field from `Authors@R` in R with
+`tools:::.expand_package_description_db_R_fields()`, and `unname()` the input
+first.**
+`read.dcf(...)[i, "Authors@R"]` returns a NAMED character value (name
+`"Authors@R"`); passing it named mangles the expander's input key so it returns
+an output with NO `Author` field at all --- verified on this runtime: the named
+form's output has zero named fields, so indexing `[["Author"]]` throws
+subscript-out-of-bounds, while `unname()` yields `Jane Doe [aut, cre]` for a
+known input.
+
+```r
+x <- read.dcf("DESCRIPTION")[1, "Authors@R"]
+tools:::.expand_package_description_db_R_fields(c("Authors@R" = unname(x)))[["Author"]]
+# -> the expanded Author string
+```
+
+Validate the function byte-reproduces a known `(Authors@R -> Author)` pair from
+an existing record before trusting it on new input.
+
+- **Do:** `unname()` the `Authors@R` value before handing it to
+  `.expand_package_description_db_R_fields()`.
+- **Don't:** pass the raw `read.dcf()` result named --- the named key silently
+  suppresses the `Author` field rather than erroring where you would notice.
+
+(`ucdavis/epi204#375`, 2026-08-16: fixed CI broken by `cards`/`cardx`
+relocating from `insightsengineering` to `pharmaverse`.
+Two `@claude` review rounds flagged that the initial hand-edit repointed only
+`RemoteUsername`/`RemoteSha`, leaving every DESCRIPTION-derived field stale
+against the new commit.
+The renv-source and `unname()` mechanisms were re-verified here against renv
+1.2.4 --- newer than the 1.2.0 the PR author checked --- and base R `tools:::`
+on this runtime.)
+
 ## lintr — no built-in function-length (line-count) linter; custom-linter pattern
 
 `{lintr}` has no built-in linter that flags functions by raw line count — it's

@@ -54,6 +54,30 @@ mutates a PR stays serial.
    - **Only iterate PRs the user owns / is responsible for** by default. In a
      shared repo, don't start review loops (which push commits) on other
      people's PRs unless told to. If unsure who owns what, ask first.
+   - **A green PR with no review check run is parked, not finished.**
+     On a repo whose review workflow is `workflow_dispatch`-only, nothing
+     fires on push, so a PR nobody ever reviewed presents exactly like one
+     that passed: every check green, nothing pending.
+     The tell is an **absence**, so no check state carries it, and the
+     sweep's own triage is where that absence has to be caught.
+     Read the review workflow's `on:` block once per repo, then treat "zero
+     review check runs on the head" as its own triage outcome.
+     `pull_request_read` `get_check_runs` answers it per PR.
+     [`pr-on-claim`](../../shared/workflow/pr-on-claim.md)'s dispatch-only
+     section covers the single-PR case; the increment here is that a sweep
+     classifying many PRs at once will otherwise sort these into the
+     nothing-to-do pile.
+     - **Do:** name such a PR's verdict as missing rather than clean, and
+       dispatch a review for it --- pricing that round first, since a
+       dispatch is a real spend and several of them is several spends.
+     - **Don't:** read green checks with nothing pending as evidence a
+       review passed; on a dispatch-only repo that is the steady state.
+
+     (`Morrison-Lab/ai-config`, 2026-08-16: an `ardia` sweep found #1500 and
+     #1509 parked 4h and 2h19m, both all-green with no verdict, because that
+     repo's `claude-review.yml` carries no `pull_request` trigger.
+     Both had never been reviewed; the dispatched rounds then returned
+     "Needs more work" on each, with a blocking correctness bug in #1509.)
    - If the list is empty, say so and stop — nothing to do.
 
    **Detect and sort stacked PRs.** Check each PR's `baseRefName`. If any PR's

@@ -715,3 +715,44 @@ Only reading the bodies separates them.
 
 The fix landed in `8cf34dce` and Claude's next round at that head returned
 `Ready for merge`, having re-verified both cited source facts itself.)
+
+## Three PRs reported clean by grepping the checker's own output
+
+(`Morrison-Lab/ai-config` #1561 / #1566 / #1575, 2026-08-16.
+A background monitor polled all three with the right instrument and decided
+what it said with a string match:
+
+```bash
+out=$(python3 scripts/check-pr-fully-clean.py "$n" 2>&1)
+if echo "$out" | grep -q 'NOT fully clean'; then allclean=0
+else echo "ai-config#$n is FULLY CLEAN"; fi
+```
+
+It announced all three clean, twice, and none of them was.
+Run directly, the checker reported:
+
+| PR | actual state |
+| --- | --- |
+| #1561 | verdict was at the pre-sync head |
+| #1566 | `Latest verdict-bearing review statement ... is NOT clean` |
+| #1575 | `No automated review comments or reviews found` |
+
+#1566 is the one that settles it as a defect rather than noise: a **blocking**
+finding, reported to a human as clean.
+#1575 had **zero** verdict comments and was reported clean, which is the
+`else`-branch failure at its plainest --- nothing to match, so the match
+failed, so the branch fired.
+
+Two details worth keeping.
+
+The bypass guard could not fire.
+`no-handrolled-verdict-parse.py` blocks matching a verdict phrase against a
+PR's *review comments* when the checker has not answered, and here the checker
+had answered --- the monitor called it correctly, on the right PR, every time.
+The defect was entirely in reading the reply.
+
+And the session that wrote the monitor had, minutes earlier, committed a rule
+that final approval comes from Claude at the current head, and a hook whose
+purpose is catching unverified claims about state.
+Neither reached the monitor, because both govern what you *assert* and this was
+a fault in what you *measured*.)

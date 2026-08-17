@@ -280,6 +280,60 @@ NOT clean over a clean verdict.**
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
 
+**Calling the checker is not consuming it: grepping its PROSE instead of
+reading its EXIT STATUS re-opens the whole failure one layer up.**
+
+The rule above and `no-handrolled-verdict-parse.py` both govern *bypassing* the
+instrument.
+This is the case where you run it, correctly, on the right PR --- and then
+decide what it said by matching a string in its output.
+
+`check-pr-fully-clean.py` answers twice.
+It prints findings for a human, and it exits 0 for clean and non-zero
+otherwise.
+Only the second is a stable interface.
+The prose is free to gain a line, split across two lines, or word a finding
+differently, and every one of those silently changes what a `grep` decides.
+
+Two properties make this worse than an ordinary parsing slip.
+
+**It fails toward clean.**
+The natural spelling is a positive test for the bad state ---
+`if output matches "NOT fully clean" then not-clean, else clean` --- so *any*
+failure of the match, including the check erroring or printing its header
+separately, lands in the `else` branch and reports clean.
+A missed match and a genuinely clean PR are the same observable, which is
+[`fail-fast`](../principles/fail-fast.md)'s pass-path-equals-failure-path shape
+arriving through a tool built to prevent exactly this.
+
+**It launders.**
+The report reads as the instrument's verdict rather than as your reading of it,
+so "the checker says clean" is what reaches the human --- and nothing in that
+sentence exposes that a `grep` stood between the two.
+
+The remedy is the shorter spelling:
+
+```bash
+if python3 scripts/check-pr-fully-clean.py "$n" >/dev/null 2>&1; then
+  echo "#$n CLEAN"
+else
+  echo "#$n NOT clean"; python3 scripts/check-pr-fully-clean.py "$n"
+fi
+```
+
+- **Do:** branch on the checker's exit status, and print its output only to
+  explain a non-zero.
+- **Do:** re-verify the agent and the head yourself before reporting ready,
+  since the exit status is necessary and this file's own SHA-surface caveats
+  still apply.
+- **Don't:** grep a purpose-built checker's output for a phrase --- its prose
+  is a human-facing report, not an API.
+- **Don't:** read "I called the right instrument" as having consumed it; the
+  bypass guard fires on the call, and nothing fires on the misreading.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"Three PRs reported clean by grepping the checker's own output".
+
 **A verdict comment quotes verdict phrases, so a phrase search identifies
 nothing --- and it misreads in both directions at once.**
 

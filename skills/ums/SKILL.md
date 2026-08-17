@@ -104,6 +104,34 @@ committed pass.
      See
      [`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)'s
      "Searching the wrong corpus is the same error with no grep in it".
+   - **When that grep finds the corpus already covers this class, record the
+     recurrence on the existing entry, not just the new fact.**
+     The bullet above already says to extend in place rather than add a
+     sibling; what is missing is the count.
+     Write it on the entry -- "3rd occurrence, 2026-08-16", with a pointer to
+     each prior record -- so the entry carries evidence about whether the
+     written rule is actually holding.
+
+     The count has a consumer that already exists and currently has nothing to
+     read.
+     [`deterministic-tools`](../../shared/principles/deterministic-tools.md)
+     names the third occurrence as the moment a recurring judgment task becomes
+     a tool, and
+     [`learn-from-review-findings`](../../shared/workflow/learn-from-review-findings.md)
+     asks of every accepted finding whether it is algorithmatizable -- but
+     nothing in the corpus counts, so that trigger fires on recollection or not
+     at all.
+     A rule on its third recurrence is a rule demonstrably not holding, which
+     is the argument for a hook or a check rather than for a sharper sentence.
+
+     A recurrence note is also a duplication signal for
+     [`find-overlap`](../find-overlap/SKILL.md) and
+     [`consolidate-memory`](../consolidate-memory/SKILL.md), since one class
+     recorded twice under different wording is exactly the near-duplicate a
+     phrase-similarity pass under-detects.
+     The reverse reading -- an entry that has never recurred and is never cited
+     is a retirement candidate -- has **no** consumer today, so treat it as a
+     property the count makes available rather than as a step anything runs.
    - Make the edit — concise bullet points, not prose
    - If updating a skill: the change should be specific enough that following
      the skill next time would avoid the mistake

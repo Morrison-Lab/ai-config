@@ -1173,3 +1173,12 @@ while `_selftest.yml` was green on `main`.)
 - **This is the exact-count instance of the general rule in [ardi](../shared/workflow/ardi.md), "Running a script is not running its tests, and an 'advisory' check can have a hard-gating twin".**
   The other live-corpus assertions in `scripts/test_*.py` are bounds or thresholds that ordinary growth does not break, so this is the only one an unrelated edit invalidates outright.
   Do not read the count off this bullet: it is stated once, in the assertion, and repeating it here would be a second copy to go stale.
+
+## Antigravity IDE / Data Cloud MCP Proxy socket ENOENT errors
+
+- **`[MCP Proxy] Socket connection error: connect ENOENT \\?\pipe\datacloud-mcp-*-antigravityide` for `context`, `notebooks`, or `visualization` MCP servers.**
+  `mcp_proxy_bundle.js` acts as a client connecting to IPC named pipes (`\\?\pipe\datacloud-mcp-*-antigravityide`) created by the `googlecloudtools.datacloud` extension daemon when active in an IDE workspace.
+  If the Data Cloud extension auto-updates (e.g. from `0.7.1` to `0.7.2`), `mcp_config.json` can be left with a stale version path in `args`, preventing Node from spawning the proxy.
+  Updating the extension path in `~/.gemini/config/mcp_config.json` points to the active `mcp_proxy_bundle.js`.
+  If no Data Cloud extension backend is active, no process creates the named pipe servers; clear or reset `mcp_config.json` (`"mcpServers": {}`) or toggle off the inactive servers in the UI to resolve the error.
+

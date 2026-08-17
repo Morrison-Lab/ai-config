@@ -87,10 +87,8 @@
 - **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, or missed item.**
   The moment the user corrects your behavior, or you realize you made an incorrect claim or missed something, run UMS right then --- do not wait for the task to finish, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
   This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section (a corrected understanding and a false claim about state both fire immediately); see that section for the full rationale and case records. (User directive / CAI, 2026-08-05).
-- When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
-  The one exception is `Lacaedemon/sparta`, which never requests him, on PR
-  creation or on deadlock escalation alike.
-  Every other repo is unchanged, `Morrison-Lab/ai-config` included.
+- When opening a GitHub PR, trigger AI review (`@claude review` / `@agy review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
+  The one exception is `Lacaedemon/sparta`, which never requests human review, on AI review approval or on deadlock escalation alike.
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --
   create, push, and open the feature PR first. The PR must expose the exact SHA
@@ -119,9 +117,9 @@
   Provenance of the Do/Don't pair: the standing directive and the "do [issue]" correction both came from the user, verbatim, on 2026-08-03.
   The reversible-vs-irreversible framing and the report-in-past-tense phrasing I generalized from those two corrections, consistent with the irreversible-or-high-stakes carve-outs already on the bullets below.
   (Standing directive from the user, verbatim, 2026-08-03: "if you are unsure whether I want you to do something or not, default to doing it; I will tell you the exceptions to that rule (like merging without mwc active)."
-- Always create a feature branch, push, open a PR, and request reviewer `d-morrison` automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
+- Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
-  After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, request `d-morrison` as reviewer, and report the PR link in the past tense immediately.
+  After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.
 - Keep PRs focused on a single concern:
   never mix CI/workflow infrastructure changes (`.github/workflows/`)
   with heavy simulation/validation dataset artifacts (e.g. `inst/extdata/*.rds`, `*.parquet`, `*.RData`)

@@ -486,7 +486,7 @@ def baseline_reader(base: Path, rev: str):
     matches what `local_reader` does and keeps a genuinely loaded file from
     being reported as a dangling import at the baseline.
 
-    The test is `("/", "~")` rather than `"~"` alone, matching `resolve()`'s
+    The test is `is_absolute()` (checking `/`, `~`, `os.path.isabs`, and drive-letter prefixes), matching `resolve()`'s
     own definition of "already absolute, do not join". Both other readers
     already fall through to disk for either spelling -- `local_reader`
     because `base / path` discards `base` when `path` is absolute, and

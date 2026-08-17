@@ -5,6 +5,17 @@ Worked-example case records for the rules in
 keep them out of the auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
+## Where the cross-vendor directive came from
+
+(Directive source: a public write-up of a multi-agent review workflow, 2026-08:
+"Models are from different vendors, and you get better results due to them
+having different approaches and different blind spots.
+Friction (disagreement) is your friend here."
+The corpus already had the mechanisms --- Copilot alongside `claude-review`,
+plus [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) and
+[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) --- and no
+statement of why to pair across vendors or how to weight their agreement.)
+
 ## A session that could reach none of four working reviewers
 
 (`Morrison-Lab/ai-config#1417`, 2026-08-12, filed as

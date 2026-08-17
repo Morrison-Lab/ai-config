@@ -2,7 +2,11 @@ When a PR you're managing has its `@claude` review workflow fail to produce a us
 Apply the same review standards the bot would (the SERG lab manual and d-morrison's modular/idiomatic priorities), then keep iterating to fully-clean on your own findings.
 Neither failure mode is an approval --- an unreviewed PR stays unreviewed regardless of why the bot didn't weigh in.
 
-**Quota-skipped:** surfaces as a bot comment --- either `Claude review skipped --- API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the `@claude` agent workflow).
+**Never write the bot's at-mention in that comment.**
+The gate is a raw substring test, so backticks and descriptive framing leave it live; say `claude-review` or "the Claude reviewer".
+See [`memories/mention-triggers.md`](../../memories/mention-triggers.md).
+
+**Quota-skipped:** surfaces as a bot comment --- either `Claude review skipped --- API quota exhausted` (the review workflow) or `You've hit your org's monthly spend limit` (the agent workflow).
 Both mean no bot will respond on this run; re-running the workflow only helps once the quota actually resets.
 
 **Stub review:** the review job reports success (`is_error: false`, real cost/turns logged) but the posted comment never states a `### Verdict` --- the run genuinely executed but got cut short before reaching a conclusion (e.g. by escalating permission denials on tool calls it needed).
@@ -72,10 +76,7 @@ Keep this distinct from [`fully-clean`](fully-clean.md)'s instability rule, whic
 - **Don't:** settle a cross-vendor split by majority or by reviewer preference.
   Check the item.
 
-(Directive source: a public write-up of a multi-agent review workflow, 2026-08:
-"Models are from different vendors, and you get better results due to them having different approaches and different blind spots.
-Friction (disagreement) is your friend here."
-The corpus already had the mechanisms --- Copilot alongside `claude-review`, plus the two skills named above --- and no statement of why to pair across vendors or how to weight their agreement.)
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "Where the cross-vendor directive came from".
 
 **"Reachable" is a property of the session as well as of the reviewer, and the second kind is not a fallback case at all.**
 Everything above treats reachability as a fact about the *reviewer* --- quota-exhausted, unlicensed, rate-limited, not configured --- so the remedy is always to re-check it later, on the reasonable assumption that whatever ails it may lift.

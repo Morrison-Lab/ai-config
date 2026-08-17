@@ -592,7 +592,12 @@ like.
 (`Lacaedemon/sparta#1305`, 2026-08-17, review round 1: `tools/README.md` and
 the PR body both carried a sample block showing the new Godot version check's
 failure output with an `[ERR]` prefix on each line.
-`check.sh`'s `err()` is `printf '%s\n' "$*" >&2` --- no severity tag, and none
-anywhere in the script.
+`check.sh`'s `err()` is `printf '%s%s%s\n' "$C_RED" "$1" "$C_RESET" >&2` ---
+ANSI color only, no text severity tag, and no severity tag anywhere in the
+script.
 The four message lines were verbatim correct; only the invented prefix was
-wrong, and it appeared in two places, so the fix swept both.)
+wrong, and it appeared in two places, so the fix swept both.
+This entry's own first draft then quoted that `err()` line as
+`printf '%s\n' "$*" >&2`, composed from memory rather than read from the
+script --- caught in this fragment's own review, the failure mode illustrating
+itself.)

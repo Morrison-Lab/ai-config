@@ -207,6 +207,13 @@ your own conventions already covered".
       claim about state**, which a reviewer has no reason to doubt: CI reports
       green because it correctly validated the older head, and the session's
       own recollection agrees with the reply.
+      It answers whether the **branch** moved, and nothing about whether the
+      **PR** is still open --- a closed PR keeps accepting pushes and stops
+      tracking its branch, so both SHAs agree while the PR's own head stays
+      frozen.
+      Read the PR's `state` as a second check, per
+      [`use-existing-pr-branch`](use-existing-pr-branch.md), rather than letting
+      this item stand for both.
 
 **Review a round's fixes as one diff, not as N independent fixes: two of them,
 each correctly addressing its own finding, can compose into a defect neither

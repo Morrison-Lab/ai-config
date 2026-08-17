@@ -42,6 +42,41 @@ confirm a genuine all-clear review is posted at the current head from an externa
 a self-review alone, or a clean state you inferred yourself from green CI and resolved threads,
 doesn't satisfy this once an external verdict is obtainable.
 
+**Weight two reviewers' agreement by whether they share a vendor, and prefer a cross-vendor second reviewer over a second run of the same one.**
+The section above says to check whether a *different* configured reviewer is reachable, and treats every second reviewer as interchangeable.
+They are not.
+Two reviewers built on the same vendor's models share their training and so share their blind spots, which means a defect both of them pass over is one neither was ever likely to catch.
+Their agreement therefore measures the shared blind spot rather than the diff.
+
+This corpus already makes the identical argument about **instruments**, so extending it to reviewers is a small step rather than a new claim.
+[`algorithmatize-checks.rationale.md`](algorithmatize-checks.rationale.md) states it directly: "Two methods keyed on the same surface feature share a blind spot, so their agreement measures the blind spot rather than the truth."
+[`fail-fast`](../principles/fail-fast.md) puts the same point in one line: "A second reading of the same stream is not a second opinion."
+
+Two consequences follow.
+
+**When chasing a second reviewer, prefer a different vendor.**
+Copilot beside `claude-review` is the common pairing, and the corpus already owns two more:
+[`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) wires up the Google Antigravity review workflow, and
+[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) runs a separately-billed ChatGPT-plan CLI.
+Re-dispatching the reviewer that already ran is the weakest of the available options, since it re-reads the same diff through the same model.
+
+**Read a cross-vendor disagreement as a prompt to check the item yourself.**
+A split means one reviewer surfaced something the other's approach did not, so the item is worth verifying rather than settling by majority or by whichever reviewer you trust more.
+The split is not evidence that either side is right --- it is evidence that the question is live, which is exactly the state
+[`address-every-comment`](address-every-comment.md) already says to resolve by checking the code rather than by weighing reviewers.
+Keep this distinct from [`fully-clean`](fully-clean.md)'s instability rule, which governs **one** reviewer contradicting itself across runs on unchanged code: that is noise from re-derivation, whereas two vendors differing is two different readings of the same diff.
+
+- **Do:** name the vendor when reporting that two reviewers agree, so a reader can weight the agreement.
+- **Do:** spend a reachability check on a cross-vendor reviewer before re-dispatching one that already ran.
+- **Don't:** read same-vendor agreement as independent corroboration.
+- **Don't:** settle a cross-vendor split by majority or by reviewer preference.
+  Check the item.
+
+(Directive source: a public write-up of a multi-agent review workflow, 2026-08:
+"Models are from different vendors, and you get better results due to them having different approaches and different blind spots.
+Friction (disagreement) is your friend here."
+The corpus already had the mechanisms --- Copilot alongside `claude-review`, plus the two skills named above --- and no statement of why to pair across vendors or how to weight their agreement.)
+
 **"Reachable" is a property of the session as well as of the reviewer, and the second kind is not a fallback case at all.**
 Everything above treats reachability as a fact about the *reviewer* --- quota-exhausted, unlicensed, rate-limited, not configured --- so the remedy is always to re-check it later, on the reasonable assumption that whatever ails it may lift.
 There is a fourth state that wording does not reach, and it never lifts on its own: the reviewer is working perfectly, and **this session** cannot summon it.

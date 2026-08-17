@@ -201,6 +201,79 @@ was no longer attached to a PR.
 - **Don't:** report a finding as Addressed on the strength of a pushed commit
   without checking which ref that commit is reachable from.
 
+**Everything above is scoped to a PR that MERGED, and the closed-not-merged
+case fires none of its tells --- while a branch-level push-landed check passes
+cleanly and feels like having complied with the rule.**
+A PR can leave your control without merging: an owner veto, a supersede, a
+scope decision.
+A closed PR still accepts pushes to its head branch.
+It simply stops tracking that branch, so its `head.sha` freezes at whatever it
+was at closure while the branch moves on normally.
+
+Note what that does to the remedy the section above prescribes.
+Its Do-bullet names the `merged` field, and on a closed-unmerged PR `merged`
+reads `false` --- which is exactly what an **open** PR reports, so the named
+field cannot discriminate the two states at all.
+`mergeable_state` is worse than useless here, since it can still read `clean`
+on a closed PR.
+The `* [new branch]` tell cannot fire either, because it requires the head
+branch to have been **deleted**, and nothing was: the branch is fine, and only
+the PR is closed.
+The ancestry check is already ruled out above for a squash-merge repo.
+
+So read `state`, not `merged`.
+`state` is the field that separates `open` from `closed`, and `closed_at`
+timestamps it.
+
+**The substitute check is what makes this survive a careful session, and it is
+the one the corpus itself marks as a killer item.**
+Comparing `git rev-parse HEAD` against `git rev-parse origin/<branch>` answers
+whether the **branch** moved.
+It cannot answer whether the **PR** is still open, and those two questions come
+apart exactly here --- the branch accepts the push, the two SHAs agree, and the
+check reports success truthfully about a question nobody needed answered.
+Running it therefore reads as compliance with the PR-state rule it is standing
+in for, which is why nothing prompts the second read.
+[`ardi`](ardi.md)'s pre-push checklist carries that comparison as its killer
+item, so the substitution has the corpus's own emphasis behind it.
+
+What it costs is a claim rather than a commit, one step further out than the
+merged case above.
+The commit is real and the branch is real; the PR is not tracking either, so a
+comment or body edit citing that commit describes a head the PR does not have.
+Every artifact of the round then reads as work continuing with approval, when
+approval had been withdrawn an hour earlier.
+
+- **Do:** read the PR's `state` before pushing to a branch whose PR you have
+  not re-read this round, and treat `closed` as ending the round whether or not
+  it merged.
+- **Do:** run the branch-level SHA comparison **and** the PR-state read, as two
+  checks answering two questions, rather than letting the first stand for both.
+- **Do:** compare the PR's `head.sha` against your local `HEAD` when a PR looks
+  quiet, since a frozen `head.sha` is the tell a closed PR leaves behind.
+- **Don't:** read `merged: false` as meaning the PR is open --- a closed PR
+  reports it identically.
+- **Don't:** expect `* [new branch]` or a `mergeable_state` change to announce
+  a closure; nothing is deleted and the state can still read `clean`.
+- **Don't:** count the killer-item SHA comparison as having checked the PR ---
+  it is a true answer to a different question, which is what makes it feel
+  sufficient.
+
+(`Morrison-Lab/ai-config#1500`, 2026-08-16/17: the PR asked in its own body to
+be vetoed rather than absorbed, and it was.
+The veto comment landed at `23:05:08Z` and the PR closed at `23:05:12Z`.
+A session then committed `ade5f0a` at `00:06:40Z`, pushed it to
+`ums/pr-1259-learnings`, posted a round-2 comment at `00:08:05Z`, and edited the
+PR body --- 61 minutes after closure, none of it noticed.
+The push was verified by comparing `HEAD` against `origin/ums/pr-1259-learnings`,
+which agreed.
+`pull_request_read` on #1500 reports `head.sha` `645ed496`, `state` `closed`,
+`merged` `false`, and `mergeable_state` `clean`, while
+`git ls-remote origin ums/pr-1259-learnings` reports `ade5f0a3`, two commits
+ahead.
+The body's own "Corrections to this body" entry cites figures re-derived at
+`ade5f0a`, a head that PR has never tracked.)
+
 **The harness-assigned branch name itself can already exist locally, pointing at unrelated stale content from an earlier session in the same container.**
 A fresh container doesn't guarantee a fresh local branch state --- `git checkout -b <harness-branch> origin/<existing-PR-branch>` can fail with "a branch named `<harness-branch>` already exists" if a prior session in this container created one under that same name and left it pointing at old work.
 Don't assume it's safe to reuse or that it reflects the actual PR: check `git merge-base --is-ancestor <local-tip> origin/main` first --- if the local tip is already an ancestor of `main` (i.e. it was old, already-merged content, not in-flight work), it's safe to discard by force-checking out the real PR branch under that same name with `git checkout -B <harness-branch> origin/<existing-PR-branch>` (uppercase `-B` resets the branch in place instead of erroring).

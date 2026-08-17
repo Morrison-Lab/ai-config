@@ -162,3 +162,33 @@ Building such an instrument is itself delegable sidecar work, not a reason to po
 - **Don't:** treat a factual correction as too small to record because no belief changed.
 - **Don't:** wait for the task the correction interrupted to reach a checkpoint of its own.
 
+**Folding or pruning a finished record is a step of the pass, and which records are outstanding is a link-graph fact rather than something you remember.**
+`CLAUDE.md`'s ["Keep a running on-disk session lab notebook"](../../CLAUDE.md) section already names the moment: fold a finished notebook into durable memory, or prune it, during UMS once its content is captured elsewhere.
+It names no way to find the ones you have forgotten, so the set is left to recollection --- and recollection covers this session's notebook and nothing else.
+A notebook from three sessions back, a `handoff` snapshot, a `.cases.md` companion nothing cites: each is invisible to the session that would have to remember it, which is exactly the blind spot [`flag-session-boundaries`](flag-session-boundaries.md) names for a state sweep.
+
+So run the instrument as part of the pass:
+
+```bash
+python3 scripts/check-stale-records.py
+```
+
+It walks the same link graph `scripts/check-links.py` does, counts inbound links and `@`-imports per markdown file, and reports two buckets plus the count it examined.
+
+**Orphans --- zero inbound references --- are a reading prompt rather than a defect.**
+A slash command invoked by name, an index, a directory README: each is legitimately unlinked, so the question the bucket answers is whether a *new* orphan appeared, not whether the count is zero.
+Measured against this repo on 2026-08-16: 503 files examined, 3 orphans (`commands/release-pr.md`, `memories/MEMORY.md`, `references/cloud-setup/README.md`), 181 generated wrappers and 2 root entry points exempt.
+All three were inspected and are the benign kinds above, so treat that as the baseline rather than as a backlog.
+
+**Old but still referenced is the bucket the corpus was blind to**, and it is the harmful case: a live link to a stale record reads as current project state to every fresh agent walking the graph, where an orphan is merely unreachable.
+
+**The age bucket carries no information under a shallow clone**, which is what the checker's own output says (`age_informative: false` in `--json`).
+`git log` cannot see past the fetch depth, so every file reads as no older than the oldest fetched commit.
+`actions/checkout` clones at depth 1, so the CI step is advisory for that reason as well as for the orphan bucket's.
+Re-run against a full clone (`git fetch --unshallow`) before reading it.
+
+- **Do:** run the checker during the pass, and fold or prune whatever it reports that the pass has already captured elsewhere.
+- **Do:** read a new orphan as a question about that file, since the standing three are benign.
+- **Don't:** decide which records are outstanding from memory --- that covers this session's own notebook and nothing else.
+- **Don't:** read the age bucket at all from a shallow clone.
+  The script reports it as uninformative rather than empty.

@@ -500,8 +500,15 @@ def baseline_reader(base: Path, rev: str):
     from_git = git_reader(base, rev)
     from_disk = local_reader(base)
 
+    def is_absolute(p: str) -> bool:
+        return (
+            p.startswith(("/", "~"))
+            or os.path.isabs(p)
+            or (len(p) >= 2 and p[1] == ":" and p[0].isalpha())
+        )
+
     def read(path: str) -> bytes | None:
-        return from_disk(path) if (path.startswith(("/", "~")) or os.path.isabs(path)) else from_git(path)
+        return from_disk(path) if is_absolute(path) else from_git(path)
 
     return read
 

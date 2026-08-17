@@ -984,7 +984,11 @@ with tempfile.TemporaryDirectory() as tmp:
     # baseline, inflating the growth by that file's full size on every run.
     _abs = base / "outside.md"
     _abs.write_text("z" * 300, encoding="utf-8")
-    for _spelling, _label in ((str(_abs), "/-prefixed"), ("~/.nonexistent-xyz.md", "~-prefixed")):
+    for _spelling, _label in (
+        (str(_abs), "/-prefixed"),
+        ("~/.nonexistent-xyz.md", "~-prefixed"),
+        ("C:/Users/test/file.md", "drive-letter-prefixed"),
+    ):
         _r = ccc.baseline_reader(base, first)(_spelling)
         _l = ccc.local_reader(base)(_spelling)
         check(

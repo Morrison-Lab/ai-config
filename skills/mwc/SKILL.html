@@ -349,7 +349,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#merge-when-confident-mwc-session-grant" id="toc-merge-when-confident-mwc-session-grant" class="nav-link active" data-scroll-target="#merge-when-confident-mwc-session-grant">Merge-When-Confident (MWC) Session Grant</a>
   <ul class="collapse">
   <li><a href="#standing-scope-policy" id="toc-standing-scope-policy" class="nav-link" data-scroll-target="#standing-scope-policy">Standing Scope &amp; Policy</a></li>
-  <li><a href="#the-standing-per-repository-grant" id="toc-the-standing-per-repository-grant" class="nav-link" data-scroll-target="#the-standing-per-repository-grant">The standing per-repository grant</a></li>
+  <li><a href="#the-standing-per-repository-grant" id="toc-the-standing-per-repository-grant" class="nav-link" data-scroll-target="#the-standing-per-repository-grant">The standing per-repository grant</a>
+  <ul class="collapse">
+  <li><a href="#a-bare-gh-pr-merge-n-refuses-and-the-refusal-may-diagnose-the-wrong-thing" id="toc-a-bare-gh-pr-merge-n-refuses-and-the-refusal-may-diagnose-the-wrong-thing" class="nav-link" data-scroll-target="#a-bare-gh-pr-merge-n-refuses-and-the-refusal-may-diagnose-the-wrong-thing">A bare <code>gh pr merge &lt;N&gt;</code> refuses, and the refusal may diagnose the wrong thing</a></li>
+  </ul></li>
   <li><a href="#session-lock-hook-integration" id="toc-session-lock-hook-integration" class="nav-link" data-scroll-target="#session-lock-hook-integration">Session Lock &amp; Hook Integration</a></li>
   <li><a href="#procedure-for-agents-handling-mwc" id="toc-procedure-for-agents-handling-mwc" class="nav-link" data-scroll-target="#procedure-for-agents-handling-mwc">Procedure for Agents Handling <code>/mwc</code></a></li>
   <li><a href="#what-a-re-grant-does-not-mean" id="toc-what-a-re-grant-does-not-mean" class="nav-link" data-scroll-target="#what-a-re-grant-does-not-mean">What a re-grant does NOT mean</a></li>
@@ -434,6 +437,47 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>So the guard runs the same ambiguity test on two axes — <strong>what kind</strong> of merge this is, and <strong>which repository</strong> it lands in — and either one coming back undetermined denies.</p>
 <p>What the standing grant removes is the need to <strong>ask</strong>, not the judgment about whether the PR is done. <a href="../../shared/workflow/ardi.md"><code>ardi</code></a>’s loop still terminates by reporting the PR ready, so the grant changes what happens at that moment and not what has to be true before you get there.</p>
 <p>Adding a repository to the grant is a one-line diff to <code>STANDING_MERGE_GRANT_REPOS</code> in the hook. It is deliberately not settable from the environment: <code>ALLOW_MERGE=1</code> already covers the one-off case from inside the command text, and an env-settable allowlist would widen a security guard from ambient state a reader of the command cannot see.</p>
+<section id="a-bare-gh-pr-merge-n-refuses-and-the-refusal-may-diagnose-the-wrong-thing" class="level3">
+<h3 class="anchored" data-anchor-id="a-bare-gh-pr-merge-n-refuses-and-the-refusal-may-diagnose-the-wrong-thing">A bare <code>gh pr merge &lt;N&gt;</code> refuses, and the refusal may diagnose the wrong thing</h3>
+<p>The uncovered case named above as “a merge with no repo named in the command” closes with “so this costs nothing in practice”. That claim is about <strong>design cost</strong> — requiring an explicit target adds no burden the corpus was not already imposing — and it is correct. What it does not say is what the <em>operator</em> sees, which is where the real cost lands.</p>
+<p>With no session grant in play, both guards deny the bare form, with different messages, and the one surfaced is not necessarily the one that names the fix. Measured 2026-08-17, feeding each hook the exact payload for fully-clean PR #1598:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">command</th>
+<th style="text-align: left;"><code>require-gh-repo-flag.py</code></th>
+<th style="text-align: left;"><code>no-unauthorized-merge.py</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><code>gh pr merge 1598 --squash --delete-branch</code></td>
+<td style="text-align: left;">deny — names the missing <code>-R</code>, gives the fix</td>
+<td style="text-align: left;">deny — names permission and <code>STANDING_MERGE_GRANT_REPOS</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><code>gh pr merge 1598 -R Morrison-Lab/ai-config --squash --delete-branch</code></td>
+<td style="text-align: left;">allow (has <code>-R</code>)</td>
+<td style="text-align: left;">allow (exit 0)</td>
+</tr>
+</tbody>
+</table>
+<p>Nothing about the two commands differs except the explicit <code>-R</code>.</p>
+<p>The session that hit this saw <code>no-unauthorized-merge.py</code>’s message, which talks about permission and the standing grant and says nothing about a missing flag. So the natural readings are “the grant lapsed”, “this PR does not qualify”, or “the hook is broken” — and each sends you somewhere useless: re-reading the grant, re-running <code>check-pr-fully-clean.py</code>, or inspecting the hook. The fix is one flag.</p>
+<p>Which of the two messages a session sees is harness behaviour rather than anything these hooks decide, so treat the observation above as one reading and not as a rule about ordering. Either message is possible; only one of them is self-diagnosing.</p>
+<p>It is worst exactly where it is most likely. A session working <em>in</em> the ai-config checkout has the least reason to name the repo, because every other <code>gh</code> command in that directory infers it correctly — so the habit that works everywhere else is the one that fails here.</p>
+<ul>
+<li><strong>Do:</strong> write <code>-R Morrison-Lab/ai-config</code> into the merge command, since the grant attaches to the target named in the command text and to nothing else.</li>
+<li><strong>Do:</strong> re-issue with <code>-R</code> as the first response to any merge refusal in a repo that carries a grant, before investigating anything.</li>
+<li><strong>Don’t:</strong> read the refusal as the grant not applying, the PR not qualifying, or the hook being broken — the commonest cause is an underspecified command, and none of those three readings is checkable against it.</li>
+<li><strong>Don’t:</strong> infer the target from the working directory the way the rest of <code>gh</code> does; that is precisely the inference the guard refuses to make.</li>
+</ul>
+</section>
 </section>
 <section id="session-lock-hook-integration" class="level2">
 <h2 class="anchored" data-anchor-id="session-lock-hook-integration">Session Lock &amp; Hook Integration</h2>

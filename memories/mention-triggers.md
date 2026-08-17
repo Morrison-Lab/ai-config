@@ -54,14 +54,17 @@ Read those bullets as instances, and the substring gate itself as the rule.
 
 This is the more useful half, because the rule was not missing.
 
-By the sixth instance the hazard was recorded in five places --- the numbered
-sequence and the mention-trigger section in
+By the sixth instance the hazard was stated in five places: the numbered
+instance sequence and the mention-trigger section in
 [`claude-bot-workflows.md`](claude-bot-workflows.md),
-[`github-actions.md`](github-actions.md),
-[`github-mcp-tools.md`](github-mcp-tools.md), and the trigger-phrase bullets in
+[`github-actions.md`](github-actions.md)'s "it retriggers even in backticks"
+bullet, and the trigger-phrase-leak bullets in
 [`ardi`](../skills/ardi/SKILL.md) and [`ard`](../skills/ard/SKILL.md).
-None of those is auto-loaded: `memories/` is read on demand, and a skill body
-loads only when that skill is invoked.
+([`github-mcp-tools.md`](github-mcp-tools.md) cites the gate too, but as an
+*analogy* for its own URL sanitizer rather than as a statement of this rule,
+so it is not a sixth home.)
+None of the five is auto-loaded: `memories/` is read on demand, and a skill
+body loads only when that skill is invoked.
 
 Meanwhile the one fragment that *instructs* a session to write the comment
 that keeps carrying the mention ---

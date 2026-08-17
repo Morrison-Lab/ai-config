@@ -388,6 +388,13 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   Mask fenced blocks before location matching with a line-anchored fence (`^[ \t]{0,3}```...`) under `re.MULTILINE`, and match each block's opening and closing fence as a balanced pair.
   Do not span blocks with a single `re.DOTALL` match: an unclosed fence then swallows everything up to a *later* block's closing fence, masking the valid location headers in between.
   (Morrison-Lab/gha#412, 2026-08-05).
+  - **Second occurrence, in ai-config's own scripts rather than gha's review parser.**
+    `` re.compile(r"```.*?```", re.S) `` pairs backtick *runs* wherever they fall instead of tracking fence open and close positionally, so a document whose runs are 4, 3, 4, 3, 3 masks the wrong spans.
+    `scripts/check-links.py:22` and `scripts/check-pr-fully-clean.py:191-192` both carry it; `scripts/check-context-closure.py:200-240` is the same repo's correct positional implementation, so the fix is to reuse that rather than to re-derive one.
+    Filed as [#1567](https://github.com/Morrison-Lab/ai-config/issues/1567).
+    Read this as the class recurring rather than as a new lesson: the bullet above already states the rule, and
+    [`fact-check-code-logic`](../shared/coding/fact-check-code-logic.md)'s "When one parser construct becomes tolerant of a condition, audit its siblings" says to sweep sibling constructs --- which here means sibling *scripts* sharing one repo, not only sibling regexes sharing one file.
+    (2026-08-16.)
 - **Use match-boundary splitting instead of single-pass lookaheads.**
   Collect every finding's location header (`**Location:** [file.ext:L10]`) into `matches`, then slice each body between consecutive matches.
   An interior body is `content[matches[i].end():matches[i+1].start()]`.

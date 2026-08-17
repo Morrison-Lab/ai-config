@@ -670,6 +670,55 @@ answer.**
 - **Don't:** carry such a claim into an issue or a decision doc, where it
   argues against the very fix that produced the silence.
 
+**The mirror runs the other way, and it is the one that discards a good fix: a
+symptom that KEEPS reproducing after a fix landed is not evidence the fix
+failed.**
+
+The bullet above governs a symptom that vanished, where the attractive wrong
+answer is nondeterminism.
+Here the symptom is still there, and the attractive wrong answer is that the
+diagnosis was wrong --- which sends you back to re-litigate a fix that is
+working, and leaves the real remaining cause unread.
+
+The mechanism is ordinary and worth naming, because it makes the persistence
+expected rather than surprising.
+A failure can have causes in series, and only the first one is observable while
+it stands.
+Removing it does not change the outcome; it changes which cause produces the
+outcome.
+So the job's colour is the same before and after, and the outcome is the one
+thing everybody checks.
+
+**The discriminator is the error, not the outcome.**
+Both runs failed, so comparing conclusions establishes nothing.
+Comparing the error text is decidable in one read, and a changed error means
+the first cause is gone and a second was behind it.
+Where the fix is upstream, pin the comparison to the dependency version each
+run actually resolved, since a run predating the fix is not evidence about it
+--- [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)'s "mirror
+direction" section owns that lookup.
+
+Note the asymmetry that makes this worth a rule.
+Reading the new error costs one glance and usually names its own remedy.
+Re-litigating the first fix costs a round, and it argues for reverting
+something correct --- the same shape the bullet above warns about, where a
+claim ends up arguing against the fix that produced the change.
+
+- **Do:** diff the error text across the fix, not the pass/fail outcome, before
+  concluding anything about whether the fix worked.
+- **Do:** resolve which dependency version each run used, when the fix landed
+  upstream, so a pre-fix run is not read as evidence against it.
+- **Do:** report a changed error as a second cause found, and file it, rather
+  than as the first fix having failed.
+- **Don't:** re-open a landed fix because the symptom persists --- that is a
+  claim about the outcome, and the outcome is what a serial second cause
+  preserves.
+- **Don't:** read the earlier bullet as covering this; it fires on a symptom
+  that stopped, and this one fires on a symptom that did not.
+
+See [`ardi.cases.md`](ardi.cases.md),
+"A trust-gate fix that revealed a tool-name mismatch behind it".
+
 **Verify a command, path, or flag *you* write into a doc, with the same rigor
 [`address-every-comment`](address-every-comment.md) demands for one a reviewer
 suggests.**

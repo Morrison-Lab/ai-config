@@ -23,7 +23,8 @@ Operationalizes the strong form of the claim workflow: branch â†’ empty commit â
 ## What it does
 
 1. Fetch `origin/main` and check out a clean branch: `feat/<slug>` or `fix/<slug>` (inferred from issue title)
-2. Create an empty commit with message: `"start: <issue title> (refs #<N>)"` --- `refs`, not `closes`, so a scope that later narrows can be corrected on the PR body, the one surface each round re-reads (see `shared/workflow/pr-on-claim.md`)
+2. Create an empty commit with message: `"start: <issue title> (refs #<N>)"` --- `refs`, not `closes`, so a scope that later narrows can be corrected on the PR body, the one surface each round re-reads.
+   Subject only, no body: a closing keyword fires from anywhere in a commit message, so an explanation of this convention would itself close the issue (see `shared/workflow/pr-on-claim.md`)
 3. Push the branch with `-u origin HEAD`
 4. Open a **draft PR** with:
    - Title: issue title (or override)

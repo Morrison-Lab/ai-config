@@ -100,3 +100,46 @@ The caller is a 90-line delegation to
 `github.event.pull_request.draft == false` at lines 185 and 346.
 The false premise reached a UMS brief as a candidate learning and was caught
 only by cloning gha and grepping it.)
+
+## The keyword scan fires mid-sentence, and a blockquote marker does not exempt it
+
+(`Morrison-Lab/ai-config#1500`, 2026-08-16.
+Two independent lines of evidence, one observational and one controlled.
+
+The observational half is the incident's own merge commit,
+`f913d5d69ea37708c496315a6fa71392c7db006b` on `Lacaedemon/sparta`'s `main`.
+Its body's third line reads
+`* start: couple knockback slide with the prone/fall roll (closes #1152)`,
+so the keyword that closed #1152 sat at roughly column 55, behind arbitrary
+prose and inside parentheses.
+The subject line carries no closing keyword at all, so the scan reads the body
+rather than only the subject.
+The only other references in that message are `Refs #1152.` and
+`Issue #1152 asks`, neither of them closing keywords, so nothing else in the
+message could have closed it.
+An anchored grep would therefore have missed the very commit that caused the
+incident.
+
+The controlled half ran in `Morrison-Lab/demo2`: five commits pushed separately
+to `main`, one issue each, exactly one reference per commit, messages verified
+byte-for-byte after pushing.
+A keyword alone on its own body line closed its issue, and `refs #N` left its
+issue open, so the harness was pinned in both directions before any result was
+read.
+Between those controls, all three of the interesting positions fired --- a
+keyword mid-sentence in plain prose
+(`... The PR body carries Closes #N.`), one mid-line inside parentheses
+(`... so a (closes #N) here reaches main ...`), and one behind a `>` blockquote
+marker.
+Every closed issue came back `closed_by_pull_requests`
+`{"total_count": 0, "references": []}`, reproducing this fragment's own tell on
+demand.
+
+One claim was overstated on the way and corrected in the same thread: that a
+squash merge concatenates the PR body "as well".
+Whether the body or the branch's commit messages reach the default branch is a
+repository squash-merge-message setting, and ai-config's own `main` carries
+both shapes --- `740de57` and `6603808` read as PR descriptions, while
+`d8d0945` carries the `*`-bulleted commit-message form.
+The hazard is real under one setting and absent under the other, which is why
+the rule names both candidates rather than asserting one.)

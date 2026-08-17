@@ -66,15 +66,75 @@ Read that empty array as evidence about the body alone: it is silent about what
 the branch's commit messages say, and it reads reassuringly right up until the
 merge lands.
 
+**The claim commit is a bare subject with no body, and that follows from the
+same argument.**
+The obvious way to stop the next reader from helpfully restoring the keyword is
+to explain in the commit body why it was held off.
+That defeats the convention, because the explanation has to name the keyword to
+warn about it, and a keyword in a commit body fires wherever it sits.
+A sentence reading `The PR body carries Closes #N.` closes that issue, on
+precisely the narrowed-scope PR the convention exists to protect.
+
+Quoting does not exempt it either.
+A `>` blockquote marker is not a quoting mechanism as far as the scan is
+concerned, so the bad template cannot be quoted in a commit message even as a
+warning.
+Commit messages get no markdown-context exemption at all: they are not rendered
+as markdown, so there is no code span, no fence, and no blockquote to hide a
+keyword inside.
+
+So the rationale lives here, in this fragment, where a reader looking for the
+convention will actually find it.
+The commit carries `start: <issue title> (refs #<N>)` and nothing else.
+
+**The scan is not line-anchored, so do not repair the grep by anchoring it.**
+A keyword fires from anywhere in a line --- mid-sentence, inside parentheses,
+behind arbitrary prose.
+Anchoring the pattern to the start of a line returns a clean zero on the real
+case, which is a silent fail-open in the direction
+[`fail-fast`](../principles/fail-fast.md) says not to trade toward.
+
+Keep the pattern wide, and read its output rather than counting it.
+A branch that follows this convention **and documents it** will match its own
+documentation, so a non-empty result is a prompt to look rather than a
+violation.
+That is the cost of the wide pattern, and it is the right cost to pay: an
+over-warn you read is cheaper than a miss you never see.
+
+**Which text reaches the default branch is a repo setting, so treat both
+candidates as live.**
+A squash merge's message is composed from either the branch's commit messages
+or the PR title and description, depending on the repository's
+squash-merge-message setting.
+So the PR body is not merely the safe surface --- under one setting it is
+itself concatenated onto the default branch, and a body that **quotes** a real
+issue number beside a keyword closes that issue exactly as a commit would.
+A PR documenting this hazard is the likeliest place to write such a sentence,
+so quote the keyword with a placeholder (`closes #N`, with the letter) rather
+than with a live number.
+
 - **Do:** write `refs #<N>` in the claim commit and keep `Closes #<N>` in the
   PR body, so the closing claim sits on the surface you re-read each round.
+- **Do:** keep the claim commit to a bare subject, and put the reasoning in
+  this fragment rather than in the commit body.
 - **Do:** grep the branch's own commit messages when a PR's scope narrows ---
   `git log origin/<default>..HEAD --format=%B | grep -niE '(close[sd]?|fix(es|ed)?|resolve[sd]?) #'`
   --- and edit the squash body at merge time when one is already there.
+- **Do:** read that grep's hits rather than counting them, since a branch
+  documenting this convention matches its own documentation.
 - **Don't:** treat switching the PR body to `Refs #N` as having stopped the
   auto-close; that settles one of the two surfaces GitHub reads.
+- **Don't:** explain the convention inside the claim commit, or quote the bad
+  template there behind a `>` marker; both fire.
+- **Don't:** anchor the grep to a line start to quiet its false positives ---
+  that misses every mid-line keyword, which is where they actually occur.
+- **Don't:** write a live issue number beside a closing keyword in a PR body
+  you are only quoting from; use a placeholder.
 - **Don't:** read an empty `closed_by_pull_requests` as evidence the merge will
   leave the issue open.
+
+See [`pr-on-claim.cases.md`](pr-on-claim.cases.md), "The keyword scan fires
+mid-sentence, and a blockquote marker does not exempt it".
 
 **Draft, not ready-for-review --- deliberately.** A draft doesn't trigger the
 `@claude` review bot, so no review round is spent on an empty or half-finished

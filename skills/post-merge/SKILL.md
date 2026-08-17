@@ -536,8 +536,31 @@ One comparison settles it, and it costs nothing:
 
 ```bash
 merged=$(gh pr view <N> --json headRefOid --jq .headRefOid)   # VIEW_PR
+git fetch origin "refs/pull/<N>/head" -q                      # FETCH
 git log --oneline "$merged".."<branch>"    # empty => the ref is the merged head
 ```
+
+**That fetch is load-bearing, not tidiness, because the merged head is
+routinely absent from the local object store at exactly this moment.**
+`gh pr merge --delete-branch` removes the remote branch, and the merge commit
+on `main` is a *squash* in this repo, so neither `origin/main` nor any
+remaining ref reaches the PR's own head.
+`git log` then answers with
+
+```
+fatal: Invalid revision range <sha>..<branch>
+```
+
+which is the shape [`fail-fast`](../../shared/principles/fail-fast.md) warns
+about: the check did not run, and it says so on stderr while printing no
+commits --- so a caller reading only stdout sees the same empty output a clean
+comparison produces.
+`refs/pull/<N>/head` survives the branch deletion and is what makes the SHA
+resolvable again.
+
+So read the exit status rather than the output.
+A non-zero exit means the comparison failed to happen, which is not evidence
+the branch is safe to delete; re-fetch and re-run before touching `-D`.
 
 A non-empty list is not automatically a problem --- a merge commit whose every
 input is already on `main` is safe to discard --- but it is a question, and it
@@ -553,6 +576,9 @@ already-landed work, means the branch carries something the PR did not.
   is a claim about the PR's head, and `-D` acts on yours.
 - **Don't:** infer from a `-d` refusal which case you are in; a squash repo
   refuses for every branch regardless.
+- **Don't:** read an `Invalid revision range` error as an empty answer --- it
+  prints no commits, exactly as a clean comparison does, and means the merged
+  head is simply not in the local object store.
 
 (`Morrison-Lab/ai-config#1566`, 2026-08-17: the PR merged at head `0a297637`,
 and the local branch stood at `ad3b7640`, which `git branch -D` duly printed
@@ -562,6 +588,18 @@ commits from `main`, including the four merge commits for this session's own
 PRs.
 Nothing authored, so nothing was lost; the point is that the check ran
 afterwards, prompted by reading the delete output, rather than before.)
+
+(The fetch requirement was measured on the very next merge, `#1586`, which
+shipped the block above.
+Running it as written, immediately after `gh pr merge --squash
+--delete-branch`, produced
+`fatal: Invalid revision range d8e17de2...ums/verify-local-branch-before-force-delete`
+and exit 128 --- the merged head was unreachable because the remote branch was
+gone and `main` carried only the squash.
+`git fetch origin refs/pull/1586/head` resolved it, and the re-run printed
+nothing, which is what actually licensed the `-D`.
+The local ref was *behind* the merged head rather than ahead, so the original
+block's failure mode was not in play; the recipe still could not answer.)
 
 **Diverged main checkout (`ahead` and `behind` both non-zero):**
 `git pull --ff-only` fails when the main checkout

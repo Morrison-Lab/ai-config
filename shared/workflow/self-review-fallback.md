@@ -69,7 +69,8 @@ Keep this distinct from [`fully-clean`](fully-clean.md)'s instability rule, whic
 - **Do:** name the vendor when reporting that two reviewers agree, so a reader can weight the agreement.
 - **Do:** spend a reachability check on a cross-vendor reviewer before re-dispatching one that already ran.
 - **Don't:** read same-vendor agreement as independent corroboration.
-- **Don't:** settle a cross-vendor split by majority or by reviewer preference; check the item.
+- **Don't:** settle a cross-vendor split by majority or by reviewer preference.
+  Check the item.
 
 (Directive source: a public write-up of a multi-agent review workflow, 2026-08:
 "Models are from different vendors, and you get better results due to them having different approaches and different blind spots.

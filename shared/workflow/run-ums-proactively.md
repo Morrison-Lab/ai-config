@@ -190,4 +190,5 @@ Re-run against a full clone (`git fetch --unshallow`) before reading it.
 - **Do:** run the checker during the pass, and fold or prune whatever it reports that the pass has already captured elsewhere.
 - **Do:** read a new orphan as a question about that file, since the standing three are benign.
 - **Don't:** decide which records are outstanding from memory --- that covers this session's own notebook and nothing else.
-- **Don't:** read the age bucket at all from a shallow clone; the script reports it as uninformative rather than empty.
+- **Don't:** read the age bucket at all from a shallow clone.
+  The script reports it as uninformative rather than empty.

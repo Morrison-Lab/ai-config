@@ -510,3 +510,35 @@ A third check, `list_repository_collaborators`, resolved it in one call: the
 account held a direct collaborator grant, matching `COLLABORATOR` and
 explaining the `MEMBER` reading as this session's own tool's outlier.
 The "unresolved" framing cost a full review round it did not need to.)
+
+## A cause read off the step next to the one that failed
+
+`Morrison-Lab/ai-config#1583`, 2026-08-17.
+A `claude-review` job completed its review and then failed at step 20, "Post
+review comment", one second later.
+
+Step 20's own log was not read.
+A sibling step running one second earlier printed an env block showing
+`PR_NUMBER:` empty, and that was reported as the likely cause --- a plausible
+story, since a posting step with no PR number would indeed fail instantly.
+
+Reading step 20's own log refuted it.
+Its env showed `PR_NUMBER: 1583`, and the actual error was
+`HTTP 503: No server is currently available to service your request.
+(https://api.github.com/graphql)` from `gh pr comment`, followed by
+`##[error]Process completed with exit code 1.`
+The empty variable belonged to a different step, which had **succeeded** with
+`outcome=success;conclusion=success;duration_ms=39`.
+
+Two details are what make it a case record rather than one bad guess.
+
+The wrong diagnosis was **more specific** than the right one would have been at
+that moment, and specificity is what made it persuasive: it named a variable,
+a value, and a timestamp, all of them real.
+
+And the two diagnoses made **opposite predictions** about the remedy.
+An empty `PR_NUMBER` is a configuration defect, so a plain re-run would
+reproduce it and the fix would be a dispatch or workflow-input change.
+A 503 is transient, so a re-run should simply work.
+A single `rerun_failed_jobs` recovered the run and the verdict posted, which
+the 503 diagnosis predicted and the `PR_NUMBER` diagnosis ruled out.

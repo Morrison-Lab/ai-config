@@ -85,6 +85,102 @@ someone re-deriving it later.
 - **Don't:** add a line to a fixture for realism while leaving a verbatim
   claim standing over it.
 
+## Your own transcript is a fixture, and searching it contaminates it
+
+The section above narrows the rule to a repo artifact you or a colleague wrote.
+The session transcript is that artifact one step further out, and it is harder
+to see, because it is not in the repo and does not look like an artifact at
+all.
+It reads as memory.
+
+So a verbatim quotation drawn from it --- an error string, a command's output,
+a figure --- can rest entirely on your own earlier prose *about* that output,
+with the output itself never recorded anywhere.
+Each restatement is faithful to the one before it, so re-reading confirms the
+quotation every time and no reading ever reaches a tool result.
+
+**The obvious remedy is unsound, which is the part worth knowing.**
+That remedy is to check whether the string appears in a `tool_result` block
+rather than in your own text, on the reasoning that a tool result is
+machine-produced.
+Two sources defeat it:
+
+- **A search writes its own needle into the transcript**, in the command and
+  again in the output, so investigating the question manufactures evidence for
+  whichever answer you were checking.
+  The hit count grows as you look.
+- **An API round-trip returns text you authored.**
+  A `pull_request_read` result carries the PR body you wrote, so a
+  machine-produced block can consist wholly of your own prose.
+
+**The sound check pairs each result with the call that produced it**, and asks
+whether that call could have *emitted* the string rather than merely *carried*
+it:
+
+```python
+import json
+T = "<path to this session's .jsonl transcript>"
+needle = "fatal: Could not access"
+uses = {}
+for line in open(T, errors="ignore"):
+    try: rec = json.loads(line)
+    except Exception: continue
+    for b in ((rec.get("message") or {}).get("content") or []):
+        if not isinstance(b, dict): continue
+        if b.get("type") == "tool_use":
+            uses[b.get("id")] = (b.get("name"), needle in json.dumps(b.get("input") or {}))
+        elif b.get("type") == "tool_result" and needle in json.dumps(b):
+            print(uses.get(b.get("tool_use_id")))
+```
+
+A row whose second field is `True` is a search finding itself.
+A row naming a read-back tool is an echo of something you wrote.
+What is left, if anything, is the observation.
+
+**Reproduce it, or drop the quotation marks.**
+When no row survives, the honest repair is to run the command that would have
+produced the string and quote what it actually prints --- or to replace the
+quotation with a description, and say in the artifact that the literal was
+never verified.
+
+[`memories/github-actions.md`](../../memories/github-actions.md)'s "Grepping a
+run log matches the echoed script, not its output" is the sibling case, and it
+states the shared shape best: "a false positive shaped exactly like
+verification: you searched the log for the thing, and the log contains the
+thing."
+A CI log is fixed once its run ends, so it carries only that one contamination
+source; a transcript is still being written by the search, and carries the
+API-echo source as well.
+
+- **Do:** pair a transcript hit with the call that produced it, and treat a
+  search's own output and an API read-back as carrying no evidence.
+- **Do:** reproduce a literal before publishing it as verbatim output, and say
+  plainly when it could not be reproduced.
+- **Don't:** read a hit count as attestation --- N restatements of one claim
+  are one claim, and some of the N are your own act of counting.
+- **Don't:** treat a `tool_result` block as machine-produced evidence; that is
+  the check this section exists to reject.
+
+(`Morrison-Lab/ai-config#1573`, 2026-08-17: that PR's body quoted
+`fatal: Could not access 'origin/main...HEAD'` as the observed failure of a
+`git diff` run under a reset working directory, and said the wording had been
+confirmed as git's own.
+Six `tool_result` blocks in the session transcript carry that string.
+Four are GitHub MCP responses echoing the PR body itself, and the two `Bash`
+results both come from commands whose own text contained the needle --- so not
+one is a command that could have emitted it.
+The count was 5 on one pass and 6 minutes later, the extra block being the
+output of the pass that went looking.
+Neither candidate condition reproduces the literal on git 2.43.0: a deleted
+working directory gives
+`fatal: Unable to read current working directory: No such file or directory`,
+and an existing non-repo directory gives
+`warning: Not a git repository. Use --no-index ...`.
+The body was corrected before merge, replacing the quotation with a
+placeholder; what went unrecorded until now is the rule, and specifically that
+the correction's own stated reason --- "no raw tool result" --- was imprecise
+in the direction that invites the unsound check above.)
+
 ## The other direction: a fixture that agrees with the bug
 
 Everything above concerns a fixture that behaves correctly, and a conclusion

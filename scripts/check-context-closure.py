@@ -91,6 +91,7 @@ number (ai-config#897, #1258).
 from __future__ import annotations
 
 import argparse
+import os
 import posixpath
 import re
 import subprocess
@@ -485,7 +486,7 @@ def baseline_reader(base: Path, rev: str):
     matches what `local_reader` does and keeps a genuinely loaded file from
     being reported as a dangling import at the baseline.
 
-    The test is `("/", "~")` rather than `"~"` alone, matching `resolve()`'s
+    The test is `is_absolute()` (checking `/`, `~`, `os.path.isabs`, and drive-letter prefixes), matching `resolve()`'s
     own definition of "already absolute, do not join". Both other readers
     already fall through to disk for either spelling -- `local_reader`
     because `base / path` discards `base` when `path` is absolute, and
@@ -499,8 +500,15 @@ def baseline_reader(base: Path, rev: str):
     from_git = git_reader(base, rev)
     from_disk = local_reader(base)
 
+    def is_absolute(p: str) -> bool:
+        return (
+            p.startswith(("/", "~"))
+            or os.path.isabs(p)
+            or (len(p) >= 2 and p[1] == ":" and p[0].isalpha())
+        )
+
     def read(path: str) -> bytes | None:
-        return from_disk(path) if path.startswith(("/", "~")) else from_git(path)
+        return from_disk(path) if is_absolute(path) else from_git(path)
 
     return read
 

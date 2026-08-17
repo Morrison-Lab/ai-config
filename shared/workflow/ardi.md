@@ -26,6 +26,39 @@ that terminal state.**
 - **Don't:** let a verdict from an earlier head stand because the repo's trigger class was already known.
   Knowing it is not the same as acting on it each round.
 
+**Dispatching needs no permission, so do not ask about the spend.**
+
+The rule above is about the mechanism and says nothing about authorization,
+which leaves a session free to know it and still stall --- by reasoning that a
+review round costs money and the spend is the maintainer's call.
+That sounds like restraint and is indistinguishable from it from the inside.
+
+The asymmetry runs the other way.
+A green, unreviewed PR is **parked, not clean**, so declining to dispatch does
+not save a round; it holds the PR in a state that reads as finished and is not.
+The stall also spends the user's attention every time, which is the thing the
+review loop exists to conserve.
+
+So dispatch when the round is ready, and put the run in the status report
+rather than the question.
+
+- **Do:** dispatch the review yourself once the round's last push has landed,
+  on any repo whose reviewer is dispatch-only.
+- **Do:** name the run you are waiting on, so the report carries a fact rather
+  than a request.
+- **Don't:** write "spending a round is the maintainer's call" into a status
+  report, or hold a ready PR pending a spend question.
+- **Don't:** read this as a general spending grant --- it covers scheduling a
+  review, and merging is still [`mwc`](../../skills/mwc/SKILL.md)'s to govern.
+
+(Directive from the user, 2026-08-16: "always dispatch".
+Three PRs reached green CI on a `workflow_dispatch`-only repo in one session,
+and each time the session asked before dispatching, citing rounds that had
+billed \$12.14, \$10.37 and \$12.44 against a monthly limit already reached.
+Both earlier dispatches came back `Needs more work`, one with a blocking
+correctness bug, so the round was not a formality.
+Tracked as ai-config#1571.)
+
 **Dispatch once, after the round's LAST push --- a per-push rhythm cancels its own reviews.**
 
 **Dispatch with `--ref <PR-branch>`, or the resulting failure is invisible on the PR.**
@@ -207,6 +240,13 @@ your own conventions already covered".
       claim about state**, which a reviewer has no reason to doubt: CI reports
       green because it correctly validated the older head, and the session's
       own recollection agrees with the reply.
+      It answers whether the **branch** moved, and nothing about whether the
+      **PR** is still open --- a closed PR keeps accepting pushes and stops
+      tracking its branch, so both SHAs agree while the PR's own head stays
+      frozen.
+      Read the PR's `state` as a second check, per
+      [`use-existing-pr-branch`](use-existing-pr-branch.md), rather than letting
+      this item stand for both.
 
 **Review a round's fixes as one diff, not as N independent fixes: two of them,
 each correctly addressing its own finding, can compose into a defect neither
@@ -669,6 +709,55 @@ answer.**
   strength of one clean run.
 - **Don't:** carry such a claim into an issue or a decision doc, where it
   argues against the very fix that produced the silence.
+
+**The mirror runs the other way, and it is the one that discards a good fix: a
+symptom that KEEPS reproducing after a fix landed is not evidence the fix
+failed.**
+
+The bullet above governs a symptom that vanished, where the attractive wrong
+answer is nondeterminism.
+Here the symptom is still there, and the attractive wrong answer is that the
+diagnosis was wrong --- which sends you back to re-litigate a fix that is
+working, and leaves the real remaining cause unread.
+
+The mechanism is ordinary and worth naming, because it makes the persistence
+expected rather than surprising.
+A failure can have causes in series, and only the first one is observable while
+it stands.
+Removing it does not change the outcome; it changes which cause produces the
+outcome.
+So the job's colour is the same before and after, and the outcome is the one
+thing everybody checks.
+
+**The discriminator is the error, not the outcome.**
+Both runs failed, so comparing conclusions establishes nothing.
+Comparing the error text is decidable in one read, and a changed error means
+the first cause is gone and a second was behind it.
+Where the fix is upstream, pin the comparison to the dependency version each
+run actually resolved, since a run predating the fix is not evidence about it
+--- [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)'s "mirror
+direction" section owns that lookup.
+
+Note the asymmetry that makes this worth a rule.
+Reading the new error costs one glance and usually names its own remedy.
+Re-litigating the first fix costs a round, and it argues for reverting
+something correct --- the same shape the bullet above warns about, where a
+claim ends up arguing against the fix that produced the change.
+
+- **Do:** diff the error text across the fix, not the pass/fail outcome, before
+  concluding anything about whether the fix worked.
+- **Do:** resolve which dependency version each run used, when the fix landed
+  upstream, so a pre-fix run is not read as evidence against it.
+- **Do:** report a changed error as a second cause found, and file it, rather
+  than as the first fix having failed.
+- **Don't:** re-open a landed fix because the symptom persists --- that is a
+  claim about the outcome, and the outcome is what a serial second cause
+  preserves.
+- **Don't:** read the earlier bullet as covering this; it fires on a symptom
+  that stopped, and this one fires on a symptom that did not.
+
+See [`ardi.cases.md`](ardi.cases.md),
+"A trust-gate fix that revealed a tool-name mismatch behind it".
 
 **Verify a command, path, or flag *you* write into a doc, with the same rigor
 [`address-every-comment`](address-every-comment.md) demands for one a reviewer

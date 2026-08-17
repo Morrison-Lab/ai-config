@@ -324,6 +324,20 @@
             "timeout": 10,
             "script": "no-unreviewed-pr.py",
             "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down. A reviewer request is per-HEAD, so a push re-arms the obligation: without that the guard is armed once and permanently discharged by the first request, and every later round carries a review of a commit that is no longer the PR's head (ai-config#1282). A REDACTION PR is exempt, because there the reviewer's input IS the secret -- the removed side of every hunk carries it (ucdavis/bcs#610) -- so the exemption is asserted by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` prefix rather than paid for by leaking (ai-config#1392)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmeasured-clock-claim.py\"",
+            "timeout": 10,
+            "script": "no-unmeasured-clock-claim.py",
+            "why": "CLAUDE.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-placeholder-reply.py\"",
+            "timeout": 10,
+            "script": "no-placeholder-reply.py",
+            "why": "CLAUDE.md 'Always produce a reply --- never end a turn silently' -- blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement). The rule names the exact string in a Do/Don't pair and the lapse still recurred three times in one session (ai-config#1579), each time on resuming after a context-window summary, which reads like a report and so makes the work it describes feel already reported. Anchored on the WHOLE message rather than a substring, because this corpus quotes the banned string constantly; and a claim about the WORK (`Nothing to report.`, `No change.`) is deliberately not matched, since a no-change tick is behaviour the same section requires."
           }
         ]
       }

@@ -1,6 +1,9 @@
 Proactively tell me --- don't wait to be asked --- when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP, a research pass) just checkpointed or fully wrapped, a PR merged with no other in-flight work riding on this conversation, or an open question just got answered with nothing left pending.
 Use the `⚠️ FLAG` tag from `CLAUDE.md`'s chat-output-tagging convention, one line, at the natural end of that turn's recap --- don't interrupt mid-task to say it.
 
+**Always state whether or not the session is at a clean stopping point.** Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration stating whether or not the session is at a clean stopping point (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached. (User correction, 2026-08-17.)
+
+
 Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, **any PR this session opened or pushed to that has not yet merged or closed**, an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) --- anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
 If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per [`run-ums-proactively`](run-ums-proactively.md)'s "Recommending that the session end is itself a UMS trigger" section.

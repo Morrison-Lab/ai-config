@@ -86,6 +86,64 @@ items under every heading, whatever that heading is called ---
 than a pass, and a reviewer files findings under exactly those words in the
 section that contradicts its own verdict line.
 
+**Final approval comes from Claude where Claude is reachable.**
+Another agent's clean verdict clears CI's review gate; it does not clear
+criterion 2 on its own.
+
+This is a directive rather than a derivation, so treat it as a standing
+preference and not as a claim about any agent's general competence.
+What it settles is which verdict a PR is reported **ready** on.
+
+The reason it needs stating is that the two are indistinguishable from the PR
+page.
+Every agent posts the same shape --- a summary, some analysis, a positive
+closing line --- so a findings-free report reads as approval whichever agent
+produced it, and the review-gate check goes green either way.
+
+Two failure modes make the preference concrete, and both have recurred:
+
+- **A clean verdict over tooling that errored.**
+  A report can open by saying its own grep failed and then approve on the
+  strength of the analysis that grep was supposed to support.
+  The error line sits above the verdict, so it reads as a caveat rather than as
+  the verdict's foundation collapsing.
+- **A clean verdict at a head another agent finds a real defect in.**
+  Not a difference of opinion about a nit --- a checkable factual error, at the
+  same commit, that the clean verdict passed over.
+
+So when Claude is reachable, its verdict is the one to report on:
+
+- **Do:** dispatch a Claude review and wait for its verdict before reporting a
+  PR ready, whatever another agent has already said.
+- **Do:** name which agent produced the verdict you are reporting, so "clean"
+  is attributable rather than anonymous.
+- **Do:** treat another agent's findings as real findings --- this ranks whose
+  *approval* is final, not whose objections count.
+- **Don't:** report a PR ready on a non-Claude clean verdict while Claude is
+  reachable, however thorough that report reads.
+- **Don't:** read a green review-gate check as settling this; the gate does not
+  know which agent answered, and on a selector-based setup the agent is chosen
+  at random.
+
+This is a different question from how much two reviewers **agreeing** is worth,
+which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
+settles: there, same-vendor agreement measures a shared blind spot, and a
+cross-vendor split is a prompt to check the item yourself.
+That section weighs corroboration; this one names whose approval is terminal.
+They compose --- a cross-vendor reviewer is still worth chasing, and its clean
+verdict still is not the one a PR is reported ready on while Claude is
+reachable.
+
+Where Claude is genuinely unreachable --- quota-skipped, a stub with no stated
+verdict, or not configured --- fall back per
+[`self-review-fallback`](self-review-fallback.md), which already governs that
+case.
+Another agent's clean verdict is worth more than nothing there, and it is still
+not Claude's; say which one you have.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"Two agents, one head, opposite verdicts".
+
 **Both criteria are per-PR, and a stack is where that stops being automatic.**
 
 - **Do:** derive a verdict per PR number, and name the PR beside each one.
@@ -221,6 +279,119 @@ NOT clean over a clean verdict.**
   against a review whose prose merely discusses finding vocabulary.
 - **Don't:** treat a `contains findings (matched pattern ...)` line as a real
   finding without reading the verdict body it matched.
+
+**Calling the checker is not consuming it: grepping its PROSE instead of
+reading its EXIT STATUS re-opens the whole failure one layer up.**
+
+The rule above and `no-handrolled-verdict-parse.py` both govern *bypassing* the
+instrument.
+This is the case where you run it, correctly, on the right PR --- and then
+decide what it said by matching a string in its output.
+
+`check-pr-fully-clean.py` answers twice.
+It prints findings for a human, and it exits 0 for clean and non-zero
+otherwise.
+Only the second is a stable interface.
+The prose is free to gain a line, split across two lines, or word a finding
+differently, and every one of those silently changes what a `grep` decides.
+
+Two properties make this worse than an ordinary parsing slip.
+
+**It fails toward clean.**
+The natural spelling is a positive test for the bad state ---
+`if output matches "NOT fully clean" then not-clean, else clean` --- so *any*
+failure of the match, including the check erroring or printing its header
+separately, lands in the `else` branch and reports clean.
+A missed match and a genuinely clean PR are the same observable, which is
+[`fail-fast`](../principles/fail-fast.md)'s pass-path-equals-failure-path shape
+arriving through a tool built to prevent exactly this.
+
+**It launders.**
+The report reads as the instrument's verdict rather than as your reading of it,
+so "the checker says clean" is what reaches the human --- and nothing in that
+sentence exposes that a `grep` stood between the two.
+
+**The status is three-valued, and collapsing it to a boolean is the same
+mistake one layer further in.**
+`check-pr-fully-clean.py` exits **0** clean, **1** not clean, and **2** for a
+usage or environment error.
+That third code is deliberate --- its own source says `USAGE_EXIT = 2` exists
+so "a usage or environment error would have been read as a verdict about the
+PR" --- so `if ! checker; then not_clean` throws away the distinction the
+script went out of its way to provide.
+
+The cost is a **false regression**: a transient `gh` failure, a rate limit, a
+network blip in a polling loop, all report a PR as having gone not-clean.
+That is the mirror of the grep bug above, which failed toward clean; this one
+fails toward alarm, and both are a two-branch reading of a three-branch answer.
+
+This is the rule
+[`errexit-is-not-uniform`](../coding/errexit-is-not-uniform.md) states as 0, 1,
+and anything else being three answers and not two --- itself a paraphrase of
+[`fail-fast`](../principles/fail-fast.md)'s hand-check guidance to treat 0 as
+found, 1 as clean, and anything else as the check having failed to run.
+It applies to a purpose-built checker exactly as it does to `grep`.
+
+**But `2` does not cover every non-verdict, so the three-way read is necessary
+and still not sufficient.**
+`USAGE_EXIT = 2` is raised by `die()`, on the paths the script anticipated.
+An **unhandled exception** exits **1** --- the code reserved for "not clean" ---
+so a crash is indistinguishable from a verdict by status alone.
+Measured: run from a checkout of the wrong repo, the script raises
+`RuntimeError: Command failed (gh pr view ...)` and exits 1.
+
+That is why the status read has to be paired with a look at the output rather
+than replacing it.
+A genuine not-clean prints `  - ` finding bullets; a crash prints a traceback.
+One `grep -q '^  - '` separates them, and unlike the phrase search above it is
+keyed on the report's *structure* rather than on its wording.
+
+**The wrong-repo case is the one to expect**, because the script resolves the
+repo from the **current working directory** unless `-R/--repo` is passed.
+A background poller inherits the session's cwd, which on a multi-repo session
+is routinely not the repo the PR lives in --- so the same command answers
+correctly by hand and crashes in the loop.
+Pass `-R OWNER/REPO` explicitly in anything that is not a one-off typed inside
+that checkout.
+
+So read the status, and read all three of it:
+
+```bash
+python3 scripts/check-pr-fully-clean.py "$n" -R "$OWNER/$REPO" >/tmp/fc.txt 2>&1
+rc=$?
+case $rc in
+  0) echo "#$n CLEAN" ;;
+  1) if grep -q '^  - ' /tmp/fc.txt; then
+       echo "#$n NOT clean"; cat /tmp/fc.txt
+     else
+       echo "#$n CHECK CRASHED (rc=1, no finding bullets) -- not a verdict"
+       tail -3 /tmp/fc.txt
+     fi ;;
+  *) echo "#$n CHECK FAILED (rc=$rc) -- not a verdict"; cat /tmp/fc.txt ;;
+esac
+```
+
+- **Do:** branch on the checker's exit status, treating 0 as clean, 1 as a
+  verdict of not-clean, and anything else as the check having failed to answer.
+- **Do:** re-verify the agent and the head yourself before reporting ready,
+  since the exit status is necessary and this file's own SHA-surface caveats
+  still apply.
+- **Don't:** grep a purpose-built checker's output for a phrase --- its prose
+  is a human-facing report, not an API.
+- **Do:** pass `-R OWNER/REPO` from any poller or script, since the repo comes
+  from the working directory otherwise and a background loop inherits whatever
+  cwd the session happened to be in.
+- **Don't:** collapse the status to a boolean either; `rc != 0` reports a
+  broken check as a regressed PR, which is the same conflation wearing the
+  remedy's clothes.
+- **Don't:** read `1` as a verdict without checking the output has finding
+  bullets --- an unhandled exception exits 1 too, so `2` is not the only
+  non-verdict code.
+- **Don't:** read "I called the right instrument" as having consumed it; the
+  bypass guard fires on the call, and nothing fires on the misreading.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"Three PRs reported clean by grepping the checker's own output".
 
 **A verdict comment quotes verdict phrases, so a phrase search identifies
 nothing --- and it misreads in both directions at once.**

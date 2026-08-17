@@ -87,10 +87,11 @@
 - **ALWAYS run UMS IMMEDIATELY upon any user correction, incorrect claim, or missed item.**
   The moment the user corrects your behavior, or you realize you made an incorrect claim or missed something, run UMS right then --- do not wait for the task to finish, a wrap-up prompt, or permission --- on a dedicated branch per the two bullets above.
   This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section (a corrected understanding and a false claim about state both fire immediately); see that section for the full rationale and case records. (User directive / CAI, 2026-08-05).
-- When creating a GitHub PR, request reviewer `d-morrison` (see request-pr-review skill).
-  The one exception is `Lacaedemon/sparta`, which never requests him, on PR
-  creation or on deadlock escalation alike.
-  Every other repo is unchanged, `Morrison-Lab/ai-config` included.
+- When opening a GitHub PR, trigger AI review (`@claude review` / `@agy review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
+  The one exception is `Lacaedemon/sparta`, which never requests human review, on AI review approval or on deadlock escalation alike.
+- **In `ai-config` (and any repo where reviews don't auto-trigger on PR creation), ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`) when done pushing code for the round.**
+  `ai-config` never auto-reviews on PR creation or push (see `memories/claude-bot-workflows.md`).
+  Do not wait to be asked "did you request claude review?", and never post a self-generated review summary comment to satisfy `check-pr-fully-clean.py` instead of running an authentic `@claude` review. (User correction, 2026-08-16.)
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --
   create, push, and open the feature PR first. The PR must expose the exact SHA
@@ -119,9 +120,11 @@
   Provenance of the Do/Don't pair: the standing directive and the "do [issue]" correction both came from the user, verbatim, on 2026-08-03.
   The reversible-vs-irreversible framing and the report-in-past-tense phrasing I generalized from those two corrections, consistent with the irreversible-or-high-stakes carve-outs already on the bullets below.
   (Standing directive from the user, verbatim, 2026-08-03: "if you are unsure whether I want you to do something or not, default to doing it; I will tell you the exceptions to that rule (like merging without mwc active)."
-- Always create a feature branch, push, open a PR, and request reviewer `d-morrison` automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
+- Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
-  After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, request `d-morrison` as reviewer, and report the PR link in the past tense immediately.
+  After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.
+- **Always State Clean Stopping Point When Stopping Work**: Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration stating whether or not the session is at a clean stopping point (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached. (User corrections / directives, 2026-08-17.)
+- **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
 - Keep PRs focused on a single concern:
   never mix CI/workflow infrastructure changes (`.github/workflows/`)
   with heavy simulation/validation dataset artifacts (e.g. `inst/extdata/*.rds`, `*.parquet`, `*.RData`)
@@ -132,14 +135,17 @@
 - Always ARDI an open PR/MR to a clean review verdict --- don't ask "want me to ARDI it?" first, just drive it to clean. An ARDI loop is NOT finished when you push fixes for a finding-bearing review or post an ARD summary -- it is only finished when a fresh, clean review evaluating that latest pushed commit arrives and confirms zero findings. (Still don't merge unless asked; "always ardi" means always drive to clean, not always merge.)
 - "Fully clean" (the ARDI/iterate terminal state) means BOTH: (1) all CI workflows AND check runs have finished with a passing outcome (success or skipped) --- across every workflow and every individual check run, not just required checks, not just the review job; includes non-gating checks like Coverage/codecov; never merge while any workflow or check run is still queued or in progress, AND (2) the latest review is totally clean --- no nits, evaluating the current HEAD SHA on the branch, and every item not directly Addressed is either Deferred to a tracked issue or Rebutted with a rebuttal that actually CONVINCED the reviewer (they didn't re-raise it).
   A rebuttal the reviewer still disputes does NOT count as clean.
+  **`mergeable_state: clean` is NOT Fully Clean**: GitHub API's `mergeable_state: clean` / `mergeStateStatus: CLEAN` indicates ONLY that git merge will succeed without merge conflicts. It does NOT mean CI has passed or that an AI/human review has approved the PR. NEVER merge a PR based on `mergeable_state: clean` without verifying both (1) all CI check runs are green, AND (2) an authentic clean review verdict evaluating the HEAD SHA has been received (triggering `@claude review` / `claude-code-review.yml` first in repos like `ai-config` where reviews do not auto-dispatch). (User correction, 2026-08-17.)
   Two gotchas when checking CI state: the field names/casing for these states vary by API surface (REST's lowercase `status`/`conclusion` vs `gh pr checks`'s uppercase `state`) --- don't hard-code one casing when scripting a check; and a workflow run blocked on `action_required` before any job starts can complete with zero check runs, invisible to a check-runs-only poll (`gh pr checks`, `get_check_runs`) --- and, verified directly against a real run, GitHub records NEITHER a matching commit/branch NOR a populated PR-linkage field for comment/dispatch-triggered runs, so no single `gh run list` filter reliably narrows to "runs for this PR" --- treat any such cross-check as best-effort, not exhaustive.
   See `shared/workflow/fully-clean.md` for the full detail.
   At fully-clean, every INLINE review thread is resolved, and the only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply to it).
-- If you and the reviewer(s) can't reach consensus on an item (rebuttal exchanged, neither side budging), escalate to a HUMAN reviewer for the final decision --- request `d-morrison` via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer d-morrison`) and `@`-mention them with the impasse.
+- If you and the reviewer(s) can't reach consensus on an item (rebuttal exchanged, neither side budging), escalate to a HUMAN reviewer for the final decision --- request human review via the `request-pr-review` skill (or `gh pr edit <N> --add-reviewer <reviewer>`) and `@`-mention them with the impasse.
   Don't loop forever and don't unilaterally override.
 - After creating a PR in a remote/web session (where PR-activity subscription is available), always subscribe to its CI/review activity (`subscribe_pr_activity`) and follow through --- autofix CI failures and address review comments per the ARD framework --- without asking first.
   Keep following until the PR is merged or closed (or I say stop).
   Don't ask "want me to watch it?"; just do it.
+- **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn while background CI, `@claude review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn. Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer. (User correction, 2026-08-17.)
+
 - When there's a well-scoped next step --- a filed follow-up issue, a sequenced item, an obvious continuation of the current work --- just start it; don't pause to ask "want me to keep going?" first.
   The answer is a standing yes.
   This removes the extra "should I continue?" pause between already-scoped steps; it does NOT override holding for genuinely ambiguous or architecturally significant decisions.
@@ -522,6 +528,7 @@
 - Some skills are platform/global --- present in the Claude Code skill registry but with NO local `skills/<name>/` directory (e.g. `deep-research`).
   Cross-references to them are valid.
   Automated reviewers (Copilot, the `@claude` bot) may wrongly flag such a reference as a "non-existent skill"; check the available-skills list presented to the agent (the Claude Code skill registry) before treating a skill cross-ref as a broken link, then rebut the false positive. (ai-config#120 flagged it 4x.)
+- Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review` / `@agy review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
   On workflows with `concurrency: cancel-in-progress` (d-morrison/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
@@ -530,6 +537,7 @@
   `gh run list` reports `main` as the branch for every dispatched review.
   Always pass `--ref`: a dispatch without it runs against the default branch, so the run's check runs land on `main`'s tip rather than the PR head --- which leaves the PR's own review check stale and makes a check-runs query at that head a vacuous all-clear about whether a review is in flight.
   See [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy".
+- During ARDI loops: when waiting for long-running review workflows (`claude-review.yml`, `@claude` review, or CI checks), set a background timer (`schedule` tool with `DurationSeconds=180` or `300`) before ending the turn so you automatically wake up to check for review completion rather than sitting idle until the next user message.
 - During ARDI loops: always ANTICIPATE what the reviewer will flag next and fix those issues preemptively in the same commit.
   Don't wait for each round to surface issues one at a time --- read the code holistically, think about what patterns the reviewer has flagged in prior rounds (documentation gaps, coupling without cross-references, missing edge-case guards, inconsistent accounting), and fix analogous issues elsewhere in the same file before pushing.
   The goal is to minimize back-and-forth rounds.
@@ -671,7 +679,7 @@
   Search for the canonical/production URL. (Learned on lab-manual#360: the issue referenced `https://beta.p5js.org/...`; substituted with the GitHub source URL.)
 - UCD-SERG/lab-manual branch protection requires at least one human approving review.
   Bot reviews (automated `@claude` review) alone leave `mergeable_state: blocked`.
-  Request `d-morrison` as a reviewer once the bot gives a clean verdict. (Learned on lab-manual#360.)
+  Request a human reviewer once the bot gives a clean verdict. (Learned on lab-manual#360.)
 
 - When adding a new `@shared/workflow/*.md` (or `@shared/coding/*.md`, `@shared/writing/*.md`) include to `CLAUDE.md`, add the `<!-- Shared with the lab manual; edit shared/<dir>/<name>.md, not here. -->` comment on the line immediately before the `@shared/...` directive, matching every sibling include.
   Missing it was flagged as a review nit. (Learned on ai-config#297.)
@@ -690,7 +698,7 @@
   Treat "waiting on a background job" and "watching a subagent" as tracked to-do items in their own right, not just implicit background state. (Learned on sparta 2026-07-24.)
 
 - When a request matches "add/build/create a skill" (skill-builder's own trigger phrases), invoke the `skill-builder` skill via the Skill tool rather than freehand-implementing the scaffold-and-ship flow.
-  Skill-builder encodes steps that are easy to skip when done ad hoc: the extend-first check, running the four local validation scripts (`validate-skills.py`, `check-links.py`, `check-vendored-drift.py`, `markdownlint-cli2`) before pushing, registering any cited MCP tool in `tool-mappings.yml`, updating `skills.qmd`'s count from the actual `skills/` directory count (not a manual +1), cross-linking related skills, and explicitly requesting `d-morrison` as reviewer. (Learned on ai-config#338 --- the `prompt-me`/`pm` skill was built and shipped without invoking `skill-builder`, so none of those steps ran; CI happened to catch what the scripts would have.
+  Skill-builder encodes steps that are easy to skip when done ad hoc: the extend-first check, running the four local validation scripts (`validate-skills.py`, `check-links.py`, `check-vendored-drift.py`, `markdownlint-cli2`) before pushing, registering any cited MCP tool in `tool-mappings.yml`, updating `skills.qmd`'s count from the actual `skills/` directory count (not a manual +1), cross-linking related skills, and explicitly requesting a human reviewer after AI review passes. (Learned on ai-config#338 --- the `prompt-me`/`pm` skill was built and shipped without invoking `skill-builder`, so none of those steps ran; CI happened to catch what the scripts would have.
   Reinforced on ai-config#347 --- `resolve-pr-threads` was hand-authored and needed a review round to catch a `tool-mappings.yml` gap `skill-builder` already documented from a near-identical miss in `push-memory` #311.)
 - Claim a PR before pushing iterative commits to it, even when you opened the PR yourself in the same session --- this repo's `@claude` review workflow can fire and interleave with an in-flight push.
   Post the "paws off" comment from `claim-pr` right after opening the PR, not just for PRs you're joining mid-flight. (Missed on ai-config#338: several commits were pushed across an ARDI-style review loop with no claim comment posted.)

@@ -642,7 +642,8 @@ check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 # @shared/writing/reorganize-prose.md; 80 after
 # UCD-SERG/serocalculator#661 added
 # @shared/workflow/read-canonical-doc-before-starting.md; 60 after converting
-# 20 heavy @shared fragments to on-demand markdown links.)
+# 20 heavy @shared fragments to on-demand markdown links; 8 after consolidating
+# overhead context across AI models.)
 #
 # The pin is deliberately a magic number rather than a value derived from
 # CLAUDE.md. Deriving it would make the guard vacuous, since it would then
@@ -651,12 +652,12 @@ check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 # so the assertion name below carries that remedy: `check` prints only the
 # name, and this is the failure an import-list edit actually produces.
 check(
-    "this repo's CLAUDE.md still yields 60 anchored imports "
+    "this repo's CLAUDE.md still yields 8 anchored imports "
     "(adding or removing an @-import bumps this pin -- update the count and "
     "record the bump in the annotation style of the comment above)",
     len(ccc.import_paths(
         (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    )[0]) == 60,
+    )[0]) == 8,
 )
 
 # --- round-6 review findings ------------------------------------------------

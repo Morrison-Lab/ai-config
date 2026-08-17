@@ -437,7 +437,7 @@ The `claim-pr` skill operationalizes this (the exact claim wording, when it appl
 
 ## Read a repo's canonical contributor doc before starting work, not just before pushing
 
-@shared/workflow/read-canonical-doc-before-starting.md
+[shared/workflow/read-canonical-doc-before-starting.md](shared/workflow/read-canonical-doc-before-starting.md)
 
 When a short `CLAUDE.md` names a fuller document as the actual authority
 --- `.github/copilot-instructions.md`, `CONTRIBUTING.md`, a linked style
@@ -473,7 +473,7 @@ That registry is the single source of truth for the gh/glab-to-MCP mapping in th
 
 ## Install and use MCP servers proactively
 
-@shared/workflow/use-mcp-servers.md
+[shared/workflow/use-mcp-servers.md](shared/workflow/use-mcp-servers.md)
 
 The section above is about substituting an MCP tool for a CLI command when the CLI is missing.
 This one is the other direction: when a server would help, install and register it rather than waiting to be asked --- including locally, where `tool-mappings.md`'s per-model table describes the default rather than a limit.
@@ -492,7 +492,7 @@ Read the fragment's boundary with `dont-incur-technical-debt` before invoking it
 
 ## Issue or discussion? Pick the venue by best practice, not by precedent
 
-@shared/workflow/choose-issue-or-discussion.md
+[shared/workflow/choose-issue-or-discussion.md](shared/workflow/choose-issue-or-discussion.md)
 
 The companion to issue-first above: that rule settles *whether* something is tracked before work starts, this one settles *where* it lands.
 Actionable work is an issue.
@@ -501,7 +501,7 @@ Its second half is the general principle: best practice outranks repo precedent 
 
 ## If you see something, say something — file an issue for every noticed mistake
 
-@shared/workflow/report-mistakes-proactively.md
+[shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)
 
 The proactive counterpart to issue-first above: when a mistake shows up in any medium — code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else — even out of scope for the current task, flag it in chat (`⚠️ FLAG`) and file a tracking issue immediately, in a repo we administrate.
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.
@@ -509,7 +509,7 @@ The `defer-issue` skill covers the user-initiated version of this; this rule is 
 
 ## Say when a practice is slipping, not only when an artifact is wrong
 
-@shared/workflow/flag-practice-slippage.md
+[shared/workflow/flag-practice-slippage.md](shared/workflow/flag-practice-slippage.md)
 
 The counterpart to the rule above, for *practice* rather than for artifacts: that one governs a mistake in a thing and its deliverable is a filed issue, this one governs how the work is being done and its deliverable is one sentence at the moment it is actionable.
 The outward direction is already covered by the review fragments and needs no restatement.
@@ -518,7 +518,7 @@ Name the specific practice and gap, cite the rule or label the opinion as an opi
 
 ## Learn from every reviewer finding you accept, not only from your own admissions
 
-@shared/workflow/learn-from-review-findings.md
+[shared/workflow/learn-from-review-findings.md](shared/workflow/learn-from-review-findings.md)
 
 The external-correction counterpart to the UMS triggers at the top of this file: those fire on a first-person admission ("I was wrong"), which is why `hooks/remind-ums-after-error.py` deliberately excludes correcting someone else.
 Agreeing with a reviewer is the commoner case and the one that machinery misses --- you admit nothing, you accept a finding --- so an accepted finding is a first-push miss to record and, where a decidable condition exists, to algorithmatize, per the goal that every PR gets a clean review on the first push.
@@ -526,7 +526,7 @@ Agreeing with a reviewer is the commoner case and the one that machinery misses 
 
 ## Tracking issues in upstream repos
 
-@shared/workflow/upstream-issues.md
+[shared/workflow/upstream-issues.md](shared/workflow/upstream-issues.md)
 
 The `sup` / `send-upstream` skill operationalizes steps 1--2 (the PR path, including fork-if-needed, and the issue path) and the link-back.
 Step 3 (own-repo fallback) is not covered by `sup`; use `gh issue create` in the current repo and ask the user to transfer it.
@@ -578,7 +578,7 @@ Stop watching only when the PR merges or closes, or I tell you to back off.
 
 ## Babysit PRs efficiently — batch pushes, trust CI's own reports, skip redundant lookups
 
-@shared/workflow/efficient-pr-babysitting.md
+[shared/workflow/efficient-pr-babysitting.md](shared/workflow/efficient-pr-babysitting.md)
 
 A long babysitting session accumulates avoidable tool calls and CI runs otherwise:
 trickled single-item pushes each re-trigger CI and race each other's reviews,
@@ -644,18 +644,18 @@ The key points, restated here because a bare pointer is invisible to a consumer 
 ## Move referenced assets along with content that migrates or gets removed
 
 <!-- Not yet shared with the lab manual; edit shared/workflow/migrate-referenced-assets.md, not here. -->
-@shared/workflow/migrate-referenced-assets.md
+[shared/workflow/migrate-referenced-assets.md](shared/workflow/migrate-referenced-assets.md)
 
 ## Prioritize internal infrastructure work slightly over feature work
 
-@shared/workflow/pr-prioritization.md
+[shared/workflow/pr-prioritization.md](shared/workflow/pr-prioritization.md)
 
 A tie-breaker for `ardia`'s PR-ordering step and `gi`'s (and `gii`/`gip`'s) issue-priority table when candidates are otherwise close in priority.
 The fragment also sets the default direction for the age factor: among several open PRs, take the **older** one first unless you have more specific instructions.
 
 ## Use subagents when helpful --- and delegate rather than queue
 
-@shared/workflow/use-subagents.md
+[shared/workflow/use-subagents.md](shared/workflow/use-subagents.md)
 
 Nothing parallelizable should ever sit "queued" --- writing "queued", "next up", "I owe you X", or "still need to" into a status recap is the trigger to launch a subagent on it right then, not a way to describe the plan.
 Sidecar delegation (independent investigation, verification, a disjoint slice, an owed UMS pass, a routed `cai`) is pre-authorized and never worth asking about; keep only the blocking critical-path edit local.
@@ -703,7 +703,7 @@ It is more dangerous than ordinary drift because the incident supplies an appare
 If you cannot point at the message where a decision was reversed, it was not reversed.
 It lapsed.
 
-@shared/workflow/incidents-dont-repeal-decisions.md
+[shared/workflow/incidents-dont-repeal-decisions.md](shared/workflow/incidents-dont-repeal-decisions.md)
 
 ## Non-destructive repo and memory actions
 
@@ -737,7 +737,7 @@ Agent teams are experimental and off by default (`CLAUDE_CODE_EXPERIMENTAL_AGENT
 So a recommendation to the user is the only correct output; a skill or `Workflow` step that forms a team is a bug.
 The one concrete reuse angle: a `.claude/agents/<name>.md` subagent definition doubles as a teammate role (its `tools` and `model` apply, and its body is appended to the teammate's prompt), but its `skills`/`mcpServers` frontmatter is not applied to a teammate.
 
-@shared/workflow/agent-teams.md
+[shared/workflow/agent-teams.md](shared/workflow/agent-teams.md)
 
 ## Algorithmatize checks: instruments over LLM reasoning
 
@@ -774,7 +774,7 @@ an eyeballed validation is the same shape as a hand-composed status line.
 Design and genuine judgment remain, but as the residue not yet automated
 rather than a fixed reserve.
 
-@shared/principles/deterministic-tools.md
+[shared/principles/deterministic-tools.md](shared/principles/deterministic-tools.md)
 
 ## Checklists: Do-Confirm, Read-Do, pause points, killer items
 
@@ -845,7 +845,7 @@ the unexamined default, not the act of choosing.
 Composes with "Present decisions one at a time" above, which governs how many
 questions to ask rather than how one question's options relate.
 
-@shared/workflow/avoid-false-dichotomies.md
+[shared/workflow/avoid-false-dichotomies.md](shared/workflow/avoid-false-dichotomies.md)
 
 ## Metacognition: monitor claims by type, and distrust the fluent ones
 
@@ -894,14 +894,14 @@ only detector.
 
 ## Check for merge conflicts on every merge in an ultracode session
 
-@shared/workflow/ultracode-merge-conflicts.md
+[shared/workflow/ultracode-merge-conflicts.md](shared/workflow/ultracode-merge-conflicts.md)
 
 ## Big-picture principles: KISS, DRY, DRW, modularity, and friends
 
 Our big-picture principles are cataloged centrally in `shared/principles/` -- the overall dev goals they serve (code and prose that is valid and easy to externally validate, reproducible, highly functional, reliable, secure, efficient, maintainable, extensible, human- and AI-readable, and reusable), each principle's statement (KISS, YAGNI, DRY, DRW, don't incur technical debt, modularity, least astonishment, purity, self-documenting code, fail fast, algorithmatize checks -- plus the reduce/reuse/recycle lens over them), the specific rules and skills that operationalize each, and how the principles relate and trade off.
 When encoding a new coding/review rule, file it under the principle it serves (and add a new principle to the catalog when one emerges) rather than leaving either the rule or the principle floating free.
 
-@shared/principles/README.md
+[shared/principles/README.md](shared/principles/README.md)
 
 ## Don't reinvent the wheel (DRW) — in dev and in review
 
@@ -909,7 +909,7 @@ Before implementing a new function or feature, check that it hasn't already been
 Prefer forking and/or contributing to an existing external source over re-building the functionality from scratch.
 Apply this in review too: a hand-rolled equivalent of functionality that already exists is a review finding, the same weight as any other standing review check.
 
-@shared/principles/dont-reinvent-wheel.md
+[shared/principles/dont-reinvent-wheel.md](shared/principles/dont-reinvent-wheel.md)
 
 The `prefer-upstream` skill runs the search; the `prefer-packaged-functions` fragment below is the R-function special case; the `scout-peers` skill gates borrowed code by license.
 
@@ -921,7 +921,7 @@ A filed tracking issue records the debt rather than paying it, and it makes the 
 The rule bounds **new** work only: adding a copy to un-migrated code is yours to fix now, the un-migrated code itself is not -- the line is authorship, not adjacency.
 Apply this in review too: a diff that adds a second copy of logic the repo already has is a review finding, and a PR that links a follow-up issue for a defect inside its own diff is a stronger one.
 
-@shared/principles/dont-incur-technical-debt.md
+[shared/principles/dont-incur-technical-debt.md](shared/principles/dont-incur-technical-debt.md)
 
 The fragment also covers the case where duplicated logic corrupts its own tests -- a test that reimplements the unit under test validates the copy, not the code -- and why this does not conflict with YAGNI.
 
@@ -948,49 +948,49 @@ directly rather than treating the enumerated rules as exhaustive.
 ## Coding: use the least-flexible construct that does the job
 
 <!-- Not yet shared with the lab manual; edit shared/coding/least-flexible-tool.md, not here. -->
-@shared/coding/least-flexible-tool.md
+[shared/coding/least-flexible-tool.md](shared/coding/least-flexible-tool.md)
 
 ## Coding style: avoid nesting; follow the lab manual
 
 Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
 
 <!-- Shared with the lab manual; edit shared/coding/avoid-nesting.md, not here. -->
-@shared/coding/avoid-nesting.md
+[shared/coding/avoid-nesting.md](shared/coding/avoid-nesting.md)
 
 ## Coding: single-indent multi-line function signatures
 
 <!-- Not yet shared with the lab manual; edit shared/coding/function-signature-style.md, not here. -->
-@shared/coding/function-signature-style.md
+[shared/coding/function-signature-style.md](shared/coding/function-signature-style.md)
 
 ## Coding: prefer existing packaged functions over rolling your own
 
 <!-- Shared with the lab manual; edit shared/coding/prefer-packaged-functions.md, not here. -->
-@shared/coding/prefer-packaged-functions.md
+[shared/coding/prefer-packaged-functions.md](shared/coding/prefer-packaged-functions.md)
 
 ## Coding: memoise pure, expensive, repeatedly-called functions
 
 <!-- Not yet shared with the lab manual; edit shared/coding/use-memoisation.md, not here. -->
-@shared/coding/use-memoisation.md
+[shared/coding/use-memoisation.md](shared/coding/use-memoisation.md)
 
 ## Coding: prefer per-operation grouping over persistent grouping (dplyr)
 
 <!-- Shared with the lab manual; edit shared/coding/per-operation-grouping.md, not here. -->
-@shared/coding/per-operation-grouping.md
+[shared/coding/per-operation-grouping.md](shared/coding/per-operation-grouping.md)
 
 ## Coding: prefer type-stable calls; never `sapply()` outside the console
 
 <!-- Not yet shared with the lab manual; edit shared/coding/type-stable-outputs.md, not here. -->
-@shared/coding/type-stable-outputs.md
+[shared/coding/type-stable-outputs.md](shared/coding/type-stable-outputs.md)
 
 ## Coding: preallocate, `seq_along()`, and `[[i]]` in for loops
 
 <!-- Not yet shared with the lab manual; edit shared/coding/loop-hygiene.md, not here. -->
-@shared/coding/loop-hygiene.md
+[shared/coding/loop-hygiene.md](shared/coding/loop-hygiene.md)
 
 ## Coding: restore global state your function changes
 
 <!-- Not yet shared with the lab manual; edit shared/coding/restore-global-state.md, not here. -->
-@shared/coding/restore-global-state.md
+[shared/coding/restore-global-state.md](shared/coding/restore-global-state.md)
 
 ## Coding: `set -e` is not uniform; tolerate expected non-zero exits explicitly
 
@@ -1000,17 +1000,17 @@ Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding a
 ## Coding: avoid hard-coding data with an external source of truth
 
 <!-- Shared with the lab manual; edit shared/coding/avoid-hardcoding-external-data.md, not here. -->
-@shared/coding/avoid-hardcoding-external-data.md
+[shared/coding/avoid-hardcoding-external-data.md](shared/coding/avoid-hardcoding-external-data.md)
 
 ## Coding: make every parameter configurable
 
 <!-- Not yet shared with the lab manual; edit shared/coding/configurable-parameters.md, not here. -->
-@shared/coding/configurable-parameters.md
+[shared/coding/configurable-parameters.md](shared/coding/configurable-parameters.md)
 
 ## Coding: write tidy code; prefer tidyverse over base R/rlang for it
 
 <!-- Not yet shared with the lab manual; edit shared/coding/tidy-code.md, not here. -->
-@shared/coding/tidy-code.md
+[shared/coding/tidy-code.md](shared/coding/tidy-code.md)
 
 Apply this both when writing code and when reviewing it — flag base R or
 `{rlang}` verbosity in review the same way `per-operation-grouping` flags a
@@ -1019,12 +1019,12 @@ persistent `group_by()` that `.by` would replace.
 ## Coding: reuse function documentation and argument lists
 
 <!-- Not yet shared with the lab manual; edit shared/coding/reuse-docs-and-args.md, not here. -->
-@shared/coding/reuse-docs-and-args.md
+[shared/coding/reuse-docs-and-args.md](shared/coding/reuse-docs-and-args.md)
 
 ## Coding: one function per file
 
 <!-- Not yet shared with the lab manual; edit shared/coding/one-function-per-file.md, not here. -->
-@shared/coding/one-function-per-file.md
+[shared/coding/one-function-per-file.md](shared/coding/one-function-per-file.md)
 
 Apply this both when writing new code and when reviewing it — a new function
 added inline to an existing multi-function file is a review finding, the
@@ -1033,17 +1033,17 @@ same weight as the other modularity checks above.
 ## Coding: no em-dashes or non-ASCII punctuation in source files
 
 <!-- Not yet shared with the lab manual; edit shared/coding/ascii-punctuation-in-source.md, not here. -->
-@shared/coding/ascii-punctuation-in-source.md
+[shared/coding/ascii-punctuation-in-source.md](shared/coding/ascii-punctuation-in-source.md)
 
 ## Coding: decompose complex code into functions, not .qmd chunks
 
 <!-- Not yet shared with the lab manual; edit shared/coding/decompose-to-functions.md, not here. -->
-@shared/coding/decompose-to-functions.md
+[shared/coding/decompose-to-functions.md](shared/coding/decompose-to-functions.md)
 
 ## Writing style: plain, direct prose
 
 <!-- Shared with the lab manual; edit shared/writing/plain-prose.md, not here. -->
-@shared/writing/plain-prose.md
+[shared/writing/plain-prose.md](shared/writing/plain-prose.md)
 
 The `use-preferred-style` skill (alias `style`) spells out the procedure, the PSW chapter links, and a filler/jargon swap table; the `find-ai-tells` skill (alias `ai-tells`) is the scan-after detector counterpart.
 
@@ -1055,7 +1055,7 @@ A pronoun with no clear referent makes a reader pause and re-read, so the cost i
 A pronoun whose *wrong* referent sits closer reads perfectly well, so the reader takes away the wrong fact without ever being unsure.
 The remedy is to replace the pronoun with the noun, not to reword around it.
 
-@shared/writing/ambiguous-reference.md
+[shared/writing/ambiguous-reference.md](shared/writing/ambiguous-reference.md)
 
 This is distinct from [`challenge-ambiguous-terminology`](shared/workflow/challenge-ambiguous-terminology.md), which governs a word whose **meaning** is unresolved rather than a word whose **antecedent** is.
 Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the other prose-review rules in this file.
@@ -1096,13 +1096,13 @@ This keeps figures consistent with tables, which already use div syntax.
 
 ## Challenge ambiguous phrasing and terminology in review
 
-@shared/workflow/challenge-ambiguous-terminology.md
+[shared/workflow/challenge-ambiguous-terminology.md](shared/workflow/challenge-ambiguous-terminology.md)
 
 The `ard`/`ardi` skill family and `use-preferred-style`/`find-ai-tells` operationalize this in their respective review contexts.
 
 ## Challenge redundant content in review
 
-@shared/workflow/challenge-redundant-content.md
+[shared/workflow/challenge-redundant-content.md](shared/workflow/challenge-redundant-content.md)
 
 The `ard`/`ardi` skill family and `code-review` apply this in PR/MR review; `find-overlap` (and its `consolidate-skills`/`consolidate-memory` actors) is the corpus-wide counterpart when redundancy spans more than the current diff.
 
@@ -1121,7 +1121,7 @@ Fires wherever a search decides whether to author something new --- `skill-build
 The detector counterpart to the plain-prose guide above.
 
 <!-- Shared with the lab manual; edit shared/writing/ai-tells.md, not here. -->
-@shared/writing/ai-tells.md
+[shared/writing/ai-tells.md](shared/writing/ai-tells.md)
 
 The `find-ai-tells` skill (alias `ai-tells`) runs this same catalog on demand against any target text.
 
@@ -1144,7 +1144,7 @@ count).
 Attach the time the claim was true so a later reader knows to
 re-verify it.
 
-@shared/writing/timestamp-volatile-claims.md
+[shared/writing/timestamp-volatile-claims.md](shared/writing/timestamp-volatile-claims.md)
 
 ## Writing style: math --- include every step; keep each equation simple
 
@@ -1166,7 +1166,7 @@ math, apply this in addition to the fact-check above.
 
 ## Hyperlink technical terms and results; no forward references
 
-@shared/writing/definition-crossrefs.md
+[shared/writing/definition-crossrefs.md](shared/writing/definition-crossrefs.md)
 
 Applies wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongside the fact-check and ambiguous-terminology checks above.
 
@@ -1175,14 +1175,14 @@ Applies wherever `code-review`/`ard`/`ardi` already reviews a prose diff, alongs
 The section above covers formal Quarto crossref-div ordering for term/result definitions specifically.
 The same problem shows up more broadly as plain-text signposting — "as discussed below", "in the following section", "we'll cover this later" — pointing at content the reader hasn't reached yet, in any prose (not just documents with crossref divs).
 
-@shared/writing/forward-references.md
+[shared/writing/forward-references.md](shared/writing/forward-references.md)
 
 Unlike `definition-crossrefs.md` above, `forward-references.md` has a dedicated actionable skill: the `fix-forward-references` skill (alias `ffr`) detects these with a grep-for-directional-word heuristic and rearranges (or rewords) the prose to fix them.
 Run it — or apply its check inline — wherever `ard`/`ardi` reviews a prose diff, alongside the other prose-review rules in this file.
 
 ## Rearranging sections, paragraphs, and content across documents is part of editing prose
 
-@shared/writing/reorganize-prose.md
+[shared/writing/reorganize-prose.md](shared/writing/reorganize-prose.md)
 
 Moving a section, subsection, paragraph, or sentence --- within a document, or in a multi-document repo (a website, a book, a manuscript) across documents --- is in scope for a prose edit whenever it improves flow, fixes a forward reference, removes duplicate content, or reunites related content split across distant locations.
 A move is authorship, not a no-op: sweep for stale self-references and count-based back-references, bring the relocated lines into compliance with the line-level checks above, migrate any referenced assets, and prove nothing was lost or accidentally added with a bidirectional content comparison.
@@ -1192,7 +1192,7 @@ A move is authorship, not a no-op: sweep for stale self-references and count-bas
 `definition-crossrefs.md` above assumes a formal-definition div already exists and checks that mentions link to it in the right order.
 A distinct, easy-to-miss gap: a concept stated with full definitional precision --- a bolded name, an equation, an `\eqdef` --- that never became a formal div at all, so it has no stable id and nothing downstream can cite it (or the concept rides along inside a *different* definition's div instead of getting its own).
 
-@shared/writing/informal-definitions.md
+[shared/writing/informal-definitions.md](shared/writing/informal-definitions.md)
 
 Like `forward-references.md`, this has a dedicated actionable skill: `detect-informal-definitions`.
 Run it --- or apply its check inline --- wherever `ard`/`ardi` reviews a diff that introduces new technical content, alongside the other prose-review rules in this file.
@@ -1202,7 +1202,7 @@ Run it --- or apply its check inline --- wherever `ard`/`ardi` reviews a diff th
 A worked example can be a perfectly well-formed `{#exm-...}` div and still reach for invented, round-number quantities --- "suppose 20% of the exposed group..." --- when the document already loads a real dataset it uses elsewhere.
 That's a distinct gap from the informal-definitions check above: it isn't a missing div, it's a missed chance to ground the illustration in real data that was already available.
 
-@shared/writing/hypothetical-examples.md
+[shared/writing/hypothetical-examples.md](shared/writing/hypothetical-examples.md)
 
 This has a dedicated actionable skill: `detect-hypothetical-examples`.
 Run it --- or apply its check inline --- wherever `ard`/`ardi` reviews a diff that introduces or edits a worked example, alongside the other prose-review rules in this file.
@@ -1229,7 +1229,7 @@ so reasoning from its behaviour back to the real system feels like checking
 rather than guessing, and the resulting claim arrives dressed as a test
 result.
 
-@shared/workflow/fixtures-are-not-evidence.md
+[shared/workflow/fixtures-are-not-evidence.md](shared/workflow/fixtures-are-not-evidence.md)
 
 Distinct from `ardi`'s fixture bullets, which are about coverage (a fixture
 too thin to reach a branch) rather than about the inference drawn from one
@@ -1237,14 +1237,14 @@ that works fine.
 
 ## Challenge unnecessary complexity in review
 
-@shared/workflow/challenge-unnecessary-complexity.md
+[shared/workflow/challenge-unnecessary-complexity.md](shared/workflow/challenge-unnecessary-complexity.md)
 
 When running `code-review`, `ard`/`ardi`, or any prose review (`use-preferred-style`, `find-ai-tells`, `fact-check-prose`), apply this alongside the normal review — those skills don't name it internally, so this CLAUDE.md directive governs regardless. It's distinct from `simplify` (a dead-code-after-refactor sweep) and `tidy` (a separate on-demand audit).
 
 ## Useful prompt formats for coding agents
 
 <!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
-@shared/vendored/prompt-formats.md
+[shared/vendored/prompt-formats.md](shared/vendored/prompt-formats.md)
 
 ## Review with Copilot before requesting human review
 
@@ -1252,17 +1252,17 @@ This is shared lab guidance on getting an automated review before asking a human
 When *I* iterate a PR, the ARDI loop above is the mechanism — it already addresses whatever the `@claude` or Copilot reviewer flags — so read this as the lab-member-facing statement of the same principle, not a second loop to run.
 
 <!-- Vendored from d-morrison/wai; edit there, not here. See README, "Shared content". -->
-@shared/vendored/copilot-review-before-human.md
+[shared/vendored/copilot-review-before-human.md](shared/vendored/copilot-review-before-human.md)
 
 ## Growth mindset: seek resources rather than accept limitations
 
 <!-- Edit shared/workflow/growth-mindset.md, not here. -->
-@shared/workflow/growth-mindset.md
+[shared/workflow/growth-mindset.md](shared/workflow/growth-mindset.md)
 
 ## Research before asking a human
 
 <!-- Edit shared/workflow/research-before-asking.md, not here. -->
-@shared/workflow/research-before-asking.md
+[shared/workflow/research-before-asking.md](shared/workflow/research-before-asking.md)
 
 ## Encoding reusable feedback into ai-config
 

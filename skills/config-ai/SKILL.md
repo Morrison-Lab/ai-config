@@ -125,12 +125,10 @@ last two.
 1. **Can this session push to the target repo?** Check the session's GitHub
    scope (the "Repository Scope" list in a remote/web session's system
    prompt, or a `git remote -v` / `gh repo view <owner>/<repo>` probe
-   locally), and whether a push would actually be accepted -- a scoped
+   locally), and whether a push would actually be accepted — a scoped
    session may be able to push only its own harness-assigned branch (see
    `CLAUDE.md`'s "Use the existing PR branch" 403 exception).
-   - **Yes** → proceed normally: branch off `main` in the target repo, build
-     via the skill/convention chosen in Step 1, open a PR, request review,
-     `ardi` to clean. The common case; nothing extra needed from this skill.
+   - **Yes** → proceed normally: branch off `main` in the target repo (such as `Morrison-Lab/ai-config`), build via the skill/convention chosen in Step 1, commit, push to origin, open a PR immediately, request review, and `ardi` to clean. Never stop after modifying local files without pushing the PR.
 2. **No push access, but the session can still read the target repo and open
    issues on it** (GitHub MCP scope or `gh`/API access, just not write
    access to code) → don't lose the request. File one fully-specified issue

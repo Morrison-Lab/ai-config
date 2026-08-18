@@ -42,7 +42,7 @@ jobs:
     with:
       mode: ${{ inputs.mode || 'code-review' }}
       pr-number: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number || '' }}
-      model: ''
+      model: 'gemini-2.5-flash'
       trigger-policy: 'on-request'
     secrets:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

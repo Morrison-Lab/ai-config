@@ -9,8 +9,8 @@
   If state is MERGED, trigger post-merge instead of reporting CI details. (Learned on ucdavis/bcs#266.)
   Same principle for tool availability: before telling a user a capability doesn't exist in the current session (e.g. "no `subscribe_pr_activity` tool here"), run a live check (`ToolSearch`, or the equivalent discovery mechanism) rather than reciting what a memory entry or a prior session documented --- a local CLI session's tool roster isn't fixed, and reciting stale documentation as current fact is the exact failure this rule exists to prevent. (Sparta gii-ffdb93 session, 2026-07-14: initially told the user no GitHub MCP server was available in local sessions based on documented prior-session behavior, without running `ToolSearch` first.
   The user's pushback "can't you use the GitHub mcp server?" was the correct challenge, and a live check would have shown the tool was in fact reachable --- that check should have been run before stating unavailability as fact, not after being questioned.)
-- **ARDI Loop Foreground Verification**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn;
-  see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for the mandatory foreground-only polling rule.
+- **ARDI Loop Foreground Verification & Monitor Timers**: Run `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn;
+  see [`shared/workflow/ardi.md`](../shared/workflow/ardi.md) for foreground verification and turn-ending review monitor timer rules.
 - Default to the most recent available package version.
   Use an older or pinned version only when compatibility, reproducibility,
   or another concrete project constraint gives a reason;
@@ -145,7 +145,8 @@
 - After creating a PR in a remote/web session (where PR-activity subscription is available), always subscribe to its CI/review activity (`subscribe_pr_activity`) and follow through --- autofix CI failures and address review comments per the ARD framework --- without asking first.
   Keep following until the PR is merged or closed (or I say stop).
   Don't ask "want me to watch it?"; just do it.
-- **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn while background CI, `@claude review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn. Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer. (User correction, 2026-08-17.)
+- **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review` / `@agy review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn. If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`). If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke `self-review-fallback` per [`shared/workflow/self-review-fallback.md`](../shared/workflow/self-review-fallback.md); otherwise fix any dispatch/workflow failures discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes. Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer. (User directive / CAI, 2026-08-17.)
+
 
 - When there's a well-scoped next step --- a filed follow-up issue, a sequenced item, an obvious continuation of the current work --- just start it; don't pause to ask "want me to keep going?" first.
   The answer is a standing yes.

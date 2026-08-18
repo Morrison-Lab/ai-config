@@ -22,8 +22,15 @@ with tempfile.TemporaryDirectory() as d:
         assert s.get("reported") == "f1ng3rpr1nt"
         s.update({"checked_at": 999})
         subject.write_state(s)
-        assert subject.read_state().get("reported") == "f1ng3rpr1nt"
+        subject.write_state({"data": [{"number": 1}], "reported": "f1ng3rpr1nt"})
+        s = subject.read_state()
+        assert s.get("data") == [{"number": 1}]
+        s.pop("data", None)
+        s["error"] = "Command failed"
+        subject.write_state(s)
+        assert subject.read_state().get("error") == "Command failed"
+        assert "data" not in subject.read_state()
     finally:
         subject.STATE_PATH = orig_path
 
-print("PASS: the all-open-PR controller preserves state keys and uses a two-minute query")
+print("PASS: the all-open-PR controller preserves state keys and clears stale data on error")

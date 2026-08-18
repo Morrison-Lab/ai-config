@@ -51,6 +51,7 @@ def monitor():
             state["data"] = open_prs()
             state.pop("error", None)
         except (OSError, ValueError, subprocess.SubprocessError) as error:
+            state.pop("data", None)
             state["error"] = str(error)
         write_state(state)
         time.sleep(POLL_SECONDS)

@@ -304,7 +304,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
-| `no-mistake-without-a-hook.py` | `Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
+| `no-mistake-without-a-hook.py` | `UserPromptSubmit`, `Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion |

@@ -1,6 +1,6 @@
 ---
 name: "migrate-discussion"
-description: "Move items between issue venues."
+description: "Move items between Issues and Discussions."
 ---
 
 # migrate-discussion (Codex wrapper)

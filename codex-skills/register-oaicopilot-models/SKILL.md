@@ -1,6 +1,6 @@
 ---
 name: "register-oaicopilot-models"
-description: "Register models in the OAICopilot VS Code extension. Use when asked to 'register these models', 'add these to oaicopilot', or 'rom'."
+description: "Register models in the OAICopilot VS Code extension (rom)."
 ---
 
 # register-oaicopilot-models (Codex wrapper)

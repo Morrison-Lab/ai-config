@@ -1,6 +1,6 @@
 ---
 name: rom
-description: "Alias for `register-oaicopilot-models`."
+description: "→ register-oaicopilot-models."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "rom"
-description: "Alias for `register-oaicopilot-models`."
+description: "\u2192 register-oaicopilot-models."
 ---
 
 # rom (Codex wrapper)

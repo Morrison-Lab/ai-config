@@ -9,12 +9,12 @@ allowed-tools:
   - Write
 ---
 
-# register-oaicopilot-models — add new models to the OAICopilot extension config
+# register-oaicopilot-models: add new models to the OAICopilot extension config
 
 Register one or more new models in the `johnny-zhao.oai-compatible-copilot`
 ("OAICopilot") VS Code extension, so they show up in the Copilot Chat model
 picker. The extension's own config lives in the user's `settings.json` under
-the `oaicopilot.models` array — there's no separate "oaic configuration" file.
+the `oaicopilot.models` array. There's no separate "oaic configuration" file.
 
 ## When this fires
 
@@ -24,11 +24,11 @@ the `oaicopilot.models` array — there's no separate "oaic configuration" file.
   Serving / MLflow endpoint list, an Azure AI Foundry deployment list) to make
   available in the Copilot model picker.
 
-## Step 0 — Locate the config
+## Step 0: Locate the config
 
 The extension stores everything in VS Code's **user** `settings.json` (or the
 workspace `.vscode/settings.json` if the user asked for project-scope
-registration) — not a dedicated file. Find it:
+registration), not a dedicated file. Find it:
 
 ```bash
 # macOS
@@ -39,6 +39,16 @@ registration) — not a dedicated file. Find it:
 "$env:APPDATA\Code\User\settings.json"
 ```
 
+The Bash snippets in Steps 1 and 4 read `$SETTINGS`. Set it once from the path
+that matches this OS, so those snippets aren't hardcoded to macOS:
+
+```bash
+# macOS
+SETTINGS="$HOME/Library/Application Support/Code/User/settings.json"
+# Linux
+SETTINGS="$HOME/.config/Code/User/settings.json"
+```
+
 Confirm the extension is actually installed before editing (`johnny-zhao.oai-compatible-copilot`):
 
 ```bash
@@ -46,45 +56,51 @@ find ~/.vscode/extensions -maxdepth 1 -iname "*oai-compatible-copilot*"
 ```
 
 Read the two relevant keys: `oaicopilot.baseUrl` (global default endpoint) and
-`oaicopilot.models` (the array of registered model entries — each has at
+`oaicopilot.models` (the array of registered model entries; each has at
 least `id` and `owned_by`).
 
 A sanitized reference schema (endpoint templated as `<workspace-url>`, no
 secrets) lives alongside this skill in
-[`models-template.jsonc`](models-template.jsonc) — one representative entry
+[`models-template.jsonc`](models-template.jsonc), one representative entry
 per model family. Use it as the per-family schema to copy from in Step 2, and
 to seed `oaicopilot.models` on a fresh machine (swap in your workspace URL).
 
-## Step 1 — Diff requested models against what's already registered
+## Step 1: Diff requested models against what's already registered
 
-The model **name** the user hands you (e.g. from a served-endpoint list) is
-almost always identical to the `id` field the extension expects — this
-extension's convention is `id == owned_by-prefixed served-model name`
-(`databricks-claude-opus-5`, `databricks-gemini-3-7-flash`, etc.). Extract the
-existing `id`s and set-subtract:
+The model **name** the user hands you (e.g. from a served-endpoint list)
+maps to the `id` field by this extension's convention:
+`id == owned_by-prefixed served-model name`
+(`databricks-claude-opus-5`, `databricks-gemini-3-7-flash`, etc.). The
+served-endpoint list usually already carries that prefix, so the handed-in
+name and the `id` are typically the same string, but confirm the prefix is
+present rather than assuming it. Extract the existing `id`s and set-subtract:
 
 ```bash
 python3 -c "
-import json, re
-path = '$HOME/Library/Application Support/Code/User/settings.json'
-text = open(path).read()
-# settings.json may have trailing commas / comments in some setups; if json.loads
-# fails, fall back to a plain grep of \"id\": \"...\" instead of hand-parsing.
-data = json.loads(text)
+import json
+data = json.load(open('$SETTINGS'))
 existing = {m['id'] for m in data.get('oaicopilot.models', [])}
 print('\n'.join(sorted(existing)))
 "
 ```
 
+If `json.load` raises (a real-world `settings.json` may contain `//` comments
+or trailing commas, i.e. JSONC), fall back to a plain grep of the `id` values
+instead of hand-parsing:
+
+```bash
+grep -oE '"id"[[:space:]]*:[[:space:]]*"[^"]+"' "$SETTINGS" | sed -E 's/.*"([^"]+)"$/\1/'
+```
+
 Compare against the requested list. Report which are already present
 (no-op) and which are genuinely new before touching the file.
 
-## Step 2 — Infer each new entry's parameters from its closest sibling
+## Step 2: Infer each new entry's parameters from its closest sibling
 
 Never invent parameters from scratch. For each missing model, find the
-**closest already-configured sibling** — same family prefix (same
+**closest already-configured sibling**: same family prefix (same
 `gpt-5.x`/`claude`/`gemini`/`llama` line) and, ideally, the most recent
-version within that line — and copy its schema verbatim except for `id` (and
+version within that line, then copy its schema verbatim except for `id` (and
 `family`, if the extension's `family` convention encodes the version, e.g.
 `gpt-5.4` vs `gpt-5.4-mini`). Carry over unchanged:
 
@@ -96,51 +112,72 @@ version within that line — and copy its schema verbatim except for `id` (and
 
 If a requested model has **no sibling at all** (a genuinely new model line,
 e.g. a first-of-its-kind name), say so explicitly rather than guessing
-silently — use the most structurally-similar existing entry as a starting
+silently. Use the most structurally-similar existing entry as a starting
 point (matching `vision`/`apiMode` conventions for that provider) and flag in
 your final report that its `context_length`/`max_tokens` are placeholders the
 user should confirm against the provider's actual model card.
 
-## Step 3 — Append, don't disturb existing entries
+## Step 3: Append, don't disturb existing entries
 
-Add only the missing entries to the end of the `oaicopilot.models` array.
-Use `replace_string_in_file`/`multi_replace_string_in_file`, anchoring on the
-**last existing array element plus the closing `],`**, and match the file's
-existing indentation exactly. Never reorder, reformat, or rewrite entries
-that already exist — a diff that touches unrelated array elements makes the
-change harder to review and risks losing a hand-tuned parameter.
+Add only the missing entries to the end of the `oaicopilot.models` array,
+via whatever file-edit tool this environment provides (the `Edit` tool, or
+the assistant's edit-a-string tool). Anchor on the **last existing array
+element plus the closing `]`**, and match the file's existing indentation
+exactly. Never reorder, reformat, or rewrite entries that already exist: a
+diff that touches unrelated array elements makes the change harder to review
+and risks losing a hand-tuned parameter.
 
-## Step 4 — Validate
+## Step 4: Validate
 
 ```bash
-python3 -c "import json; json.load(open('$HOME/Library/Application Support/Code/User/settings.json'))" && echo OK
+python3 -c "import json; json.load(open('$SETTINGS'))" && echo OK
 ```
 
-(Or use `get_errors` on the file if editing through an assistant with that
-tool.) A `settings.json` with a trailing comma or an unbalanced brace breaks
-*all* of VS Code's settings, not just this extension's — always validate
-before finishing.
+`settings.json` is officially JSONC, so this bare `json.load` will report
+failure on a perfectly valid file that merely contains a `//` comment or a
+trailing comma. If it fails, don't conclude the file is broken; strip comments
+and trailing commas first, then re-check, so a valid-but-JSONC file isn't a
+false alarm:
 
-## Step 5 — Report
+```bash
+python3 -c "
+import json, re
+t = open('$SETTINGS').read()
+t = re.sub(r'//.*', '', t)                 # line comments
+t = re.sub(r',(\s*[}\]])', r'\1', t)       # trailing commas
+json.loads(t)
+print('OK')
+"
+```
+
+(Or use the assistant's own diagnostics on the file, e.g. `get_errors`, if
+editing through an assistant with that tool.) A `settings.json` with a genuine
+unbalanced brace or a truly malformed entry breaks *all* of VS Code's
+settings, not just this extension's, so always validate before finishing.
+
+## Step 5: Report
 
 State which models were added, which were already present (no-op), and flag
 any model registered with guessed/placeholder parameters (Step 2's no-sibling
 case). Tell the user they may need to reopen the Copilot Chat model picker
-("Manage Models...") to see the new entries — no VS Code restart is required.
+("Manage Models...") to see the new entries; no VS Code restart is required.
 
 ## Relationship to other skills
 
-- **`select-model` / `assess-model-fit`** — once models are registered here,
+- **`select-model` / `assess-model-fit`**: once models are registered here,
   those skills help decide *which* registered model fits a given task; this
   skill only makes a model available, it doesn't choose one.
-- **`skill-builder`** — used to author this skill.
+- **`skill-builder`**: used to author this skill.
 
 ## Anti-patterns
 
 - Guessing parameters from scratch instead of copying a sibling's schema.
 - Reformatting or reordering existing `oaicopilot.models` entries while adding
   new ones.
-- Treating the display name/served-entity name as different from the `id`
-  without checking — for this extension's Databricks convention they're the
-  same string.
+- Assuming the served-entity name already carries the `owned_by-` prefix
+  without checking. The `id` must be the prefixed form
+  (`databricks-<served-name>`); a bare served-name missing the prefix will not
+  match the extension's convention.
+- Treating a JSONC `settings.json` (one with `//` comments or trailing commas)
+  as broken because a bare `json.load` rejected it. Strip comments first.
 - Skipping the JSON validation step and leaving `settings.json` broken.

@@ -6,8 +6,10 @@ Portable AI agent config — skills, memories, and commands synced across machin
 
 | Directory | Purpose |
 |----|----|
-| `skills/` | Reusable workflow skills for Claude Code (`~/.claude/skills/`) |
+| `skills/` | Reusable workflow skills for Claude Code (`~/.claude/skills/`) and Gemini CLI (`~/.gemini/skills/`) |
 | `codex-skills/` | Generated Codex wrappers (`~/.codex/skills/`) |
+| `cursor-rules/` | Cursor AI rules in `.mdc` format (`~/.cursor/rules/`) |
+| `AGENTS.md` | Universal vendor-neutral instruction file for all coding agents |
 | `commands/` | Slash commands (`~/.claude/commands/`) |
 | `.claude/agents/` | Read-only custom subagents (see [Agents](agents.llms.md)) |
 | `memories/` | Persistent notes and preferences (shared with VS Code Copilot) |
@@ -15,9 +17,9 @@ Portable AI agent config — skills, memories, and commands synced across machin
 
 ## Three ways to use these skills
 
-**Local CLI** — clone the repo and run `bootstrap.sh` once. It symlinks each directory into `~/.claude/`. Skills appear in Claude Code as `/skill-name`.
+**Local CLI** — clone the repo and run `bootstrap.sh` once. It symlinks each directory into `~/.claude/`, `~/.gemini/`, `~/.codex/`, and `~/.cursor/rules/`. Skills appear in Claude Code and Gemini CLI as `/skill-name`.
 
-**Codex** — the same bootstrap links generated wrappers from `codex-skills/` into `${CODEX_HOME:-$HOME/.codex}/skills`. Each wrapper reads the matching canonical workflow from `skills/`.
+**Codex & Cursor** — the same bootstrap links generated wrappers from `codex-skills/` into `${CODEX_HOME:-$HOME/.codex}/skills` and Cursor rules from `cursor-rules/` into `${CURSOR_HOME:-$HOME/.cursor}/rules`. `AGENTS.md` acts as a universal entrypoint.
 
 **Cloud sessions (other repos)** — this repo is a [plugin marketplace](https://github.com/Morrison-Lab/ai-config/blob/main/README.md#use-these-skills-in-another-repos-web-sessions-plugin-marketplace). Add `enabledPlugins` to your repo’s `.claude/settings.json` and skills load at session start, namespaced as `/ai-config:skill-name`.
 

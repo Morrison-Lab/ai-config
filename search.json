@@ -2923,14 +2923,14 @@
     "href": "index.html#whats-in-this-repo",
     "title": "ai-config",
     "section": "What’s in this repo",
-    "text": "What’s in this repo\n\n\n\nDirectory\nPurpose\n\n\n\n\nskills/\nReusable workflow skills for Claude Code (~/.claude/skills/)\n\n\ncodex-skills/\nGenerated Codex wrappers (~/.codex/skills/)\n\n\ncommands/\nSlash commands (~/.claude/commands/)\n\n\n.claude/agents/\nRead-only custom subagents (see Agents)\n\n\nmemories/\nPersistent notes and preferences (shared with VS Code Copilot)\n\n\nshared/\nSingle-topic guidance fragments shared with UCD-SERG lab manual"
+    "text": "What’s in this repo\n\n\n\nDirectory\nPurpose\n\n\n\n\nskills/\nReusable workflow skills for Claude Code (~/.claude/skills/) and Gemini CLI (~/.gemini/skills/)\n\n\ncodex-skills/\nGenerated Codex wrappers (~/.codex/skills/)\n\n\ncursor-rules/\nCursor AI rules in .mdc format (~/.cursor/rules/)\n\n\nAGENTS.md\nUniversal vendor-neutral instruction file for all coding agents\n\n\ncommands/\nSlash commands (~/.claude/commands/)\n\n\n.claude/agents/\nRead-only custom subagents (see Agents)\n\n\nmemories/\nPersistent notes and preferences (shared with VS Code Copilot)\n\n\nshared/\nSingle-topic guidance fragments shared with UCD-SERG lab manual"
   },
   {
     "objectID": "index.html#three-ways-to-use-these-skills",
     "href": "index.html#three-ways-to-use-these-skills",
     "title": "ai-config",
     "section": "Three ways to use these skills",
-    "text": "Three ways to use these skills\nLocal CLI — clone the repo and run bootstrap.sh once. It symlinks each directory into ~/.claude/. Skills appear in Claude Code as /skill-name.\nCodex — the same bootstrap links generated wrappers from codex-skills/ into ${CODEX_HOME:-$HOME/.codex}/skills. Each wrapper reads the matching canonical workflow from skills/.\nCloud sessions (other repos) — this repo is a plugin marketplace. Add enabledPlugins to your repo’s .claude/settings.json and skills load at session start, namespaced as /ai-config:skill-name.\n@claude bot on this repo’s PRs — the .claude/skills → ../skills symlink is committed to main. Claude Code Action restores it on every PR run, so you can call @claude ardi (or any other skill) in PR comments."
+    "text": "Three ways to use these skills\nLocal CLI — clone the repo and run bootstrap.sh once. It symlinks each directory into ~/.claude/, ~/.gemini/, ~/.codex/, and ~/.cursor/rules/. Skills appear in Claude Code and Gemini CLI as /skill-name.\nCodex & Cursor — the same bootstrap links generated wrappers from codex-skills/ into ${CODEX_HOME:-$HOME/.codex}/skills and Cursor rules from cursor-rules/ into ${CURSOR_HOME:-$HOME/.cursor}/rules. AGENTS.md acts as a universal entrypoint.\nCloud sessions (other repos) — this repo is a plugin marketplace. Add enabledPlugins to your repo’s .claude/settings.json and skills load at session start, namespaced as /ai-config:skill-name.\n@claude bot on this repo’s PRs — the .claude/skills → ../skills symlink is committed to main. Claude Code Action restores it on every PR run, so you can call @claude ardi (or any other skill) in PR comments."
   },
   {
     "objectID": "index.html#quick-links",

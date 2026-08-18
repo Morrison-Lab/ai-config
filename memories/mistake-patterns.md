@@ -11,7 +11,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 ## Pattern 2: Passivity on Standing Rules
 - **Mistake**: Asking permission for routine, non-destructive steps already authorized by standing rules.
 - **Example**: Asking "Should I open a PR?" when standing rules mandate opening PRs for completed changes.
-- **Canonical Rule**: See `CLAUDE.md` ("Non-destructive repo and memory actions" and "Autonomous PR delivery").
+- **Canonical Rule**: See `CLAUDE.md` ("Non-destructive repo and memory actions" and "Open a PR for every pushed feature branch").
 - **Fix**: Execute standing instructions autonomously; reserve questions for genuine design ambiguity.
 
 ## Pattern 3: Give Up Instead of Diagnose
@@ -23,7 +23,7 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 ## Pattern 4: Incomplete Workflow Follow-Through
 - **Mistake**: Executing an initial step but abandoning subsequent steps before the workflow completes.
 - **Example**: Modifying files or pushing a commit but stopping before opening a PR or driving review to clean.
-- **Canonical Rule**: See `CLAUDE.md` ("Autonomously deliver completed changes to a PR") and [`run-ums-proactively.md`](../shared/workflow/run-ums-proactively.md).
+- **Canonical Rule**: See `CLAUDE.md` ("Request review and drive every started PR to clean" and "Watch and ARDI every PR you touch --- don't ask first"), and [`run-ums-proactively.md`](../shared/workflow/run-ums-proactively.md).
 - **Fix**: Follow each workflow end-to-end: edit → test → commit → push → open PR → ARDI to clean.
 
 ## Pattern 5: Bypassing Existing Repo Knowledge

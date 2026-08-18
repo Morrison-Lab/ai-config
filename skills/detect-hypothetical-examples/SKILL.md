@@ -1,6 +1,6 @@
 ---
 name: detect-hypothetical-examples
-description: "Find invented examples where data exists."
+description: "Find invented examples with existing data."
 user-invocable: true
 allowed-tools:
   - Bash

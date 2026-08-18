@@ -1,6 +1,6 @@
 ---
 name: gi
-description: "Grab top issue, implement, and ARDI."
+description: "Grab an issue, implement, and ARDI."
 user-invocable: true
 allowed-tools:
   - Bash

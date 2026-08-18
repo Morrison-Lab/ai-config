@@ -1,6 +1,6 @@
 ---
 name: "mwc"
-description: "Merge-When-Confident session grant."
+description: "Merge when confident."
 ---
 
 # mwc (Codex wrapper)

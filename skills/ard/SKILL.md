@@ -1,6 +1,6 @@
 ---
 name: ard
-description: "Address, rebut, or defer review items."
+description: "Address or defer review items."
 user-invocable: true
 allowed-tools:
   - Bash

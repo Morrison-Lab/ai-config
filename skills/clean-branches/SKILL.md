@@ -1,6 +1,6 @@
 ---
 name: clean-branches
-description: "Clean stale Git branches."
+description: "Remove stale Git branches."
 user-invocable: true
 allowed-tools:
   - Bash

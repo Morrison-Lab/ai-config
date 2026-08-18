@@ -1,6 +1,6 @@
 ---
 name: session-lock
-description: "Lock session to prevent collision."
+description: "Prevent session collisions."
 user-invocable: true
 allowed-tools:
   - Bash

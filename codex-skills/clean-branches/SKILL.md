@@ -1,6 +1,6 @@
 ---
 name: "clean-branches"
-description: "Clean stale Git branches."
+description: "Remove stale Git branches."
 ---
 
 # clean-branches (Codex wrapper)

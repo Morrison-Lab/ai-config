@@ -42,6 +42,29 @@ It also applies to this entry: below is its own pair.
 - **Don't:** write only the corrected behaviour and leave the reader to infer which specific move it displaced.
 - **Don't:** state the pair so abstractly that no concrete action would violate it.
 
+## Status requests do not make issues report-only
+
+Treat a request for status as a request to inspect live state and finish every
+safe, in-scope, concrete action that inspection reveals. A report is the recap
+after the work, not a substitute for it. When an issue cannot be fixed
+directly, carry it forward with an actual next action. **Every issue noticed,
+however small or outside the current task's scope, must at minimum be filed in
+the owning GitHub, GitLab, or equivalent tracker.** File it before reporting
+it; use the correct private tracker and redact sensitive details when needed.
+
+- **Do:** fix an actionable CI defect, review finding, or configuration gap
+  before reporting it as status; revalidate and continue the sweep.
+- **Do:** turn an issue outside current authority into a filed/routed blocker,
+  not an unowned observation.
+- **Do:** file every noticed issue in its owning tracker, even when it is
+  trivial, already fixed locally, or outside the active task.
+- **Don't:** interpret “status” as report-only after discovering a concrete,
+  safe, in-scope repair.
+- **Don't:** end with “this failed” or “this needs a fix” when the fix is
+  available to perform in the same turn.
+- **Don't:** leave a noticed issue as chat prose because it seems too small or
+  too far outside the current scope to track.
+
 ## Flag good moments to `/clear` in long-running sessions
 
 @shared/workflow/flag-session-boundaries.md
@@ -1307,4 +1330,3 @@ It is scoped to the **target**, so a merge from an ai-config checkout into anoth
 
 - **Do:** merge a fully-clean ai-config PR without asking, and say in the same reply that you did and why it qualified.
 - **Don't:** read it as covering a PR that is not fully clean, or another repo's PR merged from an ai-config checkout.
-

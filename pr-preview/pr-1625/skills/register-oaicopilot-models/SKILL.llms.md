@@ -88,7 +88,7 @@ python3 -c "import json; json.load(open('$SETTINGS'))" && echo OK
 python3 -c "
 import json, re
 t = open('$SETTINGS').read()
-t = re.sub(r'//.*', '', t)                 # line comments
+t = re.sub(r'(?m)^\s*//.*', '', t)         # line comments (start-of-line only)
 t = re.sub(r',(\s*[}\]])', r'\1', t)       # trailing commas
 json.loads(t)
 print('OK')

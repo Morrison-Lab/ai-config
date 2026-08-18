@@ -127,7 +127,7 @@ with tempfile.TemporaryDirectory() as tmp:
           same_skill_md and found.get("skills/beta") == "stale")
 
     check("excluded dirs are never reported",
-          not any(k.startswith(("references", "codex-skills")) for k in found))
+          not any(k.startswith(("references", "codex-skills", "cursor-rules")) for k in found))
     check("repo README is never reported", "README.md" not in found)
 
 # --- reporting --------------------------------------------------------------

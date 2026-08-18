@@ -1,6 +1,6 @@
 ---
 name: prefer-upstream
-description: "Prefer upstream ecosystem packages."
+description: "Prefer upstream packages."
 user-invocable: false
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "find-overlap"
-description: "Detect overlapping skills/memories."
+description: "Find overlapping skills or memory."
 ---
 
 # find-overlap (Codex wrapper)

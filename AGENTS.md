@@ -26,6 +26,17 @@ Each reading expires immediately: run the command fresh for every recap rather t
 - When referencing files or code symbols in workspace paths, use relative markdown links (e.g. `[filename](relative/path/to/file)`) or inline code backticks (e.g. `` `path/to/file` ``).
 - Preserve semantic line breaks (SemBr) and formatting conventions when editing markdown docs.
 
+## Antigravity Workspace Rules & Activation Scopes
+
+- **Global rules**: Defined in `~/.gemini/GEMINI.md` or `~/.gemini/config/rules/`.
+- **Workspace rules**: Defined in `.agents/rules/`, `.gemini/rules/`, or root `AGENTS.md`.
+- **Activation modes**:
+  - *Always On*: Evaluated unconditionally in context (`alwaysApply: true` / root instruction files).
+  - *Glob Scoped*: Evaluated when matching active workspace paths (`globs: [...]` or `applyTo: ...`).
+  - *Model Decision*: Injected dynamically based on task context.
+  - *Manual*: Triggered via `@mention` or explicit command.
+- **Discovery manifests**: Configured via `.agents/skills.json` and `.agents/plugins.json`.
+
 ## Strict Merge Control Policy
 
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**

@@ -313,7 +313,7 @@ Measured on git 2.53.0, against a commit replacing `-- legacy flag` with `++ new
 | `--output-indicator-old/new` | 6 | 6 |
 
 `git diff --output-indicator-old=< --output-indicator-new=> --output-indicator-context=' '` re-marks the **data** lines while the file headers stay `---`/`+++`, so the collision cannot arise rather than being narrowed.
-That dissolves the class the rest of this block works around, so prefer it wherever the git version allows (`--output-indicator-*` is git 2.22+).
+That dissolves the class the rest of this block works around, so prefer it where it is available --- measured present on git 2.53.0; check `git diff --help` before relying on it under an older git, since the version that introduced `--output-indicator-*` was not verified here.
 
 Note the failure direction, which is the opposite of the extractor case above: this filter **under**-reports, so the diff looks smaller and cleaner than it is, and a reviewer trusting it approves lines nobody displayed.
 Cross-check against `git diff --stat`'s own counts, which are a second instrument keyed on a different surface --- that disagreement is the only thing that surfaced this.

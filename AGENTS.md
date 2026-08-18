@@ -28,8 +28,8 @@ Each reading expires immediately: run the command fresh for every recap rather t
 
 ## Antigravity Workspace Rules & Activation Scopes
 
-- **Global rules**: Defined in `~/.gemini/GEMINI.md` or `~/.gemini/config/rules/`.
-- **Workspace rules**: Defined in `.agents/rules/`, `.gemini/rules/`, or root `AGENTS.md`.
+- **Global rules**: Defined in `~/.gemini/GEMINI.md`.
+- **Workspace rules**: Defined in `.agents/rules/` or root `AGENTS.md` (with backward compatibility for `.agent/rules/`).
 - **Activation modes**:
   - *Always On*: Evaluated unconditionally in context (`alwaysApply: true` / root instruction files).
   - *Glob Scoped*: Evaluated when matching active workspace paths (`globs: [...]` or `applyTo: ...`).

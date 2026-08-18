@@ -38,6 +38,10 @@ A single honest measurement earlier in the session is what most easily licenses 
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
   Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
   Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
+- **Never merge over open review findings or treat skip notices as approval.**
+  Under `mwc`, a PR must be fully clean across CI and review (see [`fully-clean.md`](shared/workflow/fully-clean.md)).
+  A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
+  All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
 
 ## Request review and drive every started PR to clean
 

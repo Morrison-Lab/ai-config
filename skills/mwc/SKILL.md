@@ -30,6 +30,7 @@ without asking confirmation before every merge.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
   (all CI checks passing, review verdict clean, no unresolved comments, no open block labels).
   It NEVER authorizes merging a PR with failing CI, unresolved findings, or pending reviews.
+  A reviewer skip notice (e.g. for workflow edits) does NOT waive this requirement or clear unresolved findings.
 - **Session Duration**: The grant expires automatically when the session ends
   or when explicitly revoked via `/mwc revoke` or `disable-mwc`.
 

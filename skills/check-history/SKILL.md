@@ -1,6 +1,6 @@
 ---
 name: check-history
-description: "Review the MR/PR history (merged and closed) before starting work on an issue, to ensure proposed changes don't undo past progress or re-introduce previously fixed problems. Use automatically before beginning implementation on any issue or MR — especially when modifying shared infrastructure, CI templates, or code that has been refactored before."
+description: "Check closed PR history for issue."
 user-invocable: false
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "refresh-claude-token"
-description: "Codex wrapper for the ai-config Claude skill `refresh-claude-token`. Rotate CLAUDE_CODE_OAUTH_TOKEN across the repos that already carry it, without /install-github-app's App-install and workflow scaffolding. Wraps scripts/rotate-claude-token.py, hands the interactive minting step to the human, and closes the gap that script cannot: proving the new token authenticates, not merely that the secret changed. Use when asked to 'refresh the claude token', 'rotate the claude token', 'rct', 'update CLAUDE_CODE_OAUTH_TOKEN', 'the claude token expired', 'reviews are failing with a credential error', or 'is there a command that just updates the token'. Use when Codex is asked to use `refresh-claude-token`, `/refresh-claude-token`, or the corresponding ai-config/Claude skill workflow."
+description: "Rotate CLAUDE_CODE_OAUTH_TOKEN."
 ---
 
 # refresh-claude-token (Codex wrapper)

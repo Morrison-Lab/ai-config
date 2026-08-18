@@ -1,6 +1,6 @@
 ---
 name: rct
-description: "Alias for `refresh-claude-token`. Rotate CLAUDE_CODE_OAUTH_TOKEN across the repos that already carry it, without /install-github-app's App-install and workflow scaffolding. Use when asked to 'rct'."
+description: "→ refresh-claude-token."
 user-invocable: true
 allowed-tools:
   - Bash

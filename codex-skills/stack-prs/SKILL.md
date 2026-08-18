@@ -1,6 +1,6 @@
 ---
 name: "stack-prs"
-description: "Codex wrapper for the ai-config Claude skill `stack-prs`. Stack a PR on another open PR only when verifiably necessary \u2014 first run the decision gate (does solving this issue depend on solving the other? will both PRs heavily modify the same code passages?), and branch from `main` when neither holds. When stacking is warranted: branch off the base PR's tip, open the dependent PR with its `base` set to that PR's branch, and keep it in sync as the base branch moves (or re-point it to `main` once the base merges). Use when asked to 'stack this PR on #N', 'branch off that PR', 'stack-prs', 'should I stack this?', 'does this need to stack on #N?', or whenever new work may depend on an open, unmerged PR's code. Use when Codex is asked to use `stack-prs`, `/stack-prs`, or the corresponding ai-config/Claude skill workflow."
+description: "Stack dependent PR on another."
 ---
 
 # stack-prs (Codex wrapper)

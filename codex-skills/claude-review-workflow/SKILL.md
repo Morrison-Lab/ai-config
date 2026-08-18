@@ -1,6 +1,6 @@
 ---
 name: "claude-review-workflow"
-description: "Codex wrapper for the ai-config Claude skill `claude-review-workflow`. Add or modify the `anthropics/claude-code-action` PR review workflow (`.github/workflows/claude-code-review.yml`). Preserves the load-bearing patterns \u2014 fresh-comment-per-run (no sticky delete), inline-comment encouragement, the event-gated track_progress, and the workflow_dispatch path claude.yml uses to re-dispatch reviews. Use when Codex is asked to use `claude-review-workflow`, `/claude-review-workflow`, or the corresponding ai-config/Claude skill workflow."
+description: "Add or update claude-review workflow."
 ---
 
 # claude-review-workflow (Codex wrapper)

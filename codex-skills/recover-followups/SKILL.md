@@ -1,6 +1,6 @@
 ---
 name: "recover-followups"
-description: "Codex wrapper for the ai-config Claude skill `recover-followups`. Retrieve untracked follow-up items from closed PRs and issues. Sweeps their bodies, comments, review threads, and ARD 'Deferred'/'Acknowledged' summaries for promised future work, then cross-references against open issues and surfaces (and offers to file) the ones never tracked. Use when asked to 'recover followups', 'rfu', 'find untracked followups', 'audit closed PRs for dropped follow-ups', 'what follow-ups slipped through', or 'did we lose any deferred work?'. Use when Codex is asked to use `recover-followups`, `/recover-followups`, or the corresponding ai-config/Claude skill workflow."
+description: "Recover untracked follow-ups."
 ---
 
 # recover-followups (Codex wrapper)

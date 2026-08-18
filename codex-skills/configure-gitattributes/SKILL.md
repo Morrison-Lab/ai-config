@@ -1,6 +1,6 @@
 ---
 name: "configure-gitattributes"
-description: "Codex wrapper for the ai-config Claude skill `configure-gitattributes`. Configure or audit a repo's .gitattributes for common cases: union-merge for changelog/news files that almost always want both sides kept, line-ending normalization for shell scripts, marking generated trees so they don't count as source in diffs/language stats, and vendored/binary handling. Use when asked to 'configure gitattributes', 'set up .gitattributes', 'fix line endings', 'stop CHANGELOG merge conflicts', 'mark this as generated', or after a recurring merge-conflict pattern on a specific file suggests a merge-driver fix. Use when Codex is asked to use `configure-gitattributes`, `/configure-gitattributes`, or the corresponding ai-config/Claude skill workflow."
+description: "Configure file merge/diff attributes."
 ---
 
 # configure-gitattributes (Codex wrapper)

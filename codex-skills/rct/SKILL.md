@@ -1,6 +1,6 @@
 ---
 name: "rct"
-description: "Codex wrapper for the ai-config Claude skill `rct`. Alias for `refresh-claude-token`. Rotate CLAUDE_CODE_OAUTH_TOKEN across the repos that already carry it, without /install-github-app's App-install and workflow scaffolding. Use when asked to 'rct'. Use when Codex is asked to use `rct`, `/rct`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 refresh-claude-token."
 ---
 
 # rct (Codex wrapper)

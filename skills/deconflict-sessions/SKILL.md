@@ -1,6 +1,6 @@
 ---
 name: deconflict-sessions
-description: "Alias for `session-lock`. Use when asked to 'deconflict-sessions', 'deconflict multiple ai sessions', 'avoid stepping on another local session'."
+description: "→ session-lock."
 user-invocable: true
 allowed-tools:
   - Bash

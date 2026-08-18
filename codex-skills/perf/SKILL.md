@@ -1,6 +1,6 @@
 ---
 name: "perf"
-description: "Codex wrapper for the ai-config Claude skill `perf`. Alias for `measure-performance`. Profile first, then microbenchmark only the bottleneck. Use when asked to 'perf', 'perf this', or 'check the perf'. Use when Codex is asked to use `perf`, `/perf`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 measure-performance."
 ---
 
 # perf (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "resolve-pr-threads"
-description: "Codex wrapper for the ai-config Claude skill `resolve-pr-threads`. Sweep a PR/MR's inline review threads and resolve only the ones that are already genuinely settled (Addressed-and-pushed, Defer-with-issue-linked, Acknowledged, or a Rebut the reviewer didn't re-raise), leaving anything else open for a full `ard` pass. Use when asked to 'resolve pr threads', 'clean up the threads', 'resolve stale threads', or before re-requesting review so old threads don't carry over. Does not disposition new findings \u2014 that's `ard`'s job. Use when Codex is asked to use `resolve-pr-threads`, `/resolve-pr-threads`, or the corresponding ai-config/Claude skill workflow."
+description: "Resolve settled review threads."
 ---
 
 # resolve-pr-threads (Codex wrapper)

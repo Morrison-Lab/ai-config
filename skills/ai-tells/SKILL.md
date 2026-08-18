@@ -1,6 +1,6 @@
 ---
 name: ai-tells
-description: "Alias for `find-ai-tells`. Use when asked to 'ai-tells'."
+description: "→ find-ai-tells."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "dc"
-description: "Codex wrapper for the ai-config Claude skill `dc`. Alias for `ardi` (\"drive to clean\"). Use when asked to 'dc'. Use when Codex is asked to use `dc`, `/dc`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ardi."
 ---
 
 # dc (Codex wrapper)

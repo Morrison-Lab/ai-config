@@ -1,6 +1,6 @@
 ---
 name: "consolidate-memory"
-description: "Codex wrapper for the ai-config Claude skill `consolidate-memory`. Merge two or more genuinely-redundant memory entries in the `memories/` corpus into a single canonical entry \u2014 union the facts, keep one copy in the right scope, and repoint any `[[links]]` \u2014 so the corpus shrinks without losing a fact or a cross-reference. Delegates detection to `find-overlap` (scope = `memories/`), proposes a plan for approval, then ships it via branch + PR. The memory-corpus counterpart of `consolidate-skills`. Use when asked to \"consolidate memory\", \"consolidate memories\", \"merge duplicate memories\", \"dedupe memories\", or \"collapse redundant memory entries\". Invoke explicitly with /consolidate-memory. Use when Codex is asked to use `consolidate-memory`, `/consolidate-memory`, or the corresponding ai-config/Claude skill workflow."
+description: "Merge redundant memories."
 ---
 
 # consolidate-memory (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "adria"
-description: "Codex wrapper for the ai-config Claude skill `adria`. Alias for `ardia` (common transposition typo). Use when asked to 'adria'. Use when Codex is asked to use `adria`, `/adria`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ardia."
 ---
 
 # adria (Codex wrapper)

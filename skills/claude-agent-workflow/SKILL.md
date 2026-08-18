@@ -1,6 +1,6 @@
 ---
 name: claude-agent-workflow
-description: Add or modify the `anthropics/claude-code-action` agent workflow (`.github/workflows/claude.yml`). Preserves the load-bearing patterns — bot-actor `if:` filter, per-PR concurrency, EPI202_TOKEN/submodules access, R+Quarto+renv setup, stats-allowlist build, late-comment polling prompt, and the post-Claude review re-dispatch.
+description: "Add or update claude.yml workflow."
 user-invocable: true
 allowed-tools:
   - Read

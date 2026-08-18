@@ -1,6 +1,6 @@
 ---
 name: "sus"
-description: "Codex wrapper for the ai-config Claude skill `sus`. Alias for `sup` (send-upstream). Use when asked to 'sus'. Use when Codex is asked to use `sus`, `/sus`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 sup."
 ---
 
 # sus (Codex wrapper)

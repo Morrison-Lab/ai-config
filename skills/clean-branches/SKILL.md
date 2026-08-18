@@ -1,6 +1,6 @@
 ---
 name: clean-branches
-description: "Clean Branches: audit branches in the current repo — both LOCAL and REMOTE — delete dead ones (purely behind main, no open MR/issue), rebase stale-but-alive ones onto main, and open MRs for orphaned work. Also prunes local-only stragglers: branches already merged into main, and tracking branches whose remote is gone. Checks for active sessions before touching anything. Use when asked to 'clean branches', 'cb', 'prune', 'prune branches', 'tidy up branches', or 'clear dead branches'."
+description: "Clean stale Git branches."
 user-invocable: true
 allowed-tools:
   - Bash

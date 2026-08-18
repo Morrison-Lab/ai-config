@@ -1,6 +1,6 @@
 ---
 name: adria
-description: "Alias for `ardia` (common transposition typo). Use when asked to 'adria'."
+description: "→ ardia."
 user-invocable: true
 allowed-tools:
   - Bash

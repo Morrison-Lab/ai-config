@@ -1,6 +1,6 @@
 ---
 name: prune-worktrees
-description: "Alias for `clean-worktrees` (aka `cw`). Use when asked to 'prune-worktrees'."
+description: "→ clean-worktrees."
 user-invocable: true
 allowed-tools:
   - Bash

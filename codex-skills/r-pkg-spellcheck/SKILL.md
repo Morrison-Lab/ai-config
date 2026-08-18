@@ -1,6 +1,6 @@
 ---
 name: "r-pkg-spellcheck"
-description: "Codex wrapper for the ai-config Claude skill `r-pkg-spellcheck`. Run R-package spellcheck before pushing changes that touch user-facing text (NEWS.md, .Rd, .Rmd, roxygen comments, vignettes). Use before `git push` in any R-package repo, or when the user asks to spellcheck. Use when Codex is asked to use `r-pkg-spellcheck`, `/r-pkg-spellcheck`, or the corresponding ai-config/Claude skill workflow."
+description: "Spellcheck before git push."
 ---
 
 # r-pkg-spellcheck (Codex wrapper)

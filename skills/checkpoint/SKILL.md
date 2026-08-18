@@ -1,6 +1,6 @@
 ---
 name: checkpoint
-description: "Save a deliberate, mid-task stop-point snapshot — plan state, decisions made so far, file:line pointers, and next actions — without ending or pausing the session. Use when asked to 'checkpoint', 'save a checkpoint', 'snapshot where we are', or proactively right before a risky/hard-to-reverse step, after finishing a major phase of a long task, or before a long-running operation you might not be present to see finish."
+description: "Save mid-task snapshot."
 user-invocable: true
 allowed-tools:
   - Bash

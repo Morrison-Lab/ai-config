@@ -1,6 +1,6 @@
 ---
 name: merge-when-confident
-description: "Alias for `mwc`. Use when asked to 'merge-when-confident'."
+description: "→ mwc."
 user-invocable: true
 allowed-tools:
   - Bash

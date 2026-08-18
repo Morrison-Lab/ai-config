@@ -1,6 +1,6 @@
 ---
 name: "ciq"
-description: "Codex wrapper for the ai-config Claude skill `ciq`. Alias for `check-info-quality`. Use when asked to 'ciq'. Use when Codex is asked to use `ciq`, `/ciq`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 check-info-quality."
 ---
 
 # ciq (Codex wrapper)

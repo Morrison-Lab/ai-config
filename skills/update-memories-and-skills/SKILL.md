@@ -1,6 +1,6 @@
 ---
 name: update-memories-and-skills
-description: "Alias for `ums`. Use when asked to 'update-memories-and-skills'."
+description: "→ ums."
 user-invocable: true
 allowed-tools:
   - Bash

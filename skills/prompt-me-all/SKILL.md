@@ -1,12 +1,6 @@
 ---
 name: prompt-me-all
-description: >
-  Restate every open question still waiting on user input — anything asked
-  earlier in the conversation that hasn't been answered yet — as a single,
-  clearly numbered list, instead of leaving it scattered across the
-  transcript. Use when asked to 'prompt me all', 'promptmeall', 'pma', or
-  '/prompt-me-all'. For just the single most pressing question (or a
-  requested top N), use `prompt-me` / `pm` instead.
+description: "List all open questions."
 user-invocable: true
 allowed-tools: []
 ---

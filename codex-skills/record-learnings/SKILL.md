@@ -1,6 +1,6 @@
 ---
 name: "record-learnings"
-description: "Codex wrapper for the ai-config Claude skill `record-learnings`. Persist discoveries, debugging insights, and working patterns to memory and shared instruction files as you work. Ensures knowledge survives across sessions and is accessible to other AI agents via the shared ai-config repo. Use continuously \u2014 after solving a tricky bug, discovering a codebase convention, or learning a tool quirk. Use when Codex is asked to use `record-learnings`, `/record-learnings`, or the corresponding ai-config/Claude skill workflow."
+description: "Persist insights to memory."
 ---
 
 # record-learnings (Codex wrapper)

@@ -1,13 +1,6 @@
 ---
 name: scout-peers
-description: >
-  Survey comparable public repos for the current project, judge whether any is
-  *uniformly superior*, and borrow/adapt their best ideas — checking each
-  source's license first and attributing anything reused. Use when asked
-  "are there repos like this", "scan similar/competing projects", "borrow ideas
-  from peer repos", "competitive scan", "what can we learn from comparable
-  projects", or "see how others solved this". Invoke explicitly with
-  /scout-peers.
+description: "Survey peer repos for patterns."
 user-invocable: true
 allowed-tools:
   - WebSearch

@@ -1,6 +1,6 @@
 ---
 name: check-rendered-refs
-description: "Scan rendered output (HTML, or a deployed/preview URL) for broken Quarto/pandoc cross-references and citations — refs that failed to resolve at render time and leak into the page as literal `?@key` text (e.g. `?@def-coef-interp-procedure`), a missing citation rendered bold-with-question-mark (`**key?**`), or raw `[@key]`/`@key` citation syntax that citeproc never processed. Report each hit with file/URL and the surrounding text. Use when asked to 'check rendered refs', 'crr', 'check for broken crossrefs', 'check broken cross-references', 'find unresolved references in the rendered site', 'scan the HTML for `?@`', 'did any crossrefs/citations break in the render', or after rendering/previewing a Quarto book or website."
+description: "Find broken refs in render."
 user-invocable: true
 allowed-tools:
   - Bash

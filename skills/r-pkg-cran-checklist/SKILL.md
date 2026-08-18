@@ -1,6 +1,6 @@
 ---
 name: r-pkg-cran-checklist
-description: Walk through the standard CRAN submission checklist for an R package — clean R CMD check --as-cran, DESCRIPTION/cran-comments.md, reverse-dependency checks, win-builder/rhub checks, version bump, and a NEWS.md entry. Use when asked to 'r-pkg-cran-checklist', 'prepare for CRAN submission', 'CRAN checklist', or 'is this package ready for CRAN'.
+description: "CRAN submission checklist."
 user-invocable: true
 allowed-tools:
   - Read

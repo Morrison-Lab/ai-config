@@ -1,6 +1,6 @@
 ---
 name: "giardia"
-description: "Codex wrapper for the ai-config Claude skill `giardia`. Alias for `gia` (Grab Issues + iterate-All). Use when asked to 'giardia'. Use when Codex is asked to use `giardia`, `/giardia`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 gia."
 ---
 
 # giardia (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: iterate
-description: "Alias for `ardi`. Use when asked to 'iterate', 'iterate until clean'."
+description: "→ ardi."
 user-invocable: true
 ---
 

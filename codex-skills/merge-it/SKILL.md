@@ -1,6 +1,6 @@
 ---
 name: "merge-it"
-description: "Codex wrapper for the ai-config Claude skill `merge-it`. Merge a ready pull request, then automatically wrap up \u2014 verify the merge landed, tidy the branch, and run UMS \u2014 without asking. Use when the user says 'merge it', 'merge this', 'merge the PR', or 'go ahead and merge'. Performs the actual merge when the PR isn't merged yet (squash by default), then chains into the post-merge skill. If the PR is already merged, it skips straight to post-merge. Use when Codex is asked to use `merge-it`, `/merge-it`, or the corresponding ai-config/Claude skill workflow."
+description: "Merge ready PR and wrap up."
 ---
 
 # merge-it (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "gii"
-description: "Codex wrapper for the ai-config Claude skill `gii`. Grab Issues Iteratively: loop over the repo's open issues \u2014 grab the top one, implement it, open an MR/PR, ARDI it to clean, then recurse to the next issue. Stacks MRs when later issues depend on earlier (unmerged) branches. Use when asked to 'gii', 'gis', 'grab issues', 'work through the backlog', 'keep going', or 'do all the issues'. Use when Codex is asked to use `gii`, `/gii`, or the corresponding ai-config/Claude skill workflow."
+description: "Grab and implement issues in series."
 ---
 
 # gii (Codex wrapper)

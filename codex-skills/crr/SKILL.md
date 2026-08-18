@@ -1,6 +1,6 @@
 ---
 name: "crr"
-description: "Codex wrapper for the ai-config Claude skill `crr`. Alias for `check-rendered-refs`. Use when asked to 'crr'. Use when Codex is asked to use `crr`, `/crr`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 check-rendered-refs."
 ---
 
 # crr (Codex wrapper)

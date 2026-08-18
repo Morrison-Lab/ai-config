@@ -1,6 +1,6 @@
 ---
 name: "wrap-up"
-description: "Codex wrapper for the ai-config Claude skill `wrap-up`. End-of-session wrap-up: verify the true state of every PR/issue/branch/working tree (never assume), report a linked final summary that surfaces anything still open or dangling, then run a UMS review to persist what was learned. Use when asked to 'wrap up', 'wrap up the session', 'finish up', 'done', 'all done', 'are we done?', or to close out a multi-PR/issue session. Use when Codex is asked to use `wrap-up`, `/wrap-up`, or the corresponding ai-config/Claude skill workflow."
+description: "End-of-session verification and UMS."
 ---
 
 # wrap-up (Codex wrapper)

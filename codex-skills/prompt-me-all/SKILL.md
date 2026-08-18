@@ -1,6 +1,6 @@
 ---
 name: "prompt-me-all"
-description: "Codex wrapper for the ai-config Claude skill `prompt-me-all`. Restate every open question still waiting on user input \u2014 anything asked earlier in the conversation that hasn't been answered yet \u2014 as a single, clearly numbered list, instead of leaving it scattered across the transcript. Use when asked to 'prompt me all', 'promptmeall', 'pma', or '/prompt-me-all'. For just the single most pressing question (or a requested top N), use `prompt-me` / `pm` instead. Use when Codex is asked to use `prompt-me-all`, `/prompt-me-all`, or the corresponding ai-config/Claude skill workflow."
+description: "List all open questions."
 ---
 
 # prompt-me-all (Codex wrapper)

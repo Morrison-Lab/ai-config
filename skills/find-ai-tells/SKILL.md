@@ -1,6 +1,6 @@
 ---
 name: find-ai-tells
-description: "Scan a target text — a file, a PR/MR diff, or pasted prose — for the telltale signs of AI/LLM authorship (overused vocabulary like 'delve'/'tapestry'/'testament', the 'it's not just X, it's Y' antithesis, mechanical rule-of-three lists, hedging stacks, signposting filler, em-dash overuse, bold-leading bullets, emoji headers, promotional register) and report each tell with its location, severity, and a concrete de-slopped revision. Also a standing self-check: before presenting non-trivial prose I wrote, scan my own draft against this catalog first. Use when asked to 'find AI tells', 'find-ai-tells', 'ai-tells', 'does this sound like AI / ChatGPT', 'de-slop this', 'remove the AI tells', 'make this not sound AI-generated', or 'check if this was written by AI'."
+description: "Spot AI prose tells."
 user-invocable: true
 allowed-tools:
   - Bash

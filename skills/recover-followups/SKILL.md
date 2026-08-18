@@ -1,6 +1,6 @@
 ---
 name: recover-followups
-description: "Retrieve untracked follow-up items from closed PRs and issues. Sweeps their bodies, comments, review threads, and ARD 'Deferred'/'Acknowledged' summaries for promised future work, then cross-references against open issues and surfaces (and offers to file) the ones never tracked. Use when asked to 'recover followups', 'rfu', 'find untracked followups', 'audit closed PRs for dropped follow-ups', 'what follow-ups slipped through', or 'did we lose any deferred work?'."
+description: "Recover untracked follow-ups."
 user-invocable: true
 allowed-tools:
   - Bash

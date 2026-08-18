@@ -1,6 +1,6 @@
 ---
 name: "deconflict-sessions"
-description: "Codex wrapper for the ai-config Claude skill `deconflict-sessions`. Alias for `session-lock`. Use when asked to 'deconflict-sessions', 'deconflict multiple ai sessions', 'avoid stepping on another local session'. Use when Codex is asked to use `deconflict-sessions`, `/deconflict-sessions`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 session-lock."
 ---
 
 # deconflict-sessions (Codex wrapper)

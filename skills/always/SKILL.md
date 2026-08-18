@@ -1,6 +1,6 @@
 ---
 name: always
-description: "Alias for `memorize` (synonym of `remember`). Use when asked to 'always', 'always \u2026', 'I prefer \u2026', '/always'."
+description: "→ memorize."
 user-invocable: true
 allowed-tools:
   - Read

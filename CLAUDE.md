@@ -1312,4 +1312,3 @@ It is scoped to the **target**, so a merge from an ai-config checkout into anoth
 
 - **Do:** merge a fully-clean ai-config PR without asking, and say in the same reply that you did and why it qualified.
 - **Don't:** read it as covering a PR that is not fully clean, or another repo's PR merged from an ai-config checkout.
-

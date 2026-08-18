@@ -1,6 +1,6 @@
 ---
 name: ums
-description: "Update Memories and Skills: review recent session context for lessons learned, then actively update memory files and skill definitions to capture them. Use when asked to 'ums', 'update memories and skills', 'record what we learned', or after a workflow reveals a gap in existing skills/memories."
+description: "Update memories and skills from learnings."
 user-invocable: true
 allowed-tools:
   - Bash

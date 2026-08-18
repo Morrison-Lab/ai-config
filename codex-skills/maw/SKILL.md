@@ -1,6 +1,6 @@
 ---
 name: "maw"
-description: "Codex wrapper for the ai-config Claude skill `maw`. Alias for `mwc`. Use when asked to 'maw'. Use when Codex is asked to use `maw`, `/maw`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 mwc."
 ---
 
 # maw (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: agent-builder
-description: "Build a new fan-out subagent under `.claude/agents/<name>.md` for a skill that needs one — FIRST check whether an existing agent (dependency-auditor, hallucination-detector, community-demand-scout) should be reused or extended instead, or an open PR is already building one to redirect to, and only then scaffold a new agent definition with a tight `tools:` list, a role-scoped system prompt, and an explicit boundary statement, paired with exactly one skill that spawns it. Read-only/no-mutate (scout) is the default archetype, but bounded-worker (Edit/Write for one scoped implementation task), critic, and paranoid-reviewer archetypes are also covered — see 'Worker-role archetypes' below. Use when asked to 'build an agent', 'create a subagent', 'make a new agent', 'add an agent', 'agent-builder', or when a heavy skill's fan-out step needs a dedicated worker persona instead of an inline Agent() prompt."
+description: "Author new subagent definition."
 user-invocable: true
 allowed-tools:
   - Bash

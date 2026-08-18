@@ -1,11 +1,6 @@
 ---
 name: last
-description: >
-  Queue the instructions that follow `/last` after every other task — and keep
-  them last even as new `/also` tasks arrive. Only another `/last` goes after a
-  previous `/last`. Use when a task must run at the very end regardless of what
-  else gets added (final render, commit-and-push, cleanup, wrap-up). Invoke
-  explicitly with /last.
+description: "Queue at absolute end of queue."
 user-invocable: true
 allowed-tools: []
 ---

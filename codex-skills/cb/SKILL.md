@@ -1,6 +1,6 @@
 ---
 name: "cb"
-description: "Codex wrapper for the ai-config Claude skill `cb`. Alias for `clean-branches`. Use when asked to 'cb'. Use when Codex is asked to use `cb`, `/cb`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 clean-branches."
 ---
 
 # cb (Codex wrapper)

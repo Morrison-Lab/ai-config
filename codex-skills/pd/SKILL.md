@@ -1,6 +1,6 @@
 ---
 name: "pd"
-description: "Codex wrapper for the ai-config Claude skill `pd`. Alias for `pending-decisions`. Use when asked to 'pd', '/pd [owner/repo|all]'. Use when Codex is asked to use `pd`, `/pd`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 pending-decisions."
 ---
 
 # pd (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "clean-branches"
-description: "Codex wrapper for the ai-config Claude skill `clean-branches`. Clean Branches: audit branches in the current repo \u2014 both LOCAL and REMOTE \u2014 delete dead ones (purely behind main, no open MR/issue), rebase stale-but-alive ones onto main, and open MRs for orphaned work. Also prunes local-only stragglers: branches already merged into main, and tracking branches whose remote is gone. Checks for active sessions before touching anything. Use when asked to 'clean branches', 'cb', 'prune', 'prune branches', 'tidy up branches', or 'clear dead branches'. Use when Codex is asked to use `clean-branches`, `/clean-branches`, or the corresponding ai-config/Claude skill workflow."
+description: "Clean stale Git branches."
 ---
 
 # clean-branches (Codex wrapper)

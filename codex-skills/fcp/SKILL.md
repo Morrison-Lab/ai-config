@@ -1,6 +1,6 @@
 ---
 name: "fcp"
-description: "Codex wrapper for the ai-config Claude skill `fcp`. Alias for `fact-check-prose`. Use when asked to 'fcp'. Use when Codex is asked to use `fcp`, `/fcp`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 fact-check-prose."
 ---
 
 # fcp (Codex wrapper)

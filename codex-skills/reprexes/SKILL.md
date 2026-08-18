@@ -1,6 +1,6 @@
 ---
 name: "reprexes"
-description: "Codex wrapper for the ai-config Claude skill `reprexes`. Isolate a technical problem into a minimal reproducible example (\"reprex\") and iterate fixes on that instead of inside the full application. Use when debugging a bug whose cause isn't obvious after a first look, when a failure only surfaces deep in a large pipeline / app / render, when the full-context test loop is slow, or before filing an upstream issue. Invoke explicitly with /reprexes. Use when Codex is asked to use `reprexes`, `/reprexes`, or the corresponding ai-config/Claude skill workflow."
+description: "Build minimal reproducible example."
 ---
 
 # reprexes (Codex wrapper)

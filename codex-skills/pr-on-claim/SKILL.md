@@ -1,6 +1,6 @@
 ---
 name: "pr-on-claim"
-description: "Codex wrapper for the ai-config Claude skill `pr-on-claim`. Open a draft PR immediately after claiming an issue \u2014 branch, empty commit, draft PR, claim comment \u2014 before writing any code. Use when asked to 'pr-on-claim', 'open a draft PR for this issue', or after claiming an issue you are about to implement. Use when Codex is asked to use `pr-on-claim`, `/pr-on-claim`, or the corresponding ai-config/Claude skill workflow."
+description: "Open draft PR on claiming issue."
 ---
 
 # pr-on-claim (Codex wrapper)

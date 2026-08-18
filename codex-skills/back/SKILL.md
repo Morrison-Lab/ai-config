@@ -1,6 +1,6 @@
 ---
 name: "back"
-description: "Codex wrapper for the ai-config Claude skill `back`. Cancel the away grant and resume asking clarifying questions as normal \u2014 the counterpart to away. Surfaces the decision log away kept (every judgment call resolved unattended, everything skipped/deferred as too ambiguous) so the user can review and countermand anything before work continues. Use when asked to 'back', 'I'm back', 'stop away mode', 'end away mode', 'cancel away', or 'ask me again'. Use when Codex is asked to use `back`, `/back`, or the corresponding ai-config/Claude skill workflow."
+description: "Cancel away mode and resume questions."
 ---
 
 # back (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: address-rebut-defer-iterate-all
-description: "Alias for `ardia`. Use when asked to 'address-rebut-defer-iterate-all', 'address rebut defer iterate all'."
+description: "→ ardia."
 user-invocable: true
 allowed-tools:
   - Bash

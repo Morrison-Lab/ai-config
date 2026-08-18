@@ -1,6 +1,6 @@
 ---
 name: merge-at-will
-description: "Alias for `mwc`. Use when asked to 'merge-at-will'."
+description: "→ mwc."
 user-invocable: true
 allowed-tools:
   - Bash

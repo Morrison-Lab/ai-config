@@ -1,6 +1,6 @@
 ---
 name: "merge-when-confident"
-description: "Codex wrapper for the ai-config Claude skill `merge-when-confident`. Alias for `mwc`. Use when asked to 'merge-when-confident'. Use when Codex is asked to use `merge-when-confident`, `/merge-when-confident`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 mwc."
 ---
 
 # merge-when-confident (Codex wrapper)

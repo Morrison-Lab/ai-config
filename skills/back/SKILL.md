@@ -1,6 +1,6 @@
 ---
 name: back
-description: "Cancel the away grant and resume asking clarifying questions as normal — the counterpart to away. Surfaces the decision log away kept (every judgment call resolved unattended, everything skipped/deferred as too ambiguous) so the user can review and countermand anything before work continues. Use when asked to 'back', 'I'm back', 'stop away mode', 'end away mode', 'cancel away', or 'ask me again'."
+description: "Cancel away mode and resume questions."
 user-invocable: true
 allowed-tools:
   - Bash

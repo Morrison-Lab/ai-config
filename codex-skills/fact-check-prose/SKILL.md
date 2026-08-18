@@ -1,6 +1,6 @@
 ---
 name: "fact-check-prose"
-description: "Codex wrapper for the ai-config Claude skill `fact-check-prose`. Assess the accuracy and clarity of prose in a PR/MR, file, or pasted text \u2014 check factual claims against domain knowledge and external sources, verify document-internal reasoning (formal mathematical derivations/proofs and informal arguments) step by step, and cross-check any computed value or figure the prose describes against the actual rendered output (a PR-preview site, a gh-pages branch, or a local render). Reports which claims are inaccurate, the specific source or check each verdict rests on, and proactively suggests additional citations wherever they'd help \u2014 not just where a claim is already flagged as uncited. Use when asked to 'fact-check this', 'check the math', 'verify this reasoning', 'check this proof', 'is this accurate', 'review this prose for accuracy', or as part of reviewing any PR/MR that touches documentation, lecture notes, or other narrative content. Use when Codex is asked to use `fact-check-prose`, `/fact-check-prose`, or the corresponding ai-config/Claude skill workflow."
+description: "Verify claims and values in prose."
 ---
 
 # fact-check-prose (Codex wrapper)

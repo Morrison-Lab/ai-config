@@ -1,6 +1,6 @@
 ---
 name: "macroize"
-description: "Codex wrapper for the ai-config Claude skill `macroize`. Alias for `use-math-macros`. Use when asked to 'macroize', 'macroize the math'. Use when Codex is asked to use `macroize`, `/macroize`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 use-math-macros."
 ---
 
 # macroize (Codex wrapper)

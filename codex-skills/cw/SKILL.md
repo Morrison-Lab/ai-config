@@ -1,6 +1,6 @@
 ---
 name: "cw"
-description: "Codex wrapper for the ai-config Claude skill `cw`. Alias for `clean-worktrees`. Use when asked to 'cw'. Use when Codex is asked to use `cw`, `/cw`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 clean-worktrees."
 ---
 
 # cw (Codex wrapper)

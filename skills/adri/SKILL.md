@@ -1,6 +1,6 @@
 ---
 name: adri
-description: "Alias for `ardi` (common transposition typo). Use when asked to 'adri'."
+description: "→ ardi."
 user-invocable: true
 allowed-tools:
   - Bash

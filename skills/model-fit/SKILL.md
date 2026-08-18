@@ -1,6 +1,6 @@
 ---
 name: model-fit
-description: "Alias for `assess-model-fit`. Use when asked to 'model-fit'."
+description: "→ assess-model-fit."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "grab-issue"
-description: "Codex wrapper for the ai-config Claude skill `grab-issue`. Alias for `gi`. Use when asked to 'grab-issue'. Use when Codex is asked to use `grab-issue`, `/grab-issue`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 gi."
 ---
 
 # grab-issue (Codex wrapper)

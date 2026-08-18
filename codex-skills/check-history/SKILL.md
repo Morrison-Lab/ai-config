@@ -1,6 +1,6 @@
 ---
 name: "check-history"
-description: "Codex wrapper for the ai-config Claude skill `check-history`. Review the MR/PR history (merged and closed) before starting work on an issue, to ensure proposed changes don't undo past progress or re-introduce previously fixed problems. Use automatically before beginning implementation on any issue or MR \u2014 especially when modifying shared infrastructure, CI templates, or code that has been refactored before. Use when Codex is asked to use `check-history`, `/check-history`, or the corresponding ai-config/Claude skill workflow."
+description: "Check closed PR history for issue."
 ---
 
 # check-history (Codex wrapper)

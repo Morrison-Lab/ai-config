@@ -1,6 +1,6 @@
 ---
 name: fix-forward-references
-description: "Detect and fix forward references in prose — a cross-reference or phrase (\"see below\", \"as discussed below\", \"in the following section\", \"we'll cover this later\") that points a reader ahead to content they haven't reached yet. Greps for the primary signal of a directional word (below/later/following/subsequently/further down/next/afterward), confirms each hit isn't an idiom or already-backward reference, then rearranges the document (moves the referenced content earlier) or rewords the reference to fix it. Use when asked to 'fix forward references', 'find forward references', 'check for forward references', 'remove forward references', 'fix-forward-references', 'ffr', 'this points ahead to something not written yet', or 'rearrange this so nothing references content below it'. Also runs proactively as part of any PR/MR review that touches narrative prose, alongside `definition-crossrefs.md`'s narrower formal-crossref-div check."
+description: "Fix forward references in text."
 user-invocable: true
 allowed-tools:
   - Bash

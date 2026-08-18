@@ -46,6 +46,13 @@ FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.S)
 # surfaces as a cryptic marketplace sync failure -- see ai-config#1263.
 MARKETPLACE_DESCRIPTION_LIMIT = 1024
 
+# Claude Code includes every installed skill's name and description in its
+# routing prompt. Keep the entire catalog below roughly 1% of a 200k-token
+# context window (about 8,000 characters at four characters per token), so
+# the list remains routable instead of being truncated by the harness.
+SKILL_LISTING_BUDGET_CHARS = 8_000
+LISTING_ENTRY_OVERHEAD_CHARS = 8
+
 
 def parse_frontmatter(text: str, where: str):
     match = FRONTMATTER.match(text)
@@ -99,6 +106,37 @@ def check_skill(skill_dir: Path) -> None:
         errors.append(f"{rel}: `allowed-tools` must be a list of strings")
 
 
+def listing_chars(entries: list[tuple[str, str]]) -> int:
+    """Return the approximate routing-prompt cost of a skill catalog."""
+    return sum(
+        len(name) + len(description) + LISTING_ENTRY_OVERHEAD_CHARS
+        for name, description in entries
+    )
+
+
+def check_listing_budget(skill_mds: list[Path], label: str) -> None:
+    """Reject a catalog whose metadata would exceed Claude's routing budget."""
+    entries = []
+    for skill_md in skill_mds:
+        fm = parse_frontmatter(
+            skill_md.read_text(encoding="utf-8"), str(skill_md.relative_to(ROOT))
+        )
+        if fm is None:
+            continue
+        name = fm.get("name")
+        description = fm.get("description")
+        if isinstance(name, str) and isinstance(description, str):
+            entries.append((name, description))
+    total = listing_chars(entries)
+    if total > SKILL_LISTING_BUDGET_CHARS:
+        errors.append(
+            f"{label}: skill listing is {total} chars, over the "
+            f"{SKILL_LISTING_BUDGET_CHARS}-char context budget"
+        )
+    else:
+        print(f"  {label} listing: {total}/{SKILL_LISTING_BUDGET_CHARS} chars")
+
+
 def check_skills() -> None:
     skills_dir = ROOT / "skills"
     if not skills_dir.is_dir():
@@ -110,6 +148,7 @@ def check_skills() -> None:
             count += 1
             check_skill(child)
     print(f"  checked {count} skills")
+    check_listing_budget(sorted(skills_dir.glob("*/SKILL.md")), "skills/")
 
 
 TOKEN_PATTERN = re.compile(r"`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")
@@ -217,6 +256,7 @@ def check_codex_wrappers() -> None:
             errors.append(f"{rel}: frontmatter `description` is missing or empty")
 
     print(f"  checked {count} Codex wrappers")
+    check_listing_budget(sorted(wrappers_dir.glob("*/SKILL.md")), "codex-skills/")
 
     sync = subprocess.run(
         [sys.executable, str(ROOT / "scripts/sync-codex-skill-wrappers.py"), "--check"],

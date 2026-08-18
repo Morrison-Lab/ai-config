@@ -1,6 +1,6 @@
 ---
 name: cascade
-description: Cascade merges DOWN a PR stack — merge each open PR's base branch into it (main into unstacked PRs, each stacked PR's base branch into the PR on top of it), resolving squash-stack conflicts and verifying each merge is content-neutral. Does NOT merge any PR into main. Use on "cascade", "/cascade", "cascade the stack", "propagate main down the stack", or after one or more PRs in a stack merge and the rest need their bases folded in.
+description: "Merge base down PR stack."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "tidy"
-description: "Codex wrapper for the ai-config Claude skill `tidy`. Audit the current codebase (or a specified scope) for opportunities to simplify, DRY, outsource to well-maintained external tools/packages, reduce maintenance burden, and improve clarity. Produces a prioritized list of concrete refactoring suggestions. Use when asked to \"tidy\", \"tidy up\", \"DRY this out\", or \"what can we outsource/remove\". Invoke explicitly with /tidy. Use when Codex is asked to use `tidy`, `/tidy`, or the corresponding ai-config/Claude skill workflow."
+description: "Audit codebase to simplify and DRY."
 ---
 
 # tidy (Codex wrapper)

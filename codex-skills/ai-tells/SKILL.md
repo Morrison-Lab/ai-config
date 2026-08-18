@@ -1,6 +1,6 @@
 ---
 name: "ai-tells"
-description: "Codex wrapper for the ai-config Claude skill `ai-tells`. Alias for `find-ai-tells`. Use when asked to 'ai-tells'. Use when Codex is asked to use `ai-tells`, `/ai-tells`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 find-ai-tells."
 ---
 
 # ai-tells (Codex wrapper)

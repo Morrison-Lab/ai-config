@@ -1,6 +1,6 @@
 ---
 name: workaround-watcher
-description: Scaffold a scheduled GitHub Actions workflow that watches an upstream issue/PR you're blocked on and, when it's fixed (closed-as-completed / merged), auto-opens a PR reverting your local workaround back to a committed "target" template. Use when you add a temporary workaround for an upstream bug and want to be reminded — with the revert pre-drafted — once it's resolved, instead of the workaround silently outliving its reason.
+description: "Watch upstream issue for fix."
 user-invocable: true
 allowed-tools:
   - Read

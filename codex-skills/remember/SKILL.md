@@ -1,6 +1,6 @@
 ---
 name: "remember"
-description: "Codex wrapper for the ai-config Claude skill `remember`. Alias for `memorize`. Use when asked to 'remember', '/remember', 'remember that \u2026'. Use when Codex is asked to use `remember`, `/remember`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 memorize."
 ---
 
 # remember (Codex wrapper)

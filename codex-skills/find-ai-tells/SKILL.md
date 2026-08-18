@@ -1,6 +1,6 @@
 ---
 name: "find-ai-tells"
-description: "Codex wrapper for the ai-config Claude skill `find-ai-tells`. Scan a target text \u2014 a file, a PR/MR diff, or pasted prose \u2014 for the telltale signs of AI/LLM authorship (overused vocabulary like 'delve'/'tapestry'/'testament', the 'it's not just X, it's Y' antithesis, mechanical rule-of-three lists, hedging stacks, signposting filler, em-dash overuse, bold-leading bullets, emoji headers, promotional register) and report each tell with its location, severity, and a concrete de-slopped revision. Also a standing self-check: before presenting non-trivial prose I wrote, scan my own draft against this catalog first. Use when asked to 'find AI tells', 'find-ai-tells', 'ai-tells', 'does this sound like AI / ChatGPT', 'de-slop this', 'remove the AI tells', 'make this not sound AI-generated', or 'check if this was written by AI'. Use when Codex is asked to use `find-ai-tells`, `/find-ai-tells`, or the corresponding ai-config/Claude skill workflow."
+description: "Spot AI prose tells."
 ---
 
 # find-ai-tells (Codex wrapper)

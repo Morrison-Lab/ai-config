@@ -1,6 +1,6 @@
 ---
 name: "iterate"
-description: "Codex wrapper for the ai-config Claude skill `iterate`. Alias for `ardi`. Use when asked to 'iterate', 'iterate until clean'. Use when Codex is asked to use `iterate`, `/iterate`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ardi."
 ---
 
 # iterate (Codex wrapper)

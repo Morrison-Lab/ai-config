@@ -1,6 +1,6 @@
 ---
 name: "check-dependency-updates"
-description: "Codex wrapper for the ai-config Claude skill `check-dependency-updates`. Audit a repo for stale dependencies and surface available upgrades \u2014 pinned GitHub Actions tags/SHAs, renv.lock package versions, pre-commit revs, Quarto/tool versions in CI, submodules. Reports what could be updated and what each update buys, then drives the chosen bumps through the normal issue \u2192 branch \u2192 PR \u2192 ARDI flow. Use when asked to 'check dependency updates', 'cdu', 'audit dependency freshness', 'are my dependencies stale', 'check for outdated dependencies', 'should I bump the workflow SHAs', 'update the renv lockfile', or 'are there newer versions of my pinned actions'. Use when Codex is asked to use `check-dependency-updates`, `/check-dependency-updates`, or the corresponding ai-config/Claude skill workflow."
+description: "Audit dependency upgrades."
 ---
 
 # check-dependency-updates (Codex wrapper)

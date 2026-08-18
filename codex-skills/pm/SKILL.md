@@ -1,6 +1,6 @@
 ---
 name: "pm"
-description: "Codex wrapper for the ai-config Claude skill `pm`. Alias for `prompt-me`. Use when asked to 'pm', 'pm 3', '/pm [N]'. Use when Codex is asked to use `pm`, `/pm`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 prompt-me."
 ---
 
 # pm (Codex wrapper)

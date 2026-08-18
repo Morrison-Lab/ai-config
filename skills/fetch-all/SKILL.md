@@ -1,6 +1,6 @@
 ---
 name: fetch-all
-description: "Fetch All: run `git fetch` from origin across EVERY git repo under a directory (default: the current dir's immediate children), reporting per-repo status — up-to-date, updated (with the ref changes), failed (with the error), or skipped (no origin). A read-only sweep: it fetches, it never merges, pulls, or touches your working tree. Use when asked to 'fetch all', 'fa', 'fetch from origin on all repos', 'fetch every repo', 'update all my repos', 'git fetch everywhere', or 'fetch all the repos under <dir>'."
+description: "Fetch all remotes and submodules."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "rfu"
-description: "Codex wrapper for the ai-config Claude skill `rfu`. Alias for `recover-followups`. Use when asked to 'rfu', 'what follow-ups slipped through?'. Use when Codex is asked to use `rfu`, `/rfu`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 recover-followups."
 ---
 
 # rfu (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "pma"
-description: "Codex wrapper for the ai-config Claude skill `pma`. Alias for `prompt-me-all`. Use when asked to 'pma', '/pma'. Use when Codex is asked to use `pma`, `/pma`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 prompt-me-all."
 ---
 
 # pma (Codex wrapper)

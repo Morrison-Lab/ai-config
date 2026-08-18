@@ -1,6 +1,6 @@
 ---
 name: ph
-description: "Alias for `purge-hallucinations`. Use when asked to 'ph'."
+description: "→ purge-hallucinations."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: revive-closed
-description: "Alias for `rescue-closed`. Use when asked to 'revive closed issues', 'revive-closed'."
+description: "→ rescue-closed."
 user-invocable: true
 allowed-tools:
   - Bash

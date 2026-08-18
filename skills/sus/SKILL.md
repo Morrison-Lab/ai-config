@@ -1,6 +1,6 @@
 ---
 name: sus
-description: "Alias for `sup` (send-upstream). Use when asked to 'sus'."
+description: "→ sup."
 user-invocable: true
 allowed-tools:
   - Bash

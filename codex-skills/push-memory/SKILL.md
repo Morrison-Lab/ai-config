@@ -1,6 +1,6 @@
 ---
 name: "push-memory"
-description: "Codex wrapper for the ai-config Claude skill `push-memory`. Push a general-purpose memory into the ai-config repo when you're working primarily in ANOTHER repo \u2014 a `CLAUDE.md` standing rule or a `memories/*.md` reference fact \u2014 delivered on its own branch + PR (or via the GitHub file API) without disturbing the repo you're in. Use when the user says 'push this to ai-config', 'remember this globally from here', 'add this to ai-config's memory / CLAUDE.md', 'record this in ai-config even though we're in <other repo>', or '/push-memory'. For the normal case where ai-config IS your working repo, use `memorize` instead. Use when Codex is asked to use `push-memory`, `/push-memory`, or the corresponding ai-config/Claude skill workflow."
+description: "Push memory from external repo."
 ---
 
 # push-memory (Codex wrapper)

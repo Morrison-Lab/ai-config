@@ -1,6 +1,6 @@
 ---
 name: "ph"
-description: "Codex wrapper for the ai-config Claude skill `ph`. Alias for `purge-hallucinations`. Use when asked to 'ph'. Use when Codex is asked to use `ph`, `/ph`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 purge-hallucinations."
 ---
 
 # ph (Codex wrapper)

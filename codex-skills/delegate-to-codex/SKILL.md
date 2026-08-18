@@ -1,6 +1,6 @@
 ---
 name: "delegate-to-codex"
-description: "Codex wrapper for the ai-config Claude skill `delegate-to-codex`. Delegate heavy read/draft/verify work to the `codex` CLI (a separately-billed ChatGPT-plan subagent) before spending Claude quota \u2014 build the prompts, run codex read-only, orchestrate multi-item work via a background runner + DONE-marker poll with a `--output-schema`, detect 5-hour usage-limit exhaustion, and fall back to Claude only for what codex can't finish. Use when asked to 'delegate to codex', 'use codex', 'run this on codex', 'dtc', 'codex-first', 'do this with codex', 'offload to codex', or before a heavy fan-out read/analysis/verify pass that would otherwise burn Claude/Workflow tokens. Use when Codex is asked to use `delegate-to-codex`, `/delegate-to-codex`, or the corresponding ai-config/Claude skill workflow."
+description: "Delegate sidecar task to Codex."
 ---
 
 # delegate-to-codex (Codex wrapper)

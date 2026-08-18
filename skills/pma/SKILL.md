@@ -1,6 +1,6 @@
 ---
 name: pma
-description: "Alias for `prompt-me-all`. Use when asked to 'pma', '/pma'."
+description: "→ prompt-me-all."
 user-invocable: true
 allowed-tools: []
 ---

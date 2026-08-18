@@ -1,6 +1,6 @@
 ---
 name: rom
-description: "Alias for `register-oaicopilot-models`. Register new models in the OAICopilot VS Code extension's `oaicopilot.models` setting, inferring each new entry's parameters from its closest already-configured sibling. Use when asked to 'rom', 'register these models', or 'add these models to oaicopilot'."
+description: "Alias for `register-oaicopilot-models`."
 user-invocable: true
 allowed-tools:
   - Bash

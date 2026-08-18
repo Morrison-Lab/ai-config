@@ -1,6 +1,6 @@
 ---
 name: "register-oaicopilot-models"
-description: "Codex wrapper for the ai-config Claude skill `register-oaicopilot-models`. Register new models in the `oai-compatible-copilot` (OAICopilot) VS Code extension's `oaicopilot.models` setting, given a list or screenshot of available models (e.g. a Databricks Model Serving endpoint list). Diffs the requested models against what's already configured, infers each new entry's parameters (context length, max tokens, vision, apiMode, family) from the closest already-configured sibling of the same model family, and appends only the missing entries without disturbing existing ones. Use when asked to 'register these models', 'add these models to oaicopilot', 'register all these models in oaic configuration', 'add these to the model picker', or when handed a list/screenshot of served-model names to make available in GitHub Copilot Chat. Use when Codex is asked to use `register-oaicopilot-models`, `/register-oaicopilot-models`, or the corresponding ai-config/Claude skill workflow."
+description: "Register models in the OAICopilot VS Code extension. Use when asked to 'register these models', 'add these to oaicopilot', or 'rom'."
 ---
 
 # register-oaicopilot-models (Codex wrapper)

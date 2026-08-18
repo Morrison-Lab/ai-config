@@ -1,6 +1,6 @@
 ---
 name: "rom"
-description: "Codex wrapper for the ai-config Claude skill `rom`. Alias for `register-oaicopilot-models`. Register new models in the OAICopilot VS Code extension's `oaicopilot.models` setting, inferring each new entry's parameters from its closest already-configured sibling. Use when asked to 'rom', 'register these models', or 'add these models to oaicopilot'. Use when Codex is asked to use `rom`, `/rom`, or the corresponding ai-config/Claude skill workflow."
+description: "Alias for `register-oaicopilot-models`."
 ---
 
 # rom (Codex wrapper)

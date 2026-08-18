@@ -23,7 +23,6 @@ The `@claude` bot's own behaviour lives in
   variables (`"$PR_BRANCH"`) inside inline scripts to prevent script injection vulnerabilities.
   (Morrison-Lab/gha#482.)
 
-
 ## d-morrison/gha reusable workflows
 Check `d-morrison/gha` before writing bespoke CI — it has reusable workflows for
 common patterns.
@@ -1122,7 +1121,6 @@ That ai-config has no automatic review to race against in the first place is a s
   For those runtime uses, import `List`/`Dict` from `typing`, which work in every position.
   (Morrison-Lab/gha#412, 2026-08-05).
 
-
 ## Actions outages
 
 Detecting a live platform incident, and cleaning up the two shapes of wreckage
@@ -1156,23 +1154,11 @@ workflow this repo's review actually depends on, per
 
 **A third `claude-bot.yml` run followed, and it may have been self-triggered
 rather than a new human request.**
-The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`, called by
-`claude-bot.yml`) fires on `contains(github.event.comment.body, '@claude')`
-with no regard for code-span formatting -- the exact substring-match bug
-this repo's own `claude-bot.yml` already documents having caused once
-before, on an issue body rather than a comment (#682 -> #683).
-A FALLBACK self-review posted to this PR at 03:05:10 contained the text
-`` the `@claude` review workflow `` -- a literal `@claude` substring,
-posted by a `COLLABORATOR`-associated account (a direct repo grant, role
-`maintain`) -- enough to satisfy the gate.
-One MCP-backed read (`pull_request_read`) reported `MEMBER` for this
-comment on two calls; raw REST and GraphQL both returned `COLLABORATOR`
-independently, matching the collaborator grant -- treat the lone `MEMBER`
-reading as this session's tool outlier, not a real surface disagreement.
-The third run was picked up sixteen seconds later, at 03:05:26 -- a timing
-this session's tools cannot fully confirm as causal (no access to which
-comment fired a given `issue_comment` run).
-Tracked as ai-config#1242 (needs transfer to `gha`) for confirmation.
+The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`) fires on
+`contains(github.event.comment.body, '@claude')` without stripping code spans.
+A self-review comment containing `` `@claude` `` triggered the gate.
+Tracked as ai-config#1242 for confirmation.
+
 
 That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not
 the PR branch -- the same ambiguity
@@ -1198,13 +1184,6 @@ and `ref: <PR-branch>`, which skips the comment-relay path entirely.
   "retry once, then treat as unreachable" rule -- it isn't the reviewer failing.
 
 (2026-08-07, `Morrison-Lab/ai-config#1238`: the same string #1197 traced to a
-false repo-wide-failure report reappeared verbatim on a PR this session
-opened.
-A fallback self-review was posted before checking further -- not wrong to
-do, but reached for the wrong reason, since `list_workflow_runs` showed the
-listener succeeding throughout and the review workflow re-dispatching
-within seconds of each comment.
-Three review rounds on this entry then caught: PR #635 wrongly called a
-different repo, an overcounted "three" genuine comments (really two plus a
-probable self-retrigger), and a `MEMBER` reading that was this session's own
-tool outlier against three other checks agreeing on `COLLABORATOR`.)
+false repo-wide-failure report reappeared verbatim on a PR, where `list_workflow_runs`
+showed listener success and rapid re-dispatch.)
+

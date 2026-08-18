@@ -346,15 +346,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#register-oaicopilot-models-add-new-models-to-the-oaicopilot-extension-config" id="toc-register-oaicopilot-models-add-new-models-to-the-oaicopilot-extension-config" class="nav-link active" data-scroll-target="#register-oaicopilot-models-add-new-models-to-the-oaicopilot-extension-config">register-oaicopilot-models — add new models to the OAICopilot extension config</a>
+  <li><a href="#register-oaicopilot-models-add-new-models-to-the-oaicopilot-extension-config" id="toc-register-oaicopilot-models-add-new-models-to-the-oaicopilot-extension-config" class="nav-link active" data-scroll-target="#register-oaicopilot-models-add-new-models-to-the-oaicopilot-extension-config">register-oaicopilot-models: add new models to the OAICopilot extension config</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#step-0-locate-the-config" id="toc-step-0-locate-the-config" class="nav-link" data-scroll-target="#step-0-locate-the-config">Step 0 — Locate the config</a></li>
-  <li><a href="#step-1-diff-requested-models-against-whats-already-registered" id="toc-step-1-diff-requested-models-against-whats-already-registered" class="nav-link" data-scroll-target="#step-1-diff-requested-models-against-whats-already-registered">Step 1 — Diff requested models against what’s already registered</a></li>
-  <li><a href="#step-2-infer-each-new-entrys-parameters-from-its-closest-sibling" id="toc-step-2-infer-each-new-entrys-parameters-from-its-closest-sibling" class="nav-link" data-scroll-target="#step-2-infer-each-new-entrys-parameters-from-its-closest-sibling">Step 2 — Infer each new entry’s parameters from its closest sibling</a></li>
-  <li><a href="#step-3-append-dont-disturb-existing-entries" id="toc-step-3-append-dont-disturb-existing-entries" class="nav-link" data-scroll-target="#step-3-append-dont-disturb-existing-entries">Step 3 — Append, don’t disturb existing entries</a></li>
-  <li><a href="#step-4-validate" id="toc-step-4-validate" class="nav-link" data-scroll-target="#step-4-validate">Step 4 — Validate</a></li>
-  <li><a href="#step-5-report" id="toc-step-5-report" class="nav-link" data-scroll-target="#step-5-report">Step 5 — Report</a></li>
+  <li><a href="#step-0-locate-the-config" id="toc-step-0-locate-the-config" class="nav-link" data-scroll-target="#step-0-locate-the-config">Step 0: Locate the config</a></li>
+  <li><a href="#step-1-diff-requested-models-against-whats-already-registered" id="toc-step-1-diff-requested-models-against-whats-already-registered" class="nav-link" data-scroll-target="#step-1-diff-requested-models-against-whats-already-registered">Step 1: Diff requested models against what’s already registered</a></li>
+  <li><a href="#step-2-infer-each-new-entrys-parameters-from-its-closest-sibling" id="toc-step-2-infer-each-new-entrys-parameters-from-its-closest-sibling" class="nav-link" data-scroll-target="#step-2-infer-each-new-entrys-parameters-from-its-closest-sibling">Step 2: Infer each new entry’s parameters from its closest sibling</a></li>
+  <li><a href="#step-3-append-dont-disturb-existing-entries" id="toc-step-3-append-dont-disturb-existing-entries" class="nav-link" data-scroll-target="#step-3-append-dont-disturb-existing-entries">Step 3: Append, don’t disturb existing entries</a></li>
+  <li><a href="#step-4-validate" id="toc-step-4-validate" class="nav-link" data-scroll-target="#step-4-validate">Step 4: Validate</a></li>
+  <li><a href="#step-5-report" id="toc-step-5-report" class="nav-link" data-scroll-target="#step-5-report">Step 5: Report</a></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
   </ul></li>
@@ -369,8 +369,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <section id="register-oaicopilot-models-add-new-models-to-the-oaicopilot-extension-config" class="level1">
-<h1>register-oaicopilot-models — add new models to the OAICopilot extension config</h1>
-<p>Register one or more new models in the <code>johnny-zhao.oai-compatible-copilot</code> (“OAICopilot”) VS Code extension, so they show up in the Copilot Chat model picker. The extension’s own config lives in the user’s <code>settings.json</code> under the <code>oaicopilot.models</code> array — there’s no separate “oaic configuration” file.</p>
+<h1>register-oaicopilot-models: add new models to the OAICopilot extension config</h1>
+<p>Register one or more new models in the <code>johnny-zhao.oai-compatible-copilot</code> (“OAICopilot”) VS Code extension, so they show up in the Copilot Chat model picker. The extension’s own config lives in the user’s <code>settings.json</code> under the <code>oaicopilot.models</code> array. There’s no separate “oaic configuration” file.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
@@ -379,37 +379,40 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </ul>
 </section>
 <section id="step-0-locate-the-config" class="level2">
-<h2 class="anchored" data-anchor-id="step-0-locate-the-config">Step 0 — Locate the config</h2>
-<p>The extension stores everything in VS Code’s <strong>user</strong> <code>settings.json</code> (or the workspace <code>.vscode/settings.json</code> if the user asked for project-scope registration) — not a dedicated file. Find it:</p>
+<h2 class="anchored" data-anchor-id="step-0-locate-the-config">Step 0: Locate the config</h2>
+<p>The extension stores everything in VS Code’s <strong>user</strong> <code>settings.json</code> (or the workspace <code>.vscode/settings.json</code> if the user asked for project-scope registration), not a dedicated file. Find it:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># macOS</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="st">"</span><span class="va">$HOME</span><span class="st">/Library/Application Support/Code/User/settings.json"</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Linux</span></span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="st">"</span><span class="va">$HOME</span><span class="st">/.config/Code/User/settings.json"</span></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Windows (PowerShell)</span></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="st">"</span><span class="va">$env</span><span class="st">:APPDATA\Code\User\settings.json"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The Bash snippets in Steps 1 and 4 read <code>$SETTINGS</code>. Set it once from the path that matches this OS, so those snippets aren’t hardcoded to macOS:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># macOS</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="va">SETTINGS</span><span class="op">=</span><span class="st">"</span><span class="va">$HOME</span><span class="st">/Library/Application Support/Code/User/settings.json"</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Linux</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="va">SETTINGS</span><span class="op">=</span><span class="st">"</span><span class="va">$HOME</span><span class="st">/.config/Code/User/settings.json"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Confirm the extension is actually installed before editing (<code>johnny-zhao.oai-compatible-copilot</code>):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">find</span> ~/.vscode/extensions <span class="at">-maxdepth</span> 1 <span class="at">-iname</span> <span class="st">"*oai-compatible-copilot*"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Read the two relevant keys: <code>oaicopilot.baseUrl</code> (global default endpoint) and <code>oaicopilot.models</code> (the array of registered model entries — each has at least <code>id</code> and <code>owned_by</code>).</p>
-<p>A sanitized reference schema (endpoint templated as <code>&lt;workspace-url&gt;</code>, no secrets) lives alongside this skill in <a href="models-template.jsonc"><code>models-template.jsonc</code></a> — one representative entry per model family. Use it as the per-family schema to copy from in Step 2, and to seed <code>oaicopilot.models</code> on a fresh machine (swap in your workspace URL).</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">find</span> ~/.vscode/extensions <span class="at">-maxdepth</span> 1 <span class="at">-iname</span> <span class="st">"*oai-compatible-copilot*"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Read the two relevant keys: <code>oaicopilot.baseUrl</code> (global default endpoint) and <code>oaicopilot.models</code> (the array of registered model entries; each has at least <code>id</code> and <code>owned_by</code>).</p>
+<p>A sanitized reference schema (endpoint templated as <code>&lt;workspace-url&gt;</code>, no secrets) lives alongside this skill in <a href="models-template.jsonc"><code>models-template.jsonc</code></a>, one representative entry per model family. Use it as the per-family schema to copy from in Step 2, and to seed <code>oaicopilot.models</code> on a fresh machine (swap in your workspace URL).</p>
 </section>
 <section id="step-1-diff-requested-models-against-whats-already-registered" class="level2">
-<h2 class="anchored" data-anchor-id="step-1-diff-requested-models-against-whats-already-registered">Step 1 — Diff requested models against what’s already registered</h2>
-<p>The model <strong>name</strong> the user hands you (e.g.&nbsp;from a served-endpoint list) is almost always identical to the <code>id</code> field the extension expects — this extension’s convention is <code>id == owned_by-prefixed served-model name</code> (<code>databricks-claude-opus-5</code>, <code>databricks-gemini-3-7-flash</code>, etc.). Extract the existing <code>id</code>s and set-subtract:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">-c</span> <span class="st">"</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="st">import json, re</span></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="st">path = '</span><span class="va">$HOME</span><span class="st">/Library/Application Support/Code/User/settings.json'</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="st">text = open(path).read()</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="st"># settings.json may have trailing commas / comments in some setups; if json.loads</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="st"># fails, fall back to a plain grep of </span><span class="dt">\"</span><span class="st">id</span><span class="dt">\"</span><span class="st">: </span><span class="dt">\"</span><span class="st">...</span><span class="dt">\"</span><span class="st"> instead of hand-parsing.</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="st">data = json.loads(text)</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="st">existing = {m['id'] for m in data.get('oaicopilot.models', [])}</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="st">print('\n'.join(sorted(existing)))</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<h2 class="anchored" data-anchor-id="step-1-diff-requested-models-against-whats-already-registered">Step 1: Diff requested models against what’s already registered</h2>
+<p>The model <strong>name</strong> the user hands you (e.g.&nbsp;from a served-endpoint list) maps to the <code>id</code> field by this extension’s convention: <code>id == owned_by-prefixed served-model name</code> (<code>databricks-claude-opus-5</code>, <code>databricks-gemini-3-7-flash</code>, etc.). The served-endpoint list usually already carries that prefix, so the handed-in name and the <code>id</code> are typically the same string, but confirm the prefix is present rather than assuming it. Extract the existing <code>id</code>s and set-subtract:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">-c</span> <span class="st">"</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="st">import json</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="st">data = json.load(open('</span><span class="va">$SETTINGS</span><span class="st">'))</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="st">existing = {m['id'] for m in data.get('oaicopilot.models', [])}</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="st">print('\n'.join(sorted(existing)))</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If <code>json.load</code> raises (a real-world <code>settings.json</code> may contain <code>//</code> comments or trailing commas, i.e.&nbsp;JSONC), fall back to a plain grep of the <code>id</code> values instead of hand-parsing:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-oE</span> <span class="st">'"id"[[:space:]]*:[[:space:]]*"[^"]+"'</span> <span class="st">"</span><span class="va">$SETTINGS</span><span class="st">"</span> <span class="kw">|</span> <span class="fu">sed</span> <span class="at">-E</span> <span class="st">'s/.*"([^"]+)"$/\1/'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Compare against the requested list. Report which are already present (no-op) and which are genuinely new before touching the file.</p>
 </section>
 <section id="step-2-infer-each-new-entrys-parameters-from-its-closest-sibling" class="level2">
-<h2 class="anchored" data-anchor-id="step-2-infer-each-new-entrys-parameters-from-its-closest-sibling">Step 2 — Infer each new entry’s parameters from its closest sibling</h2>
-<p>Never invent parameters from scratch. For each missing model, find the <strong>closest already-configured sibling</strong> — same family prefix (same <code>gpt-5.x</code>/<code>claude</code>/<code>gemini</code>/<code>llama</code> line) and, ideally, the most recent version within that line — and copy its schema verbatim except for <code>id</code> (and <code>family</code>, if the extension’s <code>family</code> convention encodes the version, e.g. <code>gpt-5.4</code> vs <code>gpt-5.4-mini</code>). Carry over unchanged:</p>
+<h2 class="anchored" data-anchor-id="step-2-infer-each-new-entrys-parameters-from-its-closest-sibling">Step 2: Infer each new entry’s parameters from its closest sibling</h2>
+<p>Never invent parameters from scratch. For each missing model, find the <strong>closest already-configured sibling</strong>: same family prefix (same <code>gpt-5.x</code>/<code>claude</code>/<code>gemini</code>/<code>llama</code> line) and, ideally, the most recent version within that line, then copy its schema verbatim except for <code>id</code> (and <code>family</code>, if the extension’s <code>family</code> convention encodes the version, e.g. <code>gpt-5.4</code> vs <code>gpt-5.4-mini</code>). Carry over unchanged:</p>
 <ul>
 <li><code>baseUrl</code> / <code>apiMode</code> (per-provider, essentially never changes)</li>
 <li><code>context_length</code>, <code>max_tokens</code> or <code>max_completion_tokens</code></li>
@@ -417,26 +420,35 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><code>reasoning_effort</code> (GPT-family reasoning models only)</li>
 <li><code>owned_by</code></li>
 </ul>
-<p>If a requested model has <strong>no sibling at all</strong> (a genuinely new model line, e.g.&nbsp;a first-of-its-kind name), say so explicitly rather than guessing silently — use the most structurally-similar existing entry as a starting point (matching <code>vision</code>/<code>apiMode</code> conventions for that provider) and flag in your final report that its <code>context_length</code>/<code>max_tokens</code> are placeholders the user should confirm against the provider’s actual model card.</p>
+<p>If a requested model has <strong>no sibling at all</strong> (a genuinely new model line, e.g.&nbsp;a first-of-its-kind name), say so explicitly rather than guessing silently. Use the most structurally-similar existing entry as a starting point (matching <code>vision</code>/<code>apiMode</code> conventions for that provider) and flag in your final report that its <code>context_length</code>/<code>max_tokens</code> are placeholders the user should confirm against the provider’s actual model card.</p>
 </section>
 <section id="step-3-append-dont-disturb-existing-entries" class="level2">
-<h2 class="anchored" data-anchor-id="step-3-append-dont-disturb-existing-entries">Step 3 — Append, don’t disturb existing entries</h2>
-<p>Add only the missing entries to the end of the <code>oaicopilot.models</code> array. Use <code>replace_string_in_file</code>/<code>multi_replace_string_in_file</code>, anchoring on the <strong>last existing array element plus the closing <code>],</code></strong>, and match the file’s existing indentation exactly. Never reorder, reformat, or rewrite entries that already exist — a diff that touches unrelated array elements makes the change harder to review and risks losing a hand-tuned parameter.</p>
+<h2 class="anchored" data-anchor-id="step-3-append-dont-disturb-existing-entries">Step 3: Append, don’t disturb existing entries</h2>
+<p>Add only the missing entries to the end of the <code>oaicopilot.models</code> array, via whatever file-edit tool this environment provides (the <code>Edit</code> tool, or the assistant’s edit-a-string tool). Anchor on the <strong>last existing array element plus the closing <code>]</code></strong>, and match the file’s existing indentation exactly. Never reorder, reformat, or rewrite entries that already exist: a diff that touches unrelated array elements makes the change harder to review and risks losing a hand-tuned parameter.</p>
 </section>
 <section id="step-4-validate" class="level2">
-<h2 class="anchored" data-anchor-id="step-4-validate">Step 4 — Validate</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">-c</span> <span class="st">"import json; json.load(open('</span><span class="va">$HOME</span><span class="st">/Library/Application Support/Code/User/settings.json'))"</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> OK</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>(Or use <code>get_errors</code> on the file if editing through an assistant with that tool.) A <code>settings.json</code> with a trailing comma or an unbalanced brace breaks <em>all</em> of VS Code’s settings, not just this extension’s — always validate before finishing.</p>
+<h2 class="anchored" data-anchor-id="step-4-validate">Step 4: Validate</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">-c</span> <span class="st">"import json; json.load(open('</span><span class="va">$SETTINGS</span><span class="st">'))"</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> OK</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>settings.json</code> is officially JSONC, so this bare <code>json.load</code> will report failure on a perfectly valid file that merely contains a <code>//</code> comment or a trailing comma. If it fails, don’t conclude the file is broken; strip comments and trailing commas first, then re-check, so a valid-but-JSONC file isn’t a false alarm:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">-c</span> <span class="st">"</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="st">import json, re</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="st">t = open('</span><span class="va">$SETTINGS</span><span class="st">').read()</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="st">t = re.sub(r'//.*', '', t)                 # line comments</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="st">t = re.sub(r',(\s*[}\]])', r'\1', t)       # trailing commas</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="st">json.loads(t)</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="st">print('OK')</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>(Or use the assistant’s own diagnostics on the file, e.g.&nbsp;<code>get_errors</code>, if editing through an assistant with that tool.) A <code>settings.json</code> with a genuine unbalanced brace or a truly malformed entry breaks <em>all</em> of VS Code’s settings, not just this extension’s, so always validate before finishing.</p>
 </section>
 <section id="step-5-report" class="level2">
-<h2 class="anchored" data-anchor-id="step-5-report">Step 5 — Report</h2>
-<p>State which models were added, which were already present (no-op), and flag any model registered with guessed/placeholder parameters (Step 2’s no-sibling case). Tell the user they may need to reopen the Copilot Chat model picker (“Manage Models…”) to see the new entries — no VS Code restart is required.</p>
+<h2 class="anchored" data-anchor-id="step-5-report">Step 5: Report</h2>
+<p>State which models were added, which were already present (no-op), and flag any model registered with guessed/placeholder parameters (Step 2’s no-sibling case). Tell the user they may need to reopen the Copilot Chat model picker (“Manage Models…”) to see the new entries; no VS Code restart is required.</p>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><code>select-model</code> / <code>assess-model-fit</code></strong> — once models are registered here, those skills help decide <em>which</em> registered model fits a given task; this skill only makes a model available, it doesn’t choose one.</li>
-<li><strong><code>skill-builder</code></strong> — used to author this skill.</li>
+<li><strong><code>select-model</code> / <code>assess-model-fit</code></strong>: once models are registered here, those skills help decide <em>which</em> registered model fits a given task; this skill only makes a model available, it doesn’t choose one.</li>
+<li><strong><code>skill-builder</code></strong>: used to author this skill.</li>
 </ul>
 </section>
 <section id="anti-patterns" class="level2">
@@ -444,7 +456,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li>Guessing parameters from scratch instead of copying a sibling’s schema.</li>
 <li>Reformatting or reordering existing <code>oaicopilot.models</code> entries while adding new ones.</li>
-<li>Treating the display name/served-entity name as different from the <code>id</code> without checking — for this extension’s Databricks convention they’re the same string.</li>
+<li>Assuming the served-entity name already carries the <code>owned_by-</code> prefix without checking. The <code>id</code> must be the prefixed form (<code>databricks-&lt;served-name&gt;</code>); a bare served-name missing the prefix will not match the extension’s convention.</li>
+<li>Treating a JSONC <code>settings.json</code> (one with <code>//</code> comments or trailing commas) as broken because a bare <code>json.load</code> rejected it. Strip comments first.</li>
 <li>Skipping the JSON validation step and leaving <code>settings.json</code> broken.</li>
 </ul>
 

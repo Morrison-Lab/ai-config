@@ -1,6 +1,6 @@
 // Reference schema for the `oaicopilot.models` VS Code setting used by the
 // `johnny-zhao.oai-compatible-copilot` extension. See register-oaicopilot-models
-// SKILL.md. This is a SANITIZED template — not a live settings.json:
+// SKILL.md. This is a SANITIZED template, not a live settings.json:
 //   - Replace <workspace-url> with your provider's base URL (e.g. a Databricks
 //     Model Serving workspace: https://dbc-XXXXXXXX-YYYY.cloud.databricks.com).
 //   - The provider API key is NOT stored here; the extension keeps it in VS Code

@@ -1,45 +1,32 @@
 # Recurring Mistake Patterns & Fixes
 
+Quick-reference index of common failure patterns observed in agent sessions, with cross-references to their canonical enforcement rules and deep treatments.
+
 ## Pattern 1: Assumption Over Verification
-**Mistake**: Assume a tool call succeeded without checking output or verifying result
-**Example**: Assumed `gh pr create` worked; never verified PR actually existed
-**Fix**: Always verify critical operations complete successfully:
-- Check tool output for errors
-- Verify the artifact exists (PR, commit, file, etc.)
-- Never assume success; always confirm
+- **Mistake**: Assume an action succeeded without verifying the result from tool output or repository state.
+- **Example**: Assuming `gh pr create` succeeded without checking URL / output or verifying the open PR exists.
+- **Canonical Rule**: See [`preferences.md`](preferences.md) ("NEVER assume; ALWAYS verify").
+- **Fix**: Inspect return codes, verify produced artifacts, and check state directly before proceeding.
 
 ## Pattern 2: Passivity on Standing Rules
-**Mistake**: Ask permission for things I already have standing instructions to do
-**Example**: Asked "Would you like me to create the PR now?" when CLAUDE.md says "Open a PR for every pushed feature branch"
-**Fix**: Act on standing rules without asking:
-- Consult memories and CLAUDE.md before acting
-- If a standing rule applies, execute it
-- Only ask when genuinely ambiguous or architecturally significant
+- **Mistake**: Asking permission for routine, non-destructive steps already authorized by standing rules.
+- **Example**: Asking "Should I open a PR?" when standing rules mandate opening PRs for completed changes.
+- **Canonical Rule**: See `CLAUDE.md` ("Non-destructive repo and memory actions" and "Autonomous PR delivery").
+- **Fix**: Execute standing instructions autonomously; reserve questions for genuine design ambiguity.
 
 ## Pattern 3: Give Up Instead of Diagnose
-**Mistake**: Accept "command not found" as final; don't search for the tool
-**Example**: `gh` returned "command not found"; I didn't search for it
-**Fix**: When a command fails, diagnose immediately:
-- Search for the executable (`which`, `find`, package manager)
-- Check standard locations (Homebrew: `/opt/homebrew/bin/`)
-- Use full path if found
-- Only consider alternatives after confirming tool is truly missing
+- **Mistake**: Treating a "command not found" or tool path error as a permanent blocker without searching.
+- **Example**: Failing on `gh: command not found` without searching standard tool locations or checking PATH.
+- **Canonical Rule**: See [`growth-mindset.md`](../shared/workflow/growth-mindset.md) ("First check the limitation is real").
+- **Fix**: Probe standard paths (`/opt/homebrew/bin/`, `which`, package locations) and diagnose before concluding a capability is missing.
 
-## Pattern 4: Incomplete Tool Use
-**Mistake**: Use a tool but don't follow through to verify it worked
-**Example**: Ran `gh pr create` but never checked if PR was created
-**Fix**: Complete the full workflow:
-- Run the command
-- Verify the result (check output, verify artifact exists)
-- If verification fails, diagnose and retry
+## Pattern 4: Incomplete Workflow Follow-Through
+- **Mistake**: Executing an initial step but abandoning subsequent steps before the workflow completes.
+- **Example**: Modifying files or pushing a commit but stopping before opening a PR or driving review to clean.
+- **Canonical Rule**: See `CLAUDE.md` ("Autonomously deliver completed changes to a PR") and [`run-ums-proactively.md`](../shared/workflow/run-ums-proactively.md).
+- **Fix**: Follow each workflow end-to-end: edit → test → commit → push → open PR → ARDI to clean.
 
-## Pattern 5: Not Consulting Own Knowledge
-**Mistake**: Act without consulting memories and instructions I already have
-**Example**: Didn't reference CLAUDE.md's "Open a PR for every pushed feature branch" rule
-**Fix**: Before acting, consult:
-- `/memories/` for standing rules and patterns
-- CLAUDE.md for project-specific guidance
-- Prior session notes for context
-- Only then decide whether to ask or act
-
-undefined
+## Pattern 5: Bypassing Existing Repo Knowledge
+- **Mistake**: Taking actions without consulting existing memory files or project instructions.
+- **Canonical Rule**: See [`MEMORY.md`](MEMORY.md) and project `CLAUDE.md` / `AGENTS.md`.
+- **Fix**: Consult relevant memory files and project instructions at task start to align with existing conventions.

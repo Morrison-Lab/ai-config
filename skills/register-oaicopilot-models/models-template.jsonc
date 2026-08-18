@@ -85,7 +85,7 @@
     "apiMode": "openai"
   },
 
-  // --- Llama / open-weight families: max_tokens, usually no vision ---
+  // --- Llama / open-weight families: max_tokens ---
   {
     "id": "databricks-llama-4-maverick",
     "owned_by": "databricks",

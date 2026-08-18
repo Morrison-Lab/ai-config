@@ -1,6 +1,6 @@
 ---
 name: back
-description: "Cancel away mode and resume questions."
+description: "Resume after away mode."
 user-invocable: true
 allowed-tools:
   - Bash

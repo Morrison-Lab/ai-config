@@ -425,10 +425,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><label><input type="checkbox">Everything the sweep surfaced is named in the report, including anything unexpected, with whose call it is.</label></li>
 <li><label><input type="checkbox">The UMS pass above ran, or nothing durable emerged and that is stated explicitly — a <code>/clear</code> flag that has to mention an owed UMS pass is a flag raised too early.</label></li>
 </ul>
-<p><strong>Then close the reply correctly, depending on whether anything is waiting on the user:</strong></p>
+<p><strong>Then close the reply with an explicit stopping-point statement (the last message you post before stopping should always state whether or not this is a clean stopping point for the session):</strong></p>
 <ul>
-<li><strong>Nothing open</strong> — end with an explicit stopping-point signal, e.g.&nbsp;“This session is at a good stopping point.” A silent trailing summary leaves the user unsure whether you’re actually done or just paused.</li>
-<li><strong>Something open</strong> — an ambiguous review item, a deadlock needing a human reviewer, a choice only the user can make — do <strong>not</strong> claim a stopping point. End the reply <strong>with the open question(s)</strong>, last and clearly visible, rather than burying them earlier in a long recap. The last thing the user reads should be the thing you need from them.</li>
+<li><strong>Clean stopping point reached</strong> (nothing open or pending) — end with an explicit stopping-point statement, e.g.&nbsp;<code>**Stopping Point**: Clean stopping point reached</code> (“This session is at a good stopping point.”). A silent trailing summary leaves the user unsure whether you’re actually done or just paused.</li>
+<li><strong>Not a clean stopping point</strong> (something open or in flight) — an ambiguous review item, a deadlock needing a human reviewer, pending CI/review jobs, unmerged PRs, or a choice only the user can make — state explicitly <code>**Stopping Point**: Not a clean stopping point — [reason/open items]</code>, and end the reply <strong>with the open question(s) / pending tasks</strong>, last and clearly visible.</li>
 </ul>
 </section>
 </section>

@@ -10,4 +10,4 @@ alwaysApply: true
 - **Inspect logs before diagnosing errors**: Base diagnoses strictly on empirical log evidence.
 - **No superficial symptom patches**: Fix root causes instead of swallowing exceptions, returning dummy fallbacks, or deleting tests.
 - **Preserve semantic line breaks**: Follow semantic line breaks (SemBr) in Markdown prose documents.
-- **Use GitHub markdown links**: Use `[filename](file:///path/to/file)` format for file paths and line ranges.
+- **File formatting & links**: Use relative markdown links (e.g. `[filename](relative/path/to/file)`) or inline code backticks (e.g. `` `path/to/file` ``) for workspace paths and symbols.

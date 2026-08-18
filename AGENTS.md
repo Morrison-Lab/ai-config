@@ -4,7 +4,7 @@ This file defines standardized, vendor-neutral instructions for AI coding agents
 
 ## Keep ai-config and repo checkouts fresh
 
-In every session — at session start, and again periodically during long sessions — refresh local state:
+In every session --- at session start, and again periodically during long sessions --- refresh local state:
 
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
 2. **The consumer copies / symlinks.** Ensure `bootstrap.sh` has run so local agent config directories (`~/.gemini/skills`, `~/.claude`, `~/.codex/skills`, `~/.cursor/rules`) contain up-to-date symlinks.
@@ -17,7 +17,7 @@ In every session — at session start, and again periodically during long sessio
 
 ## Timestamp recaps in local time
 
-When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` — get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
+When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` --- get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
 
 ## File formatting & links

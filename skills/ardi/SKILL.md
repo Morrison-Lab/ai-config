@@ -192,8 +192,8 @@ How depends on the repo's review trigger first, and on whether this round pushed
 
     Then wait for the new verdict.
 
-    **Set a timer after every push to monitor for AI reviews.**
-    Set a `schedule` timer (e.g. 120s) after every push to check for incoming AI reviews.
+    **Set a timer when ending a turn waiting for AI reviews.**
+    Whenever ending a turn while waiting for AI reviews or CI completion after pushing code, launch a `schedule` timer (e.g. 120s) to monitor progress.
     When the timer fires:
     - Check if a fresh review for the current head commit has landed.
     - If no review has arrived yet: verify whether review workflow runs are still in progress in CI (`gh run list` / `gh pr view --json statusCheckRollup`).

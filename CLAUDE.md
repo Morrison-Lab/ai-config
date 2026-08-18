@@ -411,7 +411,8 @@ When opening or taking over a PR in any repo, subscribe/watch that PR's activity
 
 ## Monitor every pushed PR head to completion
 
-After every push to a PR in every repository and every session, actively monitor that exact head commit for CI failures and new review comments.
+Whenever ending a turn while waiting for CI completion or AI reviews after pushing to a PR in any repository, launch a `schedule` timer (e.g. 120s) to actively monitor that exact head commit.
+If no review has arrived when the timer expires, verify whether review workflow runs are still in progress in CI (`gh run list` / `gh pr view --json statusCheckRollup`). If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke self-review fallback per `shared/workflow/self-review-fallback.md`; otherwise fix any dispatch or workflow failures discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
 Keep polling and address actionable failures or findings until all workflows and check runs are complete and passing (success or skipped), the current-head review is clean, and no review threads remain unresolved.
 Once that commit is fully clean and green, stop the **intensive head poll** for it; don't restart that poll for the same commit unless something regresses.
 A later push creates a new head commit and starts a new monitoring cycle automatically.
@@ -1300,6 +1301,10 @@ Open the PR.
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
   Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
   Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
+- **Never merge over open review findings or treat skip notices as approval.**
+  Under `mwc`, a PR must be fully clean across CI and all review findings.
+  A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
+  All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
 
 **One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.

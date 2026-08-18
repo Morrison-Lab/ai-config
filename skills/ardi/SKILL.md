@@ -190,7 +190,10 @@ How depends on the repo's review trigger first, and on whether this round pushed
    A stray mention spawns a run that cancels the push-triggered review on `cancel-in-progress` setups.
    On some mention-bot setups it also starts a session whose residual-commit sweep can churn the branch.
 
-   Then wait for the new verdict.
+    Then wait for the new verdict.
+
+    **Set a timer when ending a turn waiting for AI reviews.**
+    Whenever ending a turn while waiting for AI reviews or CI completion after pushing code, launch a `schedule` timer (e.g. 120s) and follow the check-and-reschedule procedure in [`shared/workflow/ardi.md`](../../shared/workflow/ardi.md) when it fires.
 
    **While waiting, keep checking for merge conflicts.**
    Other PRs in this repo can become conflicting at any time (someone merges to `main` while the review runs).

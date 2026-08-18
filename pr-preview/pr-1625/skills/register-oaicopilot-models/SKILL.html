@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Register models in the OAICopilot VS Code extension. Use when asked to ‘register these models’, ‘add these to oaicopilot’, or ‘rom’.">
+<meta name="description" content="Register models in the OAICopilot VS Code extension (rom).">
 
 <title>skill – ai-config</title>
 <style>
@@ -420,6 +420,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><code>reasoning_effort</code> (GPT-family reasoning models only)</li>
 <li><code>owned_by</code></li>
 </ul>
+<p>Do not duplicate single-instance flags from the sibling (e.g.&nbsp;<code>useForCommitGeneration: true</code> — at most one model across the entire configuration should carry this flag).</p>
 <p>If a requested model has <strong>no sibling at all</strong> (a genuinely new model line, e.g.&nbsp;a first-of-its-kind name), say so explicitly rather than guessing silently. Use the most structurally-similar existing entry as a starting point (matching <code>vision</code>/<code>apiMode</code> conventions for that provider) and flag in your final report that its <code>context_length</code>/<code>max_tokens</code> are placeholders the user should confirm against the provider’s actual model card.</p>
 </section>
 <section id="step-3-append-dont-disturb-existing-entries" class="level2">
@@ -432,12 +433,41 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><code>settings.json</code> is officially JSONC, so this bare <code>json.load</code> will report failure on a perfectly valid file that merely contains a <code>//</code> comment or a trailing comma. If it fails, don’t conclude the file is broken; strip comments and trailing commas first, then re-check, so a valid-but-JSONC file isn’t a false alarm:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">-c</span> <span class="st">"</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="st">import json, re</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="st">t = open('</span><span class="va">$SETTINGS</span><span class="st">').read()</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="st">t = re.sub(r'(?m)^\s*//.*', '', t)         # line comments (start-of-line only)</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="st">t = re.sub(r',(\s*[}\]])', r'\1', t)       # trailing commas</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="st">json.loads(t)</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="st">print('OK')</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="st">def strip_jsonc(text):</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="st">    out, in_str, esc = [], False, False</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="st">    i = 0</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="st">    while i &lt; len(text):</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="st">        c = text[i]</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="st">        if in_str:</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="st">            out.append(c)</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="st">            if esc:</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="st">                esc = False</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="st">            elif c == '</span><span class="dt">\\\\</span><span class="st">':</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="st">                esc = True</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="st">            elif c == '</span><span class="dt">\"</span><span class="st">':</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="st">                in_str = False</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="st">        else:</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="st">            if c == '</span><span class="dt">\"</span><span class="st">':</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="st">                in_str = True</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a><span class="st">                out.append(c)</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a><span class="st">            elif c == '/' and i + 1 &lt; len(text) and text[i+1] == '/':</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a><span class="st">                while i &lt; len(text) and text[i] != '\n':</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="st">                    i += 1</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a><span class="st">                if i &lt; len(text):</span></span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a><span class="st">                    out.append(text[i])</span></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a><span class="st">            else:</span></span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a><span class="st">                out.append(c)</span></span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a><span class="st">        i += 1</span></span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a><span class="st">    t = ''.join(out)</span></span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a><span class="st">    return re.sub(r',(\s*[}\]])', r'\1', t)</span></span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a><span class="st">t = open('</span><span class="va">$SETTINGS</span><span class="st">').read()</span></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a><span class="st">try:</span></span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a><span class="st">    json.loads(t)</span></span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a><span class="st">except Exception:</span></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a><span class="st">    json.loads(strip_jsonc(t))</span></span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a><span class="st">print('OK')</span></span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a><span class="st">"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>(Or use the assistant’s own diagnostics on the file, e.g.&nbsp;<code>get_errors</code>, if editing through an assistant with that tool.) A <code>settings.json</code> with a genuine unbalanced brace or a truly malformed entry breaks <em>all</em> of VS Code’s settings, not just this extension’s, so always validate before finishing.</p>
 </section>
 <section id="step-5-report" class="level2">

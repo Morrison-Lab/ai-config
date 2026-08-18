@@ -70,6 +70,8 @@ Never invent parameters from scratch. For each missing model, find the **closest
 - `reasoning_effort` (GPT-family reasoning models only)
 - `owned_by`
 
+Do not duplicate single-instance flags from the sibling (e.g. `useForCommitGeneration: true` — at most one model across the entire configuration should carry this flag).
+
 If a requested model has **no sibling at all** (a genuinely new model line, e.g. a first-of-its-kind name), say so explicitly rather than guessing silently. Use the most structurally-similar existing entry as a starting point (matching `vision`/`apiMode` conventions for that provider) and flag in your final report that its `context_length`/`max_tokens` are placeholders the user should confirm against the provider’s actual model card.
 
 ## Step 3: Append, don’t disturb existing entries
@@ -87,10 +89,39 @@ python3 -c "import json; json.load(open('$SETTINGS'))" && echo OK
 ``` bash
 python3 -c "
 import json, re
+def strip_jsonc(text):
+    out, in_str, esc = [], False, False
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if esc:
+                esc = False
+            elif c == '\\\\':
+                esc = True
+            elif c == '\"':
+                in_str = False
+        else:
+            if c == '\"':
+                in_str = True
+                out.append(c)
+            elif c == '/' and i + 1 < len(text) and text[i+1] == '/':
+                while i < len(text) and text[i] != '\n':
+                    i += 1
+                if i < len(text):
+                    out.append(text[i])
+            else:
+                out.append(c)
+        i += 1
+    t = ''.join(out)
+    return re.sub(r',(\s*[}\]])', r'\1', t)
+
 t = open('$SETTINGS').read()
-t = re.sub(r'(?m)^\s*//.*', '', t)         # line comments (start-of-line only)
-t = re.sub(r',(\s*[}\]])', r'\1', t)       # trailing commas
-json.loads(t)
+try:
+    json.loads(t)
+except Exception:
+    json.loads(strip_jsonc(t))
 print('OK')
 "
 ```

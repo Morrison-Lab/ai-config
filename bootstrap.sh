@@ -185,9 +185,10 @@ if [ -f "$SCRIPT_DIR/GEMINI.md" ]; then
 fi
 
 if [ -f "$SCRIPT_DIR/AGENTS.md" ]; then
-  mkdir -p "$GEMINI_DIR" "$GEMINI_CONFIG_DIR"
+  mkdir -p "$GEMINI_DIR" "$GEMINI_CONFIG_DIR" "$CODEX_DIR"
   link_one "$SCRIPT_DIR/AGENTS.md" "$GEMINI_DIR/AGENTS.md"
   link_one "$SCRIPT_DIR/AGENTS.md" "$GEMINI_CONFIG_DIR/AGENTS.md"
+  link_one "$SCRIPT_DIR/AGENTS.md" "$CODEX_DIR/AGENTS.md"
 fi
 
 

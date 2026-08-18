@@ -1,6 +1,20 @@
-# User-wide Gemini CLI instructions
+# User-wide non-Claude AI-agent instructions
 
 [Gemini CLI](https://github.com/google-gemini/gemini-cli) is an open-source AI assistant for the terminal. It stores user-wide config under `~/.gemini`. See [Google AI](https://ai.google.dev).
+
+## Generalize instructions to every AI agent by default
+
+Unless the user explicitly scopes an instruction to one agent, project, or
+session, apply it to every available AI-agent configuration and shared
+automation surface. Do not treat the currently speaking agent as an implicit
+scope restriction.
+
+## Interpret instructions broadly and maximize safe progress
+
+Unless the user narrows a request, take the broad reading that advances its
+obvious objective and complete every safe, authorized, relevant step. Do not
+reduce an instruction to the smallest literal action when its context makes a
+larger in-scope outcome clear.
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -20,6 +34,13 @@ In every session — at session start, and again periodically during long sessio
 When printing a status recap or summary, include a timestamp in the user's local time zone (Pacific Time, `America/Los_Angeles` — get it from `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 Each reading expires immediately: run the command fresh for every recap rather than extrapolating elapsed time from a prior reading.
 A single honest measurement earlier in the session is what most easily licenses an invented timestamp later, because the memory of having consulted the clock obscures that the measurement has expired.
+
+## Resolve and file every noticed issue
+
+Status is never report-only. Resolve every safe, in-scope issue before
+reporting; for every issue outside scope or authority, file a GitHub, GitLab,
+or equivalent tracker record before reporting it. This includes trivial and
+already-fixed defects. Never leave an issue only in chat prose.
 
 ## File formatting & links
 

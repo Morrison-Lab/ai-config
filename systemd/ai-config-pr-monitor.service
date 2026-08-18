@@ -1,0 +1,8 @@
+[Unit]
+Description=Monitor all open GitHub pull requests authored by this user
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env python3 %h/.local/share/ai-config/hooks/monitor-open-prs.py --monitor
+Restart=always
+RestartSec=15

@@ -21,15 +21,16 @@ actually happens, so it is the only mechanism that reaches it. That is the
 argument `shared/principles/deterministic-tools.md` makes generally, and
 `shared/workflow/algorithmatize-checks.md` makes for checks.
 
-WHY THIS INJECTS RATHER THAN BLOCKS
------------------------------------
+WHY THIS INJECTS ON PROMPT AND BLOCKS ONLY AT STOP
+---------------------------------------------------
 Identical to remind-ums-after-error.py, and for the same reason: an error
 admission is RIGHT to send. Blocking it would suppress the honest correction,
 delay it reaching the user, and remove the signal that surfaced the mistake.
 Admitting stays free and immediate; only the FOLLOW-UP is owed.
 
-So this fires on the next prompt and only ever adds context. No code path here
-can suppress, delay, or alter a message.
+Its UserPromptSubmit registration therefore only adds context. Its separate
+Stop registration blocks only after the admission has already been delivered,
+and only until the owed hook work follows; it never suppresses the admission.
 
 RELATIONSHIP TO remind-ums-after-error.py
 -----------------------------------------
@@ -149,7 +150,7 @@ def main() -> int:
     if done_at >= admit_at:
         return 0
 
-    print(
+    message = (
         "[hook: no-mistake-without-a-hook] You admitted a mistake earlier in "
         f"this session (\"{admit_txt.strip()}\") and no hook work followed "
         "it.\n\n"
@@ -174,6 +175,10 @@ def main() -> int:
         "one records the learning, this one prevents the recurrence. Both can "
         "be owed at once."
     )
+    if os.getenv("AI_CONFIG_STOP") == "1":
+        print(json.dumps({"decision": "block", "reason": message}))
+    else:
+        print(message)
     return 0
 
 

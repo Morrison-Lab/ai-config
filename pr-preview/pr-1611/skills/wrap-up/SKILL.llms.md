@@ -56,10 +56,10 @@ Everything the sweep surfaced is named in the report, including anything unexpec
 
 The UMS pass above ran, or nothing durable emerged and that is stated explicitly — a `/clear` flag that has to mention an owed UMS pass is a flag raised too early.
 
-**Then close the reply correctly, depending on whether anything is waiting on the user:**
+**Then close the reply with an explicit stopping-point statement (the last message you post before stopping should always state whether or not this is a clean stopping point for the session):**
 
-- **Nothing open** — end with an explicit stopping-point signal, e.g. “This session is at a good stopping point.” A silent trailing summary leaves the user unsure whether you’re actually done or just paused.
-- **Something open** — an ambiguous review item, a deadlock needing a human reviewer, a choice only the user can make — do **not** claim a stopping point. End the reply **with the open question(s)**, last and clearly visible, rather than burying them earlier in a long recap. The last thing the user reads should be the thing you need from them.
+- **Clean stopping point reached** (nothing open or pending) — end with an explicit stopping-point statement, e.g. `**Stopping Point**: Clean stopping point reached` (“This session is at a good stopping point.”). A silent trailing summary leaves the user unsure whether you’re actually done or just paused.
+- **Not a clean stopping point** (something open or in flight) — an ambiguous review item, a deadlock needing a human reviewer, pending CI/review jobs, unmerged PRs, or a choice only the user can make — state explicitly `**Stopping Point**: Not a clean stopping point — [reason/open items]`, and end the reply **with the open question(s) / pending tasks**, last and clearly visible.
 
 ## Relationship to other skills
 

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Merge-When-Confident (MWC) Session Grant.">
+<meta name="description" content="Merge-When-Confident session grant.">
 
 <title>skill – ai-config</title>
 <style>
@@ -377,7 +377,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong>Baseline Prohibition</strong>: AI assistants MUST NOT merge PRs/MRs without explicit user instruction for that specific PR. Pushing, building, or driving a PR to 100% clean CI DOES NOT grant permission to merge. One repository is exempted standing — see “The standing per-repository grant” below — and the Scope Limit binds that exemption too.</li>
 <li><strong>MWC Override Scope</strong>: When the user explicitly issues <code>/mwc</code>, “merge when confident”, “merge at will”, or “maw”, that baseline prohibition is suspended for the current session only.</li>
-<li><strong>Scope Limit</strong>: An MWC grant applies ONLY to PRs that are 100% clean (all CI checks passing, review verdict clean, no unresolved comments, no open block labels). It NEVER authorizes merging a PR with failing CI, unresolved findings, or pending reviews.</li>
+<li><strong>Scope Limit</strong>: An MWC grant applies ONLY to PRs that are 100% clean (all CI checks passing, review verdict clean, no unresolved comments, no open block labels). It NEVER authorizes merging a PR with failing CI, unresolved findings, or pending reviews. A reviewer skip notice (e.g.&nbsp;for workflow edits) does NOT waive this requirement or clear unresolved findings.</li>
 <li><strong>Session Duration</strong>: The grant expires automatically when the session ends or when explicitly revoked via <code>/mwc revoke</code> or <code>disable-mwc</code>.</li>
 </ul>
 </section>

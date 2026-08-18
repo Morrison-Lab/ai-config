@@ -115,8 +115,14 @@ failure webhook against the superseded SHA".
 
 See [`ardi.cases.md`](ardi.cases.md), "A per-push dispatch cancels its own review, invisibly".
 
-NEVER use background tasks, async sleep commands, or schedule timers for ARDI status polling.
-Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn.
+Always execute `python3 scripts/check-pr-fully-clean.py <pr>` synchronously in the foreground turn to evaluate clean verdicts.
+Whenever ending a turn while waiting for an AI review or CI completion on an active PR after pushing code, launch a `schedule` timer (e.g. 120s) to check back.
+When the timer fires:
+- Check if a review for the HEAD SHA has arrived.
+- If no review has posted yet, verify whether review workflow runs are still in progress (`gh run list` / `gh pr view --json statusCheckRollup`).
+- If review workflows are still running: schedule another timer to check back.
+- If the reviewer failed, was canceled, skipped with no replacement (e.g. quota limit), or produced a stub review with no stated verdict: invoke self-review fallback per [`self-review-fallback.md`](self-review-fallback.md) rather than stalling the loop.
+- Otherwise, fix any underlying workflow or dispatch issues discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
 This applies transitively to PR-driving
 workflows such as `gi`, `gii`, and `ardia`; only monitor PRs the session owns or
 has explicitly claimed, so the rule does not authorize changing someone else's

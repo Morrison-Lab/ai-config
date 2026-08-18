@@ -13,6 +13,16 @@ The `@claude` bot's own behaviour lives in
   single backslash), which is usually easier to reason about in workflow templates.
   This applies to `branches-or-tags-to-list` / regex inputs in reusable-workflow YAML.
   (d-morrison/altdoc#30.)
+- **YAML scalar escaping in composite action metadata:** Output descriptions in `action.yml`
+  (and workflow inputs) containing single quotes inside single-quoted strings (e.g.
+  `'description: 'true' if head repo...'`) fail strict YAML parsing in GitHub Actions unless
+  block scalars `>-` or proper escaping are used. (Morrison-Lab/gha#482.)
+- **Script injection prevention in inline shell scripts:** Never expand context outputs directly
+  in bash `run:` text via `${{ steps.*.outputs.* }}`. Always map context values into step `env:`
+  variables (`env: PR_BRANCH: ${{ steps.pr-info.outputs.branch }}`) and reference them as shell
+  variables (`"$PR_BRANCH"`) inside inline scripts to prevent script injection vulnerabilities.
+  (Morrison-Lab/gha#482.)
+
 
 ## d-morrison/gha reusable workflows
 Check `d-morrison/gha` before writing bespoke CI — it has reusable workflows for

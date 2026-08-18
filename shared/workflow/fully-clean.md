@@ -263,6 +263,15 @@ all --- and its density is what gets read as the conclusion.**
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "A later comment stating no verdict does not supersede an earlier one".
 
+**A reviewer skip notice (e.g. "No review ran — this PR edits .github/workflows/...") does NOT clear or supersede prior review findings.**
+
+When a review run skips because of workflow changes or token limits and emits an advisory notice like *"Merge on a self-review or a human review instead"*, that advisory allows a self-review or human review **only in the absence of prior unresolved findings**.
+It does NOT wipe the slate clean, and it does NOT license merging over an unaddressed `Needs more work` verdict or open finding list from an earlier or concurrent review run.
+
+- **Do:** scan the complete PR review comment history for any `Needs more work` verdicts or open finding sections before declaring a PR clean or attempting a self-review.
+- **Do:** address, rebut (with convincing acceptance), or defer every previously raised finding even if the most recent run skipped.
+- **Don't:** treat a "No review ran" / "Merge on self-review" skip warning as an all-clear or as permission to ignore open findings on the PR.
+
 **Another surface,
 and the one that defeats the gate itself:
 the review check can pass on a blocking verdict.**

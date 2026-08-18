@@ -42,7 +42,7 @@ A single honest measurement earlier in the session is what most easily licenses 
 ## Autonomously deliver completed changes to a PR
 
 - **Never stop at uncommitted working tree changes**: When asked to write up, edit, or implement changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed.
-- **Complete the delivery cycle**: Commit the changes (linking tracking issues where appropriate), push the branch to origin, open a Pull Request if not already opened, trigger AI review (`@claude review` / dispatch review workflow), and drive to clean.
+- **Complete the delivery cycle**: Commit the changes (linking the tracking issue created per issue-first), push the branch to origin, open a Pull Request if not already opened, trigger AI review (`@claude review` / dispatch review workflow), and drive to clean.
 
 ## Request review and drive every started PR to clean
 

@@ -1,6 +1,6 @@
 ---
 name: dependabot
-description: "Alias for `chores`. Use when asked to 'dependabot', 'handle the dependabot PRs', 'process dependabot', 'merge the bump PRs'."
+description: "→ chores."
 user-invocable: true
 ---
 

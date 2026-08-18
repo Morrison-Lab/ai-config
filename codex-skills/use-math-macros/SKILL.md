@@ -1,6 +1,6 @@
 ---
 name: "use-math-macros"
-description: "Codex wrapper for the ai-config Claude skill `use-math-macros`. Rewrite the math in a Quarto/LaTeX manuscript to use the shared d-morrison/macros submodule, condensing and polishing all math expressions consistently across lab documents. Use when asked to 'macroize', 'macroize the math', 'use macros', 'use the macros submodule', 'convert math to macros', or 'polish the math with macros'. Use when Codex is asked to use `use-math-macros`, `/use-math-macros`, or the corresponding ai-config/Claude skill workflow."
+description: "condense manuscript math onto the shared macros submodule."
 ---
 
 # use-math-macros (Codex wrapper)

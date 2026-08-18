@@ -1,13 +1,6 @@
 ---
 name: prompt-me
-description: >
-  Surface the single most pressing open question still waiting on user
-  input — or, with a numeric argument, that many of the most pressing ones
-  — instead of leaving it buried under unrelated work in the transcript.
-  Use when asked to 'prompt me', 'pm', 'prompt me 3', 'pm 3', 'what are you
-  waiting on me for', 'what do you need from me', 'remind me what you
-  asked', or '/prompt-me [N]'. For every open question at once, use
-  `prompt-me-all` / `pma` instead.
+description: "Use prompt-me."
 user-invocable: true
 allowed-tools: []
 ---

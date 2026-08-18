@@ -1,6 +1,6 @@
 ---
 name: rc
-description: "Alias for `resolve-conflicts`. Use when asked to 'rc'."
+description: "→ resolve-conflicts."
 user-invocable: true
 allowed-tools:
   - Bash

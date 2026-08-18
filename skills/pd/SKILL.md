@@ -1,6 +1,6 @@
 ---
 name: pd
-description: "Alias for `pending-decisions`. Use when asked to 'pd', '/pd [owner/repo|all]'."
+description: "→ pending-decisions."
 user-invocable: true
 allowed-tools:
   - Bash

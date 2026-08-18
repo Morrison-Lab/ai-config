@@ -1,6 +1,6 @@
 ---
 name: drive
-description: "Alias for `ardi` (\"drive to clean\"). Use when asked to 'drive', 'drive this PR', 'drive to clean', 'drive this PR to clean'."
+description: "Alias."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "purge-hallucinations"
-description: "Codex wrapper for the ai-config Claude skill `purge-hallucinations`. Audit a target for hallucinations \u2014 concrete, checkable references that don't actually resolve (a missing file path, an undefined R function/object, a non-existent `uses:` action ref or version, a dead URL, a `[[memory-link]]` with no target, a fabricated skill name, citation, package, flag, config key, or SDK method) \u2014 then interactively propose a fix for each one. Conservative: only flags references PROVEN absent; unverifiable \u2260 hallucination. Scope is any of the memory/instruction corpus (ai-config memories/, skills/, CLAUDE.md), the current repo's code & docs, or an explicit file / PR diff / pasted AI output. Use when asked to 'purge hallucinations', 'ph', 'check for hallucinations', 'verify the references', 'find made-up / fabricated references', 'fact-check this AI output', 'does everything in this file actually exist', 'audit my memories for stale references', or 'what did you make up'. Use when Codex is asked to use `purge-hallucinations`, `/purge-hallucinations`, or the corresponding ai-config/Claude skill workflow."
+description: "verify references resolve, then purge the fakes."
 ---
 
 # purge-hallucinations (Codex wrapper)

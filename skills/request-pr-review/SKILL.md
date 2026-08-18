@@ -1,6 +1,6 @@
 ---
 name: request-pr-review
-description: Request a human reviewer after AI review passes or upon deadlock on a GitHub PR.
+description: "Use request-pr-review."
 user-invocable: true
 allowed-tools:
   - Bash(gh api *)

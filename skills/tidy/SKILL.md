@@ -1,12 +1,6 @@
 ---
 name: tidy
-description: >
-  Audit the current codebase (or a specified scope) for opportunities to
-  simplify, DRY, outsource to well-maintained external tools/packages, reduce
-  maintenance burden, and improve clarity. Produces a prioritized list of
-  concrete refactoring suggestions. Use when asked to "tidy", "tidy up",
-  "DRY this out", or "what can we outsource/remove". Invoke
-  explicitly with /tidy.
+description: "Use tidy."
 user-invocable: true
 allowed-tools:
   - Bash

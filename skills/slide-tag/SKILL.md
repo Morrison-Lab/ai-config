@@ -1,6 +1,6 @@
 ---
 name: slide-tag
-description: "Force-move a floating Git tag (e.g., v2) to a new commit — typically current main HEAD. Handles fetch, safety checks, delete+recreate pattern. Use when asked to 'slide <tag>', 'move tag to main', 'update the v2 tag', or 'bump the floating tag'."
+description: "Slide Tag."
 user-invocable: true
 allowed-tools:
   - Bash

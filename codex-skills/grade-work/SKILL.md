@@ -1,6 +1,6 @@
 ---
 name: "grade-work"
-description: "Codex wrapper for the ai-config Claude skill `grade-work`. Grade a batch of student submissions (PDFs/scans/docs) against an official solution and produce an anonymized, ranked catalog of the most common error types. Use when asked to \"grade these\", \"compare submissions to the solution\", \"what did students get wrong\", or to mine a stack of exams/homeworks for common mistakes. Pairs with plan-review-session to turn the catalog into teaching material. Use when Codex is asked to use `grade-work`, `/grade-work`, or the corresponding ai-config/Claude skill workflow."
+description: "Use grade-work."
 ---
 
 # grade-work (Codex wrapper)

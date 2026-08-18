@@ -1,6 +1,6 @@
 ---
 name: "gip"
-description: "Codex wrapper for the ai-config Claude skill `gip`. Grab Issues in Parallel: grab several provably-independent open issues and work them concurrently \u2014 one worktree-isolated subagent per issue, each implementing its issue, opening an MR/PR, and ARDI-ing it to clean. The parallel counterpart to the deliberately-serial `gii`. Use when asked to 'gip', 'grab issues in parallel', 'work several issues at once', 'parallelize the backlog', 'do these issues concurrently', or 'fan out the issue queue'. Use when Codex is asked to use `gip`, `/gip`, or the corresponding ai-config/Claude skill workflow."
+description: "Grab Issues in Parallel."
 ---
 
 # gip (Codex wrapper)

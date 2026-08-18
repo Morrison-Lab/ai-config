@@ -1,10 +1,6 @@
 ---
 name: also
-description: >
-  Queue the instructions that follow `/also` to be handled only AFTER every
-  preceding request in the conversation is finished. Use when the user appends
-  `/also <instructions>` to add a follow-up task that should run last, without
-  preempting work already in flight. Invoke explicitly with /also.
+description: "Use also."
 user-invocable: true
 allowed-tools: []
 ---

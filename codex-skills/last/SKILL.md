@@ -1,6 +1,6 @@
 ---
 name: "last"
-description: "Codex wrapper for the ai-config Claude skill `last`. Queue the instructions that follow `/last` after every other task \u2014 and keep them last even as new `/also` tasks arrive. Only another `/last` goes after a previous `/last`. Use when a task must run at the very end regardless of what else gets added (final render, commit-and-push, cleanup, wrap-up). Invoke explicitly with /last. Use when Codex is asked to use `last`, `/last`, or the corresponding ai-config/Claude skill workflow."
+description: "Use last."
 ---
 
 # last (Codex wrapper)

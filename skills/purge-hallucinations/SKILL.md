@@ -1,6 +1,6 @@
 ---
 name: purge-hallucinations
-description: "Audit a target for hallucinations — concrete, checkable references that don't actually resolve (a missing file path, an undefined R function/object, a non-existent `uses:` action ref or version, a dead URL, a `[[memory-link]]` with no target, a fabricated skill name, citation, package, flag, config key, or SDK method) — then interactively propose a fix for each one. Conservative: only flags references PROVEN absent; unverifiable ≠ hallucination. Scope is any of the memory/instruction corpus (ai-config memories/, skills/, CLAUDE.md), the current repo's code & docs, or an explicit file / PR diff / pasted AI output. Use when asked to 'purge hallucinations', 'ph', 'check for hallucinations', 'verify the references', 'find made-up / fabricated references', 'fact-check this AI output', 'does everything in this file actually exist', 'audit my memories for stale references', or 'what did you make up'."
+description: "verify references resolve, then purge the fakes."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "sync"
-description: "Codex wrapper for the ai-config Claude skill `sync`. Alias for `sync-pr-branch`. Use when asked to 'sync', 'sync the branch', 'sync up'. Use when Codex is asked to use `sync`, `/sync`, or the corresponding ai-config/Claude skill workflow."
+description: "Alias."
 ---
 
 # sync (Codex wrapper)

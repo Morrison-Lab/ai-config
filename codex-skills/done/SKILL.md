@@ -1,6 +1,6 @@
 ---
 name: "done"
-description: "Codex wrapper for the ai-config Claude skill `done`. Alias for `wrap-up`. Use when asked to 'done', 'all done', 'are we done?'. Use when Codex is asked to use `done`, `/done`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 wrap-up."
 ---
 
 # done (Codex wrapper)

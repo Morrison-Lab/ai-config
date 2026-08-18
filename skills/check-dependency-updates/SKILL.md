@@ -1,6 +1,6 @@
 ---
 name: check-dependency-updates
-description: "Audit a repo for stale dependencies and surface available upgrades — pinned GitHub Actions tags/SHAs, renv.lock package versions, pre-commit revs, Quarto/tool versions in CI, submodules. Reports what could be updated and what each update buys, then drives the chosen bumps through the normal issue → branch → PR → ARDI flow. Use when asked to 'check dependency updates', 'cdu', 'audit dependency freshness', 'are my dependencies stale', 'check for outdated dependencies', 'should I bump the workflow SHAs', 'update the renv lockfile', or 'are there newer versions of my pinned actions'."
+description: "audit dependencies for available upgrades."
 user-invocable: true
 allowed-tools:
   - Bash

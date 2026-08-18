@@ -1,6 +1,6 @@
 ---
 name: merge-it
-description: "Merge a ready pull request, then automatically wrap up — verify the merge landed, tidy the branch, and run UMS — without asking. Use when the user says 'merge it', 'merge this', 'merge the PR', or 'go ahead and merge'. Performs the actual merge when the PR isn't merged yet (squash by default), then chains into the post-merge skill. If the PR is already merged, it skips straight to post-merge."
+description: "merge a ready PR, then wrap up automatically."
 user-invocable: true
 allowed-tools:
   - Bash

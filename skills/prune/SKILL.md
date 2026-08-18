@@ -1,6 +1,6 @@
 ---
 name: prune
-description: "Alias for `clean-branches` (aka `cb`). Use when asked to 'prune', 'prune branches'."
+description: "→ clean-branches."
 user-invocable: true
 allowed-tools:
   - Bash

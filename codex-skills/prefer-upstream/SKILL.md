@@ -1,6 +1,6 @@
 ---
 name: "prefer-upstream"
-description: "Codex wrapper for the ai-config Claude skill `prefer-upstream`. Before building custom implementations, check r-lib, tidyverse, and similar ecosystem organizations for off-the-shelf solutions. Prefer well-maintained upstream packages over hand-rolled code. Use when about to write utility functions, parsers, CI helpers, or anything that 'feels like someone must have solved this already.' Use when Codex is asked to use `prefer-upstream`, `/prefer-upstream`, or the corresponding ai-config/Claude skill workflow."
+description: "Use prefer-upstream."
 ---
 
 # prefer-upstream (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: away
-description: "Grant standing session-scoped permission to stop asking clarifying questions and operate unattended for the rest of the session — e.g. when the user is about to be unavailable for a while. Use best judgment to pick work you're confident about, defer or skip work that's genuinely ambiguous instead of blocking on it, and consult a stronger/more capable model for a second opinion when one is available instead of surfacing a question. Use when asked to 'away', 'I'll be away for a while', 'going offline', 'don't ask me anything', 'use your best judgment', 'operate autonomously', 'no questions mode', or similar standing 'stop blocking on me' grants."
+description: "unattended, best-judgment operating mode."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "merge-at-will"
-description: "Codex wrapper for the ai-config Claude skill `merge-at-will`. Alias for `mwc`. Use when asked to 'merge-at-will'. Use when Codex is asked to use `merge-at-will`, `/merge-at-will`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 mwc."
 ---
 
 # merge-at-will (Codex wrapper)

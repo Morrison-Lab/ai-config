@@ -1,6 +1,6 @@
 ---
 name: "resolve-conflicts"
-description: "Codex wrapper for the ai-config Claude skill `resolve-conflicts`. Resolve git merge/rebase/cherry-pick conflicts by consolidating the best of BOTH branches \u2014 understand why each side changed the hunk, then reconstruct a resolution that preserves both intents instead of blindly picking `--ours`/`--theirs`. Remove the markers, run the repo's pre-commit checks, stage, and finish the operation. Use when a merge / rebase / cherry-pick / stash pop / revert / pull reports conflicts, or when asked to 'resolve conflicts', 'resolve the merge conflicts', 'fix the conflicts', 'I have a merge conflict', 'consolidate the best of both branches', or 'help me merge these branches'. Delegated to from `sync-pr-branch` step 5, `clean-branches`, and `gii`. (For multiple AI *sessions* clobbering one local checkout, that's `deconflict-sessions` / `session-lock`, not this.) Use when Codex is asked to use `resolve-conflicts`, `/resolve-conflicts`, or the corresponding ai-config/Claude skill workflow."
+description: "consolidate the best of both branches."
 ---
 
 # resolve-conflicts (Codex wrapper)

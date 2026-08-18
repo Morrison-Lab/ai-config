@@ -1,6 +1,6 @@
 ---
 name: "gi"
-description: "Codex wrapper for the ai-config Claude skill `gi`. Grab Issue: pick the highest-priority open issue from the repo's tracker (re-triaging if helpful), implement it on a branch, open an MR/PR, and ARDI it to clean. Use when asked to 'gi', 'grab an issue', 'pick up the next issue', 'work on the top issue', or 'what should I work on next?' Use when Codex is asked to use `gi`, `/gi`, or the corresponding ai-config/Claude skill workflow."
+description: "Grab Issue."
 ---
 
 # gi (Codex wrapper)

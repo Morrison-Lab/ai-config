@@ -1,6 +1,6 @@
 ---
 name: fcp
-description: "Alias for `fact-check-prose`. Use when asked to 'fcp'."
+description: "→ fact-check-prose."
 user-invocable: true
 allowed-tools:
   - Bash

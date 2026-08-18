@@ -1,6 +1,6 @@
 ---
 name: "pr-status-all"
-description: "Codex wrapper for the ai-config Claude skill `pr-status-all`. Print a table summarizing the true status of every open PR in the repo --- for each one, read the LATEST review comment (not a cached verdict) and parse it for remaining findings, alongside CI state and whether the branch is behind main. Gathers the per-PR signals concurrently (one subagent per PR). Use when asked \"summarize all open PRs\", \"status table of my PRs\", \"what's the state of every PR\", \"give me a PR dashboard\", or any whole-queue status overview. For a single PR use `pr-status`; to actually drive PRs to clean use `ardia`. Use when Codex is asked to use `pr-status-all`, `/pr-status-all`, or the corresponding ai-config/Claude skill workflow."
+description: "Use pr-status-all."
 ---
 
 # pr-status-all (Codex wrapper)

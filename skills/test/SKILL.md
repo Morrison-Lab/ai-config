@@ -1,6 +1,6 @@
 ---
 name: test
-description: "Test an MR's changes — run unit tests in the current repo if available, or trigger a downstream pipeline in a revdep test bed (e.g., test.hac). Use when asked to 'test this MR', 'run tests', 'verify downstream', or 'check this in test.hac'."
+description: "Test."
 user-invocable: true
 allowed-tools:
   - Bash

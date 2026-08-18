@@ -1,6 +1,6 @@
 ---
 name: "resync-branch"
-description: "Codex wrapper for the ai-config Claude skill `resync-branch`. Alias for `sync-pr-branch`. Use when asked to 'resync-branch', 'my branch and origin have diverged'. Use when Codex is asked to use `resync-branch`, `/resync-branch`, or the corresponding ai-config/Claude skill workflow."
+description: "Alias."
 ---
 
 # resync-branch (Codex wrapper)

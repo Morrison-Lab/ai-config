@@ -1,6 +1,6 @@
 ---
 name: rfu
-description: "Alias for `recover-followups`. Use when asked to 'rfu', 'what follow-ups slipped through?'."
+description: "→ recover-followups."
 user-invocable: true
 allowed-tools:
   - Bash

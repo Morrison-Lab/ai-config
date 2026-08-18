@@ -1,6 +1,6 @@
 ---
 name: "chores"
-description: "Codex wrapper for the ai-config Claude skill `chores`. Triage and wrap up dependency-bump / `chore(...)` PRs (Dependabot, Renovate, submodule and GitHub-Actions bumps): list the open bump PRs, classify each by bump size, confirm CI is fully green, auto-merge safe patch/minor bumps, and pull the changelog to flag risky major bumps for your call. Accepts an optional target repo. Use when asked to 'handle chores', 'chores', 'do the chores', 'wrap up the chore PRs', 'process the dependabot PRs', 'merge the dependency bumps', 'deal with the bump PRs', or 'handle the dependency updates'. Use when Codex is asked to use `chores`, `/chores`, or the corresponding ai-config/Claude skill workflow."
+description: "triage and wrap up dependency-bump PRs."
 ---
 
 # chores (Codex wrapper)

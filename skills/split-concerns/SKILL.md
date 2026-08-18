@@ -1,6 +1,6 @@
 ---
 name: split-concerns
-description: "When an MR/PR addresses multiple independent concerns, proactively offer to split it into separate MRs/PRs — one per concern. Simpler diffs mean easier review, independent merge timelines, and less risk of one concern blocking another. Use when reviewing your own staged changes or when a reviewer flags scope creep."
+description: "Use split-concerns."
 user-invocable: true
 allowed-tools:
   - Bash

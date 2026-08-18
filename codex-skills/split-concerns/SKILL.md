@@ -1,6 +1,6 @@
 ---
 name: "split-concerns"
-description: "Codex wrapper for the ai-config Claude skill `split-concerns`. When an MR/PR addresses multiple independent concerns, proactively offer to split it into separate MRs/PRs \u2014 one per concern. Simpler diffs mean easier review, independent merge timelines, and less risk of one concern blocking another. Use when reviewing your own staged changes or when a reviewer flags scope creep. Use when Codex is asked to use `split-concerns`, `/split-concerns`, or the corresponding ai-config/Claude skill workflow."
+description: "Use split-concerns."
 ---
 
 # split-concerns (Codex wrapper)

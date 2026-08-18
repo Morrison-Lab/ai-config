@@ -1,6 +1,6 @@
 ---
 name: assess-model-fit
-description: "Assess whether the current model is sufficient for a task. Use when you suspect the current model lacks capability for task complexity, reasoning depth, or code review quality; when asked to 'assess model fit', 'is this model enough', 'should I upgrade', or 'do I need a better model'. Dual-mode: procedural checklist or executable task analysis with auto-chaining."
+description: "Evaluate current model capability."
 user-invocable: true
 allowed-tools:
   - Bash

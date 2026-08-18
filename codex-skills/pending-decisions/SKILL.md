@@ -1,6 +1,6 @@
 ---
 name: "pending-decisions"
-description: "Codex wrapper for the ai-config Claude skill `pending-decisions`. Sweep a repo's (or every in-scope repo's) open issues and PRs for ones waiting on a decision from the user \u2014 an explicit review-request escalation, a decision-style label, or an unanswered bot-posed question in the latest activity \u2014 then ask about each one, one at a time, most pressing first. The issue-tracker-scoped analog of `prompt-me`/`prompt-me-all`, which only see the current conversation. Use when asked to 'pending decisions', 'pd', 'what decisions are you waiting on', 'any decisions needed from me', 'check for pending decisions', 'sweep issues for decisions', 'is anything stalled on my input', or '/pending-decisions [owner/repo|all]'. Use when Codex is asked to use `pending-decisions`, `/pending-decisions`, or the corresponding ai-config/Claude skill workflow."
+description: "surface issues/PRs waiting on a decision from you (pd)."
 ---
 
 # pending-decisions (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "find-duplicates"
-description: "Codex wrapper for the ai-config Claude skill `find-duplicates`. Alias for `find-overlap`. Use when asked to 'find-duplicates'. Use when Codex is asked to use `find-duplicates`, `/find-duplicates`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 find-overlap."
 ---
 
 # find-duplicates (Codex wrapper)

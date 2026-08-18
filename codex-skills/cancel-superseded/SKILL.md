@@ -1,6 +1,6 @@
 ---
 name: "cancel-superseded"
-description: "Codex wrapper for the ai-config Claude skill `cancel-superseded`. Cancel superseded (older) pipelines on the same branch, freeing runners for the latest push. Use when asked to 'cancel old pipelines', 'cancel superseded', 'free up runners', or when you notice stale pipelines blocking newer ones. Use when Codex is asked to use `cancel-superseded`, `/cancel-superseded`, or the corresponding ai-config/Claude skill workflow."
+description: "Cancel Superseded Pipelines."
 ---
 
 # cancel-superseded (Codex wrapper)

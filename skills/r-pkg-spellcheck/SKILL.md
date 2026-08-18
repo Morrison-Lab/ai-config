@@ -1,6 +1,6 @@
 ---
 name: r-pkg-spellcheck
-description: Run R-package spellcheck before pushing changes that touch user-facing text (NEWS.md, .Rd, .Rmd, roxygen comments, vignettes). Use before `git push` in any R-package repo, or when the user asks to spellcheck.
+description: "Use r-pkg-spellcheck."
 user-invocable: true
 allowed-tools:
   - Read

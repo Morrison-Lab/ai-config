@@ -1,6 +1,6 @@
 ---
 name: "scout-peers"
-description: "Codex wrapper for the ai-config Claude skill `scout-peers`. Survey comparable public repos for the current project, judge whether any is *uniformly superior*, and borrow/adapt their best ideas \u2014 checking each source's license first and attributing anything reused. Use when asked \"are there repos like this\", \"scan similar/competing projects\", \"borrow ideas from peer repos\", \"competitive scan\", \"what can we learn from comparable projects\", or \"see how others solved this\". Invoke explicitly with /scout-peers. Use when Codex is asked to use `scout-peers`, `/scout-peers`, or the corresponding ai-config/Claude skill workflow."
+description: "Use scout-peers."
 ---
 
 # scout-peers (Codex wrapper)

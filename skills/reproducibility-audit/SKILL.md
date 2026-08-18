@@ -1,6 +1,6 @@
 ---
 name: reproducibility-audit
-description: "Audit a project's reproducibility posture with a checklist scoped per project type (R package, Quarto book/site, general script repo): hidden/undocumented dependencies, hardcoded absolute paths, undocumented prerequisites, environment assumptions, and output traceability (can a result be traced back to the exact script/line that produced it). Reports gaps in a table and files a tracking issue for the ones worth fixing. Use when asked to 'reproducibility audit', 'audit reproducibility', 'check reproducibility', 'is this project reproducible', 'find hidden dependencies', 'find hardcoded paths', 'check environment assumptions', 'can this be reproduced from scratch', 'audit for a replication package', or 'check output traceability'."
+description: "checklist audit of a project's reproducibility posture."
 user-invocable: true
 allowed-tools:
   - Bash

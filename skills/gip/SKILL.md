@@ -1,6 +1,6 @@
 ---
 name: gip
-description: "Grab Issues in Parallel: grab several provably-independent open issues and work them concurrently — one worktree-isolated subagent per issue, each implementing its issue, opening an MR/PR, and ARDI-ing it to clean. The parallel counterpart to the deliberately-serial `gii`. Use when asked to 'gip', 'grab issues in parallel', 'work several issues at once', 'parallelize the backlog', 'do these issues concurrently', or 'fan out the issue queue'."
+description: "Grab Issues in Parallel."
 user-invocable: true
 allowed-tools:
   - Bash

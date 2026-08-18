@@ -1,6 +1,6 @@
 ---
 name: "antigravity-review-workflow"
-description: "Codex wrapper for the ai-config Claude skill `antigravity-review-workflow`. Alias for `agy-review-workflow`. Use when asked to 'antigravity-review-workflow'. Use when Codex is asked to use `antigravity-review-workflow`, `/antigravity-review-workflow`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 agy-review-workflow."
 ---
 
 # antigravity-review-workflow (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: compress-session
-description: "Distill the conversation into a structured note in auto memory (MEMORY.md) before context fills up, and/or trigger a focused /compact yourself instead of waiting for the automatic pass to guess what matters. Use when asked to 'compress the session', 'distill context before compacting', 'summarize before compaction', or proactively when the conversation is getting long and approaching an auto-compact boundary."
+description: "deliberate pre-compaction distillation."
 user-invocable: true
 allowed-tools:
   - Bash

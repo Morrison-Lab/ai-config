@@ -1,10 +1,6 @@
 ---
 name: and
-description: >
-  Revise or extend the previous command rather than adding a separate task. Use
-  when the user appends `/and <revision>` to amend the instruction they just
-  gave — folding the revision into that task (same queue position), not creating
-  a new one. Invoke explicitly with /and.
+description: "Use and."
 user-invocable: true
 allowed-tools: []
 ---

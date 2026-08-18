@@ -1,6 +1,6 @@
 ---
 name: "st"
-description: "Codex wrapper for the ai-config Claude skill `st`. Start Task (issue-first): kick off a new piece of work the right way \u2014 before writing any code or opening a PR, make sure a tracking issue exists (search the tracker; if none covers it, file one), then branch, implement, open a PR, and ARDI to clean. Use when starting new work that isn't already tied to an open issue, or when asked to 'st', 'start a task', 'start a new task', or 'new task'. Use when Codex is asked to use `st`, `/st`, or the corresponding ai-config/Claude skill workflow."
+description: "Start Task (issue-first)."
 ---
 
 # st (Codex wrapper)

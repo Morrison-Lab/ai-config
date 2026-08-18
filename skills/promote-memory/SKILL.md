@@ -1,6 +1,6 @@
 ---
 name: promote-memory
-description: "Review staged learning candidates (from learn-staging.md) against explicit criteria — generality, staleness, redundancy, evidence, format — and promote the durable ones into committed memory (CLAUDE.md / memories/), discarding or holding the rest. The promotion-gate half of the learn/promote-memory pair. Use when asked to 'promote memory', 'review staged learnings', 'clear out learn-staging', or periodically (e.g. as part of ums) to work through an accumulating staging file."
+description: "the review gate for staged learnings."
 user-invocable: true
 allowed-tools:
   - Bash

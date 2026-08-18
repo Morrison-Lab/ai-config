@@ -1,6 +1,6 @@
 ---
 name: "oppo"
-description: "Codex wrapper for the ai-config Claude skill `oppo`. Alias for `opposition-research`. Use when asked to 'oppo', 'do oppo research on X', \"what features does X's community want\", \"mine X's issues/subreddit for ideas\". Invoke explicitly with /oppo. Use when Codex is asked to use `oppo`, `/oppo`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 opposition-research."
 ---
 
 # oppo (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: macroize
-description: "Alias for `use-math-macros`. Use when asked to 'macroize', 'macroize the math'."
+description: "→ use-math-macros."
 user-invocable: true
 allowed-tools:
   - Bash

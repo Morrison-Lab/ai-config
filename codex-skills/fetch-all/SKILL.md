@@ -1,6 +1,6 @@
 ---
 name: "fetch-all"
-description: "Codex wrapper for the ai-config Claude skill `fetch-all`. Fetch All: run `git fetch` from origin across EVERY git repo under a directory (default: the current dir's immediate children), reporting per-repo status \u2014 up-to-date, updated (with the ref changes), failed (with the error), or skipped (no origin). A read-only sweep: it fetches, it never merges, pulls, or touches your working tree. Use when asked to 'fetch all', 'fa', 'fetch from origin on all repos', 'fetch every repo', 'update all my repos', 'git fetch everywhere', or 'fetch all the repos under <dir>'. Use when Codex is asked to use `fetch-all`, `/fetch-all`, or the corresponding ai-config/Claude skill workflow."
+description: "Fetch All (aka `fa`)."
 ---
 
 # fetch-all (Codex wrapper)

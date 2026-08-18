@@ -1,6 +1,6 @@
 ---
 name: "simplify"
-description: "Codex wrapper for the ai-config Claude skill `simplify`. Simplify code where feasible without feature loss \u2014 prune dead code paths, remove unreachable branches, collapse unnecessary indirection, and simplify variable assignments that can never take their fallback values. Use after any refactor that changes invocation context, after removing a feature, or when reviewing code that has accumulated historical cruft. Use when Codex is asked to use `simplify`, `/simplify`, or the corresponding ai-config/Claude skill workflow."
+description: "Use simplify."
 ---
 
 # simplify (Codex wrapper)

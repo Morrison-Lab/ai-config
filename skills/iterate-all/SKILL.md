@@ -1,6 +1,6 @@
 ---
 name: iterate-all
-description: "Alias for `ardia`. Use when asked to 'iterate-all'."
+description: "→ ardia."
 user-invocable: true
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: "model-fit"
-description: "Codex wrapper for the ai-config Claude skill `model-fit`. Alias for `assess-model-fit`. Use when asked to 'model-fit'. Use when Codex is asked to use `model-fit`, `/model-fit`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 assess-model-fit."
 ---
 
 # model-fit (Codex wrapper)

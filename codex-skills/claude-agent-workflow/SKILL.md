@@ -1,6 +1,6 @@
 ---
 name: "claude-agent-workflow"
-description: "Codex wrapper for the ai-config Claude skill `claude-agent-workflow`. Add or modify the `anthropics/claude-code-action` agent workflow (`.github/workflows/claude.yml`). Preserves the load-bearing patterns \u2014 bot-actor `if:` filter, per-PR concurrency, EPI202_TOKEN/submodules access, R+Quarto+renv setup, stats-allowlist build, late-comment polling prompt, and the post-Claude review re-dispatch. Use when Codex is asked to use `claude-agent-workflow`, `/claude-agent-workflow`, or the corresponding ai-config/Claude skill workflow."
+description: "Use claude-agent-workflow."
 ---
 
 # claude-agent-workflow (Codex wrapper)

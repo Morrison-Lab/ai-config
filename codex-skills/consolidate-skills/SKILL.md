@@ -1,6 +1,6 @@
 ---
 name: "consolidate-skills"
-description: "Codex wrapper for the ai-config Claude skill `consolidate-skills`. Merge two or more genuinely-overlapping skills into a single canonical skill plus thin alias stubs, preserving every existing invocation name so nothing breaks. Audits the corpus for overlap, separates intentional alias families and adjacent-but-distinct skills (leave those alone) from genuine duplicates (consolidate those), proposes a plan for approval, then ships it via branch + PR. Use when asked to \"consolidate skills\", \"merge overlapping skills\", \"merge skills\", \"dedupe skills\", \"collapse duplicate skills\", or \"these two skills do the same thing\". Invoke explicitly with /consolidate-skills. Use when Codex is asked to use `consolidate-skills`, `/consolidate-skills`, or the corresponding ai-config/Claude skill workflow."
+description: "merge overlapping skills into one canonical + alias stubs."
 ---
 
 # consolidate-skills (Codex wrapper)

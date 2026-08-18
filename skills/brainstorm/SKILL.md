@@ -1,6 +1,6 @@
 ---
 name: brainstorm
-description: "Pre-implementation Socratic Q&A: run a short multi-round clarifying-question loop with the user before any code is written or issue is filed, then write the agreed approach to a plan file. Use when asked to 'brainstorm', 'brainstorm this', 'let's brainstorm', 'plan this out first', or when a request is vague enough that jumping straight to an issue or PR would lock in the wrong scope."
+description: "pre-implementation Socratic planning."
 user-invocable: true
 allowed-tools:
   - Read

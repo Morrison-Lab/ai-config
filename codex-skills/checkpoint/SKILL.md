@@ -1,6 +1,6 @@
 ---
 name: "checkpoint"
-description: "Codex wrapper for the ai-config Claude skill `checkpoint`. Save a deliberate, mid-task stop-point snapshot \u2014 plan state, decisions made so far, file:line pointers, and next actions \u2014 without ending or pausing the session. Use when asked to 'checkpoint', 'save a checkpoint', 'snapshot where we are', or proactively right before a risky/hard-to-reverse step, after finishing a major phase of a long task, or before a long-running operation you might not be present to see finish. Use when Codex is asked to use `checkpoint`, `/checkpoint`, or the corresponding ai-config/Claude skill workflow."
+description: "deliberate mid-task snapshot."
 ---
 
 # checkpoint (Codex wrapper)

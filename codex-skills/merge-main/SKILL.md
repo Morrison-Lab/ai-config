@@ -1,6 +1,6 @@
 ---
 name: "merge-main"
-description: "Codex wrapper for the ai-config Claude skill `merge-main`. Alias for `sync-pr-branch`. Use when asked to 'merge-main'. Use when Codex is asked to use `merge-main`, `/merge-main`, or the corresponding ai-config/Claude skill workflow."
+description: "Alias."
 ---
 
 # merge-main (Codex wrapper)

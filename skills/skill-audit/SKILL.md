@@ -1,6 +1,6 @@
 ---
 name: skill-audit
-description: "Report which skills in this repo's skills/ directory actually fire (and how often) versus which are installed but never invoked, and recommend pruning candidates. Reads local Claude Code session transcripts as the usage signal (no built-in invocation-telemetry API exists), buckets every skill into actively-used / dormant / dead, and reports a pruning table without deleting anything itself. Use when asked to 'audit skill usage', 'skill-audit', 'which skills are dead weight', 'what skills have I never used', 'find unused skills', 'prune skills by usage', 'skill usage report', or 'which skills should I delete'."
+description: "usage-frequency audit and pruning recommender."
 user-invocable: true
 allowed-tools:
   - Bash

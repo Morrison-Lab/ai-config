@@ -1,6 +1,6 @@
 ---
 name: "adri"
-description: "Codex wrapper for the ai-config Claude skill `adri`. Alias for `ardi` (common transposition typo). Use when asked to 'adri'. Use when Codex is asked to use `adri`, `/adri`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ardi."
 ---
 
 # adri (Codex wrapper)

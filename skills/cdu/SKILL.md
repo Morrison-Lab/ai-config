@@ -1,6 +1,6 @@
 ---
 name: cdu
-description: "Alias for `check-dependency-updates`. Use when asked to 'cdu'."
+description: "→ check-dependency-updates."
 user-invocable: true
 allowed-tools:
   - Bash

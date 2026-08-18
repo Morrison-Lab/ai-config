@@ -1,6 +1,6 @@
 ---
 name: merge-skills
-description: "Alias for `consolidate-skills`. Use when asked to 'merge-skills'."
+description: "→ consolidate-skills."
 user-invocable: true
 ---
 

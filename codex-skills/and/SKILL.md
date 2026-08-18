@@ -1,6 +1,6 @@
 ---
 name: "and"
-description: "Codex wrapper for the ai-config Claude skill `and`. Revise or extend the previous command rather than adding a separate task. Use when the user appends `/and <revision>` to amend the instruction they just gave \u2014 folding the revision into that task (same queue position), not creating a new one. Invoke explicitly with /and. Use when Codex is asked to use `and`, `/and`, or the corresponding ai-config/Claude skill workflow."
+description: "Use and."
 ---
 
 # and (Codex wrapper)

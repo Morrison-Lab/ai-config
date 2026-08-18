@@ -1,6 +1,6 @@
 ---
 name: cai
-description: "Alias for `config-ai`. Use when asked to 'cai'."
+description: "→ config-ai."
 user-invocable: true
 allowed-tools:
   - Bash

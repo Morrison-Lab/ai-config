@@ -1,6 +1,6 @@
 ---
 name: "merge-skills"
-description: "Codex wrapper for the ai-config Claude skill `merge-skills`. Alias for `consolidate-skills`. Use when asked to 'merge-skills'. Use when Codex is asked to use `merge-skills`, `/merge-skills`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 consolidate-skills."
 ---
 
 # merge-skills (Codex wrapper)

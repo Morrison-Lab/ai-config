@@ -1,6 +1,6 @@
 ---
 name: spot-skill-opportunities
-description: "Proactively notice, in the moment and not just at a session-end checkpoint, when a repeatable multi-step workflow, decision framework, tool-integration pattern, or dedicated fan-out worker persona is emerging during ANY task — then surface it as a candidate skill (or agent) and hand off to skill-builder or agent-builder, rather than quietly repeating the same hand-rolled steps next time. This is the recognition step; skill-builder and agent-builder are the construction steps. Use continuously, whenever you catch yourself repeating a multi-step dance done earlier in this session or a prior one, improvising a workaround for something that will recur, or the user says 'again', 'like last time', 'we did this before', or 'always do X'. Also fires as a standing checklist item inside record-learnings, ums, wrap-up, and post-merge."
+description: "notice when work is skill-shaped."
 user-invocable: true
 allowed-tools:
   - Bash

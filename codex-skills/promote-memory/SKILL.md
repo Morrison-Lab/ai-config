@@ -1,6 +1,6 @@
 ---
 name: "promote-memory"
-description: "Codex wrapper for the ai-config Claude skill `promote-memory`. Review staged learning candidates (from learn-staging.md) against explicit criteria \u2014 generality, staleness, redundancy, evidence, format \u2014 and promote the durable ones into committed memory (CLAUDE.md / memories/), discarding or holding the rest. The promotion-gate half of the learn/promote-memory pair. Use when asked to 'promote memory', 'review staged learnings', 'clear out learn-staging', or periodically (e.g. as part of ums) to work through an accumulating staging file. Use when Codex is asked to use `promote-memory`, `/promote-memory`, or the corresponding ai-config/Claude skill workflow."
+description: "the review gate for staged learnings."
 ---
 
 # promote-memory (Codex wrapper)

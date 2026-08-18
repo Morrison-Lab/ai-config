@@ -1,6 +1,6 @@
 ---
 name: use-math-macros
-description: "Rewrite the math in a Quarto/LaTeX manuscript to use the shared d-morrison/macros submodule, condensing and polishing all math expressions consistently across lab documents. Use when asked to 'macroize', 'macroize the math', 'use macros', 'use the macros submodule', 'convert math to macros', or 'polish the math with macros'."
+description: "condense manuscript math onto the shared macros submodule."
 user-invocable: true
 allowed-tools:
   - Bash

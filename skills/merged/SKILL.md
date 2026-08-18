@@ -1,6 +1,6 @@
 ---
 name: merged
-description: "Alias for `wrap-up`. Use when asked to 'merged'. In a multi-PR session you can name the PR that just merged (e.g. `/merged #74`) to anchor the summary on it."
+description: "→ wrap-up."
 user-invocable: true
 allowed-tools:
   - Bash

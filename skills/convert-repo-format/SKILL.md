@@ -1,6 +1,6 @@
 ---
 name: convert-repo-format
-description: "Convert a repo from one SERG project format to another — R package, Quarto website, Quarto book, or Quarto manuscript — using the lab's template repos (`rpt`, `qwt`, `qbt`, `qmt`) as the source of truth for the target's structure. Detect the current format, swap the project config, add/remove format-specific files and CI workflows, adapt `DESCRIPTION`, then verify against the target's checks. Use when asked to 'convert this repo to a <format>', 'crf', 'convert repo format', 'turn this book into a website', 'make this manuscript an R package', 'reformat this repo as a Quarto book', or 'change this repo's project type'."
+description: "convert a repo between SERG project formats."
 user-invocable: true
 allowed-tools:
   - Bash

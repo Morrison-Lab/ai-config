@@ -1,6 +1,6 @@
 ---
 name: "cdu"
-description: "Codex wrapper for the ai-config Claude skill `cdu`. Alias for `check-dependency-updates`. Use when asked to 'cdu'. Use when Codex is asked to use `cdu`, `/cdu`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 check-dependency-updates."
 ---
 
 # cdu (Codex wrapper)

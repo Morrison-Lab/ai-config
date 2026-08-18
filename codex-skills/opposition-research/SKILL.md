@@ -1,6 +1,6 @@
 ---
 name: "opposition-research"
-description: "Codex wrapper for the ai-config Claude skill `opposition-research`. Opposition research (aka `oppo`): mine a competitor product's community pages \u2014 issue trackers, feature-request boards, subreddits, Discourse/Discord, Stack Overflow tags, review sites \u2014 for features its users ask for and value, then map the on-scope ideas to our repos and file them as tracked issues. Studies what the rival's *users want*, not what the rival *shipped*. Use when asked to 'opposition research', 'oppo', 'do oppo research on X', 'what features does X's community want', 'mine X's issues/subreddit/forum for ideas', 'what are users asking competitor for', 'competitor feature research', or 'what do users wish product X had'. Invoke with /opposition-research or the alias /oppo. Use when Codex is asked to use `opposition-research`, `/opposition-research`, or the corresponding ai-config/Claude skill workflow."
+description: "mine a competitor's community for demanded features."
 ---
 
 # opposition-research (Codex wrapper)

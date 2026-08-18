@@ -1,6 +1,6 @@
 ---
 name: "gia"
-description: "Codex wrapper for the ai-config Claude skill `gia`. Grab Issues + iterate-All: clear the repo's entire work queue in two phases \u2014 first run ARDIA (drive every open PR/MR to a clean review verdict), then run GII (grab each open issue, implement it, open an MR/PR, ARDI to clean, recurse). Use when asked to 'gia', 'ardia+gii', 'adria+gii', 'gii+ardia', 'gii+adria', 'clear the whole queue', 'clean all PRs then do all the issues', 'burn down everything', 'tidy the repo end to end', or 'empty the backlog'. Use when Codex is asked to use `gia`, `/gia`, or the corresponding ai-config/Claude skill workflow."
+description: "Grab Issues + iterate-All."
 ---
 
 # gia (Codex wrapper)

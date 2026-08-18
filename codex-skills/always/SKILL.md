@@ -1,6 +1,6 @@
 ---
 name: "always"
-description: "Codex wrapper for the ai-config Claude skill `always`. Alias for `memorize` (synonym of `remember`). Use when asked to 'always', 'always \u2026', 'I prefer \u2026', '/always'. Use when Codex is asked to use `always`, `/always`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 memorize."
 ---
 
 # always (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: gis
-description: "Alias for `gii` (Grab Issues Iteratively). Use when asked to 'gis', 'grab issues serially'. Stacks MRs when needed."
+description: "Alias."
 user-invocable: true
 allowed-tools:
   - Bash

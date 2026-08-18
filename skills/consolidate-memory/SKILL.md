@@ -1,15 +1,6 @@
 ---
 name: consolidate-memory
-description: >
-  Merge two or more genuinely-redundant memory entries in the `memories/` corpus
-  into a single canonical entry — union the facts, keep one copy in the right
-  scope, and repoint any `[[links]]` — so the corpus shrinks without losing a
-  fact or a cross-reference. Delegates detection to `find-overlap` (scope =
-  `memories/`), proposes a plan for approval, then ships it via branch + PR. The
-  memory-corpus counterpart of `consolidate-skills`. Use when asked to
-  "consolidate memory", "consolidate memories", "merge duplicate memories",
-  "dedupe memories", or "collapse redundant memory entries". Invoke explicitly
-  with /consolidate-memory.
+description: "merge redundant memory entries into one canonical."
 user-invocable: true
 allowed-tools:
   - Bash

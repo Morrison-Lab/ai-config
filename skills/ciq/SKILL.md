@@ -1,6 +1,6 @@
 ---
 name: ciq
-description: "Alias for `check-info-quality`. Use when asked to 'ciq'."
+description: "→ check-info-quality."
 user-invocable: true
 allowed-tools:
   - Bash

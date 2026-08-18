@@ -1,6 +1,6 @@
 ---
 name: crf
-description: "Alias for `convert-repo-format`. Use when asked to 'crf'."
+description: "→ convert-repo-format."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "also"
-description: "Codex wrapper for the ai-config Claude skill `also`. Queue the instructions that follow `/also` to be handled only AFTER every preceding request in the conversation is finished. Use when the user appends `/also <instructions>` to add a follow-up task that should run last, without preempting work already in flight. Invoke explicitly with /also. Use when Codex is asked to use `also`, `/also`, or the corresponding ai-config/Claude skill workflow."
+description: "Use also."
 ---
 
 # also (Codex wrapper)

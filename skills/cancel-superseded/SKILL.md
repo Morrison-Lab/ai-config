@@ -1,6 +1,6 @@
 ---
 name: cancel-superseded
-description: "Cancel superseded (older) pipelines on the same branch, freeing runners for the latest push. Use when asked to 'cancel old pipelines', 'cancel superseded', 'free up runners', or when you notice stale pipelines blocking newer ones."
+description: "Cancel Superseded Pipelines."
 user-invocable: true
 allowed-tools:
   - Bash

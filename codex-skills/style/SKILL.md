@@ -1,6 +1,6 @@
 ---
 name: "style"
-description: "Codex wrapper for the ai-config Claude skill `style`. Alias for `use-preferred-style`. Use when asked to 'style', '/style', 'use my style', 'apply my preferred style', 'tighten this prose'. Use when Codex is asked to use `style`, `/style`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 use-preferred-style."
 ---
 
 # style (Codex wrapper)

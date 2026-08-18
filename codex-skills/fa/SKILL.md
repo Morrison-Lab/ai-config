@@ -1,6 +1,6 @@
 ---
 name: "fa"
-description: "Codex wrapper for the ai-config Claude skill `fa`. Alias for `fetch-all`. Use when asked to 'fa'. Use when Codex is asked to use `fa`, `/fa`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 fetch-all."
 ---
 
 # fa (Codex wrapper)

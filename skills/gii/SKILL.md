@@ -1,6 +1,6 @@
 ---
 name: gii
-description: "Grab Issues Iteratively: loop over the repo's open issues — grab the top one, implement it, open an MR/PR, ARDI it to clean, then recurse to the next issue. Stacks MRs when later issues depend on earlier (unmerged) branches. Use when asked to 'gii', 'gis', 'grab issues', 'work through the backlog', 'keep going', or 'do all the issues'."
+description: "Grab Issues Iteratively (aka GIS)."
 user-invocable: true
 allowed-tools:
   - Bash

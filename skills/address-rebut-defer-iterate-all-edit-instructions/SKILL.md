@@ -1,6 +1,6 @@
 ---
 name: address-rebut-defer-iterate-all-edit-instructions
-description: "Alias for `ardiaei` (ARDIA + Edit Instructions). Use when asked to 'address-rebut-defer-iterate-all-edit-instructions', 'address rebut defer iterate all then edit instructions'."
+description: "→ ardiaei."
 user-invocable: true
 allowed-tools:
   - Bash

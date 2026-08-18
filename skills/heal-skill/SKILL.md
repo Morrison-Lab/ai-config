@@ -1,13 +1,6 @@
 ---
 name: heal-skill
-description: >
-  Repair a skill that just misfired — fired when it shouldn't have, failed to
-  fire when it should have, or led the session astray. Diagnose the root cause
-  from where the session got confused, propose a minimal fix to the skill's
-  trigger/description/body, and apply it with the user's approval. Use when the
-  user says "that skill confused you", "heal that skill", "fix the skill that
-  misfired", "that shouldn't have triggered", or right after a skill visibly
-  went wrong. Invoke explicitly with /heal-skill.
+description: "Use heal-skill."
 user-invocable: true
 allowed-tools:
   - Bash

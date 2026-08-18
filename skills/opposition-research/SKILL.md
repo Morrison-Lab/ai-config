@@ -1,6 +1,6 @@
 ---
 name: opposition-research
-description: "Opposition research (aka `oppo`): mine a competitor product's community pages — issue trackers, feature-request boards, subreddits, Discourse/Discord, Stack Overflow tags, review sites — for features its users ask for and value, then map the on-scope ideas to our repos and file them as tracked issues. Studies what the rival's *users want*, not what the rival *shipped*. Use when asked to 'opposition research', 'oppo', 'do oppo research on X', 'what features does X's community want', 'mine X's issues/subreddit/forum for ideas', 'what are users asking competitor for', 'competitor feature research', or 'what do users wish product X had'. Invoke with /opposition-research or the alias /oppo."
+description: "mine a competitor's community for demanded features."
 user-invocable: true
 allowed-tools:
   - WebSearch

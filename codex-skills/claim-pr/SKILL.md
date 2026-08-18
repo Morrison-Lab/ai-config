@@ -1,6 +1,6 @@
 ---
 name: "claim-pr"
-description: "Codex wrapper for the ai-config Claude skill `claim-pr`. Post a 'paws off' claim comment on a PR/MR or issue before starting a work session on it, and resolve/unclaim when done, so other humans and the @claude CI bot don't start a colliding parallel session. Use before fetching a branch, editing, or running review cycles on a PR/issue \u2014 and after the work is paused, merged, or closed. Use when Codex is asked to use `claim-pr`, `/claim-pr`, or the corresponding ai-config/Claude skill workflow."
+description: "Use claim-pr."
 ---
 
 # claim-pr (Codex wrapper)

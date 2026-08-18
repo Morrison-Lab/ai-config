@@ -1,6 +1,6 @@
 ---
 name: giardia
-description: "Alias for `gia` (Grab Issues + iterate-All). Use when asked to 'giardia'."
+description: "→ gia."
 user-invocable: true
 allowed-tools:
   - Bash

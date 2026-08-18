@@ -1,6 +1,6 @@
 ---
 name: resync-branch
-description: "Alias for `sync-pr-branch`. Use when asked to 'resync-branch', 'my branch and origin have diverged'."
+description: "Alias."
 user-invocable: true
 allowed-tools:
   - Bash

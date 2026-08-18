@@ -1,6 +1,6 @@
 ---
 name: address-rebut-defer-iterate
-description: "Alias for `ardi`. Use when asked to 'address-rebut-defer-iterate', 'address rebut defer iterate'."
+description: "→ ardi."
 user-invocable: true
 allowed-tools:
   - Bash

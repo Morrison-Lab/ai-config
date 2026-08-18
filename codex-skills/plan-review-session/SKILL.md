@@ -1,6 +1,6 @@
 ---
 name: "plan-review-session"
-description: "Codex wrapper for the ai-config Claude skill `plan-review-session`. Turn a catalog of common student errors into review-session teaching material \u2014 typically a new chapter in a Quarto course book (mistake callout + worked solution per error) \u2014 and open a PR. Use after grade-work, or when asked to \"plan a review session\", \"make a review chapter from these mistakes\", or \"build review material for the midterm\". Use when Codex is asked to use `plan-review-session`, `/plan-review-session`, or the corresponding ai-config/Claude skill workflow."
+description: "Use plan-review-session."
 ---
 
 # plan-review-session (Codex wrapper)

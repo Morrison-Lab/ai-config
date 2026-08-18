@@ -1,6 +1,6 @@
 ---
 name: claim-pr
-description: "Post a 'paws off' claim comment on a PR/MR or issue before starting a work session on it, and resolve/unclaim when done, so other humans and the @claude CI bot don't start a colliding parallel session. Use before fetching a branch, editing, or running review cycles on a PR/issue — and after the work is paused, merged, or closed."
+description: "Use claim-pr."
 user-invocable: true
 allowed-tools:
   - Bash

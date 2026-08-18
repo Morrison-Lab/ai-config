@@ -1,6 +1,6 @@
 ---
 name: "rescue-closed"
-description: "Codex wrapper for the ai-config Claude skill `rescue-closed`. Search the graveyard of closed issues and closed-but-unmerged PRs to surface the ones worth returning to \u2014 abandoned, stale-bot-closed, closed-as-not-planned, or superseded-but-never-landed \u2014 then triage, reopen, or re-file the keepers with current context. Use when asked to 'rescue closed issues', 'revive a closed PR', 'reopen abandoned work', 'what closed issues/PRs should we revisit', 'comb the graveyard', 'resurrect stale issues', 'salvage abandoned PRs', or 'rescue-closed'. Use when Codex is asked to use `rescue-closed`, `/rescue-closed`, or the corresponding ai-config/Claude skill workflow."
+description: "comb the graveyard for work worth reviving."
 ---
 
 # rescue-closed (Codex wrapper)

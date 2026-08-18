@@ -87,6 +87,29 @@ def run_check_skill(tmpdir: Path, name: str, description: str):
         vs.errors.clear()
 
 
+def run_listing_budget(tmpdir: Path, entries: list[tuple[str, str]]):
+    """Run the aggregate guard against a synthetic skill catalog."""
+    paths = []
+    for name, description in entries:
+        skill_dir = tmpdir / name
+        skill_dir.mkdir(parents=True)
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            f'---\nname: {name}\ndescription: "{description}"\n---\n\nbody\n',
+            encoding="utf-8",
+        )
+        paths.append(skill_md)
+    original_root = vs.ROOT
+    vs.ROOT = tmpdir
+    vs.errors.clear()
+    try:
+        vs.check_listing_budget(paths, "synthetic/")
+        return list(vs.errors)
+    finally:
+        vs.ROOT = original_root
+        vs.errors.clear()
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
@@ -186,6 +209,25 @@ def main() -> int:
         # that can fire on ordinary content.
         errs = run_check_skill(length_dir, "ok-skill", "A short, fine description.")
         check("short description does not trip the length guard", errs == [])
+
+        # Routing receives the whole installed catalog, not one description at
+        # a time. Its budget must therefore be enforced in aggregate.
+        check(
+            "listing at the context budget is clean",
+            vs.listing_chars([("a", "x" * (vs.SKILL_LISTING_BUDGET_CHARS - 9))])
+            == vs.SKILL_LISTING_BUDGET_CHARS,
+        )
+        check(
+            "listing over the context budget is detectable",
+            vs.listing_chars([("a", "x" * (vs.SKILL_LISTING_BUDGET_CHARS - 8))])
+            > vs.SKILL_LISTING_BUDGET_CHARS,
+        )
+        entries = [(f"skill-{index}", "x" * 1_000) for index in range(8)]
+        errs = run_listing_budget(tmp / "over-budget", entries)
+        check(
+            "aggregate listing over the context budget errors",
+            len(errs) == 1 and "context budget" in errs[0],
+        )
 
         # Boundary: exactly the limit passes, one character over fails --
         # proves the guard fires on ">", not ">=", the real limit.

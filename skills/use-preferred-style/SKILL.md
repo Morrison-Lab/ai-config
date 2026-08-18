@@ -1,6 +1,6 @@
 ---
 name: use-preferred-style
-description: "Write or revise user-facing prose in the user's preferred style, per his Principles of Scientific Writing guide (psw, https://morrison-lab.github.io/psw/) --- limit dependent (subordinate) clauses, cut low-content filler and jargon, prefer plain Anglish words over Latin ones, prefer short declarative sentences and active voice, keep relative pronouns rather than dropping them, follow a demonstrative pronoun with the noun it refers to, and join ideas with coordinating conjunctions (and/but/so/or) over subordinate constructions. Apply when drafting or editing scientific prose, reviewing or redlining a manuscript or paper, or drafting/rewriting any other user-facing prose: PR/issue/commit text, docs, READMEs, comments, release notes, emails, or chat replies. Use when asked to 'use my style', 'apply my preferred style', 'rewrite in my voice', 'tighten this', 'plain-language this', 'review this manuscript', 'redline this paper', 'psw', or '/style'."
+description: "write the way the user prefers."
 user-invocable: true
 allowed-tools:
   - Bash

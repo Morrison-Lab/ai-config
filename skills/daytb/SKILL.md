@@ -1,6 +1,6 @@
 ---
 name: daytb
-description: "Decide the question in front of you yourself instead of asking, then report what you chose. A per-decision grant of judgment latitude, scoped to the task at hand rather than the session -- the user stays present and reachable. Use when asked to 'daytb', 'do as you think best', 'do as you see fit', 'do whatever you think is best', 'your call', 'you decide', 'up to you', 'I trust your judgment here', or when a reply hands a pending decision back without answering it."
+description: "do as you think best."
 user-invocable: true
 allowed-tools:
   - Bash

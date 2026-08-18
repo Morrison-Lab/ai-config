@@ -1,6 +1,6 @@
 ---
 name: "rc"
-description: "Codex wrapper for the ai-config Claude skill `rc`. Alias for `resolve-conflicts`. Use when asked to 'rc'. Use when Codex is asked to use `rc`, `/rc`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 resolve-conflicts."
 ---
 
 # rc (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "revive-closed"
-description: "Codex wrapper for the ai-config Claude skill `revive-closed`. Alias for `rescue-closed`. Use when asked to 'revive closed issues', 'revive-closed'. Use when Codex is asked to use `revive-closed`, `/revive-closed`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 rescue-closed."
 ---
 
 # revive-closed (Codex wrapper)

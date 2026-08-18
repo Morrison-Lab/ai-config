@@ -1,6 +1,6 @@
 ---
 name: "prune-worktrees"
-description: "Codex wrapper for the ai-config Claude skill `prune-worktrees`. Alias for `clean-worktrees` (aka `cw`). Use when asked to 'prune-worktrees'. Use when Codex is asked to use `prune-worktrees`, `/prune-worktrees`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 clean-worktrees."
 ---
 
 # prune-worktrees (Codex wrapper)

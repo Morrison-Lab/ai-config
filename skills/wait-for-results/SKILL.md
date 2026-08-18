@@ -1,6 +1,6 @@
 ---
 name: wait-for-results
-description: "Wait for long-running jobs to finish (SLURM arrays, builds, CI, background tasks, remote agents), then run the agreed follow-up step. Immediately runs the `handoff` skill first so session state is saved before the wait — if the session ends or context resets mid-wait, the next session can resume cleanly. Use when asked to 'wait for results', 'wait for the jobs', 'poll until done then combine/run X', or after launching a long job you intend to act on when it completes."
+description: "make that observable."
 user-invocable: true
 allowed-tools:
   - Bash

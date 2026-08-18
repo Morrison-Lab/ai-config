@@ -1,6 +1,6 @@
 ---
 name: "memorize"
-description: "Codex wrapper for the ai-config Claude skill `memorize`. Persist a fact or preference to memory that survives across sessions, machines, and agents \u2014 routed by relevance to project-specific or general scope. Use when the user says 'memorize', 'remember that \u2026', '/remember', 'from now on \u2026', 'always/never \u2026', 'note that \u2026', or 'add to memories'. (`remember` / `/remember` and `always` / `/always` are synonyms.) Use when Codex is asked to use `memorize`, `/memorize`, or the corresponding ai-config/Claude skill workflow."
+description: "Memorize."
 ---
 
 # memorize (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: push-memory
-description: "Push a general-purpose memory into the ai-config repo when you're working primarily in ANOTHER repo — a `CLAUDE.md` standing rule or a `memories/*.md` reference fact — delivered on its own branch + PR (or via the GitHub file API) without disturbing the repo you're in. Use when the user says 'push this to ai-config', 'remember this globally from here', 'add this to ai-config's memory / CLAUDE.md', 'record this in ai-config even though we're in <other repo>', or '/push-memory'. For the normal case where ai-config IS your working repo, use `memorize` instead."
+description: "Use push-memory."
 user-invocable: true
 allowed-tools:
   - Read

@@ -1,6 +1,6 @@
 ---
 name: "first"
-description: "Codex wrapper for the ai-config Claude skill `first`. Push the instructions that follow `/first` to the HEAD of the task queue \u2014 the counter to `/also`. Use when the user appends `/first <instructions>` to jump a task ahead of everything else, even pausing work already in progress to do it now. Invoke explicitly with /first. Use when Codex is asked to use `first`, `/first`, or the corresponding ai-config/Claude skill workflow."
+description: "Use first."
 ---
 
 # first (Codex wrapper)

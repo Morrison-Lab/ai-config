@@ -1,6 +1,6 @@
 ---
 name: skill-builder
-description: "Build a new skill for the ai-config repo the right way -- FIRST check whether an existing skill should be extended instead (search skills/, scripts/, and hooks/, scan every branch for in-flight similar work, AND check open PRs for in-progress drafts to redirect to instead of duplicating), and only then scaffold skills/<name>/SKILL.md with proper frontmatter, a discoverable trigger-rich description, a spelled-out/short alias as appropriate, cross-links, and (if it encodes a standing rule) matching preferences.md / CLAUDE.md updates -- shipped via branch + PR, reviewer requested, ARDI'd to clean. Use when asked to 'build a skill', 'create a skill', 'make a new skill', 'add a skill', 'add an alias for X', 'make X an alias for Y', 'should this be an alias for Y', or 'skill-builder' -- creating an alias stub routes here too, so the codex wrapper gets regenerated and the stub is self-reviewed."
+description: "author a new skill (extend-first)."
 user-invocable: true
 allowed-tools:
   - Bash

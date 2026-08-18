@@ -1,6 +1,6 @@
 ---
 name: "compress-session"
-description: "Codex wrapper for the ai-config Claude skill `compress-session`. Distill the conversation into a structured note in auto memory (MEMORY.md) before context fills up, and/or trigger a focused /compact yourself instead of waiting for the automatic pass to guess what matters. Use when asked to 'compress the session', 'distill context before compacting', 'summarize before compaction', or proactively when the conversation is getting long and approaching an auto-compact boundary. Use when Codex is asked to use `compress-session`, `/compress-session`, or the corresponding ai-config/Claude skill workflow."
+description: "deliberate pre-compaction distillation."
 ---
 
 # compress-session (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: claude-review-workflow
-description: Add or modify the `anthropics/claude-code-action` PR review workflow (`.github/workflows/claude-code-review.yml`). Preserves the load-bearing patterns — fresh-comment-per-run (no sticky delete), inline-comment encouragement, the event-gated track_progress, and the workflow_dispatch path claude.yml uses to re-dispatch reviews.
+description: "Set up Claude PR review workflows."
 user-invocable: true
 allowed-tools:
   - Read

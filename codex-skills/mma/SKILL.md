@@ -1,6 +1,6 @@
 ---
 name: "mma"
-description: "Codex wrapper for the ai-config Claude skill `mma`. Merge main into all open PR branches in the current repo. For every open PR, fetch, merge origin/main (and origin/<branch>) in, resolve conflicts, run the repo's pre-commit checks, and push \u2014 reusing sync-pr-branch's per-branch procedure, looped across the whole open-PR queue. Use on \"merge main into all pr branches\", \"sync every open PR with main\", \"mma\", or when several PRs have all drifted behind main at once (e.g. after a run of merges) and need resyncing in one pass. Use when Codex is asked to use `mma`, `/mma`, or the corresponding ai-config/Claude skill workflow."
+description: "Use mma."
 ---
 
 # mma (Codex wrapper)

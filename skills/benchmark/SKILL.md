@@ -1,6 +1,6 @@
 ---
 name: benchmark
-description: "Alias for `measure-performance`. Profile first, then microbenchmark only the bottleneck. Use when asked to 'benchmark', 'benchmark this', 'microbenchmark', or 'which of these is faster'."
+description: "→ measure-performance."
 user-invocable: true
 allowed-tools:
   - Bash

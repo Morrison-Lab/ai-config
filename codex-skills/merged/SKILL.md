@@ -1,6 +1,6 @@
 ---
 name: "merged"
-description: "Codex wrapper for the ai-config Claude skill `merged`. Alias for `wrap-up`. Use when asked to 'merged'. In a multi-PR session you can name the PR that just merged (e.g. `/merged #74`) to anchor the summary on it. Use when Codex is asked to use `merged`, `/merged`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 wrap-up."
 ---
 
 # merged (Codex wrapper)

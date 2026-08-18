@@ -1,6 +1,6 @@
 ---
 name: rescue-closed
-description: "Search the graveyard of closed issues and closed-but-unmerged PRs to surface the ones worth returning to — abandoned, stale-bot-closed, closed-as-not-planned, or superseded-but-never-landed — then triage, reopen, or re-file the keepers with current context. Use when asked to 'rescue closed issues', 'revive a closed PR', 'reopen abandoned work', 'what closed issues/PRs should we revisit', 'comb the graveyard', 'resurrect stale issues', 'salvage abandoned PRs', or 'rescue-closed'."
+description: "comb the graveyard for work worth reviving."
 user-invocable: true
 allowed-tools:
   - Bash

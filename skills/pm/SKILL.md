@@ -1,6 +1,6 @@
 ---
 name: pm
-description: "Alias for `prompt-me`. Use when asked to 'pm', 'pm 3', '/pm [N]'."
+description: "→ prompt-me."
 user-invocable: true
 allowed-tools: []
 ---

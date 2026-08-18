@@ -1,6 +1,6 @@
 ---
 name: crr
-description: "Alias for `check-rendered-refs`. Use when asked to 'crr'."
+description: "→ check-rendered-refs."
 user-invocable: true
 allowed-tools:
   - Bash

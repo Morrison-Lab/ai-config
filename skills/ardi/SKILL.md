@@ -190,7 +190,15 @@ How depends on the repo's review trigger first, and on whether this round pushed
    A stray mention spawns a run that cancels the push-triggered review on `cancel-in-progress` setups.
    On some mention-bot setups it also starts a session whose residual-commit sweep can churn the branch.
 
-   Then wait for the new verdict.
+    Then wait for the new verdict.
+
+    **Set a timer after every push to monitor for AI reviews.**
+    Set a `schedule` timer (e.g. 120s) after every push to check for incoming AI reviews.
+    When the timer fires:
+    - Check if a fresh review for the current head commit has landed.
+    - If no review has arrived yet: verify whether review workflow runs are still in progress in CI (`gh run list` / `gh pr view --json statusCheckRollup`).
+    - If the review workflow is still running: set another timer to check back.
+    - If the review workflow failed, was canceled, or was skipped with no replacement: fix any underlying workflow/dispatch problems discovered along the way, re-dispatch if appropriate, and set another timer to maintain continuous monitoring until a review lands or CI completes.
 
    **While waiting, keep checking for merge conflicts.**
    Other PRs in this repo can become conflicting at any time (someone merges to `main` while the review runs).

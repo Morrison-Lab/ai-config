@@ -411,7 +411,8 @@ When opening or taking over a PR in any repo, subscribe/watch that PR's activity
 
 ## Monitor every pushed PR head to completion
 
-After every push to a PR in every repository and every session, actively monitor that exact head commit for CI failures and new review comments.
+After every push to a PR in every repository and every session, set a `schedule` timer (e.g. 120s) to actively monitor that exact head commit for CI failures and new review comments.
+If no review has arrived when the timer expires, verify whether review workflow runs are still in progress in CI (`gh run list` / `gh pr view --json statusCheckRollup`), fix any dispatch or workflow failures discovered along the way, and schedule another timer to maintain continuous monitoring until a review lands or CI completes.
 Keep polling and address actionable failures or findings until all workflows and check runs are complete and passing (success or skipped), the current-head review is clean, and no review threads remain unresolved.
 Once that commit is fully clean and green, stop the **intensive head poll** for it; don't restart that poll for the same commit unless something regresses.
 A later push creates a new head commit and starts a new monitoring cycle automatically.

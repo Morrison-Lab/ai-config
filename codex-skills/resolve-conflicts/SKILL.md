@@ -1,6 +1,6 @@
 ---
 name: "resolve-conflicts"
-description: "consolidate the best of both branches."
+description: "Resolve merge conflicts."
 ---
 
 # resolve-conflicts (Codex wrapper)

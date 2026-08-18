@@ -1,6 +1,6 @@
 ---
 name: "test"
-description: "Test."
+description: "Run unit or revdep tests."
 ---
 
 # test (Codex wrapper)

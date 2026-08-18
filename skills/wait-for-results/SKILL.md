@@ -1,6 +1,6 @@
 ---
 name: wait-for-results
-description: "make that observable."
+description: "Wait for pipeline/CI results."
 user-invocable: true
 allowed-tools:
   - Bash

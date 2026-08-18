@@ -1,6 +1,6 @@
 ---
 name: first
-description: "Use first."
+description: "Jump to head of task queue."
 user-invocable: true
 allowed-tools: []
 ---

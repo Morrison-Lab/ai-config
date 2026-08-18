@@ -1,6 +1,6 @@
 ---
 name: before
-description: "Use before."
+description: "Insert before a queued task."
 user-invocable: true
 allowed-tools: []
 ---

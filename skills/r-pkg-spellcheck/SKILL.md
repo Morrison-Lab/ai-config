@@ -1,6 +1,6 @@
 ---
 name: r-pkg-spellcheck
-description: "Use r-pkg-spellcheck."
+description: "Spellcheck before git push."
 user-invocable: true
 allowed-tools:
   - Read

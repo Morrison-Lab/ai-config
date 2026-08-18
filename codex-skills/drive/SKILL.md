@@ -1,6 +1,6 @@
 ---
 name: "drive"
-description: "Alias."
+description: "\u2192 ardi."
 ---
 
 # drive (Codex wrapper)

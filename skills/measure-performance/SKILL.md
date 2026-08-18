@@ -1,6 +1,6 @@
 ---
 name: measure-performance
-description: "profile first, then microbenchmark (perf, benchmark)."
+description: "Profile and benchmark."
 user-invocable: true
 allowed-tools:
   - Bash

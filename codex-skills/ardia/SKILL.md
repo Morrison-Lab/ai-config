@@ -1,6 +1,6 @@
 ---
 name: "ardia"
-description: "ARD + Iterate-All."
+description: "Drive all open PRs to clean."
 ---
 
 # ardia (Codex wrapper)

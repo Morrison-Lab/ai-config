@@ -1,6 +1,6 @@
 ---
 name: reprexes
-description: "Use reprexes."
+description: "Build minimal reproducible example."
 user-invocable: true
 allowed-tools:
   - Bash

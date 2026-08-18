@@ -1,6 +1,6 @@
 ---
 name: "measure-performance"
-description: "profile first, then microbenchmark (perf, benchmark)."
+description: "Profile and benchmark."
 ---
 
 # measure-performance (Codex wrapper)

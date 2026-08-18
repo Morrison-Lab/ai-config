@@ -1,6 +1,6 @@
 ---
 name: "gi"
-description: "Grab Issue."
+description: "Grab top issue, implement, and ARDI."
 ---
 
 # gi (Codex wrapper)

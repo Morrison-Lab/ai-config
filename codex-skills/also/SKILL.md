@@ -1,6 +1,6 @@
 ---
 name: "also"
-description: "Use also."
+description: "Queue instructions after current."
 ---
 
 # also (Codex wrapper)

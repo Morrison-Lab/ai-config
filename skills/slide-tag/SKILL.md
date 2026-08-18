@@ -1,6 +1,6 @@
 ---
 name: slide-tag
-description: "Slide Tag."
+description: "Move floating Git tag to main."
 user-invocable: true
 allowed-tools:
   - Bash

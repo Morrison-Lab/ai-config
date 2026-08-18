@@ -1,6 +1,6 @@
 ---
 name: claim-pr
-description: "Use claim-pr."
+description: "Post claim comment on PR/issue."
 user-invocable: true
 allowed-tools:
   - Bash

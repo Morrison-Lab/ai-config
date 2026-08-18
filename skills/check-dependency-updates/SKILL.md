@@ -1,6 +1,6 @@
 ---
 name: check-dependency-updates
-description: "audit dependencies for available upgrades."
+description: "Audit dependency upgrades."
 user-invocable: true
 allowed-tools:
   - Bash

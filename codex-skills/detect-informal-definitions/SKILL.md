@@ -1,6 +1,6 @@
 ---
 name: "detect-informal-definitions"
-description: "find concepts defined only in prose."
+description: "Detect informal definitions."
 ---
 
 # detect-informal-definitions (Codex wrapper)

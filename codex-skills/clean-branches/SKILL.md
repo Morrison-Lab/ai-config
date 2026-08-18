@@ -1,6 +1,6 @@
 ---
 name: "clean-branches"
-description: "Clean stale local and remote Git branches."
+description: "Clean stale Git branches."
 ---
 
 # clean-branches (Codex wrapper)

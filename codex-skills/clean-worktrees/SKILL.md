@@ -1,6 +1,6 @@
 ---
 name: "clean-worktrees"
-description: "Remove stale Git worktrees safely."
+description: "Clean stale git worktrees."
 ---
 
 # clean-worktrees (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "gii"
-description: "Grab Issues Iteratively (aka GIS)."
+description: "Grab and implement issues in series."
 ---
 
 # gii (Codex wrapper)

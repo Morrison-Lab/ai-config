@@ -1,6 +1,6 @@
 ---
 name: cancel-superseded
-description: "Cancel Superseded Pipelines."
+description: "Cancel superseded CI pipelines."
 user-invocable: true
 allowed-tools:
   - Bash

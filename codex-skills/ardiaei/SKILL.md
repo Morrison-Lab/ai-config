@@ -1,6 +1,6 @@
 ---
 name: "ardiaei"
-description: "ARDIA + Edit Instructions."
+description: "Drive all PRs clean then run UMS."
 ---
 
 # ardiaei (Codex wrapper)

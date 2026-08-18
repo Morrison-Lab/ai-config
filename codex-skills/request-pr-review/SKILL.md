@@ -1,6 +1,6 @@
 ---
 name: "request-pr-review"
-description: "Use request-pr-review."
+description: "Request human review on PR."
 ---
 
 # request-pr-review (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Use handoff."
+description: "Snapshot session state to memory."
 user-invocable: true
 allowed-tools:
   - Bash

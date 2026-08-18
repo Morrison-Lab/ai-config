@@ -1,6 +1,6 @@
 ---
 name: mma
-description: "Use mma."
+description: "Merge main into open PR branches."
 user-invocable: true
 allowed-tools:
   - Bash

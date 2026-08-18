@@ -1,6 +1,6 @@
 ---
 name: "purge-hallucinations"
-description: "verify references resolve, then purge the fakes."
+description: "Verify and purge fake citations."
 ---
 
 # purge-hallucinations (Codex wrapper)

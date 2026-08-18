@@ -1,6 +1,6 @@
 ---
 name: rescue-closed
-description: "comb the graveyard for work worth reviving."
+description: "Revive worthy closed issues/PRs."
 user-invocable: true
 allowed-tools:
   - Bash

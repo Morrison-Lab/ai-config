@@ -1,6 +1,6 @@
 ---
 name: "merge-it"
-description: "merge a ready PR, then wrap up automatically."
+description: "Merge ready PR and wrap up."
 ---
 
 # merge-it (Codex wrapper)

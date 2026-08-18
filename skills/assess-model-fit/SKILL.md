@@ -1,6 +1,6 @@
 ---
 name: assess-model-fit
-description: "Evaluate current model capability."
+description: "Assess model fit for task."
 user-invocable: true
 allowed-tools:
   - Bash

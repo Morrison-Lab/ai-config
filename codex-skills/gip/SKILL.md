@@ -1,6 +1,6 @@
 ---
 name: "gip"
-description: "Grab Issues in Parallel."
+description: "Grab and implement issues in parallel."
 ---
 
 # gip (Codex wrapper)

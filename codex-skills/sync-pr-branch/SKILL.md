@@ -1,6 +1,6 @@
 ---
 name: "sync-pr-branch"
-description: "Use sync-pr-branch."
+description: "Sync PR branch with main."
 ---
 
 # sync-pr-branch (Codex wrapper)

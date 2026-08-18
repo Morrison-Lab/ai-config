@@ -1,6 +1,6 @@
 ---
 name: "r-pkg-news"
-description: "Use r-pkg-news."
+description: "Draft NEWS.md changelog entry."
 ---
 
 # r-pkg-news (Codex wrapper)

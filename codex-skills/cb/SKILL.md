@@ -1,6 +1,6 @@
 ---
 name: "cb"
-description: "Alias."
+description: "\u2192 clean-branches."
 ---
 
 # cb (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "push"
-description: "Use push."
+description: "Pre-push check for active sessions."
 ---
 
 # push (Codex wrapper)

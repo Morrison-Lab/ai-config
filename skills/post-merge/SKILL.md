@@ -1,6 +1,6 @@
 ---
 name: post-merge
-description: "wrap up a merged PR (verify, tidy, then UMS)."
+description: "Wrap up merged PR and run UMS."
 user-invocable: true
 allowed-tools:
   - Bash

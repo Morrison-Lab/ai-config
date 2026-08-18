@@ -1,6 +1,6 @@
 ---
 name: check-history
-description: "Use check-history."
+description: "Check closed PR history for issue."
 user-invocable: false
 allowed-tools:
   - Bash

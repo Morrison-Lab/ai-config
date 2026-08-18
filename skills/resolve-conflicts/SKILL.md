@@ -1,6 +1,6 @@
 ---
 name: resolve-conflicts
-description: "consolidate the best of both branches."
+description: "Resolve merge conflicts."
 user-invocable: true
 allowed-tools:
   - Bash

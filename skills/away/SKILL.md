@@ -1,6 +1,6 @@
 ---
 name: away
-description: "unattended, best-judgment operating mode."
+description: "Unattended best-judgment mode."
 user-invocable: true
 allowed-tools:
   - Bash

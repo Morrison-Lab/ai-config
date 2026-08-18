@@ -1,6 +1,6 @@
 ---
 name: "reprexes"
-description: "Use reprexes."
+description: "Build minimal reproducible example."
 ---
 
 # reprexes (Codex wrapper)

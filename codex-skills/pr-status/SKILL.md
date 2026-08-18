@@ -1,6 +1,6 @@
 ---
 name: "pr-status"
-description: "Use pr-status."
+description: "Check PR latest review status."
 ---
 
 # pr-status (Codex wrapper)

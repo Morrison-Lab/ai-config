@@ -1,6 +1,6 @@
 ---
 name: "configure-gitattributes"
-description: "pick the right merge/diff behavior per file."
+description: "Configure file merge/diff attributes."
 ---
 
 # configure-gitattributes (Codex wrapper)

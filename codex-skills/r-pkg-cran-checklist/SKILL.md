@@ -1,6 +1,6 @@
 ---
 name: "r-pkg-cran-checklist"
-description: "Use r-pkg-cran-checklist."
+description: "CRAN submission checklist."
 ---
 
 # r-pkg-cran-checklist (Codex wrapper)

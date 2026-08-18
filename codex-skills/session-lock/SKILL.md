@@ -1,6 +1,6 @@
 ---
 name: "session-lock"
-description: "deconflict parallel local AI sessions."
+description: "Lock session to prevent collision."
 ---
 
 # session-lock (Codex wrapper)

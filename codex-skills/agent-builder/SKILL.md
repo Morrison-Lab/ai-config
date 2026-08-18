@@ -1,6 +1,6 @@
 ---
 name: "agent-builder"
-description: "author a new subagent definition (extend-first)."
+description: "Author new subagent definition."
 ---
 
 # agent-builder (Codex wrapper)

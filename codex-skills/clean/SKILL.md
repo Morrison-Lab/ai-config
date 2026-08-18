@@ -1,6 +1,6 @@
 ---
 name: "clean"
-description: "Alias."
+description: "\u2192 ardi."
 ---
 
 # clean (Codex wrapper)

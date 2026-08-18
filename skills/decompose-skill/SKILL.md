@@ -1,6 +1,6 @@
 ---
 name: decompose-skill
-description: "split an overly-broad skill into its real parts."
+description: "Split overly-broad skill."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: ts
-description: "Test + Slide."
+description: "→ slide-tag."
 user-invocable: true
 allowed-tools:
   - Bash

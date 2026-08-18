@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: "verify state, report, then UMS."
+description: "End-of-session verification and UMS."
 user-invocable: true
 allowed-tools:
   - Bash

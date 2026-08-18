@@ -1,6 +1,6 @@
 ---
 name: "pending-decisions"
-description: "surface issues/PRs waiting on a decision from you (pd)."
+description: "Surface items awaiting decision."
 ---
 
 # pending-decisions (Codex wrapper)

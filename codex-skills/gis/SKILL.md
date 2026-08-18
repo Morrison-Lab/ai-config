@@ -1,6 +1,6 @@
 ---
 name: "gis"
-description: "Alias."
+description: "\u2192 gii."
 ---
 
 # gis (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "reproducibility-audit"
-description: "checklist audit of a project's reproducibility posture."
+description: "Audit reproducibility posture."
 ---
 
 # reproducibility-audit (Codex wrapper)

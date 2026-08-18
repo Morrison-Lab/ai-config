@@ -1,6 +1,6 @@
 ---
 name: push
-description: "Use push."
+description: "Pre-push check for active sessions."
 user-invocable: true
 allowed-tools:
   - Bash

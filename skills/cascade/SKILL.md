@@ -1,6 +1,6 @@
 ---
 name: cascade
-description: "Use cascade."
+description: "Merge base down PR stack."
 user-invocable: true
 allowed-tools:
   - Bash

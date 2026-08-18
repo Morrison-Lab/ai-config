@@ -1,6 +1,6 @@
 ---
 name: "config-ai"
-description: "route AI-capability requests to the right implementation (ca, cai)."
+description: "Route AI capability requests."
 ---
 
 # config-ai (Codex wrapper)

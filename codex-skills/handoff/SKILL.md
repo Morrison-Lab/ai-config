@@ -1,6 +1,6 @@
 ---
 name: "handoff"
-description: "Use handoff."
+description: "Snapshot session state to memory."
 ---
 
 # handoff (Codex wrapper)

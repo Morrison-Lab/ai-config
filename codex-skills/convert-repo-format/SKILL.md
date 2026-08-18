@@ -1,6 +1,6 @@
 ---
 name: "convert-repo-format"
-description: "convert a repo between SERG project formats."
+description: "Convert repo format."
 ---
 
 # convert-repo-format (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "decompose-skill"
-description: "split an overly-broad skill into its real parts."
+description: "Split overly-broad skill."
 ---
 
 # decompose-skill (Codex wrapper)

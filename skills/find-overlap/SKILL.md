@@ -1,6 +1,6 @@
 ---
 name: find-overlap
-description: "read-only overlap / redundancy detector."
+description: "Detect overlapping skills/memories."
 user-invocable: true
 allowed-tools:
   - Bash

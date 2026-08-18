@@ -1,6 +1,6 @@
 ---
 name: fetch-all
-description: "Fetch All (aka `fa`)."
+description: "Fetch all remotes and submodules."
 user-invocable: true
 allowed-tools:
   - Bash

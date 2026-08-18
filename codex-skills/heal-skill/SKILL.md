@@ -1,6 +1,6 @@
 ---
 name: "heal-skill"
-description: "Use heal-skill."
+description: "Repair misfiring AI skill."
 ---
 
 # heal-skill (Codex wrapper)

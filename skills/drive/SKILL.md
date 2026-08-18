@@ -1,6 +1,6 @@
 ---
 name: drive
-description: "Alias."
+description: "→ ardi."
 user-invocable: true
 allowed-tools:
   - Bash

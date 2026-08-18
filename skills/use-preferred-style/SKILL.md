@@ -1,6 +1,6 @@
 ---
 name: use-preferred-style
-description: "write the way the user prefers."
+description: "Apply preferred writing style."
 user-invocable: true
 allowed-tools:
   - Bash

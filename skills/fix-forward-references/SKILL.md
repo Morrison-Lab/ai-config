@@ -1,6 +1,6 @@
 ---
 name: fix-forward-references
-description: "detect and rearrange to remove forward pointers."
+description: "Fix forward references in text."
 user-invocable: true
 allowed-tools:
   - Bash

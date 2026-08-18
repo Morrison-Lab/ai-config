@@ -1,6 +1,6 @@
 ---
 name: plan-review-session
-description: "Use plan-review-session."
+description: "Turn student errors into lessons."
 user-invocable: true
 allowed-tools:
   - Bash

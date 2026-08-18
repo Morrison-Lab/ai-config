@@ -1,6 +1,6 @@
 ---
 name: pr-status
-description: "Use pr-status."
+description: "Check PR latest review status."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: memorize
-description: "Memorize."
+description: "Persist memory across sessions."
 user-invocable: true
 allowed-tools:
   - Read

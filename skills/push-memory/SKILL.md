@@ -1,6 +1,6 @@
 ---
 name: push-memory
-description: "Use push-memory."
+description: "Push memory from external repo."
 user-invocable: true
 allowed-tools:
   - Read

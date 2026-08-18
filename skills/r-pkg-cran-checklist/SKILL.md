@@ -1,6 +1,6 @@
 ---
 name: r-pkg-cran-checklist
-description: "Use r-pkg-cran-checklist."
+description: "CRAN submission checklist."
 user-invocable: true
 allowed-tools:
   - Read

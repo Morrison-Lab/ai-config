@@ -1,6 +1,6 @@
 ---
 name: spot-skill-opportunities
-description: "notice when work is skill-shaped."
+description: "Identify candidates for new skills."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -314,6 +314,19 @@ the rule is consulted when it is *read* and broken when a message is
 | `inject-pr-monitor-status.py` | `UserPromptSubmit` | injects changed state from a detached PR poller on the next prompt; local pollers cannot wake a terminated model session |
 | `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service is running when an agent session begins |
 | `monitor-open-prs.py` | detached timer | reconciles every open PR authored by the authenticated user every two minutes, including PRs opened outside the current session |
+| `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
+| `remind-brief-premises.py` | `PreToolUse` (Agent) | reminds, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
+| `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
+| `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
+| `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |
+| `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
+| `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
+| `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
+| `no-unmeasured-clock-claim.py` | `Stop` | warns, never blocks, when a reply states a Pacific clock time and no clock read appears since the previous message |
+| `no-unauthorized-merge.py` | `PreToolUse` (Bash, mcp__github__.*) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`, or GitHub MCP merge tools) unless an explicit `ALLOW_MERGE=1` assertion or active /mwc accompanies it |
+| `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
+| `no-placeholder-reply.py` | `Stop` | blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement), anchored on the whole message since this corpus quotes the banned string constantly, and deliberately silent on a claim about the *work* (`Nothing to report.`), which the same rule requires |
+| `no-misattributed-quote.py` | `Stop` | **not registered ([#1527](https://github.com/Morrison-Lab/ai-config/issues/1527))** --- would block a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:
@@ -328,19 +341,6 @@ remaining open. If a user systemd bus is unavailable, the installer starts the
 monitor immediately and installs an equivalent per-user cron `@reboot` entry.
 It copies the monitor to `~/.local/share/ai-config/hooks/`, so neither path
 depends on a temporary worktree or an individual agent's hook directory.
-| `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
-| `remind-brief-premises.py` | `PreToolUse` (Agent) | reminds, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
-| `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
-| `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
-| `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |
-| `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
-| `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
-| `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
-| `no-unmeasured-clock-claim.py` | `Stop` | warns, never blocks, when a reply states a Pacific clock time and no clock read appears since the previous message |
-| `no-unauthorized-merge.py` | `PreToolUse` (Bash, mcp__github__.*) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`, or GitHub MCP merge tools) unless an explicit `ALLOW_MERGE=1` assertion or active /mwc accompanies it |
-| `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
-| `no-placeholder-reply.py` | `Stop` | blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement), anchored on the whole message since this corpus quotes the banned string constantly, and deliberately silent on a claim about the *work* (`Nothing to report.`), which the same rule requires |
-| `no-misattributed-quote.py` | `Stop` | **not registered ([#1527](https://github.com/Morrison-Lab/ai-config/issues/1527))** --- would block a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 
 ### Writing a warn-only hook: emit `systemMessage`, not `reason`
 

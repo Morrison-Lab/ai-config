@@ -45,7 +45,8 @@ def open_prs():
 
 def monitor():
     while True:
-        state = {"kind": "all_open_prs", "pid": os.getpid(), "checked_at": time.time()}
+        state = read_state()
+        state.update({"kind": "all_open_prs", "pid": os.getpid(), "checked_at": time.time()})
         try:
             state["data"] = open_prs()
             state.pop("error", None)
@@ -64,7 +65,9 @@ def ensure():
                                    stderr=subprocess.DEVNULL, start_new_session=True)
     except OSError:
         return False
-    write_state({"kind": "all_open_prs", "pid": process.pid, "started_at": time.time()})
+    state = read_state()
+    state.update({"kind": "all_open_prs", "pid": process.pid, "started_at": time.time()})
+    write_state(state)
     return True
 
 

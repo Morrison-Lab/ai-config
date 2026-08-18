@@ -40,7 +40,8 @@ def main():
     except (OSError, subprocess.SubprocessError):
         subprocess.run([sys.executable, str(INSTALLED_HOOK)], check=True)
         try:
-            install_cron()
+            if not install_cron():
+                sys.exit("FATAL: neither systemd nor crontab could persist the PR monitor")
         except (OSError, subprocess.SubprocessError):
             sys.exit("FATAL: neither systemd nor crontab could persist the PR monitor")
         print("started monitor now; installed cron @reboot fallback")

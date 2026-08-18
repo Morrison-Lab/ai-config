@@ -41,5 +41,3 @@
 - CLAUDE.md for project-specific guidance
 - Prior session notes for context
 - Only then decide whether to ask or act
-
-undefined

@@ -1,0 +1,27 @@
+---
+description: "Global AI workflow guidelines, worktree isolation, PR review, and merge control rules for Morrison-Lab repositories."
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Global Agent Workflow Rules (Morrison-Lab)
+
+## Keep ai-config and repo checkouts fresh
+- Keep `ai-config` updated (`main` branch, `git pull --ff-only`).
+- Run `bootstrap.sh` to ensure symlinks in local environment are fresh.
+
+## Worktree isolation
+- **Always use a worktree.** When starting write/edit tasks in a repository, isolate into a dedicated `git worktree` so parallel sessions never step on working directory state.
+
+## Timestamp recaps in local time
+- Include timestamps in user's local time zone (Pacific Time, `America/Los_Angeles`).
+- Query fresh time via `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`.
+
+## Strict Merge Control Policy
+- **NEVER merge any Pull Request or Merge Request without explicit user permission.**
+- Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
+
+## Request review and drive every started PR to clean
+- Request AI review (`@claude review` / `@agy review`) after completing code pushes.
+- Run `ardi` / review loop to drive CI to clean.
+- Request human review ONLY after AI approval or deadlock.

@@ -10,6 +10,7 @@ echo "ai-config inventory:"
 echo "  skills:             $(count skills -maxdepth 2 -name SKILL.md)"
 echo "  Codex wrappers:     $(count codex-skills -maxdepth 2 -name SKILL.md)"
 echo "  Gemini CLI skills:  (uses canonical skills/ directly)"
+echo "  Cursor rules:       $(count cursor-rules -maxdepth 1 -name '*.mdc')"
 echo "  commands:           $(count commands -maxdepth 1 -name '*.md')"
 
 echo "  doc pages:          $(count docs -maxdepth 1 -name '*.md')"

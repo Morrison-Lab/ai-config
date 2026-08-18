@@ -19,6 +19,7 @@ CLAUDE_DIR="${CLAUDE_HOME:-$HOME/.claude}"
 CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
 GEMINI_DIR="${GEMINI_HOME:-$HOME/.gemini}"
 GEMINI_CONFIG_DIR="${GEMINI_CONFIG_HOME:-$GEMINI_DIR/config}"
+CURSOR_DIR="${CURSOR_HOME:-$HOME/.cursor}"
 
 # VS Code Copilot memory directory (macOS default; override with COPILOT_MEMORY_DIR)
 COPILOT_MEMORY_DIR="${COPILOT_MEMORY_DIR:-$HOME/Library/Application Support/Code/User/globalStorage/github.copilot-chat/memory-tool/memories}"
@@ -51,10 +52,11 @@ for src in "$SCRIPT_DIR"/*/; do
     # references/ is documentation/example material, not consumable config, so
     # it is deliberately NOT symlinked into ~/.claude.
     # codex-skills/ is linked into ~/.codex/skills below, not ~/.claude.
+    # cursor-rules/ is linked into ~/.cursor/rules below, not ~/.claude.
     # plugins/ is an Antigravity plugin manifest bundle linked into ~/.gemini/config/plugins below, not ~/.claude.
     # dotfiles/ is machine-specific shell tooling installed into ~/bin and
     # friends by its own per-machine installer at the bottom of this script.
-    .git|node_modules|references|codex-skills|dotfiles|plugins) continue ;;
+    .git|node_modules|references|codex-skills|cursor-rules|dotfiles|plugins) continue ;;
 
   esac
 
@@ -189,6 +191,17 @@ if [ -f "$SCRIPT_DIR/AGENTS.md" ]; then
   link_one "$SCRIPT_DIR/AGENTS.md" "$GEMINI_DIR/AGENTS.md"
   link_one "$SCRIPT_DIR/AGENTS.md" "$GEMINI_CONFIG_DIR/AGENTS.md"
 fi
+
+# --- Cursor rules: symlink cursor-rules into ~/.cursor/rules ---
+if [ -d "$SCRIPT_DIR/cursor-rules" ]; then
+  printf '\n--- Cursor rules ---\n'
+  mkdir -p "$CURSOR_DIR/rules"
+  for src in "$SCRIPT_DIR"/cursor-rules/*; do
+    [ -f "$src" ] || [ -d "$src" ] || continue
+    link_one "$src" "$CURSOR_DIR/rules/$(basename "$src")"
+  done
+fi
+
 
 
 # --- Stacked-install warning ---

@@ -298,6 +298,34 @@ drops".
 - **Don't:** reuse `^+[^+]` on prose --- it eats added blank lines, and the
   whitespace-normalized check will not report that either.
 
+**The positional remedy does not generalize to a TWO-sided filter, and the obvious substitute for it is the same mistake with a longer prefix.**
+`grep '^+' | tail -n +2` works because one file contributes exactly one added header.
+A filter wanting both sides --- `git diff -U0 | grep -E '^[+-]' | grep -v '^[+-][+-]'` --- has no such position to skip to, so the reach for a two-marker prefix is natural and wrong in exactly the way the paragraphs above describe.
+Markdown is where it bites hardest, since every list item begins with the data marker: a removed `- item` renders as `-- item` and an added one as `+- item`, both matching `^[+-][+-]` precisely as a header does.
+
+Excluding the **real** header patterns is better and still not a fix, because `^--- ` and `^+++ ` are prefixes too.
+Measured on git 2.53.0, against a commit replacing `-- legacy flag` with `++ new flag` alongside two ordinary lines:
+
+| filter | reported | actual |
+|---|---|---|
+| `^[+-]` minus `^[+-][+-]` | 4 | 6 |
+| minus `^(diff \|index \|--- \|\+\+\+ \|@@)` | 4 | 6 |
+| `--output-indicator-old/new` | 6 | 6 |
+
+`git diff --output-indicator-old=< --output-indicator-new=> --output-indicator-context=' '` re-marks the **data** lines while the file headers stay `---`/`+++`, so the collision cannot arise rather than being narrowed.
+That dissolves the class the rest of this block works around, so prefer it wherever the git version allows (`--output-indicator-*` is git 2.22+).
+
+Note the failure direction, which is the opposite of the extractor case above: this filter **under**-reports, so the diff looks smaller and cleaner than it is, and a reviewer trusting it approves lines nobody displayed.
+Cross-check against `git diff --stat`'s own counts, which are a second instrument keyed on a different surface --- that disagreement is the only thing that surfaced this.
+
+- **Do:** re-mark the data with `--output-indicator-old/new/context` when a filter needs both sides, rather than excluding markers from the data's own alphabet.
+- **Do:** reconcile any hand-rolled diff filter's line count against `git diff --stat` before trusting what it printed.
+- **Don't:** answer a header collision with a longer prefix --- `^--- ` and `^+++ ` collide with the data lines `-- legacy flag` and `++ new flag` exactly as `^[+-][+-]` collides with a markdown bullet.
+- **Don't:** read a plausible-looking filter output as complete; under-reporting produces a clean-looking diff and no error.
+
+(2026-08-17: the two-sided filter above reported 4 changed lines where `git diff --stat` said 8 insertions and 8 deletions, the missing lines being markdown bullets.
+Re-measured here on a synthetic three-line case, so the arithmetic is checkable without that branch.)
+
 **A fourth direction, and the one that answers a question you never asked:
 `grep -o` reports the MATCH, so it cannot describe the VALUE.**
 

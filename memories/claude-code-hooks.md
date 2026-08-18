@@ -186,6 +186,52 @@ The user ran `/reload-plugins`.
 No user correction was given --- the finding is inferred from the incident.
 Verified against the scripts rather than recalled: the docstrings quoted above, `classify()`'s existence test, and the note's placement inside the non-`--fix` branch.)
 
+## A hook's deny rejects the WHOLE call, so a compound command's setup segments never run either
+
+The two sections above are about *which calls* a hook blocks.
+This is about *how much of one call* a block throws away, and the answer is all of it.
+
+A `PreToolUse` hook decides over `tool_input.command` --- one string, one verdict.
+A guard may **match** per segment, and several here deliberately do, but the decision it emits has no per-segment field, so the harness rejects the tool call rather than the offending segment.
+Every `cd`, `git checkout -b`, `mkdir`, and `export` earlier in that command is silently absent afterward, and the next command runs against whatever state was actually there.
+
+Measured 2026-08-17 against `no-whole-file-punct-replace.py`, whose docstring states it evaluates "per segment rather than over the whole command".
+Fed `cd ... && git checkout -q -b fix/x && python3 -c "<glyph replace>"`, it matched only the third segment and returned:
+
+```
+permissionDecision: deny
+keys in hookSpecificOutput: ['hookEventName', 'permissionDecision', 'permissionDecisionReason']
+```
+
+No segment index, no offset --- so per-segment matching buys a precise *reason*, never a partial execution.
+
+**Nothing downstream reports the missing setup.**
+The natural mental model is "the blocked step didn't run", which is true and incomplete.
+Re-running only the blocked part under its documented override then operates on the un-switched branch, and a `git commit` there succeeds --- so the first signal can be a remote ruleset rejecting the push, arbitrarily later.
+
+**Distinct from `flag-unchained-branch-switch.py`'s `&&` rule**, which is the closest thing in this corpus and covers the opposite mechanism.
+There the shell runs a later command after an earlier one failed, so the granularity is the shell's own control flow and `&&` is the fix.
+Here nothing in the call runs at all, so `&&` changes nothing --- the block precedes the shell.
+
+Recovery, when a commit has already landed on the wrong branch and the push is refused:
+
+```bash
+git branch <name> <sha>          # save the commit
+git reset --hard origin/main     # restore the branch you were actually on
+git push -u origin <name>
+```
+
+- **Do:** after a hook blocks a compound command, re-verify any state its earlier segments were supposed to establish --- `git branch --show-current`, `pwd` --- before continuing.
+- **Do:** re-run the whole corrected command rather than only the segment the hook named, so the setup steps run too.
+- **Don't:** read "the blocked step didn't run" as the scope of the block; nothing in that call ran.
+- **Don't:** reach for `&&` as the remedy --- that governs a *shell* sequencing hazard, and a hook denial never reaches the shell.
+
+(2026-08-17, `Morrison-Lab/lab-manual`: one call carried `cd ... && git checkout -q -b fix/benchmarking-non-ascii && python3 - <<'EOF' ... EOF`.
+The heredoc was a whole-file punctuation replace, correctly blocked.
+Re-running the python part alone under `ALLOW_WHOLE_FILE_PUNCT=1` edited the file and committed --- onto `main`, because the branch had never been created.
+Caught by `remote: error: GH013: Repository rule violations found for refs/heads/main`, not by anything local.
+Tracked as ai-config#1609.)
+
 ## Hook matchers use JavaScript regular expressions, NOT shell globs
 
 Hook matchers in `hooks/hooks.json` containing characters outside `[A-Za-z0-9_\- ,|]` are evaluated as JavaScript regexes (`RegExp.prototype.test()`).

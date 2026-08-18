@@ -49,6 +49,12 @@ Read the two relevant keys: `oaicopilot.baseUrl` (global default endpoint) and
 `oaicopilot.models` (the array of registered model entries — each has at
 least `id` and `owned_by`).
 
+A sanitized reference schema (endpoint templated as `<workspace-url>`, no
+secrets) lives alongside this skill in
+[`models-template.jsonc`](models-template.jsonc) — one representative entry
+per model family. Use it as the per-family schema to copy from in Step 2, and
+to seed `oaicopilot.models` on a fresh machine (swap in your workspace URL).
+
 ## Step 1 — Diff requested models against what's already registered
 
 The model **name** the user hands you (e.g. from a served-endpoint list) is

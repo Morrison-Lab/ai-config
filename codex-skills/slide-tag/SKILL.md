@@ -1,6 +1,6 @@
 ---
 name: "slide-tag"
-description: "Codex wrapper for the ai-config Claude skill `slide-tag`. Force-move a floating Git tag (e.g., v2) to a new commit \u2014 typically current main HEAD. Handles fetch, safety checks, delete+recreate pattern. Use when asked to 'slide <tag>', 'move tag to main', 'update the v2 tag', or 'bump the floating tag'. Use when Codex is asked to use `slide-tag`, `/slide-tag`, or the corresponding ai-config/Claude skill workflow."
+description: "Move floating Git tag to main."
 ---
 
 # slide-tag (Codex wrapper)

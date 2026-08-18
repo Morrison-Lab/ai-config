@@ -1,6 +1,6 @@
 ---
 name: merge-main
-description: "Alias for `sync-pr-branch`. Use when asked to 'merge-main'."
+description: "→ sync-pr-branch."
 user-invocable: true
 allowed-tools:
   - Bash

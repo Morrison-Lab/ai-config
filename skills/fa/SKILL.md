@@ -1,6 +1,6 @@
 ---
 name: fa
-description: "Alias for `fetch-all`. Use when asked to 'fa'."
+description: "→ fetch-all."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: migrate-discussion
-description: "Migrate an item between GitHub Discussions and Issues when it fits the other tracker better — a discussion that's really an actionable bug/task moves to Issues; an issue that's really an open-ended question, idea, or support request moves to Discussions. Prefers GitHub's native convert feature (preserves author, thread, and cross-links); falls back to a recreate-and-cross-link procedure via `gh` when the native path isn't available. Use when asked to 'convert this issue to a discussion', 'move this to a discussion', 'this discussion should be an issue', 'make an issue from this discussion', or 'migrate between discussions and issues'."
+description: "Move items between Discussions/Issues."
 user-invocable: true
 allowed-tools:
   - Bash

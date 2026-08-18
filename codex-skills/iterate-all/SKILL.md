@@ -1,6 +1,6 @@
 ---
 name: "iterate-all"
-description: "Codex wrapper for the ai-config Claude skill `iterate-all`. Alias for `ardia`. Use when asked to 'iterate-all'. Use when Codex is asked to use `iterate-all`, `/iterate-all`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ardia."
 ---
 
 # iterate-all (Codex wrapper)

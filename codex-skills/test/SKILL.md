@@ -1,6 +1,6 @@
 ---
 name: "test"
-description: "Codex wrapper for the ai-config Claude skill `test`. Test an MR's changes \u2014 run unit tests in the current repo if available, or trigger a downstream pipeline in a revdep test bed (e.g., test.hac). Use when asked to 'test this MR', 'run tests', 'verify downstream', or 'check this in test.hac'. Use when Codex is asked to use `test`, `/test`, or the corresponding ai-config/Claude skill workflow."
+description: "Run unit or revdep tests."
 ---
 
 # test (Codex wrapper)

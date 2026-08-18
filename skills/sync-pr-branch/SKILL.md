@@ -1,6 +1,6 @@
 ---
 name: sync-pr-branch
-description: Sync an active PR branch with both `main` and its own remote -- fetch origin, verify its PR has not already merged, merge origin/main into the branch, merge origin/<current-branch> into local (reconciling commits pushed elsewhere, e.g. by the @claude bot or another machine), then resolve conflicts, run the repo's pre-commit checks, and push. Use before triggering a review or pushing fixes, on "sync", "update the branch", "merge main in", "resync the branch", "reconcile local and remote", "the branch is behind main", or whenever main or the remote branch has moved ahead.
+description: "Sync PR branch with main."
 user-invocable: true
 allowed-tools:
   - Bash

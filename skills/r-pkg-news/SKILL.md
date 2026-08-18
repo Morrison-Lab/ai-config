@@ -1,6 +1,6 @@
 ---
 name: r-pkg-news
-description: Draft a new NEWS.md entry for an R package from recent commits or a PR description, matching the package's existing entry style. Use when asked to 'r-pkg-news', 'update NEWS.md', 'write a NEWS entry', or 'add a changelog entry for this R package'.
+description: "Draft NEWS.md changelog entry."
 user-invocable: true
 allowed-tools:
   - Read

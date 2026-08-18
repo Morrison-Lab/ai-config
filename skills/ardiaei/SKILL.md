@@ -1,6 +1,6 @@
 ---
 name: ardiaei
-description: "ARDIA + Edit Instructions: first run ARDIA (drive every open PR/MR to a clean review verdict), then run UMS (update memories and skills) to persist what the loop taught. Use when asked to 'ardiaei', 'ardia then ums', 'clean all PRs and record what we learned', or 'drive everything to clean and update instructions'."
+description: "Drive all PRs clean then run UMS."
 user-invocable: true
 allowed-tools:
   - Bash

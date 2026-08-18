@@ -1,6 +1,6 @@
 ---
 name: "pr-status"
-description: "Codex wrapper for the ai-config Claude skill `pr-status`. Report a PR's true review status by reading the LATEST review comment, not a cached or earlier verdict, and parse it for any remaining findings before declaring \"clean\" / \"ready to merge\". Use when asked \"what's the status of PR Use when Codex is asked to use `pr-status`, `/pr-status`, or the corresponding ai-config/Claude skill workflow."
+description: "Check PR latest review status."
 ---
 
 # pr-status (Codex wrapper)

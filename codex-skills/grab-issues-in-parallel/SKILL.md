@@ -1,6 +1,6 @@
 ---
 name: "grab-issues-in-parallel"
-description: "Codex wrapper for the ai-config Claude skill `grab-issues-in-parallel`. Alias for `gip` (Grab Issues in Parallel). Use when asked to 'grab-issues-in-parallel'. Use when Codex is asked to use `grab-issues-in-parallel`, `/grab-issues-in-parallel`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 gip."
 ---
 
 # grab-issues-in-parallel (Codex wrapper)

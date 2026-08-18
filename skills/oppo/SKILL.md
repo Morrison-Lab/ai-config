@@ -1,6 +1,6 @@
 ---
 name: oppo
-description: "Alias for `opposition-research`. Use when asked to 'oppo', 'do oppo research on X', \"what features does X's community want\", \"mine X's issues/subreddit for ideas\". Invoke explicitly with /oppo."
+description: "→ opposition-research."
 user-invocable: true
 allowed-tools:
   - WebSearch

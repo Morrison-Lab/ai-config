@@ -1,6 +1,6 @@
 ---
 name: r-pkg-check
-description: Run devtools::check() / R CMD check on an R package before a release, triage the NOTEs/WARNINGs/ERRORs it reports, and re-run to confirm clean. Use when asked to 'r-pkg-check', 'run R CMD check', 'run devtools::check', 'check this R package before release', or before submitting to CRAN.
+description: "Run devtools::check() and triage."
 user-invocable: true
 allowed-tools:
   - Read

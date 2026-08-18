@@ -1,6 +1,6 @@
 ---
 name: clean
-description: "Alias for `ardi` (\"drive to clean\"). Use when asked to 'clean', 'clean this PR', 'drive to clean', 'make this PR clean'. Not for git-branch, worktree, or code cleanup -- see `clean-branches` (`cb`), `clean-worktrees` (`cw`), and `tidy` / `simplify`."
+description: "→ ardi."
 user-invocable: true
 allowed-tools:
   - Bash

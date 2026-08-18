@@ -1,6 +1,6 @@
 ---
 name: record-learnings
-description: "Persist discoveries, debugging insights, and working patterns to memory and shared instruction files as you work. Ensures knowledge survives across sessions and is accessible to other AI agents via the shared ai-config repo. Use continuously — after solving a tricky bug, discovering a codebase convention, or learning a tool quirk."
+description: "Persist insights to memory."
 user-invocable: true
 allowed-tools:
   - Bash

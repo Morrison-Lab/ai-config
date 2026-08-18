@@ -1,6 +1,6 @@
 ---
 name: "sup"
-description: "Codex wrapper for the ai-config Claude skill `sup`. Send to Upstream: file an issue or open a PR on an upstream repo (a fork's parent, a dependency, or any external project). Use when you've found a bug, want to propose a fix, or need to request a feature in a project you don't own. Handles both 'just report it' (issue) and 'here's the fix' (PR) workflows. Use when asked to 'sup', 'send upstream', 'file upstream issue', 'upstream PR', 'contribute this fix back', or 'report this bug upstream'. Use when Codex is asked to use `sup`, `/sup`, or the corresponding ai-config/Claude skill workflow."
+description: "Send issue or fix upstream."
 ---
 
 # sup (Codex wrapper)

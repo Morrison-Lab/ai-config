@@ -1,10 +1,6 @@
 ---
 name: first
-description: >
-  Push the instructions that follow `/first` to the HEAD of the task queue —
-  the counter to `/also`. Use when the user appends `/first <instructions>` to
-  jump a task ahead of everything else, even pausing work already in progress to
-  do it now. Invoke explicitly with /first.
+description: "Jump to head of task queue."
 user-invocable: true
 allowed-tools: []
 ---

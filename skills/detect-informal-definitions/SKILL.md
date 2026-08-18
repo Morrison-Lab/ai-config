@@ -1,6 +1,6 @@
 ---
 name: detect-informal-definitions
-description: "Detect concepts introduced with definition-grade precision --- a named term, an equation, an `\\eqdef` --- that never got wrapped in the project's formal definition construct (a Quarto `#def-`/`#thm-`-style crossref div, or the equivalent glossary/docstring convention elsewhere), so it has no stable id and nothing downstream can cite it. Greps for a bolded term followed by defining language, or a naming sentence ending 'is:'/'are:' right before a display equation, then confirms each hit isn't a reused already-defined term, a tool-usage aside, or part of a deliberately informal list --- before proposing a formal div, a worked example, and updated citations. Use when asked to 'detect informal definitions', 'find informal definitions', 'check for missing definitions', 'is this concept formally defined', or 'detect-informal-definitions'. Also runs proactively in any PR/MR review that introduces new technical content."
+description: "Detect informal definitions."
 user-invocable: true
 allowed-tools:
   - Bash

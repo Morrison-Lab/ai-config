@@ -1,6 +1,6 @@
 ---
 name: "clean"
-description: "Codex wrapper for the ai-config Claude skill `clean`. Alias for `ardi` (\"drive to clean\"). Use when asked to 'clean', 'clean this PR', 'drive to clean', 'make this PR clean'. Not for git-branch, worktree, or code cleanup -- see `clean-branches` (`cb`), `clean-worktrees` (`cw`), and `tidy` / `simplify`. Use when Codex is asked to use `clean`, `/clean`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ardi."
 ---
 
 # clean (Codex wrapper)

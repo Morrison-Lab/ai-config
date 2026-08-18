@@ -1,6 +1,6 @@
 ---
 name: sync
-description: "Alias for `sync-pr-branch`. Use when asked to 'sync', 'sync the branch', 'sync up'."
+description: "→ sync-pr-branch."
 user-invocable: true
 allowed-tools:
   - Bash

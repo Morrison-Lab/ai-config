@@ -1,6 +1,6 @@
 ---
 name: "gis"
-description: "Codex wrapper for the ai-config Claude skill `gis`. Alias for `gii` (Grab Issues Iteratively). Use when asked to 'gis', 'grab issues serially'. Stacks MRs when needed. Use when Codex is asked to use `gis`, `/gis`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 gii."
 ---
 
 # gis (Codex wrapper)

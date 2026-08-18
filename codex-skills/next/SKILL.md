@@ -1,6 +1,6 @@
 ---
 name: "next"
-description: "Codex wrapper for the ai-config Claude skill `next`. Insert the instructions that follow `/next` immediately AFTER the currently in-progress task \u2014 ahead of anything queued behind it, but without preempting the task in flight. Use when the user appends `/next <instructions>` to jump a task to the front of the queue while letting current work finish. Invoke explicitly with /next. Use when Codex is asked to use `next`, `/next`, or the corresponding ai-config/Claude skill workflow."
+description: "Insert after in-flight task."
 ---
 
 # next (Codex wrapper)

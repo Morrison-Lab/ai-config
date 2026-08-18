@@ -1,6 +1,6 @@
 ---
 name: dc
-description: "Alias for `ardi` (\"drive to clean\"). Use when asked to 'dc'."
+description: "→ ardi."
 user-invocable: true
 allowed-tools:
   - Bash

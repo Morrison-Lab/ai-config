@@ -1,6 +1,6 @@
 ---
 name: "ffr"
-description: "Codex wrapper for the ai-config Claude skill `ffr`. Alias for `fix-forward-references`. Use when asked to 'ffr'. Use when Codex is asked to use `ffr`, `/ffr`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 fix-forward-references."
 ---
 
 # ffr (Codex wrapper)

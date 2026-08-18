@@ -1,6 +1,6 @@
 ---
 name: "drive"
-description: "Codex wrapper for the ai-config Claude skill `drive`. Alias for `ardi` (\"drive to clean\"). Use when asked to 'drive', 'drive this PR', 'drive to clean', 'drive this PR to clean'. Use when Codex is asked to use `drive`, `/drive`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ardi."
 ---
 
 # drive (Codex wrapper)

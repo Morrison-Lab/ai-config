@@ -1,6 +1,6 @@
 ---
 name: "before"
-description: "Codex wrapper for the ai-config Claude skill `before`. Insert the instructions that follow `/before <target>` immediately ahead of a task already in the queue, rather than at the head or tail. Use when the user appends `/before <target> <instructions>` \u2014 e.g. `/before that ...` to slot it just before the most recently added task. Invoke explicitly with /before. Use when Codex is asked to use `before`, `/before`, or the corresponding ai-config/Claude skill workflow."
+description: "Insert before a queued task."
 ---
 
 # before (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "dependabot"
-description: "Codex wrapper for the ai-config Claude skill `dependabot`. Alias for `chores`. Use when asked to 'dependabot', 'handle the dependabot PRs', 'process dependabot', 'merge the bump PRs'. Use when Codex is asked to use `dependabot`, `/dependabot`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 chores."
 ---
 
 # dependabot (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "send-upstream"
-description: "Codex wrapper for the ai-config Claude skill `send-upstream`. Alias for `sup`. Use when asked to 'send-upstream'. Use when Codex is asked to use `send-upstream`, `/send-upstream`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 sup."
 ---
 
 # send-upstream (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "cascade"
-description: "Codex wrapper for the ai-config Claude skill `cascade`. Cascade merges DOWN a PR stack \u2014 merge each open PR's base branch into it (main into unstacked PRs, each stacked PR's base branch into the PR on top of it), resolving squash-stack conflicts and verifying each merge is content-neutral. Does NOT merge any PR into main. Use on \"cascade\", \"/cascade\", \"cascade the stack\", \"propagate main down the stack\", or after one or more PRs in a stack merge and the rest need their bases folded in. Use when Codex is asked to use `cascade`, `/cascade`, or the corresponding ai-config/Claude skill workflow."
+description: "Merge base down PR stack."
 ---
 
 # cascade (Codex wrapper)

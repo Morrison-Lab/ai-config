@@ -1,6 +1,6 @@
 ---
 name: "address-rebut-defer-iterate-all-edit-instructions"
-description: "Codex wrapper for the ai-config Claude skill `address-rebut-defer-iterate-all-edit-instructions`. Alias for `ardiaei` (ARDIA + Edit Instructions). Use when asked to 'address-rebut-defer-iterate-all-edit-instructions', 'address rebut defer iterate all then edit instructions'. Use when Codex is asked to use `address-rebut-defer-iterate-all-edit-instructions`, `/address-rebut-defer-iterate-all-edit-instructions`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ardiaei."
 ---
 
 # address-rebut-defer-iterate-all-edit-instructions (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: grab-issue
-description: "Alias for `gi`. Use when asked to 'grab-issue'."
+description: "→ gi."
 user-invocable: true
 allowed-tools:
   - Bash

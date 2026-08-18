@@ -1,6 +1,6 @@
 ---
 name: resolve-pr-threads
-description: "Sweep a PR/MR's inline review threads and resolve only the ones that are already genuinely settled (Addressed-and-pushed, Defer-with-issue-linked, Acknowledged, or a Rebut the reviewer didn't re-raise), leaving anything else open for a full `ard` pass. Use when asked to 'resolve pr threads', 'clean up the threads', 'resolve stale threads', or before re-requesting review so old threads don't carry over. Does not disposition new findings — that's `ard`'s job."
+description: "Resolve settled review threads."
 user-invocable: true
 allowed-tools:
   - Bash

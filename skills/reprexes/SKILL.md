@@ -1,12 +1,6 @@
 ---
 name: reprexes
-description: >
-  Isolate a technical problem into a minimal reproducible example ("reprex")
-  and iterate fixes on that instead of inside the full application. Use when
-  debugging a bug whose cause isn't obvious after a first look, when a failure
-  only surfaces deep in a large pipeline / app / render, when the full-context
-  test loop is slow, or before filing an upstream issue. Invoke explicitly
-  with /reprexes.
+description: "Build minimal reproducible example."
 user-invocable: true
 allowed-tools:
   - Bash

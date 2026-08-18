@@ -1,6 +1,6 @@
 ---
 name: pr-status
-description: Report a PR's true review status by reading the LATEST review comment, not a cached or earlier verdict, and parse it for any remaining findings before declaring "clean" / "ready to merge". Use when asked "what's the status of PR #N", "is this PR ready to merge", or before you report any PR as mergeable. Handles the @claude bot login variants so you never false-pass on a stale or null read.
+description: "Check PR latest review status."
 user-invocable: true
 allowed-tools:
   - Bash

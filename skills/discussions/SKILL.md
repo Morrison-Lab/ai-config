@@ -1,6 +1,6 @@
 ---
 name: discussions
-description: "Read and respond to GitHub Discussions forum topics -- list a repo's discussions, read a topic and its comments, draft and post a reply, and mark an answer on Q&A discussions. Reads are available over REST (`gh api repos/{owner}/{repo}/discussions/...`), so a topic is readable even where GraphQL is blocked; writes are GraphQL-only (no `gh discussion` subcommand, no GitHub MCP tool), so posting runs `gh api graphql`. Use when asked to 'read the discussions', 'respond to this discussion', 'answer the discussion topic', 'reply to the forum', 'triage the discussion board', or 'check GitHub Discussions'."
+description: "Manage forge discussions."
 user-invocable: true
 allowed-tools:
   - Bash

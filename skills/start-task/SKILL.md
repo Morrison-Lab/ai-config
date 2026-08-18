@@ -1,6 +1,6 @@
 ---
 name: start-task
-description: "Alias for `st` (Start Task, issue-first). Use when asked to 'start-task'."
+description: "→ st."
 user-invocable: true
 allowed-tools:
   - Bash

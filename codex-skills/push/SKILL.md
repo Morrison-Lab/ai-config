@@ -1,6 +1,6 @@
 ---
 name: "push"
-description: "Codex wrapper for the ai-config Claude skill `push`. Pre-push safety gate: before `git push`, check the PR/branch for signals that say don't touch it \u2014 another session's 'paws off' claim, a branch HEAD that advanced past your last commit, hold/block labels (do-not-merge, WIP, hold, blocked), `@claude` runs in flight, or a push straight to a protected branch. If any fire, STOP and ask the user for guidance instead of pushing; if clean, push with the standard retry backoff. Use when asked to 'push', 'push this', 'push my changes', or before any push to a shared PR branch. Use when Codex is asked to use `push`, `/push`, or the corresponding ai-config/Claude skill workflow."
+description: "Pre-push check for active sessions."
 ---
 
 # push (Codex wrapper)

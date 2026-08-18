@@ -1,10 +1,6 @@
 ---
 name: before
-description: >
-  Insert the instructions that follow `/before <target>` immediately ahead of a
-  task already in the queue, rather than at the head or tail. Use when the user
-  appends `/before <target> <instructions>` — e.g. `/before that ...` to slot it
-  just before the most recently added task. Invoke explicitly with /before.
+description: "Insert before a queued task."
 user-invocable: true
 allowed-tools: []
 ---

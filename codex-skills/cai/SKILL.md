@@ -1,6 +1,6 @@
 ---
 name: "cai"
-description: "Codex wrapper for the ai-config Claude skill `cai`. Alias for `config-ai`. Use when asked to 'cai'. Use when Codex is asked to use `cai`, `/cai`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 config-ai."
 ---
 
 # cai (Codex wrapper)

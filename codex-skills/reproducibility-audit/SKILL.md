@@ -1,6 +1,6 @@
 ---
 name: "reproducibility-audit"
-description: "Codex wrapper for the ai-config Claude skill `reproducibility-audit`. Audit a project's reproducibility posture with a checklist scoped per project type (R package, Quarto book/site, general script repo): hidden/undocumented dependencies, hardcoded absolute paths, undocumented prerequisites, environment assumptions, and output traceability (can a result be traced back to the exact script/line that produced it). Reports gaps in a table and files a tracking issue for the ones worth fixing. Use when asked to 'reproducibility audit', 'audit reproducibility', 'check reproducibility', 'is this project reproducible', 'find hidden dependencies', 'find hardcoded paths', 'check environment assumptions', 'can this be reproduced from scratch', 'audit for a replication package', or 'check output traceability'. Use when Codex is asked to use `reproducibility-audit`, `/reproducibility-audit`, or the corresponding ai-config/Claude skill workflow."
+description: "Audit reproducibility posture."
 ---
 
 # reproducibility-audit (Codex wrapper)

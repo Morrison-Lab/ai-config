@@ -1,6 +1,6 @@
 ---
 name: "link-skills"
-description: "Codex wrapper for the ai-config Claude skill `link-skills`. Audit the skills corpus for cross-reference gaps \u2014 pairs of skills that should point to each other under `## Relationship to other skills` but don't. Surfaces asymmetric links (A names B but B omits A), thematic clusters whose members don't reference their siblings, and real skills missing a Relationship section; proposes minimal edits to add the links. Use when asked to 'link skills', 'link-skills', 'cross-link the skills', 'find cross-link opportunities', 'which skills should reference each other', 'audit skill cross-references', or 'find missing skill links'. Use when Codex is asked to use `link-skills`, `/link-skills`, or the corresponding ai-config/Claude skill workflow."
+description: "Find cross-ref gaps across skills."
 ---
 
 # link-skills (Codex wrapper)

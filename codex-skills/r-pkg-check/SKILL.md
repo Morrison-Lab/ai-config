@@ -1,6 +1,6 @@
 ---
 name: "r-pkg-check"
-description: "Codex wrapper for the ai-config Claude skill `r-pkg-check`. Run devtools::check() / R CMD check on an R package before a release, triage the NOTEs/WARNINGs/ERRORs it reports, and re-run to confirm clean. Use when asked to 'r-pkg-check', 'run R CMD check', 'run devtools::check', 'check this R package before release', or before submitting to CRAN. Use when Codex is asked to use `r-pkg-check`, `/r-pkg-check`, or the corresponding ai-config/Claude skill workflow."
+description: "Run devtools::check() and triage."
 ---
 
 # r-pkg-check (Codex wrapper)

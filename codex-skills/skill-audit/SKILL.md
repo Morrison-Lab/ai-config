@@ -1,6 +1,6 @@
 ---
 name: "skill-audit"
-description: "Codex wrapper for the ai-config Claude skill `skill-audit`. Report which skills in this repo's skills/ directory actually fire (and how often) versus which are installed but never invoked, and recommend pruning candidates. Reads local Claude Code session transcripts as the usage signal (no built-in invocation-telemetry API exists), buckets every skill into actively-used / dormant / dead, and reports a pruning table without deleting anything itself. Use when asked to 'audit skill usage', 'skill-audit', 'which skills are dead weight', 'what skills have I never used', 'find unused skills', 'prune skills by usage', 'skill usage report', or 'which skills should I delete'. Use when Codex is asked to use `skill-audit`, `/skill-audit`, or the corresponding ai-config/Claude skill workflow."
+description: "Audit skill usage and prune."
 ---
 
 # skill-audit (Codex wrapper)

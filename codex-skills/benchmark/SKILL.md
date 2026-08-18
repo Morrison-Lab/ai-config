@@ -1,6 +1,6 @@
 ---
 name: "benchmark"
-description: "Codex wrapper for the ai-config Claude skill `benchmark`. Alias for `measure-performance`. Profile first, then microbenchmark only the bottleneck. Use when asked to 'benchmark', 'benchmark this', 'microbenchmark', or 'which of these is faster'. Use when Codex is asked to use `benchmark`, `/benchmark`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 measure-performance."
 ---
 
 # benchmark (Codex wrapper)

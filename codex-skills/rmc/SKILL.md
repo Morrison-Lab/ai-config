@@ -1,6 +1,6 @@
 ---
 name: "rmc"
-description: "Codex wrapper for the ai-config Claude skill `rmc`. Alias for `resolve-conflicts`. Use when asked to 'rmc', 'resolve merge conflicts'. Use when Codex is asked to use `rmc`, `/rmc`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 resolve-conflicts."
 ---
 
 # rmc (Codex wrapper)

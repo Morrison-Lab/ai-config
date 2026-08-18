@@ -1,6 +1,6 @@
 ---
 name: antigravity-review-workflow
-description: "Alias for `agy-review-workflow`. Use when asked to 'antigravity-review-workflow'."
+description: "→ agy-review-workflow."
 user-invocable: true
 allowed-tools:
   - Bash

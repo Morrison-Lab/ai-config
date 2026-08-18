@@ -1,6 +1,6 @@
 ---
 name: "check-info-quality"
-description: "Codex wrapper for the ai-config Claude skill `check-info-quality`. Scan a target --- a file, a PR/MR diff, or pasted text --- for three information-quality problems that neither purge-hallucinations nor find-ai-tells catches: (1) out-of-date information (a version, API, guideline, or 'current' claim that's since been superseded), (2) irrelevant information (off-topic tangents, scope creep, a true-but-unrelated fact), and (3) misleading or out-of-context information (a technically-true statement that misleads through missing context, cherry-picked evidence, or a citation used to support a claim it doesn't actually support). Reports each finding with location, evidence, and severity, then proposes --- never silently applies --- a fix. Use when asked to 'check info quality', 'check-info-quality', 'ciq', 'is this out of date', 'is this still accurate', 'find stale information', 'is this relevant', 'does this belong here', 'is this misleading', 'does this citation support the claim', or 'audit this for information quality'. Use when Codex is asked to use `check-info-quality`, `/check-info-quality`, or the corresponding ai-config/Claude skill workflow."
+description: "Flag stale or misleading content."
 ---
 
 # check-info-quality (Codex wrapper)

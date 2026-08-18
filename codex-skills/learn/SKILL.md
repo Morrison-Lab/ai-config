@@ -1,6 +1,6 @@
 ---
 name: "learn"
-description: "Codex wrapper for the ai-config Claude skill `learn`. Log a candidate learning to a lightweight, local staging file \u2014 without deciding yet whether it's durable enough for committed memory. The low-friction counterpart to record-learnings/memorize: jot it down now, let promote-memory vet it later. Use when asked to 'log a learning', 'stage this as a learning', 'note this for later', or proactively for a discovery that might matter but you're not yet sure it's general/durable enough to commit directly. Use when Codex is asked to use `learn`, `/learn`, or the corresponding ai-config/Claude skill workflow."
+description: "Persist new pattern to memory."
 ---
 
 # learn (Codex wrapper)

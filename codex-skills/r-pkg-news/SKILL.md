@@ -1,6 +1,6 @@
 ---
 name: "r-pkg-news"
-description: "Codex wrapper for the ai-config Claude skill `r-pkg-news`. Draft a new NEWS.md entry for an R package from recent commits or a PR description, matching the package's existing entry style. Use when asked to 'r-pkg-news', 'update NEWS.md', 'write a NEWS entry', or 'add a changelog entry for this R package'. Use when Codex is asked to use `r-pkg-news`, `/r-pkg-news`, or the corresponding ai-config/Claude skill workflow."
+description: "Draft NEWS.md changelog entry."
 ---
 
 # r-pkg-news (Codex wrapper)

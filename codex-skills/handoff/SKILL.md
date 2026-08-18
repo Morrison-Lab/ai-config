@@ -1,6 +1,6 @@
 ---
 name: "handoff"
-description: "Codex wrapper for the ai-config Claude skill `handoff`. Snapshot the current work state into a project memory so the next session can pick up cleanly --- branch, HEAD, unpushed commits, dirty files, running jobs (SLURM/background/CI), backups, open decisions, and the exact pick-up command sequence. Post a paused-state note on the active PR/MR if there is one. Also retires a handoff once everything it names has resolved. Use when ending or pausing a session, when asked to 'handoff', 'leave myself notes', 'hand this off', or 'pause and save state' --- and proactively whenever pausing while a long-running job is in flight. Use also when asked to 'clear stale handoffs', 'retire this handoff', 'delete out of date handoff files', or 'is this handoff still current?'. Use when Codex is asked to use `handoff`, `/handoff`, or the corresponding ai-config/Claude skill workflow."
+description: "Snapshot session state to memory."
 ---
 
 # handoff (Codex wrapper)

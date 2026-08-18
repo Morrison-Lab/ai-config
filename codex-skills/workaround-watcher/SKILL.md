@@ -1,6 +1,6 @@
 ---
 name: "workaround-watcher"
-description: "Codex wrapper for the ai-config Claude skill `workaround-watcher`. Scaffold a scheduled GitHub Actions workflow that watches an upstream issue/PR you're blocked on and, when it's fixed (closed-as-completed / merged), auto-opens a PR reverting your local workaround back to a committed \"target\" template. Use when you add a temporary workaround for an upstream bug and want to be reminded \u2014 with the revert pre-drafted \u2014 once it's resolved, instead of the workaround silently outliving its reason. Use when Codex is asked to use `workaround-watcher`, `/workaround-watcher`, or the corresponding ai-config/Claude skill workflow."
+description: "Watch upstream issue for fix."
 ---
 
 # workaround-watcher (Codex wrapper)

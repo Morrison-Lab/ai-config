@@ -1,6 +1,6 @@
 ---
 name: session-lock
-description: "Deconflict multiple AI agent sessions working the same local repo checkout. Maintains a machine-local registry (under .git/) of active sessions so parallel Claude Code / Copilot / other sessions can see each other, refuse to clobber the same working tree or branch, isolate into a git worktree, and recover after a crash. Use when starting a write session on a repo that other local sessions may also have open, when asked to 'deconflict sessions', 'avoid stepping on another session', 'lock the worktree', or before edits/commits in a shared checkout. The LOCAL counterpart to claim-pr (which deconflicts via GitHub/GitLab comments)."
+description: "Lock session to prevent collision."
 user-invocable: true
 allowed-tools:
   - Bash

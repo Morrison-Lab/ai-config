@@ -1,14 +1,6 @@
 ---
 name: decompose-skill
-description: >
-  Split an overly-broad skill into a canonical skill plus extracted shared
-  fragments or narrower sibling skills — the mirror image of
-  consolidate-skills. Detects (or accepts as input) a SKILL.md that bundles
-  multiple distinct concerns, or content genuinely reusable by other skills
-  but stuck inline in one, classifies what actually earns splitting, proposes
-  a plan for approval, then ships it via branch + PR. Use when asked to
-  "decompose this skill", "split this skill up", "this skill does too much",
-  "break this skill apart", or "extract this into a shared fragment".
+description: "Split overly-broad skill."
 user-invocable: true
 allowed-tools:
   - Bash

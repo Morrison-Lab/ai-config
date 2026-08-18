@@ -1,6 +1,6 @@
 ---
 name: find-duplicates
-description: "Alias for `find-overlap`. Use when asked to 'find-duplicates'."
+description: "→ find-overlap."
 user-invocable: true
 ---
 

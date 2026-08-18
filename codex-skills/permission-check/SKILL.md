@@ -1,6 +1,6 @@
 ---
 name: "permission-check"
-description: "Codex wrapper for the ai-config Claude skill `permission-check`. Read-only self-diagnostic for 'why is Claude Code prompting me for this' (or 'why isn't it'). Walks the permission config layers in resolution order (managed policy, CLI args, project-local, project-shared, user) and reports which layer's rule actually wins for a given tool/action pattern. Never edits config \u2014 see update-config for that. Use when asked to 'permission check', 'why does this keep prompting', 'why is this auto-allowed', 'check my permissions', 'diagnose permission prompt', or 'what rule controls this tool call'. Use when Codex is asked to use `permission-check`, `/permission-check`, or the corresponding ai-config/Claude skill workflow."
+description: "Diagnose tool prompting behavior."
 ---
 
 # permission-check (Codex wrapper)

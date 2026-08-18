@@ -1,6 +1,6 @@
 ---
 name: remember
-description: "Alias for `memorize`. Use when asked to 'remember', '/remember', 'remember that \u2026'."
+description: "→ memorize."
 user-invocable: true
 allowed-tools:
   - Read

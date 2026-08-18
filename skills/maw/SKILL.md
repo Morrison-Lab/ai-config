@@ -1,6 +1,6 @@
 ---
 name: maw
-description: "Alias for `mwc`. Use when asked to 'maw'."
+description: "→ mwc."
 user-invocable: true
 allowed-tools:
   - Bash

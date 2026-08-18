@@ -108,12 +108,9 @@ def operations_table(mappings: dict) -> str:
 
 
 def wrapper_description(name: str, source_description: str) -> str:
-    return (
-        f"Codex wrapper for the ai-config Claude skill `{name}`. "
-        f"{source_description} "
-        f"Use when Codex is asked to use `{name}`, `/{name}`, or the corresponding "
-        "ai-config/Claude skill workflow."
-    )
+    # The canonical description already carries the routing signal. Repeating
+    # the wrapper mechanics for every skill wastes the finite catalog budget.
+    return source_description
 
 
 def wrapper_text(name: str, source_description: str) -> str:

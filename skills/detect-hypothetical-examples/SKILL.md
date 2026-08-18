@@ -1,6 +1,6 @@
 ---
 name: detect-hypothetical-examples
-description: "Detect worked examples that illustrate a definition or theorem with invented, round-number quantities ('Suppose a binary covariate Z...', 'If 20% of the exposed group...') even though the document already has a real, loaded dataset it uses elsewhere. Greps for hypothetical/suppose/consider signal phrases and suspiciously round proportions inside a `#exm-`/`#def-` div, then confirms each hit against whether a real dataset with the needed variables exists, whether the example needs real numbers at all, and whether real numbers would erase the point. Fixing isn't mechanical substitution, so the fix menu includes finding a more illustrative real covariate or keeping clearly-hedged toy numbers. Use when asked to 'detect hypothetical examples', 'find hypothetical examples', 'replace hypothetical examples with real data', or 'detect-hypothetical-examples'. Also runs proactively in any PR/MR review that introduces new worked examples, alongside `detect-informal-definitions` and `find-ai-tells`."
+description: "Find invented examples where data exists."
 user-invocable: true
 allowed-tools:
   - Bash

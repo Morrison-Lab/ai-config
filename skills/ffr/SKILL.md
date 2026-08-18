@@ -1,6 +1,6 @@
 ---
 name: ffr
-description: "Alias for `fix-forward-references`. Use when asked to 'ffr'."
+description: "→ fix-forward-references."
 user-invocable: true
 allowed-tools:
   - Bash

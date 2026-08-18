@@ -1,6 +1,6 @@
 ---
 name: "adr"
-description: "Codex wrapper for the ai-config Claude skill `adr`. Alias for `ard` (common transposition typo). Use when asked to 'adr'. Use when Codex is asked to use `adr`, `/adr`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 ard."
 ---
 
 # adr (Codex wrapper)

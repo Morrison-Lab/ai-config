@@ -1,14 +1,6 @@
 ---
 name: consolidate-skills
-description: >
-  Merge two or more genuinely-overlapping skills into a single canonical skill
-  plus thin alias stubs, preserving every existing invocation name so nothing
-  breaks. Audits the corpus for overlap, separates intentional alias families
-  and adjacent-but-distinct skills (leave those alone) from genuine duplicates
-  (consolidate those), proposes a plan for approval, then ships it via branch +
-  PR. Use when asked to "consolidate skills", "merge overlapping skills", "merge
-  skills", "dedupe skills", "collapse duplicate skills", or "these two skills do
-  the same thing". Invoke explicitly with /consolidate-skills.
+description: "Merge overlapping skills."
 user-invocable: true
 allowed-tools:
   - Bash

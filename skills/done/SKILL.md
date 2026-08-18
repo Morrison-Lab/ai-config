@@ -1,6 +1,6 @@
 ---
 name: done
-description: "Alias for `wrap-up`. Use when asked to 'done', 'all done', 'are we done?'."
+description: "→ wrap-up."
 user-invocable: true
 allowed-tools:
   - Bash

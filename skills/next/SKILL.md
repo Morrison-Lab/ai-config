@@ -1,11 +1,6 @@
 ---
 name: next
-description: >
-  Insert the instructions that follow `/next` immediately AFTER the currently
-  in-progress task — ahead of anything queued behind it, but without preempting
-  the task in flight. Use when the user appends `/next <instructions>` to jump a
-  task to the front of the queue while letting current work finish. Invoke
-  explicitly with /next.
+description: "Insert after in-flight task."
 user-invocable: true
 allowed-tools: []
 ---

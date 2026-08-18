@@ -1,6 +1,6 @@
 ---
 name: "request-pr-review"
-description: "Codex wrapper for the ai-config Claude skill `request-pr-review`. Request a human reviewer after AI review passes or upon deadlock on a GitHub PR. Use when Codex is asked to use `request-pr-review`, `/request-pr-review`, or the corresponding ai-config/Claude skill workflow."
+description: "Request human review on PR."
 ---
 
 # request-pr-review (Codex wrapper)

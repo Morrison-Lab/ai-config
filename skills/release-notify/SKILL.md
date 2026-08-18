@@ -1,6 +1,6 @@
 ---
 name: release-notify
-description: "Release a breaking change: tag the new version, identify affected consumer repos (revdeps), and file migration issues on each. Use after merging a breaking change, when asked to 'release and notify', 'tag and notify consumers', or 'notify revdeps of the breaking change'."
+description: "Tag release and notify revdeps."
 user-invocable: true
 allowed-tools:
   - Bash

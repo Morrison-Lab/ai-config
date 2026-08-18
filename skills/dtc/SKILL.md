@@ -1,6 +1,6 @@
 ---
 name: dtc
-description: "Alias for `delegate-to-codex`. Use when asked to 'dtc'."
+description: "→ delegate-to-codex."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: grab-issues-in-parallel
-description: "Alias for `gip` (Grab Issues in Parallel). Use when asked to 'grab-issues-in-parallel'."
+description: "→ gip."
 user-invocable: true
 allowed-tools:
   - Bash

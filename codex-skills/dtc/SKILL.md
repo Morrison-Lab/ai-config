@@ -1,6 +1,6 @@
 ---
 name: "dtc"
-description: "Codex wrapper for the ai-config Claude skill `dtc`. Alias for `delegate-to-codex`. Use when asked to 'dtc'. Use when Codex is asked to use `dtc`, `/dtc`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 delegate-to-codex."
 ---
 
 # dtc (Codex wrapper)

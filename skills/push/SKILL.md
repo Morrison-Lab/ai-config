@@ -1,6 +1,6 @@
 ---
 name: push
-description: "Pre-push safety gate: before `git push`, check the PR/branch for signals that say don't touch it — another session's 'paws off' claim, a branch HEAD that advanced past your last commit, hold/block labels (do-not-merge, WIP, hold, blocked), `@claude` runs in flight, or a push straight to a protected branch. If any fire, STOP and ask the user for guidance instead of pushing; if clean, push with the standard retry backoff. Use when asked to 'push', 'push this', 'push my changes', or before any push to a shared PR branch."
+description: "Pre-push check for active sessions."
 user-invocable: true
 allowed-tools:
   - Bash

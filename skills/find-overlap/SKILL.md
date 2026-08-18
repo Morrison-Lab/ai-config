@@ -1,16 +1,6 @@
 ---
 name: find-overlap
-description: >
-  Read-only detector of overlapping or redundant content across a corpus —
-  skills, memories, docs, prose, or any file set. Clusters comparable units by
-  similarity, classifies each cluster as intentional-alias / adjacent-but-distinct
-  / genuine-duplicate, and reports each with similarity evidence and a recommended
-  disposition (merge / cross-link / leave-distinct) routed to the right action
-  skill. Detects and reports only — never edits, merges, or deletes. Use when
-  asked to 'find overlap', 'find overlapping skills', 'find overlapping content',
-  'find duplicates', 'find redundant content', 'audit for duplication', 'dedupe
-  audit', "what's redundant here", or 'where do these overlap'. Invoke explicitly
-  with /find-overlap.
+description: "Detect overlapping skills/memories."
 user-invocable: true
 allowed-tools:
   - Bash

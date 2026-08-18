@@ -1,6 +1,6 @@
 ---
 name: plan-review-session
-description: Turn a catalog of common student errors into review-session teaching material — typically a new chapter in a Quarto course book (mistake callout + worked solution per error) — and open a PR. Use after grade-work, or when asked to "plan a review session", "make a review chapter from these mistakes", or "build review material for the midterm".
+description: "Turn student errors into lessons."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "prune"
-description: "Codex wrapper for the ai-config Claude skill `prune`. Alias for `clean-branches` (aka `cb`). Use when asked to 'prune', 'prune branches'. Use when Codex is asked to use `prune`, `/prune`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 clean-branches."
 ---
 
 # prune (Codex wrapper)

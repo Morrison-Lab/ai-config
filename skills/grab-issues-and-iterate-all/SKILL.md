@@ -1,6 +1,6 @@
 ---
 name: grab-issues-and-iterate-all
-description: "Alias for `gia` (Grab Issues + iterate-All). Use when asked to 'grab-issues-and-iterate-all', 'grab issues and iterate all'."
+description: "→ gia."
 user-invocable: true
 allowed-tools:
   - Bash

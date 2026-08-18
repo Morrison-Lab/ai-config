@@ -1,6 +1,6 @@
 ---
 name: "crf"
-description: "Codex wrapper for the ai-config Claude skill `crf`. Alias for `convert-repo-format`. Use when asked to 'crf'. Use when Codex is asked to use `crf`, `/crf`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 convert-repo-format."
 ---
 
 # crf (Codex wrapper)

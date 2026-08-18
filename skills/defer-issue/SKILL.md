@@ -1,6 +1,6 @@
 ---
 name: defer-issue
-description: File a follow-up issue (GitHub via `gh`, GitLab via `glab`) when the user defers work out of the current scope. Use when the user says "defer this", "followup issue for X", "let's handle this in a separate PR", or otherwise asks to push work to later.
+description: "File issue for deferred work."
 user-invocable: true
 allowed-tools:
   - Bash

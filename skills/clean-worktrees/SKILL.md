@@ -1,6 +1,6 @@
 ---
 name: clean-worktrees
-description: "Clean Worktrees: sweep dead git worktrees in the current repo — prune admin stubs for already-deleted dirs, then remove linked worktrees whose branch merged into main (or is gone) and whose tree is clean. Never touches the main or current worktree, a dirty tree, a locked worktree, or one with a live session-lock session. Presents a dry-run plan first. Use when asked to 'clean worktrees', 'cw', 'prune worktrees', 'clean dead worktrees', 'remove stale worktrees', or 'tidy up worktrees'."
+description: "Clean stale git worktrees."
 user-invocable: true
 allowed-tools:
   - Bash

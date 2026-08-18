@@ -1,6 +1,6 @@
 ---
 name: grade-work
-description: Grade a batch of student submissions (PDFs/scans/docs) against an official solution and produce an anonymized, ranked catalog of the most common error types. Use when asked to "grade these", "compare submissions to the solution", "what did students get wrong", or to mine a stack of exams/homeworks for common mistakes. Pairs with plan-review-session to turn the catalog into teaching material.
+description: "Grade submissions vs solution."
 user-invocable: true
 allowed-tools:
   - Bash

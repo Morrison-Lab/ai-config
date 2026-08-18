@@ -1,6 +1,6 @@
 ---
 name: pr-on-claim
-description: "Open a draft PR immediately after claiming an issue — branch, empty commit, draft PR, claim comment — before writing any code. Use when asked to 'pr-on-claim', 'open a draft PR for this issue', or after claiming an issue you are about to implement."
+description: "Open draft PR on claiming issue."
 user-invocable: true
 allowed-tools:
   - Bash

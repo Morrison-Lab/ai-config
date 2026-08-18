@@ -1,6 +1,6 @@
 ---
 name: rmc
-description: "Alias for `resolve-conflicts`. Use when asked to 'rmc', 'resolve merge conflicts'."
+description: "→ resolve-conflicts."
 user-invocable: true
 allowed-tools:
   - Bash

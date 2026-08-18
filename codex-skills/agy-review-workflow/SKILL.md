@@ -1,6 +1,6 @@
 ---
 name: "agy-review-workflow"
-description: "Codex wrapper for the ai-config Claude skill `agy-review-workflow`. Add or modify the Google Antigravity PR review, security audit, and test generation workflow (`.github/workflows/antigravity-review.yml`). Preserves load-bearing patterns -- workflow_call delegation to Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2, GEMINI_API_KEY secret propagation, mode selection (code-review, security-audit, test-generation), and event-gated trigger policies. Use when Codex is asked to use `agy-review-workflow`, `/agy-review-workflow`, or the corresponding ai-config/Claude skill workflow."
+description: "Set up Antigravity review workflow."
 ---
 
 # agy-review-workflow (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "ts"
-description: "Codex wrapper for the ai-config Claude skill `ts`. Test + Slide: run tests (local or downstream), and if they pass, slide the floating tag to main. Use when asked to 'ts', 'test and slide', 'verify then bump the tag', or after merging when you want confirmation before sliding. Use when Codex is asked to use `ts`, `/ts`, or the corresponding ai-config/Claude skill workflow."
+description: "\u2192 slide-tag."
 ---
 
 # ts (Codex wrapper)

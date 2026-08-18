@@ -1,6 +1,6 @@
 ---
 name: ts
-description: "Test + Slide: run tests (local or downstream), and if they pass, slide the floating tag to main. Use when asked to 'ts', 'test and slide', 'verify then bump the tag', or after merging when you want confirmation before sliding."
+description: "→ slide-tag."
 user-invocable: true
 allowed-tools:
   - Bash

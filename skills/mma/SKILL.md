@@ -1,6 +1,6 @@
 ---
 name: mma
-description: Merge main into all open PR branches in the current repo. For every open PR, fetch, merge origin/main (and origin/<branch>) in, resolve conflicts, run the repo's pre-commit checks, and push — reusing sync-pr-branch's per-branch procedure, looped across the whole open-PR queue. Use on "merge main into all pr branches", "sync every open PR with main", "mma", or when several PRs have all drifted behind main at once (e.g. after a run of merges) and need resyncing in one pass.
+description: "Merge main into open PR branches."
 user-invocable: true
 allowed-tools:
   - Bash

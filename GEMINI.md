@@ -39,6 +39,11 @@ A single honest measurement earlier in the session is what most easily licenses 
   Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
   Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
 
+## Autonomously deliver completed changes to a PR
+
+- **Never stop at uncommitted working tree changes**: When asked to write up, edit, or implement changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed.
+- **Complete the delivery cycle**: Commit the changes (linking tracking issues where appropriate), push the branch to origin, open a Pull Request if not already opened, trigger AI review (`@claude review` / dispatch review workflow), and drive to clean.
+
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
@@ -48,4 +53,3 @@ Whenever starting or working on a Pull Request:
 
 - **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
 - **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
-

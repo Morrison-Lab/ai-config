@@ -193,12 +193,13 @@ How depends on the repo's review trigger first, and on whether this round pushed
     Then wait for the new verdict.
 
     **Set a timer when ending a turn waiting for AI reviews.**
-    Whenever ending a turn while waiting for AI reviews or CI completion after pushing code, launch a `schedule` timer (e.g. 120s) to monitor progress.
+    Whenever ending a turn while waiting for AI reviews or CI completion after pushing code, launch a `schedule` timer (e.g. 120s) to monitor progress per [`shared/workflow/ardi.md`](../../shared/workflow/ardi.md).
     When the timer fires:
     - Check if a fresh review for the current head commit has landed.
     - If no review has arrived yet: verify whether review workflow runs are still in progress in CI (`gh run list` / `gh pr view --json statusCheckRollup`).
     - If the review workflow is still running: set another timer to check back.
-    - If the review workflow failed, was canceled, or was skipped with no replacement: fix any underlying workflow/dispatch problems discovered along the way, re-dispatch if appropriate, and set another timer to maintain continuous monitoring until a review lands or CI completes.
+    - If the reviewer failed, was canceled, skipped with no replacement (e.g. quota exhaustion), or produced a stub review with no stated verdict: invoke self-review fallback per [`shared/workflow/self-review-fallback.md`](../../shared/workflow/self-review-fallback.md) rather than stalling the loop.
+    - Otherwise, fix any underlying workflow/dispatch problems discovered along the way, re-dispatch if appropriate, and set another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
 
    **While waiting, keep checking for merge conflicts.**
    Other PRs in this repo can become conflicting at any time (someone merges to `main` while the review runs).

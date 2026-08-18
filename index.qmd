@@ -21,11 +21,15 @@ Copilot, and any agent that reads markdown instruction files.
 
 ## Three ways to use these skills
 
-**Local CLI** — clone the repo and run `bootstrap.sh` once. It symlinks each
-directory into `~/.claude/`, `~/.gemini/`, `~/.codex/`, and `~/.cursor/rules/`. Skills appear in Claude Code and Gemini CLI as `/skill-name`.
+**Local CLI** — clone the repo and run `bootstrap.sh` once.
+It symlinks each directory into `~/.claude/`, `~/.gemini/`,
+`~/.codex/`, and `~/.cursor/rules/`.
+Skills appear in Claude Code and Gemini CLI as `/skill-name`.
 
-**Codex & Cursor** — the same bootstrap links generated wrappers from `codex-skills/`
-into `${CODEX_HOME:-$HOME/.codex}/skills` and Cursor rules from `cursor-rules/` into `${CURSOR_HOME:-$HOME/.cursor}/rules`. `AGENTS.md` acts as a universal entrypoint.
+**Codex & Cursor** — the same bootstrap links generated wrappers
+from `codex-skills/` into `${CODEX_HOME:-$HOME/.codex}/skills`
+and Cursor rules from `cursor-rules/` into `${CURSOR_HOME:-$HOME/.cursor}/rules`.
+`AGENTS.md` acts as a universal entrypoint.
 
 **Cloud sessions (other repos)** — this repo is a
 [plugin marketplace](https://github.com/Morrison-Lab/ai-config/blob/main/README.md#use-these-skills-in-another-repos-web-sessions-plugin-marketplace).

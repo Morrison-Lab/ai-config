@@ -1,6 +1,6 @@
 ---
 name: daytb
-description: "do as you think best."
+description: "Decide current question yourself."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "gia"
-description: "Grab Issues + iterate-All."
+description: "Clear PR queue then all issues."
 ---
 
 # gia (Codex wrapper)

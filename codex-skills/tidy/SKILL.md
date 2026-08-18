@@ -1,6 +1,6 @@
 ---
 name: "tidy"
-description: "Use tidy."
+description: "Audit codebase to simplify and DRY."
 ---
 
 # tidy (Codex wrapper)

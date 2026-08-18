@@ -1,6 +1,6 @@
 ---
 name: "pr-status-all"
-description: "Use pr-status-all."
+description: "Summarize all open PR statuses."
 ---
 
 # pr-status-all (Codex wrapper)

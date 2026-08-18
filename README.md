@@ -498,8 +498,10 @@ activated.")
 
 ## What's tracked
 
-- `skills/` — reusable workflow skills (`~/.claude/skills/`)
-- `codex-skills/` — generated Codex wrappers (`~/.codex/skills/`)
+- `skills/` --- reusable workflow skills (`~/.claude/skills/`, `~/.gemini/skills/`)
+- `codex-skills/` --- generated Codex wrappers (`~/.codex/skills/`)
+- `cursor-rules/` --- Cursor AI rules in `.mdc` format (`~/.cursor/rules/`)
+- `AGENTS.md` --- universal vendor-neutral instruction file for all coding agents
 - `tool-mappings.yml` / `tool-mappings.md` — cross-model tool registry and its
   generated reference (see *Tool mappings* above)
 - `commands/` — slash commands (`~/.claude/commands/`)

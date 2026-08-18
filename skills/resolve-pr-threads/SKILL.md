@@ -1,6 +1,6 @@
 ---
 name: resolve-pr-threads
-description: "Use resolve-pr-threads."
+description: "Resolve settled review threads."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "scout-peers"
-description: "Use scout-peers."
+description: "Survey peer repos for patterns."
 ---
 
 # scout-peers (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: "and"
-description: "Use and."
+description: "Revise previous command in-place."
 ---
 
 # and (Codex wrapper)

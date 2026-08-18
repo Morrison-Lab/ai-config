@@ -1,6 +1,6 @@
 ---
 name: next
-description: "Use next."
+description: "Insert after in-flight task."
 user-invocable: true
 allowed-tools: []
 ---

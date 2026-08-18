@@ -1,6 +1,6 @@
 ---
 name: "recover-followups"
-description: "find follow-up items that closed PRs/issues promised but never tracked."
+description: "Recover untracked follow-ups."
 ---
 
 # recover-followups (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: agy-review-workflow
-description: "Set up Antigravity PR review workflows."
+description: "Set up Antigravity review workflow."
 user-invocable: true
 allowed-tools:
   - Read

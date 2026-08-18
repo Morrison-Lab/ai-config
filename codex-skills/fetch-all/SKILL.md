@@ -1,6 +1,6 @@
 ---
 name: "fetch-all"
-description: "Fetch All (aka `fa`)."
+description: "Fetch all remotes and submodules."
 ---
 
 # fetch-all (Codex wrapper)

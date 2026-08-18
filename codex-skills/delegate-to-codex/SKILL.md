@@ -1,6 +1,6 @@
 ---
 name: "delegate-to-codex"
-description: "run heavy sidecar work on codex, not Claude."
+description: "Delegate sidecar task to Codex."
 ---
 
 # delegate-to-codex (Codex wrapper)

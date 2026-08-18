@@ -1,6 +1,6 @@
 ---
 name: select-model
-description: "Choose the right Claude model."
+description: "Select Claude model for task."
 user-invocable: true
 allowed-tools:
   - Bash

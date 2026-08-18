@@ -1,6 +1,6 @@
 ---
 name: "use-math-macros"
-description: "condense manuscript math onto the shared macros submodule."
+description: "Use shared math macros submodule."
 ---
 
 # use-math-macros (Codex wrapper)

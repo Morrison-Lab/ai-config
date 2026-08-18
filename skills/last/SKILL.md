@@ -1,6 +1,6 @@
 ---
 name: last
-description: "Use last."
+description: "Queue at absolute end of queue."
 user-invocable: true
 allowed-tools: []
 ---

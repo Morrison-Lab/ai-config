@@ -1,6 +1,6 @@
 ---
 name: refresh-claude-token
-description: "Use refresh-claude-token."
+description: "Rotate CLAUDE_CODE_OAUTH_TOKEN."
 user-invocable: true
 allowed-tools:
   - Bash

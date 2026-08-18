@@ -1,6 +1,6 @@
 ---
 name: "find-ai-tells"
-description: "spot the telltale signs of AI-written prose."
+description: "Spot AI prose tells."
 ---
 
 # find-ai-tells (Codex wrapper)

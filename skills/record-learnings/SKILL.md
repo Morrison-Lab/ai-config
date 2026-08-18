@@ -1,6 +1,6 @@
 ---
 name: record-learnings
-description: "Use record-learnings."
+description: "Persist insights to memory."
 user-invocable: true
 allowed-tools:
   - Bash

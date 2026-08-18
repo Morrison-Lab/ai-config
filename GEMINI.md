@@ -59,6 +59,15 @@ already-fixed defects. Never leave an issue only in chat prose.
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
   Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
   Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
+- **Never merge over open review findings or treat skip notices as approval.**
+  Under `mwc`, a PR must be fully clean across CI and review (see [`fully-clean.md`](shared/workflow/fully-clean.md)).
+  A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
+  All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
+
+## Autonomously deliver completed changes to a PR
+
+- **Never stop at uncommitted working tree changes**: When asked to write up, edit, or implement changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed.
+- **Complete the delivery cycle**: Commit the changes (linking the tracking issue created per issue-first), push the branch to origin, open a Pull Request if not already opened, trigger AI review (`@claude review` / dispatch review workflow), and drive to clean.
 
 ## Request review and drive every started PR to clean
 

@@ -1,6 +1,6 @@
 ---
 name: discussions
-description: "read and respond to forum topics."
+description: "Manage forge discussions."
 user-invocable: true
 allowed-tools:
   - Bash

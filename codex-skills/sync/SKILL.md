@@ -1,6 +1,6 @@
 ---
 name: "sync"
-description: "Alias."
+description: "\u2192 sync-pr-branch."
 ---
 
 # sync (Codex wrapper)

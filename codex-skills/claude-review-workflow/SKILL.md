@@ -1,6 +1,6 @@
 ---
 name: "claude-review-workflow"
-description: "Set up Claude PR review workflows."
+description: "Add or update claude-review workflow."
 ---
 
 # claude-review-workflow (Codex wrapper)

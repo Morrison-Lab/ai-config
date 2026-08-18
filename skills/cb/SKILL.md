@@ -1,6 +1,6 @@
 ---
 name: cb
-description: "Alias."
+description: "→ clean-branches."
 user-invocable: true
 allowed-tools:
   - Bash

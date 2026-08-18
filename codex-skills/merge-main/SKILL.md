@@ -1,6 +1,6 @@
 ---
 name: "merge-main"
-description: "Alias."
+description: "\u2192 sync-pr-branch."
 ---
 
 # merge-main (Codex wrapper)

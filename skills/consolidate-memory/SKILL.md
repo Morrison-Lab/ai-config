@@ -1,6 +1,6 @@
 ---
 name: consolidate-memory
-description: "merge redundant memory entries into one canonical."
+description: "Merge redundant memories."
 user-invocable: true
 allowed-tools:
   - Bash

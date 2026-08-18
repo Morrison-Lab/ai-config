@@ -1,6 +1,6 @@
 ---
 name: "wait-for-results"
-description: "make that observable."
+description: "Wait for pipeline/CI results."
 ---
 
 # wait-for-results (Codex wrapper)

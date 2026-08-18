@@ -1,6 +1,6 @@
 ---
 name: "ts"
-description: "Test + Slide."
+description: "\u2192 slide-tag."
 ---
 
 # ts (Codex wrapper)

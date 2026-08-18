@@ -1,6 +1,6 @@
 ---
 name: resync-branch
-description: "Alias."
+description: "→ sync-pr-branch."
 user-invocable: true
 allowed-tools:
   - Bash

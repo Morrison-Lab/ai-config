@@ -1,6 +1,6 @@
 ---
 name: grade-work
-description: "Use grade-work."
+description: "Grade submissions vs solution."
 user-invocable: true
 allowed-tools:
   - Bash

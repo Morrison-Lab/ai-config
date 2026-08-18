@@ -1,6 +1,6 @@
 ---
 name: checkpoint
-description: "deliberate mid-task snapshot."
+description: "Save mid-task snapshot."
 user-invocable: true
 allowed-tools:
   - Bash

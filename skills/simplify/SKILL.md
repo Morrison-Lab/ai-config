@@ -1,6 +1,6 @@
 ---
 name: simplify
-description: "Use simplify."
+description: "Prune dead code paths and logic."
 user-invocable: true
 allowed-tools:
   - Bash

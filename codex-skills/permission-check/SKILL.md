@@ -1,6 +1,6 @@
 ---
 name: "permission-check"
-description: "diagnose why Claude Code is (or isn't) prompting."
+description: "Diagnose tool prompting behavior."
 ---
 
 # permission-check (Codex wrapper)

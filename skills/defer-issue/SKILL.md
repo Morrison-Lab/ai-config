@@ -1,6 +1,6 @@
 ---
 name: defer-issue
-description: "Use defer-issue."
+description: "File issue for deferred work."
 user-invocable: true
 allowed-tools:
   - Bash

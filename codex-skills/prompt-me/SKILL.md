@@ -1,6 +1,6 @@
 ---
 name: "prompt-me"
-description: "Use prompt-me."
+description: "Surface top question for user."
 ---
 
 # prompt-me (Codex wrapper)

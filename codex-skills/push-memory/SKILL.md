@@ -1,6 +1,6 @@
 ---
 name: "push-memory"
-description: "Use push-memory."
+description: "Push memory from external repo."
 ---
 
 # push-memory (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: consolidate-skills
-description: "merge overlapping skills into one canonical + alias stubs."
+description: "Merge overlapping skills."
 user-invocable: true
 allowed-tools:
   - Bash

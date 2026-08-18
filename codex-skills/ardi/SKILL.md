@@ -1,6 +1,6 @@
 ---
 name: "ardi"
-description: "ARDI --- ARD + Iterate (single PR/MR)."
+description: "Drive PR to clean review verdict."
 ---
 
 # ardi (Codex wrapper)

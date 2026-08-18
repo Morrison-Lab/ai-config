@@ -1,6 +1,6 @@
 ---
 name: "link-skills"
-description: "find cross-reference gaps across skills."
+description: "Find cross-ref gaps across skills."
 ---
 
 # link-skills (Codex wrapper)

@@ -1,6 +1,6 @@
 ---
 name: brainstorm
-description: "pre-implementation Socratic planning."
+description: "Pre-implementation design Q&A."
 user-invocable: true
 allowed-tools:
   - Read

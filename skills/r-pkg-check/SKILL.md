@@ -1,6 +1,6 @@
 ---
 name: r-pkg-check
-description: "Use r-pkg-check."
+description: "Run devtools::check() and triage."
 user-invocable: true
 allowed-tools:
   - Read

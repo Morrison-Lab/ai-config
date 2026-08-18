@@ -1,6 +1,6 @@
 ---
 name: "checkpoint"
-description: "deliberate mid-task snapshot."
+description: "Save mid-task snapshot."
 ---
 
 # checkpoint (Codex wrapper)

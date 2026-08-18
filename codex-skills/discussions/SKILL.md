@@ -1,6 +1,6 @@
 ---
 name: "discussions"
-description: "read and respond to forum topics."
+description: "Manage forge discussions."
 ---
 
 # discussions (Codex wrapper)

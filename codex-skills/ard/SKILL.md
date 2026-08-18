@@ -1,6 +1,6 @@
 ---
 name: "ard"
-description: "Address, Rebut, Defer, or Acknowledge."
+description: "Address, rebut, or defer review items."
 ---
 
 # ard (Codex wrapper)

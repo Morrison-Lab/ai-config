@@ -1,6 +1,6 @@
 ---
 name: "stack-prs"
-description: "Use stack-prs."
+description: "Stack dependent PR on another."
 ---
 
 # stack-prs (Codex wrapper)

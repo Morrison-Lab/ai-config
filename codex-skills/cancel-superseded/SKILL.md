@@ -1,6 +1,6 @@
 ---
 name: "cancel-superseded"
-description: "Cancel Superseded Pipelines."
+description: "Cancel superseded CI pipelines."
 ---
 
 # cancel-superseded (Codex wrapper)

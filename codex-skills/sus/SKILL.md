@@ -1,6 +1,6 @@
 ---
 name: "sus"
-description: "Alias."
+description: "\u2192 sup."
 ---
 
 # sus (Codex wrapper)

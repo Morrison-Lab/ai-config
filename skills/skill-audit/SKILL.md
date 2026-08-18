@@ -1,6 +1,6 @@
 ---
 name: skill-audit
-description: "usage-frequency audit and pruning recommender."
+description: "Audit skill usage and prune."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: sus
-description: "Alias."
+description: "→ sup."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: sup
-description: "Send to Upstream."
+description: "Send issue or fix upstream."
 user-invocable: true
 allowed-tools:
   - Bash

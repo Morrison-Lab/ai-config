@@ -1,6 +1,6 @@
 ---
 name: "dc"
-description: "Alias."
+description: "\u2192 ardi."
 ---
 
 # dc (Codex wrapper)

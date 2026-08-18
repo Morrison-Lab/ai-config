@@ -1,6 +1,6 @@
 ---
 name: back
-description: "end the away grant."
+description: "Cancel away mode and resume questions."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: migrate-discussion
-description: "move items between Discussions and Issues."
+description: "Move items between Discussions/Issues."
 user-invocable: true
 allowed-tools:
   - Bash

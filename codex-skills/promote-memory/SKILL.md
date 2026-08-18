@@ -1,6 +1,6 @@
 ---
 name: "promote-memory"
-description: "the review gate for staged learnings."
+description: "Promote project memory to shared."
 ---
 
 # promote-memory (Codex wrapper)

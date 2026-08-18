@@ -1,6 +1,6 @@
 ---
 name: "release-notify"
-description: "Tag + Notify Revdeps of Breaking Changes."
+description: "Tag release and notify revdeps."
 ---
 
 # release-notify (Codex wrapper)

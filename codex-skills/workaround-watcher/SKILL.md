@@ -1,6 +1,6 @@
 ---
 name: "workaround-watcher"
-description: "Use workaround-watcher."
+description: "Watch upstream issue for fix."
 ---
 
 # workaround-watcher (Codex wrapper)

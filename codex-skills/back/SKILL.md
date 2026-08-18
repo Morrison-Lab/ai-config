@@ -1,6 +1,6 @@
 ---
 name: "back"
-description: "end the away grant."
+description: "Cancel away mode and resume questions."
 ---
 
 # back (Codex wrapper)

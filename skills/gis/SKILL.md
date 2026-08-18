@@ -1,6 +1,6 @@
 ---
 name: gis
-description: "Alias."
+description: "→ gii."
 user-invocable: true
 allowed-tools:
   - Bash

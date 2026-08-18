@@ -1,6 +1,6 @@
 ---
 name: compress-session
-description: "deliberate pre-compaction distillation."
+description: "Distill context before compacting."
 user-invocable: true
 allowed-tools:
   - Bash

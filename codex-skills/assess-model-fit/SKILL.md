@@ -1,6 +1,6 @@
 ---
 name: "assess-model-fit"
-description: "Evaluate current model capability."
+description: "Assess model fit for task."
 ---
 
 # assess-model-fit (Codex wrapper)

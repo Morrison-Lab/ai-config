@@ -1,6 +1,6 @@
 ---
 name: ums
-description: "Update Memories and Skills."
+description: "Update memories and skills from learnings."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "prefer-upstream"
-description: "Use prefer-upstream."
+description: "Prefer upstream ecosystem packages."
 ---
 
 # prefer-upstream (Codex wrapper)

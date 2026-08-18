@@ -1,6 +1,6 @@
 ---
 name: "learn"
-description: "low-friction staged capture."
+description: "Persist new pattern to memory."
 ---
 
 # learn (Codex wrapper)

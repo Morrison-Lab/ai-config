@@ -1,6 +1,6 @@
 ---
 name: "claude-agent-workflow"
-description: "Use claude-agent-workflow."
+description: "Add or update claude.yml workflow."
 ---
 
 # claude-agent-workflow (Codex wrapper)

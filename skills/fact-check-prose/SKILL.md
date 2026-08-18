@@ -1,6 +1,6 @@
 ---
 name: fact-check-prose
-description: "verify claims, reasoning, and computed values in prose."
+description: "Verify claims and values in prose."
 user-invocable: true
 allowed-tools:
   - Bash

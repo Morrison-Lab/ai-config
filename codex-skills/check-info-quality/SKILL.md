@@ -1,6 +1,6 @@
 ---
 name: "check-info-quality"
-description: "flag stale, irrelevant, and misleading content."
+description: "Flag stale or misleading content."
 ---
 
 # check-info-quality (Codex wrapper)

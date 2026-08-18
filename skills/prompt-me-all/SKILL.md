@@ -1,6 +1,6 @@
 ---
 name: prompt-me-all
-description: "Use prompt-me-all."
+description: "List all open questions."
 user-invocable: true
 allowed-tools: []
 ---

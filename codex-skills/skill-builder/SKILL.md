@@ -1,6 +1,6 @@
 ---
 name: "skill-builder"
-description: "author a new skill (extend-first)."
+description: "Create or update a skill."
 ---
 
 # skill-builder (Codex wrapper)

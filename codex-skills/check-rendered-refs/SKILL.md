@@ -1,6 +1,6 @@
 ---
 name: "check-rendered-refs"
-description: "find crossrefs/citations that broke in the render."
+description: "Find broken refs in render."
 ---
 
 # check-rendered-refs (Codex wrapper)

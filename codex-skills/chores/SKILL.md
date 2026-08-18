@@ -1,6 +1,6 @@
 ---
 name: "chores"
-description: "triage and wrap up dependency-bump PRs."
+description: "Handle chore and bump PRs."
 ---
 
 # chores (Codex wrapper)

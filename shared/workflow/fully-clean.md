@@ -263,6 +263,15 @@ all --- and its density is what gets read as the conclusion.**
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "A later comment stating no verdict does not supersede an earlier one".
 
+**A reviewer skip notice (e.g. for workflow edits or quota exhaustion) does NOT clear or supersede prior review findings.**
+
+When a review run skips (e.g. self-modification workflow guard or quota limits) and falls back to a self-review or human review per [`self-review-fallback`](self-review-fallback.md), that fallback authorizes **merging** only in the absence of prior unresolved findings.
+It does NOT wipe the slate clean, and it does NOT license merging over an unaddressed `Needs more work` verdict or open finding list from an earlier or concurrent review run.
+
+- **Do:** scan the complete PR review comment history for any `Needs more work` verdicts or open finding sections before declaring a PR clean or ready to merge.
+- **Do:** address, rebut (with convincing acceptance), or defer every previously raised finding even if the most recent review run skipped.
+- **Don't:** treat a reviewer skip notice or self-review fallback as an all-clear or as permission to ignore open findings on the PR.
+
 **Another surface,
 and the one that defeats the gate itself:
 the review check can pass on a blocking verdict.**

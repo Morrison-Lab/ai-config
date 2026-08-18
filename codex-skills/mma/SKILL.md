@@ -1,6 +1,6 @@
 ---
 name: "mma"
-description: "Use mma."
+description: "Merge main into open PR branches."
 ---
 
 # mma (Codex wrapper)

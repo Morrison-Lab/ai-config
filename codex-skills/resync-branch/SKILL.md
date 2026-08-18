@@ -1,6 +1,6 @@
 ---
 name: "resync-branch"
-description: "Alias."
+description: "\u2192 sync-pr-branch."
 ---
 
 # resync-branch (Codex wrapper)

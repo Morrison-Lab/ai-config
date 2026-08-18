@@ -1,6 +1,6 @@
 ---
 name: and
-description: "Use and."
+description: "Revise previous command in-place."
 user-invocable: true
 allowed-tools: []
 ---

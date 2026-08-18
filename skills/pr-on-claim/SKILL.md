@@ -1,6 +1,6 @@
 ---
 name: pr-on-claim
-description: "Open a draft PR immediately after claiming an issue."
+description: "Open draft PR on claiming issue."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -16,8 +16,8 @@ repo triggers `claude.yml` in agent mode, not the dedicated review workflow
 directly --- see `memories/claude-bot-workflows.md`'s note that this repo's
 review has no push trigger.
 Run `31140546175`'s own agent turn reported `is_error: true`, `num_turns: 1`,
-`total_cost_usd: 0` --- the exact zero-cost signature this file's credential-
-versus-quota section treats as ambiguous and worth investigating before
+`total_cost_usd: 0` --- the exact zero-cost signature this file's
+credential-versus-quota section treats as ambiguous and worth investigating before
 trusting.
 The same job kept going anyway: its log shows an unconditional shell step
 --- `Dispatching claude-review.yml for PR #1234 (@claude review comment)` ---

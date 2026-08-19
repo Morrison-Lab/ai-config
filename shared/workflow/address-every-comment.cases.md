@@ -575,8 +575,8 @@ The general form is already in
 is 'the same file'" section, in its last "Don't" bullet: "a
 differently-worded instance would not have matched."
 What this case adds is how differently a defect can be worded when the thing
-moving is prose rather than code, and a phrase search is not even the second-
-best instrument here --- for a defect class defined by what a sentence
+moving is prose rather than code, and a phrase search is not even the
+second-best instrument here --- for a defect class defined by what a sentence
 *refers to* rather than by what string it *contains*, the site list cannot be
 derived by grep at all.
 It has to be derived by reading, because the only reliable test is "does this

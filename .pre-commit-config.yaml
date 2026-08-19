@@ -62,3 +62,15 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: hook-output-shape
+        name: hook output shape (warn-only hooks emit systemMessage)
+        entry: python scripts/check-hook-output-shape.py
+        language: python
+        pass_filenames: false
+        always_run: true
+      - id: hook-output-shape-tests
+        name: hook-output-shape check tests
+        entry: python scripts/test_check_hook_output_shape.py
+        language: python
+        pass_filenames: false
+        always_run: true

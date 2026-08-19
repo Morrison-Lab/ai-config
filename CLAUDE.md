@@ -418,6 +418,9 @@ So `#316 session title convention`, not `PR #316 session title convention` or `P
 ## Re-check for latest review findings before reporting PR status
 
 **Before** reporting status on a PR (especially "clean" / "ready to merge"), re-read the **most recent** review comment on the PR.
+The same fetch applies to any other question about that live PR
+("why didn't you wait", "did you fix it", "why haven't you responded").
+Don't answer from chat context alone.
 Don't trust an earlier "verdict" you've cached — a new review may have been posted since (by the @claude bot, by a human, or by a re-trigger), and that newer review may contain findings the old one missed.
 
 Specifically: when scanning checks (`gh pr checks`) shows green or "no failures", that's about CI state, **not** review verdict.

@@ -140,6 +140,15 @@ The first `git branch -D` failed with the worktree message, and `git worktree li
 
 (`rme`#988/`epi204`#362: both cited `shared/writing/math-derivation-steps.md` in present tense while `ai-config`#502 was still open and each repo's `.ai-config` pin predated it --- flagged as a dangling reference by review in both, fixed by bumping the pin once #502 merged and hedging the still-open `gha`#228 half of the same citation.)
 
+## Re-check for latest review findings before reporting PR status --- A process question is still a status fetch
+
+(Morrison-Lab/gha#511, 2026-08-18: the user asked why the session had not
+waited for CI, then why it had not answered
+https://github.com/Morrison-Lab/gha/pull/511#issuecomment-5336851477.
+The session answered the first question from chat and never opened the
+thread, so a Needs more work review of `89e3702` sat unanswered until
+asked.)
+
 ## Re-check for latest review findings before reporting PR status --- Filter on the body marker, not on an author login
 
 (Morrison-Lab/ai-config#1054, 2026-08-03: the round-3 verdict --- **Ready for merge**, all four findings independently re-verified --- posted as `github-actions[bot]` at `03:04:19Z`.

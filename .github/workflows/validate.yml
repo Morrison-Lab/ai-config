@@ -52,7 +52,9 @@ jobs:
         # Only the tests run here. check-install.py itself compares against a
         # consumer directory (~/.claude) that no CI runner has, so on a runner
         # it correctly reports "nothing installed to check" and proves nothing.
-        run: python3 scripts/test_check_install.py
+        run: |
+          python3 scripts/test_check_install.py
+          python3 scripts/test_check_harness_installs.py
       - name: Run plugin-overlap detector tests
         # Only the tests run here. check-plugin-overlap.py itself inspects a
         # consumer directory (~/.claude) plus its settings.json, which no CI

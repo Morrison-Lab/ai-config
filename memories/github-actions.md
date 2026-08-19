@@ -642,6 +642,8 @@ common patterns.
   are explicit overrides. (gha#148: `test-coverage.yml`'s `fail-ci-if-error` input.)
 - **A composite action `action.yml` input default overrides shell script fallback logic, so default to empty string `''` when delegating ref/branch resolution to a helper script.**
   If `action.yml` specifies `default: 'HEAD'`, passing it via `env: TARGET_REF: ${{ inputs.target-ref }}` to a script using `${1:-$DEFAULT_REF}` always passes `"HEAD"`, bypassing fallback chains (`origin/main` -> `main` -> `HEAD`) needed on PR checkouts. Defaulting `target-ref: ''` in `action.yml` allows the helper script to apply its fallback resolution dynamically when unsupplied. (gha#512: `check-tag-drift` composite action.)
+- **A numeric version check in shell should validate that the parsed version string is numeric (`^[0-9]+$`) before evaluating `-lt` or `-gt`.**
+  Inside an `if [ "$NODE_MAJOR" -lt 18 ]; then ... fi` condition block, if `NODE_MAJOR` is non-numeric (e.g. unparseable output or empty string), `[` returns exit status 2. Because `[` is evaluated as the condition of an `if` statement, `set -e` does not abort on failure; instead, bash skips the `then` block and execution silently falls through to exit status 0 (passing the check). Validate `[[ "$NODE_MAJOR" =~ ^[0-9]+$ ]]` first and exit 1 on parse failures. (gha#283: `check-node-version.sh`.)
 - **Writing any explicit step-level `if:` REPLACES the default `success()`, so a
   guard step's failure does not skip the steps that follow it.**
   The default condition on a step is `success()`, which is why a failing step

@@ -9,7 +9,7 @@ spec.loader.exec_module(subject)
 
 assert subject.POLL_SECONDS == 120
 assert subject.STATE_PATH.endswith("all-open-prs.json")
-assert "--author" in subject.open_prs.__code__.co_consts[1]
+assert any(isinstance(c, (str, tuple, list)) and "--author" in c for c in subject.open_prs.__code__.co_consts)
 
 # Verify read_state / write_state roundtrip preserves reported fingerprint
 import tempfile, os

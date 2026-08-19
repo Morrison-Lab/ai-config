@@ -61,7 +61,7 @@ operations:
     cli: gh pr view <N> --comments
     github_mcp: mcp__github__pull_request_read (method=get_comments)
   - id: READ_PR_REVIEW_COMMENTS
-    description: Read a pull request's inline review-thread comments (also returns thread ids).
+    description: Read a pull request's inline review threads. The MCP tool returns thread objects under a `review_threads` key, each with `id` (a `PRRT_` thread node ID for `resolve_thread`), `is_resolved`, `is_outdated`, `is_collapsed`, and a nested `comments` array (wrapping GraphQL `reviewThreads`' camelCase `isResolved`/`isOutdated`). The CLI fallback (`gh api "repos/<owner>/<repo>/pulls/<N>/comments"`) returns flat comment objects without resolution state; inspecting thread resolution via CLI requires a GraphQL `reviewThreads` query.
     cli: gh api "repos/<owner>/<repo>/pulls/<N>/comments"
     github_mcp: mcp__github__pull_request_read (method=get_review_comments)
   - id: READ_PR_REVIEWS

@@ -49,8 +49,10 @@ cases = [
     ("**Stopping Point**: Not clean --- CI is still running.", False),
     ("This PR adds a hook that requires text like `**Stopping Point**: Clean stopping point reached` in every final reply.", True),
     ("Discussion of rule:\n```\n**Stopping Point**: Clean stopping point reached\n```\nStill working on task.", True),
+    ("Discussion of rule:\n```markdown\n**Stopping Point**: Clean stopping point reached\n```\nDone with task.\n\n**Stopping Point**: Clean stopping point reached.", False),
     ("**Stopping Point**: Cleanup pending, more work needed.", True),
     ("To open a fence type ``` on its own line.\n\n**Stopping Point**: Clean stopping point reached\n\n```\ncode\n```", False),
+    ("Fences look like this on their own line:\n\n```\n\nThat is how you open one.\n\n**Stopping Point**: Clean stopping point reached\n\n```\nexample code\n```\n", False),
 ]
 
 failed = 0

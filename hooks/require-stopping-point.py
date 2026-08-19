@@ -7,21 +7,41 @@ import re
 import sys
 import tempfile
 
+FENCE_LINE_RX = re.compile(r"^\s*([`~]{3,})(?:[a-zA-Z0-9_-]+)?\s*$")
 RX_LINE = re.compile(
     r"^\s*(?:[-*]\s+|\d+\.\s+|#{1,6}\s+)?(?:\*\*)?Stopping Point:?(?:\*\*)?:?\s*(?:Clean\b|Not (?:a )?clean\b)",
-    re.IGNORECASE | re.MULTILINE,
+    re.IGNORECASE,
 )
-
-FENCE_RX = re.compile(r"^([`~]{3,})[^\n]*\n.*?\n^\1[ \t]*$", re.DOTALL | re.MULTILINE)
 INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 
 
 def has_stopping_point_declaration(text: str) -> bool:
     if not text:
         return False
-    stripped = FENCE_RX.sub("", text)
-    stripped = INLINE_CODE_RX.sub("", stripped)
-    return bool(RX_LINE.search(stripped))
+    lines = text.splitlines()
+    fence_indices = [idx for idx, line in enumerate(lines) if FENCE_LINE_RX.match(line)]
+
+    def get_code_line_indices(fences):
+        code_lines = set()
+        for i in range(0, len(fences) - 1, 2):
+            for l in range(fences[i], fences[i + 1] + 1):
+                code_lines.add(l)
+        return code_lines
+
+    candidate_code_sets = []
+    if len(fence_indices) % 2 == 0:
+        candidate_code_sets.append(get_code_line_indices(fence_indices))
+    else:
+        candidate_code_sets.append(get_code_line_indices(fence_indices[1:]))
+        candidate_code_sets.append(get_code_line_indices(fence_indices[:-1]))
+
+    for idx, line in enumerate(lines):
+        stripped = INLINE_CODE_RX.sub("", line)
+        if RX_LINE.search(stripped):
+            for code_set in candidate_code_sets:
+                if idx not in code_set:
+                    return True
+    return False
 
 
 def last_text(path: str) -> str:

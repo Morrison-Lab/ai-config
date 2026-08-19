@@ -1167,36 +1167,12 @@ workflow this repo's review actually depends on, per
 
 **A third `claude-bot.yml` run followed, and it may have been self-triggered
 rather than a new human request.**
-The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`) fires on
-`contains(github.event.comment.body, '@claude')` without stripping code spans.
-A self-review comment containing `` `@claude` `` triggered the gate.
-Tracked as ai-config#1242 for confirmation.
+The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`) fires on `contains(github.event.comment.body, '@claude')` without stripping code spans. A self-review comment containing `` `@claude` `` triggered the gate (ai-config#1242).
+That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not the PR branch (`ai-config#635`). Dispatch directly with an explicit `pr_number` input and `ref: <PR-branch>`.
 
-
-That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not
-the PR branch -- the same ambiguity
-[`fully-clean`](../shared/workflow/fully-clean.md) documents for the **same**
-repo (`ai-config#635`, run 29967418653; verified directly, not assumed from
-the fragment's "this very PR" phrasing).
-Don't use those fields to decide whether the run is reviewing your PR;
-read what it posts, or dispatch directly with an explicit `pr_number` input
-and `ref: <PR-branch>`, which skips the comment-relay path entirely.
-
-- **Do:** treat a listener's own error comment as evidence about that step
-  only, and check the dispatched workflow's run history before concluding a
-  review failed.
-- **Do:** dispatch the review workflow directly rather than relying on a
-  mention comment to relay through the listener.
-- **Do:** avoid writing an unescaped `@claude` substring into a PR comment on
-  a repo whose bot gates on `contains()` -- it retriggers even in backticks.
-- **Don't:** re-derive "the review workflow is broken repo-wide" from one
-  PR's comments without checking `list_workflow_runs` first -- #1197 already
-  found this claim false once, from the same symptom.
-- **Don't:** count a listener's own error as one of the retries in
-  [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s
-  "retry once, then treat as unreachable" rule -- it isn't the reviewer failing.
-
-(2026-08-07, `Morrison-Lab/ai-config#1238`: the same string #1197 traced to a
-false repo-wide-failure report reappeared verbatim on a PR, where `list_workflow_runs`
-showed listener success and rapid re-dispatch.)
-
+- **Do:** treat a listener's own error comment as evidence about that step only, and check the dispatched workflow's run history before concluding a review failed.
+- **Do:** dispatch the review workflow directly rather than relying on a mention comment to relay through the listener.
+- **Do:** avoid writing an unescaped `@claude` substring into a PR comment on a repo whose bot gates on `contains()`.
+- **Don't:** re-derive "the review workflow is broken repo-wide" from one PR's comments without checking `list_workflow_runs` first.
+- **Don't:** count a listener's own error as one of the retries in [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s "retry once, then treat as unreachable" rule.
+(2026-08-07, `Morrison-Lab/ai-config#1238`.)

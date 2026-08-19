@@ -53,6 +53,10 @@ def monitor_path(url):
     return os.path.join(STATE_DIR, hashlib.sha256(url.encode()).hexdigest()[:16] + ".json")
 
 
+def cwd_monitor_path(cwd):
+    return os.path.join(STATE_DIR, "cwd-" + hashlib.sha256(os.path.abspath(cwd).encode()).hexdigest()[:16] + ".json")
+
+
 def read_json(path):
     try:
         with open(path, encoding="utf-8") as stream:
@@ -93,11 +97,15 @@ def pr_url(cwd):
 def start_monitor(cwd):
     if not shutil.which("gh"):
         return None
+    cwd_state = cwd_monitor_path(cwd)
+    if alive(read_json(cwd_state).get("pid")):
+        return False
     url = pr_url(cwd)
     if not url:
         return None
     path = monitor_path(url)
     if alive(read_json(path).get("pid")):
+        write_json(cwd_state, {"url": url, "pid": read_json(path).get("pid"), "path": path})
         return False
     try:
         process = subprocess.Popen([sys.executable, os.path.abspath(__file__), "--poll", url, path],
@@ -107,6 +115,7 @@ def start_monitor(cwd):
     except OSError:
         return None
     write_json(path, {"url": url, "pid": process.pid, "started_at": time.time()})
+    write_json(cwd_state, {"url": url, "pid": process.pid, "path": path})
     return True
 
 

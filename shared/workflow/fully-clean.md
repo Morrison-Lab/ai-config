@@ -70,6 +70,21 @@ Worked-example case records for the rules below live in
    reason, and a platform outage produces the same shape for a reason none of
    them can reach.**
 
+   **A job's conclusion is set by whichever step failed, which need not be the step whose verdict you read.**
+   Every rule above is about an enumeration that came back short.
+   This one is the opposite case: the enumeration is complete and terminal, and the answer you read came from the wrong member of it.
+   A workflow can carry a guard step that decides what a run *meant* --- a review guard classifying an outcome, a summarizer, a status resolver --- and that step can conclude "this is fine", write its output, and end `success`, while the job is red because an earlier step failed without `continue-on-error`.
+   Reading the guard's own log line then reports the opposite of the check.
+   So when a red job's log carries a green verdict, do not treat it as a contradiction to explain: enumerate the steps and find the one whose conclusion is `failure`.
+   The same reading also settles what to do next: whether a fix to the classifier can clear the check at all, since a classifier the job does not consult is fixable without changing anything the reader sees.
+
+   - **Do:** identify the failing *step* before diagnosing a failing job, rather than reasoning from whichever step's output you happened to read.
+   - **Do:** treat a green guard step beside a red job as evidence about the wiring, since the two were decided by different steps.
+   - **Don't:** read a guard step's own log line as the job's verdict --- the two are decided by different steps, so agreeing is a coincidence rather than a confirmation.
+   - **Don't:** claim a fix to a classifier clears a check until you have confirmed the job's conclusion actually depends on that classifier.
+
+   See [`fully-clean.cases.md`](fully-clean.cases.md), "A green guard step beside a red job".
+
 2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
 
 **Criterion 2's test is the absence of findings, not the presence of a verdict

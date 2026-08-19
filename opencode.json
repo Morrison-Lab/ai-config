@@ -1,0 +1,51 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "skills": {
+    "paths": [
+      "skills",
+      "shared/sembr-skills/skills"
+    ]
+  },
+  "references": {
+    "shared": {
+      "path": "shared",
+      "description": "Shared coding, writing, workflow, and principle fragments used across skills and agent configs"
+    },
+    "memories": {
+      "path": "memories",
+      "description": "Persistent memory files for cross-session learnings"
+    }
+  },
+  "permission": {
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "edit": "ask",
+    "bash": {
+      "git *": "allow",
+      "gh *": "allow",
+      "ls *": "allow",
+      "cat *": "allow",
+      "*": "ask"
+    },
+    "external_directory": {
+      "~/**": "allow",
+      "*": "ask"
+    },
+    "webfetch": "allow",
+    "websearch": "allow"
+  },
+  "tool_output": {
+    "max_lines": 200,
+    "max_bytes": 8192
+  },
+  "compaction": {
+    "auto": true,
+    "tail_turns": 15
+  }
+}

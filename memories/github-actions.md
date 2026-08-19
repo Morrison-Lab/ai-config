@@ -148,6 +148,15 @@ common patterns.
      To actually run it, the caller has to be on the default branch: add a
      throwaway dispatch-only caller workflow to `main`, `workflow_dispatch` it,
      then delete it.
+     **Same guard, consumer PR, 2026-08-18 (2nd occurrence, gha#386):**
+     Morrison-Lab/ai-config#1642 edited `.github/workflows/validate.yml` (not
+     the review workflow). A `workflow_dispatch` of `claude-review.yml` skipped
+     with a PR warning that token exchange refuses until that file matches the
+     default branch. Re-dispatching does not lift it.
+     - **Do:** self-review immediately, then start the *agent* workflow with a
+       dedicated mention comment if an external verdict is still owed.
+     - **Don't:** re-dispatch `claude-review.yml` hoping the skip comment was
+       a one-off.
   2. **A nested `uses: <owner>/<repo>/.github/actions/<x>@v2` composite ref
      inside the reusable workflow resolves at its OWN literal `@v2`,
      independent of the ref the reusable workflow was called at.**

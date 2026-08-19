@@ -1,5 +1,17 @@
 # Local tools & CLIs
 
+## Cursor agent cannot write `.cursorignore` from the sandbox
+
+The Write/StrReplace tools, and a sandboxed Shell, refuse a file named
+`.cursorignore` with `operation not permitted`, including a tempfile of that
+name under `/tmp`. The filename is the trigger, not the destination.
+
+- **Do:** write `.cursorignore` with Shell `required_permissions: ["all"]`.
+- **Don't:** retry Write or StrReplace after that denial, or conclude the
+  path is unwritable.
+
+(Measured 2026-08-18 on Morrison-Lab/ai-config#1642.)
+
 ## Codex plugin marketplace renames require a remove/re-add migration
 
 `codex plugin marketplace upgrade <old-name>` refuses to refresh a Git marketplace when the repository's manifest now declares a different marketplace name.

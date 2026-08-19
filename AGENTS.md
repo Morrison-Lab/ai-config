@@ -25,11 +25,18 @@ directly, carry it forward with an actual next action. Every issue noticed,
 however small or outside the current task's scope, must at minimum be filed in
 the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
 
+## Keep ai-config and repo checkouts fresh
+
 In every session --- at session start, and again periodically during long sessions --- refresh local state:
 
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
 2. **The consumer copies / symlinks.** Ensure `bootstrap.sh` has run so local agent config directories (`~/.gemini/skills`, `~/.claude`, `~/.codex/skills`, `~/.cursor/rules`) contain up-to-date symlinks.
 3. **Working repo checkouts.** Keep `main` updated (`git fetch origin`, `git pull --ff-only`).
+
+## Autonomously deliver completed changes to a PR
+
+- **Never stop at uncommitted working tree changes**: When asked to write up, edit, or implement changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed.
+- **Complete the delivery cycle**: Commit the changes (linking the tracking issue created per issue-first), push the branch to origin, open a Pull Request if not already opened, trigger AI review (`@claude review` / dispatch review workflow), and drive to clean.
 
 ## Worktree isolation
 

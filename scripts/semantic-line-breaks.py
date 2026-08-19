@@ -15,6 +15,8 @@ path previews the reformat and writes nothing; `--write` applies it, scoped
 by default to the lines the branch changed against a base ref; `--all`
 widens that scope to the whole file. See `main()` for the rationale.
 """
+from __future__ import annotations
+
 import argparse
 import difflib
 import re

@@ -59,6 +59,10 @@ jobs:
         # runner has, so on a runner it correctly reports nothing examined and
         # proves nothing (ai-config#1409).
         run: python3 scripts/test_plugin_overlap.py
+      - name: Run codex-plugin detector tests
+        # Only the tests run here. test_codex_plugin.py exercises Codex plugin
+        # detection and stale-wrapper cleanup logic offline (ai-config#1629).
+        run: python3 scripts/test_codex_plugin.py
       - name: Run token-rotation tool tests
         # Only the tests run here. rotate-claude-token.py itself mutates
         # repository secrets across the estate, so it is a local operator tool

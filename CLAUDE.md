@@ -42,52 +42,9 @@ It also applies to this entry: below is its own pair.
 - **Don't:** write only the corrected behaviour and leave the reader to infer which specific move it displaced.
 - **Don't:** state the pair so abstractly that no concrete action would violate it.
 
-## Generalize instructions to every AI agent by default
+## Universal instructions
 
-Unless the user explicitly scopes an instruction to one agent, project, or
-session, apply it to every available AI-agent configuration and shared
-automation surface. A Claude-only implementation is incomplete when Codex,
-Gemini, Antigravity, or another installed agent can encounter the same rule.
-
-- **Do:** update the shared source and every applicable agent-specific entry
-  point; prefer an agent-independent service for operational behavior.
-- **Don't:** treat the name of the agent currently speaking as an implicit
-  scope restriction.
-
-## Interpret instructions broadly and maximize safe progress
-
-Unless the user narrows a request, take the broad reading that advances its
-obvious objective and complete every safe, authorized, relevant step. Do not
-reduce an instruction to the smallest literal action when its context makes a
-larger in-scope outcome clear.
-
-- **Do:** inspect for adjacent actionable work, resolve it, verify it, and
-  carry it through the normal PR/review/monitoring lifecycle.
-- **Don't:** stop at a narrow literal reading that leaves the requested outcome
-  only partially achieved.
-
-## Status requests do not make issues report-only
-
-Treat a request for status as a request to inspect live state and finish every
-safe, in-scope, concrete action that inspection reveals. A report is the recap
-after the work, not a substitute for it. When an issue cannot be fixed
-directly, carry it forward with an actual next action. **Every issue noticed,
-however small or outside the current task's scope, must at minimum be filed in
-the owning GitHub, GitLab, or equivalent tracker.** File it before reporting
-it; use the correct private tracker and redact sensitive details when needed.
-
-- **Do:** fix an actionable CI defect, review finding, or configuration gap
-  before reporting it as status; revalidate and continue the sweep.
-- **Do:** turn an issue outside current authority into a filed/routed blocker,
-  not an unowned observation.
-- **Do:** file every noticed issue in its owning tracker, even when it is
-  trivial, already fixed locally, or outside the active task.
-- **Don't:** interpret "status" as report-only after discovering a concrete,
-  safe, in-scope repair.
-- **Don't:** end with "this failed" or "this needs a fix" when the fix is
-  available to perform in the same turn.
-- **Don't:** leave a noticed issue as chat prose because it seems too small or
-  too far outside the current scope to track.
+Follow all universal instructions defined in [`AGENTS.md`](AGENTS.md) (freshness, worktree isolation, local timestamp recaps, status requests not report-only, broad interpretation, cross-agent generalization, strict merge control, autonomous delivery, and review workflows).
 
 ## Flag good moments to `/clear` in long-running sessions
 

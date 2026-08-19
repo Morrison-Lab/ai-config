@@ -78,14 +78,20 @@ for src in "$SCRIPT_DIR"/*/; do
   fi
 done
 
-# --- Codex skill wrappers: symlink individual generated wrappers into Codex ---
+# --- Codex skill wrappers vs plugin ---
+# Select the enabled Codex plugin or its wrapper symlinks, never both (ai-config#1629).
 if [ -d "$SCRIPT_DIR/codex-skills" ]; then
-  printf '\n--- Codex skill wrappers ---\n'
-  mkdir -p "$CODEX_DIR/skills"
-  for src in "$SCRIPT_DIR"/codex-skills/*; do
-    [ -d "$src" ] || continue
-    link_one "$src" "$CODEX_DIR/skills/$(basename "$src")"
-  done
+  printf '\n--- Codex skills ---\n'
+  if python3 -c "import sys; sys.path.insert(0, '$SCRIPT_DIR/scripts/lib'); from codex_plugin import is_codex_plugin_enabled; sys.exit(0 if is_codex_plugin_enabled('$CODEX_DIR', '$SCRIPT_DIR') else 1)" 2>/dev/null; then
+    printf 'plugin  Codex plugin is enabled; cleaning up any stale skill wrappers\n'
+    python3 -c "import sys; sys.path.insert(0, '$SCRIPT_DIR/scripts/lib'); from codex_plugin import clean_stale_codex_wrappers; removed = clean_stale_codex_wrappers('$CODEX_DIR', '$SCRIPT_DIR'); print(f'cleaned {len(removed)} wrapper(s)') if removed else None" 2>/dev/null || true
+  else
+    mkdir -p "$CODEX_DIR/skills"
+    for src in "$SCRIPT_DIR"/codex-skills/*; do
+      [ -d "$src" ] || continue
+      link_one "$src" "$CODEX_DIR/skills/$(basename "$src")"
+    done
+  fi
 fi
 
 # --- Memories: symlink individual .md files into VS Code Copilot memory dir ---

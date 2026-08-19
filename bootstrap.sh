@@ -140,7 +140,7 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   SKILLS_JSON="$GEMINI_CONFIG_DIR/skills.json"
   if [ ! -f "$SKILLS_JSON" ]; then
     # Derive the alias set rather than hard-coding it. An alias skill declares
-    # `description: "Alias for ..."` in its frontmatter and is a thin pointer to
+    # `description: "→ ..."` (or `Alias for ...`) in its frontmatter and is a thin pointer to
     # its canonical skill, so the set is enumerable from the repo itself. A
     # hand-maintained list drifts silently in both directions: a newly added
     # alias eats budget until the banner returns, and a skill that stops being
@@ -149,7 +149,7 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
     for _skill_dir in "$SCRIPT_DIR"/skills/*/; do
       [ -f "$_skill_dir/SKILL.md" ] || continue
       _skill_name=$(basename "$_skill_dir")
-      if head -8 "$_skill_dir/SKILL.md" | grep -qiE '^description: *"?Alias for'; then
+      if head -8 "$_skill_dir/SKILL.md" | grep -qiE '^description: *"?([→]|->|Alias for\b)'; then
         [ -z "$ALIAS_PATTERNS" ] || ALIAS_PATTERNS="$ALIAS_PATTERNS,
 "
         ALIAS_PATTERNS="$ALIAS_PATTERNS$(printf '        "^%s$"' "$_skill_name")"

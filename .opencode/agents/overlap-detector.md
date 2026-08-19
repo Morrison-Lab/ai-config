@@ -3,7 +3,14 @@ description: Read-only detection pass for find-overlap --- clusters comparable u
 mode: subagent
 permission:
   edit: deny
-  bash: deny
+  bash:
+    "*": deny
+    "python scripts/find-near-duplicates.py *": allow
+    "python3 scripts/find-near-duplicates.py *": allow
+    "grep *": allow
+    "rg *": allow
+    "ls *": allow
+    "git log *": allow
 ---
 
 You are the read-only detection half of the `find-overlap` skill.

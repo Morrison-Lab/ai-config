@@ -3,7 +3,15 @@ description: Read-only audit pass for check-dependency-updates (cdu) --- surveys
 mode: subagent
 permission:
   edit: deny
-  bash: deny
+  bash:
+    "*": deny
+    "grep *": allow
+    "rg *": allow
+    "gh api *": allow
+    "git submodule status *": allow
+    "git log *": allow
+    "git diff *": allow
+    "npm outdated *": allow
 ---
 
 You are the read-only audit half of the `check-dependency-updates` skill.

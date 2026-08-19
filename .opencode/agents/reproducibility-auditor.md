@@ -3,7 +3,14 @@ description: Read-only audit pass for reproducibility-audit --- surveys a projec
 mode: subagent
 permission:
   edit: deny
-  bash: deny
+  bash:
+    "*": deny
+    "grep *": allow
+    "rg *": allow
+    "git log *": allow
+    "git diff *": allow
+    "git status *": allow
+    "ls *": allow
 ---
 
 You are the read-only audit half of the `reproducibility-audit` skill. Your

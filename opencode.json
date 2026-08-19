@@ -27,15 +27,15 @@
     "list": "allow",
     "edit": "ask",
     "bash": {
+      "*": "ask",
       "git *": "allow",
       "gh *": "allow",
       "ls *": "allow",
-      "cat *": "allow",
-      "*": "ask"
+      "cat *": "allow"
     },
     "external_directory": {
-      "~/**": "allow",
-      "*": "ask"
+      "*": "ask",
+      "~/**": "allow"
     },
     "webfetch": "allow",
     "websearch": "allow"

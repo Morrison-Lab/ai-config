@@ -3,7 +3,20 @@ description: Read-only detection pass for purge-hallucinations (ph) --- verifies
 mode: subagent
 permission:
   edit: deny
-  bash: deny
+  bash:
+    "*": deny
+    "test *": allow
+    "git ls-files *": allow
+    "git status *": allow
+    "git log *": allow
+    "git show *": allow
+    "git diff *": allow
+    "git rev-parse *": allow
+    "git ls-remote *": allow
+    "gh api *": allow
+    "grep *": allow
+    "rg *": allow
+    "curl -sSI *": allow
 ---
 
 You are the read-only detection half of the `purge-hallucinations` skill.

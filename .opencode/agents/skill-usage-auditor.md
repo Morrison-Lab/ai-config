@@ -3,7 +3,13 @@ description: Read-only audit pass for skill-audit --- enumerates skills/*/ (cano
 mode: subagent
 permission:
   edit: deny
-  bash: deny
+  bash:
+    "*": deny
+    "ls *": allow
+    "grep *": allow
+    "rg *": allow
+    "find *": allow
+    "git log *": allow
 ---
 
 You are the read-only detection half of the `skill-audit` skill. Your job is

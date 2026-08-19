@@ -74,3 +74,9 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: check-pr-body-figures-tests
+        name: check-pr-body-figures check tests
+        entry: python scripts/test_check_pr_body_figures.py
+        language: python
+        pass_filenames: false
+        always_run: true

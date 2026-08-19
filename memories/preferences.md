@@ -562,6 +562,9 @@
   Not every mistake is mechanizable: a one-off factual slip or a judgment call has no decidable condition, and a hook invented for one misfires and gets switched off, taking the real cases with it.
   Saying plainly that a mistake is not mechanizable, and why, discharges this.
   This is separate from the UMS pass an error already owes: that records the learning, the hook prevents the recurrence, and both can be owed at once. (`cai`, 2026-08-02; implemented as `hooks/no-mistake-without-a-hook.py`, which is the rule applied to itself.)
+- **A new enforcement hook always ships with its test in the same change before pushing.**
+  When authoring or modifying a hook in `hooks/`, create its companion regression suite `hooks/test-<name>.py` in the same commit and run `python3 scripts/test_hooks.py` before pushing.
+  Shipping a hook without its test fails the runner's subject-to-test coverage check in CI and pre-commit; keeping the subject and test tightly coupled ensures new guards and their behavioral assertions land together. (ai-config#1616: `no-unshipped-commit.py` reached a PR before its test suite was written.)
 - Keep the bot's `@`-mention trigger phrase OUT of PR/issue comment prose unless you actually intend to dispatch.
   The `issue_comment` trigger fires on the bare mention ANYWHERE in a comment --- even in a sentence saying you're NOT triggering a review (e.g. an ARD summary noting "not posting [the mention]").
   A stray mention spawns a run that cancels the push-triggered review on `cancel-in-progress` setups.

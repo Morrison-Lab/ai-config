@@ -375,7 +375,8 @@ So when adding a warn-only hook:
 No check enforces this yet; the condition is decidable and is tracked in
 [#1582](https://github.com/Morrison-Lab/ai-config/issues/1582).
 
-A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
+Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
+`scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse
 direction --- it enumerates the hooks and flags any that lack a test --- so a
 *tested* guard cannot regress unnoticed and an *untested* one cannot hide. It

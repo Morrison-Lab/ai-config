@@ -8,11 +8,11 @@ import sys
 import tempfile
 
 RX_LINE = re.compile(
-    r"^(?:[-*]\s+|\d+\.\s+|#{1,6}\s+)?(?:\*\*)?Stopping Point(?:\*\*)?:\s*(?:Clean|Not (?:a )?clean\b)",
+    r"^\s*(?:[-*]\s+|\d+\.\s+|#{1,6}\s+)?(?:\*\*)?Stopping Point:?(?:\*\*)?:?\s*(?:Clean\b|Not (?:a )?clean\b)",
     re.IGNORECASE | re.MULTILINE,
 )
 
-FENCE_RX = re.compile(r"(`{3,}|~{3,}).*?\n.*?\n\1", re.DOTALL)
+FENCE_RX = re.compile(r"^([`~]{3,})[^\n]*\n.*?\n^\1[ \t]*$", re.DOTALL | re.MULTILINE)
 INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 
 
@@ -27,8 +27,18 @@ def has_stopping_point_declaration(text: str) -> bool:
 def last_text(path: str) -> str:
     last = ""
     try:
-        for line in open(path, errors="ignore"):
-            event = json.loads(line)
+        f = open(path, errors="ignore")
+    except Exception:
+        return ""
+    with f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except Exception:
+                continue
             if event.get("type") == "assistant":
                 text = "".join(
                     block.get("text", "")
@@ -37,8 +47,6 @@ def last_text(path: str) -> str:
                 )
                 if text.strip():
                     last = text
-    except Exception:
-        return ""
     return last
 
 

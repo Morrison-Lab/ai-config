@@ -430,6 +430,92 @@ expect(
     f"got rendered help: {norm_help!r}",
 )
 
+# Bug/enhancement: untouched sentences in a changed paragraph preserve their exact wrapping (ai-config#1599)
+UNTOUCHED_WRAPPED_PARA = (
+    "Where no CI gate covers a file\n"
+    "(commonly a Markdown doc...)\n"
+    "Treat adding or extending\n"
+    "the check.\n"
+)
+scoped_res = slb.reformat(UNTOUCHED_WRAPPED_PARA, {3, 4})
+expected_scoped_res = (
+    "Where no CI gate covers a file\n"
+    "(commonly a Markdown doc...)\n"
+    "Treat adding or extending the check.\n"
+)
+expect(
+    "untouched wrapped sentences in a changed paragraph preserve line breaks",
+    scoped_res == expected_scoped_res,
+    f"expected:\n{expected_scoped_res!r}\ngot:\n{scoped_res!r}",
+)
+
+all_res = slb.reformat(UNTOUCHED_WRAPPED_PARA, None)
+expected_all_res = (
+    "Where no CI gate covers a file (commonly a Markdown doc...)\n"
+    "Treat adding or extending the check.\n"
+)
+expect(
+    "whole-file scope reflows all sentences",
+    all_res == expected_all_res,
+    f"expected:\n{expected_all_res!r}\ngot:\n{all_res!r}",
+)
+
+BQ_WRAPPED = (
+    "> Where no CI gate covers a file\n"
+    "> (commonly a Markdown doc...)\n"
+    "> Treat adding or extending\n"
+    "> the check.\n"
+)
+bq_scoped_res = slb.reformat(BQ_WRAPPED, {3, 4})
+expected_bq_scoped_res = (
+    "> Where no CI gate covers a file\n"
+    "> (commonly a Markdown doc...)\n"
+    "> Treat adding or extending the check.\n"
+)
+expect(
+    "untouched wrapped sentences in blockquote preserve line breaks",
+    bq_scoped_res == expected_bq_scoped_res,
+    f"expected:\n{expected_bq_scoped_res!r}\ngot:\n{bq_scoped_res!r}",
+)
+
+BULLET_WRAPPED = (
+    "- Where no CI gate covers a file\n"
+    "  (commonly a Markdown doc...)\n"
+    "  Treat adding or extending\n"
+    "  the check.\n"
+)
+bullet_scoped_res = slb.reformat(BULLET_WRAPPED, {3, 4})
+expected_bullet_scoped_res = (
+    "- Where no CI gate covers a file\n"
+    "  (commonly a Markdown doc...)\n"
+    "  Treat adding or extending the check.\n"
+)
+expect(
+    "untouched wrapped sentences in bullet continuation preserve line breaks",
+    bullet_scoped_res == expected_bullet_scoped_res,
+    f"expected:\n{expected_bullet_scoped_res!r}\ngot:\n{bullet_scoped_res!r}",
+)
+
+# Review Finding 1: internal double spaces / tabs must not break sentence matching or drop markers
+DOUBLE_SPACE_BULLET = "- Ok  then.\n  Ok then.\n"
+ds_res = slb.reformat(DOUBLE_SPACE_BULLET, {1})
+expected_ds_res = "- Ok then.\n  Ok then.\n"
+expect(
+    "double-spaced line in touched bullet reformats cleanly with marker intact",
+    ds_res == expected_ds_res,
+    f"expected:\n{expected_ds_res!r}\ngot:\n{ds_res!r}",
+)
+
+# Review Finding 2: empty bullet-marker line must not vanish
+EMPTY_MARKER_BULLET = "- \n  Hello world.\n"
+em_res = slb.reformat(EMPTY_MARKER_BULLET, {1})
+expected_em_res = "- Hello world.\n"
+expect(
+    "empty bullet marker line is reformatted with prefix when touched",
+    em_res == expected_em_res,
+    f"expected:\n{expected_em_res!r}\ngot:\n{em_res!r}",
+)
+
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

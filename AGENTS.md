@@ -71,31 +71,35 @@ CI and review findings to a clean result.
 This does not grant merge authority; the strict merge policy below still
 applies.
 
-## Open PRs ready for review, not as drafts
+## Put PRs in ready mode when they are ready for review
 
-Open a Pull Request ready for review by default whenever it already carries
-completed, verified work.
-Do not leave such a PR in draft, and do not rely on a harness or tool default
-that opens PRs as drafts --- when the tool defaults to draft, pass the flag
-that opens it ready (or mark it ready immediately after the final push of the
-round).
+A Pull Request that is ready for review must be in ready mode, not left in
+draft.
+Two paths satisfy this, and either is fine: open the PR ready for review when
+it already carries completed, verified work, or open it as a draft and mark it
+ready the moment it becomes ready for review (for example, right after the
+final push of the round).
+What is not acceptable is leaving a review-ready PR in draft --- so do not
+rely on a harness or tool default that opens PRs as drafts and then forget to
+flip it: when the tool defaults to draft, either pass the flag that opens it
+ready or mark it ready as soon as the work lands.
 This overrides any agent-harness default that creates PRs as drafts unless the
 user opts in.
 
-Draft status stays reserved for the two cases that intend it: the empty
-up-front PR opened when claiming an issue (the issue-first / pr-on-claim
-pattern), which is un-drafted as soon as the implementation lands; and the
-deliberate draft-gating of a dependent PR until its prerequisite merges (see
-the merge-order guidance).
+Draft status stays reserved for the cases that intend it while work is still
+in progress: the empty up-front PR opened when claiming an issue (the
+issue-first / pr-on-claim pattern), un-drafted as soon as the implementation
+lands; and the deliberate draft-gating of a dependent PR until its prerequisite
+merges (see the merge-order guidance).
 Marking a PR ready still grants no merge authority; the strict merge policy
 below applies unchanged.
 
-- **Do:** open a completed-work PR ready for review, passing the ready flag
-  when the tool would otherwise default to draft.
+- **Do:** open a completed-work PR ready for review, or mark a draft ready the
+  moment it is ready for review.
 - **Do:** un-draft an up-front empty PR the moment its implementation lands.
-- **Don't:** leave a PR carrying finished, verified work in draft.
-- **Don't:** treat a tool's draft-by-default as the intended state for a
-  completed-work PR.
+- **Don't:** leave a PR that is ready for review in draft.
+- **Don't:** treat a tool's draft-by-default as the intended state once the
+  work is ready for review.
 
 ## Antigravity Workspace Rules & Activation Scopes
 

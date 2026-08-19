@@ -157,6 +157,10 @@ detail in the skill body.
 On a `bootstrap.sh` machine, leave the plugin disabled;
 the symlinked copy already serves every skill.
 
+For Codex, `bootstrap.sh` detects an enabled `ai-config@*` plugin, skips the
+bare wrappers, and removes only stale wrapper symlinks that point to the same
+checkout. Re-run it after enabling or disabling the plugin.
+
 The same goes for enabling the plugin from **more than one marketplace**:
 both `Morrison-Lab/ai-config` and `d-morrison/ai-config` publish a plugin
 named `ai-config` from the same repo, so only one entry can own the

@@ -59,6 +59,13 @@ jobs:
         # runner has, so on a runner it correctly reports nothing examined and
         # proves nothing (ai-config#1409).
         run: python3 scripts/test_plugin_overlap.py
+      - name: Run Codex skill-install tests
+        # Bootstrap must choose either an ai-config Codex plugin or its bare
+        # wrappers. Installing both doubles the routing catalog and can exceed
+        # the skill-listing context budget.
+        run: |
+          python3 scripts/test_codex_plugin_enabled.py
+          python3 scripts/test_bootstrap_codex_plugin.py
       - name: Run token-rotation tool tests
         # Only the tests run here. rotate-claude-token.py itself mutates
         # repository secrets across the estate, so it is a local operator tool

@@ -150,6 +150,25 @@ def _is_bot_author(login: str) -> bool:
     )
 
 
+def _resolve_run_head_sha(body: str, repo: str) -> Optional[str]:
+    """Extract a workflow run ID from a review comment body and return its head_sha.
+
+    Review comments from the ``@claude`` workflow contain a "View run" link
+    like ``https://github.com/{owner}/{repo}/actions/runs/{run_id}``.
+    Fetching that run's ``head_sha`` proves which commit the reviewer was
+    dispatched against, which is the authoritative source per #1520.
+    """
+    m = re.search(r"/actions/runs/(\d+)", body)
+    if not m:
+        return None
+    run_id = m.group(1)
+    try:
+        out = run_cmd(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
+        return json.loads(out).get("head_sha")
+    except RuntimeError:
+        return None
+
+
 def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
     data = json.loads(out)
@@ -524,23 +543,6 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     # Match items evaluating the target HEAD commit SHA
     sha_short = sha[:7]
 
-    # Fetch check runs for the target SHA once; used below to resolve bot-authored
-    # issue comments that lack a commit OID.  A completed check run whose own
-    # head_sha equals the target proves the reviewer was dispatched against this
-    # commit, so the accompanying comment counts as evaluating HEAD even when the
-    # body omits the SHA.  See Morrison-Lab/ai-config#1520, #1213.
-    try:
-        cr_out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
-        check_runs = json.loads(cr_out).get("check_runs", [])
-    except RuntimeError:
-        check_runs = []
-
-    completed_cr_shas = {
-        cr["head_sha"]
-        for cr in check_runs
-        if cr.get("status") == "completed" and cr.get("head_sha")
-    }
-
     matching_items = []
     for item in all_items:
         body = item[2]
@@ -554,20 +556,20 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         else:
             # An issue comment counts as evaluating HEAD if either:
             # (a) it references the SHA in its body (original logic), or
-            # (b) it is from a bot author AND a completed check run exists whose
-            #     own head_sha matches the target -- proving the reviewer was
+            # (b) it is from a bot author AND contains a "View run" link whose
+            #     run's head_sha matches the target -- proving the reviewer was
             #     dispatched against this commit.  This resolves the reviewed
             #     commit from the run rather than from the comment body, which is
-            #     what fully-clean.md prescribes.  A workflow_dispatch run's
-            #     head_sha names the dispatch ref, not the reviewed commit, so
-            #     only completed runs from non-dispatch triggers qualify (the
-            #     dispatch run itself is not in completed_cr_shas unless it
-            #     re-ran on the actual HEAD).
+            #     what fully-clean.md prescribes.  Falls back to body-SHA scan
+            #     when no run can be resolved (no link, or API failure).
+            #     See Morrison-Lab/ai-config#1520, #1213.
             is_match = is_sha_match
             if not is_match:
                 author_login = item[5] if len(item) > 5 else ""
-                if _is_bot_author(author_login) and sha in completed_cr_shas:
-                    is_match = True
+                if _is_bot_author(author_login):
+                    run_sha = _resolve_run_head_sha(body, repo)
+                    if run_sha == sha:
+                        is_match = True
 
         if is_match:
             matching_items.append(item)

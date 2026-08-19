@@ -145,48 +145,53 @@ def main() -> int:
         check("human APPROVED review without bot review fails criterion 2", not human_ok and any("No automated review" in i for i in human_issues))
 
     # Regression: a bot-authored review comment that omits the HEAD SHA is now
-    # accepted when a completed check run exists with head_sha matching the
-    # target (#1520, #1213). The check run proves the reviewer was dispatched
+    # accepted when its "View run" link resolves to a run whose head_sha matches
+    # the target (#1520, #1213). The run proves the reviewer was dispatched
     # against this commit.
     stale_no_sha_comment = {
         "createdAt": "2026-08-05T18:30:00Z",
-        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nEverything looks great.\n\nVerdict: Clean / Ready for merge.",
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nEverything looks great.\n\nVerdict: Clean / Ready for merge.\n\n[View run](https://github.com/test/repo/actions/runs/99999)",
         "author": {"login": "claude[bot]"},
     }
     mock_pr_data = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
-    mock_cr_data = json.dumps({"check_runs": [
-        {"status": "completed", "head_sha": "sha123", "conclusion": "success"}
-    ]})
-    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data, mock_cr_data]):
+    mock_run_data = json.dumps({"head_sha": "sha123"})
+    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data, mock_run_data]):
         stale_ok, stale_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
-        check("bot comment without SHA accepted when check run has matching head_sha (#1520)",
+        check("bot comment without SHA accepted when run head_sha matches (#1520)",
               stale_ok and stale_issues == [])
 
-    # New: a bot comment without SHA must be rejected when NO check run has
-    # head_sha matching the target.
+    # New: a bot comment without SHA must be rejected when its run's head_sha
+    # does NOT match the target.
     mock_pr_data2 = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
-    mock_cr_data2 = json.dumps({"check_runs": [
-        {"status": "completed", "head_sha": "other_sha", "conclusion": "success"}
-    ]})
-    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data2, mock_cr_data2]):
+    mock_run_data2 = json.dumps({"head_sha": "other_sha"})
+    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data2, mock_run_data2]):
         stale_no_match_ok, stale_no_match_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
-        check("bot comment without SHA rejected when no check run matches head_sha",
+        check("bot comment without SHA rejected when run head_sha does not match",
               (not stale_no_match_ok) and len(stale_no_match_issues) > 0)
 
+    # New: a bot comment without SHA and without a run link must be rejected.
+    no_link_comment = {
+        "createdAt": "2026-08-05T18:30:00Z",
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nVerdict: Clean / Ready for merge.",
+        "author": {"login": "claude[bot]"},
+    }
+    mock_pr_data3 = json.dumps({"comments": [no_link_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data3]):
+        no_link_ok, no_link_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
+        check("bot comment without SHA and without run link is rejected",
+              (not no_link_ok) and len(no_link_issues) > 0)
+
     # New: a non-bot comment without SHA must still require SHA in the body,
-    # even when a matching check run exists.
+    # even when a matching run exists.
     human_no_sha = {
         "createdAt": "2026-08-05T18:30:00Z",
         "body": "Looks good to me!",
         "author": {"login": "d-morrison"},
     }
-    mock_pr_data3 = json.dumps({"comments": [human_no_sha], "reviews": []})
-    mock_cr_data3 = json.dumps({"check_runs": [
-        {"status": "completed", "head_sha": "sha123", "conclusion": "success"}
-    ]})
-    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data3, mock_cr_data3]):
+    mock_pr_data4 = json.dumps({"comments": [human_no_sha], "reviews": []})
+    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data4]):
         human_after_ok, human_after_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
-        check("non-bot comment without SHA rejected even with matching check run",
+        check("non-bot comment without SHA rejected even with matching run",
               (not human_after_ok) and len(human_after_issues) > 0)
 
     # Regression (round 12): a plain human formal review whose body merely

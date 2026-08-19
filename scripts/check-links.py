@@ -15,11 +15,13 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from fences import strip_fences  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 # Strip code regions first so link-shaped examples inside fences / backticks
 # (regexes, `[text](url)` snippets) aren't mistaken for real links.
-FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
 INLINE = re.compile(r"`[^`]*`")
 SCAN_GLOBS = [
     "skills/**/*.md",
@@ -44,7 +46,7 @@ def is_external(target: str) -> bool:
 def check_file(md: Path) -> None:
     global checked
     text = md.read_text(encoding="utf-8")
-    text = FENCE.sub("", text)
+    text = strip_fences(text)
     text = INLINE.sub("", text)
     for match in LINK.finditer(text):
         target = match.group(1).strip()

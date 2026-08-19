@@ -34,6 +34,10 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from fences import strip_fences  # noqa: E402
 from typing import Dict, List, Optional, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
@@ -188,8 +192,8 @@ def strip_cited_finding_vocab(text: str) -> str:
         # hide an incidentally-quoted genuine finding -- the unsafe direction.
         return m.group(0) if "**" in m.group(0) else " "
 
-    # Fenced code blocks first (``` ... ```), spanning lines.
-    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+    # Fenced code blocks first, spanning lines.
+    text = strip_fences(text, replacement=" ")
     # Inline code spans (`...`), within a line.
     text = re.sub(r"`[^`\n]*`", " ", text)
     # Straight and curly double-quoted spans, within a line (bold-carrying spans kept).

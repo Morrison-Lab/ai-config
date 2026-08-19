@@ -98,6 +98,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from fences import (  # noqa: E402
+    count_unbalanced_fences,
+    strip_code as _shared_strip_code,
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 DEFAULT_BUDGET_BYTES = 200_000
@@ -225,34 +231,6 @@ _INLINE_IMPORT_RE = re.compile(r"(?<![\w`])@([^\s`]+?)(?=[.,;:!?)\]]*(?:\s|$))")
 #     the anchored-import count from 69 to 50 and the closure from 70 files
 #     to 51. Stopping at a blank line keeps multi-line spans working while
 #     confining any mismatch to a single paragraph.
-_UNCLOSED_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})[^\n]*$", re.MULTILINE)
-# Backtick and tilde fences are separate alternatives so a closer must use
-# the SAME character as its opener, and each opening run carries `(?!x)` so
-# it cannot BACKTRACK to a shorter capture. Without that, `+`/`{3,}` shrinks
-# on demand and a four-backtick fence is "closed" by three, or a
-# double-backtick span pairs with a single-backtick closer -- stripping
-# content that is not code and hiding the imports inside it.
-_FENCE_RE = re.compile(
-    r"^ {0,3}(?:(`{3,})(?!`)[^\n]*$[\s\S]*?^ {0,3}\1`*[ \t]*\r?$"
-    r"|(~{3,})(?!~)[^\n]*$[\s\S]*?^ {0,3}\2~*[ \t]*\r?$)",
-    re.MULTILINE,
-)
-# A code span's delimiters must also be maximal runs, and its opener must
-# not be preceded by a backtick -- otherwise ``@a.md` pairs its SECOND
-# backtick with the closer and strips an import that is not in a span.
-#
-# Every line-ending construct here accepts CRLF, and the omission bit twice.
-# A fence closer whose `[ \t]*$` cannot consume the `\r` leaves a BALANCED
-# block looking like two orphan markers, so `strip_code` drops the marker
-# lines and keeps the body -- counting the `@path` examples inside a
-# documented code block as real imports. And a blank-line bound written
-# `\n(?![ \t]*\n)` never fires on CRLF, which reopens the swallow bug this
-# module already fixed once for LF.
-_CODE_SPAN_RE = re.compile(
-    r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
-)
-
-
 def strip_code(text: str) -> str:
     """Remove fenced blocks, orphan fence markers, and code spans.
 
@@ -260,11 +238,10 @@ def strip_code(text: str) -> str:
     from an unclosed fence is a block-level marker, not a span delimiter,
     so leaving it in lets the code-span pass pair it with a later marker
     and swallow real content. Only the marker line goes -- its body stays,
-    per the deliberate no-swallow decision above.
+    per the deliberate no-swallow decision above (ai-config#1567).
     """
-    return _CODE_SPAN_RE.sub(
-        " ", _UNCLOSED_FENCE_RE.sub("", _FENCE_RE.sub("", text))
-    )
+    return _shared_strip_code(text, swallow_unclosed=False)
+
 
 # Claude Code stops following imports after this many hops: its docs say
 # "Imported files can recursively import other files, with a maximum depth
@@ -278,10 +255,10 @@ def unbalanced_fences(text: str) -> int:
 
     An unclosed fence makes this parser's answer ambiguous: CommonMark says
     the rest of the document is code, while this module deliberately does
-    not swallow it (see `_UNCLOSED_FENCE_RE`'s comment). Rather than pick
-    silently, count the leftovers so the report can say so.
+    not swallow it. Rather than pick silently, count the leftovers so the
+    report can say so.
     """
-    return len(_UNCLOSED_FENCE_RE.findall(_FENCE_RE.sub("", text)))
+    return count_unbalanced_fences(text)
 
 
 def import_paths(text: str) -> tuple[list[str], list[str]]:

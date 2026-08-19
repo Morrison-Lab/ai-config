@@ -193,6 +193,22 @@ with tempfile.TemporaryDirectory() as tmp:
         names(report["orphans"]) == {"orphan.md"},
     )
 
+with tempfile.TemporaryDirectory() as tmp:
+    root, times = build_corpus(tmp)
+    # An @path inside a multi-line inline code span is not a live import either (#1567).
+    (root / "index.md").write_text(
+        "# Index\n\n"
+        "See [the old one](docs/old-ref.md) and "
+        "[the fresh one](docs/fresh-ref.md).\n\n"
+        "example `code\n@docs/orphan.md\nmore`\n",
+        encoding="utf-8",
+    )
+    report = run(root, times)
+    check(
+        "an @path import inside a multi-line inline code span is not an inbound reference (#1567)",
+        names(report["orphans"]) == {"orphan.md"},
+    )
+
 check(
     "an import must sit in the first column",
     # A mid-line `@name` is an email address, a handle, or a decorator.

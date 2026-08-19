@@ -26,23 +26,35 @@ try:
     assert not subject.pending(scheduled)
     assert subject.monitor_path("https://github.com/o/r/pull/1") == subject.monitor_path("https://github.com/o/r/pull/1")
     assert subject.monitor_path("https://github.com/o/r/pull/1") != subject.monitor_path("https://github.com/o/r/pull/2")
-    assert subject.cwd_monitor_path("/foo/bar") == subject.cwd_monitor_path("/foo/bar")
-    assert subject.cwd_monitor_path("/foo/bar") != subject.cwd_monitor_path("/foo/baz")
 
-    # Verify start_monitor early return without pr_url call when cwd monitor is alive
+    # Verify extract_pr_urls
+    multi_pr = transcript([
+        {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create --title 'A'"}},
+        {"type": "tool_result", "content": "https://github.com/o/r/pull/10"},
+        {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create --title 'B'"}},
+        {"type": "tool_result", "content": "https://github.com/o/r/pull/20"}
+    ])
+    try:
+        urls = subject.extract_pr_urls(multi_pr)
+        assert urls == ["https://github.com/o/r/pull/10", "https://github.com/o/r/pull/20"]
+    finally:
+        os.unlink(multi_pr)
+
+    # Verify start_monitor_for_url early return when already alive
     orig_state_dir = subject.STATE_DIR
     with tempfile.TemporaryDirectory() as d:
         subject.STATE_DIR = d
-        cwd_state = subject.cwd_monitor_path(d)
-        subject.write_json(cwd_state, {"pid": os.getpid()})
-        # Monkeypatch pr_url to raise if called
-        orig_pr_url = subject.pr_url
-        subject.pr_url = lambda cwd: (_ for _ in ()).throw(AssertionError("pr_url should not be called"))
-        try:
-            assert subject.start_monitor(d) is False
-        finally:
-            subject.pr_url = orig_pr_url
-            subject.STATE_DIR = orig_state_dir
+        url1 = "https://github.com/o/r/pull/1"
+        url2 = "https://github.com/o/r/pull/2"
+        p1 = subject.monitor_path(url1)
+        subject.write_json(p1, {"url": url1, "pid": os.getpid()})
+        # url1 is alive -> returns False without error
+        assert subject.start_monitor_for_url(url1, d) is False
+        # url2 is not alive -> attempts to start (or starts)
+        p2 = subject.monitor_path(url2)
+        assert not os.path.exists(p2)
+        # Verify PR 2 gets its own distinct state path and is not shadowed by PR 1
+        assert p1 != p2
 finally:
     os.unlink(opened)
     os.unlink(scheduled)

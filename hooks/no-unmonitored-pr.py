@@ -49,12 +49,21 @@ def pending(path):
     return opened and not armed
 
 
+PR_URL = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+")
+
+
 def monitor_path(url):
     return os.path.join(STATE_DIR, hashlib.sha256(url.encode()).hexdigest()[:16] + ".json")
 
 
-def cwd_monitor_path(cwd):
-    return os.path.join(STATE_DIR, "cwd-" + hashlib.sha256(os.path.abspath(cwd).encode()).hexdigest()[:16] + ".json")
+def extract_pr_urls(path):
+    urls = []
+    for record in records(path):
+        for match in PR_URL.finditer(json.dumps(record)):
+            url = match.group(0)
+            if url not in urls:
+                urls.append(url)
+    return urls
 
 
 def read_json(path):
@@ -94,18 +103,11 @@ def pr_url(cwd):
     return result.stdout.strip()
 
 
-def start_monitor(cwd):
-    if not shutil.which("gh"):
-        return None
-    cwd_state = cwd_monitor_path(cwd)
-    if alive(read_json(cwd_state).get("pid")):
-        return False
-    url = pr_url(cwd)
+def start_monitor_for_url(url, cwd):
     if not url:
         return None
     path = monitor_path(url)
     if alive(read_json(path).get("pid")):
-        write_json(cwd_state, {"url": url, "pid": read_json(path).get("pid"), "path": path})
         return False
     try:
         process = subprocess.Popen([sys.executable, os.path.abspath(__file__), "--poll", url, path],
@@ -115,8 +117,16 @@ def start_monitor(cwd):
     except OSError:
         return None
     write_json(path, {"url": url, "pid": process.pid, "started_at": time.time()})
-    write_json(cwd_state, {"url": url, "pid": process.pid, "path": path})
     return True
+
+
+def start_monitor(cwd):
+    if not shutil.which("gh"):
+        return None
+    url = pr_url(cwd)
+    if not url:
+        return None
+    return start_monitor_for_url(url, cwd)
 
 
 def poll(url, path):
@@ -151,13 +161,39 @@ def main():
         payload = json.load(sys.stdin)
     except Exception:
         return
-    if not pending(payload.get("transcript_path") or ""):
+    transcript_path = payload.get("transcript_path") or ""
+    if not pending(transcript_path):
         return
-    status = start_monitor(payload.get("cwd") or os.getcwd())
-    if status is True:
+    cwd = payload.get("cwd") or os.getcwd()
+    if not shutil.which("gh"):
+        print(json.dumps({"decision": "block", "reason": "A PR was opened without recurring monitoring. No local timer could be armed; call send_later, ScheduleWakeup, or a trigger routine before ending this turn."}))
+        return
+
+    urls = extract_pr_urls(transcript_path)
+    if not urls:
+        url = pr_url(cwd)
+        if url:
+            urls = [url]
+
+    if not urls:
+        print(json.dumps({"decision": "block", "reason": "A PR was opened without recurring monitoring. No local timer could be armed; call send_later, ScheduleWakeup, or a trigger routine before ending this turn."}))
+        return
+
+    any_started = False
+    all_monitored = True
+    for url in urls:
+        status = start_monitor_for_url(url, cwd)
+        if status is True:
+            any_started = True
+        elif status is False:
+            pass
+        else:
+            all_monitored = False
+
+    if any_started:
         print(json.dumps({"systemMessage": "No model scheduler was recorded, so a detached two-minute PR poller was started. It records GitHub state and injects changes on the next prompt; it cannot wake a terminated session."}))
         return
-    elif status is False:
+    if all_monitored:
         return
     print(json.dumps({"decision": "block", "reason": "A PR was opened without recurring monitoring. No local timer could be armed; call send_later, ScheduleWakeup, or a trigger routine before ending this turn."}))
 

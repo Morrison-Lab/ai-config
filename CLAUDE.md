@@ -1,5 +1,11 @@
 # User-wide Claude Code instructions
 
+`AGENTS.md` is the authoritative, auto-read cross-agent contract.
+It owns universal freshness, worktree, delivery, timestamp, formatting, merge,
+and review rules; this manual adds Claude-specific workflows.
+Consult it on demand rather than loading this entire manual for another
+agent's session.
+
 Worked-example case records for the rules below live in
 [`CLAUDE.cases.md`](CLAUDE.cases.md), moved out of this auto-loaded context.
 

@@ -1,6 +1,6 @@
 ---
 name: "detect-hypothetical-examples"
-description: "Find invented examples where data exists."
+description: "Flag invented examples when real data exists."
 ---
 
 # detect-hypothetical-examples (Codex wrapper)

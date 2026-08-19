@@ -2,6 +2,16 @@
 
 This file defines standardized, vendor-neutral instructions for AI coding agents operating within Morrison-Lab repositories (OpenAI Codex CLI, Gemini CLI / Antigravity, Claude Code, Cursor, Aider, etc.).
 
+## Instruction layering
+
+`AGENTS.md` is the compact, unconditional cross-agent contract.
+Keep every rule that applies to all agents here, rather than duplicating it in
+model-specific manuals.
+Do not load `CLAUDE.md`, `GEMINI.md`, or their case records wholesale at
+session start: consult the relevant section on demand when changing that
+model's integration or resolving a model-specific workflow question.
+Those manuals must defer to this file for universal policy.
+
 ## Generalize instructions to every AI agent by default
 
 Unless the user explicitly scopes an instruction to one agent, project, or
@@ -25,6 +35,8 @@ directly, carry it forward with an actual next action. Every issue noticed,
 however small or outside the current task's scope, must at minimum be filed in
 the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
 
+## Keep ai-config and repo checkouts fresh
+
 In every session --- at session start, and again periodically during long sessions --- refresh local state:
 
 1. **The ai-config checkout.** Check that the local `ai-config` clone is on `main` and run `git pull --ff-only`.
@@ -47,6 +59,17 @@ Each reading expires immediately: run the command fresh for every recap rather t
 - When referencing files or code symbols in workspace paths, use relative markdown links (e.g. `[filename](relative/path/to/file)`) or inline code backticks (e.g. `` `path/to/file` ``).
 - Preserve semantic line breaks (SemBr) and formatting conventions when editing markdown docs.
 
+## Deliver completed implementation work
+
+When asked to implement, edit, or write up a change on a feature branch, do
+not stop at an uncommitted worktree.
+Complete the delivery cycle: create the applicable tracking issue when
+issue-first workflow applies, commit the scoped changes, push the branch, open
+or update its Pull Request, request AI review after the final push, and drive
+CI and review findings to a clean result.
+This does not grant merge authority; the strict merge policy below still
+applies.
+
 ## Antigravity Workspace Rules & Activation Scopes
 
 - **Global rules**: Defined in `~/.gemini/GEMINI.md`.
@@ -63,6 +86,11 @@ Each reading expires immediately: run the command fresh for every recap rather t
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
   Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
   Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
+- **Never merge over open review findings or treat a reviewer skip notice as approval.**
+  Under `mwc`, a PR must be fully clean across CI and review (see
+  [`fully-clean.md`](shared/workflow/fully-clean.md)).
+  All findings across the PR history must be Addressed, Rebutted, or Deferred
+  before merge.
 
 ## Request review and drive every started PR to clean
 

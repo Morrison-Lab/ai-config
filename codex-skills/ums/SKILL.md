@@ -1,6 +1,6 @@
 ---
 name: "ums"
-description: "Update memories and skills from learnings."
+description: "Update memories and skills."
 ---
 
 # ums (Codex wrapper)

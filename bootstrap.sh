@@ -78,14 +78,32 @@ for src in "$SCRIPT_DIR"/*/; do
   fi
 done
 
-# --- Codex skill wrappers: symlink individual generated wrappers into Codex ---
+# --- Codex skill wrappers: plugin and symlink installs are alternatives ---
 if [ -d "$SCRIPT_DIR/codex-skills" ]; then
   printf '\n--- Codex skill wrappers ---\n'
   mkdir -p "$CODEX_DIR/skills"
-  for src in "$SCRIPT_DIR"/codex-skills/*; do
-    [ -d "$src" ] || continue
-    link_one "$src" "$CODEX_DIR/skills/$(basename "$src")"
-  done
+  if python3 "$SCRIPT_DIR/scripts/codex-plugin-enabled.py" \
+      --config "$CODEX_DIR/config.toml"; then
+    # A Codex plugin supplies the same catalog under its namespace. Leaving
+    # these bare wrapper links in place doubles every entry in Codex's skill
+    # routing prompt. Remove only links that this checkout created; never
+    # touch real paths or links owned by another checkout.
+    removed=0
+    for src in "$SCRIPT_DIR"/codex-skills/*; do
+      [ -d "$src" ] || continue
+      dest="$CODEX_DIR/skills/$(basename "$src")"
+      if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
+        rm "$dest"
+        removed=$((removed + 1))
+      fi
+    done
+    printf 'skip  Codex wrappers (ai-config plugin is enabled; removed %d stale wrapper link(s))\n' "$removed"
+  else
+    for src in "$SCRIPT_DIR"/codex-skills/*; do
+      [ -d "$src" ] || continue
+      link_one "$src" "$CODEX_DIR/skills/$(basename "$src")"
+    done
+  fi
 fi
 
 # --- Memories: symlink individual .md files into VS Code Copilot memory dir ---

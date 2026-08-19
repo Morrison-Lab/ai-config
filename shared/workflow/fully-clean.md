@@ -366,6 +366,48 @@ Pass `-R OWNER/REPO` explicitly in anything that is not a one-off typed inside
 that checkout.
 See [`fully-clean.cases.md`](fully-clean.cases.md), "Checker unhandled exception on wrong repo".
 
+**A remote or web session has no `gh` at all, so the checker cannot answer there
+--- and that is a property of the session rather than of the PR.**
+The wrong-repo case above is a mistake you can stop making.
+This one is not: `check-pr-fully-clean.py` shells out to `gh`, and a
+remote/web Claude Code session has no `gh` on `PATH`, so the script refuses
+with ``` `gh` is not installed or not on PATH ``` and exits **2** on every
+invocation, whatever the PR's real state.
+
+That lands in the third branch of the read above, which is the right answer and
+an easy one to skip past, because the mandated instrument failing feels like a
+step to work around rather than a result to report.
+Two things follow.
+
+**Say that the checker did not run.**
+[`ardi`](../../skills/ardi/SKILL.md)'s fully-clean exit checklist opens by
+requiring exit `0` from it, so reporting a PR clean without noting the
+substitution asserts a check that never happened.
+The substitution itself is ordinary --- root `CLAUDE.md`'s "Skills that call
+gh/glab: fall back to tool-mappings.md in remote sessions" already governs it
+--- so establish both criteria from the GitHub MCP surfaces instead: the
+paginated check-runs endpoint for criterion 1, the review body and thread list
+for criterion 2.
+
+**Do not read the `2` as a verdict in either direction.**
+It is neither "not clean" nor a licence to assume clean.
+It is the check declining to answer, which is exactly what the three-valued
+read above exists to preserve.
+
+- **Do:** state which surfaces supplied the verdict when the checker could not
+  run, so "clean" stays attributable.
+- **Don't:** report the checklist item satisfied on a session where the script
+  exits 2 --- it did not run.
+- **Don't:** treat the refusal as a PR problem, or spend a round diagnosing it;
+  the absence of `gh` is the whole cause.
+
+(Measured 2026-08-19 on a remote session driving
+[ai-config#1673](https://github.com/Morrison-Lab/ai-config/pull/1673).
+Tracked as
+[ai-config#1679](https://github.com/Morrison-Lab/ai-config/issues/1679), which
+weighs teaching the script a REST fallback against documenting the branch;
+until one lands, every remote-session ARDI run hits this.)
+
 So read the status, and read all three of it:
 
 ```bash

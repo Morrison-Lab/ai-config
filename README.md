@@ -372,8 +372,10 @@ So when adding a warn-only hook:
 - mutation-check it: revert `systemMessage` to `reason` and require the suite to
   fail
 
-No check enforces this yet; the condition is decidable and is tracked in
-[#1582](https://github.com/Morrison-Lab/ai-config/issues/1582).
+`scripts/check-hook-output-shape.py` enforces this on every run: it verifies that
+warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
+`systemMessage`, and that their test suites inspect the payload shape rather than
+checking non-empty output.
 
 Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
 `scripts/test_hooks.py` runs

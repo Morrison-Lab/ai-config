@@ -11,6 +11,10 @@ permission:
     "git diff *": allow
     "git status *": allow
     "ls *": allow
+    "Rscript *": allow
+    "R -e *": allow
+    "R --vanilla *": allow
+    "quarto render *": allow
 ---
 
 You are the read-only audit half of the `reproducibility-audit` skill. Your

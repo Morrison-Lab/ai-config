@@ -12,6 +12,9 @@ permission:
     "git log *": allow
     "git diff *": allow
     "npm outdated *": allow
+    "Rscript *": allow
+    "R -e *": allow
+    "R --vanilla *": allow
 ---
 
 You are the read-only audit half of the `check-dependency-updates` skill.

@@ -142,6 +142,14 @@ def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
     return head_sha, data["headRefName"], data["state"], commit_date, review_decision
 
 
+def _is_bot_author(login: str) -> bool:
+    """Return True if *login* belongs to an automated review bot."""
+    return (
+        login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        or login.endswith("[bot]")
+    )
+
+
 def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
     data = json.loads(out)
@@ -438,7 +446,7 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     return True, []
 
 
-def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", commit_date: str = "") -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
     data = json.loads(out)
 
@@ -473,7 +481,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if "ard review disposition summary" in body_lower:
             continue
 
-        is_bot_author = author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        is_bot_author = _is_bot_author(author_login)
         # "**claude finished" and "### verdict" are the canonical review markers
         # CLAUDE.md prescribes ("Completed runs start the body with
         # `**Claude finished`"). The older "claude finished review" marker was a
@@ -499,10 +507,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # authors only -- never sniff body text, which a human review can
         # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
-        is_bot_author = (
-            author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
-            or author_login.endswith("[bot]")
-        )
+        is_bot_author = _is_bot_author(author_login)
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
             all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 
@@ -519,6 +524,23 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     # Match items evaluating the target HEAD commit SHA
     sha_short = sha[:7]
 
+    # Fetch check runs for the target SHA once; used below to resolve bot-authored
+    # issue comments that lack a commit OID.  A completed check run whose own
+    # head_sha equals the target proves the reviewer was dispatched against this
+    # commit, so the accompanying comment counts as evaluating HEAD even when the
+    # body omits the SHA.  See Morrison-Lab/ai-config#1520, #1213.
+    try:
+        cr_out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
+        check_runs = json.loads(cr_out).get("check_runs", [])
+    except RuntimeError:
+        check_runs = []
+
+    completed_cr_shas = {
+        cr["head_sha"]
+        for cr in check_runs
+        if cr.get("status") == "completed" and cr.get("head_sha")
+    }
+
     matching_items = []
     for item in all_items:
         body = item[2]
@@ -530,22 +552,21 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)
         else:
-            # An issue comment from a bot author counts as evaluating HEAD if
-            # posted after the HEAD commit timestamp. This uses timing as a
-            # proxy for the check run's head_sha (which issue comments lack),
-            # accepting the small risk of a slow review of an earlier commit
-            # posting after a newer push. The alternative -- requiring the SHA
-            # in the body -- fails on every clean review that omits it, which
-            # is the commoner case (findings-free verdicts cite no lines).
-            # See Morrison-Lab/ai-config#1520, #1213.
-            is_match = is_sha_match  # default: require SHA in body
-            if commit_date and item[1] and not is_sha_match:
+            # An issue comment counts as evaluating HEAD if either:
+            # (a) it references the SHA in its body (original logic), or
+            # (b) it is from a bot author AND a completed check run exists whose
+            #     own head_sha matches the target -- proving the reviewer was
+            #     dispatched against this commit.  This resolves the reviewed
+            #     commit from the run rather than from the comment body, which is
+            #     what fully-clean.md prescribes.  A workflow_dispatch run's
+            #     head_sha names the dispatch ref, not the reviewed commit, so
+            #     only completed runs from non-dispatch triggers qualify (the
+            #     dispatch run itself is not in completed_cr_shas unless it
+            #     re-ran on the actual HEAD).
+            is_match = is_sha_match
+            if not is_match:
                 author_login = item[5] if len(item) > 5 else ""
-                is_bot = author_login in (
-                    "github-actions", "github-actions[bot]",
-                    "claude[bot]", "claude",
-                ) or author_login.endswith("[bot]")
-                if is_bot and item[1] >= commit_date:
+                if _is_bot_author(author_login) and sha in completed_cr_shas:
                     is_match = True
 
         if is_match:
@@ -626,7 +647,7 @@ def main():
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha, repo)
-    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision, commit_date)
+    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision)
 
     all_issues = ci_issues + review_issues
 

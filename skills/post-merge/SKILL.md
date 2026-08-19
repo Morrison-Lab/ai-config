@@ -574,8 +574,8 @@ Two distinct failure modes occur when skipping this fetch:
    settles it cleanly:
 
    ```bash
-   git fetch origin "refs/pull/<N>/head" -q
-   git log --oneline FETCH_HEAD.."<branch>"   # empty => all local work reached the PR
+   git fetch origin "refs/pull/<N>/head" -q &&
+   git log --oneline "$merged".."<branch>"   # empty => all local work reached the PR
    ```
 
 So read the exit status rather than the output, and always anchor the comparison

@@ -459,6 +459,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="select-top-issue-automatically" class="level3">
 <h3 class="anchored" data-anchor-id="select-top-issue-automatically">3. Select top issue automatically</h3>
 <p>Pick the highest-priority issue automatically based on the triage signals in step 2 (unless the user explicitly specified an issue or candidate preference). State which issue was selected and why, then proceed directly to check in-flight status and implementation without pausing for user confirmation.</p>
+<p>Do not describe the issue as “in progress” or say that implementation has started until steps 4, 6, 7, and 8 have completed: the live claim, isolated branch/worktree, and draft PR are the observable start of work. Investigation or triage alone is preparatory work, not an active implementation.</p>
 </section>
 <section id="check-the-issue-isnt-already-in-flight" class="level3">
 <h3 class="anchored" data-anchor-id="check-the-issue-isnt-already-in-flight">4. Check the issue isn’t already in-flight</h3>

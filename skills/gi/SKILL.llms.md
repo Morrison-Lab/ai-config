@@ -46,6 +46,8 @@ Scan the issue list and rank by priority. Use these signals (in order):
 
 Pick the highest-priority issue automatically based on the triage signals in step 2 (unless the user explicitly specified an issue or candidate preference). State which issue was selected and why, then proceed directly to check in-flight status and implementation without pausing for user confirmation.
 
+Do not describe the issue as “in progress” or say that implementation has started until steps 4, 6, 7, and 8 have completed: the live claim, isolated branch/worktree, and draft PR are the observable start of work. Investigation or triage alone is preparatory work, not an active implementation.
+
 ### 4. Check the issue isn’t already in-flight
 
 Before claiming or branching, confirm no other session is already on this issue. Two signals must **both** be clear (`gh issue list` in step 1 returns titles, labels, and assignees but neither comment text nor linked PRs, so check both explicitly here).

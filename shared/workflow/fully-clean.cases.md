@@ -864,7 +864,8 @@ verdict.)
 (Morrison-Lab/gha#520 / #521, 2026-08-19.)
 
 `d-morrison/rme#1072`'s `review / claude-review` check was red.
-The cause was in the run's result object rather than in the PR:
+The cause was in the run's result object rather than in the PR.
+Abridged below --- it also carried `terminal_reason: "api_error"` and `permission_denials_count: 42`.
 
 ```json
 {
@@ -895,7 +896,7 @@ and the job was red anyway, because a step above it had already failed:
 ##[end-action id=claude-review.run;outcome=failure;conclusion=failure]
 ```
 
-The action exits 1 on any error result, and that step carried no `continue-on-error`, so its failure decided the job whatever the guard concluded afterwards --- making the graceful path unreachable for every exhaustion that got past the pre-flight check.
+The action exits 1 on an `is_error` result, and that step carried no `continue-on-error`, so its failure decided the job whatever the guard concluded afterwards --- making the graceful path unreachable for every exhaustion that got past the pre-flight check.
 
 Two things generalize.
 The guard's `success` and the job's `failure` were never in tension.

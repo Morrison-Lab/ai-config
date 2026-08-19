@@ -940,6 +940,33 @@ local ancestry.
 - **Don't:** treat `git branch -d` refusing, a non-zero ahead-count, or absence
   from `git branch --merged` as evidence a branch still holds unpushed work.
 
+## Git — `--force-with-lease` is rejected with `stale info` against an auto-deleted branch
+
+When starting or reusing a designated branch after its PR squash-merged and auto-deleted:
+
+```console
+$ git push -u origin <branch> --force-with-lease
+ ! [rejected]  <branch> -> <branch> (stale info)
+```
+
+The lease checks the remote tracking ref (`refs/remotes/origin/<branch>`), which still points to the pre-merge commit, while the remote branch itself was deleted by GitHub upon merge.
+The guard is working as intended, but the wording is a trap: `stale info` sounds like a race with a concurrent session that pushed new work.
+
+Distinguish auto-deletion from a true concurrent race in one call:
+
+```bash
+git ls-remote origin "refs/heads/<branch>"
+```
+
+- **Empty:** The branch was auto-deleted on merge. Prune the stale remote-tracking ref and push:
+  ```bash
+  git remote prune origin && git push -u origin <branch>
+  ```
+- **Non-empty:** A real concurrent session pushed to the remote branch. Settle claims and compare heads before forcing.
+
+- **Do:** run `git ls-remote` to check if a `stale info` rejection is an auto-deleted branch before debugging a phantom concurrent race.
+- **Don't:** blindly remove `--force-with-lease` or force-push without verifying whether the remote ref exists.
+
 ## `git rev-parse <ref>:<path>` writes its own input to stdout when the path is absent
 
 `git rev-parse` resolves `<ref>:<path>` to a blob SHA.

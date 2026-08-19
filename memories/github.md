@@ -652,7 +652,7 @@ closed-issue references in multiple PR bodies, and stacking conflicts mid-ARDI.
     So the ladder is: MCP tools, then `add_repo` if the repo genuinely needs
     API or write access, then `git ls-remote` for anything that is only a ref
     lookup.
-    See [`git.md`](git.md)'s "Resolving a tag to a COMMIT sha" for the exact
+    See [`git-tags.md`](git-tags.md)'s "Resolving a tag to a COMMIT sha" for the exact
     refspec form to ask for.
     (d-morrison/altdoc#65, 2026-07-26: SHA-pinning seven third-party actions
     needed tag shas from `actions/`, `r-lib/`, `r-hub/`, `quarto-dev/`, and

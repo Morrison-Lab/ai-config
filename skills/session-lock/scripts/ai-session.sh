@@ -80,11 +80,21 @@ find_agent_pid() {
   return 1
 }
 
-# Resolve session id from flag, then env, then single live session in registry.
+# Resolve session id from flag, then env. Fails closed if neither is set.
 resolve_id() {
-  if [ -n "${OPT_ID:-}" ]; then printf '%s' "$OPT_ID"; return; fi
-  if [ -n "${AI_SESSION_ID:-}" ]; then printf '%s' "$AI_SESSION_ID"; return; fi
-  if [ -n "${CLAUDE_SESSION_ID:-}" ]; then printf '%s' "$CLAUDE_SESSION_ID"; return; fi
+  if [ -n "${OPT_ID:-}" ]; then printf '%s' "$OPT_ID"; return 0; fi
+  if [ -n "${AI_SESSION_ID:-}" ]; then printf '%s' "$AI_SESSION_ID"; return 0; fi
+  if [ -n "${CLAUDE_SESSION_ID:-}" ]; then printf '%s' "$CLAUDE_SESSION_ID"; return 0; fi
+  return 1
+}
+
+# Diagnostic helper: resolve explicit/env id, or fall back to single live session on host.
+# Used ONLY in read-only diagnostic commands (check-mwc), never in mutating subcommands.
+resolve_id_or_single_live() {
+  if id="$(resolve_id)"; then
+    printf '%s' "$id"
+    return 0
+  fi
   local live_ids=() f
   shopt -s nullglob
   for f in "$REG_DIR"/*.session; do
@@ -436,7 +446,7 @@ case "$CMD" in
     #   0  active
     #   1  no grant recorded
     #   2  grant recorded but not currently honourable (say why, and how to fix)
-    id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
+    id="$(resolve_id_or_single_live)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
     f="$(mwc_file "$id")"
     s_file="$(session_file "$id")"
     if [ ! -f "$f" ]; then
@@ -463,8 +473,9 @@ case "$CMD" in
     printf 'mwc is active for session %s\n' "$id"
     if [ -z "${AI_SESSION_ID:-}" ] && [ -z "${CLAUDE_SESSION_ID:-}" ]; then
       printf '  Notice: AI_SESSION_ID and CLAUDE_SESSION_ID are unset in this shell.\n'
-      printf '  The pre-tool-use merge guard will resolve session id from the harness hook payload\n'
-      printf '  (session_id or transcript_path stem). Ensure the granted id matches the harness session.\n'
+      printf '  The pre-tool-use merge guard resolves session id from the harness hook payload\n'
+      printf '  (session_id/sessionId, conversation_id/conversationId, transcript_path stem).\n'
+      printf '  Ensure the granted id matches the harness session.\n'
     fi
     exit 0
     ;;

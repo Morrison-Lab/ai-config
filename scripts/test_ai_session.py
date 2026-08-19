@@ -274,6 +274,14 @@ def main() -> int:
         check(f"mwc is active for session {sid}" in p.stdout,
               "check-mwc output names the resolved single live session", p.stdout.strip())
 
+        # Mutating subcommands MUST NOT hijack single live session; they fail closed.
+        p_dis = subprocess.run([bash, str(SCRIPT), "disable-mwc"],
+                               cwd=repo, capture_output=True, text=True, env=clean_env)
+        check(p_dis.returncode != 0,
+              "disable-mwc without --id fails closed rather than mutating single live session",
+              f"rc={p_dis.returncode}")
+        check(marker.exists(), "single live session marker untouched after failed disable-mwc")
+
     print()
     if failures:
         print(f"{len(failures)} FAILED:")

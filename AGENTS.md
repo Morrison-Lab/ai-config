@@ -110,9 +110,9 @@ The "product" is three things: a Quarto documentation website, a suite of
 Python validators/tests under `scripts/`, and the enforcement hooks under
 `hooks/`.
 Standard commands are already documented --- lint/test steps in
-[`.github/workflows/validate.yml`](.github/workflows/validate.yml), quality
-gates and build/preview in [`README.md`](README.md) --- so consult those
-rather than re-deriving them.
+[`.github/workflows/validate.yml`](.github/workflows/validate.yml) and the
+quality gates in [`README.md`](README.md) --- so consult those rather than
+re-deriving them; the build and preview commands are in the bullets below.
 The startup update script keeps the `shared/sembr-skills` submodule current;
 the system tools below (Quarto, the `python` shim, `pre-commit`) are already
 present in the environment.

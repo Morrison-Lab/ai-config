@@ -30,3 +30,9 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Mistake**: Taking actions without consulting existing memory files or project instructions.
 - **Canonical Rule**: See [`MEMORY.md`](MEMORY.md) and project `CLAUDE.md` / `AGENTS.md`.
 - **Fix**: Consult relevant memory files and project instructions at task start to align with existing conventions.
+
+## Pattern 6: Answering the asked process question without fetching the PR
+- **Mistake**: Treating a "why didn't you wait / did you fix it / why no reply" question as chat-only, so a review that landed during that exchange stays unread.
+- **Example**: gha#511 (2026-08-18): answered the CI-wait question, never opened the Needs more work comment.
+- **Canonical Rule**: See `CLAUDE.md` ("Re-check for latest review findings before reporting PR status") and `skills/pr-status/SKILL.md` ("When this fires").
+- **Fix**: Fetch the latest review and CI before answering any question about a live PR, not only when the user said "status".

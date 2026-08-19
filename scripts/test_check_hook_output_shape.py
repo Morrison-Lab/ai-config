@@ -7,7 +7,8 @@ verifying that:
   2. A warn-only hook emitting `reason` without `decision` fails (the defect from #1566).
   3. A warn-only Stop hook that fails to emit `systemMessage` fails.
   4. A test for a warn-only hook that does not assert payload shape fails (test-side blindness).
-  5. Missing hooks.json fails loudly.
+  5. Missing or unparseable hooks.json fails loudly with usage exit code 2.
+  6. Unparseable Python source in a hook fails loudly with a diagnostic.
 """
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ def check(name: str, condition: bool, extra: str = "") -> None:
 
 def make_repo(
     tmpdir: str,
-    hooks_json_data: dict,
+    hooks_json_data: dict | None,
     files: dict[str, str],
 ) -> Path:
     root = Path(tmpdir)
@@ -50,10 +51,11 @@ def make_repo(
         SCRIPT.read_text(encoding="utf-8"), encoding="utf-8"
     )
 
-    # Write hooks.json
-    (hooks_dir / "hooks.json").write_text(
-        json.dumps(hooks_json_data, indent=2), encoding="utf-8"
-    )
+    # Write hooks.json if provided
+    if hooks_json_data is not None:
+        (hooks_dir / "hooks.json").write_text(
+            json.dumps(hooks_json_data, indent=2), encoding="utf-8"
+        )
 
     # Write individual hook and test files
     for relpath, content in files.items():
@@ -76,18 +78,18 @@ def run(root: Path) -> tuple[int, str]:
 
 def case(
     name: str,
-    hooks_json_data: dict,
+    hooks_json_data: dict | None,
     files: dict[str, str],
-    want_fail: bool,
+    want_exit: int = 0,
     needle: str | None = None,
 ) -> None:
     with tempfile.TemporaryDirectory() as td:
         root = make_repo(td, hooks_json_data, files)
         rc, out = run(root)
-    ok = (rc != 0) if want_fail else (rc == 0)
+    ok = (rc == want_exit)
     if ok and needle:
         ok = needle in out
-    check(name, ok, f"(rc={rc}, needle={needle!r}, out={out!r})")
+    check(name, ok, f"(rc={rc} want={want_exit}, needle={needle!r}, out={out!r})")
 
 
 # --- 1. Clean synthetic baseline ---
@@ -135,7 +137,7 @@ CLEAN_FILES = {
     ),
 }
 
-case("clean synthetic repo passes", CLEAN_HOOKS_JSON, CLEAN_FILES, want_fail=False)
+case("clean synthetic repo passes", CLEAN_HOOKS_JSON, CLEAN_FILES, want_exit=0)
 
 # --- 2. Warn-only hook emitting reason without decision (defect from #1566) ---
 BAD_REASON_FILES = dict(CLEAN_FILES)
@@ -147,7 +149,7 @@ case(
     "warn-only hook emitting reason without decision fails",
     CLEAN_HOOKS_JSON,
     BAD_REASON_FILES,
-    want_fail=True,
+    want_exit=1,
     needle="emits 'reason' without 'decision'",
 )
 
@@ -161,7 +163,7 @@ case(
     "warn-only Stop hook without systemMessage fails",
     CLEAN_HOOKS_JSON,
     NO_SYSMSG_FILES,
-    want_fail=True,
+    want_exit=1,
     needle="does not emit 'systemMessage'",
 )
 
@@ -175,7 +177,7 @@ case(
     "test-side blindness on warn-only Stop hook fails",
     CLEAN_HOOKS_JSON,
     BLIND_TEST_FILES,
-    want_fail=True,
+    want_exit=1,
     needle="never inspects 'systemMessage'",
 )
 
@@ -189,11 +191,34 @@ case(
     "test-side blindness on warn-only PreToolUse hook fails",
     CLEAN_HOOKS_JSON,
     BLIND_PRETOOL_TEST_FILES,
-    want_fail=True,
+    want_exit=1,
     needle="never inspects 'additionalContext' or 'systemMessage'",
 )
 
-# --- 6. Live repository holding-constant check ---
+# --- 6. Missing hooks.json fails loudly with usage exit 2 ---
+case(
+    "missing hooks.json fails with exit code 2",
+    None,
+    CLEAN_FILES,
+    want_exit=2,
+    needle="no hooks parsed",
+)
+
+# --- 7. Unparseable Python source in a hook fails loudly ---
+SYNTAX_ERR_FILES = dict(CLEAN_FILES)
+SYNTAX_ERR_FILES["hooks/warn-stop.py"] = (
+    'def invalid_syntax(\n'
+)
+
+case(
+    "unparseable hook source fails with parse error",
+    CLEAN_HOOKS_JSON,
+    SYNTAX_ERR_FILES,
+    want_exit=1,
+    needle="could not be parsed as Python",
+)
+
+# --- 8. Live repository holding-constant check ---
 proc = subprocess.run(
     [sys.executable, str(SCRIPT)],
     capture_output=True,

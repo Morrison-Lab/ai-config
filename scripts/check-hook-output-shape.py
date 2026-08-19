@@ -33,13 +33,20 @@ ROOT = Path(__file__).resolve().parent.parent
 HOOKS_DIR = ROOT / "hooks"
 HOOKS_JSON = HOOKS_DIR / "hooks.json"
 
+SUCCESS_EXIT = 0
+CHECK_FAIL_EXIT = 1
+USAGE_EXIT = 2
 
-def parse_string_constants(source_code: str) -> set[str]:
-    """Extract all string literal constants from Python source code via AST."""
+
+def parse_string_constants(source_code: str) -> tuple[set[str], str | None]:
+    """Extract all string literal constants from Python source code via AST.
+
+    Returns (set of strings, error_message if syntax error else None).
+    """
     try:
         tree = ast.parse(source_code)
-    except SyntaxError:
-        return set()
+    except SyntaxError as err:
+        return set(), f"could not be parsed as Python ({err})"
 
     strings = set()
     for node in ast.walk(tree):
@@ -47,15 +54,18 @@ def parse_string_constants(source_code: str) -> set[str]:
             strings.add(node.value)
         elif hasattr(ast, "Str") and isinstance(node, getattr(ast, "Str")):
             strings.add(node.s)
-    return strings
+    return strings, None
 
 
 def load_registered_hooks(hooks_json_path: Path) -> dict[str, list[tuple[str, str]]]:
     """Map script_name -> [(event, matcher)]."""
     if not hooks_json_path.is_file():
         return {}
-    with open(hooks_json_path, encoding="utf-8") as fh:
-        data = json.load(fh)
+    try:
+        with open(hooks_json_path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (json.JSONDecodeError, OSError):
+        return {}
     out: dict[str, list[tuple[str, str]]] = {}
     for event, groups in data.get("hooks", {}).items():
         for group in groups:
@@ -83,7 +93,10 @@ def check_hook_sources(
             continue
 
         source = script_path.read_text(encoding="utf-8")
-        constants = parse_string_constants(source)
+        constants, parse_err = parse_string_constants(source)
+        if parse_err:
+            errors.append(f"FAIL: {script} {parse_err}")
+            continue
 
         has_decision = "decision" in constants or "permissionDecision" in constants
         has_reason = "reason" in constants
@@ -125,7 +138,11 @@ def check_hook_tests(
             continue
 
         subject_source = subject_path.read_text(encoding="utf-8")
-        subject_constants = parse_string_constants(subject_source)
+        subject_constants, subj_err = parse_string_constants(subject_source)
+        if subj_err:
+            errors.append(f"FAIL: {subject_name} {subj_err}")
+            continue
+
         has_decision = "decision" in subject_constants or "permissionDecision" in subject_constants
         has_system_message = "systemMessage" in subject_constants
         has_additional_context = "additionalContext" in subject_constants
@@ -136,7 +153,10 @@ def check_hook_tests(
         is_warn_only_pretool = "PreToolUse" in events and not has_decision and (has_system_message or has_additional_context)
 
         test_source = test_path.read_text(encoding="utf-8")
-        test_constants = parse_string_constants(test_source)
+        test_constants, test_err = parse_string_constants(test_source)
+        if test_err:
+            errors.append(f"FAIL: {test_path.name} {test_err}")
+            continue
 
         if is_warn_only_stop:
             if "systemMessage" not in test_constants:
@@ -160,7 +180,7 @@ def main() -> int:
     registered = load_registered_hooks(HOOKS_JSON)
     if not registered:
         print(f"FAIL: no hooks parsed from {HOOKS_JSON}")
-        return 1
+        return USAGE_EXIT
 
     source_errors = check_hook_sources(HOOKS_DIR, registered)
     test_errors = check_hook_tests(HOOKS_DIR, registered)
@@ -171,13 +191,13 @@ def main() -> int:
         for err in all_errors:
             print(err)
         print(f"\n{len(all_errors)} output-shape check error(s) found.")
-        return 1
+        return CHECK_FAIL_EXIT
 
     print(
         f"✓ Checked {len(registered)} registered hook(s) and their test suites: "
         "all warn-only hooks emit systemMessage and tests inspect payload shape."
     )
-    return 0
+    return SUCCESS_EXIT
 
 
 if __name__ == "__main__":

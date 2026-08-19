@@ -642,6 +642,11 @@ common patterns.
   are explicit overrides. (gha#148: `test-coverage.yml`'s `fail-ci-if-error` input.)
 - **A composite action `action.yml` input default overrides shell script fallback logic, so default to empty string `''` when delegating ref/branch resolution to a helper script.**
   If `action.yml` specifies `default: 'HEAD'`, passing it via `env: TARGET_REF: ${{ inputs.target-ref }}` to a script using `${1:-$DEFAULT_REF}` always passes `"HEAD"`, bypassing fallback chains (`origin/main` -> `main` -> `HEAD`) needed on PR checkouts. Defaulting `target-ref: ''` in `action.yml` allows the helper script to apply its fallback resolution dynamically when unsupplied. (gha#512: `check-tag-drift` composite action.)
+- **A numeric version check in shell should validate that the parsed version string is numeric (`^[0-9]+$`) before evaluating `-lt` or `-gt`.**
+  Inside an `if [ "$NODE_MAJOR" -lt 18 ]; then ... fi` condition block, if `NODE_MAJOR` is non-numeric (e.g. unparseable output or empty string), `[` returns exit status 2.
+  Because `[` is evaluated as the condition of an `if` statement, `set -e` does not abort on failure;
+  instead, bash skips the `then` block and execution silently falls through to exit status 0 (passing the check).
+  Validate `[[ "$NODE_MAJOR" =~ ^[0-9]+$ ]]` first and exit 1 on parse failures. (gha#283: `check-node-version.sh`.)
 - **Writing any explicit step-level `if:` REPLACES the default `success()`, so a
   guard step's failure does not skip the steps that follow it.**
   The default condition on a step is `success()`, which is why a failing step
@@ -1165,36 +1170,14 @@ workflow this repo's review actually depends on, per
 
 **A third `claude-bot.yml` run followed, and it may have been self-triggered
 rather than a new human request.**
-The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`) fires on
-`contains(github.event.comment.body, '@claude')` without stripping code spans.
-A self-review comment containing `` `@claude` `` triggered the gate.
-Tracked as ai-config#1242 for confirmation.
+The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`) fires on `contains(github.event.comment.body, '@claude')` without stripping code spans.
+A self-review comment containing `` `@claude` `` triggered the gate (ai-config#1242).
+That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not the PR branch (`ai-config#635`).
+Dispatch directly with an explicit `pr_number` input and `ref: <PR-branch>`.
 
-
-That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not
-the PR branch -- the same ambiguity
-[`fully-clean`](../shared/workflow/fully-clean.md) documents for the **same**
-repo (`ai-config#635`, run 29967418653; verified directly, not assumed from
-the fragment's "this very PR" phrasing).
-Don't use those fields to decide whether the run is reviewing your PR;
-read what it posts, or dispatch directly with an explicit `pr_number` input
-and `ref: <PR-branch>`, which skips the comment-relay path entirely.
-
-- **Do:** treat a listener's own error comment as evidence about that step
-  only, and check the dispatched workflow's run history before concluding a
-  review failed.
-- **Do:** dispatch the review workflow directly rather than relying on a
-  mention comment to relay through the listener.
-- **Do:** avoid writing an unescaped `@claude` substring into a PR comment on
-  a repo whose bot gates on `contains()` -- it retriggers even in backticks.
-- **Don't:** re-derive "the review workflow is broken repo-wide" from one
-  PR's comments without checking `list_workflow_runs` first -- #1197 already
-  found this claim false once, from the same symptom.
-- **Don't:** count a listener's own error as one of the retries in
-  [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s
-  "retry once, then treat as unreachable" rule -- it isn't the reviewer failing.
-
-(2026-08-07, `Morrison-Lab/ai-config#1238`: the same string #1197 traced to a
-false repo-wide-failure report reappeared verbatim on a PR, where `list_workflow_runs`
-showed listener success and rapid re-dispatch.)
-
+- **Do:** treat a listener's own error comment as evidence about that step only, and check the dispatched workflow's run history before concluding a review failed.
+- **Do:** dispatch the review workflow directly rather than relying on a mention comment to relay through the listener.
+- **Do:** avoid writing an unescaped `@claude` substring into a PR comment on a repo whose bot gates on `contains()`.
+- **Don't:** re-derive "the review workflow is broken repo-wide" from one PR's comments without checking `list_workflow_runs` first.
+- **Don't:** count a listener's own error as one of the retries in [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s "retry once, then treat as unreachable" rule.
+(2026-08-07, `Morrison-Lab/ai-config#1238`.)

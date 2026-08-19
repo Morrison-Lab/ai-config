@@ -264,8 +264,8 @@ git log --oneline "$merged".."<branch>"    # empty => the ref is the merged head
 2.  **The succeed-and-lie direction (`origin/main..<branch>` comparison):** Comparing against `origin/main..<branch>` instead of `refs/pull/<N>/head` exits **0** and prints plausible commit output. Because a squash-merge creates a new commit on `main` with a different SHA and parentage, the branch’s original commits are not ancestors of `main` even though their diff is fully merged. `git log --oneline origin/main..<branch>` lists every commit from the merged PR, falsely suggesting unmerged work remains on the branch. Comparing against `refs/pull/<N>/head` (via `git log "$merged".."<branch>"`) settles it cleanly:
 
     ``` bash
-    git fetch origin "refs/pull/<N>/head" -q
-    git log --oneline FETCH_HEAD.."<branch>"   # empty => all local work reached the PR
+    git fetch origin "refs/pull/<N>/head" -q &&
+    git log --oneline "$merged".."<branch>"   # empty => all local work reached the PR
     ```
 
 So read the exit status rather than the output, and always anchor the comparison to the PR’s fetched head ref rather than `origin/main`. A non-zero exit means the comparison failed to happen, which is not evidence the branch is safe to delete; re-fetch and re-run before touching `-D`.

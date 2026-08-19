@@ -901,6 +901,21 @@ secrets under `pull_request`) has to be re-established explicitly.
   `payload` before concluding its trigger is fixed --- `src/` for a legible
   version of the gate, and `dist/` to confirm what the pinned SHA actually
   runs, since the bundle is what Actions executes and it can lag `src/`.
+
+- **Do:** fetch a checker at the SHA the calling workflow **pins** when
+  reproducing a diff-scoped CI gate locally, not the action's default branch.
+  The bullet above pins when *auditing* an action; the same applies when
+  *running* one to validate a fix pre-push, where a shallow default-branch
+  clone yields a plausible script with no sign it is the wrong one.
+  Measured 2026-08-19: `ai-config`'s `validate.yml` pins
+  `Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@209bfb76`,
+  whose `check-new-line-breaks.py` differs from that repo's default branch by
+  **339 lines**, so validating against the default branch would have exercised
+  a different checker and reported a result about nothing.
+  Run `git fetch --depth 1 origin <sha>`, then `git diff --stat FETCH_HEAD --
+  <subdir>/` (empty output means the pin is current) *before*
+  `git checkout FETCH_HEAD -- <subdir>/`, which makes that question
+  unanswerable.
 - **Do:** re-derive any safety property the original event was providing for
   free, once the event is synthesized.
 - **Don't:** fork an action, or abandon the feature, on the strength of an

@@ -40,10 +40,7 @@ Worked-example case records for the rules below live in
    - **Don't:** read a 404 on the log fetch as positive evidence of a hang or a stall --- it is the opposite, evidence the job is still running.
    - **Don't:** file an issue reporting a review job as hung or "no verdict produced" while its log fetch still 404s and its status is `in_progress`.
    - **Don't:** run the rule backwards: a log URL being **served** is not evidence the job completed.
-     The blob can exist mid-run, so a successful log fetch and a still-running job coexist
-     (measured 2026-08-15 on run 31903219396: the MCP `get_job_logs` call returned a signed
-     `logs_url` while the job's own `status` still read `in_progress` and it ran on for
-     several more minutes).
+     The blob can exist mid-run, so a successful log fetch and a still-running job coexist.
      Completion comes from `status`/`conclusion` alone, in both directions.
 
    **`gh pr checks` is not a complete enumeration of a head's check runs, so
@@ -209,18 +206,10 @@ and the verdict's own conclusion every round.**
   and create zero inline comments
   while placing substantive findings inside a collapsed
   `<details>` suppression block in the review body.
-  The heading moves,
-  so match case-insensitively on `suppressed` **inside the `<summary>`
-  heading**, not anywhere in the body:
-  PR #660 emitted `Comments suppressed due to low confidence (3)`,
-  while PRs #1029 and #1031 emitted `Suppressed comments (4)`.
-  A literal grep for either exact phrase can return a false zero.
-  A body-wide match over-corrects the other way and can permanently reject a
-  genuinely clean review, since ordinary overview prose can also contain the
-  word --- review 4837572117's summary table read "suppressed Copilot
-  findings" outside any collapsed block.
-  A body read that stops at the overview is therefore not a body read, and a
-  match against the whole body is not the right instrument either.
+  Match case-insensitively on `suppressed` **inside the `<summary>`
+  heading**, not anywhere in the body.
+  See [`fully-clean.cases.md`](fully-clean.cases.md),
+  "The collapsed-block case (Morrison-Lab/ai-config#1029)".
 - **"No verdict" is its own state, distinct from "a verdict with no
   findings".**
   A review job can fail having posted *nothing* --- not a stub, not an empty
@@ -346,8 +335,6 @@ and still not sufficient.**
 `USAGE_EXIT = 2` is raised by `die()`, on the paths the script anticipated.
 An **unhandled exception** exits **1** --- the code reserved for "not clean" ---
 so a crash is indistinguishable from a verdict by status alone.
-Measured: run from a checkout of the wrong repo, the script raises
-`RuntimeError: Command failed (gh pr view ...)` and exits 1.
 
 That is why the status read has to be paired with a look at the output rather
 than replacing it.
@@ -362,6 +349,7 @@ is routinely not the repo the PR lives in --- so the same command answers
 correctly by hand and crashes in the loop.
 Pass `-R OWNER/REPO` explicitly in anything that is not a one-off typed inside
 that checkout.
+See [`fully-clean.cases.md`](fully-clean.cases.md), "Checker unhandled exception on wrong repo".
 
 So read the status, and read all three of it:
 

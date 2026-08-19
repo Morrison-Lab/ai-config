@@ -858,3 +858,47 @@ So this is [`fail-fast`](../principles/fail-fast.md)'s "A sound checker pointed
 at the wrong repository": a correct instrument returning a truthful answer about a
 repository nobody asked about, with the subject never printed alongside the
 verdict.)
+
+## A green guard step beside a red job
+
+(Morrison-Lab/gha#520 / #521, 2026-08-19.)
+
+`d-morrison/rme#1072`'s `review / claude-review` check was red.
+The cause was in the run's result object rather than in the PR.
+Abridged below --- it also carried `terminal_reason: "api_error"` and `permission_denials_count: 42`.
+
+```json
+{
+  "subtype": "success",
+  "is_error": true,
+  "num_turns": 13,
+  "total_cost_usd": 4.100043149999999,
+  "api_error_status": 429,
+  "result": "You've hit your weekly limit"
+}
+```
+
+The account's quota ran out 13 turns into the review.
+The workflow already had a graceful path for quota exhaustion, and the guard script did not recognize this shape, because its detection keyed on `total_cost_usd: 0` plus `num_turns: 1` --- a request rejected before any work, not one cut off part-way through.
+
+Fixing that alone would have left the check red, which the fix's own PR then demonstrated on itself.
+With the guard hitting its **pre-existing** zero-cost branch, the log read:
+
+```
+##[warning]Claude review skipped -- quota or auth error (zero cost, turn 1).
+##[end-action id=fail-check.run;outcome=success;conclusion=success]
+```
+
+and the job was red anyway, because a step above it had already failed:
+
+```
+##[error]Action failed with error: Claude execution failed: result is_error:true
+##[end-action id=claude-review.run;outcome=failure;conclusion=failure]
+```
+
+The action exits 1 on an `is_error` result, and that step carried no `continue-on-error`, so its failure decided the job whatever the guard concluded afterwards --- making the graceful path unreachable for every exhaustion that got past the workflow's own `preflight-quota` step, which catches a missing credential before dispatch but cannot see an account that still had quota then.
+
+Two things generalize.
+The guard's `success` and the job's `failure` were never in tension.
+They were two different steps' conclusions, and only a step enumeration distinguishes them.
+And the first diagnosis was right about the classifier and still incomplete about the symptom: the shape genuinely was unrecognized, and recognizing it changed nothing the reader could see until the propagation was fixed too.

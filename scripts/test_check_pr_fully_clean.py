@@ -154,7 +154,7 @@ def main() -> int:
         "author": {"login": "claude[bot]"},
     }
     mock_pr_data = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
-    mock_run_data = json.dumps({"head_sha": "sha123"})
+    mock_run_data = json.dumps({"head_sha": "sha123", "event": "push", "head_branch": "main"})
     with patch.object(checker, "run_cmd", side_effect=[mock_pr_data, mock_run_data]):
         stale_ok, stale_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("bot comment without SHA accepted when run head_sha matches (#1520)",
@@ -163,11 +163,29 @@ def main() -> int:
     # New: a bot comment without SHA must be rejected when its run's head_sha
     # does NOT match the target.
     mock_pr_data2 = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
-    mock_run_data2 = json.dumps({"head_sha": "other_sha"})
+    mock_run_data2 = json.dumps({"head_sha": "other_sha", "event": "push", "head_branch": "main"})
     with patch.object(checker, "run_cmd", side_effect=[mock_pr_data2, mock_run_data2]):
         stale_no_match_ok, stale_no_match_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
         check("bot comment without SHA rejected when run head_sha does not match",
               (not stale_no_match_ok) and len(stale_no_match_issues) > 0)
+
+    # New: a workflow_dispatch run with head_branch matching the PR branch is
+    # accepted (dispatcher passed explicit --ref).
+    mock_pr_data_disp = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
+    mock_run_data_disp = json.dumps({"head_sha": "sha123", "event": "workflow_dispatch", "head_branch": "my-branch"})
+    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data_disp, mock_run_data_disp]):
+        disp_ok, disp_issues = checker.check_review_comments("1167", "sha123", TEST_REPO, branch="my-branch")
+        check("workflow_dispatch run with matching head_branch is accepted",
+              disp_ok and disp_issues == [])
+
+    # New: a workflow_dispatch run with head_branch NOT matching the PR branch
+    # is rejected (dispatcher defaulted to main, head_sha is unreliable).
+    mock_pr_data_disp2 = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
+    mock_run_data_disp2 = json.dumps({"head_sha": "sha123", "event": "workflow_dispatch", "head_branch": "main"})
+    with patch.object(checker, "run_cmd", side_effect=[mock_pr_data_disp2, mock_run_data_disp2]):
+        disp_no_ok, disp_no_issues = checker.check_review_comments("1167", "sha123", TEST_REPO, branch="my-branch")
+        check("workflow_dispatch run with non-matching head_branch is rejected",
+              (not disp_no_ok) and len(disp_no_issues) > 0)
 
     # New: a bot comment without SHA and without a run link must be rejected.
     no_link_comment = {

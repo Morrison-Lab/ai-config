@@ -150,13 +150,19 @@ def _is_bot_author(login: str) -> bool:
     )
 
 
-def _resolve_run_head_sha(body: str, repo: str) -> Optional[str]:
+def _resolve_run_head_sha(body: str, repo: str, branch: str = "") -> Optional[str]:
     """Extract a workflow run ID from a review comment body and return its head_sha.
 
     Review comments from the ``@claude`` workflow contain a "View run" link
     like ``https://github.com/{owner}/{repo}/actions/runs/{run_id}``.
     Fetching that run's ``head_sha`` proves which commit the reviewer was
     dispatched against, which is the authoritative source per #1520.
+
+    A ``workflow_dispatch`` run's ``head_sha`` names the dispatch ref, not
+    the reviewed commit (see ``fully-clean.rationale.md``), so this only
+    trusts the field when the run's ``head_branch`` matches the PR's own
+    branch -- confirming the dispatcher passed an explicit ``--ref``.
+    Falls back to ``None`` (body-SHA scan) when the check cannot be made.
     """
     m = re.search(r"/actions/runs/(\d+)", body)
     if not m:
@@ -164,7 +170,13 @@ def _resolve_run_head_sha(body: str, repo: str) -> Optional[str]:
     run_id = m.group(1)
     try:
         out = run_cmd(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
-        return json.loads(out).get("head_sha")
+        run = json.loads(out)
+        event = run.get("event", "")
+        head_branch = run.get("head_branch", "")
+        head_sha = run.get("head_sha")
+        if event == "workflow_dispatch" and branch and head_branch != branch:
+            return None
+        return head_sha
     except RuntimeError:
         return None
 
@@ -465,7 +477,7 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     return True, []
 
 
-def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "") -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", branch: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
     data = json.loads(out)
 
@@ -567,7 +579,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             if not is_match:
                 author_login = item[5] if len(item) > 5 else ""
                 if _is_bot_author(author_login):
-                    run_sha = _resolve_run_head_sha(body, repo)
+                    run_sha = _resolve_run_head_sha(body, repo, branch)
                     if run_sha == sha:
                         is_match = True
 
@@ -649,7 +661,7 @@ def main():
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha, repo)
-    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision)
+    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision, branch)
 
     all_issues = ci_issues + review_issues
 

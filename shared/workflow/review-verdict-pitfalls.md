@@ -968,19 +968,24 @@ records that gha#286 root-caused exactly this and fixed it upstream by passing
 `--ref <PR-branch>` explicitly, so a re-dispatched review's check runs do
 attach to the PR's head commit.
 
-Two paths reach that dispatch, and only one of them now carries the flag.
+Two paths reach that dispatch.
 The manual command in [`ardi`](../../skills/ardi/SKILL.md)'s step 6 and
-[`preferences.md`](../../memories/preferences.md) omitted it until this entry
-was written, so the instrument was vacuous on the very command the corpus told
-people to run --- the worst place for a precondition to go unstated.
+[`preferences.md`](../../memories/preferences.md) omitted `--ref` until this
+entry was written, so the instrument was vacuous on the very command the
+corpus told people to run --- the worst place for a precondition to go
+unstated.
 Both are fixed alongside this section, so an agent following either now
 dispatches with the ref.
+The mention-driven path gained `--ref` in #1000 (`claude.yml@v2`).
 
-The mention-driven path is not fixed and is not ours to fix from here.
-A repo pinning `claude.yml@v1` does not carry gha#286, so `@claude review`
-still dispatches without a ref and still lands on the default branch.
-That asymmetry is what the rest of this section turns on: your own dispatches
-became visible at the PR head, and a human's did not.
+The mention-driven path was the residual when this section was written:
+`claude-bot.yml` pinned `claude.yml@v1`, which omitted `--ref`.
+#1000 moved that pin to `@v2`, which passes `--ref "$BRANCH"` (gha#286),
+so a human `@claude review` now lands on the PR head the same way a
+manual dispatch does.
+The measured table below is the pre-#1000 state.
+Fork PRs still omit `--ref` (gha#289), because the head branch does not
+exist in this repo.
 
 Dispatch with the ref, and the one-call pre-check becomes available --- for
 the runs you dispatch:
@@ -1001,16 +1006,16 @@ version.
 One further caveat decides how far the pre-check can be trusted, and this
 passage's earlier paragraph already supplies it without drawing the
 conclusion.
-`--ref` is yours to pass, so it fixes only the dispatches you control.
-A human's `@claude review again` routes through `claude-bot.yml`, which pins
-`claude.yml@v1` and passes no ref, so that run still lands on the default
-branch and is still invisible at the PR head.
-The pre-check is therefore sound against your own dispatches and silent about
-a concurrent mention-driven one --- which is the worse half, because that run
+`--ref` is yours to pass, so it used to fix only the dispatches you control.
+Until #1000, a human `@claude review again` routed through `claude.yml@v1`
+and landed on the default branch, invisible at the PR head.
+The pre-check was therefore sound against your own dispatches and silent
+about a concurrent mention-driven one --- the worse half, because that run
 is the one whose cancellation costs somebody else their review.
-Until `claude-bot.yml` carries the fix, keep the `gather-context` attribution
-as the check before dispatching, and read the PR-head query as confirming your
-own run rather than as clearing the field.
+With the pin at `@v2`, mention-driven runs also pass `--ref` and appear at
+the PR head.
+Keep the `gather-context` attribution as well: the pre-check is still racy
+(see below), and a fork PR still omits `--ref` (gha#289).
 
 That residual is worth naming rather than filing away, since it is this
 section's own subject recurring one level up: a check whose scope is narrower
@@ -1035,11 +1040,12 @@ than inside either.
 Two things follow.
 Treat the pre-check as reducing the odds rather than as establishing safety,
 and say which it did when reporting.
-And note that the durable fix is upstream rather than procedural: either the
-mention path carries a ref, so its runs are visible where you are looking, or
-the concurrency group stops cancelling across dispatch sources.
-Until one of those lands, a dispatch is a small bet that nobody mentioned the
-bot in the last few seconds.
+The mention path now carries a ref (#1000), so those runs are visible at the
+PR head.
+The remaining gap is the race between the two calls, plus fork PRs that still
+omit `--ref` (gha#289).
+A dispatch is still a small bet that nothing was created in the last few
+seconds.
 
 - **Do:** confirm the class of run you are looking for can appear at the PR
   head at all, before reading its absence there as an all-clear.
@@ -1051,10 +1057,9 @@ bot in the last few seconds.
 - **Don't:** substitute a check-runs query at the PR head for the
   `gather-context` attribution above while the dispatch omits `--ref` --- it
   answers a narrower question and answers it reassuringly.
-- **Don't:** read your own `--ref` discipline as clearing the field, while
-  `claude-bot.yml` pins `claude.yml@v1` --- a mention-driven run remains
-  invisible at the PR head, and it is the one a colliding dispatch would
-  cancel out from under a human.
+- **Don't:** read your own `--ref` discipline as clearing the field for a
+  fork PR, or for a mention-driven run from before #1000 --- those land on
+  the default branch, and a colliding dispatch can still cancel them.
 - **Don't:** report a pre-check as having established that nothing was in
   flight --- it establishes that nothing was in flight *when it ran*, and a
   dispatch is a later event.
@@ -1076,9 +1081,9 @@ at #1281's head, which is the positive control the bullets above ask for.
 successful and 3 cancelled, pooled across several PRs.
 The run object offers no attribution either: `pull_requests` is empty,
 `head_branch` is `main`, and `display_title` is the workflow name.
-This repo's `claude-bot.yml` pins `Morrison-Lab/gha/.github/workflows/claude.yml@v1`
-while `claude-review.yml` pins `claude-code-review.yml@v2`, so the gha#286 fix
-is present on one leg of the chain and not the other.
+This repo's `claude-bot.yml` pinned `claude.yml@v1` while `claude-review.yml`
+pinned `claude-code-review.yml@v2`, so the gha#286 fix was present on one
+leg of the chain and not the other. #1000 moved the agent pin to `@v2`.
 
 The `--ref` half is measured rather than inherited, against the neighbouring
 PR whose review happened to be dispatched with one:

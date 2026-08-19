@@ -24,9 +24,12 @@ jobs:
       issues: write
       id-token: write
       actions: write
-    uses: Morrison-Lab/gha/.github/workflows/claude.yml@v1
+    uses: Morrison-Lab/gha/.github/workflows/claude.yml@v2
     secrets: inherit
     with:
       setup-r: false
       eager-pr: true
       review-workflow-file: claude-review.yml
+      # This repo already is ai-config. v2's default (true) marketplace-installs
+      # the plugin on top of the checkout and double-loads the auto-loaded set.
+      use-ai-config: false

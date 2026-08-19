@@ -421,6 +421,15 @@ with tempfile.TemporaryDirectory() as repo:
         rel_scope == slb.changed_lines_for(nested, 'base-ref'),
     )
 
+# Bug/clarity: parser epilog and help text accurately state paragraph scope (ai-config#1605)
+parser = slb.build_parser()
+help_text = parser.format_help()
+expect(
+    "parser help accurately mentions paragraph scoping",
+    "paragraphs containing lines" in help_text or "paragraphs" in parser.epilog,
+    f"got epilog: {parser.epilog!r}",
+)
+
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

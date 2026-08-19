@@ -12,6 +12,8 @@ Three authorization paths, narrowest last: the per-command ALLOW_MERGE=1 /
 --allow-merge override, an active session `/mwc` grant, and a STANDING
 per-repository grant for PRs targeting a repo in STANDING_MERGE_GRANT_REPOS.
 """
+from __future__ import annotations
+
 import bisect
 import json
 import os

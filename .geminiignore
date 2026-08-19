@@ -1,0 +1,8 @@
+# Local session residue. .gitignore already keeps these out of git;
+# this file keeps Gemini CLI tools that honor .geminiignore off the
+# same paths (ai-config#1641).
+.claude/worktrees/
+.worktrees/
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/

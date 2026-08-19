@@ -190,6 +190,12 @@ def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
     for src in sorted(repo_root.glob("*.md")):
         if src.name in EXCLUDED_TOP_LEVEL_FILES:
             continue
+        # Path.glob("*.md") matches hidden names on current Python, so a
+        # local Aider history file would otherwise look like an installable
+        # top-level instruction file (ai-config#1641). Bootstrap's `*.md`
+        # loop does not enable dotglob, so this skip keeps the two in step.
+        if src.name.startswith("."):
+            continue
         entries.append(classify(src, consumer_dir / src.name, "", src.name, repo_root))
 
     for src in sorted(p for p in repo_root.iterdir() if p.is_dir()):

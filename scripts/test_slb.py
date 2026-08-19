@@ -423,11 +423,11 @@ with tempfile.TemporaryDirectory() as repo:
 
 # Bug/clarity: parser epilog and help text accurately state paragraph scope (ai-config#1605)
 parser = slb.build_parser()
-help_text = parser.format_help()
+norm_help = " ".join(parser.format_help().split())
 expect(
     "parser help accurately mentions paragraph scoping",
-    "paragraphs containing lines" in help_text or "paragraphs" in parser.epilog,
-    f"got epilog: {parser.epilog!r}",
+    "scoped to paragraphs containing lines this branch changed against --base" in norm_help,
+    f"got rendered help: {norm_help!r}",
 )
 
 

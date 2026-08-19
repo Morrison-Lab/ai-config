@@ -640,6 +640,8 @@ common patterns.
   `'auto'`) and resolve the real expression where the input is consumed (a `with:`/`env:`
   value or a step), treating `'auto'` as "apply the heuristic" while `'true'`/`'false'`
   are explicit overrides. (gha#148: `test-coverage.yml`'s `fail-ci-if-error` input.)
+- **A composite action `action.yml` input default overrides shell script fallback logic, so default to empty string `''` when delegating ref/branch resolution to a helper script.**
+  If `action.yml` specifies `default: 'HEAD'`, passing it via `env: TARGET_REF: ${{ inputs.target-ref }}` to a script using `${1:-$DEFAULT_REF}` always passes `"HEAD"`, bypassing fallback chains (`origin/main` -> `main` -> `HEAD`) needed on PR checkouts. Defaulting `target-ref: ''` in `action.yml` allows the helper script to apply its fallback resolution dynamically when unsupplied. (gha#512: `check-tag-drift` composite action.)
 - **Writing any explicit step-level `if:` REPLACES the default `success()`, so a
   guard step's failure does not skip the steps that follow it.**
   The default condition on a step is `success()`, which is why a failing step

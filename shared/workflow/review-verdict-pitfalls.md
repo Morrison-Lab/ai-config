@@ -980,7 +980,7 @@ The mention-driven path gained `--ref` in #1000 (`claude.yml@v2`).
 
 The mention-driven path was the residual when this section was written:
 `claude-bot.yml` pinned `claude.yml@v1`, which omitted `--ref`.
-#1000 moved that pin to `@v2`, which passes `--ref "$BRANCH"` (gha#286),
+Issue #1000 moved that pin to `@v2`, which passes `--ref "$BRANCH"` (gha#286),
 so a human `@claude review` now lands on the PR head the same way a
 manual dispatch does.
 The measured table below is the pre-#1000 state.

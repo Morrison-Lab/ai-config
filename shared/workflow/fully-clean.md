@@ -208,7 +208,8 @@ and the verdict's own conclusion every round.**
   `<details>` suppression block in the review body.
   Match case-insensitively on `suppressed` **inside the `<summary>`
   heading**, not anywhere in the body.
-  See [`fully-clean.cases.md`](fully-clean.cases.md), "Suppressed findings heading variations".
+  See [`fully-clean.cases.md`](fully-clean.cases.md),
+  "The collapsed-block case (Morrison-Lab/ai-config#1029)".
 - **"No verdict" is its own state, distinct from "a verdict with no
   findings".**
   A review job can fail having posted *nothing* --- not a stub, not an empty

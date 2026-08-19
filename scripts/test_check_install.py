@@ -130,6 +130,11 @@ with tempfile.TemporaryDirectory() as tmp:
           not any(k.startswith(("references", "codex-skills", "cursor-rules")) for k in found))
     check("repo README is never reported", "README.md" not in found)
 
+    write(repo / ".hidden.md", "local residue, not an instruction file\n")
+    found_with_hidden = statuses(repo, consumer)
+    check("hidden top-level markdown is not installable",
+          ".hidden.md" not in found_with_hidden)
+
 # --- reporting --------------------------------------------------------------
 
 with tempfile.TemporaryDirectory() as tmp:

@@ -373,10 +373,13 @@ So when adding a warn-only hook:
 - mutation-check it: revert `systemMessage` to `reason` and require the suite to
   fail
 
-No check enforces this yet; the condition is decidable and is tracked in
-[#1582](https://github.com/Morrison-Lab/ai-config/issues/1582).
+`scripts/check-hook-output-shape.py` enforces this on every run: it verifies that
+warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
+`systemMessage`, and that their test suites inspect the payload shape rather than
+checking non-empty output.
 
-A hook can ship a `test-<name>.py` beside it; `scripts/test_hooks.py` runs
+Every hook must ship a companion `test-<name>.py` beside it in the same change before pushing;
+`scripts/test_hooks.py` runs
 every such suite (pairing each with its subject) and also checks the reverse
 direction --- it enumerates the hooks and flags any that lack a test --- so a
 *tested* guard cannot regress unnoticed and an *untested* one cannot hide. It
@@ -507,6 +510,8 @@ activated.")
 - `skills/` --- reusable workflow skills (`~/.claude/skills/`, `~/.gemini/skills/`)
 - `codex-skills/` --- generated Codex wrappers (`~/.codex/skills/`)
 - `cursor-rules/` --- Cursor AI rules in `.mdc` format (`~/.cursor/rules/`)
+- `.cursorignore` / `.geminiignore` --- keep local worktree and Aider residue
+  out of Cursor and Gemini search (same paths `.gitignore` already excludes)
 - `AGENTS.md` --- universal vendor-neutral instruction file for all coding agents
 - `tool-mappings.yml` / `tool-mappings.md` — cross-model tool registry and its
   generated reference (see *Tool mappings* above)

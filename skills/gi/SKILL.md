@@ -68,6 +68,11 @@ step 2 (unless the user explicitly specified an issue or candidate preference).
 State which issue was selected and why, then proceed directly to check
 in-flight status and implementation without pausing for user confirmation.
 
+Do not describe the issue as "in progress" or say that implementation has
+started until steps 4, 6, 7, and 8 have completed: the live claim, isolated
+branch/worktree, and draft PR are the observable start of work. Investigation
+or triage alone is preparatory work, not an active implementation.
+
 ### 4. Check the issue isn't already in-flight
 
 Before claiming or branching, confirm no other session is already on this

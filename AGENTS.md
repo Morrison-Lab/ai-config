@@ -71,6 +71,32 @@ CI and review findings to a clean result.
 This does not grant merge authority; the strict merge policy below still
 applies.
 
+## Open PRs ready for review, not as drafts
+
+Open a Pull Request ready for review by default whenever it already carries
+completed, verified work.
+Do not leave such a PR in draft, and do not rely on a harness or tool default
+that opens PRs as drafts --- when the tool defaults to draft, pass the flag
+that opens it ready (or mark it ready immediately after the final push of the
+round).
+This overrides any agent-harness default that creates PRs as drafts unless the
+user opts in.
+
+Draft status stays reserved for the two cases that intend it: the empty
+up-front PR opened when claiming an issue (the issue-first / pr-on-claim
+pattern), which is un-drafted as soon as the implementation lands; and the
+deliberate draft-gating of a dependent PR until its prerequisite merges (see
+the merge-order guidance).
+Marking a PR ready still grants no merge authority; the strict merge policy
+below applies unchanged.
+
+- **Do:** open a completed-work PR ready for review, passing the ready flag
+  when the tool would otherwise default to draft.
+- **Do:** un-draft an up-front empty PR the moment its implementation lands.
+- **Don't:** leave a PR carrying finished, verified work in draft.
+- **Don't:** treat a tool's draft-by-default as the intended state for a
+  completed-work PR.
+
 ## Antigravity Workspace Rules & Activation Scopes
 
 - **Global rules**: Defined in `~/.gemini/GEMINI.md`.

@@ -6,8 +6,8 @@ Quarto book or site, that construct is the theorem-like crossref div
 in other repo types the equivalent might be a docstring, a glossary entry,
 or a spec's defined-terms list. Either way, a concept defined only in
 running prose never gets a stable id, so nothing downstream can cite it,
-and [`definition-crossrefs.md`](definition-crossrefs.md)'s hyperlink-on-
-first-mention check has nothing to link to.
+and [`definition-crossrefs.md`](definition-crossrefs.md)'s
+hyperlink-on-first-mention check has nothing to link to.
 
 This is a **different gap** from what `definition-crossrefs.md` catches.
 That check assumes a defining div exists somewhere and verifies mentions

@@ -119,7 +119,7 @@ glab mr create --draft --title "<title>" --description "Closes #<N>
 WIP — opened up front to claim the issue; implementing now." --assignee <your-gitlab-username>  # default: demorrison
 ```
 
-Keep it a draft: a draft doesn’t trigger the `@claude` review bot, so no review round is wasted on an empty diff. Include `Closes #N` to auto-close the issue on merge.
+Keep it a draft: a draft doesn’t trigger the `@claude` review bot, so no review round is wasted on an empty diff. Include `Closes #N` to auto-close the issue on merge **only when this PR will finish the issue**. If a later comment splits the issue into independent cases and this PR ships only one, file the leftover as its own issue **before merge** and rewrite the PR body so it does not `Closes` the parent (link both: this PR for the shipped slice, the new issue for the rest). Closing the parent on a partial ship drops the deferred half from the tracker ([gha#373](https://github.com/Morrison-Lab/gha/issues/373) / [\#516](https://github.com/Morrison-Lab/gha/pull/516) / [\#517](https://github.com/Morrison-Lab/gha/issues/517)).
 
 ### 9. Implement
 

@@ -70,8 +70,8 @@ in-flight status and implementation without pausing for user confirmation.
 
 Do not describe the issue as "in progress" or say that implementation has
 started until steps 4, 6, 7, and 8 have completed: the live claim, isolated
-branch/worktree, and draft PR are the observable start of work. Investigation
-or triage alone is preparatory work, not an active implementation.
+branch/worktree, and draft PR are the observable start of work.
+Investigation or triage alone is preparatory work, not an active implementation.
 
 ### 4. Check the issue isn't already in-flight
 

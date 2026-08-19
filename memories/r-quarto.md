@@ -34,7 +34,8 @@
     toolchain broken.
   - **Do:** derive the conda base with `conda info --base`, since `conda` is
     already on `PATH` if you got as far as `conda run`.
-  - **Don't:** describe this as the executable being off `PATH` --- that
+  - **Don't:** describe the Quarto/Deno case as the executable being off
+    `PATH` --- that
     records a failure model the observed error contradicts.
   - **Don't:** paste an absolute `/home/<user>/miniconda3/...` path into a
     recorded recovery command; it fails for every other user and install

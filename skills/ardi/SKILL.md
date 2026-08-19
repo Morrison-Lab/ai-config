@@ -1,6 +1,6 @@
 ---
 name: ardi
-description: "Drive PR to clean review verdict."
+description: "Drive one PR to clean."
 user-invocable: true
 allowed-tools:
   - Bash

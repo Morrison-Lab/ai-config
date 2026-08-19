@@ -1,6 +1,6 @@
 ---
 name: ardiaei
-description: "Drive all PRs clean then run UMS."
+description: "Drive PRs clean and run UMS."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -2,9 +2,11 @@
 
 [Gemini CLI](https://github.com/google-gemini/gemini-cli) is an open-source AI assistant for the terminal. It stores user-wide config under `~/.gemini`. See [Google AI](https://ai.google.dev).
 
-## Universal instructions
-
-Follow all universal instructions defined in [`AGENTS.md`](AGENTS.md) (freshness, worktree isolation, local timestamp recaps, status requests not report-only, broad interpretation, cross-agent generalization, strict merge control, autonomous delivery, and review workflows).
+`AGENTS.md` is the authoritative, auto-read cross-agent contract.
+It owns universal freshness, worktree, delivery, timestamp, formatting, merge,
+and review rules; do not duplicate them here.
+Read the relevant section of this file only for Gemini CLI or Antigravity
+integration work.
 
 ## Antigravity Plugin & Customization Integration
 

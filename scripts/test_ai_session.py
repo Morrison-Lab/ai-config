@@ -50,7 +50,7 @@ def rewrite_record(path, **fields):
     for line in text.splitlines():
         key = line.split("=", 1)[0]
         out.append(f"{key}={fields[key]}" if key in fields else line)
-    path.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
 def dead_pid(bash):
@@ -253,7 +253,7 @@ def main() -> int:
         run("register", "--id", sid)
         run("enable-mwc", "--id", sid)
         crlf = sess.read_text(encoding="utf-8").replace("\n", "\r\n")
-        sess.write_text(crlf, encoding="utf-8", newline="")
+        sess.write_bytes(crlf.encode("utf-8"))
         p = run("check-mwc", "--id", sid)
         check(p.returncode == 0,
               "a CRLF session record still reads as a live grant",

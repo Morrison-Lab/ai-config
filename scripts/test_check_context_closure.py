@@ -957,8 +957,8 @@ check(
 
 with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
-    (base / "CLAUDE.md").write_text("@frag.md\n", encoding="utf-8", newline="\n")
-    (base / "frag.md").write_text("short", encoding="utf-8", newline="\n")
+    (base / "CLAUDE.md").write_text("@frag.md\n", encoding="utf-8")
+    (base / "frag.md").write_text("short", encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
@@ -968,7 +968,7 @@ with tempfile.TemporaryDirectory() as tmp:
         ["git", "rev-parse", "HEAD"], cwd=base, capture_output=True, text=True
     ).stdout.strip()
     # Grow the fragment in the working tree only; the baseline rev keeps "short".
-    (base / "frag.md").write_text("a considerably longer fragment", encoding="utf-8", newline="\n")
+    (base / "frag.md").write_text("a considerably longer fragment", encoding="utf-8")
 
     at_base, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.baseline_reader(base, first))
     in_tree, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.local_reader(base))

@@ -7,7 +7,8 @@ import re
 import sys
 import tempfile
 
-FENCE_LINE_RX = re.compile(r"^\s*([`~]{3,})(?:[a-zA-Z0-9_-]+)?\s*$")
+FENCE_OPEN_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})(?:[a-zA-Z0-9_-]+)?\s*$")
+FENCE_CLOSE_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})\s*$")
 RX_LINE = re.compile(
     r"^\s*(?:[-*]\s+|\d+\.\s+|#{1,6}\s+)?(?:\*\*)?Stopping Point:?(?:\*\*)?:?\s*(?:Clean\b|Not (?:a )?clean\b)",
     re.IGNORECASE,
@@ -18,29 +19,25 @@ INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 def has_stopping_point_declaration(text: str) -> bool:
     if not text:
         return False
-    lines = text.splitlines()
-    fence_indices = [idx for idx, line in enumerate(lines) if FENCE_LINE_RX.match(line)]
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
 
-    def get_code_line_indices(fences):
-        code_lines = set()
-        for i in range(0, len(fences) - 1, 2):
-            for l in range(fences[i], fences[i + 1] + 1):
-                code_lines.add(l)
-        return code_lines
-
-    candidate_code_sets = []
-    if len(fence_indices) % 2 == 0:
-        candidate_code_sets.append(get_code_line_indices(fence_indices))
-    else:
-        candidate_code_sets.append(get_code_line_indices(fence_indices[1:]))
-        candidate_code_sets.append(get_code_line_indices(fence_indices[:-1]))
-
-    for idx, line in enumerate(lines):
-        stripped = INLINE_CODE_RX.sub("", line)
-        if RX_LINE.search(stripped):
-            for code_set in candidate_code_sets:
-                if idx not in code_set:
+    for line in text.splitlines():
+        if not in_fence:
+            m = FENCE_OPEN_RX.match(line)
+            if m:
+                in_fence = True
+                fence_char = m.group(1)[0]
+                fence_len = len(m.group(1))
+            else:
+                stripped = INLINE_CODE_RX.sub("", line)
+                if RX_LINE.search(stripped):
                     return True
+        else:
+            m = FENCE_CLOSE_RX.match(line)
+            if m and m.group(1)[0] == fence_char and len(m.group(1)) >= fence_len:
+                in_fence = False
     return False
 
 

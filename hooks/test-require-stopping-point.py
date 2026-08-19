@@ -52,7 +52,8 @@ cases = [
     ("Discussion of rule:\n```markdown\n**Stopping Point**: Clean stopping point reached\n```\nDone with task.\n\n**Stopping Point**: Clean stopping point reached.", False),
     ("**Stopping Point**: Cleanup pending, more work needed.", True),
     ("To open a fence type ``` on its own line.\n\n**Stopping Point**: Clean stopping point reached\n\n```\ncode\n```", False),
-    ("Fences look like this on their own line:\n\n```\n\nThat is how you open one.\n\n**Stopping Point**: Clean stopping point reached\n\n```\nexample code\n```\n", False),
+    ("Don't write a bare declaration like this:\n```\n**Stopping Point**: Clean stopping point reached\n```\nI have not actually finished; more work remains.\n\nAlso, here's a separate unrelated snippet I was about to show:\n```\n", True),
+    ("```\n**Stopping Point**: Clean stopping point reached\n```\n```\n", True),
 ]
 
 failed = 0

@@ -138,7 +138,7 @@ def link_targets(text: str) -> list[str]:
 
 def import_targets(text: str) -> list[str]:
     """Every Claude Code auto-load import (`@path` in col 1) in `text`."""
-    stripped = strip_fences(text)
+    stripped = INLINE.sub("", strip_fences(text))
     targets = []
     for match in AUTOLOAD.finditer(stripped):
         target = match.group(1).strip()

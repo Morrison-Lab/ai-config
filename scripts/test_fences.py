@@ -95,6 +95,9 @@ doc_unclosed = """prose 1
 code 1
 code 2"""
 
+stripped_default = strip_fences(doc_unclosed)
+check("strip_fences defaults to swallow_unclosed=False (safe default)", "code 1" in stripped_default and "code 2" in stripped_default)
+
 stripped_swallow = strip_fences(doc_unclosed, swallow_unclosed=True)
 check("swallow_unclosed=True strips to EOF", "code 1" not in stripped_swallow and "code 2" not in stripped_swallow)
 check("swallow_unclosed=True preserves leading prose", "prose 1" in stripped_swallow)

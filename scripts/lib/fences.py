@@ -23,9 +23,6 @@ import re
 FENCE_LINE = re.compile(
     r"^(?P<indent> {0,3})(?P<run>`{3,}|~{3,})(?P<info>[^\r\n]*)$"
 )
-UNCLOSED_FENCE_LINE = re.compile(
-    r"^ {0,3}(`{3,}|~{3,})[^\n]*$", re.MULTILINE
-)
 CODE_SPAN_RE = re.compile(
     r"(?<!`)(`+)(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
 )
@@ -34,7 +31,7 @@ CODE_SPAN_RE = re.compile(
 def find_fence_spans(
     text: str,
     *,
-    swallow_unclosed: bool = True,
+    swallow_unclosed: bool = False,
 ) -> tuple[set[int], int, set[int]]:
     """Scan text line-by-line for CommonMark fenced code blocks.
 
@@ -92,7 +89,7 @@ def find_fence_spans(
 def strip_fences(
     text: str,
     *,
-    swallow_unclosed: bool = True,
+    swallow_unclosed: bool = False,
     replacement: str = "",
 ) -> str:
     """Strip fenced code blocks from markdown text, blanking block lines."""

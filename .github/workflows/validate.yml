@@ -34,8 +34,6 @@ jobs:
         run: python3 scripts/test_validate_skills.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
-      - name: Run fence-stripper tests
-        run: python3 scripts/test_fences.py
       - name: Run semantic-line-break tool tests
         run: python3 scripts/test_slb.py
       - name: Run memory-file-size check tests

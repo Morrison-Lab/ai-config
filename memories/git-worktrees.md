@@ -285,11 +285,12 @@ Those two files are a subset of the four `491906bf` touched.
 Discarding was confirmed safe by content, for **both** files rather than one
 --- the section's own principle is that membership in a merged commit's file
 list is not the deciding read:
-`git show origin/main:shared/workflow/pr-on-claim.md` carries
+`git show 2714db61:shared/workflow/pr-on-claim.md` (now in
+`shared/workflow/pr-on-claim.rationale.md`) carries
 `gh workflow run <review-workflow>.yml -R <owner>/<repo> --ref <PR-branch> -f
-pr_number=<N>` at line 236, and
-`git show origin/main:skills/ardi/SKILL.md` carries the same string at line
-158.
+pr_number=<N>` in its review-dispatch section, and
+`git show 2714db61:skills/ardi/SKILL.md` carries the same string in its
+review-dispatch section.
 Resolved with `git worktree remove --force` plus `git branch -D`.
 How the two worktrees came to share the branch was **not** established, so
 nothing here asserts a mechanism for it.

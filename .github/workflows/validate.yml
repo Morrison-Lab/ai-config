@@ -55,6 +55,9 @@ jobs:
         run: |
           python3 scripts/test_check_install.py
           python3 scripts/test_check_harness_installs.py
+          python3 scripts/test_check_harness_ignores.py
+      - name: Check harness ignore files cover local residue
+        run: python3 scripts/check-harness-ignores.py
       - name: Run plugin-overlap detector tests
         # Only the tests run here. check-plugin-overlap.py itself inspects a
         # consumer directory (~/.claude) plus its settings.json, which no CI

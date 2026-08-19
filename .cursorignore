@@ -1,0 +1,8 @@
+# Local session residue. .gitignore already keeps these out of git;
+# this file keeps Cursor search, indexing, and agent Glob/Grep off the
+# same paths when those tools walk the working tree (ai-config#1641).
+.claude/worktrees/
+.worktrees/
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/

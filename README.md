@@ -507,6 +507,8 @@ activated.")
 - `skills/` --- reusable workflow skills (`~/.claude/skills/`, `~/.gemini/skills/`)
 - `codex-skills/` --- generated Codex wrappers (`~/.codex/skills/`)
 - `cursor-rules/` --- Cursor AI rules in `.mdc` format (`~/.cursor/rules/`)
+- `.cursorignore` / `.geminiignore` --- keep local worktree and Aider residue
+  out of Cursor and Gemini search (same paths `.gitignore` already excludes)
 - `AGENTS.md` --- universal vendor-neutral instruction file for all coding agents
 - `tool-mappings.yml` / `tool-mappings.md` — cross-model tool registry and its
   generated reference (see *Tool mappings* above)

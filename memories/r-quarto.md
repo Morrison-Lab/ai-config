@@ -19,6 +19,17 @@
   `conda run` can still suit a self-contained R invocation, but it is not a
   substitute for full shell activation when the tool shells out to its own
   bundled helpers.
+
+  An R package check that compiles native code is one such self-contained
+  invocation: run it as
+  `conda run -n bcs env R_PROFILE_USER=/dev/null Rscript -e '...'` rather than
+  calling the environment's `Rscript` by absolute path.
+  The latter loads R libraries but does not add the environment's compiler
+  drivers to `PATH`, so `pkgbuild::check_build_tools(debug = TRUE)` reports a
+  missing compiler even after the compiler package is installed.
+  Install the toolchain with `conda install -n bcs -c conda-forge compilers
+  --yes`, then repeat that diagnostic through `conda run` before rerunning
+  `devtools::check()`.
   - **Do:** activate, then re-run the failing command, before reporting a
     toolchain broken.
   - **Do:** derive the conda base with `conda info --base`, since `conda` is

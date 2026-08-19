@@ -643,7 +643,9 @@ common patterns.
 - **A composite action `action.yml` input default overrides shell script fallback logic, so default to empty string `''` when delegating ref/branch resolution to a helper script.**
   If `action.yml` specifies `default: 'HEAD'`, passing it via `env: TARGET_REF: ${{ inputs.target-ref }}` to a script using `${1:-$DEFAULT_REF}` always passes `"HEAD"`, bypassing fallback chains (`origin/main` -> `main` -> `HEAD`) needed on PR checkouts. Defaulting `target-ref: ''` in `action.yml` allows the helper script to apply its fallback resolution dynamically when unsupplied. (gha#512: `check-tag-drift` composite action.)
 - **A numeric version check in shell should validate that the parsed version string is numeric (`^[0-9]+$`) before evaluating `-lt` or `-gt`.**
-  Inside an `if [ "$NODE_MAJOR" -lt 18 ]; then ... fi` condition block, if `NODE_MAJOR` is non-numeric (e.g. unparseable output or empty string), `[` returns exit status 2. Because `[` is evaluated as the condition of an `if` statement, `set -e` does not abort on failure; instead, bash skips the `then` block and execution silently falls through to exit status 0 (passing the check). Validate `[[ "$NODE_MAJOR" =~ ^[0-9]+$ ]]` first and exit 1 on parse failures. (gha#283: `check-node-version.sh`.)
+  Inside an `if [ "$NODE_MAJOR" -lt 18 ]; then ... fi` condition block, if `NODE_MAJOR` is non-numeric (e.g. unparseable output or empty string), `[` returns exit status 2.
+  Because `[` is evaluated as the condition of an `if` statement, `set -e` does not abort on failure; instead, bash skips the `then` block and execution silently falls through to exit status 0 (passing the check).
+  Validate `[[ "$NODE_MAJOR" =~ ^[0-9]+$ ]]` first and exit 1 on parse failures. (gha#283: `check-node-version.sh`.)
 - **Writing any explicit step-level `if:` REPLACES the default `success()`, so a
   guard step's failure does not skip the steps that follow it.**
   The default condition on a step is `success()`, which is why a failing step
@@ -1167,8 +1169,8 @@ workflow this repo's review actually depends on, per
 
 **A third `claude-bot.yml` run followed, and it may have been self-triggered
 rather than a new human request.**
-The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`) fires on `contains(github.event.comment.body, '@claude')` without stripping code spans. A self-review comment containing `` `@claude` `` triggered the gate (ai-config#1242).
-That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not the PR branch (`ai-config#635`). Dispatch directly with an explicit `pr_number` input and `ref: <PR-branch>`.
+The upstream gate (`Morrison-Lab/gha`'s `claude.yml@v1`) fires on `contains(github.event.comment.body, '@claude')` without stripping code spans.
+A self-review comment containing `` `@claude` `` triggered the gate (ai-config#1242). That `workflow_dispatch` run's `head_branch`/`head_sha` reflect `main`, not the PR branch (`ai-config#635`). Dispatch directly with an explicit `pr_number` input and `ref: <PR-branch>`.
 
 - **Do:** treat a listener's own error comment as evidence about that step only, and check the dispatched workflow's run history before concluding a review failed.
 - **Do:** dispatch the review workflow directly rather than relying on a mention comment to relay through the listener.

@@ -108,19 +108,106 @@ def _is_new_block(line: str) -> bool:
 
 # Blockquote prose flusher
 
-def _flush_bq_prose(bq_lines: list[str], output: list[str]) -> None:
+def _emit_prose_sentences(
+    orig_lines: list[str],
+    orig_start_idx: int,
+    indent_str: str,
+    changed: set[int] | None,
+    output: list[str],
+    raw_lines: list[str] | None = None,
+    first_prefix: str | None = None,
+) -> None:
+    """Emit prose sentences with sentence-granular scope preservation.
+
+    If changed is None (whole-file mode), all sentences are reformatted to
+    semantic line breaks.
+    If changed is a set of 1-based line numbers, sentences whose original lines
+    were completely untouched by `changed` (and not sharing a line with a
+    touched sentence) are emitted verbatim, preserving their exact multi-line
+    breaks. Sentences touched by changed lines are reformatted to semantic line
+    breaks.
+    """
+    if raw_lines is None:
+        raw_lines = orig_lines
+
+    line_spans: list[tuple[int, int, int]] = []  # (line_index, start_pos, end_pos)
+    para_text_parts: list[str] = []
+    pos = 0
+    for offset, line in enumerate(orig_lines):
+        s = line.strip()
+        if not s:
+            continue
+        if para_text_parts:
+            pos += 1
+        start_pos = pos
+        end_pos = start_pos + len(s)
+        line_spans.append((orig_start_idx + offset, start_pos, end_pos))
+        para_text_parts.append(s)
+        pos = end_pos
+
+    para_text = ' '.join(para_text_parts)
+    if not para_text:
+        output.extend(raw_lines)
+        return
+
+    sentences = split_sentences(para_text)
+    if not sentences:
+        output.extend(raw_lines)
+        return
+
+    if changed is None:
+        for k, s in enumerate(sentences):
+            prefix = first_prefix if (k == 0 and first_prefix is not None) else indent_str
+            output.append(prefix + s)
+        return
+
+    curr_pos = 0
+    for k, s in enumerate(sentences):
+        prefix = first_prefix if (k == 0 and first_prefix is not None) else indent_str
+        s_idx = para_text.find(s, curr_pos)
+        if s_idx == -1:
+            output.append(prefix + s)
+            continue
+        s_start = s_idx
+        s_end = s_idx + len(s)
+        curr_pos = s_end
+
+        overlapping = [
+            line_idx for line_idx, l_start, l_end in line_spans
+            if l_start < s_end and l_end > s_start
+        ]
+
+        touched = any((line_idx + 1) in changed for line_idx in overlapping)
+        is_isolated = False
+        if overlapping:
+            first_line = overlapping[0]
+            last_line = overlapping[-1]
+            first_span = next(span for span in line_spans if span[0] == first_line)
+            last_span = next(span for span in line_spans if span[0] == last_line)
+            if s_start <= first_span[1] and s_end >= last_span[2]:
+                is_isolated = True
+
+        if not touched and is_isolated:
+            for line_idx in overlapping:
+                output.append(raw_lines[line_idx - orig_start_idx])
+        else:
+            output.append(prefix + s)
+
+
+def _flush_bq_prose(
+    bq_lines: list[str],
+    output: list[str],
+    bq_start_idx: int = 0,
+    changed: set[int] | None = None,
+) -> None:
     """Sentence-split accumulated blockquote prose lines and append to output."""
     if not bq_lines:
         return
     bq_prefix = re.match(r'^(\s*>\s*)', bq_lines[0]).group(1)
-    bq_text = ' '.join(re.sub(r'^\s*>\s*', '', bl).strip() for bl in bq_lines)
-    bq_text = re.sub(r'\s+', ' ', bq_text).strip()
-    sentences = split_sentences(bq_text)
-    if not sentences or (len(sentences) <= 1 and len(bq_lines) == 1):
-        output.extend(bq_lines)
-    else:
-        for s in sentences:
-            output.append(bq_prefix + s)
+    inner_lines = [re.sub(r'^\s*>\s*', '', bl) for bl in bq_lines]
+    _emit_prose_sentences(
+        inner_lines, bq_start_idx, bq_prefix, changed, output, raw_lines=bq_lines
+    )
 
 
 # Diff scoping
@@ -339,6 +426,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             j = i
             block_out: list[str] = []
             bq_prose: list[str] = []   # accumulated prose lines to sentence-split
+            bq_prose_start = i
             in_bq_code = False
 
             while j < len(lines) and _BQ_RE.match(lines[j]):
@@ -346,7 +434,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                 inner = re.sub(r'^\s*>\s?', '', bq_line)
                 if _FENCE_RE.match(inner):
                     # Flush any buffered prose before toggling code state.
-                    _flush_bq_prose(bq_prose, block_out)
+                    _flush_bq_prose(bq_prose, block_out, bq_prose_start, changed)
                     bq_prose = []
                     in_bq_code = not in_bq_code
                     block_out.append(bq_line)
@@ -355,15 +443,17 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                 elif _BULLET_RE.match(inner) or _BLANK_RE.match(inner):
                     # List items and blank separator lines inside blockquotes:
                     # flush any preceding prose and pass through verbatim.
-                    _flush_bq_prose(bq_prose, block_out)
+                    _flush_bq_prose(bq_prose, block_out, bq_prose_start, changed)
                     bq_prose = []
                     block_out.append(bq_line)
                 else:
+                    if not bq_prose:
+                        bq_prose_start = j
                     bq_prose.append(bq_line)
                 j += 1
 
             # Flush any trailing prose.
-            _flush_bq_prose(bq_prose, block_out)
+            _flush_bq_prose(bq_prose, block_out, bq_prose_start, changed)
             output.extend(block_out if _in_scope(i, j, changed) else lines[i:j])
             i = j
             continue
@@ -404,20 +494,11 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
                 i = j
                 continue
 
-            # Split into sentences and re-emit.
-            sentences = split_sentences(all_text)
-            if not sentences:
-                # Nothing to split; emit original.
-                output.append(line)
-                i = j
-                continue
-
-            for k, s in enumerate(sentences):
-                if k == 0:
-                    output.append(marker_str + s)
-                else:
-                    output.append(cont_indent + s)
-
+            inner_lines = [first_text] + [re.sub(r'^\s*', '', lines[k]) for k in range(i + 1, j)]
+            _emit_prose_sentences(
+                inner_lines, i, cont_indent, changed, output,
+                raw_lines=lines[i:j], first_prefix=marker_str,
+            )
             i = j
             continue
 
@@ -426,14 +507,11 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
         para_lead = len(line) - len(line.lstrip())
         indent_str = ' ' * para_lead
 
-        para_text = stripped
         j = i + 1
         while j < len(lines):
             nl = lines[j]
-            ns = nl.strip()
             if _is_new_block(nl):
                 break
-            para_text += ' ' + ns
             j += 1
 
         if not _in_scope(i, j, changed):
@@ -441,17 +519,7 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             i = j
             continue
 
-        para_text = re.sub(r'\s+', ' ', para_text).strip()
-        sentences = split_sentences(para_text)
-
-        if not sentences:
-            output.append(line)
-            i = j
-            continue
-
-        for s in sentences:
-            output.append(indent_str + s)
-
+        _emit_prose_sentences(lines[i:j], i, indent_str, changed, output)
         i = j
 
     result = '\n'.join(output)

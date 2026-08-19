@@ -41,6 +41,32 @@ def pending_commit(path):
     return pending
 
 
+def last_assistant_text(path):
+    last = ""
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as stream:
+            for line in stream:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if record.get("type") != "assistant":
+                    continue
+                blocks = (record.get("message") or {}).get("content") or []
+                text = "".join(
+                    b.get("text", "") for b in blocks
+                    if isinstance(b, dict) and b.get("type") == "text"
+                )
+                if text.strip():
+                    last = text
+    except Exception:
+        return ""
+    return last
+
+
 def main():
     try:
         path = json.load(sys.stdin).get("transcript_path") or ""
@@ -49,7 +75,8 @@ def main():
     command = pending_commit(path)
     if not command:
         return
-    key = hashlib.sha256((path + command).encode()).hexdigest()[:16]
+    text = last_assistant_text(path)
+    key = hashlib.sha256((path + command + text).encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-unshipped-commit-{key}")
     if os.path.exists(sentinel):
         return

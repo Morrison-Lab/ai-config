@@ -29,6 +29,9 @@ try:
 
     # Verify extract_pr_urls
     multi_pr = transcript([
+        {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr view 999"}},
+        {"type": "tool_result", "content": "https://github.com/o/r/pull/999"},
+        {"type": "text", "text": "See also https://github.com/o/r/pull/888"},
         {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create --title 'A'"}},
         {"type": "tool_result", "content": "https://github.com/o/r/pull/10"},
         {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create --title 'B'"}},
@@ -36,7 +39,7 @@ try:
     ])
     try:
         urls = subject.extract_pr_urls(multi_pr)
-        assert urls == ["https://github.com/o/r/pull/10", "https://github.com/o/r/pull/20"]
+        assert urls == ["https://github.com/o/r/pull/10", "https://github.com/o/r/pull/20"], f"Got {urls}"
     finally:
         os.unlink(multi_pr)
 

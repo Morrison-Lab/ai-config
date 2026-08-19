@@ -57,12 +57,46 @@ def monitor_path(url):
 
 
 def extract_pr_urls(path):
+    """Extract PR URLs strictly produced by gh pr create / create_pull_request tool calls."""
     urls = []
+    pending_tool_ids = set()
+    pending_open = False
+
     for record in records(path):
-        for match in PR_URL.finditer(json.dumps(record)):
-            url = match.group(0)
-            if url not in urls:
-                urls.append(url)
+        content_items = []
+        if isinstance(record.get("content"), list):
+            content_items.extend(record.get("content"))
+        if isinstance((record.get("message") or {}).get("content"), list):
+            content_items.extend(record["message"]["content"])
+        elif isinstance(record.get("message"), list):
+            content_items.extend(record["message"])
+
+        for block in content_items:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if btype == "tool_use":
+                blob = block.get("name", "") + " " + json.dumps(block.get("input") or {})
+                if OPEN.search(blob):
+                    tool_id = block.get("id")
+                    if tool_id:
+                        pending_tool_ids.add(tool_id)
+                    else:
+                        pending_open = True
+                    for match in PR_URL.finditer(blob):
+                        u = match.group(0)
+                        if u not in urls:
+                            urls.append(u)
+            elif btype == "tool_result":
+                tool_id = block.get("tool_use_id")
+                if (tool_id and tool_id in pending_tool_ids) or pending_open:
+                    for match in PR_URL.finditer(json.dumps(block)):
+                        u = match.group(0)
+                        if u not in urls:
+                            urls.append(u)
+                    if tool_id:
+                        pending_tool_ids.discard(tool_id)
+                    pending_open = False
     return urls
 
 

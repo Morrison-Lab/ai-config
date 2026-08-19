@@ -7,9 +7,9 @@ import re
 import sys
 import tempfile
 
-COMMIT = re.compile(r"(?:^|[;&|]\s*)git\s+commit\b")
-PUSH = re.compile(r"(?:^|[;&|]\s*)git\s+push\b")
-CREATE = re.compile(r"(?:^|[;&|]\s*)gh\s+pr\s+create\b")
+COMMIT = re.compile(r"(?:^|[;&|\n]\s*)git\s+commit\b", re.MULTILINE)
+PUSH = re.compile(r"(?:^|[;&|\n]\s*)git\s+push\b", re.MULTILINE)
+CREATE = re.compile(r"(?:^|[;&|\n]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 
 
 def pending_commit(path):
@@ -17,7 +17,13 @@ def pending_commit(path):
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
             for line in stream:
-                record = json.loads(line)
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
                 if record.get("type") != "assistant":
                     continue
                 for block in (record.get("message") or {}).get("content") or []:
@@ -25,7 +31,7 @@ def pending_commit(path):
                         continue
                     if block.get("name") not in {"Bash", "bash", "run_command"}:
                         continue
-                    command = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or "")
+                    command = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or (block.get("input") or {}).get("CommandLine") or "")
                     if COMMIT.search(command):
                         pending = command
                     if pending and (PUSH.search(command) or CREATE.search(command)):

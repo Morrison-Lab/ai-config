@@ -82,9 +82,9 @@ it; use the correct private tracker and redact sensitive details when needed.
   not an unowned observation.
 - **Do:** file every noticed issue in its owning tracker, even when it is
   trivial, already fixed locally, or outside the active task.
-- **Don't:** interpret “status” as report-only after discovering a concrete,
+- **Don't:** interpret "status" as report-only after discovering a concrete,
   safe, in-scope repair.
-- **Don't:** end with “this failed” or “this needs a fix” when the fix is
+- **Don't:** end with "this failed" or "this needs a fix" when the fix is
   available to perform in the same turn.
 - **Don't:** leave a noticed issue as chat prose because it seems too small or
   too far outside the current scope to track.

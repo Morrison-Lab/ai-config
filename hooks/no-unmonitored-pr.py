@@ -77,11 +77,14 @@ def alive(pid):
         return False
 
 
+MAX_CONSECUTIVE_ERRORS = 15
+
+
 def pr_url(cwd):
     try:
         result = subprocess.run(["gh", "pr", "view", "--json", "url", "--jq", ".url"],
                                 cwd=cwd, capture_output=True, text=True,
-                                timeout=10, check=True)
+                                timeout=5, check=True)
     except (OSError, subprocess.SubprocessError):
         return ""
     return result.stdout.strip()
@@ -89,25 +92,26 @@ def pr_url(cwd):
 
 def start_monitor(cwd):
     if not shutil.which("gh"):
-        return ""
+        return None
     url = pr_url(cwd)
     if not url:
-        return ""
+        return None
     path = monitor_path(url)
     if alive(read_json(path).get("pid")):
-        return path
+        return False
     try:
         process = subprocess.Popen([sys.executable, os.path.abspath(__file__), "--poll", url, path],
                                    cwd=cwd, stdin=subprocess.DEVNULL,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                    start_new_session=True)
     except OSError:
-        return ""
+        return None
     write_json(path, {"url": url, "pid": process.pid, "started_at": time.time()})
-    return path
+    return True
 
 
 def poll(url, path):
+    consecutive_errors = 0
     while True:
         state = read_json(path)
         state.update({"url": url, "pid": os.getpid(), "checked_at": time.time()})
@@ -117,11 +121,15 @@ def poll(url, path):
                                     capture_output=True, text=True, timeout=30, check=True)
             state["data"] = json.loads(result.stdout)
             state.pop("error", None)
+            consecutive_errors = 0
         except (OSError, ValueError, subprocess.SubprocessError) as error:
+            consecutive_errors += 1
             state.pop("data", None)
             state["error"] = str(error)
         write_json(path, state)
         if state.get("data", {}).get("state") in {"MERGED", "CLOSED"}:
+            return
+        if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
             return
         time.sleep(POLL_SECONDS)
 
@@ -136,8 +144,11 @@ def main():
         return
     if not pending(payload.get("transcript_path") or ""):
         return
-    if start_monitor(payload.get("cwd") or os.getcwd()):
+    status = start_monitor(payload.get("cwd") or os.getcwd())
+    if status is True:
         print(json.dumps({"systemMessage": "No model scheduler was recorded, so a detached two-minute PR poller was started. It records GitHub state and injects changes on the next prompt; it cannot wake a terminated session."}))
+        return
+    elif status is False:
         return
     print(json.dumps({"decision": "block", "reason": "A PR was opened without recurring monitoring. No local timer could be armed; call send_later, ScheduleWakeup, or a trigger routine before ending this turn."}))
 

@@ -2,7 +2,28 @@
 
 This file defines standardized, vendor-neutral instructions for AI coding agents operating within Morrison-Lab repositories (OpenAI Codex CLI, Gemini CLI / Antigravity, Claude Code, Cursor, Aider, etc.).
 
-## Keep ai-config and repo checkouts fresh
+## Generalize instructions to every AI agent by default
+
+Unless the user explicitly scopes an instruction to one agent, project, or
+session, apply it to every available AI-agent configuration and shared
+automation surface. Do not treat the currently speaking agent as an implicit
+scope restriction.
+
+## Interpret instructions broadly and maximize safe progress
+
+Unless the user narrows a request, take the broad reading that advances its
+obvious objective and complete every safe, authorized, relevant step. Do not
+reduce an instruction to the smallest literal action when its context makes a
+larger in-scope outcome clear.
+
+## Status requests do not make issues report-only
+
+Treat a request for status as a request to inspect live state and finish every
+safe, in-scope, concrete action that inspection reveals. A report is the recap
+after the work, not a substitute for it. When an issue cannot be fixed
+directly, carry it forward with an actual next action. Every issue noticed,
+however small or outside the current task's scope, must at minimum be filed in
+the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
 
 In every session --- at session start, and again periodically during long sessions --- refresh local state:
 

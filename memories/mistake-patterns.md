@@ -36,3 +36,9 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Example**: gha#511 (2026-08-18): answered the CI-wait question, never opened the Needs more work comment.
 - **Canonical Rule**: See `CLAUDE.md` ("Re-check for latest review findings before reporting PR status") and `skills/pr-status/SKILL.md` ("When this fires").
 - **Fix**: Fetch the latest review and CI before answering any question about a live PR, not only when the user said "status".
+
+## Pattern 7: Stale PR body figures surviving iteration pushes
+- **Mistake**: Pushing changes or review fixes that alter file counts, diff stats, or commit SHAs without updating the verification table in the PR body.
+- **Example**: Morrison-Lab/ai-config#1531: at `3a373100`, the body still claimed +31/-3 across 1 file at `685b5dc8`, while HEAD had moved to +35/-4 across 2 files.
+- **Canonical Rule**: See `shared/workflow/ardi.md` and `scripts/check-pr-body-figures.py` (Morrison-Lab/ai-config#1549).
+- **Fix**: Run `python3 scripts/check-pr-body-figures.py` to mechanically compare stated figures and derivation SHAs against the HEAD commit.

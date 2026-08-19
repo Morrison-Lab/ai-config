@@ -419,7 +419,7 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     latest_verdict = ""
     latest_when = ""
     n_with_verdict = 0
-    for _kind, when, body, _oid, state in dated:
+    for _kind, when, body, _oid, state, *_ in dated:
         verdict = classify_verdict(body, state)
         if verdict:
             n_with_verdict += 1
@@ -438,7 +438,7 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     return True, []
 
 
-def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "") -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", commit_date: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
     data = json.loads(out)
 
@@ -486,7 +486,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "**claude finished", "### verdict", "verdict:"))
 
         if is_bot_author or is_review_header:
-            all_items.append(("comment", c["createdAt"], body, "", "COMMENT"))
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
 
     for r in reviews:
         body = r.get("body", "")
@@ -504,7 +504,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             or author_login.endswith("[bot]")
         )
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
-            all_items.append(("review", submitted_at, body, commit_oid, state))
+            all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 
     if not all_items:
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
@@ -530,15 +530,23 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)
         else:
-            # An issue comment counts as evaluating HEAD only if it actually
-            # references the HEAD SHA (full or short). Matching on timing alone
-            # (posted after the commit + a generic marker word) is unsafe: a slow
-            # review of an earlier commit can post AFTER a newer push and would
-            # then be accepted as a review of the new HEAD, reporting a stale
-            # verdict as "fully clean" -- the exact review-vs-push race
-            # shared/workflow/fully-clean.md documents ("a review comment's
-            # header SHA can be stale"). Fail closed: no SHA reference, no match.
-            is_match = is_sha_match
+            # An issue comment from a bot author counts as evaluating HEAD if
+            # posted after the HEAD commit timestamp. This uses timing as a
+            # proxy for the check run's head_sha (which issue comments lack),
+            # accepting the small risk of a slow review of an earlier commit
+            # posting after a newer push. The alternative -- requiring the SHA
+            # in the body -- fails on every clean review that omits it, which
+            # is the commoner case (findings-free verdicts cite no lines).
+            # See Morrison-Lab/ai-config#1520, #1213.
+            is_match = is_sha_match  # default: require SHA in body
+            if commit_date and item[1] and not is_sha_match:
+                author_login = item[5] if len(item) > 5 else ""
+                is_bot = author_login in (
+                    "github-actions", "github-actions[bot]",
+                    "claude[bot]", "claude",
+                ) or author_login.endswith("[bot]")
+                if is_bot and item[1] >= commit_date:
+                    is_match = True
 
         if is_match:
             matching_items.append(item)
@@ -618,7 +626,7 @@ def main():
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha, repo)
-    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision)
+    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision, commit_date)
 
     all_issues = ci_issues + review_issues
 

@@ -145,17 +145,53 @@ def main() -> int:
         check("human APPROVED review without bot review fails criterion 2", not human_ok and any("No automated review" in i for i in human_issues))
 
     # Regression: a stale review posted AFTER the commit, carrying a marker
-    # word but NOT referencing the HEAD SHA, must NOT be accepted as evaluating
-    # HEAD (the fail-open timing-race guarded by fully-clean.md). It is a slow
-    # review of an earlier commit landing after a newer push.
+    # word but NOT referencing the HEAD SHA. With the timing-based fix
+    # (#1520, #1213), bot-authored comments posted after the HEAD commit
+    # are accepted as evaluating HEAD. This is a deliberate trade-off:
+    # the common case (clean bot reviews that omit the SHA) now works,
+    # at the cost of accepting slow reviews of earlier commits that post
+    # after a newer push. The alternative (requiring SHA in body) fails
+    # on every clean review that omits it.
     stale_no_sha_comment = {
         "createdAt": "2026-08-05T18:30:00Z",  # posted after the commit, references no HEAD SHA
-        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nAnalysis of an older commit.\n\nVerdict: Clean / Ready for merge."
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nAnalysis of an older commit.\n\nVerdict: Clean / Ready for merge.",
+        "author": {"login": "claude[bot]"},
     }
     mock_stale_data = json.dumps({"comments": [stale_no_sha_comment], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_stale_data):
-        stale_ok, stale_issues = checker.check_review_comments("1167", "sha123", TEST_REPO)
-        check("stale review not referencing HEAD SHA is rejected (fail-closed)", (not stale_ok) and len(stale_issues) > 0)
+        stale_ok, stale_issues = checker.check_review_comments(
+            "1167", "sha123", TEST_REPO, commit_date="2026-08-05T18:14:14Z"
+        )
+        check("bot comment posted after HEAD commit is accepted (#1520)", stale_ok and stale_issues == [])
+
+    # New: a bot comment posted BEFORE the HEAD commit must still be rejected,
+    # because it cannot be reviewing a commit that didn't exist yet.
+    stale_before_comment = {
+        "createdAt": "2026-08-05T18:10:00Z",  # posted BEFORE the HEAD commit
+        "body": "### \ud83e\udd16 Antigravity Agent Report\n\nVerdict: Clean / Ready for merge.",
+        "author": {"login": "claude[bot]"},
+    }
+    mock_stale_before = json.dumps({"comments": [stale_before_comment], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_stale_before):
+        stale_before_ok, stale_before_issues = checker.check_review_comments(
+            "1167", "sha123", TEST_REPO, commit_date="2026-08-05T18:14:14Z"
+        )
+        check("bot comment posted before HEAD commit is rejected", (not stale_before_ok) and len(stale_before_issues) > 0)
+
+    # New: a non-bot comment posted after HEAD commit must still require SHA
+    # in the body -- timing alone is not sufficient for human comments.
+    human_no_sha_after = {
+        "createdAt": "2026-08-05T18:30:00Z",
+        "body": "Looks good to me!",
+        "author": {"login": "d-morrison"},
+    }
+    mock_human_after = json.dumps({"comments": [human_no_sha_after], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_human_after):
+        human_after_ok, human_after_issues = checker.check_review_comments(
+            "1167", "sha123", TEST_REPO, commit_date="2026-08-05T18:14:14Z"
+        )
+        check("non-bot comment without SHA is rejected even if posted after HEAD",
+              (not human_after_ok) and len(human_after_issues) > 0)
 
     # Regression (round 12): a plain human formal review whose body merely
     # contains an automated-review marker phrase ("verdict:", "code review", ...)

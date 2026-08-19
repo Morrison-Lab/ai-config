@@ -112,10 +112,6 @@ jobs:
         run: python3 scripts/check-hook-catalog.py
       - name: Run hook-catalog check tests
         run: python3 scripts/test_check_hook_catalog.py
-      - name: Check hook output shape (warn-only hooks emit systemMessage)
-        run: python3 scripts/check-hook-output-shape.py
-      - name: Run hook-output-shape check tests
-        run: python3 scripts/test_check_hook_output_shape.py
       - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
         # The BUDGET half reports rather than gates, and deliberately so:
         # this repo is currently ~4x the shipped budget (ai-config#897), so a

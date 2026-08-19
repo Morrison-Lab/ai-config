@@ -34,6 +34,8 @@ jobs:
         run: python3 scripts/test_validate_skills.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-pr-body-figures tests
+        run: python3 scripts/test_check_pr_body_figures.py
       - name: Run semantic-line-break tool tests
         run: python3 scripts/test_slb.py
       - name: Run memory-file-size check tests
@@ -230,10 +232,10 @@ jobs:
         uses: Morrison-Lab/gha/lint-qmd@cba62aa00856c40111cd976d563e1ebe748f3f9a # gha#280
 
   new-line-breaks:
-    # Diff-scoped, non-blocking (ai-config#682, ported to gha#300): MD013 is
-    # off repo-wide (see .markdownlint-cli2.jsonc) because most of the corpus
-    # has drifted from the last semantic-line-breaks reformat. This only
-    # flags lines a PR itself adds, so it can't reflag that drift.
+    # Diff-scoped, blocking (ai-config#682, ported to gha#300): MD013 is off
+    # repo-wide (see .markdownlint-cli2.jsonc) because most of the corpus has
+    # drifted from the last semantic-line-breaks reformat. This only flags
+    # lines a PR itself adds, so it can't reflag that drift.
     #
     # No event_name guard: the reusable workflow's own base-ref input
     # (github.event.pull_request.base.sha on PRs, '' otherwise) already
@@ -248,3 +250,4 @@ jobs:
       # (ai-config#962).
       globs: '*.md'
       paths-ignore: 'codex-skills/**,docs/**,_site/**,.quarto/**'
+      fail: true

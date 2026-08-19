@@ -80,11 +80,24 @@ find_agent_pid() {
   return 1
 }
 
-# Resolve session id from flag, then env. Generate one only for `register`.
+# Resolve session id from flag, then env, then single live session in registry.
 resolve_id() {
   if [ -n "${OPT_ID:-}" ]; then printf '%s' "$OPT_ID"; return; fi
   if [ -n "${AI_SESSION_ID:-}" ]; then printf '%s' "$AI_SESSION_ID"; return; fi
   if [ -n "${CLAUDE_SESSION_ID:-}" ]; then printf '%s' "$CLAUDE_SESSION_ID"; return; fi
+  local live_ids=() f
+  shopt -s nullglob
+  for f in "$REG_DIR"/*.session; do
+    load_session "$f"
+    if [ "$S_host" = "$HOST" ] && ! is_stale; then
+      live_ids+=("$S_id")
+    fi
+  done
+  shopt -u nullglob
+  if [ "${#live_ids[@]}" -eq 1 ]; then
+    printf '%s' "${live_ids[0]}"
+    return 0
+  fi
   return 1
 }
 
@@ -448,6 +461,11 @@ case "$CMD" in
       exit 2
     fi
     printf 'mwc is active for session %s\n' "$id"
+    if [ -z "${AI_SESSION_ID:-}" ] && [ -z "${CLAUDE_SESSION_ID:-}" ]; then
+      printf '  Notice: AI_SESSION_ID and CLAUDE_SESSION_ID are unset in this shell.\n'
+      printf '  The pre-tool-use merge guard will resolve session id from the harness hook payload\n'
+      printf '  (session_id or transcript_path stem). Ensure the granted id matches the harness session.\n'
+    fi
     exit 0
     ;;
   -h|--help) sed -n '2,40p' "$0" ;;

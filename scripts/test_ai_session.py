@@ -261,6 +261,19 @@ def main() -> int:
         check("invalid arithmetic" not in p.stderr,
               "a CRLF session record does not crash is_stale", p.stderr.strip())
 
+        # 12. check-mwc without --id or env vars resolves the single live session on host (ai-config#1608)
+        run("register", "--id", sid)
+        run("enable-mwc", "--id", sid)
+        clean_env = {k: v for k, v in os.environ.items()
+                     if k not in ("AI_SESSION_ID", "CLAUDE_SESSION_ID")}
+        p = subprocess.run([bash, str(SCRIPT), "check-mwc"],
+                           cwd=repo, capture_output=True, text=True, env=clean_env)
+        check(p.returncode == 0,
+              "check-mwc without --id resolves single live session on host",
+              f"rc={p.returncode} out={p.stdout.strip()} err={p.stderr.strip()}")
+        check(f"mwc is active for session {sid}" in p.stdout,
+              "check-mwc output names the resolved single live session", p.stdout.strip())
+
     print()
     if failures:
         print(f"{len(failures)} FAILED:")

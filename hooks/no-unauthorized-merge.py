@@ -748,16 +748,16 @@ def resolve_session_id(payload: dict | None = None) -> str | None:
     returned None unconditionally and no legitimate grant ever reached the guard
     (ai-config#1279, defect 1).
 
-    Order: the payload's own id, then the transcript filename stem (the same id,
-    for a harness that omits the field), then the environment forms. Each is a
-    way to learn WHICH session is running -- none of them grants anything, since
-    the caller still requires a marker for exactly that id plus a live session.
+    Order: the payload's session fields (session_id, sessionId, sessionID,
+    conversation_id, conversationId), then transcript filename stem, then
+    environment forms.
     """
     if payload:
-        sid = payload.get("session_id")
-        if isinstance(sid, str) and sid.strip():
-            return sid.strip()
-        tpath = payload.get("transcript_path")
+        for key in ("session_id", "sessionId", "sessionID", "conversation_id", "conversationId"):
+            sid = payload.get(key)
+            if isinstance(sid, str) and sid.strip():
+                return sid.strip()
+        tpath = payload.get("transcript_path") or payload.get("transcriptPath")
         if isinstance(tpath, str) and tpath.strip():
             stem = Path(tpath.strip()).stem
             if stem:

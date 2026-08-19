@@ -474,6 +474,11 @@ try:
     wrong += (v_pay != "allow")
     print(f"  {v_pay:<6} MWC grant honoured from the payload session_id (no env var)")
 
+    v_pay_alt = verdict("gh pr merge 411 --squash", env=env_bare,
+                        extra={"conversation_id": session_a})
+    wrong += (v_pay_alt != "allow")
+    print(f"  {v_pay_alt:<6} MWC grant honoured from payload conversation_id")
+
     # Same, via the transcript filename stem, for a harness that omits the
     # field. Uses session C, whose id is filename-shaped like a real harness
     # UUID -- session A's id deliberately contains `/` and `:` to exercise
@@ -600,6 +605,6 @@ for tool_name, tool_input, desc in MCP_ALLOW:
     wrong += (v != "allow")
     print(f"  {v:<6} {desc}")
 
-total = len(BLOCK) + len(ALLOW) + len(MCP_BLOCK) + len(MCP_ALLOW) + 10
+total = len(BLOCK) + len(ALLOW) + len(MCP_BLOCK) + len(MCP_ALLOW) + 11
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

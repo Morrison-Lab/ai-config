@@ -30,6 +30,15 @@ Copilot separately did stay silent on that PR, which is the distinct third state
 They had zero Copilot reviews until the user asked why no review had been requested about ten minutes later.
 The repo's `claude-review` workflow was failing for the same context-closure limit that made #1029's review fail on every attempt, so a PR without the explicit Copilot request had no working reviewer despite review-shaped checks.)
 
+## Do not `Closes` a parent issue on a partial ship
+
+(Morrison-Lab/gha#373 / #516 / #517, 2026-08-19: `gi` opened the draft with
+`Closes #373` and shipped only Case B of a later A/B split. The merge
+closed #373, so Case A --- a human security decision the issue itself
+said not to fold into an unrelated PR --- left the tracker until wrap-up
+filed #517. File the leftover issue before merge and drop `Closes` on the
+parent.)
+
 ## Verify you switched branches before the second issue's code
 
 (ucdavis/bcs `gia` session, 2026-07-06: SLURM-hardening changes for issue #286

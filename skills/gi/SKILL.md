@@ -68,6 +68,11 @@ step 2 (unless the user explicitly specified an issue or candidate preference).
 State which issue was selected and why, then proceed directly to check
 in-flight status and implementation without pausing for user confirmation.
 
+Do not describe the issue as "in progress" or say that implementation has
+started until steps 4, 6, 7, and 8 have completed: the live claim, isolated
+branch/worktree, and draft PR are the observable start of work.
+Investigation or triage alone is preparatory work, not an active implementation.
+
 ### 4. Check the issue isn't already in-flight
 
 Before claiming or branching, confirm no other session is already on this
@@ -162,7 +167,15 @@ WIP — opened up front to claim the issue; implementing now." --assignee <your-
 
 Keep it a draft: a draft doesn't trigger the `@claude` review bot, so no review
 round is wasted on an empty diff. Include `Closes #N` to auto-close the issue on
-merge.
+merge **only when this PR will finish the issue**. If a later comment splits the
+issue into independent cases and this PR ships only one, file the leftover as
+its own issue **before merge** and rewrite the PR body so it does not `Closes`
+the parent (link both: this PR for the shipped slice, the new issue for the
+rest). Closing the parent on a partial ship drops the deferred half from the
+tracker
+([gha#373](https://github.com/Morrison-Lab/gha/issues/373) /
+[#516](https://github.com/Morrison-Lab/gha/pull/516) /
+[#517](https://github.com/Morrison-Lab/gha/issues/517)).
 
 ### 9. Implement
 

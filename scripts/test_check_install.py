@@ -81,6 +81,7 @@ def make_fixture(tmpdir: Path) -> tuple[Path, Path]:
     write(consumer / "skills" / "gamma" / "SKILL.md", "gamma v1\n")
     write(consumer / "skills" / "zeta" / "SKILL.md", "a built-in we do not ship\n")
     write(consumer / "skills" / "index.json", json.dumps({"harness": "index"}))
+    write(consumer / "skills" / "manifest.json", json.dumps({"skills": []}))
 
     return repo, consumer
 
@@ -115,7 +116,9 @@ with tempfile.TemporaryDirectory() as tmp:
     check("repo child absent from a merged dir is missing",
           found.get("skills/delta") == "missing")
     check("consumer-only directory is foreign", found.get("skills/zeta") == "foreign")
-    check("consumer-only file is foreign", found.get("skills/index.json") == "foreign")
+    check("harness skill index is not a foreign skill",
+          "skills/manifest.json" not in found)
+    check("stray file in skills/ is ignored", "skills/index.json" not in found)
 
     # The headline improvement over the SKILL.md-only sweep: beta is stale
     # even though the file that sweep compared is byte-identical.
@@ -153,7 +156,7 @@ with tempfile.TemporaryDirectory() as tmp:
           and f"checked {expected} installed entries" in result.stdout)
     check("summary names each defect count",
           "1 stale" in result.stdout and "2 missing" in result.stdout
-          and "1 unlinked" in result.stdout and "2 foreign" in result.stdout)
+          and "1 unlinked" in result.stdout and "1 foreign" in result.stdout)
     check("defects prompt the reader toward --fix", "--fix" in result.stdout)
     check("read-only run mutates nothing",
           not (consumer / "skills" / "beta").is_symlink())
@@ -179,7 +182,10 @@ with tempfile.TemporaryDirectory() as tmp:
     check("foreign directory is left alone",
           (consumer / "skills" / "zeta" / "SKILL.md").read_text(encoding="utf-8")
           == "a built-in we do not ship\n")
-    check("foreign file is left alone", (consumer / "skills" / "index.json").is_file())
+    check("ignored harness file is left alone",
+          (consumer / "skills" / "manifest.json").is_file())
+    check("ignored stray file is left alone",
+          (consumer / "skills" / "index.json").is_file())
     check("misdirected symlink is left alone",
           (consumer / "GEMINI.md").resolve() == (Path(tmp) / "elsewhere" / "GEMINI.md").resolve())
 

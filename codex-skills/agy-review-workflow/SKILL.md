@@ -1,6 +1,6 @@
 ---
 name: "agy-review-workflow"
-description: "Set up Antigravity review workflow."
+description: "Set up Antigravity workflow."
 ---
 
 # agy-review-workflow (Codex wrapper)

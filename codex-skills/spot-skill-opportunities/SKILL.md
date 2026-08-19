@@ -1,6 +1,6 @@
 ---
 name: "spot-skill-opportunities"
-description: "Identify candidates for new skills."
+description: "Find opportunities for new skills."
 ---
 
 # spot-skill-opportunities (Codex wrapper)

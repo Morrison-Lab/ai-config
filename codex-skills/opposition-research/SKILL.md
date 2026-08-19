@@ -1,6 +1,6 @@
 ---
 name: "opposition-research"
-description: "Mine competitor issues/community."
+description: "Mine competitor community demand."
 ---
 
 # opposition-research (Codex wrapper)

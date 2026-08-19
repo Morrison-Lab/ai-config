@@ -1,6 +1,6 @@
 ---
 name: opposition-research
-description: "Mine competitor issues/community."
+description: "Mine competitor community demand."
 user-invocable: true
 allowed-tools:
   - WebSearch

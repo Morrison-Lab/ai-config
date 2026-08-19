@@ -78,15 +78,27 @@ for src in "$SCRIPT_DIR"/*/; do
   fi
 done
 
-# --- Codex skill wrappers vs plugin ---
-# Select the enabled Codex plugin or its wrapper symlinks, never both (ai-config#1629).
+# --- Codex skill wrappers: plugin and symlink installs are alternatives ---
 if [ -d "$SCRIPT_DIR/codex-skills" ]; then
-  printf '\n--- Codex skills ---\n'
-  if python3 -c "import sys; sys.path.insert(0, '$SCRIPT_DIR/scripts/lib'); from codex_plugin import is_codex_plugin_enabled; sys.exit(0 if is_codex_plugin_enabled('$CODEX_DIR', '$SCRIPT_DIR') else 1)" 2>/dev/null; then
-    printf 'plugin  Codex plugin is enabled; cleaning up any stale skill wrappers\n'
-    python3 -c "import sys; sys.path.insert(0, '$SCRIPT_DIR/scripts/lib'); from codex_plugin import clean_stale_codex_wrappers; removed = clean_stale_codex_wrappers('$CODEX_DIR', '$SCRIPT_DIR'); print(f'cleaned {len(removed)} wrapper(s)') if removed else None" 2>/dev/null || true
+  printf '\n--- Codex skill wrappers ---\n'
+  mkdir -p "$CODEX_DIR/skills"
+  if python3 "$SCRIPT_DIR/scripts/codex-plugin-enabled.py" \
+      --config "$CODEX_DIR/config.toml"; then
+    # A Codex plugin supplies the same catalog under its namespace. Leaving
+    # these bare wrapper links in place doubles every entry in Codex's skill
+    # routing prompt. Remove only links that this checkout created; never
+    # touch real paths or links owned by another checkout.
+    removed=0
+    for src in "$SCRIPT_DIR"/codex-skills/*; do
+      [ -d "$src" ] || continue
+      dest="$CODEX_DIR/skills/$(basename "$src")"
+      if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
+        rm "$dest"
+        removed=$((removed + 1))
+      fi
+    done
+    printf 'skip  Codex wrappers (ai-config plugin is enabled; removed %d stale wrapper link(s))\n' "$removed"
   else
-    mkdir -p "$CODEX_DIR/skills"
     for src in "$SCRIPT_DIR"/codex-skills/*; do
       [ -d "$src" ] || continue
       link_one "$src" "$CODEX_DIR/skills/$(basename "$src")"

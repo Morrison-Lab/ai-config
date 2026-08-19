@@ -74,7 +74,7 @@ lines had accumulated — unrelated to fence state, but found in the same cycle.
 - After pushing fixes during an iterate loop, DON'T declare "clean" based on
   the previous review. A new push triggers a new auto-review.
 - After a CI-fix push, don't return to chat on the first green jobs.
-  Wait for a terminal rollup (pending, queued, cancelled still count).
+  Wait for a terminal, passing rollup (pending, queued, in-progress are still running; cancelled needs investigation/rerun).
   A question about that PR that isn't the word "status" still needs a
   fresh review fetch; answering from chat can leave a landed review
   unread (gha#511, 2026-08-18).

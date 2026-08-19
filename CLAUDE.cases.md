@@ -144,7 +144,7 @@ The first `git branch -D` failed with the worktree message, and `git worktree li
 
 (Morrison-Lab/gha#511, 2026-08-18: the user asked why the session had not
 waited for CI, then why it had not answered
-https://github.com/Morrison-Lab/gha/pull/511#issuecomment-5336851477.
+[that review comment](https://github.com/Morrison-Lab/gha/pull/511#issuecomment-5336851477).
 The session answered the first question from chat and never opened the
 thread, so a Needs more work review of `89e3702` sat unanswered until
 asked.)

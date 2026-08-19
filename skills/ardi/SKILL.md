@@ -197,8 +197,8 @@ How depends on the repo's review trigger first, and on whether this round pushed
     Then wait for the new verdict **and** for CI.
 
     A CI-fix push is not handled when the first few jobs go green.
-    Read the full rollup: pending, queued, in-progress, and cancelled jobs
-    still count as unfinished.
+    Read the full rollup: pending, queued, and in-progress jobs are still running;
+    a cancelled job has finished but is not clean and still needs investigation or a rerun before the rollup counts as done.
     Arm [`wait-for-results`](../wait-for-results/SKILL.md) (or the timer
     below) instead of returning to chat with a partial `gh pr checks` read.
     (gha#511, 2026-08-18: lint/link went green, a sibling job sat in

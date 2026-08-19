@@ -12,8 +12,8 @@ Reformats: prose paragraphs, bullet continuation text, and blockquote prose.
 
 Writing is opt-in, and its scope is opt-in separately. A run that names a
 path previews the reformat and writes nothing; `--write` applies it, scoped
-by default to the lines the branch changed against a base ref; `--all`
-widens that scope to the whole file. See `main()` for the rationale.
+by default to paragraphs containing lines the branch changed against a base ref;
+`--all` widens that scope to the whole file. See `main()` for the rationale.
 """
 from __future__ import annotations
 
@@ -477,8 +477,8 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             'Writing is opt-in and its scope is opt-in separately. Naming a '
             'path previews the reformat and writes nothing. --write applies '
-            'it, scoped to the lines this branch changed against --base. '
-            '--all widens that to the whole file.'
+            'it, scoped to paragraphs containing lines this branch changed '
+            'against --base. --all widens that to the whole file.'
         ),
     )
     parser.add_argument('paths', nargs='+', type=Path, help='Markdown files')
@@ -488,7 +488,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         '--all', action='store_true',
-        help='widen scope from changed lines to the whole file',
+        help='widen scope from changed-line paragraphs to the whole file',
     )
     parser.add_argument(
         '--base', default='origin/main',
@@ -539,7 +539,7 @@ def main(argv: list[str] | None = None) -> int:
             errors += 1
             print(f'  ERROR:   {path}: {e}', file=sys.stderr)
 
-    scope_label = 'whole file' if args.all else f'lines changed vs {args.base}'
+    scope_label = 'whole file' if args.all else f'paragraphs with lines changed vs {args.base}'
     verb = 'written' if args.write else 'would change'
     print(
         f'\nDone ({scope_label}): {changed_files} {verb}, '

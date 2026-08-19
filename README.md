@@ -308,10 +308,16 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
-| `no-mistake-without-a-hook.py` | `UserPromptSubmit` | reminds, never blocks, that an admitted mistake owes a *mechanism*, not just a note |
+| `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake until hook work follows it |
 | `remind-learn-from-review.py` | `UserPromptSubmit` | reminds, never blocks, when an accepted reviewer finding has no learning or mechanism after it |
 | `flag-unassigned-worktree.py` | `PreToolUse` (Agent) | warns, never blocks, on a write-capable Agent launch with no `isolation` |
 | `no-unreviewed-pr.py` | `Stop` | blocks a reply ending a session after a PR was opened or readied with no reviewer requested, or after a push re-headed it with no reviewer requested since; deferred by draft status, or on a redaction PR by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` assertion |
+| `no-unshipped-commit.py` | `Stop` | blocks a completion reply after a commit with no later push or PR creation |
+| `no-report-unfixed-hook-test.py` | `Stop` | blocks a status-only reply after CI identifies a missing hook test, until that exact test is written |
+| `no-unmonitored-pr.py` | `Stop` | starts a detached two-minute `gh` poller when no model scheduler was used; blocks only when neither works |
+| `inject-pr-monitor-status.py` | `UserPromptSubmit` | injects changed state from a detached PR poller on the next prompt; local pollers cannot wake a terminated model session |
+| `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service is running when an agent session begins |
+| `monitor-open-prs.py` | detached timer | reconciles every open PR authored by the authenticated user every two minutes, including PRs opened outside the current session |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
 | `remind-brief-premises.py` | `PreToolUse` (Agent) | reminds, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
@@ -325,6 +331,20 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
 | `no-placeholder-reply.py` | `Stop` | blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement), anchored on the whole message since this corpus quotes the banned string constantly, and deliberately silent on a claim about the *work* (`Nothing to report.`), which the same rule requires |
 | `no-misattributed-quote.py` | `Stop` | **not registered ([#1527](https://github.com/Morrison-Lab/ai-config/issues/1527))** --- would block a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
+
+For agent-independent monitoring across all projects and sessions, install the
+user service after the hook files are installed:
+
+```bash
+python3 scripts/install-pr-monitor.py
+```
+
+The service polls every open PR authored by the authenticated GitHub user every
+two minutes. It does not depend on Claude, Codex, Gemini, or a project session
+remaining open. If a user systemd bus is unavailable, the installer starts the
+monitor immediately and installs an equivalent per-user cron `@reboot` entry.
+It copies the monitor to `~/.local/share/ai-config/hooks/`, so neither path
+depends on a temporary worktree or an individual agent's hook directory.
 
 ### Writing a warn-only hook: emit `systemMessage`, not `reason`
 

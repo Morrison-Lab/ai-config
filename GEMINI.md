@@ -1,4 +1,4 @@
-# User-wide Gemini CLI instructions
+# User-wide non-Claude AI-agent instructions
 
 [Gemini CLI](https://github.com/google-gemini/gemini-cli) is an open-source AI assistant for the terminal. It stores user-wide config under `~/.gemini`. See [Google AI](https://ai.google.dev).
 

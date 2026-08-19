@@ -26,6 +26,20 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/ensure-open-pr-monitor.py\"",
+            "timeout": 10,
+            "script": "ensure-open-pr-monitor.py",
+            "why": "Ensures one detached timer continuously reconciles every open PR authored by the authenticated user, including PRs opened outside this session."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-pr-monitor-status.py\"",
+            "timeout": 10,
+            "script": "inject-pr-monitor-status.py",
+            "why": "Surfaces changed state from no-unmonitored-pr.py's detached timer on the next prompt. The fallback observes a PR while the session is absent but cannot wake a terminated model."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-after-error.py\"",
             "timeout": 10,
             "script": "remind-ums-after-error.py",
@@ -336,6 +350,34 @@
             "timeout": 10,
             "script": "no-unreviewed-pr.py",
             "why": "CLAUDE.md 'Open a PR for every pushed feature branch' + skills/ardi 'always request another review' -- opening a PR auto-triggers the repo's own review workflow but does NOT summon Copilot, and that auto-triggered half is what disguises the missing one. claude-review has failed on every attempted review this session (ai-config#897, which calls the cause an unconfirmed leading hypothesis); whatever the cause, an unrequested PR gets no review at all while it is down. A reviewer request is per-HEAD, so a push re-arms the obligation: without that the guard is armed once and permanently discharged by the first request, and every later round carries a review of a commit that is no longer the PR's head (ai-config#1282). A REDACTION PR is exempt, because there the reviewer's input IS the secret -- the removed side of every hunk carries it (ucdavis/bcs#610) -- so the exemption is asserted by a `no-ai-review` label or an `ALLOW_UNREVIEWED_REDACTION_PR=1` prefix rather than paid for by leaking (ai-config#1392)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unshipped-commit.py\"",
+            "timeout": 10,
+            "script": "no-unshipped-commit.py",
+            "why": "Blocks a completion message after a git commit when no later push or PR creation appears in the transcript."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-report-unfixed-hook-test.py\"",
+            "timeout": 10,
+            "script": "no-report-unfixed-hook-test.py",
+            "why": "A CI diagnostic that names a missing hook test makes the repair mechanically decidable; blocks a status-only reply until that in-scope test is written."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmonitored-pr.py\"",
+            "timeout": 10,
+            "script": "no-unmonitored-pr.py",
+            "why": "After opening a PR, uses a recorded model scheduler when available; otherwise starts a detached two-minute gh poller and injects changed state on the next prompt. Blocks only if neither mechanism can be armed."
+          },
+          {
+            "type": "command",
+            "command": "AI_CONFIG_STOP=1 python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mistake-without-a-hook.py\"",
+            "timeout": 10,
+            "script": "no-mistake-without-a-hook.py",
+            "why": "Turns an admitted, mechanizable mistake into an immediate stop condition until hook work follows it."
           },
           {
             "type": "command",

@@ -898,5 +898,6 @@ and the job was red anyway, because a step above it had already failed:
 The action exits 1 on any error result, and that step carried no `continue-on-error`, so its failure decided the job whatever the guard concluded afterwards --- making the graceful path unreachable for every exhaustion that got past the pre-flight check.
 
 Two things generalize.
-The guard's `success` and the job's `failure` were never in tension; they were two different steps' conclusions, and only a step enumeration distinguishes them.
+The guard's `success` and the job's `failure` were never in tension.
+They were two different steps' conclusions, and only a step enumeration distinguishes them.
 And the first diagnosis was right about the classifier and still incomplete about the symptom: the shape genuinely was unrecognized, and recognizing it changed nothing the reader could see until the propagation was fixed too.

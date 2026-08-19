@@ -200,10 +200,10 @@ eventually harming what it's part of. Apply the same test here:
   what the task requires" rule in this same corpus --- they are this same
   principle applied to code.
 - **Prune as readily as you add** --- run `find-overlap` / `consolidate-skills` /
-  `consolidate-memory` / `prune` when growth has produced duplication or
-  drift, so the corpus stays legible rather than sprawling. Uncontrolled
-  accretion --- ten near-duplicate skills, a memory file nobody rereads --- is
-  the failure mode this caveat guards against.
+  `consolidate-memory` when growth has produced duplication or drift, so the
+  corpus stays legible rather than sprawling. Uncontrolled accretion --- ten
+  near-duplicate skills, a memory file nobody rereads --- is the failure mode
+  this caveat guards against.
 - **Growth must serve the whole system's clarity**, not just add a data point.
   If a new fragment or skill would make the corpus harder for a future session
   (human or AI) to navigate, that is a cost to weigh against the gap it

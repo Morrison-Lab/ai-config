@@ -14,6 +14,15 @@ __pycache__/
 # Claude Code worktree-isolated background agents
 .claude/worktrees/
 
+# Local git worktrees checked out inside this clone (session-lock / gi).
+# Agent Glob/Grep walk these otherwise and can edit a stale copy.
+.worktrees/
+
+# Aider local session residue (never commit)
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+
 # Quarto website build
 _site/
 .quarto/

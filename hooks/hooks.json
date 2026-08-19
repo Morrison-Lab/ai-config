@@ -395,6 +395,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-misattributed-quote.py\"",
+            "timeout": 10,
+            "script": "no-misattributed-quote.py",
+            "why": "A quoted phrase attributed to shared/workflow/pr-on-claim.md that is in pr-on-claim.rationale.md instead (2026-08-16) -- after #1468 split the heaviest fragments, a stale context misattributes systematically, and the zero hits in the named file read as a fabricated quote rather than a moved one."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-stopping-point.py\"",
             "timeout": 10,
             "script": "require-stopping-point.py",

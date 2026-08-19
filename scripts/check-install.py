@@ -95,6 +95,14 @@ EXCLUDED_TOP_LEVEL_FILES = {"README.md"}
 # whose tracked files all match.
 IGNORED_NAMES = {"__pycache__", ".DS_Store", ".git", ".pytest_cache"}
 
+# Groups whose installable children are directories (a skill is a directory
+# containing SKILL.md). The Claude harness also writes regular files beside
+# those directories -- notably skills/manifest.json -- and those files are
+# not entries. A leftover symlink to a deleted skill still is, so the
+# filter keeps symlinks (ai-config#777). Other merged groups (commands/,
+# memories/) do install files, so this set is not global.
+DIR_ONLY_GROUPS = {"skills"}
+
 # Statuses `--fix` can repair, and those it reports without touching.
 FIXABLE = ("stale", "unlinked", "missing")
 REPORT_ONLY = ("misdirected", "foreign")
@@ -149,6 +157,25 @@ def tree_fingerprint(path: Path) -> dict[str, str]:
             else:
                 fingerprint[rel] = file_digest(full)
     return fingerprint
+
+
+def child_names(path: Path, dirs_only: bool) -> set[str]:
+    """Names to compare in a merged consumer directory.
+
+    `dirs_only` drops regular files (the harness index sitting next to
+    skill directories) so they are not classified as foreign skills.
+    It keeps directories and symlinks, including dangling ones: a leftover
+    link to a deleted skill is exactly the case `foreign` exists to surface
+    (ai-config#777).
+    """
+    names: set[str] = set()
+    for child in path.iterdir():
+        if child.name in IGNORED_NAMES:
+            continue
+        if dirs_only and not child.is_dir() and not child.is_symlink():
+            continue
+        names.add(child.name)
+    return names
 
 
 def resolves_into_repo(link: Path, repo_root: Path) -> bool:
@@ -213,10 +240,13 @@ def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
         # A real directory is already here, so bootstrap merges child by child
         # and this check has to follow it in. This is where pre-seeded copies
         # shadow the repo.
-        names = {c.name for c in src.iterdir()} | {c.name for c in dest.iterdir()}
+        # Filter harness files on the consumer side only. The repo side still
+        # enumerates every child so a file shipped under skills/ is not
+        # silently dropped from the missing/ok report.
+        names = child_names(src, dirs_only=False) | child_names(
+            dest, dirs_only=src.name in DIR_ONLY_GROUPS,
+        )
         for name in sorted(names):
-            if name in IGNORED_NAMES:
-                continue
             child_src = src / name
             entries.append(classify(
                 child_src if child_src.exists() else None,

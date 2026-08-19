@@ -892,25 +892,13 @@ someone wrapped in backticks or quoted as a block.
 It cannot catch one sitting in ordinary prose, and a rule cited by its own
 title is exactly that, since quotation marks are not markup.
 
-**Two things stop that from being the whole story here, and the first is the
-pin.**
-The stripper ships in `@v2`, and this repo's `claude-bot.yml` still calls
-`claude.yml@v1`.
-Check it by content rather than by tag date, since `v1` is frozen on a
-diverged line and is not an ancestor of the fix:
+**The pin used to be the first reason this repo did not have the stripper.**
+`claude-bot.yml` called `claude.yml@v1` until #1000; #998 had already moved
+`claude-review.yml` to `@v2`. Check by content, not tag date: `v1` is frozen
+and is not an ancestor of the fix (`detect-bot-mention` count is 0 at `v1`
+and 1 at `v2`). A backticked mention on this repo now reaches the stripper.
 
-```bash
-git show v1:.github/workflows/claude.yml | grep -c detect-bot-mention   # 0
-git show v2:.github/workflows/claude.yml | grep -c detect-bot-mention   # 1
-```
-
-So a backticked mention in a comment on *this* repo fires exactly like a bare
-one, and none of the markup reasoning above applies until the pin moves.
-Note that #998 moved `claude-review.yml` to `@v2` and left `claude-bot.yml`
-alone, so the two callers disagree and reading either one settles nothing
-about the other.
-
-The second reason holds even after the pin moves.
+The remaining reason holds after the pin moved.
 `claude.yml@v2`'s own job-level `if:` still tests the raw body with
 `contains()`, because a GitHub expression cannot strip Markdown, so the job
 starts and the runner spins up regardless.

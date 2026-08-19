@@ -29,7 +29,9 @@ Run the sweep --- open PRs and issues per repo, `git status`, local branches, wo
 
 **Two mechanical details about that leftover-branch case, one of which reads as the opposite of what it is.**
 The harness assigns its branch name in *every* scoped repo and leaves each one checked out on it, including repos the session never opens.
-Settle liveness from the branch's own commits (`origin/main..<branch>` having zero commits plus absence from remote) rather than from the `used by worktree` error text, switch that repo to `main`, and delete the branch.
+First, fast-forwarding `main` quietly does nothing in those repos because `main` is not checked out.
+Second, `git branch -D` refuses with `cannot delete branch 'X' used by worktree`, which is almost always just that repo's ordinary checkout on that branch.
+Settle liveness from the branch's commits (`origin/main..<branch>` having zero commits plus absence from remote), resist adding a redundant `--is-ancestor` check, switch that repo to `main`, and delete the branch.
 
 - **Do:** run the sweep across every scoped repo, not only the ones this session worked in.
 - **Do:** settle liveness first, then `git checkout main` in that repo, then `git branch -D`.

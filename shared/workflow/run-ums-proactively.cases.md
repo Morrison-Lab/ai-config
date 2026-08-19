@@ -1,18 +1,27 @@
-# Proactive UMS Case Records
+# Case records: run-ums-proactively
 
-Case records and measured baselines for [`run-ums-proactively.md`](run-ums-proactively.md).
+Worked-example case records for the rules in
+[`run-ums-proactively.md`](run-ums-proactively.md), moved here verbatim to
+keep them out of the auto-loaded `CLAUDE.md` context.
+Each heading names the rule the record supports.
 
 ## Stale records checker baseline and shallow clones
 
 ### Measured baseline (2026-08-16)
 
-Running `python3 scripts/check-stale-records.py` against this repository measured:
-- 503 files examined
-- 3 orphans: `commands/release-pr.md`, `memories/MEMORY.md`, `references/cloud-setup/README.md`
-- 181 generated wrappers and 2 root entry points exempt
-
-All three orphans were inspected and confirmed benign (an index, a directory README, and a named command).
+Measured against this repo on 2026-08-16:
+503 files examined,
+3 orphans (`commands/release-pr.md`, `memories/MEMORY.md`, `references/cloud-setup/README.md`),
+181 generated wrappers and 2 root entry points exempt.
+All three were inspected and are the benign kinds above,
+so treat that as the baseline rather than as a backlog.
 
 ### Shallow clone behavior
 
-Under a shallow clone (such as default `actions/checkout` with depth 1), `git log` cannot inspect past the fetch depth, so every file appears no older than the oldest fetched commit. The checker reports `age_informative: false` in `--json`. A full unshallow fetch (`git fetch --unshallow`) is required for informative age measurements.
+The age bucket carries no information under a shallow clone,
+which is what the checker's own output says (`age_informative: false` in `--json`).
+`git log` cannot see past the fetch depth,
+so every file reads as no older than the oldest fetched commit.
+`actions/checkout` clones at depth 1,
+so the CI step is advisory for that reason as well as for the orphan bucket's.
+Re-run against a full clone (`git fetch --unshallow`) before reading it.

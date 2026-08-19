@@ -59,19 +59,12 @@ quota problem needing a fix.)
    The job in fact completed `success` at `00:57:00Z` after a legitimate ~16-minute review that started `00:41:00Z`, posting a real `**Claude finished review**` verdict ("Needs minor changes", cost $15.07) at `00:56:55Z`.
    The 404 had meant "still running"; every check before ~`00:57Z` was premature, and the job's own `timeout-minutes` was 60, so it was nowhere near timing out either.)
 
-## Suppressed findings heading variations
-
-Copilot can report zero new comments while placing substantive findings inside a collapsed `<details>` suppression block in the review body.
-The summary heading text varies across PRs:
-- PR #660 emitted `Comments suppressed due to low confidence (3)`
-- PRs #1029 and #1031 emitted `Suppressed comments (4)`
-
-A literal match for either phrase returns a false negative. Matching case-insensitively on `suppressed` strictly inside `<summary>` headings prevents false positives against overview text (e.g. review 4837572117 whose summary table mentioned "suppressed Copilot findings" in uncollapsed prose).
-
 ## Checker unhandled exception on wrong repo
 
-Run from a checkout of the wrong repository, `check-pr-fully-clean.py` raises `RuntimeError: Command failed (gh pr view ...)` and exits with code 1 (the code reserved for "not clean").
-Paired checking of finding bullets (`grep -q '^  - '`) confirms whether exit code 1 represents genuine review findings or an unhandled exception. Passing `-R OWNER/REPO` explicitly avoids relying on the current working directory.
+Run from a checkout of the wrong repository,
+`check-pr-fully-clean.py` raises `RuntimeError: Command failed (gh pr view ...)` and exits 1.
+Paired checking of finding bullets (`grep -q '^  - '`) confirms whether exit code 1 represents genuine review findings or an unhandled exception.
+Passing `-R OWNER/REPO` explicitly avoids relying on the current working directory.
 
 ## "`gh pr checks` is not a complete enumeration" --- the rollup gap
 
@@ -197,6 +190,13 @@ while the full review body carried severe findings under `Suppressed comments (N
 Round 7 posted at 2026-08-02T06:29:10Z,
 about two minutes before the PR merged at 06:30:55Z,
 and those real findings had to be carried forward to #1034.)
+
+The heading moves across PRs:
+PR #660 emitted `Comments suppressed due to low confidence (3)`,
+while PRs #1029 and #1031 emitted `Suppressed comments (4)`.
+A literal match for either phrase can return a false zero.
+Matching case-insensitively on `suppressed` strictly inside `<summary>` headings prevents false positives against overview prose
+(such as review 4837572117 whose summary table mentioned "suppressed Copilot findings" in uncollapsed text).
 
 ## A review comment's header SHA can be stale
 

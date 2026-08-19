@@ -896,7 +896,7 @@ and the job was red anyway, because a step above it had already failed:
 ##[end-action id=claude-review.run;outcome=failure;conclusion=failure]
 ```
 
-The action exits 1 on an `is_error` result, and that step carried no `continue-on-error`, so its failure decided the job whatever the guard concluded afterwards --- making the graceful path unreachable for every exhaustion that got past the pre-flight check.
+The action exits 1 on an `is_error` result, and that step carried no `continue-on-error`, so its failure decided the job whatever the guard concluded afterwards --- making the graceful path unreachable for every exhaustion that got past the workflow's own `preflight-quota` step, which catches a missing credential before dispatch but cannot see an account that still had quota then.
 
 Two things generalize.
 The guard's `success` and the job's `failure` were never in tension.

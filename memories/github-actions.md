@@ -912,17 +912,10 @@ secrets under `pull_request`) has to be re-established explicitly.
   whose `check-new-line-breaks.py` differs from that repo's default branch by
   **339 lines**, so validating against the default branch would have exercised
   a different checker and reported a result about nothing.
-  Run `git diff --stat` *before* the checkout: it is what tells you whether
-  pinning mattered, and overwriting the tree makes it unanswerable.
-  Take the gate's inputs from the failing job's own `env:` log group, and
-  re-run against both the PR's original base and current `main` --- a
-  diff-scoped verdict is a function of its base.
-
-  ```bash
-  git fetch --depth 1 origin <pinned-sha>
-  git diff --stat FETCH_HEAD -- <action-subdir>/   # empty = pin is current
-  git checkout FETCH_HEAD -- <action-subdir>/
-  ```
+  Run `git fetch --depth 1 origin <sha>`, then `git diff --stat FETCH_HEAD --
+  <subdir>/` (empty output means the pin is current) *before*
+  `git checkout FETCH_HEAD -- <subdir>/`, which makes that question
+  unanswerable.
 - **Do:** re-derive any safety property the original event was providing for
   free, once the event is synthesized.
 - **Don't:** fork an action, or abandon the feature, on the strength of an

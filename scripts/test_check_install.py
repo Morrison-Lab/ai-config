@@ -82,6 +82,7 @@ def make_fixture(tmpdir: Path) -> tuple[Path, Path]:
     write(consumer / "skills" / "zeta" / "SKILL.md", "a built-in we do not ship\n")
     write(consumer / "skills" / "index.json", json.dumps({"harness": "index"}))
     write(consumer / "skills" / "manifest.json", json.dumps({"skills": []}))
+    (consumer / "skills" / "gone").symlink_to(repo / "skills" / "does-not-exist")
 
     return repo, consumer
 
@@ -119,6 +120,8 @@ with tempfile.TemporaryDirectory() as tmp:
     check("harness skill index is not a foreign skill",
           "skills/manifest.json" not in found)
     check("stray file in skills/ is ignored", "skills/index.json" not in found)
+    check("dangling skill symlink is still foreign",
+          found.get("skills/gone") == "foreign")
 
     # The headline improvement over the SKILL.md-only sweep: beta is stale
     # even though the file that sweep compared is byte-identical.
@@ -156,7 +159,7 @@ with tempfile.TemporaryDirectory() as tmp:
           and f"checked {expected} installed entries" in result.stdout)
     check("summary names each defect count",
           "1 stale" in result.stdout and "2 missing" in result.stdout
-          and "1 unlinked" in result.stdout and "1 foreign" in result.stdout)
+          and "1 unlinked" in result.stdout and "2 foreign" in result.stdout)
     check("defects prompt the reader toward --fix", "--fix" in result.stdout)
     check("read-only run mutates nothing",
           not (consumer / "skills" / "beta").is_symlink())
@@ -186,6 +189,8 @@ with tempfile.TemporaryDirectory() as tmp:
           (consumer / "skills" / "manifest.json").is_file())
     check("ignored stray file is left alone",
           (consumer / "skills" / "index.json").is_file())
+    check("dangling skill symlink is left alone",
+          (consumer / "skills" / "gone").is_symlink())
     check("misdirected symlink is left alone",
           (consumer / "GEMINI.md").resolve() == (Path(tmp) / "elsewhere" / "GEMINI.md").resolve())
 
@@ -199,7 +204,8 @@ with tempfile.TemporaryDirectory() as tmp:
           not any(v in ("stale", "unlinked", "missing") for v in after.values()))
     check("re-run still reports the untouched entries",
           after.get("GEMINI.md") == "misdirected"
-          and after.get("skills/zeta") == "foreign")
+          and after.get("skills/zeta") == "foreign"
+          and after.get("skills/gone") == "foreign")
     check("--strict passes once only report-only entries remain",
           run_cli(repo, consumer, "--strict").returncode == 0)
 

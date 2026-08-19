@@ -496,6 +496,26 @@ expect(
     f"expected:\n{expected_bullet_scoped_res!r}\ngot:\n{bullet_scoped_res!r}",
 )
 
+# Review Finding 1: internal double spaces / tabs must not break sentence matching or drop markers
+DOUBLE_SPACE_BULLET = "- Ok  then.\n  Ok then.\n"
+ds_res = slb.reformat(DOUBLE_SPACE_BULLET, {1})
+expected_ds_res = "- Ok then.\n  Ok then.\n"
+expect(
+    "double-spaced line in touched bullet reformats cleanly with marker intact",
+    ds_res == expected_ds_res,
+    f"expected:\n{expected_ds_res!r}\ngot:\n{ds_res!r}",
+)
+
+# Review Finding 2: empty bullet-marker line must not vanish
+EMPTY_MARKER_BULLET = "- \n  Hello world.\n"
+em_res = slb.reformat(EMPTY_MARKER_BULLET, {1})
+expected_em_res = "- Hello world.\n"
+expect(
+    "empty bullet marker line is reformatted with prefix when touched",
+    em_res == expected_em_res,
+    f"expected:\n{expected_em_res!r}\ngot:\n{em_res!r}",
+)
+
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

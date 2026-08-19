@@ -134,8 +134,9 @@ def _emit_prose_sentences(
     para_text_parts: list[str] = []
     pos = 0
     for offset, line in enumerate(orig_lines):
-        s = line.strip()
+        s = re.sub(r'\s+', ' ', line.strip())
         if not s:
+            line_spans.append((orig_start_idx + offset, pos, pos))
             continue
         if para_text_parts:
             pos += 1
@@ -174,7 +175,7 @@ def _emit_prose_sentences(
 
         overlapping = [
             line_idx for line_idx, l_start, l_end in line_spans
-            if l_start < s_end and l_end > s_start
+            if (l_start < s_end and l_end > s_start) or (l_start == l_end and s_start <= l_start <= s_end)
         ]
 
         touched = any((line_idx + 1) in changed for line_idx in overlapping)

@@ -392,6 +392,13 @@
             "timeout": 10,
             "script": "no-placeholder-reply.py",
             "why": "CLAUDE.md 'Always produce a reply --- never end a turn silently' -- blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement). The rule names the exact string in a Do/Don't pair and the lapse still recurred three times in one session (ai-config#1579), each time on resuming after a context-window summary, which reads like a report and so makes the work it describes feel already reported. Anchored on the WHOLE message rather than a substring, because this corpus quotes the banned string constantly; and a claim about the WORK (`Nothing to report.`, `No change.`) is deliberately not matched, since a no-change tick is behaviour the same section requires."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-stopping-point.py\"",
+            "timeout": 10,
+            "script": "require-stopping-point.py",
+            "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap; blocks an otherwise final reply that omits it."
           }
         ]
       }

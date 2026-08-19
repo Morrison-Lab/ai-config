@@ -29,6 +29,24 @@ gh pr create --draft --title "<title>" --body "Closes #<N>
 WIP --- opened up front to claim the issue; implementing now."
 ```
 
+**Do not `Closes` a parent issue on a partial ship.** `Closes #<N>` in the
+draft body is the default because most issues are one slice. If the issue
+(or a later comment) splits into independent cases and this PR only
+implements one, file the leftover as its own issue before merge and
+rewrite the PR body so it does not auto-close the parent.
+
+- **Do:** keep `Closes #<N>` when the PR will finish every remaining case.
+- **Do:** file the deferred case first, then change the PR to link both
+  (`Fixes the Case B half of #N; remainder is #M`) with no `Closes` on
+  the parent.
+- **Don't:** leave `Closes #<N>` on a PR that explicitly deferred part of
+  `#N` --- GitHub will close the parent and the deferred half disappears
+  from the tracker
+  ([gha#373](https://github.com/Morrison-Lab/gha/issues/373) /
+  [#516](https://github.com/Morrison-Lab/gha/pull/516) /
+  [#517](https://github.com/Morrison-Lab/gha/issues/517)).
+
+
 **Draft, not ready-for-review --- deliberately.** A draft doesn't trigger the
 `@claude` review bot, so no review round is spent on an empty or half-finished
 diff. Implement on top, pushing commits to the same PR; when the change is

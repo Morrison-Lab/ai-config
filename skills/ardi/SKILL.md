@@ -27,6 +27,10 @@ Skip if your most recent comment already says so and is still live --- claims ex
 Pull the most recent reviewer comment --- the `@claude` bot's, or a human's.
 Don't trust earlier cached verdicts --- actively poll until a review appears that references the commit you just pushed, then read **that** one.
 `gh pr checks` (`PR_CHECKS`) / `glab ci list` going green is about **CI state**, not the review verdict --- always parse the latest review *body* for findings.
+A user question about this PR that is not the word "status" still requires
+this fetch (see [`pr-status`](../pr-status/SKILL.md)).
+Don't answer the chat question from session memory while a review comment
+sits unread.
 
    **When the user provides a specific review link/ID** (e.g. `#pullrequestreview-4761444085`): Fetch that review directly via the GitHub API using its ID.
    Many bot reviews have a generic overview body but the actual findings live in **inline comments on specific lines** --- don't rely on the top-level review body alone.
@@ -190,7 +194,16 @@ How depends on the repo's review trigger first, and on whether this round pushed
    A stray mention spawns a run that cancels the push-triggered review on `cancel-in-progress` setups.
    On some mention-bot setups it also starts a session whose residual-commit sweep can churn the branch.
 
-    Then wait for the new verdict.
+    Then wait for the new verdict **and** for CI.
+
+    A CI-fix push is not handled when the first few jobs go green.
+    Read the full rollup: pending, queued, and in-progress jobs are still running;
+    a cancelled job has finished but is not clean and still needs investigation or a rerun before the rollup counts as done.
+    Arm [`wait-for-results`](../wait-for-results/SKILL.md) (or the timer
+    below) instead of returning to chat with a partial `gh pr checks` read.
+    (gha#511, 2026-08-18: lint/link went green, a sibling job sat in
+    setup then cancelled, and the session left without waiting; the user
+    asked why.)
 
     **Set a timer when ending a turn waiting for AI reviews.**
     Whenever ending a turn while waiting for AI reviews or CI completion after pushing code, launch a `schedule` timer (e.g. 120s) and follow the check-and-reschedule procedure in [`shared/workflow/ardi.md`](../../shared/workflow/ardi.md) when it fires.

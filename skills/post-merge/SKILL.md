@@ -541,24 +541,45 @@ git log --oneline "$merged".."<branch>"    # empty => the ref is the merged head
 ```
 
 **That fetch is load-bearing, not tidiness, because the merged head is
-routinely absent from the local object store at exactly this moment.**
-`gh pr merge --delete-branch` removes the remote branch, and the merge commit
-on `main` is a *squash* in this repo, so neither `origin/main` nor any
-remaining ref reaches the PR's own head.
-`git log` then answers with
+routinely absent from the local object store at exactly this moment, and
+comparing against `origin/main` succeeds and lies.**
+Two distinct failure modes occur when skipping this fetch:
 
-```
-fatal: Invalid revision range <sha>..<branch>
-```
+1. **The error direction (behind merged head):**
+   `gh pr merge --delete-branch` removes the remote branch, and the merge commit
+   on `main` is a *squash* in this repo, so neither `origin/main` nor any
+   remaining ref reaches the PR's own head.
+   `git log` then answers with
 
-which is the shape [`fail-fast`](../../shared/principles/fail-fast.md) warns
-about: the check did not run, and it says so on stderr while printing no
-commits --- so a caller reading only stdout sees the same empty output a clean
-comparison produces.
-`refs/pull/<N>/head` survives the branch deletion and is what makes the SHA
-resolvable again.
+   ```
+   fatal: Invalid revision range <sha>..<branch>
+   ```
 
-So read the exit status rather than the output.
+   which is the shape [`fail-fast`](../../shared/principles/fail-fast.md) warns
+   about: the check did not run, and it says so on stderr while printing no
+   commits --- so a caller reading only stdout sees the same empty output a clean
+   comparison produces.
+   `refs/pull/<N>/head` survives the branch deletion and is what makes the SHA
+   resolvable again.
+
+2. **The succeed-and-lie direction (`origin/main..<branch>` comparison):**
+   Comparing against `origin/main..<branch>` instead of `refs/pull/<N>/head`
+   exits **0** and prints plausible commit output.
+   Because a squash-merge creates a new commit on `main` with a different SHA
+   and parentage, the branch's original commits are not ancestors of `main` even
+   though their diff is fully merged.
+   `git log --oneline origin/main..<branch>` lists every commit from the merged PR,
+   falsely suggesting unmerged work remains on the branch.
+   Comparing against `refs/pull/<N>/head` (via `git log "$merged".."<branch>"`)
+   settles it cleanly:
+
+   ```bash
+   git fetch origin "refs/pull/<N>/head" -q &&
+   git log --oneline "$merged".."<branch>"   # empty => all local work reached the PR
+   ```
+
+So read the exit status rather than the output, and always anchor the comparison
+to the PR's fetched head ref rather than `origin/main`.
 A non-zero exit means the comparison failed to happen, which is not evidence
 the branch is safe to delete; re-fetch and re-run before touching `-D`.
 
@@ -568,17 +589,23 @@ has to be answered before the delete rather than after.
 Read the subjects: anything authored, rather than a merge or a revert of
 already-landed work, means the branch carries something the PR did not.
 
-- **Do:** compare the local ref against the PR's merged head before `-D`, and
-  read the extra commits' subjects when they differ.
+- **Do:** compare the local ref against the PR's fetched head (`refs/pull/<N>/head`)
+  before `-D`, and read the extra commits' subjects when they differ.
 - **Do:** name the branch's SHA in the report when it differed from the merged
   head, so the discrepancy is visible rather than absorbed.
 - **Don't:** read step 1's merge confirmation as covering the local ref --- it
   is a claim about the PR's head, and `-D` acts on yours.
+- **Don't:** use `origin/main..<branch>` as a liveness test in a squash-merging
+  repo --- it exits 0 and falsely reports merged commits as unmerged work.
 - **Don't:** infer from a `-d` refusal which case you are in; a squash repo
   refuses for every branch regardless.
 - **Don't:** read an `Invalid revision range` error as an empty answer --- it
   prints no commits, exactly as a clean comparison does, and means the merged
   head is simply not in the local object store.
+
+(`Morrison-Lab/ai-config#1595`, 2026-08-17: running `git log --oneline origin/main..<branch>`
+immediately after squash-merging printed two commits that had already merged under squash
+commit `86cc8233`. Fetching `refs/pull/1595/head` confirmed `FETCH_HEAD..<branch>` was empty.)
 
 (`Morrison-Lab/ai-config#1566`, 2026-08-17: the PR merged at head `0a297637`,
 and the local branch stood at `ad3b7640`, which `git branch -D` duly printed

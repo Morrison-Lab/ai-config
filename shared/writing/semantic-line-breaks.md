@@ -277,11 +277,11 @@ so nothing about the phrase "line-scoped check" reaches it.
 
 Its scope and its severity run opposite to everything else in the block, which
 is what makes the omission expensive.
-`validate.yml` runs `npx --yes markdownlint-cli2` as a plain step, so a
-non-zero exit fails the job, while `check-new-line-breaks` is the advisory one
-that warns and exits 0.
-The blocking check is therefore the one the ordering rule leaves out, and a
-reflow can introduce a rule violation none of the enumerated scans can see ---
+`validate.yml` runs both `npx --yes markdownlint-cli2` and
+`check-new-line-breaks` as blocking checks (each fails the job on a non-zero
+exit).
+Markdownlint is the one the ordering rule above leaves out, and a reflow can
+introduce a rule violation none of the enumerated line-scoped scans can see ---
 MD018 when a split lands an issue reference in column 1 (the section further
 down owns that collision), and MD022 when it disturbs the blank line around a
 heading.

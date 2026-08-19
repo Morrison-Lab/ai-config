@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Profile and benchmark.">
+
+<title>skill – ai-config</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-4de2da5e8af8a56ca594d71261300eb6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-e3adbaa939bcd423dddc8c8a834270b4.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">ai-config</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../skills.html"> 
+<span class="menu-text">Skills</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../agents.html"> 
+<span class="menu-text">Agents</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../workflow.html"> 
+<span class="menu-text">Workflow</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Morrison-Lab/ai-config"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#measure-performance-profile-first-then-microbenchmark-perf-benchmark" id="toc-measure-performance-profile-first-then-microbenchmark-perf-benchmark" class="nav-link active" data-scroll-target="#measure-performance-profile-first-then-microbenchmark-perf-benchmark">measure-performance – profile first, then microbenchmark (perf, benchmark)</a>
+  <ul class="collapse">
+  <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
+  <ul class="collapse">
+  <li><a href="#check-the-measurement-is-worth-taking" id="toc-check-the-measurement-is-worth-taking" class="nav-link" data-scroll-target="#check-the-measurement-is-worth-taking">1. Check the measurement is worth taking</a></li>
+  <li><a href="#fix-the-input-and-a-correctness-baseline" id="toc-fix-the-input-and-a-correctness-baseline" class="nav-link" data-scroll-target="#fix-the-input-and-a-correctness-baseline">2. Fix the input and a correctness baseline</a></li>
+  <li><a href="#profile-locate-the-bottleneck-do-not-guess" id="toc-profile-locate-the-bottleneck-do-not-guess" class="nav-link" data-scroll-target="#profile-locate-the-bottleneck-do-not-guess">3. Profile: locate the bottleneck, do not guess</a></li>
+  <li><a href="#read-the-profile" id="toc-read-the-profile" class="nav-link" data-scroll-target="#read-the-profile">4. Read the profile</a></li>
+  <li><a href="#microbenchmark-only-the-bottleneck" id="toc-microbenchmark-only-the-bottleneck" class="nav-link" data-scroll-target="#microbenchmark-only-the-bottleneck">5. Microbenchmark only the bottleneck</a></li>
+  <li><a href="#interpret-the-numbers" id="toc-interpret-the-numbers" class="nav-link" data-scroll-target="#interpret-the-numbers">6. Interpret the numbers</a></li>
+  <li><a href="#re-profile-at-real-scale" id="toc-re-profile-at-real-scale" class="nav-link" data-scroll-target="#re-profile-at-real-scale">7. Re-profile at real scale</a></li>
+  <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">8. Report</a></li>
+  </ul></li>
+  <li><a href="#limitations-to-state-in-the-report" id="toc-limitations-to-state-in-the-report" class="nav-link" data-scroll-target="#limitations-to-state-in-the-report">Limitations to state in the report</a></li>
+  <li><a href="#outside-r" id="toc-outside-r" class="nav-link" data-scroll-target="#outside-r">Outside R</a></li>
+  <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
+  <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/measure-performance/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/measure-performance/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+
+<section id="measure-performance-profile-first-then-microbenchmark-perf-benchmark" class="level1">
+<h1>measure-performance – profile first, then microbenchmark (perf, benchmark)</h1>
+<p>Find out what is actually slow before changing anything, then prove the change helped. The method is <a href="https://adv-r.hadley.nz/perf-measure.html">Advanced R, ch.&nbsp;23 “Measuring performance”</a>: <a href="https://rstudio.github.io/profvis/">profvis</a> to locate the bottleneck, <a href="https://bench.r-lib.org/">bench</a> to compare alternatives for it.</p>
+<p><strong>Why this exists.</strong> Intuition about what is slow is unreliable, even for experienced programmers, so the chapter opens with Knuth’s warning that time spent worrying about the speed of noncritical code has a strong negative effect on debugging and maintenance. Two failure modes follow from skipping measurement. Optimizing the wrong line makes code harder to read and no faster. Winning a microbenchmark and reporting it as a speedup makes a claim the real workload does not support: a 2x win on an operation that takes 2 microseconds of a 30-second job is not a win. This skill is <a href="../../shared/workflow/algorithmatize-checks.md"><code>algorithmatize-checks</code></a> applied to performance claims, and it operationalizes the “performance tuning beyond that needs a demonstrated hot spot, not speculation” clause of the Efficient goal in <a href="../../shared/principles/README.md">the principles catalog</a>.</p>
+<section id="when-this-fires" class="level2">
+<h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
+<ul>
+<li>“measure performance”, “perf”, “benchmark”, “benchmark this”, “microbenchmark”, “profile this”, “run profvis”, “use <code>bench::mark()</code>”</li>
+<li>“why is this slow”, “what is the bottleneck”, “find the hot spot”</li>
+<li>“which version is faster”, “is this actually faster”, “time these two approaches”, “how much did that speed things up”</li>
+<li>Reviewing or writing a diff that asserts a speedup without numbers, or that proposes a micro-optimization with no profile behind it.</li>
+</ul>
+</section>
+<section id="procedure" class="level2">
+<h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
+<section id="check-the-measurement-is-worth-taking" class="level3">
+<h3 class="anchored" data-anchor-id="check-the-measurement-is-worth-taking">1. Check the measurement is worth taking</h3>
+<p>Answer these before installing anything:</p>
+<ul>
+<li><strong>Is something actually slow?</strong> Name the workload and roughly how long it takes now. A script nobody waits on does not need a profile.</li>
+<li><strong>Is it slow on a realistic input?</strong> A profile of a toy input measures the toy.</li>
+<li><strong>What would “fast enough” be?</strong> Without a target there is no way to stop, and the loop runs until the code is unreadable.</li>
+</ul>
+<p>If the answer to the first question is “no”, say so and stop. That is a complete, correct result for this skill, not a failure to deliver.</p>
+</section>
+<section id="fix-the-input-and-a-correctness-baseline" class="level3">
+<h3 class="anchored" data-anchor-id="fix-the-input-and-a-correctness-baseline">2. Fix the input and a correctness baseline</h3>
+<p>Put the code under measurement in its own file and <code>source()</code> it, so the profiler can link its samples back to source lines.</p>
+<p>Record what the current code returns on the realistic input. Every alternative gets checked against it later:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"&lt;script&gt;.R"</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>baseline <span class="ot">&lt;-</span> <span class="er">&lt;</span>call<span class="sc">-</span>under<span class="sc">-</span>test<span class="sc">&gt;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(baseline, <span class="st">"baseline.rds"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Speed is only interesting among alternatives that agree. <code>bench::mark()</code> enforces that in step 5, but a saved baseline also catches an alternative that changes results in a way the benchmark never evaluates.</p>
+</section>
+<section id="profile-locate-the-bottleneck-do-not-guess" class="level3">
+<h3 class="anchored" data-anchor-id="profile-locate-the-bottleneck-do-not-guess">3. Profile: locate the bottleneck, do not guess</h3>
+<p>R’s profiler is a sampling profiler: it stops execution every few milliseconds and records the call stack. That keeps overhead low at the cost of being stochastic, so successive profiles differ slightly. The variability mostly affects functions that take very little time, which are the ones you care least about.</p>
+<p>The interactive route, which links the profile back to source lines:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"&lt;script&gt;.R"</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>p <span class="ot">&lt;-</span> profvis<span class="sc">::</span><span class="fu">profvis</span>(<span class="sc">&lt;</span>call<span class="sc">-</span>under<span class="sc">-</span>test<span class="sc">&gt;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>If the call finishes before any sample lands, profvis aborts with <code>No parsing data available. Maybe your function was too fast?</code>. That is the profiler telling you the input is not realistic enough to profile, so go back to step 1 rather than shrinking the sampling interval.</p>
+<p>In a headless session, save the widget and open it later:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>htmlwidgets<span class="sc">::</span><span class="fu">saveWidget</span>(p, <span class="st">"profile.html"</span>, <span class="at">selfcontained =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>selfcontained = TRUE</code> needs pandoc, and htmlwidgets discovers it through <code>{rmarkdown}</code>: as of htmlwidgets 1.6.0 that path “now uses the <code>{rmarkdown}</code> package to discover and call pandoc” (<a href="https://github.com/ramnathv/htmlwidgets/blob/master/NEWS.md">NEWS</a>). <code>rmarkdown::pandoc_available()</code> is therefore the gate that matches what htmlwidgets itself consults, rather than a proxy for it. Without pandoc the call aborts rather than degrading quietly, with <code>Saving a widget with selfcontained = TRUE requires pandoc.</code> (verified on htmlwidgets 1.6.4). Drop the argument to <code>FALSE</code> in that case, which writes a sidecar dependencies directory next to the HTML instead.</p>
+<p>When there is no way to view HTML at all, take the text summary instead:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"&lt;script&gt;.R"</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>tmp <span class="ot">&lt;-</span> <span class="fu">tempfile</span>()</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">Rprof</span>(tmp, <span class="at">interval =</span> <span class="fl">0.01</span>, <span class="at">memory.profiling =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="sc">&lt;</span>call<span class="sc">-</span>under<span class="sc">-</span>test<span class="sc">&gt;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">Rprof</span>(<span class="cn">NULL</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="fu">summaryRprof</span>(tmp, <span class="at">memory =</span> <span class="st">"both"</span>)<span class="sc">$</span>by.self</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>by.self</code> ranks functions by time spent in the function itself rather than in its callees, which is what points at the line to change.</p>
+<p>Use <code>profvis::pause()</code>, never <code>Sys.sleep()</code>, when building a synthetic example to reason about: as far as R can tell, <code>Sys.sleep()</code> uses no computing time, so it never appears in the profile.</p>
+</section>
+<section id="read-the-profile" class="level3">
+<h3 class="anchored" data-anchor-id="read-the-profile">4. Read the profile</h3>
+<p>The flame graph shows the full call stack, so a function called from two places is visible as two stacks rather than one aggregate. Watch for two things in particular.</p>
+<p><strong>A function high in the self-time ranking because it is called often, not because it is slow.</strong> The fix is the call count, not the function.</p>
+<p><strong><code>&lt;GC&gt;</code>.</strong> This entry is the garbage collector, not your code. A lot of time in <code>&lt;GC&gt;</code> almost always means many short-lived objects, and the usual cause is copy-on-modify in a loop that grows an object one element at a time:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">integer</span>()</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fl">1e4</span>) x <span class="ot">&lt;-</span> <span class="fu">c</span>(x, i)     <span class="co"># every iteration copies all of x</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Confirm it from the memory column: a line that allocates and frees large amounts on every pass is the one to fix, and the fix is preallocation, not a faster arithmetic operator.</p>
+</section>
+<section id="microbenchmark-only-the-bottleneck" class="level3">
+<h3 class="anchored" data-anchor-id="microbenchmark-only-the-bottleneck">5. Microbenchmark only the bottleneck</h3>
+<p><code>bench::mark()</code> uses a high-precision timer, so it can separate operations that take microseconds. Benchmark the one expression the profile implicated, with the realistic input from step 2, not the whole pipeline:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">runif</span>(<span class="dv">100</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>lb <span class="ot">&lt;-</span> bench<span class="sc">::</span><span class="fu">mark</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sqrt</span>(x),</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  x<span class="sc">^</span><span class="fl">0.5</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>lb[<span class="fu">c</span>(<span class="st">"expression"</span>, <span class="st">"min"</span>, <span class="st">"median"</span>, <span class="st">"itr/sec"</span>, <span class="st">"n_gc"</span>, <span class="st">"mem_alloc"</span>)]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>By default each expression runs at least once (<code>min_iterations = 1</code>) and then as many times as fit in half a second (<code>min_time = 0.5</code>).</p>
+<p><code>bench::mark()</code> checks that every expression returns the same value and aborts if they differ:</p>
+<pre class="text"><code>Error : Each result must equal the first result:
+`sum(x)` does not equal `mean(x)`</code></pre>
+<p>That error is usually the benchmark catching a real bug in the alternative. Set <code>check = FALSE</code> only when the expressions are <em>meant</em> to return different things, and say in the report why.</p>
+<p>Use <code>bench::press()</code> when the answer depends on input size, so the comparison runs across a grid of sizes rather than at one arbitrary point.</p>
+</section>
+<section id="interpret-the-numbers" class="level3">
+<h3 class="anchored" data-anchor-id="interpret-the-numbers">6. Interpret the numbers</h3>
+<p><strong>Read <code>min</code> and <code>median</code>, not the mean.</strong> The timing distribution is heavily right-skewed, and often multimodal because the machine is doing other things. <code>min</code> is the best achievable time and <code>median</code> the typical one; <code>plot(lb)</code> shows the distribution on a log x-axis. The returned tibble carries <code>expression</code>, <code>min</code>, <code>median</code>, <code>itr/sec</code>, <code>mem_alloc</code>, <code>gc/sec</code>, <code>n_itr</code>, <code>n_gc</code>, <code>total_time</code>, and the list-columns <code>result</code>, <code>memory</code>, <code>time</code>, and <code>gc</code> (verified against bench 1.1.4).</p>
+<p><strong>Report absolute units, not just a ratio.</strong> “2.1x faster” is not actionable on its own. Calibrate with how many calls it takes to reach one second:</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Per call</th>
+<th>Calls per second of run time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1 ms</td>
+<td>one thousand</td>
+</tr>
+<tr class="even">
+<td>1 us</td>
+<td>one million</td>
+</tr>
+<tr class="odd">
+<td>1 ns</td>
+<td>one billion</td>
+</tr>
+</tbody>
+</table>
+<p>So an expression at 1.4 us that the real workload calls a few hundred times cannot account for a slow job, however large its ratio, and swapping it is churn.</p>
+<p><strong>Check <code>mem_alloc</code> and <code>n_gc</code> alongside the times.</strong> When step 4 flagged <code>&lt;GC&gt;</code>, these are the columns that show whether the alternative actually allocates less.</p>
+</section>
+<section id="re-profile-at-real-scale" class="level3">
+<h3 class="anchored" data-anchor-id="re-profile-at-real-scale">7. Re-profile at real scale</h3>
+<p>A microbenchmark measures a snippet in isolation. Real code is dominated by higher-order effects, so a microbenchmark win is a hypothesis about the real workload, not a result about it. Apply the change, re-run step 3 on the full realistic workload, and compare against the original wall-clock time from step 1.</p>
+<p>If the end-to-end time did not move, revert the change. A faster expression that leaves the job the same length has bought nothing and cost readability.</p>
+</section>
+<section id="report" class="level3">
+<h3 class="anchored" data-anchor-id="report">8. Report</h3>
+<p>State, in this order:</p>
+<ol type="1">
+<li>The workload, its input, and its before/after wall-clock time.</li>
+<li>The bottleneck the profile identified, and how much of total time it held.</li>
+<li>The <code>bench::mark()</code> table for the alternatives, with units.</li>
+<li>Whether the end-to-end re-profile confirmed the win.</li>
+<li>Which limitations below apply, if any.</li>
+</ol>
+<p>Attach the numbers to the PR when the change ships, so the next reviewer does not have to re-derive them.</p>
+</section>
+</section>
+<section id="limitations-to-state-in-the-report" class="level2">
+<h2 class="anchored" data-anchor-id="limitations-to-state-in-the-report">Limitations to state in the report</h2>
+<p>The profiler cannot see everything, and each gap silently misattributes time:</p>
+<ul>
+<li><strong>Compiled code.</strong> Profiling shows that R called into C/C++ but not what happened inside. Say so rather than reporting the C call as a leaf.</li>
+<li><strong>Anonymous functions.</strong> Heavy functional-programming code is hard to attribute call by call. Name the functions before profiling.</li>
+<li><strong>Lazy evaluation.</strong> An argument is evaluated where it is first used, so in <code>j(i())</code> the profile attributes <code>i()</code>’s cost to <code>j()</code>. Use <code>force()</code> to pull evaluation forward when the attribution matters.</li>
+</ul>
+</section>
+<section id="outside-r" class="level2">
+<h2 class="anchored" data-anchor-id="outside-r">Outside R</h2>
+<p>The tools are R-specific; the order is not. Profile before optimizing, microbenchmark only the bottleneck the profile found, read medians rather than means, and confirm the win end to end. In Python the stdlib equivalents of the two measurement steps are <code>cProfile</code> and <code>timeit</code>.</p>
+</section>
+<section id="relationship-to-other-skills" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
+<ul>
+<li><a href="../../shared/workflow/algorithmatize-checks.md"><code>algorithmatize-checks</code></a> – the general rule this skill instruments: a performance claim is decidable by measurement, so never settle it by reasoning.</li>
+<li><a href="../../shared/principles/dont-reinvent-wheel.md"><code>dont-reinvent-wheel</code></a> and <a href="../../shared/coding/prefer-packaged-functions.md"><code>prefer-packaged-functions</code></a> – check for an existing, usually C-backed, packaged implementation before hand-optimizing. A found package beats a won benchmark.</li>
+<li><a href="../../shared/coding/use-memoisation.md"><code>use-memoisation</code></a> – one of the fixes this skill’s profile can point at, and the fragment that says to raise a missed memoisation only when the function is “demonstrably hot”. Step 3 is what demonstrates it, and step 6’s <code>mem_alloc</code> column is where the memory half of the trade shows up.</li>
+<li><a href="../../skills/reprexes/SKILL.html"><code>reprexes</code></a> – reduces a slow workload to the minimal self-contained snippet step 5 benchmarks.</li>
+<li><a href="../../skills/test/SKILL.html"><code>test</code></a> and <a href="../../skills/r-pkg-check/SKILL.html"><code>r-pkg-check</code></a> – the correctness gates an optimization still has to pass. <code>bench::mark()</code>’s equality check compares the benchmarked expressions to each other, not the package to its test suite.</li>
+<li><a href="../../skills/simplify/SKILL.html"><code>simplify</code></a> and <a href="../../skills/tidy/SKILL.html"><code>tidy</code></a> – an optimization step 7 could not confirm is complexity debt; hand the cleanup to these.</li>
+<li><a href="../../skills/ardi/SKILL.html"><code>ardi</code></a> – the loop that carries step 8’s numbers into a review round, whether the finding is yours or a reviewer’s.</li>
+</ul>
+</section>
+<section id="anti-patterns" class="level2">
+<h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
+<ul>
+<li>Optimizing a line because it looks slow, with no profile.</li>
+<li>Profiling a toy input, then acting on the result as if it described the real workload.</li>
+<li>Microbenchmarking the whole pipeline instead of the bottleneck the profile named.</li>
+<li>Comparing means, or reporting a ratio with no absolute units behind it.</li>
+<li>Passing <code>check = FALSE</code> to silence a genuine difference in results, rather than because the expressions are meant to differ.</li>
+<li>Shipping a microbenchmark win without the end-to-end re-profile of step 7.</li>
+<li>Reading <code>&lt;GC&gt;</code> as slow code rather than as an allocation problem.</li>
+<li>Using <code>Sys.sleep()</code> in a synthetic profiling example, where it is invisible to the profiler.</li>
+<li>Asserting a speedup in a PR body with no numbers attached.</li>
+</ul>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/Morrison-Lab\.github\.io\/ai-config\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // default icon
+            link.classList.add("external");
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Built with <a href="https://quarto.org/">Quarto</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/measure-performance/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/measure-performance/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

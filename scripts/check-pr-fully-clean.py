@@ -142,6 +142,45 @@ def get_pr_info(pr_num: str, repo: str) -> Tuple[str, str, str, str, str]:
     return head_sha, data["headRefName"], data["state"], commit_date, review_decision
 
 
+def _is_bot_author(login: str) -> bool:
+    """Return True if *login* belongs to an automated review bot."""
+    return (
+        login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        or login.endswith("[bot]")
+    )
+
+
+def _resolve_run_head_sha(body: str, repo: str, branch: str = "") -> Optional[str]:
+    """Extract a workflow run ID from a review comment body and return its head_sha.
+
+    Review comments from the ``@claude`` workflow contain a "View run" link
+    like ``https://github.com/{owner}/{repo}/actions/runs/{run_id}``.
+    Fetching that run's ``head_sha`` proves which commit the reviewer was
+    dispatched against, which is the authoritative source per #1520.
+
+    A ``workflow_dispatch`` run's ``head_sha`` names the dispatch ref, not
+    the reviewed commit (see ``fully-clean.rationale.md``), so this only
+    trusts the field when the run's ``head_branch`` matches the PR's own
+    branch -- confirming the dispatcher passed an explicit ``--ref``.
+    Falls back to ``None`` (body-SHA scan) when the check cannot be made.
+    """
+    m = re.search(r"/actions/runs/(\d+)", body)
+    if not m:
+        return None
+    run_id = m.group(1)
+    try:
+        out = run_cmd(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
+        run = json.loads(out)
+        event = run.get("event", "")
+        head_branch = run.get("head_branch", "")
+        head_sha = run.get("head_sha")
+        if event == "workflow_dispatch" and branch and head_branch != branch:
+            return None
+        return head_sha
+    except RuntimeError:
+        return None
+
+
 def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "api", f"repos/{repo}/commits/{sha}/check-runs?per_page=100"])
     data = json.loads(out)
@@ -419,7 +458,7 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     latest_verdict = ""
     latest_when = ""
     n_with_verdict = 0
-    for _kind, when, body, _oid, state in dated:
+    for _kind, when, body, _oid, state, *_ in dated:
         verdict = classify_verdict(body, state)
         if verdict:
             n_with_verdict += 1
@@ -438,7 +477,7 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     return True, []
 
 
-def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "") -> Tuple[bool, List[str]]:
+def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", branch: str = "") -> Tuple[bool, List[str]]:
     out = run_cmd(["gh", "pr", "view", pr_num, "--repo", repo, "--json", "comments,reviews"])
     data = json.loads(out)
 
@@ -473,7 +512,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if "ard review disposition summary" in body_lower:
             continue
 
-        is_bot_author = author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
+        is_bot_author = _is_bot_author(author_login)
         # "**claude finished" and "### verdict" are the canonical review markers
         # CLAUDE.md prescribes ("Completed runs start the body with
         # `**Claude finished`"). The older "claude finished review" marker was a
@@ -486,7 +525,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "**claude finished", "### verdict", "verdict:"))
 
         if is_bot_author or is_review_header:
-            all_items.append(("comment", c["createdAt"], body, "", "COMMENT"))
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))
 
     for r in reviews:
         body = r.get("body", "")
@@ -499,12 +538,9 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # authors only -- never sniff body text, which a human review can
         # trivially collide with -- OR a blocking CHANGES_REQUESTED/REJECTED state
         # from any author.
-        is_bot_author = (
-            author_login in ("github-actions", "github-actions[bot]", "claude[bot]", "claude")
-            or author_login.endswith("[bot]")
-        )
+        is_bot_author = _is_bot_author(author_login)
         if is_bot_author or state in ("CHANGES_REQUESTED", "REJECTED"):
-            all_items.append(("review", submitted_at, body, commit_oid, state))
+            all_items.append(("review", submitted_at, body, commit_oid, state, author_login))
 
     if not all_items:
         issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
@@ -530,15 +566,22 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
             # Formal reviews with an explicit commit OID must match the target HEAD SHA exactly
             is_match = (oid == sha)
         else:
-            # An issue comment counts as evaluating HEAD only if it actually
-            # references the HEAD SHA (full or short). Matching on timing alone
-            # (posted after the commit + a generic marker word) is unsafe: a slow
-            # review of an earlier commit can post AFTER a newer push and would
-            # then be accepted as a review of the new HEAD, reporting a stale
-            # verdict as "fully clean" -- the exact review-vs-push race
-            # shared/workflow/fully-clean.md documents ("a review comment's
-            # header SHA can be stale"). Fail closed: no SHA reference, no match.
+            # An issue comment counts as evaluating HEAD if either:
+            # (a) it references the SHA in its body (original logic), or
+            # (b) it is from a bot author AND contains a "View run" link whose
+            #     run's head_sha matches the target -- proving the reviewer was
+            #     dispatched against this commit.  This resolves the reviewed
+            #     commit from the run rather than from the comment body, which is
+            #     what fully-clean.md prescribes.  Falls back to body-SHA scan
+            #     when no run can be resolved (no link, or API failure).
+            #     See Morrison-Lab/ai-config#1520, #1213.
             is_match = is_sha_match
+            if not is_match:
+                author_login = item[5] if len(item) > 5 else ""
+                if _is_bot_author(author_login):
+                    run_sha = _resolve_run_head_sha(body, repo, branch)
+                    if run_sha == sha:
+                        is_match = True
 
         if is_match:
             matching_items.append(item)
@@ -618,7 +661,7 @@ def main():
     print(f"PR #{pr_num} ({branch}): state={state}, HEAD={sha[:8]} (committed {commit_date})")
 
     ci_ok, ci_issues = check_ci_runs(sha, repo)
-    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision)
+    review_ok, review_issues = check_review_comments(pr_num, sha, repo, review_decision, branch)
 
     all_issues = ci_issues + review_issues
 

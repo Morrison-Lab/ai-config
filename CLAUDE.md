@@ -952,8 +952,9 @@ only detector.
 
 ## Big-picture principles: KISS, DRY, DRW, modularity, and friends
 
-Our big-picture principles are cataloged centrally in `shared/principles/` -- the overall dev goals they serve (code and prose that is valid and easy to externally validate, reproducible, highly functional, reliable, secure, efficient, maintainable, extensible, human- and AI-readable, and reusable), each principle's statement (KISS, YAGNI, DRY, DRW, don't incur technical debt, modularity, least astonishment, purity, self-documenting code, fail fast, algorithmatize checks -- plus the reduce/reuse/recycle lens over them), the specific rules and skills that operationalize each, and how the principles relate and trade off.
-When encoding a new coding/review rule, file it under the principle it serves (and add a new principle to the catalog when one emerges) rather than leaving either the rule or the principle floating free.
+The catalog in `shared/principles/` maps each principle to its purpose,
+operational rules, and trade-offs.
+When adding a coding or review rule, place it under the principle it serves.
 
 [shared/principles/README.md](shared/principles/README.md)
 
@@ -969,15 +970,7 @@ The `prefer-upstream` skill runs the search; the `prefer-packaged-functions` fra
 
 ## Don't incur technical debt
 
-When the right way to do the work in front of you needs a change you have not made yet, make that change as part of the work, rather than shipping the version that routes around it.
-The moment debt is incurred is the moment you defer a fix you have **already diagnosed** -- the most defensible-sounding moment there is, because the diagnosis is fresh, the scope argument is genuine, and deferring reads as discipline rather than as a decision.
-A filed tracking issue records the debt rather than paying it, and it makes the deferral feel settled in a way an undocumented shortcut never does.
-The rule bounds **new** work only: adding a copy to un-migrated code is yours to fix now, the un-migrated code itself is not -- the line is authorship, not adjacency.
-Apply this in review too: a diff that adds a second copy of logic the repo already has is a review finding, and a PR that links a follow-up issue for a defect inside its own diff is a stronger one.
-
 [shared/principles/dont-incur-technical-debt.md](shared/principles/dont-incur-technical-debt.md)
-
-The fragment also covers the case where duplicated logic corrupts its own tests -- a test that reimplements the unit under test validates the copy, not the code -- and why this does not conflict with YAGNI.
 
 ## Fail fast — no silent failures
 
@@ -988,16 +981,10 @@ Apply this in review too: error handling that hides failure is a review finding,
 
 ## Coding: KISS is the umbrella principle
 
-Follow the KISS principle (keep it simple, stupid) in code and prose alike:
-prefer the simplest construct that does the job, and treat added complexity
-as a cost that needs justification.
-The specific coding rules below --- every fragment under `shared/coding/`,
-indexed by the principle it serves in the catalog above --- and the
-review-side
-`challenge-unnecessary-complexity` policy are special cases of this
-principle — they exist because a bare "keep it simple" isn't concretely
-reviewable, but when a case arises that none of them covers, apply KISS
-directly rather than treating the enumerated rules as exhaustive.
+Apply KISS to code and prose: use the simplest construct that does the job,
+and justify added complexity.
+The rules below and `challenge-unnecessary-complexity` are concrete cases,
+not an exhaustive list.
 
 ## Coding: use the least-flexible construct that does the job
 
@@ -1118,35 +1105,9 @@ Apply it wherever `code-review`/`ard`/`ardi` already reviews a prose diff, along
 
 [`shared/writing/semantic-line-breaks.md`](shared/writing/semantic-line-breaks.md)
 
-## Quarto: link packages on first mention
-
-**Link packages up front.** Package names in `.qmd` prose take the
-`[{pkg}](url)` link form on first mention in a section (e.g.
-`[{dplyr}](https://dplyr.tidyverse.org/)`). Add those links as you write the
-section — the review bots flag every unlinked package name, one round at a time.
-
 ## Quarto: div syntax for figure/table labels and captions
 
-In Quarto `.qmd` files, label and caption figures and tables with **div syntax**, not chunk-option syntax.
-Wrap the code chunk in a `::: {#fig-...}` / `::: {#tbl-...}` fenced div and put the caption as the last line before the closing `:::`:
-
-````
-::: {#fig-stage-at-dx}
-
-```{r}
-#| label: stage-at-dx-fig
-#| code-fold: true
-
-plot_stage_at_dx(pt_data)
-```
-
-Stage at diagnosis by screening frequency
-:::
-````
-
-Don't use the chunk options `#| label: fig-...` / `#| fig-cap: "..."` for the cross-reference id and caption.
-The div id (`#fig-`/`#tbl-`) carries the cross-reference; the chunk `label` stays a plain code label.
-This keeps figures consistent with tables, which already use div syntax.
+[`shared/writing/quarto-figure-captions.md`](shared/writing/quarto-figure-captions.md)
 
 ## Challenge ambiguous phrasing and terminology in review
 

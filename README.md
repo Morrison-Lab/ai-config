@@ -30,6 +30,7 @@ After bootstrapping, confirm the symlinks resolved and the skills are visible:
 ```sh
 ls -l ~/.claude/skills ~/.claude/commands ~/.codex/skills ~/.gemini/skills ~/.gemini/config/plugins/ai-config
 scripts/inventory.sh                         # live counts of skills/wrappers/commands/docs
+python3 scripts/check-harness-installs.py    # audit every installed harness
 ```
 
 In a Claude Code session, type `/` and confirm the skills appear (e.g.

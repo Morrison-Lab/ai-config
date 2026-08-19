@@ -177,18 +177,15 @@ It walks the same link graph `scripts/check-links.py` does, counts inbound links
 
 **Orphans --- zero inbound references --- are a reading prompt rather than a defect.**
 A slash command invoked by name, an index, a directory README: each is legitimately unlinked, so the question the bucket answers is whether a *new* orphan appeared, not whether the count is zero.
-Measured against this repo on 2026-08-16: 503 files examined, 3 orphans (`commands/release-pr.md`, `memories/MEMORY.md`, `references/cloud-setup/README.md`), 181 generated wrappers and 2 root entry points exempt.
-All three were inspected and are the benign kinds above, so treat that as the baseline rather than as a backlog.
 
 **Old but still referenced is the bucket the corpus was blind to**, and it is the harmful case: a live link to a stale record reads as current project state to every fresh agent walking the graph, where an orphan is merely unreachable.
 
 **The age bucket carries no information under a shallow clone**, which is what the checker's own output says (`age_informative: false` in `--json`).
-`git log` cannot see past the fetch depth, so every file reads as no older than the oldest fetched commit.
-`actions/checkout` clones at depth 1, so the CI step is advisory for that reason as well as for the orphan bucket's.
 Re-run against a full clone (`git fetch --unshallow`) before reading it.
 
 - **Do:** run the checker during the pass, and fold or prune whatever it reports that the pass has already captured elsewhere.
-- **Do:** read a new orphan as a question about that file, since the standing three are benign.
+- **Do:** read a new orphan as a question about that file.
 - **Don't:** decide which records are outstanding from memory --- that covers this session's own notebook and nothing else.
 - **Don't:** read the age bucket at all from a shallow clone.
-  The script reports it as uninformative rather than empty.
+
+See [`run-ums-proactively.cases.md`](run-ums-proactively.cases.md), "Stale records checker baseline and shallow clones".

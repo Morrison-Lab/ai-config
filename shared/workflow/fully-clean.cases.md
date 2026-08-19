@@ -59,6 +59,20 @@ quota problem needing a fix.)
    The job in fact completed `success` at `00:57:00Z` after a legitimate ~16-minute review that started `00:41:00Z`, posting a real `**Claude finished review**` verdict ("Needs minor changes", cost $15.07) at `00:56:55Z`.
    The 404 had meant "still running"; every check before ~`00:57Z` was premature, and the job's own `timeout-minutes` was 60, so it was nowhere near timing out either.)
 
+## Suppressed findings heading variations
+
+Copilot can report zero new comments while placing substantive findings inside a collapsed `<details>` suppression block in the review body.
+The summary heading text varies across PRs:
+- PR #660 emitted `Comments suppressed due to low confidence (3)`
+- PRs #1029 and #1031 emitted `Suppressed comments (4)`
+
+A literal match for either phrase returns a false negative. Matching case-insensitively on `suppressed` strictly inside `<summary>` headings prevents false positives against overview text (e.g. review 4837572117 whose summary table mentioned "suppressed Copilot findings" in uncollapsed prose).
+
+## Checker unhandled exception on wrong repo
+
+Run from a checkout of the wrong repository, `check-pr-fully-clean.py` raises `RuntimeError: Command failed (gh pr view ...)` and exits with code 1 (the code reserved for "not clean").
+Paired checking of finding bullets (`grep -q '^  - '`) confirms whether exit code 1 represents genuine review findings or an unhandled exception. Passing `-R OWNER/REPO` explicitly avoids relying on the current working directory.
+
 ## "`gh pr checks` is not a complete enumeration" --- the rollup gap
 
 (`Morrison-Lab/ai-config#1056`, merged as `e1875ff7`, at head

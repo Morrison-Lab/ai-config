@@ -379,6 +379,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li>“what’s the status of PR #N”, “is #N ready to merge”, “is the review clean”.</li>
 <li>Before you state, anywhere, that a PR is mergeable / clean / ready.</li>
+<li>Any other question about a live PR this session is driving, even when the user never said “status”: “why didn’t you wait”, “did you fix it”, “why haven’t you responded to that comment”. Fetch the latest review <strong>and</strong> CI before answering. The review may have landed while you were answering a different process question. (gha#511, 2026-08-18: the session answered a CI-wait question from chat and never opened the PR thread, so a Needs more work review sat unanswered.)</li>
 </ul>
 <p>Commands below are annotated with their abstract operation token (e.g. <code>VIEW_PR</code>, <code>PR_CHECKS</code>) — resolve to your model’s tool via <a href="../../tool-mappings.md"><code>tool-mappings.md</code></a> instead of the <code>gh</code> command shown if this session doesn’t have <code>gh</code>.</p>
 </section>

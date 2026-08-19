@@ -6,6 +6,7 @@ Report a PR’s review status honestly: based on the **most recent** review, wit
 
 - “what’s the status of PR \#N”, “is \#N ready to merge”, “is the review clean”.
 - Before you state, anywhere, that a PR is mergeable / clean / ready.
+- Any other question about a live PR this session is driving, even when the user never said “status”: “why didn’t you wait”, “did you fix it”, “why haven’t you responded to that comment”. Fetch the latest review **and** CI before answering. The review may have landed while you were answering a different process question. (gha#511, 2026-08-18: the session answered a CI-wait question from chat and never opened the PR thread, so a Needs more work review sat unanswered.)
 
 Commands below are annotated with their abstract operation token (e.g. `VIEW_PR`, `PR_CHECKS`) — resolve to your model’s tool via [`tool-mappings.md`](../../tool-mappings.md) instead of the `gh` command shown if this session doesn’t have `gh`.
 

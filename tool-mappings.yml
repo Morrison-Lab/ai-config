@@ -35,10 +35,24 @@ models:
 # Each operation gives the canonical `gh`/`git` command (the CLI fallback,
 # and what the Claude skills are written in) plus the GitHub MCP tool that
 # performs the same action. `<N>` is a PR/issue number; `<branch>` a ref.
+#
+# Quote every operand carrying a `<...>` placeholder. These commands are meant
+# to be copy-pasted, and the shell reads a bare `<` as input redirection and a
+# bare `>` as output redirection, so an unsubstituted placeholder is eaten by
+# the shell rather than passed to the command. Measured 2026-08-19 in bash
+# 3.2.57, bash 5.3.15, and zsh 5.9, which agree:
+# `gh pr view <N> --comments` reads stdin from a file named `N` and CREATES OR
+# TRUNCATES one named `--comments`, leaving `gh pr view` to run with no
+# arguments; `gh pr view <N>` with nothing after it is a syntax error, since
+# the `>` has no target. Quoting the whole operand (`gh pr view "<N>"`) passes
+# the placeholder through literally, so the command fails on the placeholder
+# instead of silently redirecting. scripts/validate-skills.py enforces this by
+# testing the effect -- any `<` outside quotes in a command field -- rather
+# than by matching particular command spellings.
 operations:
   - id: VIEW_PR
     description: Read a pull request's details and metadata.
-    cli: gh pr view <N>
+    cli: gh pr view "<N>"
     github_mcp: mcp__github__pull_request_read (method=get)
   - id: LIST_PRS
     description: List pull requests.
@@ -50,15 +64,15 @@ operations:
     github_mcp: mcp__github__search_pull_requests
   - id: DIFF_PR
     description: Read a pull request's diff.
-    cli: gh pr diff <N>
+    cli: gh pr diff "<N>"
     github_mcp: mcp__github__pull_request_read (method=get_diff)
   - id: PR_CHECKS
     description: Read a pull request's CI check / status results.
-    cli: gh pr checks <N>
+    cli: gh pr checks "<N>"
     github_mcp: mcp__github__pull_request_read (method=get_check_runs)
   - id: READ_PR_COMMENTS
     description: Read a pull request's top-level (conversation) comments.
-    cli: gh pr view <N> --comments
+    cli: gh pr view "<N>" --comments
     github_mcp: mcp__github__pull_request_read (method=get_comments)
   - id: READ_PR_REVIEW_COMMENTS
     description: Read a pull request's inline review threads. The MCP tool returns thread objects under a `review_threads` key, each with `id` (a `PRRT_` thread node ID for `resolve_thread`), `is_resolved`, `is_outdated`, `is_collapsed`, and a nested `comments` array (wrapping GraphQL `reviewThreads`' camelCase `isResolved`/`isOutdated`). The CLI fallback (`gh api "repos/<owner>/<repo>/pulls/<N>/comments"`) returns flat comment objects without resolution state; inspecting thread resolution via CLI requires a GraphQL `reviewThreads` query.
@@ -78,23 +92,23 @@ operations:
     github_mcp: mcp__github__create_pull_request
   - id: EDIT_PR
     description: Edit a pull request (reviewers, labels, base, etc.).
-    cli: gh pr edit <N>
+    cli: gh pr edit "<N>"
     github_mcp: mcp__github__update_pull_request
   - id: MERGE_PR
     description: Merge a pull request.
-    cli: gh pr merge <N>
+    cli: gh pr merge "<N>"
     github_mcp: mcp__github__merge_pull_request
   - id: MARK_PR_READY
     description: Flip a draft pull request to ready for review.
-    cli: gh pr ready <N>
+    cli: gh pr ready "<N>"
     github_mcp: mcp__github__update_pull_request (draft=false)
   - id: REOPEN_PR
     description: Reopen a closed pull request.
-    cli: gh pr reopen <N>
+    cli: gh pr reopen "<N>"
     github_mcp: mcp__github__update_pull_request (state=open)
   - id: COMMENT_PR
     description: Post a top-level comment on a pull request.
-    cli: gh pr comment <N> --body "..."
+    cli: gh pr comment "<N>" --body "..."
     github_mcp: mcp__github__add_issue_comment
   - id: REPLY_REVIEW_COMMENT
     description: Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead.
@@ -110,7 +124,7 @@ operations:
     github_mcp: mcp__github__subscribe_pr_activity / mcp__github__unsubscribe_pr_activity
   - id: VIEW_ISSUE
     description: Read an issue's details.
-    cli: gh issue view <N>
+    cli: gh issue view "<N>"
     github_mcp: mcp__github__issue_read
   - id: LIST_ISSUES
     description: List issues.
@@ -122,7 +136,7 @@ operations:
     github_mcp: mcp__github__search_issues
   - id: READ_ISSUE_COMMENTS
     description: Read an issue's comments.
-    cli: gh issue view <N> --comments
+    cli: gh issue view "<N>" --comments
     github_mcp: mcp__github__issue_read (method=get_comments)
   - id: ISSUE_LINKED_PRS
     description: List the pull requests cross-referenced from an issue's timeline (i.e. PRs that link or close it).
@@ -134,15 +148,15 @@ operations:
     github_mcp: mcp__github__issue_write (method=create)
   - id: COMMENT_ISSUE
     description: Post a comment on an issue.
-    cli: gh issue comment <N> --body "..."
+    cli: gh issue comment "<N>" --body "..."
     github_mcp: mcp__github__add_issue_comment
   - id: CLOSE_ISSUE
     description: Close an issue with a reason.
-    cli: gh issue close <N> --reason "..."
+    cli: gh issue close "<N>" --reason "..."
     github_mcp: mcp__github__issue_write (method=update, state=closed, state_reason=...)
   - id: REOPEN_ISSUE
     description: Reopen a closed issue.
-    cli: gh issue reopen <N> --comment "..."
+    cli: gh issue reopen "<N>" --comment "..."
     github_mcp: mcp__github__issue_write (method=update, state=open)
   - id: LABEL_ISSUE
     description: >-
@@ -151,7 +165,7 @@ operations:
       path REPLACES the whole set, so pass the union of existing and new
       labels there. The MCP path also silently creates an unknown label name
       instead of rejecting it.
-    cli: gh issue edit <N> --add-label "..."
+    cli: gh issue edit "<N>" --add-label "..."
     github_mcp: mcp__github__issue_write (method=update, labels=[...])
   - id: GET_LABEL
     description: >-
@@ -186,7 +200,7 @@ operations:
     github_mcp: (no GitHub MCP tool; use gh api graphql)
   - id: PUSH
     description: Push commits to a branch.
-    cli: git push -u origin <branch>
+    cli: git push -u origin "<branch>"
     github_mcp: (use git; no GitHub MCP equivalent)
   - id: COMMIT
     description: Record staged changes as a commit.
@@ -194,19 +208,19 @@ operations:
     github_mcp: (use git; mcp__github__create_or_update_file commits a single file)
   - id: FETCH
     description: Fetch refs from the remote.
-    cli: git fetch origin <branch>
+    cli: git fetch origin "<branch>"
     github_mcp: (use git; no GitHub MCP equivalent)
   - id: MERGE_BRANCH
     description: Merge a branch into the current one.
-    cli: git merge origin/<branch>
+    cli: git merge "origin/<branch>"
     github_mcp: (use git; no GitHub MCP equivalent)
   - id: CREATE_BRANCH
     description: Create a new branch (e.g. off the default branch).
-    cli: git switch -c <branch> origin/<base>
+    cli: git switch -c "<branch>" "origin/<base>"
     github_mcp: mcp__github__create_branch
   - id: DELETE_REF
     description: Delete a remote branch or tag ref.
-    cli: git push origin --delete <branch> (or git push origin :refs/tags/<tag>)
+    cli: git push origin --delete "<branch>" (or git push origin ":refs/tags/<tag>")
     github_mcp: (no GitHub MCP tool; use gh api -X DELETE "repos/<owner>/<repo>/git/refs/heads/<branch>")
   - id: READ_FILE
     description: Read a file's contents from the repo.
@@ -220,7 +234,7 @@ operations:
     github_mcp: mcp__github__list_commits
   - id: WRITE_FILE
     description: Create or update file(s) on a branch in a single commit.
-    cli: git add <path> && git commit -m "..." && git push
+    cli: git add "<path>" && git commit -m "..." && git push
     github_mcp: mcp__github__create_or_update_file (one file) / mcp__github__push_files (multiple)
   - id: LIST_SECRETS
     description: >-
@@ -240,7 +254,7 @@ operations:
       Set an Actions secret. Omit --body so the value is read from stdin,
       keeping it out of argv (visible in ps) and shell history. Exiting 0 means
       the value was stored, not that it is valid.
-    cli: gh secret set <name> --repo <owner>/<repo>
+    cli: gh secret set "<name>" --repo "<owner>/<repo>"
     github_mcp: (no GitHub MCP tool; use gh)
   - id: RUN_WORKFLOW
     description: >-
@@ -248,9 +262,9 @@ operations:
       omitting it dispatches against the default branch, which is rarely what a
       PR-scoped dispatch wants. The MCP tool's `ref` is required for the same
       reason.
-    cli: gh workflow run <workflow>.yml --repo <owner>/<repo> --ref <branch> --field <key>=<value>
+    cli: gh workflow run "<workflow>.yml" --repo "<owner>/<repo>" --ref "<branch>" --field "<key>=<value>"
     github_mcp: mcp__github__actions_run_trigger (method=run_workflow)
   - id: LIST_WORKFLOW_RUNS
     description: List a workflow's recent runs, with conclusion and timestamps.
-    cli: gh run list --workflow <workflow>.yml --repo <owner>/<repo>
+    cli: gh run list --workflow "<workflow>.yml" --repo "<owner>/<repo>"
     github_mcp: mcp__github__actions_list (method=list_workflow_runs)

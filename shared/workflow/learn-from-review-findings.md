@@ -59,9 +59,12 @@ The replacement is usually a different kind of evidence rather than a better pat
 Ask what would settle the question directly, and whether you can observe it: an artifact instead of a description of one, a derived count instead of a claim about a count, a tool call instead of the prose announcing it.
 Where no such evidence exists, say so and pick the failure direction deliberately, per [`fail-fast`](../principles/fail-fast.md) --- a bounded, nameable false positive beats a silent bypass, and both beat a heuristic nobody can characterize.
 
-This is [`deterministic-tools`](../principles/deterministic-tools.md)'s recurrence bar pointed the other way.
+This is [`deterministic-tools`](../principles/deterministic-tools.md)'s recurrence bar pointed the other way, and the two thresholds differ on purpose.
 That rule says the third time you do a judgment task by hand, build a tool.
-This one says the third time your tool gets the same finding, the tool is wrong --- and the fact that it keeps *almost* working is the reason it survives that long.
+This one fires a round earlier: the **second** time your tool draws the same finding, the tool is wrong --- and the fact that it keeps *almost* working is the reason it survives that long.
+The asymmetry is the point rather than an oversight.
+Waiting for a third instance costs a whole extra round spent narrowing something that cannot work, which is precisely the delay this section exists to prevent;
+waiting for a third hand-run of a judgment call costs only that call.
 
 - **Do:** treat the second instance of a finding class as a question about the instrument, and say in the round which of the two questions you are answering.
 - **Do:** read a reviewer's "same issue as before" framing as a finding in its own right, separate from the case it arrives attached to.

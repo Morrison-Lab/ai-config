@@ -19,7 +19,8 @@ The review produces no verdict, and the `permission_denials_count` exceeds the r
 The workflow correctly refuses to retry --- re-running this pattern has repeatedly NOT recovered --- so the PR is stuck: the reviewer runs, produces no verdict, and the self-review fallback doesn't satisfy `fully-clean`'s requirement for an external verdict.
 The denied tools are logged in the workflow output (after [gha#540](https://github.com/Morrison-Lab/gha/issues/540)), which turns the diagnostic from "the reviewer gave up" into an actionable permissions gap.
 Treat this the same as a reviewer-down case: self-review immediately, then dispatch a cross-vendor reviewer (Antigravity, Copilot, Codex) as the external verdict --- re-dispatching the same reviewer won't help.
-Don't spend more than one manual re-run on this pattern; two high-denial stubs back to back is conclusive.
+Don't spend more than one manual re-run on this pattern ---
+two high-denial stubs back to back is conclusive.
 
 **No review workflow configured at all is a third failure mode, and the one nothing signals on its own.**
 Quota-skipped and a stub review both require a review workflow to exist and attempt to run.

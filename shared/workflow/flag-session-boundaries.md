@@ -6,6 +6,43 @@ Don't suggest it when there's still live state only this conversation holds: a b
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) --- anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
 If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per [`run-ums-proactively`](run-ums-proactively.md)'s "Recommending that the session end is itself a UMS trigger" section.
 
+**A clean stopping point requires that something finished, and the disqualifier list above cannot tell you whether anything did.**
+The rule's two halves read as one test and are not.
+The opening paragraph defines a stopping point by **completion** --- a task checkpointed or fully wrapped, a PR merged, an open question answered with nothing left pending.
+The paragraph above lists what **disqualifies** one.
+Nothing marks that second list as necessary rather than sufficient, so "none of these apply" gets read as "clean", and the completion half is never consulted at all.
+
+The gap opens on the commonest turn shape there is: the one that only explored.
+A turn that answered a question conversationally, ran diagnostics, read code, or made a change it never committed has finished nothing by construction --- and it trips none of the disqualifiers either, because a session with no PR has no unmerged PR and a session with no CI run has nothing in flight.
+Absence of live state and presence of a completion are different facts about a session.
+A turn that produced neither is the only kind that can be mistaken for both, which is why this misreads in exactly the case where it is least deserved.
+
+So name the thing that finished, in the declaration itself.
+"No PR opened or pushed to by this session" is a true sentence answering the wrong question, and enumerating the disqualifiers that way is what makes the declaration read as checked.
+That is the near-miss: the check *looks* performed, in the specific vocabulary of the rule, while the question the rule exists to answer went unasked.
+
+**Two mechanical checks settle it, so run them instead of judging.**
+
+**A boxed marker in the same turn contradicts the declaration.**
+A `QUESTION`, `OFFER`, or `BLOCKER` box is by definition something the user has not answered yet, which the disqualifier list already covers under "an unanswered question".
+The contradiction is invisible from the inside when both land in one message, because posing the question and declaring the stop feel like separate acts performed at different moments.
+They are not separate to the reader, who gets a request for input and a claim that nothing is pending in the same breath.
+
+**`git log origin/<default-branch>..HEAD` plus `git status --short` decides whether the session produced anything durable.**
+An empty range and a clean tree together mean the session's entire output was conversation, whatever else it spent its time on.
+Resolve the default branch from the repo rather than assuming `main`.
+An untracked local change --- a dotfile repaired, a scratch script written --- is real work and still not a completion, because nothing another session or another person could find records that it happened.
+The remedy converts it rather than excusing it: file it or commit it, and it becomes something nameable.
+
+- **Do:** name the specific thing that finished, in the declaration itself.
+- **Do:** run both checks --- boxed markers in this turn, and the commit range plus tree state --- before writing the word clean.
+- **Don't:** read "none of the disqualifiers apply" as "clean"; that list is necessary and not sufficient.
+- **Don't:** declare a clean stopping point in a turn that also posts a `QUESTION`, `OFFER`, or `BLOCKER` box.
+- **Don't:** count exploration, diagnosis, or an uncommitted local change as a completion.
+
+(Directive from the user, 2026-08-19: "cai: that wasn't a real stopping point; you haven't finished anything".
+See [`flag-session-boundaries.cases.md`](flag-session-boundaries.cases.md), "A clean declaration over a session that committed nothing".)
+
 **That PR clause is a bright line, not a judgment call, and it was narrowed deliberately.**
 It used to read "a PR I'm actively babysitting", which invites the question of whether *this* PR still counts as active --- and the answer always sounds like no.
 A PR whose checks are green and whose review has not come back yet feels finished: there is nothing to do, so there is nothing live.

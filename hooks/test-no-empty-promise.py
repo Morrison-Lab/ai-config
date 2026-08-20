@@ -51,6 +51,11 @@ DISPATCHED_WRITE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "name": "Task",
      "input": {"prompt": "Write the new rule into shared/workflow/x.md.",
                "description": "author the fragment"}}]}}
+# A sidechain record does not reach a Stop hook's transcript at all --
+# measured 2026-08-20, 0 of 126 session transcripts carried one. These
+# fixtures therefore pin that sidechain content is IGNORED, not that it
+# discharges: a fixture is not evidence about the harness it imitates
+# (shared/workflow/fixtures-are-not-evidence.md).
 SUBAGENT_WROTE = {"type": "assistant", "isSidechain": True, "message": {
     "content": [{"type": "tool_use", "name": "Write",
                  "input": {"file_path": "shared/workflow/x.md",
@@ -58,6 +63,10 @@ SUBAGENT_WROTE = {"type": "assistant", "isSidechain": True, "message": {
 SUBAGENT_SAID = {"type": "assistant", "isSidechain": True, "message": {
     "content": [{"type": "text",
                  "text": "Going forward I will always do X."}]}}
+# How a delegated build actually ends: the parent stages the artifact.
+STAGED_ARTIFACT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "git add hooks/request-reviewer-on-ready.py"}}]}}
 # A read-only dispatch whose brief merely cites a rule surface. Subagent
 # briefs in this corpus cite such paths constantly, so this is the realistic
 # shape rather than a contrived one (review finding on #1724).
@@ -138,7 +147,9 @@ CASES = [
     ([DISPATCHED_WRITE, say("Going forward I'll do X.")],
      True, "a brief DESCRIBING a write does not discharge it (review #1724)"),
     ([DISPATCHED_WRITE, SUBAGENT_WROTE, say("Going forward I'll do X.")],
-     False, "the subagent's actual write discharges it"),
+     True, "a sidechain write is NOT visible here, so it cannot discharge"),
+    ([DISPATCHED_WRITE, STAGED_ARTIFACT, say("Going forward I'll do X.")],
+     False, "staging the delegated artifact discharges it"),
     ([SUBAGENT_SAID, say("Going forward I'll do X.")],
      True, "a subagent's own prose is neither my promise nor my mechanism"),
 

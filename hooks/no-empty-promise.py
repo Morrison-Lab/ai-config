@@ -208,21 +208,14 @@ def scan(path):
         kind = m.get("type")
         blocks = (m.get("message") or {}).get("content") or []
 
-        # A subagent's own PROSE is not my outgoing message, so it can never
-        # be the promise. Its WRITES are another matter: a delegated agent
-        # that creates a rule surface has shipped a mechanism as surely as I
-        # would have, and observing that beats inferring it from the brief I
-        # sent. Whether these records reach this transcript depends on the
-        # harness layout -- remind-ums-after-error.py records that they can
-        # live in a separate subagents/agent-*.jsonl file -- so this is a
-        # route that helps when available and costs nothing when it is not.
+        # A subagent's turns are not mine, and -- measured, not assumed --
+        # they are not here at all. Across 232 local transcripts on
+        # 2026-08-20, 0 of the 126 SESSION transcripts carried a single
+        # `isSidechain` record; all 106 that did were `subagents/agent-*.jsonl`
+        # files. A Stop hook is handed the session transcript, so reading a
+        # subagent's writes from here would be dead code. See
+        # `discharges()` for what a delegated build discharges on instead.
         if m.get("isSidechain"):
-            if kind == "assistant" and isinstance(blocks, list):
-                for b in blocks:
-                    if (isinstance(b, dict) and b.get("type") == "tool_use"
-                            and discharges(b.get("name") or "",
-                                           b.get("input") or {})):
-                        mech = True
             continue
 
         if kind == "user":
@@ -265,16 +258,28 @@ def discharges(name, inp):
       * Prose does not discharge at all. The whole near-miss this guard
         exists for is the promise that names its own mechanism in the future
         tense ("going forward I'll add `hooks/x.py`"), and any check keyed on
-        the path appearing in the text passes exactly that sentence. There is
-        no real cost to dropping it: a mechanism built by a subagent still
-        shows up as this turn's `Agent` call, and one built by a skill shows
-        up as the `Skill` call.
+        the path appearing in the text passes exactly that sentence.
       * A READ does not discharge either. `Read`, `Grep`, and `cat` over a
         rule surface are what ordinary work in this corpus looks like, so
         matching any tool whose payload mentions such a path would discharge
         nearly every turn.
 
     So each tool kind is asked the question its own payload can answer.
+
+    A DELEGATED build is the case this cannot see, and saying so plainly
+    beats guessing. A subagent's own writes are not in this transcript --
+    0 of 126 session transcripts carried an `isSidechain` record when that
+    was measured -- and a dispatch brief is prose, so no reading of its
+    wording is evidence about what the agent did. Two earlier rounds of
+    review narrowed exactly that wording heuristic before a third found it
+    still matching bare nouns, so it is not reintroduced here.
+
+    What a delegated build discharges on instead is the parent's own next
+    act: staging or committing the artifact (`git add hooks/x.py`) is a
+    `bash` write against a rule surface and discharges normally, and that
+    is how such work actually ends. A turn that dispatches a build, makes
+    a promise, and stops before touching the result is the residual false
+    positive -- deliberate, named, and one command from clearing.
     """
     if not isinstance(inp, dict):
         return False
@@ -366,6 +371,10 @@ def main() -> int:
             "(README's activation gate);\n"
             "  * a filed issue, when the mechanism is real work someone must "
             "schedule.\n\n"
+            "Delegated the build to a subagent? Its writes are not in this "
+            "transcript (measured: 0 of 126 session transcripts carried a "
+            "sidechain record), so stage or commit the artifact -- "
+            "`git add <path>` -- and this clears.\n\n"
             "If none of those is worth building, the honest move is to drop "
             "the promise and state the fact without it -- 'I was wrong about "
             "X, and here is Y' costs the user nothing and claims nothing."

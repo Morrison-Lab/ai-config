@@ -169,15 +169,6 @@ WRITE_TOOLS = {
     "create", "update", "str_replace_editor", "apply_patch",
 }
 
-# A creation verb, for payloads that are PROSE rather than a file path -- a
-# dispatch brief, where the only evidence of intent is what the brief asks for.
-WRITE_VERB = re.compile(
-    r"\b(?:writ(?:e|es|ing)|creat(?:e|es|ing)|add(?:s|ing)?|append(?:s|ing)?"
-    r"|record(?:s|ing)?|register(?:s|ing)?|edit(?:s|ing)?|updat(?:e|es|ing)"
-    r"|implement(?:s|ing)?|author(?:s|ing)?|patch(?:es|ing)?)\b",
-    re.I,
-)
-
 # What makes a shell command a write rather than a read.
 BASH_WRITE = re.compile(
     r">>?[^&|]|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)\b"
@@ -214,12 +205,25 @@ def scan(path):
     promise_txt, mech = None, False
 
     for m in records(path):
-        # A subagent's own turns are not my outgoing message.
-        if m.get("isSidechain"):
-            continue
-
         kind = m.get("type")
         blocks = (m.get("message") or {}).get("content") or []
+
+        # A subagent's own PROSE is not my outgoing message, so it can never
+        # be the promise. Its WRITES are another matter: a delegated agent
+        # that creates a rule surface has shipped a mechanism as surely as I
+        # would have, and observing that beats inferring it from the brief I
+        # sent. Whether these records reach this transcript depends on the
+        # harness layout -- remind-ums-after-error.py records that they can
+        # live in a separate subagents/agent-*.jsonl file -- so this is a
+        # route that helps when available and costs nothing when it is not.
+        if m.get("isSidechain"):
+            if kind == "assistant" and isinstance(blocks, list):
+                for b in blocks:
+                    if (isinstance(b, dict) and b.get("type") == "tool_use"
+                            and discharges(b.get("name") or "",
+                                           b.get("input") or {})):
+                        mech = True
+            continue
 
         if kind == "user":
             # A tool_result arrives as a `user` record; a real prompt does not.
@@ -291,18 +295,22 @@ def discharges(name, inp):
         return bool(MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd))
 
     if low in ("task", "agent", "skill"):
-        # A dispatch brief is prose, so it gets the same two-part test `bash`
-        # gets rather than a bare path match. MECHANISM_WORD alone suffices --
-        # `gh issue create`, `ums`, `memorize` are already actions. A path
-        # needs a creation verb beside it, so "read hooks/x.py and tell me
-        # what it does" reads as the read it is. (Review finding on #1724:
-        # this branch kept the mere-mention match every other branch had just
-        # shed, and subagent briefs cite rule-surface paths constantly.)
+        # ONLY an action word. A brief naming a path is not evidence about
+        # what the agent will do with it, and no reading of the wording can
+        # make it one: "read hooks/x.py", "summarize the latest edit to
+        # shared/x.md", "who wrote shared/x.md" all cite a rule surface while
+        # writing nothing. Two rounds of review narrowed a verb heuristic here
+        # and a third found `edit`, `update`, `record`, `author`, and `patch`
+        # still matching as bare NOUNS, so the heuristic is abandoned rather
+        # than narrowed again.
+        #
+        # MECHANISM_WORD survives because those tokens name an ACT --
+        # `gh issue create`, `ums`, `memorize` -- rather than a location.
+        # The real evidence about a delegated write is the write itself,
+        # which scan() reads off the subagent's own tool calls.
         blob = " ".join(str(inp.get(k, "")) for k in
                         ("prompt", "description", "skill", "args"))
-        if MECHANISM_WORD.search(blob):
-            return True
-        return bool(MECHANISM_PATH.search(blob) and WRITE_VERB.search(blob))
+        return bool(MECHANISM_WORD.search(blob))
 
     return False
 

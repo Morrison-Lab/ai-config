@@ -45,10 +45,19 @@ DISPATCHED_UMS = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "name": "Task",
      "input": {"prompt": "Run a ums pass recording this learning.",
                "description": "owed UMS pass"}}]}}
+# A brief that DESCRIBES writing is still only a brief. What discharges a
+# delegated mechanism is the subagent's own write, below.
 DISPATCHED_WRITE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "name": "Task",
      "input": {"prompt": "Write the new rule into shared/workflow/x.md.",
                "description": "author the fragment"}}]}}
+SUBAGENT_WROTE = {"type": "assistant", "isSidechain": True, "message": {
+    "content": [{"type": "tool_use", "name": "Write",
+                 "input": {"file_path": "shared/workflow/x.md",
+                           "content": "the rule"}}]}}
+SUBAGENT_SAID = {"type": "assistant", "isSidechain": True, "message": {
+    "content": [{"type": "text",
+                 "text": "Going forward I will always do X."}]}}
 # A read-only dispatch whose brief merely cites a rule surface. Subagent
 # briefs in this corpus cite such paths constantly, so this is the realistic
 # shape rather than a contrived one (review finding on #1724).
@@ -79,6 +88,12 @@ TOOL_RESULT = {"type": "user", "message": {"content": [
 def say(text):
     return {"type": "assistant", "message": {"content": [
         {"type": "text", "text": text}]}}
+
+
+def dispatch(prompt):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Task",
+         "input": {"prompt": prompt, "description": "read-only lookup"}}]}}
 
 
 # (events, should_block, label)
@@ -121,7 +136,26 @@ CASES = [
     ([DISPATCHED_UMS, say("Going forward I'll do X.")],
      False, "dispatching the recording pass discharges it"),
     ([DISPATCHED_WRITE, say("Going forward I'll do X.")],
-     False, "dispatching an agent to WRITE the fragment discharges it"),
+     True, "a brief DESCRIBING a write does not discharge it (review #1724)"),
+    ([DISPATCHED_WRITE, SUBAGENT_WROTE, say("Going forward I'll do X.")],
+     False, "the subagent's actual write discharges it"),
+    ([SUBAGENT_SAID, say("Going forward I'll do X.")],
+     True, "a subagent's own prose is neither my promise nor my mechanism"),
+
+    # The noun/verb ambiguity that defeated the previous round's verb
+    # heuristic: each of these cites a rule surface while writing nothing.
+    ([say("Going forward, I will always check the rule first."),
+      dispatch("Summarize the latest edit to shared/workflow/x.md.")],
+     True, "the noun 'edit' near a path does not discharge (review #1724)"),
+    ([say("Going forward, I will always check the rule first."),
+      dispatch("What does the latest update to memories/preferences.md say?")],
+     True, "the noun 'update' near a path does not discharge"),
+    ([say("Going forward, I will always check the rule first."),
+      dispatch("Find the record in memories/github.md about tokens.")],
+     True, "the noun 'record' near a path does not discharge"),
+    ([say("Going forward, I will always check the rule first."),
+      dispatch("Who is the author of shared/workflow/ardi.md?")],
+     True, "the noun 'author' near a path does not discharge"),
     ([say("Going forward I will add `hooks/no-foo.py` for it."),
       DISPATCHED_READ],
      True, "a read-only dispatch citing a hook path does NOT discharge it"),

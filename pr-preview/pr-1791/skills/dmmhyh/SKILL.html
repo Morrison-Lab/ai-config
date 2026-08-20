@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Stop over-asking; decide, and record the correction.">
+<meta name="description" content="Stop over-asking.">
 
 <title>skill – ai-config</title>
 <style>
@@ -382,7 +382,7 @@ ul.task-list li input[type="checkbox"] {
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
 <li><strong><a href="../../skills/daytb/SKILL.html"><code>daytb</code></a></strong> – supplies the immediate-decision mechanics <code>dmmhyh</code> uses for the triggering item. <code>daytb</code> alone doesn’t change future behavior in-session or across sessions; <code>dmmhyh</code> layers both on top.</li>
-<li><strong><a href="../../skills/away/SKILL.html"><code>away</code></a></strong> – supplies the judgment-call vs. information-or-authorization split <code>dmmhyh</code> uses to decide what still gets asked in-session. <code>away</code> presumes the user is <em>gone</em>; <code>dmmhyh</code> presumes the user is <em>here</em> and is telling you to ask them less anyway. Where they overlap (both raise the decide-vs-ask threshold), <code>away</code>’s scope is broader (it also drops the requirement to report before the session ends, keeps a decision log, etc.) – <code>dmmhyh</code> doesn’t imply those extras, and doesn’t need <code>back</code> to end, since it isn’t a suppression mode. Both can be active at once without conflict.</li>
+<li><strong><a href="../../skills/away/SKILL.html"><code>away</code></a></strong> – supplies the judgment-call vs.&nbsp;information-or-authorization split <code>dmmhyh</code> uses to decide what still gets asked in-session. <code>away</code> presumes the user is <em>gone</em>; <code>dmmhyh</code> presumes the user is <em>here</em> and is telling you to ask them less anyway. Where they overlap (both raise the decide-vs-ask threshold), <code>away</code>’s scope is broader (it also drops the requirement to report before the session ends, keeps a decision log, etc.) – <code>dmmhyh</code> doesn’t imply those extras, and doesn’t need <code>back</code> to end, since it isn’t a suppression mode. Both can be active at once without conflict.</li>
 <li><strong><a href="../../skills/ums/SKILL.html"><code>ums</code></a></strong> – owns the mechanics step 4 invokes: the scan-categorize-write-commit procedure, the grep-before-write dedupe rule, and the recurrence-count convention <code>dmmhyh</code> reuses rather than duplicating.</li>
 <li><strong><a href="../../skills/config-ai/SKILL.html"><code>config-ai</code></a></strong> – the escalation path step 4 reaches for once a class of over-asking has recurred enough to justify more than a memory bullet (a hook, most likely).</li>
 <li><strong><a href="../../shared/workflow/no-empty-promises.md"><code>no-empty-promises</code></a></strong> – the rule that makes step 4 mandatory rather than a nice-to-have: a session-only recalibration is a forward-looking commitment with no shipped mechanism, which is exactly what that rule forbids.</li>

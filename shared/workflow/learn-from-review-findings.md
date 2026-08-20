@@ -67,7 +67,8 @@ This one says the third time your tool gets the same finding, the tool is wrong 
 - **Do:** read a reviewer's "same issue as before" framing as a finding in its own right, separate from the case it arrives attached to.
 - **Do:** look for evidence you can observe directly before reaching for a better pattern.
 - **Don't:** apply a suggested narrowing just because the reviewer offered it --- a recurrence's proposed remedy is usually one more patch.
-- **Don't:** read a passing suite after a narrowing as evidence the class is closed; the tests came from the instance.
+- **Don't:** read a passing suite after a narrowing as evidence the class is closed;
+  the tests came from the instance.
 
 (Morrison-Lab/ai-config#1733, from three review rounds on #1724.
 Rounds 1 and 2 were answered by narrowing a wording heuristic, and round 3 found the same class again in bare nouns (`edit`, `update`, `record`, `author`, `patch`) that the round-2 verb pattern matched.

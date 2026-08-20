@@ -135,6 +135,13 @@
 - Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.
+  (Recurred on ucdavis/bcs, 2026-08-20, even with an explicit repo-level "Pull requests: standing authorization" section in that repo's own `CLAUDE.md`.
+  After finishing a manuscript edit, the session still asked whether more changes were coming before opening the PR ---
+  "cai: don't ask whether more changes are coming;
+  just open the PR immediately."
+  The repo-level grant was redundant with this already-unconditional rule;
+  the miss was not applying the existing rule, not a gap in its scope ---
+  so this generalizes to any repo/session carrying a standing "just do X" grant, not only one with its own explicit PR-authorization section.)
 - **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never finish or stop without stating whether or not a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
@@ -159,12 +166,6 @@
 - After creating a PR in a remote/web session (where PR-activity subscription is available), always subscribe to its CI/review activity (`subscribe_pr_activity`) and follow through --- autofix CI failures and address review comments per the ARD framework --- without asking first.
   Keep following until the PR is merged or closed (or I say stop).
   Don't ask "want me to watch it?"; just do it.
-- **Once a repo has granted standing PR-open authorization** for completed units of work (its `CLAUDE.md`, a prior session directive, or an established convention), open the PR as soon as the work is done --- no confirmation question first.
-  Don't ask "should I open a PR, or are more changes coming?" (or any equivalent gating question) once that authorization exists --- that question isn't neutral politeness, it's a regression to the exact confirmation gate the standing grant was written to remove.
-  (User correction on ucdavis/bcs, 2026-08-20: the repo's `CLAUDE.md` carried a "Pull requests: standing authorization" section pre-approving PR creation for any completed unit of work,
-  and after finishing a manuscript edit the session still asked whether more changes were coming --- "cai: don't ask whether more changes are coming;
-  just open the PR immediately."
-  Generalizes past that one repo: the same failure applies to any repo/session carrying a standing "just do X" grant.)
 - **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review` / `@agy review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn. If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`). If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke `self-review-fallback` per [`shared/workflow/self-review-fallback.md`](../shared/workflow/self-review-fallback.md); otherwise fix any dispatch/workflow failures discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes. Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer. (User directive / CAI, 2026-08-17.)
 
 

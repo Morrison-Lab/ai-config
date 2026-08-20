@@ -67,13 +67,6 @@
   a figure shows shape and trend at a glance.
   Present both so the reader gets both precision and intuition.
 - ALWAYS record what I learn in memory/AI-instruction notes as I work (standing request).
-- Memories must NEVER be local-only
-  (session memory, auto-memory, or local-only files).
-  A reusable learning belongs in a version-controlled repo ---
-  `ai-config` for cross-cutting rules,
-  the specific repo for repo-specific conventions.
-  Session memory is a scratchpad, not a home;
-  anything worth keeping must be committed and pushed.
 - When recording a factual claim about tool/workflow behavior (an implementation detail or a causal explanation derived from a specific source), cite the source inline --- e.g., "(source: gha#70 PR body)" --- so future sessions can calibrate trust and verify if needed.
   Directly observed facts need no citation, but explanations inferred from a PR body, commit message, or doc do. (Learned on ai-config#118.)
   Citing the source isn't the same as the citation being *accurate* --- before publishing, re-read the source and check the claim doesn't say more than the source actually establishes (a hedged "suggests"/"may" in the source shouldn't become an assertive "traces the root cause to X specifically" in the memory entry), and cross-check the new claim against related existing entries in the same file for consistency. (Learned on ai-config#482: a new bullet overstated what gha#173 had established, contradicting an existing gha#185/#187 bullet a few screens up in the same file --- caught by the PR's own review.)
@@ -370,7 +363,10 @@
   The `@claude` bot review caught the drift in round 1.)
 - After adding or updating skills OR memory files in the ai-config repo, always commit and push everything to origin (on the current branch if a PR is already open, or create a new branch + PR if the change is out of scope).
   Never leave ANY changes in ai-config as local-only uncommitted edits --- including memory files.
-- **AI memories, skills, and commands never stay local-only.** When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
+- **AI memories, skills, and commands never stay local-only.**
+  That covers session memory and auto-memory as well as local-only files:
+  a scratchpad is not a home, so anything worth keeping must be committed and
+  pushed. When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
   A memory kept only under `~/.claude/projects/<path>/memory/` or `~/.codex/memories/` is invisible to other sessions, machines, and humans, and rots silently --- so migrate it.
   Capturing a learning isn't done until it's committed where the right audience will see it.
 - **A migrate-then-delete cleanup (copy content into a repo, THEN delete the local source) must verify the copy is both COMPLETE and CURRENT before deleting --- not just that it exists.**

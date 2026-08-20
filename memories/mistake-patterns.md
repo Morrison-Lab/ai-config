@@ -78,7 +78,11 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
   disabling a feature to make CI green,
   commenting out a failing test,
   removing a dependency instead of fixing the integration.
-- **Canonical Rule**: See project CLAUDE.md ("Don't remove features as workarounds").
+- **Canonical Rule**: none states this case directly --- the nearest is
+  [`dont-incur-technical-debt.md`](../shared/principles/dont-incur-technical-debt.md)
+  ("shipping the version that routes around it"), which covers routing around a
+  needed change rather than deleting the feature that exposed it.
+  Tracked as a gap in Morrison-Lab/ai-config#1746.
 - **Fix**: Diagnose the root cause and fix it while preserving the feature.
   If unsure how, use a subagent to research the correct approach
   or check sibling repos for the working pattern.

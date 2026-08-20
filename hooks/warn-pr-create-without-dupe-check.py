@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""PreToolUse reminder: creating a PR with no duplicate check earlier in the session.
+
+[`pr-on-claim`](../shared/workflow/pr-on-claim.md) already names the check --- the
+authoritative in-flight signal for a piece of work is the issue's
+cross-referenced **open PRs**, not the claim comment. That rule is consulted at
+read time and broken at composition time, which is the shape
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) says to
+mechanize rather than restate.
+
+WHAT HAPPENED
+-------------
+Measured on `Morrison-Lab/wai`, 2026-08-19/20. Five branches attacked the same
+`check-non-standard-chars` failure across about five hours:
+
+    20:14  fix/replace-em-dashes
+    23:29  fix/replace-em-dashes-v2
+    23:38  fix/replace-all-non-standard-chars
+    00:16  fix/all-non-standard-chars          -> PR #77
+    01:16  fix/ascii-punctuation               -> PR #78
+
+Two reached PRs and duplicated each other. #77 was additionally cut from an
+unrelated PR's branch while targeting `main`, so merging it would have shipped
+a version of that PR's content its own reviewer had already rejected.
+
+The session that opened #78 had filed the tracking issue minutes earlier. Filing
+an issue and opening a PR against it *feels* like following the issue-first
+workflow, so nothing in the moment suggests a step was skipped. That is why a
+rule does not reach it: the omission is invisible from the inside, and the more
+sessions run in parallel, the likelier the collision and the less any one
+session can see it.
+
+WHY WARN RATHER THAN BLOCK
+--------------------------
+Deliberate. README's "A hook that misfires is worse than a missing one" sets the
+bar, and the asymmetry here runs the opposite way from
+`no-handrolled-verdict-parse.py`'s:
+
+  * A duplicate PR is cheap. It is visible, it is closeable, and closing it
+    costs one comment.
+  * A blocked `gh pr create` is expensive. It interrupts the one action that
+    makes work visible to other sessions, which is the very thing this rule
+    exists to encourage.
+
+So the safe direction is a reminder carrying the query to run, not a refusal.
+That also means a false positive costs a line of context and nothing else,
+which is what lets the matcher stay broad enough to be useful.
+
+THE CHECK
+---------
+Both must hold:
+
+  1. the command creates a PR/MR at a COMMAND POSITION --- `gh pr create` or
+     `glab mr create` at the start of the command or after `;`, `&&`, `||`,
+     `|`, or a newline.
+  2. NO duplicate-surfacing command appears earlier in the transcript.
+
+Clause 1's anchoring is load-bearing, not tidiness. This corpus quotes
+`gh pr create` constantly --- in fragments, in issue bodies, in heredocs
+documenting the workflow, and in this very docstring. A substring matcher would
+fire on every reply that cites the rule it enforces, which is exactly the
+failure `CLAUDE.md` records for `no-placeholder-reply.py` and solves there with
+whole-message anchoring. Here the equivalent is position anchoring.
+
+A heredoc is the specific trap: writing an issue body that contains the words
+`gh pr create` on its own line puts the phrase at what looks like a command
+position. Clause 1 therefore strips heredoc bodies before matching.
+
+WHAT DISCHARGES IT
+------------------
+Any earlier command that could surface an existing PR:
+
+    gh pr list, gh pr view, gh pr status, gh search prs
+    glab mr list, glab mr view
+    mcp__github__list_pull_requests, mcp__github__search_pull_requests
+
+The discharge is deliberately generous --- session-wide rather than per-topic.
+[`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) warns
+that an over-broad discharge makes a guard go silent, and that is a real cost
+here: a session that listed PRs once at the start is discharged for every PR it
+later creates. That was accepted because the target is the session that never
+looked at all, which is what the measured incident was. Tightening it to
+per-topic would need a notion of "same topic" that nothing in the transcript
+supplies.
+
+FAILS OPEN
+----------
+Any parse trouble, an unreadable transcript, or a missing transcript path all
+return 0 silently. A reminder that cannot establish its own precondition must
+not fire --- see `fail-fast.md` on making a fallback explicit and bounded.
+"""
+import json
+import os
+import re
+import sys
+
+# `gh pr create` / `glab mr create` at a command position.
+RX_CREATE = re.compile(
+    r"(?:^|[;&|\n]|&&|\|\|)\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"      # env-assignment prefixes
+    r"(?:gh\s+pr\s+create|glab\s+mr\s+create)\b",
+    re.MULTILINE,
+)
+
+# Anything that could have surfaced an already-open PR.
+RX_DISCHARGE = re.compile(
+    r"gh\s+pr\s+(?:list|view|status)\b"
+    r"|gh\s+search\s+prs\b"
+    r"|glab\s+mr\s+(?:list|view)\b"
+    r"|mcp__github__list_pull_requests"
+    r"|mcp__github__search_pull_requests",
+)
+
+# A heredoc body is prose, not commands. Strip it before position matching.
+RX_HEREDOC = re.compile(
+    r"<<-?\s*'?\"?([A-Za-z_][A-Za-z0-9_]*)'?\"?\s*\n.*?\n\1\b",
+    re.DOTALL,
+)
+
+NOTE = """\
+No duplicate check ran before this PR creation.
+
+`pr-on-claim` makes the issue's cross-referenced **open PRs** the authoritative
+in-flight signal, and nothing in this session's transcript has listed or
+searched them. Parallel sessions collide most often on exactly the work that
+feels obviously unclaimed.
+
+Measured on Morrison-Lab/wai (2026-08-19/20): five branches fixed the same CI
+failure across five hours, two of them reaching duplicate PRs.
+
+One query settles it before you spend a PR:
+
+    gh pr list --repo <owner>/<repo> --state open --search "<keywords>"
+
+If a PR already covers this, add to it instead. If you have already checked
+another way, carry on --- this is a reminder, not a refusal.
+"""
+
+
+def strip_heredocs(command):
+    """Remove heredoc bodies so quoted prose cannot look like a command."""
+    return RX_HEREDOC.sub("", command)
+
+
+def creates_pr(command):
+    """True when the command creates a PR/MR at a command position."""
+    return bool(RX_CREATE.search(strip_heredocs(command)))
+
+
+def transcript_has_dupe_check(transcript_path):
+    """True when some earlier transcript command could have surfaced a PR.
+
+    Returns True (i.e. discharged, silent) on any read failure --- fail open.
+    """
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return True
+    try:
+        with open(transcript_path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                for text in _tool_inputs(entry):
+                    if RX_DISCHARGE.search(text):
+                        return True
+    except OSError:
+        return True
+    return False
+
+
+def _tool_inputs(entry):
+    """Yield command-ish strings from one transcript entry."""
+    message = entry.get("message")
+    if not isinstance(message, dict):
+        return
+    content = message.get("content")
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        name = block.get("name")
+        if isinstance(name, str):
+            yield name
+        payload = block.get("input")
+        if isinstance(payload, dict):
+            for key in ("command", "cmd", "CommandLine"):
+                value = payload.get(key)
+                if isinstance(value, str):
+                    yield value
+
+
+def main():
+    try:
+        payload = json.load(sys.stdin)
+    except Exception as exc:  # fail open, but say so
+        print("warn-pr-create-without-dupe-check: unreadable hook input "
+              f"({exc})", file=sys.stderr)
+        return 0
+
+    if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
+        return 0
+
+    tool_input = payload.get("tool_input") or {}
+    command = (tool_input.get("command")
+               or tool_input.get("cmd")
+               or tool_input.get("CommandLine")
+               or "")
+    if not isinstance(command, str) or not command.strip():
+        return 0
+
+    try:
+        if not creates_pr(command):
+            return 0
+        if transcript_has_dupe_check(payload.get("transcript_path") or ""):
+            return 0
+    except Exception as exc:  # fail open on any parse trouble
+        print("warn-pr-create-without-dupe-check: could not evaluate "
+              f"({exc})", file=sys.stderr)
+        return 0
+
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": NOTE,
+        }
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

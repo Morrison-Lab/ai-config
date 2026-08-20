@@ -437,9 +437,11 @@ rather than an oversight.
 `\[[^\]]*\]\(([^)]+)\)` discards the link text as an unbound group --- and it
 splits any `#anchor` off the path before testing (`re.split(r"[#?]", target,
 maxsplit=1)[0]`), so its only assertion is `resolved.exists()`.
-A grep for `anchor` across `scripts/*.py` turns up no script validating a URL
-anchor or a heading, so as far as that search reaches, nothing here checks
-either.
+A grep for `anchor` across `scripts/*.py` matches ten files, and every hit is
+either a skip comment (`check-links.py`'s and `check-stale-records.py`'s
+`pure in-page anchor`) or `check-context-closure.py`'s unrelated
+"anchored import" terminology --- so none of them validates a URL anchor or a
+heading, as far as that one search reaches.
 So the sweep that would plausibly catch a bad citation passes with the citation
 intact, which is worse than having no check at all: a green link run reads as
 having validated the reference.

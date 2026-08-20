@@ -542,8 +542,8 @@ See ai-config#694 for the precedent.
   hide in.
   Not every session gets this --- some are restricted to the
   harness-assigned branch only, or fully read-only, per
-  [`github-actions.md`](github-actions.md)'s "403 caveat" and "fully
-  READ-ONLY" entries --- so test with a throwaway push before relying on
+  [`gha-reusable-workflows.md`](gha-reusable-workflows.md)'s "403 caveat"
+  and "fully READ-ONLY" entries --- so test with a throwaway push before relying on
   it.
 - **Issue *writes* 404 while *reads* succeed → the issue was transferred to
   another repo, not a permissions gap.** If `mcp__github__add_issue_comment` /

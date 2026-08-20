@@ -1123,12 +1123,40 @@ Fixed in #91.
 A single query for a `claude` comment on any earlier PR would have caught it at any
 point in the preceding month.)
 
-## `ai-config` never auto-reviews a PR on push, and the absence is silent
+## `ai-config` auto-reviews a PR on push again, as of 2026-08-20
 
-Nothing here summons a reviewer when a PR is pushed: `validate` and `preview`
-fire on a PR event, and no reviewer does.
-So a PR reaches all-green CI, `mergeStateStatus: CLEAN`, and sits with zero
-reviews forever, because nobody asked.
+**Corrected 2026-08-20.** This section previously read "`ai-config` never
+auto-reviews a PR on push, and the absence is silent", and its advice --- dispatch
+after every push --- is now the thing that breaks a PR rather than the thing that
+saves it.
+
+`c329ac45` ("ci: auto-run Claude reviews on PR pushes", #1707) restored the
+`pull_request` trigger:
+
+```yaml
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+  workflow_dispatch:
+```
+
+So a push **does** summon a reviewer here now, and dispatching as well starts a
+second run that races the first.
+`concurrency: cancel-in-progress` kills one of them, and per this file's own
+"the wreckage is permanent" finding the cancelled run's
+`review / claude-review` (cancelled) and `review / require-review` (failure)
+check runs stay attached to that SHA forever.
+
+Measured on #1724 (2026-08-20), by following this section's former advice:
+
+| run | event | outcome |
+| --- | --- | --- |
+| `32345965633` | `pull_request` | **cancelled** |
+| `32345990687` | `workflow_dispatch` | proceeded |
+
+`review / require-review` went red with
+`Claude review job did not succeed (result: cancelled)`, on a PR whose diff was
+fine.
 
 Derive it rather than recalling it; every row is one `on:` block that can change:
 
@@ -1140,44 +1168,56 @@ for f in .github/workflows/*.yml; do
 done
 ```
 
-Every reviewer workflow, measured 2026-08-07:
+Every reviewer workflow, re-measured 2026-08-20 with the command above:
 
 | workflow | triggers |
 | --- | --- |
-| `claude-bot.yml` | `issue_comment`, `pull_request_review_comment`, `issues: assigned`, `pull_request_review` --- **no `pull_request` at all** |
-| `claude-review.yml` | `workflow_dispatch` only, input `pr_number` |
+| `claude-bot.yml` | `issue_comment`, `pull_request_review_comment`, `issues`, `pull_request_review` --- still **no `pull_request`** |
+| `claude-review.yml` | **`pull_request`** (opened, synchronize, ready_for_review, reopened) **and** `workflow_dispatch` |
 | `antigravity-review.yml` | `issue_comment`, `workflow_dispatch` |
 | `jules-review.yml` | `issue_comment`, gated on an `@jules` mention |
 
-The remedy is one command:
+Dispatching is now the exception rather than the remedy --- reach for it only
+when a round pushed no code, where there is no `synchronize` event to fire one:
 
 ```bash
 gh workflow run claude-review.yml --repo Morrison-Lab/ai-config --ref <branch> -f pr_number=<N>
 ```
 
-**The contrary expectation is written down, correctly, for other repos.**
-This file's "Re-triggering the @claude PR *review*" section and
+**This file's other sections agree again, and that is the point of keeping
+this one.** Its "Re-triggering the @claude PR *review*" section and
 [`debugging.md`](debugging.md)'s ARDI polling bullet both say a push auto-fires
-a review, and both are right about the content and package repos --- as is
-`Lacaedemon/sparta`, which re-enabled its own trigger in sparta#1122.
-So the question is not "does review fire on push" but "what does **this** repo
-trigger on".
+a review, and they were right for the content and package repos throughout the
+window when ai-config was the exception.
+The question was never "does review fire on push" but "what does **this** repo
+trigger on", and that is exactly as live a question now that the answer has
+changed back.
 
-**The absence is silent and shaped like patience.**
-Green checks plus no review is indistinguishable from a review still running,
-so the natural response is to wait for something never scheduled.
-[`fully-clean`](../shared/workflow/fully-clean.md)'s criterion 2 separates "no
-findings" from "no verdict"; here nobody asked.
-Copilot is no fallback either: `repos/Morrison-Lab/ai-config/rulesets` returns
-one ruleset, `main`, carrying `deletion,non_fast_forward,pull_request` and no
-`copilot_code_review` rule.
+**Ask it of `origin/main`, not of your branch.**
+This is the trap that produced the #1724 cancellation above.
+Reading `.github/workflows/claude-review.yml` from a feature branch whose
+merge-base predates `c329ac45` returns the dispatch-only version --- the file's
+true content on that branch, and a false claim about the repo.
+A re-query that hits the wrong ref is worse than none, because it comes back
+confident:
 
-- **Do:** dispatch `claude-review.yml` explicitly after opening a PR here, and
-  again after every push you want re-reviewed.
-- **Do:** derive a repo's review triggers from its own `on:` blocks before
-  concluding a review is late rather than absent.
-- **Don't:** wait on an ai-config review you did not dispatch --- green checks
-  plus an empty `reviews` array is the steady state, not a transient one.
+```bash
+git fetch -q origin && git show origin/main:.github/workflows/claude-review.yml
+```
+
+**The answer has now flipped three times** --- push (2026-06-18), dispatch-only
+(2026-08-06, #1172), push again (2026-08-20, #1707) --- so treat every statement
+here, this one included, as a measurement with a date on it rather than a
+standing fact.
+
+- **Do:** let the push trigger the review here, as in every other repo, and
+  dispatch only when a round pushed no code.
+- **Do:** derive a repo's review triggers from its own `on:` blocks, read at
+  `origin/main`, before concluding a review is late, absent, or automatic.
+- **Don't:** dispatch after a push --- that is the double-trigger this file's
+  own amendment shows leaves permanent red check runs on the SHA.
+- **Don't:** treat this section's answer as durable; it has changed three times
+  in two months.
 - **Don't:** carry a sibling repo's auto-review behaviour across; the two look
   identical from the PR page.
 

@@ -216,6 +216,61 @@ stale on `origin/main`, vs. only stale on the current feature-branch worktree
 — see the `CLAUDE.md` "Keep ai-config and repo checkouts fresh" step 4 update
 this same session added. `Lacaedemon/sparta`, 2026-07-04.)
 
+## `git checkout <branch> 2>/dev/null; <next>` silently continues on the wrong branch
+
+`git checkout` is a **state-changing** command whose only report of failure is
+its stderr and its exit status.
+Redirect the first and separate with `;` rather than `&&`, and both signals are
+discarded:
+
+```bash
+git checkout main -q 2>/dev/null; git pull --ff-only -q     # WRONG
+```
+
+When the checkout fails --- most commonly because another session left
+uncommitted changes that would be overwritten --- nothing is printed, nothing
+stops, and every subsequent command in the session runs against whatever branch
+was already checked out.
+The failure mode is not a wrong read but a wrong **write**: later edits, and
+potentially a commit, land on somebody else's branch.
+
+Two things make this worse than an ordinary swallowed error.
+The `-q` flag suppresses the success message too, so the silent-failure case
+and the silent-success case produce byte-identical output --- which is
+[`fail-fast`](../shared/principles/fail-fast.md)'s pass-path-equals-failure-path
+shape exactly.
+And the natural next command is often `git pull`, which succeeds on the wrong
+branch and prints something reassuring.
+
+```bash
+git checkout main -q && git pull --ff-only -q               # RIGHT
+```
+
+- **Do:** join a checkout to what follows with `&&`, so a failed checkout stops
+  the sequence.
+- **Do:** let `git checkout`'s stderr through; its message names the blocking
+  file directly.
+- **Do:** re-read `git rev-parse --abbrev-ref HEAD` before editing, when a
+  checkout was not verified.
+- **Don't:** redirect stderr on any state-changing git command --- the
+  distinction from a read-only one is that a swallowed failure here leaves you
+  writing to the wrong place.
+- **Don't:** rely on `-q` plus a `;` chain and assume a later command's success
+  says anything about the checkout.
+
+(Morrison-Lab/ai-config, 2026-08-19: a session ran the WRONG form above against
+the shared primary checkout, which another session had left on
+`fix/quote-yaml-placeholders` with uncommitted work.
+The checkout failed with `Your local changes ... would be overwritten`, the
+redirect hid it, and a 49-line memory edit was written to that session's
+working tree.
+It was caught only when a later `git checkout -b` printed `Aborting` with
+stderr unredirected, and reverted with `git checkout -- <file>` after
+confirming the diff was a single hunk containing nothing of theirs.
+The standing rule against touching the primary checkout from a worktree
+session is in [`preferences.md`](preferences.md); this entry is about why the
+violation produced no error message.)
+
 ## Working several PRs in one session shares ONE working tree — commit before switching branches
 
 Without explicit worktree isolation, `git checkout <other-branch>` in the

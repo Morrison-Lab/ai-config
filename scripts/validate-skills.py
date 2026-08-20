@@ -176,6 +176,9 @@ NON_OPERATION_TOKENS = {
     "GITLAB_TOKEN",
     "NOT_CRAN",
     "NOT_PLANNED",
+    # env var: names the ollama endpoint, which delegate-to-opencode cites as
+    # one way the ollama provider ends up pointing off-machine
+    "OLLAMA_HOST",
     "PROJECT_ID",
     "PR_NUMBER",
     "REBASE_HEAD",
@@ -196,6 +199,56 @@ def load_operation_ids() -> set[str]:
         return set()
     data = yaml.safe_load(mappings_file.read_text(encoding="utf-8"))
     return {op["id"] for op in (data or {}).get("operations", [])}
+
+
+# Command fields whose values are meant to be copy-pasted into a shell. A
+# `<...>` placeholder left unquoted there is read by the shell as a redirect
+# rather than passed to the command -- see the convention comment at the top
+# of tool-mappings.yml for the measured behaviour (ai-config#671, #1476,
+# #1480).
+COMMAND_FIELDS = ("cli", "github_mcp")
+
+
+def unquoted_angle_brackets(command: str) -> bool:
+    """True if `command` has a `<` or `>` outside single or double quotes.
+
+    Tests the EFFECT (does the shell see a redirect operator?) rather than
+    matching particular command spellings -- #671's 2-site count and #1476's
+    first 6-site derivation each came up short by anchoring on a spelling.
+    """
+    quote = None
+    for char in command:
+        if quote is not None:
+            if char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            quote = char
+        elif char in ("<", ">"):
+            return True
+    return False
+
+
+def check_mapping_placeholders() -> None:
+    mappings_file = ROOT / "tool-mappings.yml"
+    if not mappings_file.is_file():
+        warnings.append("tool-mappings.yml not found; skipping placeholder validation")
+        return
+    data = yaml.safe_load(mappings_file.read_text(encoding="utf-8"))
+    operations = (data or {}).get("operations", [])
+    checked = 0
+    for op in operations:
+        for field in COMMAND_FIELDS:
+            value = op.get(field)
+            if not isinstance(value, str):
+                continue
+            checked += 1
+            if unquoted_angle_brackets(value):
+                errors.append(
+                    f"tool-mappings.yml: {op.get('id', '<unknown>')}.{field} has an "
+                    f"unquoted `<` or `>` the shell would read as a redirect: "
+                    f"{value!r} -- quote the operand carrying the placeholder"
+                )
+    print(f"  checked {checked} command fields for unquoted placeholders")
 
 
 def check_operation_tokens() -> None:
@@ -389,6 +442,7 @@ def main() -> None:
 
     check_skills()
     check_operation_tokens()
+    check_mapping_placeholders()
     print("Validating Codex wrappers…")
     check_codex_wrappers()
     print("Validating manifests…")

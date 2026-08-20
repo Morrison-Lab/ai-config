@@ -102,6 +102,7 @@ visible_prose = getattr(_ums, "visible_prose", None)
 # shared/coding/ascii-punctuation-in-source.md and still matches it.
 _APOS = "['\u2019]"
 _SUBJ = r"(?:i|we)"
+_SUBJ_OBJ = r"(?:me|us)"
 _MODAL = (r"(?:" + _APOS + r"ll|\s+will|\s+shall|\s+am\s+going\s+to|"
           + _APOS + r"m\s+going\s+to)")
 _NEG = r"(?:\s+won" + _APOS + r"?t|\s+will\s+not)"
@@ -140,6 +141,21 @@ PROMISE = re.compile(
 
     # Bare performatives, which need no generalizer to be promises.
     | \b """ + _SUBJ + r"""\s+(?:promise|commit)\s+to\b
+
+    # A promise stated as an outstanding DEBT rather than as a modal.
+    # "The UMS pass is owed by me" commits to future behaviour with no modal
+    # anywhere in it, and it reads as bookkeeping rather than as a
+    # commitment, so it passes self-review more easily than "I'll do X"
+    # does -- which makes it the worse form, not a lesser one.
+    #
+    # Bound to a first-person OWNER deliberately. This corpus discusses owed
+    # work constantly ("an owed UMS pass", "the pass is owed", "a pass is
+    # owed" all appear in shared/workflow/run-ums-proactively.md as ordinary
+    # rule prose), so a bare `owed` would fire on every reply that cites
+    # those rules. That is the trap hooks/no-placeholder-reply.py avoids by
+    # anchoring rather than matching a substring.
+    | \bowed\s+by\s+""" + _SUBJ_OBJ + r"""\b
+    | \b """ + _SUBJ + r"""\s+(?:still\s+)?owe\b
     )""",
     re.I | re.X,
 )

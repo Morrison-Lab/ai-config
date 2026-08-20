@@ -53,7 +53,8 @@ It also applies to this entry: below is its own pair.
 [`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md)
 
 A commitment about my own future behaviour --- "going forward, I will X", "from
-now on I won't Y", "I'll always Z", "I won't do that again" --- must ship an
+now on I won't Y", "I'll always Z", "I won't do that again", "that is owed
+by me" --- must ship an
 **implemented accountability mechanism in the same turn**, or not be made at
 all.
 A memory or rule entry is the minimum and is always available; a hook is the

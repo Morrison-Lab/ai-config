@@ -51,4 +51,5 @@ The evidence was never missing.
 Only the question was.
 
 The follow-through matters as much as the rule.
-The offer became [#1693](https://github.com/Morrison-Lab/ai-config/issues/1693) and a skill rather than staying chat prose, and the dotfile repair became a Troubleshooting note in that skill, so both of the session's real outputs ended up somewhere a later reader can find them.
+The offer was filed as [#1693](https://github.com/Morrison-Lab/ai-config/issues/1693) rather than left as chat prose, and that issue carries the dotfile repair as a Troubleshooting item for whatever implements it.
+Filing is what makes the difference here, not shipping: an issue is findable by a later reader whether or not the work it describes has landed yet, which is precisely the property the untracked dotfile edit lacked.

@@ -433,18 +433,12 @@ now describes a section that no longer goes by that name.
 
 Nothing in this repo reports it, and that is a property of the instruments
 rather than an oversight.
-`scripts/check-links.py` captures only the link **target** --- its
-`\[[^\]]*\]\(([^)]+)\)` discards the link text as an unbound group --- and it
-splits any `#anchor` off the path before testing (`re.split(r"[#?]", target,
-maxsplit=1)[0]`), so its only assertion is `resolved.exists()`.
-`check-links.py` and `check-stale-records.py` each carry the word `anchor`
-only in a comment marking the case they SKIP (`pure in-page anchor`), which is
-the whole of what either says about anchors.
-No claim is made here about the rest of `scripts/`: the word appears in ten
-other files in senses that have nothing to do with URLs --- regex anchoring,
-"anchored import", adjacency-anchored matching --- and separating those by
-reading is exactly the exhaustive triage this section warns against asserting
-without doing.
+`scripts/check-links.py` captures only the link **target**: its
+`\[[^\]]*\]\(([^)]+)\)` never captures the link text, since `[^\]]*` is a
+character class rather than a group and the one capture group holds the target.
+It then splits any `#anchor` off the path before testing
+(`re.split(r"[#?]", target, maxsplit=1)[0]`), so its only assertion is
+`resolved.exists()`.
 So the sweep that would plausibly catch a bad citation passes with the citation
 intact, which is worse than having no check at all: a green link run reads as
 having validated the reference.

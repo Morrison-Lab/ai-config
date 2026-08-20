@@ -341,8 +341,8 @@ The sentence was present verbatim the whole time.)
 
 **Third occurrence, 2026-08-20** (after ai-config#771), twice, and with two different phrases rather than one phrase in two files.
 `never auto-reviews a PR on push` gave `grep` 0 and a `\s+` regex 1 here;
-`at the end of this file` gave `grep` 0 in `claude-review-dispatch.md`,
-split across lines 32-33, and was found while checking the first.
+`at the end of this file` gave `grep` 0 at `a578a050:memories/claude-review-dispatch.md`, split across lines 32-33 there.
+Cite the blob rather than the path, since that wording was fixed the same day and the live file no longer carries the phrase.
 The remedy above was already written and not reached for, so what recurs is
 recall rather than knowledge, and this machine's BSD `grep` also rejects `-P`.
 

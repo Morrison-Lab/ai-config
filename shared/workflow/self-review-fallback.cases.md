@@ -101,7 +101,7 @@ ran.)
 signature exactly: `Retry Claude Code Review after a stub result or action
 short-circuit` concluded `skipped`, `Resolve final review outcome` concluded
 `failure`, and `review / require-review` went red behind it.
-Three instances inside two days puts this past
+Three instances inside one day puts this past
 [`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence
 bar, so the retry-eligibility gate is a candidate for a fix in `gha` rather than
 for a sharper sentence here --- the sentinel defaults toward refusing a retry,

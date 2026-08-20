@@ -279,19 +279,28 @@ merely re-adds.
 This is the case where nothing was wrong before: you insert a sentence into an
 existing line, your clause is clean, the line you inserted it into is clean,
 and the joined line now carries two sentences.
+That worked example violates
+[`semantic-line-breaks`](../writing/semantic-line-breaks.md) rather than this
+file's own rule --- splicing ASCII into ASCII cannot manufacture a glyph --- and
+it sits here because the *seam* mechanism is shared: both checks are
+diff-scoped, so both fire on the joined line and neither fires on either half.
+An em-dash arriving at a seam is the same shape with this file's subject.
 Nothing here is grandfathered, and the check is not being harsh --- the
 violation is new text you wrote, in the one place you were not looking.
 
 Where it lands is predictable enough to check directly rather than by
 re-reading the whole hunk.
-The boundary between the inserted text and the pre-existing text is the only
-place the edit created a new adjacency, so that is where the failure sits, and
-it sits there rather than inside either half.
+A splice creates a new adjacency at each end of what you inserted --- two of
+them when you land in the middle of a line, one when you append or prepend ---
+and the failure sits at one of those, rather than inside either half.
+Check both ends: reading only the join you were thinking about is how the other
+one survives.
 Re-reading what you inserted therefore passes every time, which is exactly why
 the seam is the thing to read.
 
 - **Do:** re-read the joined line in full after splicing into an existing one,
-  rather than the sentence you inserted.
+  rather than the sentence you inserted, and check both ends of what you
+  inserted rather than the one you were thinking about.
 - **Don't:** treat a clean insertion as evidence of a clean line --- the check
   reads the line, and the line is now both halves at once.
 

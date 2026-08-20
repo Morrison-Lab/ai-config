@@ -490,6 +490,8 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   - **Do:** treat the hook's `MORATORIUM_END` as the switch, and move it and this memory together.
   - **Don't:** unregister the hook from `~/.claude/settings.json` to quiet it --- that does nothing on a plugin install, and nothing is needed on any install now.
 
+  The general form of that lesson --- any hook suppression aimed at a registration is blind to one of the two installation shapes --- lives in [`shared/workflow/keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md), beside the enabling-direction hazard it mirrors.
+
   **Restated and widened 2026-08-19: the moratorium covers ALL REPOS, not just Morrison-Lab.**
   The user said "stop requesting copilot reviews until september", then, asked about scope, "ALL REPOS".
   So the paragraph above should be read with `ucdavis/bcs` and every other repo inside it, not only the Morrison-Lab org the 2026-08-04 measurement happened to cover.

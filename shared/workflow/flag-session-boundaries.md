@@ -31,7 +31,9 @@ The contradiction is invisible from the inside when both land in one message, be
 They are not separate to the reader, who gets a request for input and a claim that nothing is pending in the same breath.
 
 **`git log origin/<default-branch>..HEAD` plus `git status --short` decides whether the session produced anything durable.**
-An empty range and a clean tree together mean the session's entire output was conversation, whatever else it spent its time on.
+An empty range and a clean tree mean this branch carries nothing.
+That is not the same as the session having produced nothing: one that merged its own PR and then ran [`post-merge`](../../skills/post-merge/SKILL.md)'s cleanup leaves an identical reading while having finished the most a session can finish.
+So establish what merged before reading an empty range as an empty session.
 Resolve the default branch from the repo rather than assuming `main`.
 An untracked local change --- a dotfile repaired, a scratch script written --- is real work and still not a completion, because nothing another session or another person could find records that it happened.
 The remedy converts it rather than excusing it: file it or commit it, and it becomes something nameable.
@@ -46,7 +48,7 @@ The remedy converts it rather than excusing it: file it or commit it, and it bec
 "cai: that wasn't a real stopping point; you haven't finished anything".
 See [`flag-session-boundaries.cases.md`](flag-session-boundaries.cases.md), "A clean declaration over a session that committed nothing".)
 
-**That PR clause is a bright line, not a judgment call, and it was narrowed deliberately.**
+**That unmerged-PR clause in the disqualifier list above is a bright line, not a judgment call, and it was narrowed deliberately.**
 It used to read "a PR I'm actively babysitting", which invites the question of whether *this* PR still counts as active --- and the answer always sounds like no.
 A PR whose checks are green and whose review has not come back yet feels finished: there is nothing to do, so there is nothing live.
 That reading is what the rule has to rule out, because "waiting on a review round" is the single most common state for a PR to be in when a session reaches a natural pause, and it is exactly when the flag is most tempting.

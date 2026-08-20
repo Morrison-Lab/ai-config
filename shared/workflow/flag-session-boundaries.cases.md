@@ -42,7 +42,8 @@ Posing the offer and declaring the stop happened in the same message, and from t
 The second failure had no rule pointed at it.
 `git log origin/main..HEAD` was empty and `git status --short` clean.
 The branch carried nothing at all, and the session's whole durable output was one untracked edit to a dotfile outside any repository.
-Every disqualifier was genuinely absent, because a session that opens no PR cannot have an unmerged one.
+Every *remaining* disqualifier was genuinely absent, because a session that opens no PR cannot have an unmerged one.
+Strike the offer from the record and the declaration is still wrong, which is what makes this a second failure rather than a restatement of the first.
 The declaration even enumerated that absence as its justification, which is what made it read as a check rather than as an omission.
 
 The repair is the completion half of the test, now stated explicitly in the fragment: name what finished.

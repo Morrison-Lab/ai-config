@@ -125,6 +125,7 @@ When the current tier is clearly underpowered for the task ahead, say so and sug
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
 Two such budgets exist and the standing preference is to try both first: `codex` (ChatGPT plan, operationalized by `delegate-to-codex`) and `agy` (Google Antigravity).
+`opencode` is a third destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of both on cost and behind both on capability, per `delegate-to-opencode`.
 `memories/preferences.md`'s "Delegate heavy work to another CLI first" carries the rule and the usage-window semantics.
 Read it for one mechanical detail before invoking `agy`: `--print` consumes the next token as its prompt, so a flag placed between the two becomes the prompt and the real one is discarded, silently and with exit 0.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.

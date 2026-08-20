@@ -79,6 +79,15 @@ REMIND = [
      "a write that is NOT to a memory/skill path does not clear it"),
     ([tool("Edit", {"file_path": "memories/tools.md"}), ADMIT],
      "a recording BEFORE the admission does not clear it"),
+    # Omission self-critique (ai-config#1751). "should have" + past
+    # participle is retrospective, distinct from every pattern above, which
+    # all catch a FACTUAL retraction rather than a behavioral gap.
+    ([txt("The user is right -- I should have proactively found the open PRs.")],
+     "should have + verb, the exact quoted case"),
+    ([txt("I should have checked the review before pushing.")],
+     "should have + verb"),
+    ([txt("I should" + chr(0x2019) + "ve verified that first.")],
+     "should've, curly apostrophe"),
 ]
 
 SILENT = [
@@ -97,6 +106,29 @@ SILENT = [
     ([txt("Correcting the reviewer, who misread the diff.")],
      "correcting SOMEONE ELSE, not myself"),
     ([txt("The reviewer overstated the risk here.")], "reviewer overstated"),
+    # The boundary the "should have" widening (ai-config#1751) must not
+    # cross: a future obligation ("should have this ready by Friday",
+    # main-verb "have") reads identically to a retrospective critique up to
+    # the word after "have", and a third-person "should have" is someone
+    # ELSE's gap, not mine.
+    ([txt("I should have this done by Friday.")],
+     "should have + possessive/determiner NP, future obligation not a critique"),
+    ([txt("I should have a plan ready before the next push.")],
+     "should have + indefinite article NP"),
+    ([txt("You should have checked that yourself.")],
+     "should have, but second person"),
+    ([txt("The reviewer should have caught this earlier.")],
+     "should have, but SOMEONE ELSE's gap"),
+    # PR #1752 review: `i\s+should` with no `\b` matched the trailing "i" of
+    # any word ending in that letter -- "the AI should", "the API should",
+    # "this semi should" all fired as if "I" were the subject. Pinned here so
+    # the boundary cannot regress.
+    ([txt("The AI should have caught this earlier.")],
+     "should have, but subject is 'the AI' not 'I' (word-boundary regression)"),
+    ([txt("The API should have returned an error here.")],
+     "should have, but subject is 'the API' not 'I' (word-boundary regression)"),
+    ([txt("This semi should have been replaced before merge.")],
+     "should have, but 'semi' merely ends in 'i' (word-boundary regression)"),
     ([txt("The rule fires on phrases like `I was wrong` in a message.")],
      "quoting the trigger inside inline code"),
     ([txt("The user wrote:\n\n> I was wrong about that\n\nso the rule applies.")],

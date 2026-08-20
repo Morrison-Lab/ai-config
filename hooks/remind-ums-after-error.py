@@ -50,6 +50,12 @@ import re
 import sys
 import tempfile
 
+# Typographic apostrophe, spelled as an escape rather than embedding the
+# glyph, so this file stays pure ASCII per
+# shared/coding/ascii-punctuation-in-source.md while still matching "I
+# should've" as typed by a model that prefers the curly form.
+_APOS = "['\u2019]"
+
 # First-person admissions only. Correcting SOMEONE ELSE ("the review was
 # wrong", "the docs are incorrect") must never fire this -- hence an explicit
 # first-person subject in every pattern rather than a bare "was wrong".
@@ -80,6 +86,19 @@ ADMISSION = re.compile(
     | correcting\s+(myself|my|this)\b
     | retracting\s+(my|that\s+claim)
     | i\s+(need\s+to\s+)?retract\b
+    # Omission self-critique (ai-config#1751): "I should have proactively
+    # found the open PRs" is a first-person admission of a behavioral gap,
+    # not a factual retraction, so none of the patterns above catch it.
+    # "should have" + past participle is always retrospective in English
+    # ("should have" as an unfulfilled past obligation); the possessive
+    # reading ("I should have this ready by Friday", main-verb "have") is
+    # future-oriented and must NOT fire, so the word right after "have" is
+    # excluded when it signals that NP reading (a determiner/possessive)
+    # rather than a verb.
+    | \bi\s+should(?:""" + _APOS + r"""ve|\s+have)\s+
+        (?!(?:this|that|it|these|those|my|your|his|her|their|our
+            |the|a|an|some|no)\b)
+        \w+
     )""",
     re.I | re.X,
 )

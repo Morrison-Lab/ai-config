@@ -484,11 +484,17 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   So the paragraph above should be read with `ucdavis/bcs` and every other repo inside it, not only the Morrison-Lab org the 2026-08-04 measurement happened to cover.
   The expiry is unchanged and deliberate: **September 2026**, after which re-verify the quota and re-enable the per-round request rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
 
-  The same session measured what a request buys outside Morrison-Lab, and the answer is nothing.
-  Four `requested_reviewers` POSTs for `copilot-pull-request-reviewer[bot]` on `ucdavis/bcs` PRs #648, #649, and #650 were all accepted --- HTTP **200** --- and every one produced **zero** Copilot reviews, with the pending request vanishing from both `gh pr view --json reviewRequests` and the `GET .../requested_reviewers` endpoint each time.
-  That is the same 201-then-empty signature recorded above, at a third repo, so an accepted POST remains evidence about the API rather than about whether a review is coming.
-  The requests were accomplishing nothing before the directive.
-  The directive only makes not sending them the stated position rather than a silent omission.
+  The same session tried four `requested_reviewers` POSTs for `copilot-pull-request-reviewer[bot]` on `ucdavis/bcs` PRs #648, #649, and #650.
+  Each was accepted with HTTP **200**, and each left zero Copilot reviews behind, the pending request absent from both `gh pr view --json reviewRequests` and the `GET .../requested_reviewers` endpoint.
+  Re-verified 2026-08-20: all three PRs still carry zero Copilot reviews and no pending Copilot request.
+
+  **Read that as weak evidence, not as the 201-then-empty signature above, and the reason is the status code.**
+  `hooks/no-unreviewed-pr.py`'s `_argv_close` docstring records that GitHub accepts this POST on a **merged or closed** PR with HTTP **200** and adds nobody, which is a different outcome from the **201** the signature above is defined by.
+  Two of the three PRs fit that reading: #648 was closed at `2026-08-20T01:33:34Z` and #649 merged at `01:40:47Z`, both plausibly before the POSTs.
+  #650 was open throughout and remains open, so at least one of the four is not explained that way, but the per-POST timings were not recorded and cannot now be recovered.
+  So this measurement does not establish that a Copilot request fails on a live PR outside Morrison-Lab.
+  It is not what the moratorium rests on either --- the maintainer's directive is --- and it is kept here only so a later reader does not re-derive it as fresh support.
+  A clean version of the experiment would POST once on a PR known to be open and record the status code beside the timestamp.
 
   **This outranks `hooks/no-unreviewed-pr.py`, which demands a Copilot request after every PR open, ready, or re-head.**
   That hook's docstring names two legitimate deferrals, a draft PR and a redaction PR.
@@ -497,7 +503,8 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   Unregistering the hook, per the paragraph above, remains the fix for the turn-by-turn nag while the moratorium is live.
 
   - **Do:** skip the `requested_reviewers` POST and `request_copilot_review` on every repo until September 2026, and state the directive as the reason when a PR ships without a Copilot request.
-  - **Do:** rely on `claude-review` plus self-review meanwhile, which is the no-reachable-external-reviewer fallback in `shared/workflow/self-review-fallback.md`.
+  - **Do:** rely on `claude-review` plus self-review meanwhile, which is the same no-reachable-external-reviewer fallback the paragraph above already cites --- `shared/workflow/review-verdict-pitfalls.md`'s fifth case.
+    Withheld-by-policy is not literally unreachable, so the fit is by analogy rather than by definition; say which one applies when reporting a PR's review state.
   - **Don't:** read `hooks/no-unreviewed-pr.py`'s demand, or `shared/workflow/pr-on-claim.md`'s "request the external reviewer in the same stride", as overriding a standing user directive.
   - **Don't:** treat an accepted POST (200 or 201) as evidence the moratorium is over --- all four 2026-08-19 requests were accepted and none produced a review.
   - **Don't:** let September 2026 pass without re-verifying.

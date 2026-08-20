@@ -754,7 +754,7 @@ Where the difference is deliberate, say so in the insertion, so the next reader 
 - **Do:** read the whole section an insertion joins, before pushing it, for a sentence that qualifies or bounds the same phenomenon.
 - **Do:** rewrite whichever of the two is wrong, or state the difference as deliberate in the insertion itself.
 - **Don't:** treat a clean review as evidence of consistency --- the reviewer read the diff, and the contradicted sentence was not in it.
-- **Don't:** confuse this with a deliberate asymmetry between two rules; the defect is two readings of one phenomenon, not two rules with different thresholds.
+- **Don't:** confuse this with a deliberate asymmetry between two rules, when the defect is two readings of one phenomenon rather than two rules with different thresholds.
 
 No mechanical check is proposed, and this is not a case where one is being deferred: contradiction between two paragraphs is semantic, so it is not lexically decidable over the artifact, and [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s point applies to any grep that would stand in for it.
 The reviewable action is the read, not an instrument.
@@ -764,4 +764,4 @@ Commit `4d1a979b` inserted a paragraph into [`self-review-fallback`](../workflow
 Thirteen lines below, untouched by the diff, the file already said that two stubs back to back is "still not conclusive" and that the failure modes behind stubs "don't always repeat".
 The automated reviewer read the same diff and reported only a tense problem on a different line.
 The insertion additionally re-listed a set of reviewer options the same file defines in another section, which [#1778](https://github.com/Morrison-Lab/ai-config/pull/1778) was concurrently editing.
-Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794); corrected on the branch by `0cc398ca`.)
+Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794), and corrected on the branch by `0cc398ca`.)

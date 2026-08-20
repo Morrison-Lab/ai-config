@@ -544,8 +544,8 @@ not block `claude-review`.)
   almost always `1` — while `<attempt-label>` (`attempt1`/`attempt2`) is the
   *review's own* stub-retry count.
   The two are easy to conflate: targeting a specific review attempt means
-  changing `attempt-label`, not `run-attempt`.
-  E.g. `attempt2` of a review that never got manually rerun is still
+  changing `attempt-label`, not `run-attempt` --- for example,
+  `attempt2` of a review that never got manually rerun is still
   `claude-review-execution-<run-id>-1-attempt2`, not `...-2-attempt2`.
   Fetch it with
   `gh run download <run-id> --repo <owner>/<repo> -n <name> -D <dir>`,

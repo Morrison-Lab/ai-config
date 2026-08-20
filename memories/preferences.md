@@ -92,7 +92,7 @@
 - When opening a GitHub PR, trigger AI review (`@claude review` / `@agy review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
   The one exception is `Lacaedemon/sparta`, which never requests human review, on AI review approval or on deadlock escalation alike.
 - **In `ai-config` (and any repo where reviews don't auto-trigger on PR creation), ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`) when done pushing code for the round.**
-  `ai-config` never auto-reviews on PR creation or push (see `memories/claude-bot-workflows.md`).
+  `ai-config` never auto-reviews on PR creation or push (see `memories/claude-review-dispatch.md`).
   Do not wait to be asked "did you request claude review?", and never post a self-generated review summary comment to satisfy `check-pr-fully-clean.py` instead of running an authentic `@claude` review. (User correction, 2026-08-16.)
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --

@@ -13,7 +13,7 @@ Each heading names the rule the record supports.
 
 (Morrison-Lab/ai-config#1234, 2026-08-07: posting `@claude review` on this
 repo triggers `claude.yml` in agent mode, not the dedicated review workflow
-directly --- see `memories/claude-bot-workflows.md`'s note that this repo's
+directly --- see `memories/claude-review-dispatch.md`'s note that this repo's
 review has no push trigger.
 Run `31140546175`'s own agent turn reported `is_error: true`, `num_turns: 1`,
 `total_cost_usd: 0` --- the exact zero-cost signature this file's

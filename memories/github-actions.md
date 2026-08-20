@@ -142,7 +142,7 @@ common patterns.
      the version on the repository's default branch`).
      A caller placed on a throwaway BRANCH therefore always fails validation and
      skips the review BEFORE it starts -- producing no execution output at all.
-     This is the same guard `claude-bot-workflows.md` documents for the
+     This is the same guard `claude-review-dispatch.md` documents for the
      review-workflow repo itself, but it fires in **consumer** repos too, not
      just where the reusable workflow lives.
      To actually run it, the caller has to be on the default branch: add a
@@ -1135,7 +1135,7 @@ Three other PRs' reviews dispatched inside the same window (`31135656213`, `3113
 
 Pass `--ref` anyway, for the unrelated reason the section above gives --- `workflow_dispatch` reads the workflow file from the ref you name, defaulting to the default branch.
 Just do not read a run's survival as evidence that you passed it.
-That ai-config has no automatic review to race against in the first place is a separate fact, recorded in [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "`ai-config` never auto-reviews a PR on push".
+That ai-config has no automatic review to race against in the first place is a separate fact, recorded in [`claude-review-dispatch.md`](claude-review-dispatch.md)'s "`ai-config` never auto-reviews a PR on push".
 
 - **Do:** read the reusable workflow a caller invokes before concluding a cancellation is unexplained.
 - **Do:** check a cancelled run's end time against the next dispatch for the same key --- a consistent short lag across several runs is the signature of a `cancel-in-progress` group rather than of anything you changed.
@@ -1181,7 +1181,7 @@ Separately, each comment also triggered a `workflow_dispatch` run of
 `claude-review.yml` (visible via `list_workflow_runs` on `claude-review.yml`,
 `event: workflow_dispatch`, timed within seconds of the comment) -- the
 workflow this repo's review actually depends on, per
-[`claude-bot-workflows.md`](claude-bot-workflows.md)'s trigger table.
+[`claude-review-dispatch.md`](claude-review-dispatch.md)'s trigger table.
 
 **A third `claude-bot.yml` run followed, and it may have been self-triggered
 rather than a new human request.**

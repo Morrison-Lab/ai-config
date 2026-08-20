@@ -268,6 +268,13 @@
             "timeout": 10,
             "script": "no-handrolled-verdict-parse.py",
             "why": "shared/workflow/ardi.md mandates check-pr-fully-clean.py as verdict authority. PreToolUse guard that refuses hand-rolled regex/grep verdict parses of review comments without running the script or setting ALLOW_HANDROLLED_VERDICT_PARSE=1."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-adjacent-comment.py\"",
+            "timeout": 15,
+            "script": "flag-stale-adjacent-comment.py",
+            "why": "shared/workflow/learn-from-review-findings.md, from ucdavis/bcs#679. Warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one."
           }
         ]
       },

@@ -366,3 +366,66 @@ negative is unrecoverable, and neither is a defect in `LEAD` itself.
 Round 5's suggested direction is this rule's remedy stated as a design change:
 "invert the default the way pass 2 already did --- treat a heredoc as executing
 unless its introducing line is provably fed to a non-executing consumer".)
+
+## Repointing a configured path at a different artifact is reuse, and the accessor's own docs say what it is for
+
+Everything above concerns reusing a **structure** --- a template, a script, a
+neighbouring file's shape.
+The same failure arrives through **data**, and there it wears the clothes of
+debugging rather than of authorship.
+
+An artifact the code expects is missing.
+A configured path --- an environment variable, a config key, a CLI flag ---
+lets you point the code somewhere else, and another artifact on disk has a
+compatible shape.
+Setting the variable to that other artifact makes the code run.
+
+Nothing about that sequence resembles reuse, which is why the check above does
+not fire on it.
+You wrote no code, adapted no template, and copied nothing.
+You supplied a value that the software's own interface invited you to supply,
+and it worked.
+
+But the value is doing exactly what a reused template does: standing in for
+something on the strength of fitting mechanically.
+And the accessor almost always states its purpose in its own documentation,
+which is the one thing a substitution made in a hurry does not read.
+The tell is that the code is now running, so nothing prompts the question.
+
+State the general form plainly, because it is the reusable half.
+**A substitution that makes the code run is not evidence the substitution is
+correct.**
+Running is what the false positive and the true positive have in common; only
+the docs of the thing you repointed separate them.
+
+- **Do:** read the accessor's own documentation before pointing its path
+  variable at a different artifact, and say what that accessor is for.
+- **Do:** treat a missing artifact as a question about how to produce it, not
+  as a question about what else has a compatible shape.
+- **Don't:** read "the pipeline now runs" as evidence the substituted artifact
+  is the right one.
+- **Don't:** leave such an override in place undocumented; a value chosen to
+  unblock one run reads to the next reader as the configuration.
+
+This one is **not mechanizable**, and it is worth saying why rather than
+leaving it as an omission.
+The two checks in this PR's siblings are lexical --- a literal that left a
+changed line and stayed in a comment, a list member with no matching probe ---
+so a script can decide each from the diff with no understanding of what the
+values mean.
+Here the condition is whether artifact B satisfies the contract accessor A
+documents, which is a semantic comparison between prose and a dataset.
+Nothing in the diff distinguishes a correct override from a wrong one; both are
+one line setting one variable to a real path that exists.
+Per [`learn-from-review-findings`](learn-from-review-findings.md), saying
+plainly that a finding has no mechanism behind it discharges the lesson as
+completely as building one does, and inventing a guard here would produce the
+misfiring check [`algorithmatize-checks`](algorithmatize-checks.md) warns
+against.
+
+(`ucdavis/bcs#679`, 2026-08-20: `AB507BS_PARQUET_PATH` was set to the
+all8sites cohort dataset to get past a missing file.
+The accessor's own roxygen says the path is "a derived cache of the AB507BS raw
+RDS, not a second copy of the all8sites cohort" --- a sentence written to
+forbid exactly the substitution that was made.
+It was never read.)

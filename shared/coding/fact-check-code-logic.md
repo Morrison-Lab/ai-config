@@ -322,6 +322,45 @@ Round 2 refuted the SECOND shipped claim --- "a live finding does not describe i
 Only the THIRD version, which added an explicit resolution-wording requirement on top of adjacency, was approved ("Ready for merge"), with one narrow residual gap the reviewer explicitly judged non-blocking.
 Both refuted claims were found by the reviewer executing a constructed counter-example, not by the author testing one first, despite this fragment's own execution-based verification section already existing in the corpus at the time either claim was written.)
 
+## A comment beside a value you changed is part of the edit
+
+Changing a literal --- a cap, a threshold, a timeout, a path, a flag --- edits every comment near it that states, computes from, or justifies that literal.
+Read the neighbourhood before changing the value, and change the comment in the same commit.
+
+The failure is easy to miss because nothing about it looks like an omission.
+The changed line is correct, the diff is small and legible, and the surrounding comment is not in the diff at all, so a reader reviewing their own change sees only lines they meant to write.
+What the reader does not see is the line that now contradicts them, and a stale comment is worse than no comment, because a reader trusts it exactly as much as the code.
+
+Three things go stale at once, and they are worth separating because only the first is obvious.
+The **stated value** is the visible half.
+The **arithmetic derived from it** goes with it, so a comment reciting a product or a total is wrong by whatever factor the value moved.
+The **justification** is the half that actually matters, because a comment explaining why a value was chosen frequently records a **prior incident** --- an outage, a resource exhaustion, a bug that motivated the limit.
+Editing the value without reading that justification means changing a number whose reason you never learned, which is a different and larger mistake than leaving a stale sentence behind.
+
+The corpus already states scoped versions of this and none of them fires here.
+`memories/preferences.md` says to grep both code and comments when renaming a **concept**.
+[`simplify`](../../skills/simplify/SKILL.md) calls a vestigial comment worse than none, as a cleanup pass rather than at edit time.
+[`check-dependency-updates`](../../skills/check-dependency-updates/SKILL.md) says a stale comment beside a fresh SHA is its own bug, for **pinned dependencies** only.
+The general case --- any literal, at the moment it is edited --- is what this section adds.
+
+The condition is decidable from the diff alone, with no semantics: a literal leaves a changed line, and an unchanged comment line nearby still carries it.
+So it is mechanized, per [`algorithmatize-checks`](../workflow/algorithmatize-checks.md), by `hooks/flag-stale-adjacent-comment.py`.
+That guard **warns and never blocks**, because a comment quoting a value historically --- a changelog line, a "was N until ..." note --- is a real and common false positive it cannot distinguish from a stale assertion.
+Reading the flagged comment is the whole of the response.
+Confirming it is deliberately historical discharges the warning.
+
+- **Do:** read the comment lines above and below a literal before changing it, and update them in the same commit.
+- **Do:** treat a comment that justifies a value as a record of a past incident, and find out what happened before overriding it.
+- **Do:** recompute any arithmetic a nearby comment derives from the value.
+- **Don't:** read "my changed line is correct" as the change being finished --- the line that contradicts it is the one outside your diff.
+- **Don't:** dismiss the hook's warning without reading the comment it names.
+  The false-positive case is confirmed by reading, not by assuming.
+
+(`ucdavis/bcs#679`, 2026-08-20: `#SBATCH --array=1-25%6` was raised to `%20` in `data-raw/ab507bs-imp.sbatch`.
+The four comment lines directly above went untouched, so they still said 6, their stated 192G total was now wrong by more than a factor of three, and they still recorded the incident that had motivated the cap --- an unbounded array previously drained a node with an unkillable process stuck on network I/O.
+Only the directive line was ever read.
+An AI reviewer returned "Needs more work" on the contradiction.)
+
 ## Matching values is not matching roles
 
 When checking whether our code follows a reference implementation, confirm the

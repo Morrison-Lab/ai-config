@@ -605,6 +605,55 @@ def main() -> int:
         ) == "clean",
     )
 
+    # --- #1524: unreadable-format detection ---
+    # Antigravity reviews that use "### Conclusion" with prose (no "### Verdict"
+    # heading and no classifiable phrase) must be detected as "unreadable" rather
+    # than falling through to "" (no verdict) which would trigger self-review
+    # fallback and waste a round.
+    antigravity_conclusion = (
+        "### \U0001f916 Antigravity Agent Report (Code-Review)\n\n"
+        "The PR is complete, robust, well-documented, and thoroughly tested.\n\n"
+        "### Conclusion\n\n"
+        "The PR is complete, robust, well-documented, and thoroughly tested."
+    )
+    check(
+        "classify_verdict: Antigravity conclusion prose returns 'unreadable'",
+        checker.classify_verdict(antigravity_conclusion) == "unreadable",
+    )
+    # But an Antigravity review WITH a classifiable verdict still works.
+    antigravity_with_verdict = (
+        "### \U0001f916 Antigravity Agent Report (Code-Review)\n\n"
+        "Verdict: Clean / Ready for merge."
+    )
+    check(
+        "classify_verdict: Antigravity with Verdict heading still classifies as clean",
+        checker.classify_verdict(antigravity_with_verdict) == "clean",
+    )
+    # A Jules review with "VERDICT: block" is a not-clean verdict, not unreadable.
+    jules_block = "VERDICT: block -- two findings must be addressed."
+    check(
+        "classify_verdict: Jules 'VERDICT: block' is not-clean, not unreadable",
+        checker.classify_verdict(jules_block) == "not-clean",
+    )
+    # A non-bot comment with no verdict is still "" (not unreadable).
+    check(
+        "classify_verdict: a human comment with no verdict stays ''",
+        checker.classify_verdict("Looks good to me!") == "",
+    )
+    # _detect_review_agent unit tests
+    check(
+        "_detect_review_agent: Claude marker detected",
+        checker._detect_review_agent("**Claude finished** -- adversarial review") == "Claude",
+    )
+    check(
+        "_detect_review_agent: Antigravity marker detected",
+        checker._detect_review_agent("### \U0001f916 Antigravity Agent Report (Code-Review)") == "Antigravity",
+    )
+    check(
+        "_detect_review_agent: unknown body returns None",
+        checker._detect_review_agent("Just a regular comment.") is None,
+    )
+
     # POSITIVE CONTROL -- the exact #1267 shape that bypassed the gate.
     # An explicit "Needs more work" at an EARLIER commit (so it never enters
     # matching_items), followed by a rich, evidence-dense comment at HEAD that

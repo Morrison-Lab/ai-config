@@ -361,14 +361,16 @@ new skill still has to pass the rest — e.g. unique headings (MD024) and blank
 lines around tables (MD058).
 
 **A fifth CI gate isn't among those four, and it fires on the new file's own prose: `check-new-line-breaks`, a separate workflow that rejects any line you add (anywhere in the diff, not just `SKILL.md`) that packs more than one sentence.**
-Run `python3 scripts/semantic-line-breaks.py <path>...` (no flags) to preview; it only flags **lines this branch actually changed against `origin/main`**, so run it against every file the skill touches, not just the new `SKILL.md`.
+Run `python3 scripts/semantic-line-breaks.py <path>...` (no flags) to preview.
+It only flags **lines this branch actually changed against `origin/main`**, so run it against every file the skill touches, not just the new `SKILL.md`.
 Add `--write` to apply once you've confirmed the diff is what you expect.
 **Don't reach for `--all` by default** — it widens the reformat to the whole file, and on a file with pre-existing hard-wrapped (but otherwise CI-clean) prose it can rewrite hundreds of untouched lines into a large, unrelated-looking diff.
 Prefer the scoped mode, and if it under-fixes a paragraph (a same-sentence line shows up as "still would change" on a second scoped run even though `git diff origin/main` shows that region untouched), just fix that one paragraph by hand instead of widening scope.
 
 **The 8000-char skill-listing budget lives inside `validate-skills.py`, not a separate script.**
 Adding a skill grows two catalogs at once — `skills/` (this repo's own routing prompt) and `codex-skills/` (the Codex-wrapper mirror) — and `validate-skills.py` reports both totals even when neither is over budget, so a passing run still tells you your margin.
-If either is over, shorten **this skill's own** `description` field rather than editing an unrelated skill's frontmatter to make room; re-run `sync-codex-skill-wrappers.py` after any frontmatter edit, since the Codex listing is derived from it.
+If either is over, shorten **this skill's own** `description` field rather than editing an unrelated skill's frontmatter to make room.
+Re-run `sync-codex-skill-wrappers.py` after any frontmatter edit, since the Codex listing is derived from it.
 
 Then, as their own explicit steps (don't leave them buried in a comment):
 

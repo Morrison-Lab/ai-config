@@ -11,7 +11,9 @@ Source: [skills/address-rebut-defer/SKILL.md](../../skills/address-rebut-defer/S
 
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
-The source lives at `skills/address-rebut-defer/SKILL.md` in the same ai-config checkout as this wrapper. If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/address-rebut-defer`, resolve the symlink target for this wrapper directory first, then read `../../skills/address-rebut-defer/SKILL.md` relative to that real directory. Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
+The source lives at `skills/address-rebut-defer/SKILL.md` in the same ai-config checkout as this wrapper.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/address-rebut-defer`, resolve the symlink target for this wrapper directory first, then read `../../skills/address-rebut-defer/SKILL.md` relative to that real directory.
+Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.
 - Use the tools available in this Codex session for equivalent operations.
@@ -20,7 +22,5 @@ The source lives at `skills/address-rebut-defer/SKILL.md` in the same ai-config 
 
 ## Tool mappings
 
-The canonical skill names `gh`/`git` commands (and sometimes
-`mcp__github__*` tools). Resolve those operations using the full per-model
-reference at [tool-mappings.md](../../tool-mappings.md), preferring the
-GitHub MCP tool when this Codex session has it and otherwise using the CLI.
+The canonical skill names `gh`/`git` commands (and sometimes `mcp__github__*` tools).
+Resolve those operations using the full per-model reference at [tool-mappings.md](../../tool-mappings.md), preferring the GitHub MCP tool when this Codex session has it and otherwise using the CLI.

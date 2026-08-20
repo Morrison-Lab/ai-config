@@ -19,6 +19,20 @@ This is a default, not an absolute rule. A tiny, dependency-free helper can
 beat pulling in a package, and sometimes nothing fits --- but look first, and
 prefer the standard, well-known way over a bespoke one.
 
+One reason to skip a packaged function does not count: an environment your
+own change chose.
+"The script runs on a bare R, so `rlang` is unreachable" is not evidence that
+`rlang` does not fit when this change is what decided the script would run
+that way.
+Install the package, fix the CI job, and re-run the comparison.
+See the DRW fragment's "A constraint your own change authored is not evidence
+against an upstream".
+
+- **Do:** say whether a constraint ruling out a package is external or one of
+  ours, before letting it decide.
+- **Don't:** verify a self-imposed constraint and report that as having
+  justified the hand-rolled version.
+
 This is the R-function special case of the broader don't-reinvent-the-wheel
 principle --- see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)
 for the general statement, which also covers whole features, the

@@ -254,6 +254,120 @@ When you do build custom, note in the PR (or a code comment) that you
 checked and nothing fit, so the next reader doesn't re-run the search
 — and so the reviewer's DRW check below has its answer up front.
 
+## A constraint your own change authored is not evidence against an upstream
+
+The escape hatches above are all statements about the world: nothing close
+enough exists, the API is wrong, the dependency is too heavy, the package is
+unmaintained.
+Each is a fact you could have found before starting.
+
+A different kind of reason shows up in practice and reads exactly like those:
+a constraint the change itself created.
+The script has to run somewhere the package is not installed.
+The helper cannot take a new dependency because this PR decided it would not.
+The CI job installs nothing, so nothing can be imported.
+Reasoning from one of those is circular --- the change creates the constraint,
+and the constraint then licenses the change --- and the circle closes inside a
+single diff, so no reviewer reading that diff sees anything missing.
+
+**The circularity is invisible because the constraint is real and checkable.**
+This is what makes the failure survive scrutiny rather than a sloppier one.
+The CI job genuinely installs nothing, and you can verify that against the
+workflow file in one read, so the verdict feels measured and empirical rather
+than convenient.
+Every "did you actually check this?" prompt fires and passes.
+The question never asked is whether the measured constraint should have
+existed at all, and that is a question about the assignment rather than about
+the facts --- see
+[`challenge-the-assignment`](../workflow/challenge-the-assignment.md).
+
+So before a DRW verdict rests on a constraint, classify it:
+
+- **External** --- a platform limit, an upstream API, a license, a policy, a
+  requirement from outside our control.
+  Not merely outside *this* change: a constraint an earlier change of ours
+  chose is still self-imposed.
+  Reasoning from an external one is fine.
+- **Self-imposed** --- a choice made in this change, or in an earlier one of
+  ours.
+  Challenge it, and usually relax it: add the dependency, install it in CI,
+  widen the environment.
+  Only after the relaxation is shown to be genuinely unavailable does the
+  constraint become evidence.
+
+Relaxing it is normally cheap, which is the other half of why the excuse does
+not hold: adding a package to a CI job is a smaller change than the
+reimplementation it was being used to justify.
+[`growth-mindset`](../workflow/growth-mindset.md) is the general form ---
+go get the resource rather than accepting the limitation --- and this is that
+rule at the moment it is hardest to apply, because here the limitation is
+documented, verified, and yours.
+
+- **Do:** name the constraint a "keep ours" verdict rests on, and say in the
+  same sentence whether it is external or self-imposed.
+- **Do:** relax a self-imposed constraint --- add the dependency, fix the CI
+  job --- and re-run the DRW comparison against the relaxed environment.
+- **Don't:** cite an environment your own change or an earlier one of ours
+  chose as proof that an upstream package does not fit.
+- **Don't:** treat having verified the constraint as having justified it.
+  Confirming that the CI job installs nothing is the near-miss here: it looks
+  like the check, and it answers a question nobody was disputing.
+
+## Review is the wrong layer to catch a missed DRW pass
+
+The line at the top of this fragment --- a development principle and a review
+principle --- is easy to read as two chances at the same catch.
+They are not equivalent, and the review half is the weaker one by a wide
+margin.
+
+A reviewer sees the functions in front of it and asks whether each is correct,
+idiomatic, tested, and documented.
+Asking instead whether the whole file should exist requires a search of an
+ecosystem the diff never mentions, and nothing in the diff prompts it.
+Four AI review rounds on the case below raised nothing, and the miss was
+caught by a maintainer reading the merged package.
+
+So treat the pre-write pass as the load-bearing one, and make it produce a
+written record: run [`prefer-upstream`](../../skills/prefer-upstream/SKILL.md)
+before writing a generic-looking helper, and put what you searched for and
+what you found in the PR body.
+The "checked, nothing fit" note that "When rolling our own is right" asks for,
+just above, is that record.
+Its absence is the one DRW signal a reviewer *can* see without doing the
+search itself, which makes it worth flagging on its own.
+
+- **Do:** run the DRW search before writing a helper that is not
+  project-specific, and record the search terms and every candidate found in
+  the PR body.
+- **Do:** flag a missing "checked, nothing fit" note in review, as a finding
+  in its own right.
+- **Don't:** rely on review to catch a reimplementation --- a clean review is
+  evidence that the code is good, not that it should exist.
+- **Don't:** read a helper's small size as exempting it.
+  The near-exact duplicates in the case below were one-liners, which is why
+  writing them felt cheaper than searching.
+
+(`ucdavis/bcs#641`, 2026-08-19: the PR merged 30 hand-rolled static-analysis
+helpers into an R package --- an AST flattener, a symbol collector, a
+top-level-definition index, a call-graph reachability closure, and small
+call-introspection helpers `call_name`, `drop_call_head`, `is_call_to`,
+`named_args`, and `unnamed_args`.
+`rlang::call_name()` and `rlang::call_args()` are near-exact duplicates of two
+of them, and `rlang` was already in the package's `Imports`.
+`codetools::walkCode()` duplicates the AST walker, and `codetools` is a
+recommended package that ships with R.
+`foodwebr`, already in `Suggests`, and `funspotr` cover the call-graph and
+per-file-symbol halves.
+No DRW pass was run before writing them, and four AI review rounds did not
+raise it.
+The whole PR was reverted, at 66 files and 2010 deletions.
+The DRW audit run afterwards returned "keep ours" for several helpers on the
+grounds that the check script had to run on a bare R with no packages
+installed, so `rlang` was unreachable --- a constraint that same PR had
+authored.
+The maintainer's answer was "don't make excuses, install the packages needed"
+and "fix the CI job".)
+
 ## In review
 
 For each new function or feature a diff adds, ask whether that

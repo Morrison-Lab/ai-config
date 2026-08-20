@@ -1135,7 +1135,7 @@ Three other PRs' reviews dispatched inside the same window (`31135656213`, `3113
 
 Pass `--ref` anyway, for the unrelated reason the section above gives --- `workflow_dispatch` reads the workflow file from the ref you name, defaulting to the default branch.
 Just do not read a run's survival as evidence that you passed it.
-That ai-config has no automatic review to race against in the first place is a separate fact, recorded in [`claude-review-dispatch.md`](claude-review-dispatch.md)'s "`ai-config` never auto-reviews a PR on push".
+Whether ai-config has an automatic review to race against is a separate fact, and it changed: [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) restored the `pull_request` trigger on 2026-08-20, so a dispatch now CAN race a push-triggered run here. Measured on [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724) that day: run `32345965633` (`pull_request`) was cancelled by run `32345990687` (`workflow_dispatch`), leaving `review / require-review` red. See [`claude-review-dispatch.md`](claude-review-dispatch.md)'s "`ai-config` auto-reviews on push as of 2026-08-20, and did not before".
 
 - **Do:** read the reusable workflow a caller invokes before concluding a cancellation is unexplained.
 - **Do:** check a cancelled run's end time against the next dispatch for the same key --- a consistent short lag across several runs is the signature of a `cancel-in-progress` group rather than of anything you changed.

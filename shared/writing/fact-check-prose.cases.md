@@ -231,3 +231,18 @@ the page that had just deployed was two commits old the moment it appeared.
 The build-versus-push intervals above are measured; that a marker check caught
 this three times in the session is reported from that session rather than
 derived here.)
+
+## An availability claim about a repository is a state claim, not a safe default
+
+(`ucdavis/bcs`, 2026-08-20: reviewing a manuscript PR that reworded the
+abstract and introduction, I added a Code and Data Availability section and an
+Introduction rewrite that both asserted the `bcs` R package was "open-source"
+and gave a live, clickable `https://github.com/ucdavis/bcs` link.
+The `@claude` review bot caught it: the repository is private, confirmed by an
+unauthenticated fetch returning 404, so a reader following the link in the
+published manuscript would hit a dead end.
+The claim did not feel like something to verify, because most R packages under
+active development eventually go public, and "open-source" read as a plausible
+default rather than as an assertion about the repository's state that day.
+Fixed by rewording to state the repository is private during development and
+dropping "open-source".)

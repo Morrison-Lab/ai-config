@@ -370,7 +370,7 @@
   **Don't:** work directly in the shared/primary checkout, even for "just a quick read" or "just one file" --- reads often become writes, and the primary checkout is shared with concurrent sessions.
   This default holds for EVERY local session, not just substantial multi-file work or when the user flags the wd as "in use" / "do this in a separate repo", so parallel local AI agent sessions never step on or clobber each other's working directory or branch state.
   The ai-config working copy is often in use by CONCURRENT local AI agent sessions; untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
-  This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch. (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
+  (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
 - **Don't touch anyone else's branch.**
   **Do:** only push to or modify branches I created in my own worktree.
   **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user --- even if the content looks worth keeping or the branch looks abandoned.

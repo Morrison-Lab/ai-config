@@ -98,9 +98,13 @@ ran.)
 **A near-miss worth recording, because the step shape is not the cause.**
 [#1757](https://github.com/Morrison-Lab/ai-config/pull/1757)'s own
 `review / claude-review` job (`96501751353`, run `32392491819`) shows the same
-three step outcomes --- retry `skipped`, `Resolve final review outcome`
-`failure`, `require-review` red --- and is **not** another instance of this
-defect.
+three step outcomes --- `Fail the check if the review did not complete
+(attempt 1)` `success`, `Retry Claude Code Review after a stub result or action
+short-circuit` `skipped`, `Resolve final review outcome` `failure` --- and is
+**not** another instance of this defect.
+(`require-review` went red behind it, as it does whenever the review job fails,
+but that is a separate JOB (`96502554966`) rather than a fourth step, so it is
+no part of the signature.)
 Its log reads `"permission_denials_count": 6` against `max_denials=5`, and the
 workflow says so itself: `this looks like gha#198's pattern, not gha#185's; not
 marking as retryable`.

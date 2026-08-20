@@ -2,6 +2,32 @@ Proactively tell me --- don't wait to be asked --- when a session has grown long
 Use the `⚠️ FLAG` tag from `CLAUDE.md`'s chat-output-tagging convention, one line, at the natural end of that turn's recap --- don't interrupt mid-task to say it.
 
 **Always state whether or not the session is at a clean stopping point.** The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
+
+**The declaration is for a human reading a recap, so it does not apply where the last message is consumed by a machine instead.**
+The rule says the last message MUST be the declaration.
+A CI harness that posts an agent's reply to a PR or issue thread typically takes the **last assistant message** and posts that.
+Two rules then claim the same slot, and the declaration wins every time, because it is by construction written last --- so the answer is replaced by a status marker and discarded.
+
+The loss is silent and usually unrecoverable: a run log does not carry the conversation, and such workflows rarely publish the transcript as an artifact.
+It is also self-concealing, because a stopping-point line reads like a completed task, so nobody looking at the thread can tell an answer went missing.
+
+So: **when the final message is not being read by a person --- a non-interactive run whose output is posted somewhere by a harness --- put the declaration inside the substantive reply rather than after it, or omit it.**
+The tell is that nothing about the session resembles a terminal recap: no human is reading turn-by-turn, and the "session" is a single automated invocation whose whole output is one artifact.
+
+- **Do:** end with the declaration in an interactive session, where a person reads the recap.
+- **Do:** fold it into the substantive message, or leave it out, when a harness will post your last message verbatim.
+- **Don't:** emit a bare declaration as a separate final message in a CI run --- that is the whole failure, and it looks like compliance.
+- **Don't:** assume the harness concatenates your turn.
+  The common implementation takes one message.
+
+(Measured 2026-08-19 on `d-morrison/rme`.
+Installing this corpus as a plugin in that repo's `@claude` workflow ([rme#1076](https://github.com/d-morrison/rme/pull/1076)) made every prose reply collapse to a one-line declaration.
+The pre-plugin reply was 1182 characters and substantive.
+The three post-plugin replies were 233, 356, and 501 characters, and each began with the marker.
+One run diagnosed the bug itself and had its diagnosis swallowed by the bug.
+Tracked as [rme#1081](https://github.com/d-morrison/rme/issues/1081).
+[rme#1082](https://github.com/d-morrison/rme/pull/1082) is the consumer-side workaround, and this section is the upstream fix that stops it recurring in every other repo installing the plugin.)
+
 Don't suggest it when there's still live state only this conversation holds: a background agent or CI run still in flight that I'm tracking, **any PR this session opened or pushed to that has not yet merged or closed**, an unanswered question, or a mid-investigation train of thought that would be expensive to reconstruct.
 `/clear` wipes conversation state outright (unlike compaction, which summarizes) --- anything not already durable (in `CLAUDE.md`, a memory file, or a tracked issue/PR) is gone.
 If UMS hasn't run recently, run it *before* raising the flag rather than disclosing the debt inside it, per [`run-ums-proactively`](run-ums-proactively.md)'s "Recommending that the session end is itself a UMS trigger" section.

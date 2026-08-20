@@ -42,7 +42,7 @@ So decide by the re-run's outcome rather than by the number: stop after a second
 - **Do:** read the denial count to classify which failure family you are in, then let the re-run's outcome decide what to do next.
 - **Do:** stop re-triggering after the second no-verdict attempt, and go cross-vendor for the external verdict.
 - **Don't:** call a high-denial run non-recovering --- one at 72 posted a real verdict the same day.
-- **Don't:** read the workflow's refusal to mark a run retryable as advice against the manual re-run; those are two different retries.
+- **Don't:** read the workflow's refusal to mark a run retryable as advice against the manual re-run, which is a different retry.
 
 Either way: don't wait on the bot indefinitely --- do the review yourself and keep driving to fully-clean.
 

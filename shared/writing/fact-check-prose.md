@@ -726,3 +726,42 @@ This is a first occurrence of this specific pattern, so it does not yet clear
 [`deterministic-tools`](../principles/deterministic-tools.md)'s
 third-occurrence bar for a dedicated instrument.
 Revisit as a check only if the pattern recurs.
+
+## An insertion asserts something about the whole file, not just the added lines
+
+The two sections above each turn a sentence back on its own document, and both compare it against something *inside* the passage being written --- a figure the same passage reports, or the rule the contrast sentence is stating.
+This one compares the new text against a sentence it never touched.
+
+Inserting a paragraph into an existing fragment publishes a file, not a paragraph.
+Whatever the insertion claims, the file now claims, alongside everything the file already said --- so a sentence a dozen lines away that **qualifies, bounds, or hedges the same phenomenon** is part of the assertion you are making, and contradicting it makes the fragment say both things at once.
+
+**Nothing in the normal loop looks there.**
+The author reads the insertion, which is coherent on its own.
+The reviewer reads the diff, and the contradicted sentence appears in it as context or not at all, so a review can be careful, correct, and still never consider it.
+This is the instrument-soundness argument [`sync-with-main`](../workflow/sync-with-main.md) already states for merges --- "when a defect can be introduced by **deleting** a line, any instrument keyed on added lines is unsound" --- borrowed for its *reasoning* rather than for its merge case.
+Here the added line is the defective one, and it is only defective **relative to an unchanged line**, which leaves every diff-scoped check equally blind.
+
+**Read the surrounding paragraphs before landing the insertion, not the insertion point.**
+Read far enough out to cover the section the insertion joins, and look specifically for a sentence that already limits the claim you are about to state without limits.
+A hedge is the likeliest collision, because a hedge and a confident restatement of the same finding are the two natural things to write about one phenomenon.
+Duplication is the same read's second finding --- an option list or definition the file already owns elsewhere --- and [`challenge-redundant-content`](../workflow/challenge-redundant-content.md) governs what to do with it.
+
+**This does not license checking your claim against the neighbour.**
+[`A contrast sentence imports the neighbouring rule's parameters`](#a-contrast-sentence-imports-the-neighbouring-rules-parameters) above says the neighbour is where a wrong parameter comes *from*, never what you verify against, and that still holds: a deliberate asymmetry between two rules is sanctioned there.
+The question here is different --- not whether your parameter matches the neighbour's, but whether the file now states two incompatible things about **one** phenomenon.
+Where the difference is deliberate, say so in the insertion, so the next reader does not reconcile them by deleting one.
+
+- **Do:** read the whole section an insertion joins, before pushing it, for a sentence that qualifies or bounds the same phenomenon.
+- **Do:** rewrite whichever of the two is wrong, or state the difference as deliberate in the insertion itself.
+- **Don't:** treat a clean review as evidence of consistency --- the reviewer read the diff, and the contradicted sentence was not in it.
+- **Don't:** confuse this with a deliberate asymmetry between two rules; the defect is two readings of one phenomenon, not two rules with different thresholds.
+
+No mechanical check is proposed, and this is not a case where one is being deferred: contradiction between two paragraphs is semantic, so it is not lexically decidable over the artifact, and [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s point applies to any grep that would stand in for it.
+The reviewable action is the read, not an instrument.
+
+(Morrison-Lab/ai-config#1788, 2026-08-20.
+Commit `4d1a979b` inserted a paragraph into [`self-review-fallback`](../workflow/self-review-fallback.md) calling a high-denial review stub a "non-recovering" subcase, asserting that "re-running this pattern has repeatedly NOT recovered", and that "two high-denial stubs back to back is conclusive".
+Thirteen lines below, untouched by the diff, the file already said that two stubs back to back is "still not conclusive" and that the failure modes behind stubs "don't always repeat".
+The automated reviewer read the same diff and reported only a tense problem on a different line.
+The insertion additionally re-listed a set of reviewer options the same file defines in another section, which [#1778](https://github.com/Morrison-Lab/ai-config/pull/1778) was concurrently editing.
+Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794); corrected on the branch by `0cc398ca`.)

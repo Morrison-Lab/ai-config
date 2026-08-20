@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+"""Stop-hook guard: a promise about future behaviour owes a MECHANISM.
+
+Standing `cai` (2026-08-19): "no empty promises; every promise ('going
+forward, I will/won't' etc) must be accompanied by an implemented mechanism
+for ensuring accountability (for example, a memory + hook pair)".
+
+WHY A PROSE RULE CANNOT CARRY THIS ONE
+--------------------------------------
+The rule is itself a promise about future behaviour, so a version of it that
+ships as prose alone is an instance of the thing it forbids. That is not a
+rhetorical point: a promise is composed at exactly the moment a correction
+lands, when the corpus is not being read, and it *feels* like the corrective
+action rather than like a substitute for one. Nothing downstream detects it --
+no file changes, no check turns red, and the reply reads as responsive.
+
+WHY THIS BLOCKS RATHER THAN REMINDS
+-----------------------------------
+The opposite call from remind-ums-after-error.py and
+no-mistake-without-a-hook.py, and for a reason that inverts cleanly.
+
+An error admission is RIGHT to send, so blocking it would suppress an honest
+correction; those hooks therefore inject on the next prompt instead. An
+undischarged promise is WRONG to send: it costs the user a turn spent reading
+a commitment that nothing will keep, and delivering it first buys nothing,
+because the mechanism is what the promise was for. So this guard sits at
+`Stop`, where the reply can still gain its mechanism before going out.
+
+Nothing here suppresses a correction. Admitting a mistake, reporting a fact,
+and apologizing all pass untouched; only the forward-looking commitment is
+matched, and only when the same turn produced no durable mechanism.
+
+WHAT DISCHARGES IT
+------------------
+Any durable, inspectable artifact written at or after the promise, in the same
+turn: a write to a rule surface (`CLAUDE.md`, `AGENTS.md`, `memories/`,
+`shared/`, `skills/`, `hooks/`, `.claude/settings.json`), a filed issue, or an
+invocation of `memorize`/`ums`. Prose naming such an artifact discharges it
+too, since reporting "added `hooks/x.py`" is how a discharged promise reads.
+
+There is deliberately no "not mechanizable" escape, unlike
+no-mistake-without-a-hook.py. That hook needs one because a one-off factual
+slip has no decidable condition to key a hook on. A promise always has at
+least one mechanism available -- writing it down durably, which is the memory
+half of the user's own "memory + hook pair" -- so the honest alternative to
+building one is to not make the promise, and state the fact without it.
+
+FALSE POSITIVES
+---------------
+Discussing this rule quotes its own trigger phrases constantly, this docstring
+included. Matching runs over `visible_prose` from remind-ums-after-error.py,
+which drops fenced blocks, blockquotes, and inline code -- so write an example
+in backticks and it cannot fire. Capability statements ("I'll never be able to
+know the exact time") are excluded explicitly rather than left to luck.
+
+Fails OPEN and fires at most once per promise per session: a guard that wedges
+a session costs more than the lapse it prevents.
+"""
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _sibling(name):
+    """Import a hyphenated sibling module, or None if unavailable."""
+    path = os.path.join(HERE, name)
+    try:
+        spec = importlib.util.spec_from_file_location("_sib", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
+
+
+_ums = _sibling("remind-ums-after-error.py")
+
+# Reuse the sibling's code-region stripping rather than copying it, so the two
+# cannot drift. The fallback exists only so this hook degrades to silence
+# instead of crashing when the sibling is missing.
+visible_prose = getattr(_ums, "visible_prose", None)
+
+# A first-person commitment about a CLASS of future occasions. Each
+# alternative pairs a first-person modal with a generalizer, because "I'll
+# open the PR now" is a statement about the next action and carries no
+# promise at all -- the generalizer is what turns it into one.
+#
+# `_APOS` spells the typographic apostrophe a model actually emits as an
+# escape rather than embedding the glyph, so this file stays pure ASCII per
+# shared/coding/ascii-punctuation-in-source.md and still matches it.
+_APOS = "['\u2019]"
+_SUBJ = r"(?:i|we)"
+_MODAL = (r"(?:" + _APOS + r"ll|\s+will|\s+shall|\s+am\s+going\s+to|"
+          + _APOS + r"m\s+going\s+to)")
+_NEG = r"(?:\s+won" + _APOS + r"?t|\s+will\s+not)"
+
+PROMISE = re.compile(
+    r"""(
+    # Explicit temporal generalizer anywhere in the same sentence as a
+    # first-person modal, in either order.
+      (?:going\s+forward|from\s+now\s+on|from\s+here\s+on(?:\s+out)?
+       |henceforth|in\s+(?:the\s+)?future|next\s+time
+       |(?:every|each)\s+time)
+      [^.!?\n]{0,80}?\b """ + _SUBJ + r"(?:" + _MODAL + r"|" + _NEG + r""")\b
+    | \b """ + _SUBJ + r"(?:" + _MODAL + r"|" + _NEG + r""")\b
+      [^.!?\n]{0,80}?
+      (?:going\s+forward|from\s+now\s+on|from\s+here\s+on(?:\s+out)?
+       |henceforth|in\s+(?:the\s+)?future|next\s+time
+       |(?:every|each)\s+time)
+
+    # "always"/"never" bound directly to the modal. The lookahead drops
+    # capability statements -- "I'll never be able to know" is a limitation,
+    # not a commitment.
+    | \b """ + _SUBJ + _MODAL + r"""\s+
+      (?:always|never)(?!\s+(?:be\s+able|know\b|have\s+access|see\b))
+
+    # "I won't do that again" / "I will no longer do that".
+    | \b """ + _SUBJ + _NEG + r"""\b[^.!?\n]{0,80}?\bagain\b
+    | \b """ + _SUBJ + _MODAL + r"""\s*no\s+longer\b
+
+    # Bare performatives, which need no generalizer to be promises.
+    | \b """ + _SUBJ + r"""\s+(?:promise|commit)\s+to\b
+    )""",
+    re.I | re.X,
+)
+
+# Durable, inspectable rule surfaces. Wider than remind-ums-after-error.py's
+# UMS_PATH, deliberately: a recorded learning is one kind of mechanism, and a
+# hook or a harness setting is another that fragment's rule has no interest
+# in. Each alternative demands a FILE rather than a bare directory, so a
+# promise that merely mentions `shared/` in passing cannot discharge itself.
+MECHANISM_PATH = re.compile(
+    r"(?:\bmemories?/[\w.-]+\.md"
+    r"|\bMEMORY\.md"
+    r"|\b(?:CLAUDE|AGENTS|GEMINI)\.md"
+    r"|\bshared/[\w./-]+\.md"
+    r"|\bskills/[\w./-]+"
+    r"|\bhooks/[\w.-]+\.(?:py|sh)"
+    r"|\bhooks\.json"
+    r"|\binstall-hooks\.py"
+    r"|\.claude/settings(?:\.local)?\.json"
+    r"|\b(?:commands|cursor-rules|codex-skills)/[\w./-]+)",
+    re.I,
+)
+
+# Filing the tracking issue, or invoking the skill that records the learning.
+MECHANISM_WORD = re.compile(
+    r"\bgh\s+issue\s+create\b|\bissue_write\b|\bglab\s+issue\s+create\b"
+    r"|\bums\b|update\s+memories|record[- ]learnings|\bmemorize\b",
+    re.I,
+)
+
+
+def records(path):
+    with open(path, errors="ignore") as fh:
+        for line in fh:
+            try:
+                yield json.loads(line)
+            except Exception:
+                continue
+
+
+def scan(path):
+    """Return (promise_text, promised_at, mechanism_at) for the current turn.
+
+    Indices restart at each real user prompt, so "the same turn" is what the
+    comparison actually tests. A promise left undischarged in an earlier turn
+    was already blocked when it was composed; re-blocking it every turn after
+    would wedge the session.
+    """
+    promise_txt, promise_at, mech_at = None, -1, -1
+    i = -1
+
+    for m in records(path):
+        # A subagent's own turns are not my outgoing message.
+        if m.get("isSidechain"):
+            continue
+
+        kind = m.get("type")
+        blocks = (m.get("message") or {}).get("content") or []
+
+        if kind == "user":
+            # A tool_result arrives as a `user` record; a real prompt does not.
+            is_tool_result = isinstance(blocks, list) and any(
+                isinstance(b, dict) and b.get("type") == "tool_result"
+                for b in blocks
+            )
+            if not is_tool_result:
+                promise_txt, promise_at, mech_at = None, -1, -1
+                i = -1
+            continue
+
+        if kind != "assistant" or not isinstance(blocks, list):
+            continue
+
+        i += 1
+        for b in blocks:
+            if not isinstance(b, dict):
+                continue
+
+            if b.get("type") == "text":
+                raw = b.get("text") or ""
+                if not raw.strip():
+                    continue
+                hit = PROMISE.search(visible_prose(raw))
+                if hit:
+                    promise_txt, promise_at = hit.group(0).strip(), i
+                # Discharge is read from the RAW text: a path naming the
+                # mechanism is normally written in backticks, which
+                # visible_prose strips.
+                if MECHANISM_PATH.search(raw):
+                    mech_at = i
+
+            elif b.get("type") == "tool_use":
+                name = b.get("name") or ""
+                inp = b.get("input") or {}
+                if not isinstance(inp, dict):
+                    continue
+                blob = name + " " + json.dumps(inp)
+                if MECHANISM_PATH.search(blob) or MECHANISM_WORD.search(blob):
+                    mech_at = i
+
+    return promise_txt, promise_at, mech_at
+
+
+def main() -> int:
+    if visible_prose is None:
+        return 0  # sibling unavailable; degrade to silence
+
+    try:
+        payload = json.load(sys.stdin)
+    except Exception:
+        return 0
+
+    path = payload.get("transcript_path") or ""
+    if not path or not os.path.isfile(path):
+        return 0
+
+    try:
+        promise_txt, promise_at, mech_at = scan(path)
+    except Exception:
+        return 0  # fail open
+
+    if promise_at < 0:
+        return 0
+    # `>=` rather than `>`: one message can both promise and ship the
+    # mechanism, and that is the ideal shape rather than a violation.
+    if mech_at >= promise_at:
+        return 0
+
+    key = hashlib.sha256(
+        f"{path}:{promise_txt}:{promise_at}".encode()).hexdigest()[:16]
+    sentinel = os.path.join(tempfile.gettempdir(), f".claude-promise-{key}")
+    if os.path.exists(sentinel):
+        return 0
+    try:
+        open(sentinel, "w").close()
+    except Exception:
+        pass
+
+    print(json.dumps({
+        "decision": "block",
+        "reason": (
+            "[hook: no-empty-promise] Your reply promises future behaviour "
+            f"(\"{promise_txt}\") and this turn wrote no mechanism to keep "
+            "it.\n\n"
+            "Standing rule (shared/workflow/no-empty-promises.md, from the "
+            "user's own `cai`): no empty promises. A commitment about how you "
+            "will behave from now on dies with this conversation unless "
+            "something durable outlives it -- so the promise is the report of "
+            "the work, never the work.\n\n"
+            "Ship one of these in this turn, then say what you shipped:\n"
+            "  * a memory or rule entry (memories/, CLAUDE.md, AGENTS.md, or "
+            "a shared/ fragment) -- the minimum, and always available;\n"
+            "  * a hook, when the condition is decidable from the transcript "
+            "-- model it on hooks/no-offer-to-file.py, add tests, register it "
+            "in hooks/hooks.json, and do NOT activate it before its PR merges "
+            "(README's activation gate);\n"
+            "  * a filed issue, when the mechanism is real work someone must "
+            "schedule.\n\n"
+            "If none of those is worth building, the honest move is to drop "
+            "the promise and state the fact without it -- 'I was wrong about "
+            "X, and here is Y' costs the user nothing and claims nothing."
+        ),
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

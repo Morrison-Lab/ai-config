@@ -504,7 +504,8 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
 
   - **Do:** skip the `requested_reviewers` POST and `request_copilot_review` on every repo until September 2026, and state the directive as the reason when a PR ships without a Copilot request.
   - **Do:** rely on `claude-review` plus self-review meanwhile, which is the same no-reachable-external-reviewer fallback the paragraph above already cites --- `shared/workflow/review-verdict-pitfalls.md`'s fifth case.
-    Withheld-by-policy is not literally unreachable, so the fit is by analogy rather than by definition; say which one applies when reporting a PR's review state.
+    Withheld-by-policy is not literally unreachable, so the fit is by analogy rather than by definition.
+    Say which one applies when reporting a PR's review state.
   - **Don't:** read `hooks/no-unreviewed-pr.py`'s demand, or `shared/workflow/pr-on-claim.md`'s "request the external reviewer in the same stride", as overriding a standing user directive.
   - **Don't:** treat an accepted POST (200 or 201) as evidence the moratorium is over --- all four 2026-08-19 requests were accepted and none produced a review.
   - **Don't:** let September 2026 pass without re-verifying.

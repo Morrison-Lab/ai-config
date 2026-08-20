@@ -300,6 +300,28 @@ Two habits make it pay off beyond the one check:
   [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md)
   applies to prose.
 
+## A "safe because X never happens" comment needs its own counter-example before it ships
+
+When a fix's safety rests on a claim that some input shape "never" happens or "is not realistic phrasing" --- a live finding won't describe itself this way, a user never types that --- construct the counter-example yourself and run it through the actual code before writing the comment, not after a reviewer does it for you.
+The claim reads as reasoning, but it is a factual assertion about a population of possible inputs, and "I can't think of a case" is not the same evidence as "I tried to construct one and it didn't work."
+
+The tell is a comment or docstring asserting "X is not realistic" or "this never happens in practice" sitting beside the exact regex or conditional whose safety depends entirely on that claim being true.
+That is checkable, by this fragment's own ["run the claim instead of reasoning about it"](#when-the-runtime-is-available-run-the-claim-instead-of-reasoning-about-it) section above --- the difference here is which claim to run: not "what does this return", but "can I construct an input that breaks the thing I just asserted can't happen."
+
+A single refutation is a normal review finding.
+What makes it worth a rule of its own is a SECOND refutation of the same underlying ambiguity on the same fix, because that is the signal the first counter-example didn't generalize from --- a narrower patch closed the one case found without closing the *class* the case belonged to.
+
+- **Do:** for every "X never happens" / "not realistic phrasing" safety claim in a comment, write the adversarial counter-example and execute the actual function against it before shipping.
+- **Do:** treat a second reviewer refutation of the same underlying ambiguity as a signal to search for the general class of counter-example, not just patch the specific instance found.
+- **Don't:** ship a safety claim in a comment that was reasoned about but never executed against an adversarial input.
+- **Don't:** treat one fixed counter-example as proof the class is exhausted --- the next one can share its shape exactly.
+
+(Morrison-Lab/ai-config#1762, 2026-08-20: a citation-stripping regex fix went through three review rounds.
+Round 1 refuted the FIRST shipped claim --- "a genuine bold-labeled finding in parens is never blanked" (a co-occurring-wording gate) --- with a live finding that mentioned "the previous round" in its own text.
+Round 2 refuted the SECOND shipped claim --- "a live finding does not describe itself that way" (adjacency alone) --- with a live finding re-raised across rounds using the identical citation syntax.
+Only the THIRD version, which added an explicit resolution-wording requirement on top of adjacency, was approved ("Ready for merge"), with one narrow residual gap the reviewer explicitly judged non-blocking.
+Both refuted claims were found by the reviewer executing a constructed counter-example, not by the author testing one first, despite this fragment's own execution-based verification section already existing in the corpus at the time either claim was written.)
+
 ## Matching values is not matching roles
 
 When checking whether our code follows a reference implementation, confirm the

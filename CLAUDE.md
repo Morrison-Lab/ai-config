@@ -243,7 +243,8 @@ The same bare-keyword reading applies to the judgment-grant keywords, which are 
 `away` is the session-scoped version, presuming I am not there to answer at all, and `back` revokes it.
 `mwc` is the separate grant covering merge authority, which none of the others extend to.
 Read a bare "do as you think best" as `daytb`, not as `away` -- the session-wide reading suspends clarifying questions long after I expected them back.
-`dmmhyh` ("don't make me hold your hand", and its longhand) is a correction rather than a proactive grant: it fires when I'm asking for more guidance than the moment calls for. It resolves the pending item like `daytb`, raises the decide-vs-ask threshold for the rest of the session like `away`'s judgment-call test, and -- unlike either -- writes the correction down as a memory entry so it doesn't have to be re-taught next session; see [`dmmhyh`](skills/dmmhyh/SKILL.md).
+`dmmhyh` ("don't make me hold your hand", and its longhand) is a correction rather than a proactive grant: it fires when I'm asking for more guidance than the moment calls for.
+It resolves the pending item like `daytb`, raises the decide-vs-ask threshold for the rest of the session like `away`'s judgment-call test, and -- unlike either -- writes the correction down as a memory entry so it doesn't have to be re-taught next session; see [`dmmhyh`](skills/dmmhyh/SKILL.md).
 
 ## Link PRs in tables
 

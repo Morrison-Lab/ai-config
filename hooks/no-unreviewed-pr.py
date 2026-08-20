@@ -69,6 +69,14 @@ that requesting a reviewer is itself the exposure. See the "Redaction
 exemption" block below for that second one's two forms and why it is asserted
 rather than inferred.
 
+A THIRD deferral is legitimate and is not detected here: a standing user
+directive not to request the reviewer at all. As of 2026-08-19 that is live --
+Copilot review is off across ALL repos until September 2026 (memories/github.md,
+"Restated and widened 2026-08-19"). A user instruction outranks a hook, so this
+guard's demand does not apply while such a directive stands, and honoring it
+wedges the session in a nag loop instead. Unregister the hook from the Stop
+hooks for the duration rather than satisfying it; the script stays.
+
 Fails OPEN on any parse trouble, and fires at most once per distinct message
 per transcript, so it cannot wedge a session.
 """

@@ -478,6 +478,28 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   That loop persisted even though each request POST succeeded, because the hook discharges only on a reviewer-request that is the **last simple command in the call** (its exit status is then unambiguous), and every turn chained a verify `gh pr view` after the POST, leaving it non-last.
   Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids, so unregistering is the right fix while the quota is out.
   (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
+
+  **Restated and widened 2026-08-19: the moratorium covers ALL REPOS, not just Morrison-Lab.**
+  The user said "stop requesting copilot reviews until september", then, asked about scope, "ALL REPOS".
+  So the paragraph above should be read with `ucdavis/bcs` and every other repo inside it, not only the Morrison-Lab org the 2026-08-04 measurement happened to cover.
+  The expiry is unchanged and deliberate: **September 2026**, after which re-verify the quota and re-enable the per-round request rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
+
+  The same session measured what a request buys outside Morrison-Lab, and the answer is nothing.
+  Four `requested_reviewers` POSTs for `copilot-pull-request-reviewer[bot]` on `ucdavis/bcs` PRs #648, #649, and #650 were all accepted --- HTTP **200** --- and every one produced **zero** Copilot reviews, with the pending request vanishing from both `gh pr view --json reviewRequests` and the `GET .../requested_reviewers` endpoint each time.
+  That is the same 201-then-empty signature recorded above, at a third repo, so an accepted POST remains evidence about the API rather than about whether a review is coming.
+  The requests were accomplishing nothing before the directive; the directive only makes not sending them the stated position rather than a silent omission.
+
+  **This outranks `hooks/no-unreviewed-pr.py`, which demands a Copilot request after every PR open, ready, or re-head.**
+  That hook's docstring names two legitimate deferrals, a draft PR and a redaction PR.
+  A standing maintainer directive is a third, and it wins: a user instruction outranks a skill or a hook.
+  Say so in the PR or the recap when you defer on this ground, so the omission reads as a recorded deferral rather than as a missed step --- that is the whole reason to write it down, since silence and compliance look identical from outside.
+  Unregistering the hook, per the paragraph above, remains the fix for the turn-by-turn nag while the moratorium is live.
+
+  - **Do:** skip the `requested_reviewers` POST and `request_copilot_review` on every repo until September 2026, and state the directive as the reason when a PR ships without a Copilot request.
+  - **Do:** rely on `claude-review` plus self-review meanwhile, which is the no-reachable-external-reviewer fallback in `shared/workflow/self-review-fallback.md`.
+  - **Don't:** read `hooks/no-unreviewed-pr.py`'s demand, or `shared/workflow/pr-on-claim.md`'s "request the external reviewer in the same stride", as overriding a standing user directive.
+  - **Don't:** treat an accepted POST (200 or 201) as evidence the moratorium is over --- all four 2026-08-19 requests were accepted and none produced a review.
+  - **Don't:** let September 2026 pass without re-verifying; the expiry is part of the rule, not a footnote to it.
 - **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
   when its output is not a terminal --- which is always, for an agent.**
   A cancellation and a real failure are therefore the same word in the column

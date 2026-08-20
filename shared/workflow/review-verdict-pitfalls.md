@@ -744,7 +744,7 @@ The retraction only revealed the loss rather than causing it.
 
 **A stale branch can make workflow validation fail red before the reviewer starts,
 even when the PR edits no workflow file.**
-[`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)
+[`memories/claude-review-dispatch.md`](../../memories/claude-review-dispatch.md)
 already covers the more familiar workflow-validation case, a green skip on a
 PR that edits the review workflow itself.
 This one is different.
@@ -963,7 +963,7 @@ Run it against a **completed** review you know belonged to the PR, and where
 that review does not appear either, the null is silent rather than reassuring.
 
 **`--ref` is what decides it.**
-[`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md)
+[`memories/claude-review-dispatch.md`](../../memories/claude-review-dispatch.md)
 records that gha#286 root-caused exactly this and fixed it upstream by passing
 `--ref <PR-branch>` explicitly, so a re-dispatched review's check runs do
 attach to the PR's head commit.

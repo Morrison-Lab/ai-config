@@ -16,6 +16,14 @@ checked against one feels checked rather than guessed.
 It is not a source: see
 [`fixtures-are-not-evidence.md`](../workflow/fixtures-are-not-evidence.md).
 
+A fixture is one instance of a wider substitution: the artifact inspected is
+adjacent to the one the claim is about, so the evidence is genuine, the
+reasoning from it is sound, and the conclusion is false.
+The checks below all assume the object in hand is the object under discussion.
+[`verify-the-right-artifact.md`](../workflow/verify-the-right-artifact.md)
+covers confirming that, and the shapes the substitution takes when it is not
+so.
+
 ## What to check
 
 - **Factual claims.** Check each claim against the AI's own domain knowledge
@@ -536,6 +544,11 @@ local rendered tree, where the fix is a re-render rather than a wait.
   failed; a build predating the fix looks exactly like that.
 - **Don't:** treat a preview comment's timestamp, or the mere existence of a
   deployed page, as saying which commit it was built from.
+
+A CDN copy of the deployed site is a further step removed than the build is,
+and reading one for the branch's own bytes is the same substitution one layer
+out; see
+[`verify-the-right-artifact.md`](../workflow/verify-the-right-artifact.md).
 
 ## A block presented as program output is a claim, so capture it rather than composing it
 

@@ -604,9 +604,13 @@ itself.)
 
 ## A contrast sentence imports the neighbouring rule's parameters
 
-The checks above test what a sentence claims about the world.
-This one tests a sentence against the *rest of your own document*, which is a
-question none of them ask.
+[`Check a general claim against the concrete numbers in the same
+document`](#check-a-general-claim-against-the-concrete-numbers-in-the-same-document)
+above already turns a sentence back on its own document.
+This check does too, and differs in **what it compares against**: that one
+reads a stated rule against a figure the document reports elsewhere, while this
+one reads a rule's stated parameters against the neighbouring rule its own
+sentence contrasts itself with.
 
 The construction at risk is the one this corpus is built on: stating a rule by
 contrasting it with an adjacent rule.

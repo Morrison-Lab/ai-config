@@ -53,3 +53,44 @@ So the PR was reported blocked on an external verdict rather than ready, and
 was not merged, even though `Morrison-Lab/ai-config` carries a standing `mwc`
 grant --- that grant's scope limit is a **fully clean** PR, and a PR one human
 action short of a reachable reviewer is not one.)
+
+## The stub-retry skipped on a sentinel denial count
+
+(Morrison-Lab/ai-config, 2026-08-20: two PRs, [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724)
+and [#1741](https://github.com/Morrison-Lab/ai-config/pull/1741), produced an
+identical `review / claude-review` job signature --- jobs `96364511234` and
+`96365603526`, the latter in run `32349569604`.
+
+Read off `actions/jobs/<id>`, both jobs concluded `failure` with the same three
+steps deciding it:
+
+| step | conclusion |
+| --- | --- |
+| `Fail the check if the review did not complete (attempt 1)` | `success` |
+| `Retry Claude Code Review after a stub result or action short-circuit` | `skipped` |
+| `Resolve final review outcome` | `failure` |
+
+Every other step in both jobs was `success` or `skipped`, which is
+[`fully-clean`](fully-clean.md)'s "a job's conclusion is set by whichever step
+failed" in its plainest form.
+
+The job log carries the cause in three consecutive lines:
+
+```
+permission_denials_count could not be parsed from execution result
+  (got 'MISSING'); defaulting to sentinel 999999 (gha#370).
+permission_denials_count=999999 (stub-retry max_denials=5)
+permission_denials_count=999999 exceeds the stub-retry threshold (5) ---
+  this looks like gha#198's pattern, not gha#185's; not marking as retryable.
+```
+
+The execution result's own summary earlier in the same log reads
+`"permission_denials_count": 0`, so the real count was well inside the
+threshold and the run was refused a retry purely on the parser's failure value.
+`Morrison-Lab/gha#370` is closed, and the sentinel behaviour it introduced is
+what fires here.
+
+The check then reported `Claude review states no verdict (no '### Verdict'
+heading or 'Verdict:' line anywhere in its output)` --- the stub signature the
+parent fragment already describes --- while the retry meant to recover it never
+ran.)

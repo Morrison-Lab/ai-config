@@ -28,6 +28,50 @@ Then, before writing the check off as permanently broken, try one manual re-run 
 Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.
 If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR.
 
+**The built-in retry can be `skipped` rather than stubbing,
+and then only one attempt ever ran.**
+The paragraph above anticipates the workflow's own same-run retry
+*running and also stubbing*,
+which is the case where two independent attempts agree.
+A second signature reaches the same red check
+having spent one attempt rather than two:
+the retry step concludes `skipped`,
+so "two stubs back to back" never applies,
+and a manual re-run is the **first** retry rather than the second.
+
+What suppresses it is a parse failure rather than a real denial count,
+which is why nothing on the job page reads as a cause.
+The retry is gated on `permission_denials_count`,
+and when that value cannot be parsed out of the execution result
+the workflow substitutes a fail-safe sentinel of `999999`,
+far above the stub-retry threshold of `5`.
+The run is then classified as gha#198's non-recovering pattern
+rather than gha#185's retryable one.
+Note which way the sentinel errs.
+It defaults toward *not* retrying,
+so a review whose real denial count would have qualified
+is refused its second attempt.
+
+So read the retry step's own conclusion
+before deciding what a failed review means:
+`skipped` means one attempt, `failure` means two.
+That is one API call,
+and it changes what a manual re-run is worth ---
+an independent second sample,
+rather than a third after two that already agreed.
+
+- **Do:** read the retry step's conclusion, and say whether the review was
+  attempted once or twice.
+- **Do:** spend the manual re-run on a `skipped` retry, since no second
+  attempt has happened yet.
+- **Don't:** read a red review check as "the retry also stubbed" --- that is
+  one of two signatures, and the other spent half as many attempts.
+- **Don't:** treat `999999` as a denial count; it is the parser's failure
+  value, not a measurement.
+
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
+"The stub-retry skipped on a sentinel denial count".
+
 Either way: don't wait on the bot indefinitely --- do the review yourself and keep driving to fully-clean.
 
 **Self-review is the immediate fallback so the PR never stalls --
@@ -124,3 +168,41 @@ This is the fallback-specific sharpening of "Apply the same review standards the
 - **Don't:** let a fallback self-review stop at structural checks (dogfood, ASCII, line breaks) and report "no findings".
 - **Don't:** read "the bot was down" as permission for a lighter review than the bot itself would have given.
 
+
+**A defect the self-review SURFACES and then dismisses
+is worse than one it misses.**
+The section above governs the defect a shallow pass never notices.
+This one gets noticed, written down in the review body,
+and closed out on your own judgment ---
+"the exposure is narrow", "not worth another boundary change" ---
+which reads as proportionate scoping
+rather than as a decision to ship a defect you have already found.
+
+It is worse than the miss on two counts.
+The observation was already made,
+so acting on it was the cheapest it was ever going to be,
+and the dismissal spends that for nothing.
+And the written finding *documents that you knew*,
+so when an external reviewer then demonstrates it,
+the record shows a defect identified and waved through rather than overlooked.
+
+The missing piece is structural rather than a lapse of nerve.
+A self-review has no second party to overrule the dismissal,
+which is exactly what the disposition vocabulary supplies everywhere else.
+[`ard`](../../skills/ard/SKILL.md) gives three dispositions and no fourth ---
+Address it,
+Rebut it with an argument you would be willing to post to a reviewer,
+or Defer it to a tracked issue.
+"Not worth fixing" is a Defer with no issue behind it,
+and [`issue-first`](issue-first.md) already rules that out:
+an untracked deferral is a dropped request
+wearing the vocabulary of scope discipline.
+
+- **Do:** give every defect your own self-review names one of the three
+  dispositions, in writing.
+- **Do:** file the issue in the same round when you defer, so a narrowness
+  judgment is one someone else can disagree with.
+- **Don't:** close a finding you raised yourself on your own estimate of its
+  blast radius.
+- **Don't:** read "I mentioned it in the review" as having handled it ---
+  naming a defect is the input to a disposition, not one of them.

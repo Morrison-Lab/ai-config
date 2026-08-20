@@ -272,6 +272,29 @@ whole line yours to split.
 - **Don't:** read such a flag as the check misfiring --- it is reporting the
   diff correctly, and the diff genuinely contains that character.
 
+**Splicing into a line creates a violation neither half carried, and it lands
+at the seam.**
+The section above is about a violation the line already had, which your edit
+merely re-adds.
+This is the case where nothing was wrong before: you insert a sentence into an
+existing line, your clause is clean, the line you inserted it into is clean,
+and the joined line now carries two sentences.
+Nothing here is grandfathered, and the check is not being harsh --- the
+violation is new text you wrote, in the one place you were not looking.
+
+Where it lands is predictable enough to check directly rather than by
+re-reading the whole hunk.
+The boundary between the inserted text and the pre-existing text is the only
+place the edit created a new adjacency, so that is where the failure sits, and
+it sits there rather than inside either half.
+Re-reading what you inserted therefore passes every time, which is exactly why
+the seam is the thing to read.
+
+- **Do:** re-read the joined line in full after splicing into an existing one,
+  rather than the sentence you inserted.
+- **Don't:** treat a clean insertion as evidence of a clean line --- the check
+  reads the line, and the line is now both halves at once.
+
 **Relocating prose is the strongest form of touching it, not an exception to
 this rule.**
 The section above is about a line you *edit*.

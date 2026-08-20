@@ -442,6 +442,43 @@ are easy to swap without noticing.
 - **Don't:** ship a superlative you have not counted even where it turns out to
   be true --- an undefended claim is a finding on its own, per the bullet above.
 
+## A clause you carried through a rewrite is a claim you are now asserting
+
+The section above covers a phrase you bring **in** from somewhere else --- an
+issue body, a sibling repo's comment --- where the tell is that copying feels
+like faithful porting.
+This is the nearer miss and it has no import step at all: the clause was
+already in the sentence, and you rewrote the sentence around it.
+
+[`ascii-punctuation-in-source`](../coding/ascii-punctuation-in-source.md) states
+the line-level form --- touching a line makes its contents yours, because the
+diff cannot tell which words you meant to change.
+The content-level form has no check behind it, so nothing reports it at all.
+
+Rewriting a sentence puts every clause in it under your name, including the ones
+that rode through unexamined: a locator, a figure, an attribution, a claim about
+what some other file says.
+Those parts go on feeling like someone else's while you work, precisely because
+you were not thinking about them --- and that feeling is the defect rather than
+a symptom of it.
+Attention went to the clause being changed, and the untouched clause quietly
+inherited the confidence of the rewrite around it.
+
+The check has to be deliberate, since nothing prompts it and the sentence reads
+as freshly written.
+Read the finished sentence back as though you had written it from scratch, and
+verify each factual clause against its referent rather than against your memory
+of having left it alone.
+
+- **Do:** verify every factual clause in a sentence you rewrote, not only the
+  part you rewrote it for.
+- **Do:** re-check locators and figures specifically, since those are the
+  clauses a rewrite is least likely to touch and most likely to invalidate.
+- **Don't:** treat a clause you did not deliberately change as still belonging
+  to whoever wrote it --- you shipped the sentence.
+- **Don't:** read this as covered by the import rule above; there is no source
+  to have been faithful to, which is what removes the moment of doubt.
+
 ## A definition can resolve, render, and still say nothing
 
 The "Rendered/computed artifacts" bullet above covers a computed value or a

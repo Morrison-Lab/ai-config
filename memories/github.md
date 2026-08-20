@@ -1080,3 +1080,14 @@ file(s)` and listing all four; a `tail_lines`-capped fetch showed only the last
 two, and that partial read was mistaken for the checker's own output.
 An independent scan produced the right set anyway, so the fix was correct while
 the reason given for it was not.)
+
+## Diagnosing a stub/no-verdict `claude-code-review` run
+
+Covered in [`claude-bot-workflows.md`](claude-bot-workflows.md)'s
+"A `claude-code-review`-style job that fails with 'no verdict written'"
+bullet, not here --- that file is scoped to the bot's own runtime behavior,
+which is what this diagnostic technique is about.
+Download and parse the run's `claude-review-execution-*` artifact
+(exact naming, `jq` pattern, and a worked case are there) rather than
+reading the job log's own summary line, which never shows which tool
+call was actually denied.

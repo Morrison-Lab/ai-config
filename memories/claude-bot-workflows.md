@@ -531,13 +531,26 @@ not block `claude-review`.)
 - **A `claude-code-review`-style job that fails with "no verdict written" but `is_error: false` and real cost/turns can be root-caused by downloading the uploaded execution-transcript artifact, not just reading the summary `result` object.**
   The `Run Claude Code Review` step's own JSON output only shows the final SDK
   summary (`is_error`, `num_turns`, `total_cost_usd`, `permission_denials_count`)
-  — enough to confirm a stub occurred, not why. The workflow separately uploads
-  the full turn-by-turn transcript as a `claude-review-execution-<run>-<attempt>.zip`
-  artifact (the name is defined by `d-morrison/gha`'s reusable workflow, not a
-  Claude Code convention — a future rename there invalidates this; confirm via
+  — enough to confirm a stub occurred, not why.
+  The workflow separately uploads the full turn-by-turn transcript as a
+  `claude-review-execution-<run-id>-<run-attempt>-<attempt-label>` artifact
+  (no `.zip` suffix — that's not part of the artifact's own `name`, and
+  `gh run download -n <name>` auto-unzips; the name is defined by
+  `Morrison-Lab/gha`'s reusable workflow, not a Claude Code convention — a
+  future rename there invalidates this pattern, so confirm via
   `gh api repos/<owner>/<repo>/actions/runs/<run_id>/artifacts` rather than
-  assuming the name, then `curl -H "Authorization: token $(gh auth token)"
-  .../artifacts/<id>/zip` to fetch). It's a single pretty-printed JSON array of
+  assuming it).
+  `<run-attempt>` is `github.run_attempt` — the *workflow rerun* count,
+  almost always `1` — while `<attempt-label>` (`attempt1`/`attempt2`) is the
+  *review's own* stub-retry count.
+  The two are easy to conflate: targeting a specific review attempt means
+  changing `attempt-label`, not `run-attempt` --- for example,
+  `attempt2` of a review that never got manually rerun is still
+  `claude-review-execution-<run-id>-1-attempt2`, not `...-2-attempt2`.
+  Fetch it with
+  `gh run download <run-id> --repo <owner>/<repo> -n <name> -D <dir>`,
+  rather than a manual `curl`.
+  It's a single pretty-printed JSON array of
   Claude Code SDK message objects, not NDJSON — each element has a top-level
   `type` (`"system"`/`"assistant"`/`"user"`/`"result"`) and, for `"assistant"`
   elements, a `message.content` array of blocks (`{"type":"tool_use", "name":
@@ -548,6 +561,33 @@ not block `claude-review`.)
   fanning its own review out across background `Agent` calls and ending its turn
   on "waiting for background agents" — a mechanism the summary object alone
   can't show (`d-morrison/gha#185`, `Lacaedemon/sparta` PR #615, 2026-07-03).
+  A second, usually simpler route to the same detail is a re-run with the
+  reusable workflow's `show-full-output` input turned on, which surfaces
+  denied tool calls directly in the job log — see
+  [`claude-review-dispatch.md`](claude-review-dispatch.md)'s
+  "Diagnosing which tool call was denied" note.
+  Reach for the artifact download instead when a re-run isn't an option
+  (the failure needs diagnosing from the run that already happened,
+  not a fresh one), or when `show-full-output` itself is unavailable.
+  A specific mechanism found this way: `permission_denials_count: 33`,
+  no verdict, on a `claude-review` run reviewing a large PR diff
+  (21 files, 700+ lines) in `ucdavis/win#78`.
+  The artifact showed the reviewer looping roughly 15 times trying to save
+  the diff to a file so it could be grepped/counted in chunks — every
+  attempt denied, either because chaining an allowlisted `gh pr diff`
+  command with `;`/`&&`/a redirect makes the whole compound command require
+  approval even though the allowed part matches exactly, or because writing
+  anywhere outside a very narrow "allowed working directory" is a hard
+  block rather than a promptable permission — including `/tmp` and even a
+  freshly `mkdir`-created subdirectory of the repo checkout being reviewed.
+  Filed with the full transcript as `Morrison-Lab/gha#541`
+  (2026-08-20).
+  A related case, `Morrison-Lab/gha#370`, hit a comparably high
+  `permission_denials_count: 32` on a different repo but couldn't confirm
+  the mechanism because that session's egress proxy blocked the artifact
+  download from `productionresultssa5.blob.core.windows.net` — worth
+  retrying from a session without that restriction before assuming the
+  artifact is unreachable.
 - **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.** `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments. If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading. This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review. Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text. Filed with full evidence as `d-morrison/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
 - **Both bullets above presuppose `@v2`: at `@v1` the execution artifact is
   never produced at all, so its absence is not an access problem.**

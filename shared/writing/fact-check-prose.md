@@ -732,7 +732,7 @@ Revisit as a check only if the pattern recurs.
 Two earlier sections in this file each turn a sentence back on its own document --- [`Check a general claim against the concrete numbers in the same document`](#check-a-general-claim-against-the-concrete-numbers-in-the-same-document) and [`A contrast sentence imports the neighbouring rule's parameters`](#a-contrast-sentence-imports-the-neighbouring-rules-parameters).
 Both compare the new text against something *inside* the passage being written --- a figure the same passage reports, or the rule the contrast sentence is stating.
 This one compares it against a sentence it never touched.
-They are named rather than counted to deliberately, since the section directly above this one ([`An availability claim about a repository is a state claim, not a safe default`](#an-availability-claim-about-a-repository-is-a-state-claim-not-a-safe-default)) is about verifying against **external** live state and is not one of them.
+Naming them beats counting to them here, deliberately, because the section directly above this one ([`An availability claim about a repository is a state claim, not a safe default`](#an-availability-claim-about-a-repository-is-a-state-claim-not-a-safe-default)) is about verifying against **external** live state and is not one of them.
 
 Inserting a paragraph into an existing fragment publishes a file, not a paragraph.
 Whatever the insertion claims, the file now claims, alongside everything the file already said --- so a sentence a dozen lines away that **qualifies, bounds, or hedges the same phenomenon** is part of the assertion you are making, and contradicting it makes the fragment say both things at once.

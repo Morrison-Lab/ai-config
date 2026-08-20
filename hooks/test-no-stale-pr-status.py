@@ -97,6 +97,18 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("There are no unresolved threads and #1689 is fully clean.")], True,
      "bare 'no' earlier in the sentence must not suppress an unrelated ASSERT phrase"),
+
+    ([QUERY, PUSH, say("| #1690 | not clean |\n| #1689 | ready to merge |")], True,
+     "a bare newline must count as a sentence boundary -- a negation on one "
+     "table row must not suppress an unrelated claim on the next row"),
+    ([QUERY, PUSH, say("- #1690 not clean\n- #1689 ready to merge")], True,
+     "same as above for a bulleted list"),
+    ([QUERY, PUSH, say("**Not clean yet.** All checks green now.")], True,
+     "markdown bold-close punctuation right after the terminator must not "
+     "swallow the sentence boundary"),
+    ([QUERY, PUSH, say('Quoting the review: "not clean." All checks green now.')], True,
+     "a closing quote right after the terminator must not swallow the "
+     "sentence boundary either"),
 ]
 
 

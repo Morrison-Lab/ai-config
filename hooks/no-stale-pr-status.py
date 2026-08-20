@@ -80,12 +80,18 @@ RX_FAIL_QUERY = re.compile(
 # negation signal silently disables the guard on exactly the phrasing this
 # repo's own recap convention uses most.
 RX_NEGATION = re.compile(
-    r"\b(not|never|cannot|unable)\b|n['’]t\b", re.I,
+    r"\b(not|never|cannot|unable)\b|n['\u2019]t\b", re.I,
 )
-# Sentence boundaries: a terminator followed by whitespace, or a blank line.
+# Sentence boundaries: a terminator (optionally followed by markdown/quote
+# closing punctuation, e.g. "yet.**" or "clean.\"") then whitespace or
+# end-of-string -- OR any single newline. A bare newline has to count on its
+# own, not just a blank line: a table row or list item ("| ... | not clean |
+# \n| ... | ready to merge |") is a full independent clause in this repo's
+# own recap conventions, and treating only a BLANK line as a break let a
+# negation on one row silently suppress an unrelated claim on the next.
 # Deliberately coarse -- this only needs to find SOME earlier boundary, not
 # parse prose correctly.
-RX_SENTENCE_BREAK = re.compile(r"[.!?](?:\s|$)|\n\s*\n")
+RX_SENTENCE_BREAK = re.compile(r"[.!?][\"'\)\]*_`]*(?:\s|$)|\n")
 
 
 def find_unnegated_assert(text):

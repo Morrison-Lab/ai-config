@@ -6,6 +6,11 @@ imitates.
 Worked-example case records for the rules below live in
 [`fixtures-are-not-evidence.cases.md`](fixtures-are-not-evidence.cases.md), moved out of the auto-loaded context.
 
+A fixture is one adjacent artifact among several that get read in place of the
+thing a claim is about; see
+[`verify-the-right-artifact`](verify-the-right-artifact.md) for the general
+case and its other shapes.
+
 The circularity is invisible from the inside, which is what makes this worth
 a rule rather than a reminder.
 A test failing against a fixture feels exactly like a test failing against

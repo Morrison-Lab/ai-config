@@ -1,9 +1,8 @@
 # Two consumer-side gotchas when calling `Morrison-Lab/gha`'s Claude workflows
 
 [`gha-reusable-workflows.md`](gha-reusable-workflows.md) is where this belongs
-topically; this is a satellite file for two consumer-side findings rather than
-an addition there, for the same topic-splitting reason
-[`github-mcp-tools.md`](github-mcp-tools.md) split out of [`github.md`](github.md).
+topically; this stays a separate satellite file for two consumer-side
+findings rather than a merge into that file.
 Both were hit migrating a hand-rolled
 `claude.yml`/`claude-code-review.yml` in a consumer repo to thin callers of
 `Morrison-Lab/gha`'s reusable versions (`d-morrison/qwt#135`).

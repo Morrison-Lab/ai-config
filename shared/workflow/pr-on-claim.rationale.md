@@ -209,7 +209,7 @@ Waiting costs nothing where a trigger exists and costs the entire review where n
 That discharge is satisfied while the repo's actual reviewer never runs, which is the over-broad discharge condition [`algorithmatize-checks`](algorithmatize-checks.md)'s "A reminder guard's discharge condition is a second matcher, and its failure is silence" section names as the dangerous direction: the guard goes quiet, and quiet reads as compliance.
 Tightening it so a `requested_reviewers` POST cannot discharge on a dispatch-only repo is tracked in `Morrison-Lab/ai-config#1249`.
 
-The per-repo trigger table for `Morrison-Lab/ai-config` lives in [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md), which owns the repo-specific facts.
+The per-repo trigger table for `Morrison-Lab/ai-config` lives in [`memories/claude-review-dispatch.md`](../../memories/claude-review-dispatch.md), which owns the repo-specific facts.
 This entry owns the cross-repo rule and the hook gap, neither of which that file states.
 
 This is part of opening the PR, not a follow-up task.

@@ -686,7 +686,8 @@ workflow comment that makes the same claim.)
 
 ## A job's step list identifies which version of a reusable workflow ran
 
-The `referenced_workflows[].sha` bullet above answers "which commit did this
+The `referenced_workflows[].sha` field ([`gha-reusable-workflows.md`](gha-reusable-workflows.md))
+answers "which commit did this
 run resolve", and it is the right instrument when you have it.
 A job's own **step list** answers the same question independently, from a
 different endpoint, and needs no reasoning about re-run modes: `actions_get`
@@ -831,8 +832,9 @@ branch, and that file is where the `uses: .../<workflow>.yml@<ref>` line
 lives.
 So a PR that changes a call from `@v1` to `@v2` exercises `@v2` in its own
 pre-merge run, with no tag slide and no merge required.
-That is the reverse of the reusable-workflow bootstrapping gap described
-above, and it is worth knowing in both directions.
+That is the reverse of the reusable-workflow bootstrapping gap
+[`gha-reusable-workflows.md`](gha-reusable-workflows.md) describes, and it is
+worth knowing in both directions.
 
 - **Do:** treat a pin-bump PR's own run as a real test of the new pin, and
   read its step list to confirm which version answered, per the section
@@ -882,7 +884,7 @@ Three other PRs' reviews dispatched inside the same window (`31135656213`, `3113
 
 Pass `--ref` anyway, for the unrelated reason the section above gives --- `workflow_dispatch` reads the workflow file from the ref you name, defaulting to the default branch.
 Just do not read a run's survival as evidence that you passed it.
-That ai-config has no automatic review to race against in the first place is a separate fact, recorded in [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "`ai-config` never auto-reviews a PR on push".
+That ai-config has no automatic review to race against in the first place is a separate fact, recorded in [`claude-review-dispatch.md`](claude-review-dispatch.md)'s "`ai-config` never auto-reviews a PR on push".
 
 - **Do:** read the reusable workflow a caller invokes before concluding a cancellation is unexplained.
 - **Do:** check a cancelled run's end time against the next dispatch for the same key --- a consistent short lag across several runs is the signature of a `cancel-in-progress` group rather than of anything you changed.
@@ -928,7 +930,7 @@ Separately, each comment also triggered a `workflow_dispatch` run of
 `claude-review.yml` (visible via `list_workflow_runs` on `claude-review.yml`,
 `event: workflow_dispatch`, timed within seconds of the comment) -- the
 workflow this repo's review actually depends on, per
-[`claude-bot-workflows.md`](claude-bot-workflows.md)'s trigger table.
+[`claude-review-dispatch.md`](claude-review-dispatch.md)'s trigger table.
 
 **A third `claude-bot.yml` run followed, and it may have been self-triggered
 rather than a new human request.**

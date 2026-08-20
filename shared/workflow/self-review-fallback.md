@@ -59,10 +59,25 @@ This corpus already makes the identical argument about **instruments**, so exten
 Two consequences follow.
 
 **When chasing a second reviewer, prefer a different vendor.**
-Copilot beside `claude-review` is the common pairing, and the corpus already owns two more:
-[`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) wires up the Google Antigravity review workflow, and
-[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) runs a separately-billed ChatGPT-plan CLI.
+Copilot beside `claude-review` is the common pairing, and
+[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) runs a
+separately-billed ChatGPT-plan CLI.
 Re-dispatching the reviewer that already ran is the weakest of the available options, since it re-reads the same diff through the same model.
+
+**Antigravity is not one of these any more, and the difference matters here more
+than anywhere else.**
+It is permanently out of service (user directive, 2026-08-20), confirmed the
+same day on a dispatched run that ended
+`request failed (code 429): Your prepayment credits are depleted` and
+`Execution failed: model unreachable`.
+That is not the transient outage this fragment otherwise teaches you to re-check
+each round --- re-checking it will never succeed.
+So `delegate-to-codex` is currently the corpus's **only** cross-vendor reviewer,
+which means the preference above now names one destination rather than a choice.
+[`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
+history rather than as an option; do not dispatch it, since a dispatch burns a
+run and leaves a red check for a reviewer that cannot answer.
+Tracked as ai-config#1776.
 
 **Read a cross-vendor disagreement as a prompt to check the item yourself.**
 A split means one reviewer surfaced something the other's approach did not, so the item is worth verifying rather than settling by majority or by whichever reviewer you trust more.

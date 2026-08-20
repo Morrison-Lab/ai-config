@@ -316,8 +316,11 @@ What makes it worth a rule of its own is a SECOND refutation of the same underly
 - **Don't:** ship a safety claim in a comment that was reasoned about but never executed against an adversarial input.
 - **Don't:** treat one fixed counter-example as proof the class is exhausted --- the next one can share its shape exactly.
 
-(Morrison-Lab/ai-config#1762, 2026-08-20: a citation-stripping regex fix shipped two consecutive safety claims in the same docstring --- first that a live finding "does not describe itself that way" [adjacency alone], then, after that was refuted, that adjacency plus co-occurring wording was sufficient.
-An external reviewer refuted both by constructing and executing a counter-example, in two separate review rounds on the same PR, despite this fragment's own execution-based verification section already existing in the corpus at the time either comment was written.)
+(Morrison-Lab/ai-config#1762, 2026-08-20: a citation-stripping regex fix went through three review rounds.
+Round 1 refuted the FIRST shipped claim --- "a genuine bold-labeled finding in parens is never blanked" (a co-occurring-wording gate) --- with a live finding that mentioned "the previous round" in its own text.
+Round 2 refuted the SECOND shipped claim --- "a live finding does not describe itself that way" (adjacency alone) --- with a live finding re-raised across rounds using the identical citation syntax.
+Only the THIRD version, which added an explicit resolution-wording requirement on top of adjacency, was approved ("Ready for merge"), with one narrow residual gap the reviewer explicitly judged non-blocking.
+Both refuted claims were found by the reviewer executing a constructed counter-example, not by the author testing one first, despite this fragment's own execution-based verification section already existing in the corpus at the time either claim was written.)
 
 ## Matching values is not matching roles
 

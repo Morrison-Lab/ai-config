@@ -98,6 +98,29 @@ grants the move, it does not exempt it from what a move costs.
   both point to for this: a one-sided "did anything go missing" diff cannot
   see a token the move itself introduced, such as a diff header or stray
   marker a mechanical extraction leaked into the result.
+
+  **That proof cannot stand in for the self-reference sweep above, and it is
+  the substitution to expect** --- the word comparison is the more rigorous
+  of the two, it runs in both directions, and it returns a clean verdict, so
+  having run it makes the softer-sounding grep feel already covered.
+  It is not, and the reason is structural rather than a matter of thoroughness:
+  a preservation check tests **membership** in the union of the results, while
+  a pointer's correctness is a **relational** property of where its target sits
+  relative to it.
+  A split leaves both the pointer and its target present somewhere, so the
+  comparison reports nothing lost --- correctly --- while every "see below"
+  whose target went to the sibling file now resolves to nothing.
+  The two checks are independent, and only one of them can see this.
+- **A line's "pre-existing" status is a fact about a destination, not about a
+  file.**
+  A line that has sat in the source file for months is an **added** line in the
+  file a split creates, so every line-level rule --- banned glyphs, one
+  sentence per line, house punctuation --- applies to it there.
+  The trap is that both halves of a split feel like the same file, so a scan
+  run on the survivor, where the lines genuinely are pre-existing and
+  genuinely are out of scope, reads as having covered the move.
+  Scan each destination separately, and treat a relocated line by where it is
+  landing rather than by where it has been.
 - **A multi-document move can break navigation and cross-file crossrefs.**
   A Quarto sidebar, table of contents, or `_quarto.yml` entry that named the
   section by its old location may need updating, and a crossref id

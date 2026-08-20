@@ -83,7 +83,8 @@ the *other* work, once the authorized part is already done.
 
 (Directive from the user, 2026-08-20: "'say the word' is a sign you're
 probably avoiding something you've already been told to do without my
-guidance. also flag similar cop-out phrases".
+guidance.
+also flag similar cop-out phrases".
 It came at the end of a deadline session in which verified analysis results
 sat in an unpushed local branch for hours while the replies reported the
 numbers into chat and closed with "say the word and I'll push" --- for a

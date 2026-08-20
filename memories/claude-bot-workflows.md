@@ -2,7 +2,7 @@
 
 The bot's own behaviour: what a run does, how it fails, and how to recover.
 Split out of [`github-actions.md`](github-actions.md), which keeps the
-generic Actions-authoring and reusable-workflow material.
+generic Actions-authoring material.
 
 ## Re-triggering the @claude PR *review* (d-morrison Quarto / R-pkg repos, e.g. `psw`)
 - Filenames below are those in the **content/package repos** (verified in

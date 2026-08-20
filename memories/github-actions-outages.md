@@ -10,7 +10,7 @@ lives here too --- a change to shared configuration, which fails across every
 repo at once exactly as an outage does.
 
 Split out of [`github-actions.md`](github-actions.md), which keeps the generic
-Actions-authoring and reusable-workflow material.
+Actions-authoring material.
 
 ## Check the GitHub status page when workflows stall across several PRs at once
 

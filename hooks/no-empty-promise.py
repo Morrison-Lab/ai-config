@@ -144,6 +144,18 @@ PROMISE = re.compile(
     re.I | re.X,
 )
 
+# `\b` is the wrong boundary for a bare action word: `-` and `/` are non-word
+# characters, so `\bums\b` matches INSIDE
+# `shared/workflow/run-ums-proactively.md`, and `cat`-ing that file discharged
+# a promise. Anchor on path characters too.
+#
+# `.` is deliberately NOT excluded on its own. A first attempt used
+# `(?![\w./-])`, which also rejected a sentence-final period, so `run ums.`
+# stopped discharging -- the commonest phrasing of all. What marks a path is a
+# dot with a word character AFTER it (`ums.md`), not a dot at a full stop.
+_NOT_PATH = r"(?<![\w/-])"
+_NOT_PATH_END = r"(?![\w/-]|\.\w)"
+
 # Durable, inspectable rule surfaces. Wider than remind-ums-after-error.py's
 # UMS_PATH, deliberately: a recorded learning is one kind of mechanism, and a
 # hook or a harness setting is another that fragment's rule has no interest
@@ -163,22 +175,24 @@ MECHANISM_PATH = re.compile(
     re.I,
 )
 
-# Filing the tracking issue, or invoking the skill that records the learning.
-# `\b` is the wrong boundary here: `-` and `/` are non-word characters, so
-# `\bums\b` matches INSIDE `shared/workflow/run-ums-proactively.md`, and
-# `cat`-ing that file discharged a promise. Anchor on path characters too.
+# Two kinds of "action word", split because they live in different payloads
+# and only one of them is ever a shell command.
 #
-# `.` is deliberately NOT excluded on its own. A first attempt used
-# `(?![\w./-])`, which also rejected a sentence-final period -- so `run ums.`
-# stopped discharging, which is the commonest phrasing of all. What
-# distinguishes a path is a dot with a word character AFTER it (`ums.md`),
-# not a dot at a full stop.
-_NOT_PATH = r"(?<![\w/-])"
-_NOT_PATH_END = r"(?![\w/-]|\.\w)"
-MECHANISM_WORD = re.compile(
+# FILING_CMD is a real command line. Seeing it in a `bash` payload means the
+# command ran.
+FILING_CMD = re.compile(
     r"\bgh\s+issue\s+create\b|\bglab\s+issue\s+create\b"
-    r"|" + _NOT_PATH + r"issue_write" + _NOT_PATH_END +
-    r"|" + _NOT_PATH + r"ums" + _NOT_PATH_END +
+    r"|" + _NOT_PATH + r"issue_write" + _NOT_PATH_END,
+    re.I,
+)
+
+# SKILL_WORD names a SKILL, invoked through the Skill/Task tools -- never a
+# shell command. It is therefore only evidence inside a dispatch payload.
+# Treating it as evidence in a `bash` payload made `grep -n ums README.md`
+# and `grep -c memorize CLAUDE.md` discharge a promise, which is the opposite
+# of this module's own rule that a read discharges nothing.
+SKILL_WORD = re.compile(
+    r"" + _NOT_PATH + r"ums" + _NOT_PATH_END +
     r"|update\s+memories"
     r"|" + _NOT_PATH + r"record[- ]learnings" + _NOT_PATH_END +
     r"|" + _NOT_PATH + r"memorize" + _NOT_PATH_END,
@@ -340,7 +354,7 @@ def discharges(name, inp):
 
     if low == "bash":
         cmd = str(inp.get("command", ""))
-        if MECHANISM_WORD.search(cmd):
+        if FILING_CMD.search(cmd):
             return True
         # A shell write needs BOTH a rule surface and something that writes to
         # it, so `cat shared/workflow/ardi.md` reads as the read it is.
@@ -356,14 +370,24 @@ def discharges(name, inp):
         # still matching as bare NOUNS, so the heuristic is abandoned rather
         # than narrowed again.
         #
-        # MECHANISM_WORD survives because those tokens name an ACT --
-        # `gh issue create`, `ums`, `memorize` -- rather than a location.
+        # SKILL_WORD is evidence HERE and nowhere else. `ums`/`memorize`
+        # name skills invoked through this very tool, so a brief carrying
+        # one is a request to run it. The same token in a `bash` payload is
+        # a search term, which is why the two regexes are separate.
+        #
+        # A brief that merely DISCUSSES a pass ("summarize what the ums
+        # skill does") still discharges, and that is a deliberate residual
+        # rather than an oversight: separating discussion from request is
+        # the same wording judgment that three earlier rounds defeated on
+        # this branch, and the over-discharge is bounded to briefs that name
+        # a recording skill without asking for one -- rare next to the
+        # delegation this corpus actually encourages.
         # A delegated build discharges on the parent staging the artifact
         # afterwards, per this function's docstring; scan() cannot see the
         # subagent's own writes, so nothing here tries to.
         blob = " ".join(str(inp.get(k, "")) for k in
                         ("prompt", "description", "skill", "args"))
-        return bool(MECHANISM_WORD.search(blob))
+        return bool(FILING_CMD.search(blob) or SKILL_WORD.search(blob))
 
     return False
 

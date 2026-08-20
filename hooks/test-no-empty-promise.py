@@ -128,6 +128,11 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
+def bash(command):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Bash", "input": {"command": command}}]}}
+
+
 def dispatch(prompt):
     return {"type": "assistant", "message": {"content": [
         {"type": "tool_use", "name": "Task",
@@ -253,6 +258,19 @@ CASES = [
      False, "'memorize.' at a sentence end still discharges"),
     ([say("Going forward I'll do X."), dispatch("Open ums.md and summarize it.")],
      True, "a dotted FILENAME still does not discharge"),
+
+    # Round 9: a bare skill word in a BASH payload is a search term, not an
+    # action -- `grep -n ums README.md` discharged a promise.
+    ([say("Going forward I'll do X."), bash("grep -n ums README.md")],
+     True, "grep for 'ums' does NOT discharge (review #1724)"),
+    ([say("Going forward I'll do X."), bash('grep -rn "ums" .')],
+     True, "a recursive grep for 'ums' does NOT discharge"),
+    ([say("Going forward I'll do X."), bash("grep -c memorize CLAUDE.md")],
+     True, "grep for 'memorize' does NOT discharge"),
+    ([say("Going forward I'll do X."), bash("echo checking for ums mentions")],
+     True, "echoing the word 'ums' does NOT discharge"),
+    ([say("Going forward I'll do X."), bash("gh issue create -R o/r --title x --body y")],
+     False, "a real filing COMMAND still discharges from bash"),
 
     # F2: `>` matched a stderr redirect, and cp/mv read OUT of a rule surface.
     ([say("Going forward I'll do X."), CAT_WITH_STDERR],

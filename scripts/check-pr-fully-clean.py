@@ -731,9 +731,19 @@ def main():
 
     all_issues = ci_issues + review_issues
 
-    if all_issues:
+    # NOTE-prefixed issues are informational (unreadable-format warnings) and
+    # do not block -- only real findings or missing reviews cause a failure.
+    notes = [i for i in all_issues if i.startswith("NOTE: ")]
+    blocking = [i for i in all_issues if not i.startswith("NOTE: ")]
+
+    if notes:
+        print("\n\u2139\ufe0f Notes:")
+        for n in notes:
+            print(f"  - {n}")
+
+    if blocking:
         print("\n\u274c PR is NOT fully clean:")
-        for issue in all_issues:
+        for issue in blocking:
             print(f"  - {issue}")
         sys.exit(1)
 

@@ -111,6 +111,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`back`](skills/back/SKILL.llms.md) |  | Cancel the `away` grant and surface a decision log of what was resolved unattended |
 | [`daytb`](skills/daytb/SKILL.llms.md) | `do-as-you-think-best` | Decide the question at hand yourself and report the choice – scoped to that task, unlike `away`’s whole-session grant |
 | [`delegate-to-codex`](skills/delegate-to-codex/SKILL.llms.md) | `dtc` | Offload heavy read/draft/verify work to the `codex` CLI before spending Claude quota, with Claude fallback |
+| [`delegate-to-opencode`](skills/delegate-to-opencode/SKILL.llms.md) | `dto` | Offload mechanical work to opencode’s free hosted or fully local models, and route anything that must stay on the machine to the local tier |
 | [`prompt-me`](skills/prompt-me/SKILL.llms.md) | `pm` | Surface the single most pressing open question (or top N) waiting on user input |
 | [`prompt-me-all`](skills/prompt-me-all/SKILL.llms.md) | `pma` | Restate every open question still waiting on user input, uncapped |
 | [`pending-decisions`](skills/pending-decisions/SKILL.llms.md) | `pd` | Sweep issues/PRs (not just this conversation) for ones waiting on a decision from you, and ask about them one at a time |

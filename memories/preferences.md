@@ -875,21 +875,33 @@ On `shared/coding/tidy-code.md` (ai-config#476), a "Preferred" R example labeled
 The paired "Avoid" example was also contrived (a nested `eval_tidy()`/`quo()` call nobody writes, and not even equivalent inside `summarise()`'s NSE) rather than the realistic verbose form.
 Both were caught by the `@claude` review bot, not by me --- mentally (or actually) running the example against its stated claim before publishing would have caught it first.
 
-## Delegate heavy work to a separately-billed CLI first --- codex, and now agy
+## Delegate heavy work to another CLI first --- codex, agy, and now opencode
 
-For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to a separately-billed agent CLI and spend that budget **before** Claude/Workflow tokens.
+For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
+Two of those CLIs are separately-billed plans with usage windows, and the third is free.
 Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
 This is a standing default across all sessions, including ultracode/Workflow fan-outs, not occasional use.
 
-**There are two such budgets, and the rule is to try both before Claude's.**
+**Two of these are metered plans, and the rule is to try both before Claude's.
+A third, `opencode`, is free and sits outside that window logic entirely.**
 
 | CLI | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
 | `agy` (Google Antigravity) | Antigravity | none yet --- mechanics below; the skill is worth writing |
+| `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
-Exhaust the *current usage window* of each --- roughly 5 hours for codex --- then fall back to Claude until it resets.
+Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.
 "Delegate first" means the current window, not abandoning Claude permanently.
+
+**`opencode` has no window to exhaust, which changes where it sits rather than just adding a row.**
+Its two tiers cost nothing, so for work a small model can actually do it goes *ahead* of codex and agy rather than behind them: there is no budget to conserve by skipping it.
+Capability is the binding constraint in its place, and it is unmeasured here --- the local ids carry parameter counts from 2B to 30B, and the hosted ids are preview names nobody has benchmarked against this corpus's work.
+The local (`ollama/*`) tier is also the only destination anywhere in this ladder that *can* keep the payload on the machine, so it is the one route for work whose data must not leave.
+That is a property of the endpoint its provider entry is configured with, and not of the `ollama/` prefix, which reads the same when the `baseURL` points at a LAN box or a remote `OLLAMA_HOST`.
+So the claim is licensed by the loopback check in that skill's step 1 rather than by the model id, and the check refuses rather than passing when the config cannot be read.
+[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule.
+The tiers and version above were measured 2026-08-19 on opencode 1.18.15.
 `delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
 
 **`agy --print` CONSUMES THE NEXT TOKEN as its prompt, so a flag placed between the two becomes the prompt.**

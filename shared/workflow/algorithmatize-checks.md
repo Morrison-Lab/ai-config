@@ -247,6 +247,48 @@ The section above closes on "publish the command", and that rule is right.
 - **Don't:** read "I published a command" as discharging the rule above; that
   rule is discharged by publishing *that* command.
 
+## An instrument's own exit code is not the gate; find what CI actually runs
+
+The two sections above govern the command you publish.
+This one governs the command you *believe*, and it is the cheaper mistake to
+make because running the right script feels like having checked.
+
+A repo can ship a checker that reports a finding and still exits `0`, because
+it was designed to advise rather than block.
+Separately, a **test** can pin the same property as a hard fact, and CI can run
+that test.
+Reading the script's exit code then answers "does the script complain?" when
+the question you are actually asking is "does CI pass?" --- and the two answers
+differ precisely when the property is one somebody cared enough to pin.
+
+The failure direction is the bad one.
+The script exits `0`, the local check looks green, and the gate is discovered
+by a red PR rather than by the pre-push sweep that was supposed to prevent it.
+Nothing in the script's output hints that a second consumer exists.
+
+So resolve the question against the workflow rather than against the tool:
+read the job's step list and run **what it runs**, tests included, instead of
+picking the script whose name matches the property.
+
+- **Do:** enumerate the CI job's steps and run that set, rather than the one
+  script that seems to cover the check.
+- **Do:** treat an advisory script and a test pinning the same property as two
+  different instruments with two different verdicts.
+- **Don't:** read a `0` from a purpose-built checker as "CI will pass" --- it
+  reports only that *that* script is satisfied.
+- **Don't:** conclude a threshold is advisory from the exit code of the script
+  that measures it.
+
+(Measured 2026-08-19 on ai-config.
+`scripts/check-memory-file-size.py` exits `0` while printing that
+`memories/github-actions.md` was over its 1200-line threshold, so the crossing
+was reported here as advisory and pushed.
+`validate` went red on both parallel runs: `scripts/test_check_memory_file_size.py`
+carries `# The real corpus must stay under the shipped default, or the check
+ships red` and asserts it directly, and `validate.yml` runs that test.
+The whole local `validate` job was then run before the fixing push, which is
+what this section is asking for.)
+
 ## A reference frame chosen from the initial condition expires as the system moves
 
 The section above is about an instrument that **changed**, leaving every figure

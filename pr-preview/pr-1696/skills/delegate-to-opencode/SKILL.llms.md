@@ -2,7 +2,7 @@
 
 The `opencode` CLI reaches two model tiers this corpus has no other route to: a hosted free tier (opencode Zen) and a fully local one (ollama). Both cost no quota at all, so work small enough for them should not spend Claude’s budget, codex’s window, or agy’s. The local tier also does something none of the other destinations can: it keeps the payload on the machine.
 
-Claude stays the orchestrator. It writes the prompt, runs the delegate, validates what comes back, and does the synthesis. This skill is the mechanism. The budget preference it plugs into lives in `memories/preferences.md` (“Delegate heavy work to a separately-billed CLI first”).
+Claude stays the orchestrator. It writes the prompt, runs the delegate, validates what comes back, and does the synthesis. This skill is the mechanism. The budget preference it plugs into lives in `memories/preferences.md` (“Delegate heavy work to another CLI first”).
 
 ## Why this is a shell-out and not a subagent
 
@@ -12,14 +12,14 @@ The `Agent` tool’s `model` parameter is an enum of Claude aliases, and `.claud
 
 - “delegate to opencode”, “use opencode”, “run this on opencode”, “run this on a local model”, “use a free model”, “keep this local”, “dto”
 - Proactively, before any **mechanical, bounded** read/extract/reformat pass — a grep-and-summarize sweep, a bulk reformat, a first-pass triage of many files — that would otherwise spend a metered budget.
-- Whenever the work reads data that must not leave the machine, which routes to the local tier specifically (see the next section).
+- Whenever the work reads data that must not leave the machine, which routes to the local tier rather than the hosted one.
 
 ## When NOT to delegate
 
 - **The task needs strong reasoning, judgment, or long-context synthesis.** This is the exception with no codex analogue, so check it first. A wrong answer from a small model costs more to detect than the quota it saved.
-- **The critical-path edit the rest of the work waits on.** Keep it local so progress does not block on a round-trip.
-- **The result must conform to a schema and you have no cheap validator.** `opencode run` has no schema flag (see step 2), so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
-- **The hosted tier is rate-limited, or the ollama daemon is down.** Neither is a window running out, because neither tier has a window. This is availability, not budget, and what it licenses depends on the routing rule below.
+- **The critical-path edit the rest of the work waits on.** Do it inline, in this session, so progress does not block on a round-trip.
+- **The result must conform to a schema and you have no cheap validator.** `opencode run` has no schema flag, so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
+- **The hosted tier is rate-limited, or the ollama daemon is down.** Neither is a window running out, because neither tier has a window. This is availability, not budget, and what it licenses depends on whether a data trigger applies.
 
 The first two transfer from `delegate-to-codex`, but for a reason that skill does not have. There, work shape and model capability were independent. Here they point the same way: authoring and judgment work is exactly what the free and local tiers are worst at.
 
@@ -29,24 +29,27 @@ The first two transfer from `delegate-to-codex`, but for a reason that skill doe
 
 That trigger does not transfer to opencode. It **splits**, because opencode is two destinations rather than one, and the two differ in the only property the trigger cares about.
 
-**The split.** `ollama/*` runs against the base URL the config declares for the ollama provider, `http://localhost:11434/v1` as of 2026-08-19. The payload does not leave the machine. No other destination on the ladder — not Claude, not codex, not agy, not opencode Zen — has that property. `opencode/*` is opencode Zen, a hosted gateway: the payload leaves the machine exactly as it does for any other hosted model. Free is a **billing** fact and says nothing about where bytes go.
+**The split.** `opencode/*` is opencode Zen, a hosted gateway: the payload leaves the machine exactly as it does for any other hosted model. Free is a **billing** fact and says nothing about where bytes go. `ollama/*` is the only id on the whole ladder that *can* keep the payload on the machine — not Claude, not codex, not agy, not opencode Zen.
+
+**But locality is a property of the configured endpoint, not of the prefix.** `ollama` is a user-authored provider entry in the opencode config, and its `options.baseURL` is an ordinary field in it. Pointing that field at a LAN GPU box or a remote `OLLAMA_HOST` is ordinary usage rather than an edge case, and the id still reads `ollama/*` when it happens. So the prefix narrows the candidates to one and licenses nothing by itself, and a model id recorded in a report names the provider label rather than the endpoint it resolved to. What licenses the locality claim is the endpoint check in step 1, which resolves that `baseURL` and refuses anything that is not loopback. Run it before sending data-triggered work, and record the endpoint it printed rather than the model id alone. Measured 2026-08-19 on this machine: `http://localhost:11434/v1`, resolving to `127.0.0.1` and `::1`.
 
 So a data trigger routes to `ollama/*` and forbids `opencode/*`, where under codex the same trigger simply said “delegate”. Read a repo’s approval as naming a **destination**, not as naming delegation in general: a `CLAUDE.md` rule permitting codex for restricted data says nothing about a hosted free tier nobody has cleared.
 
-**The discriminator is the provider prefix, not the `-free` suffix.** `opencode models` on 2026-08-19 listed `opencode/big-pickle` alongside six ids ending in `-free`, all under the same hosted provider. The suffix answers a pricing question. The prefix answers the routing one.
+**The discriminator is the provider prefix, not the `-free` suffix.** `opencode models` on 2026-08-19 listed `opencode/big-pickle` alongside six ids ending in `-free`, all under the same hosted provider. The suffix answers a pricing question. The prefix answers which tier a job goes to, which is the routing question. It does not answer where that tier’s endpoint points, which is what step 1’s endpoint check settles.
 
 **The fallback inverts differently than it does for codex.** There, the inversion was “wait for the window instead of falling back to Claude”. Local has no window, so there is nothing to wait for, and the move that must be blocked is a **tier** fallback rather than a vendor one: re-running a slow or failed `ollama/*` job on `opencode/*` because the hosted tier is faster. That retry is one flag value away and reads as ordinary troubleshooting, which is why it needs naming rather than leaving to judgment. When the local tier cannot do a data-triggered job, fall back only to whatever the repo’s own rule already permits — which may be doing the work by hand.
 
 As in the codex skill, do not infer a data trigger from a repo merely holding sensitive data. It applies where the consuming repo has written the rule down, and that repo owns the path list.
 
-- **Do:** pick the destination by provider prefix, and name the exact model id in the report so the destination is auditable afterwards.
-- **Do:** send data-triggered work to an `ollama/*` id, and stop rather than re-route when the daemon is unavailable.
+- **Do:** run step 1’s endpoint check before data-triggered work, and record the endpoint it printed beside the model id so the destination is auditable afterwards.
+- **Do:** send data-triggered work to an `ollama/*` id, and stop rather than re-route when the daemon is unavailable or the check refuses.
 - **Don’t:** retry a failed or slow local run on a hosted model.
+- **Don’t:** treat the `ollama/` prefix as the locality guarantee — it names a provider entry whose endpoint is user-configurable.
 - **Don’t:** read a `-free` suffix, or its absence, as evidence about where the payload goes.
 
 ## Where opencode sits in the budget ladder
 
-`memories/preferences.md`’s “Delegate heavy work to a separately-billed CLI first” holds the order across `codex`, `agy`, and `opencode`. Read it there rather than re-deriving it here.
+`memories/preferences.md`’s “Delegate heavy work to another CLI first” holds the order across `codex`, `agy`, and `opencode`. Read it there rather than re-deriving it here.
 
 Two things follow from opencode not being a metered plan at all, and they are what make its position unlike the other two:
 
@@ -75,17 +78,61 @@ opencode run -m opencode/deepseek-v4-flash-free "Reply with exactly the word: PO
 
 Measured 2026-08-19 on opencode 1.18.15: both returned `PONG`, in 13.3s local and 7.9s hosted.
 
+**Before any data-triggered work, verify the endpoint.** The routing rule above turns on where `ollama/*` actually points, and that is a config value rather than a fixed property, so it gets checked rather than assumed. `opencode debug config` prints the resolved config as JSON on stdout (verified 2026-08-19), so the check reads the merged value rather than one file that something else may override:
+
+``` bash
+python3 - <<'PY'
+import ipaddress, json, socket, subprocess, sys
+from urllib.parse import urlparse
+
+try:
+    raw = subprocess.run(
+        ["opencode", "debug", "config"],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    url = json.loads(raw)["provider"]["ollama"]["options"]["baseURL"]
+except Exception as exc:
+    sys.exit(f"REFUSE: cannot read the ollama baseURL from opencode's config: {exc}")
+
+host = urlparse(url).hostname
+if not host:
+    sys.exit(f"REFUSE: no host in ollama baseURL {url!r}")
+
+try:
+    addrs = {info[4][0] for info in socket.getaddrinfo(host, None)}
+except OSError as exc:
+    sys.exit(f"REFUSE: cannot resolve {host!r}: {exc}")
+
+remote = sorted(a for a in addrs if not ipaddress.ip_address(a).is_loopback)
+if remote:
+    sys.exit(f"REFUSE: ollama baseURL {url} resolves off-machine: {', '.join(remote)}")
+
+print(f"OK: ollama baseURL {url} resolves to loopback only ({', '.join(sorted(addrs))})")
+PY
+```
+
+It exits 0 and prints the endpoint only when every address the host resolves to is loopback. Every other outcome refuses: an unreadable or unparseable config, a missing `ollama` provider or `baseURL`, a host that will not resolve, or any resolved address that is not loopback. Refusing on an unreadable config is deliberate rather than defensive, per [`fail-fast`](../../shared/principles/fail-fast.md): a config you could not read is not evidence that anything is local, so it must not reach the pass branch. This check is what licenses the locality claim, so run it in the session that sends the data and quote its output, rather than carrying a verdict over from an earlier one.
+
 ### 2. Prepare the prompt
 
-`opencode run` takes the message as positional arguments, and `-f/--file` attaches files. Use `--dir` to point the run at a repo, and `--variant` for a provider-specific reasoning effort. Fetch anything from the network yourself and embed it in the prompt.
+As of 2026-08-19, `opencode run` takes the message as positional arguments, and `-f/--file` attaches files. Use `--dir` to point the run at a repo, and `--variant` for a provider-specific reasoning effort. Fetch anything from the network yourself and embed it in the prompt.
 
 **There is no schema flag.** `opencode run --help` on 2026-08-19 offered `--format json`, which emits the raw event stream rather than a schema-constrained final message, and nothing equivalent to codex’s `--output-schema`. So ask for the structure in the prompt and validate it on return. Expect that validation to fail sometimes, because emitting strict JSON is one of the things small models are worst at.
 
 ### 3. Run it
 
-There is no sandbox flag either. `opencode run --help` lists none, and permissions come from the `permission` block in the opencode config. `--auto` auto-approves everything not explicitly denied, and its own help calls it dangerous, so scope the config rather than reaching for that flag.
+There is no sandbox flag either. `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config. `--auto` auto-approves everything not explicitly denied, and its own help calls it dangerous, so scope the config rather than reaching for that flag.
 
-For a long or multi-item run, use the background-runner-plus-DONE-marker pattern in [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md) step 3 rather than a foreground call that the tool timeout will kill. One thing there does not transfer: **that runner’s `MAXPAR` fan-out applies to the hosted tier and not to the local one.** Local runs share one machine’s GPU and memory, so raising parallelism against a single ollama daemon contends for the same hardware instead of fanning out. The crossover point is unmeasured here, so treat local work as serial until somebody measures it.
+For a long or multi-item run, borrow the background-runner-plus-DONE-marker *shape* from [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md) step 3 rather than making a foreground call that the tool timeout will kill. Borrow the shape and not the body. **Four things in that skill’s `run_one()` do not transfer**, and the fourth fails silently rather than erroring:
+
+- **`-o <file>`**, which opencode has no equivalent of, so there is no per-item JSON file to write.
+- **`--output-schema`**, which it has no equivalent of either.
+- **stdin `-`**, which is not how a prompt is passed here. `opencode run` took the message as positional arguments as of 2026-08-19, so a literal `-` becomes the prompt text.
+- **The `bytes=0` success gate**, which reads the `-o` file that was never written. It therefore reports `bytes=0` for every item, misclassifying a run that fully succeeded as one that entirely failed.
+
+Capture stdout and gate on the exit status instead, per step 4.
+
+**`MAXPAR` is the fifth, and it half-transfers: it applies to the hosted tier and not to the local one.** Local runs share one machine’s GPU and memory, so raising parallelism against a single ollama daemon contends for the same hardware instead of fanning out. The crossover point is unmeasured here, so treat local work as serial until somebody measures it.
 
 ### 4. Detect failure
 

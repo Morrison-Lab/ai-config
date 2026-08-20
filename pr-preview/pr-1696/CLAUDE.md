@@ -100,6 +100,7 @@ it; use the correct private tracker and redact sensitive details when needed.
 @shared/workflow/flag-session-boundaries.md
 
 Proactively flag a good stopping point --- a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, an open question answered with nothing pending --- with the `⚠️ FLAG` tag, at the end of a turn's recap rather than mid-task.
+A clean stopping point requires that something actually finished, and the fragment's disqualifier list cannot tell you whether anything did --- so name the thing that finished, and read a turn that only explored as having completed nothing however few blockers it trips.
 Hold the flag while any PR this session opened or pushed to is still unmerged, per the bright line the fragment states in full; run `wrap-up`'s state sweep first rather than trusting memory, since a bot-opened PR or a leftover branch never entered the conversation.
 Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread; the fragment covers each option's tradeoff and the same menu applied at the moment of opening a *new* PR, not only at a stopping point.
 
@@ -124,7 +125,7 @@ When the current tier is clearly underpowered for the task ahead, say so and sug
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
 Two such budgets exist and the standing preference is to try both first: `codex` (ChatGPT plan, operationalized by `delegate-to-codex`) and `agy` (Google Antigravity).
-`memories/preferences.md`'s "Delegate heavy work to a separately-billed CLI first" carries the rule and the usage-window semantics.
+`memories/preferences.md`'s "Delegate heavy work to another CLI first" carries the rule and the usage-window semantics.
 Read it for one mechanical detail before invoking `agy`: `--print` consumes the next token as its prompt, so a flag placed between the two becomes the prompt and the real one is discarded, silently and with exit 0.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
@@ -1142,6 +1143,22 @@ The detector counterpart to the plain-prose guide above.
 [shared/writing/ai-tells.md](shared/writing/ai-tells.md)
 
 The `find-ai-tells` skill (alias `ai-tells`) runs this same catalog on demand against any target text.
+
+## Writing style: an example of a checked pattern is itself checked
+
+[shared/writing/examples-are-scanned.md](shared/writing/examples-are-scanned.md)
+
+When a document explains a mechanically-enforced convention, its illustrative
+example sits inside the file the checker scans -- so writing the example the
+natural way can trip the rule the passage is describing, and implicate the one
+passage meant to prevent it.
+Whether it does turns on the checker: backticks and fenced blocks shield
+nothing from a line-oriented scanner, and everything from a structure-aware
+one, so read it rather than assuming either way.
+Teach the checker about code regions when you own it (this repo's
+`scripts/lib/fences.py` is that fix), render the example so it cannot match
+when you do not, and either way run the detector rather than re-reading --
+self-review confirms the claim, which was never the defect.
 
 ## Writing style: cite sources thoroughly
 

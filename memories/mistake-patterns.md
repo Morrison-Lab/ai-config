@@ -31,6 +31,12 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Canonical Rule**: See [`MEMORY.md`](MEMORY.md) and project `CLAUDE.md` / `AGENTS.md`.
 - **Fix**: Consult relevant memory files and project instructions at task start to align with existing conventions.
 
+## Pattern 5b: Skipping Standing Rules That Already Exist
+- **Mistake**: Completing a task without checking whether a standing rule already governs it, then getting corrected and saying "I'll remember" instead of recording the failure.
+- **Example**: wai session 2026-08-19: wrote content, committed, but stopped before pushing/opening a PR. AGENTS.md line 63-72 already mandated the full delivery cycle. The fix was recorded verbally but not persisted.
+- **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): commit → push → PR → share link, as one automatic sequence.
+- **Fix**: Before acting on a task, grep AGENTS.md and project CLAUDE.md for rules that apply. After a correction, record it in mistake-patterns.md (don't just say you'll remember — the next session won't have this conversation).
+
 ## Pattern 6: Answering the asked process question without fetching the PR
 - **Mistake**: Treating a "why didn't you wait / did you fix it / why no reply" question as chat-only, so a review that landed during that exchange stays unread.
 - **Example**: gha#511 (2026-08-18): answered the CI-wait question, never opened the Needs more work comment.

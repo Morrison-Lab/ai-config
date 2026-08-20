@@ -1,7 +1,12 @@
 # Caller for Morrison-Lab/gha's reusable Claude PR review workflow.
+# Automatic reviews run on in-repo PR opens, updates, reopens, and draft->ready
+# transitions. The workflow_dispatch path remains for explicit redispatches from
+# claude.yml after an @claude run or trusted @claude review comment.
 name: Claude Code Review
 
 on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
   workflow_dispatch:
     inputs:
       pr_number:

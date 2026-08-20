@@ -94,6 +94,13 @@ That is what keeps countermanding cheap.
 - **[`prompt-me`](../prompt-me/SKILL.md) /
   [`prompt-me-all`](../prompt-me-all/SKILL.md)** -- the opposite direction:
   surface the questions rather than resolve them.
+- **[`dmmhyh`](../dmmhyh/SKILL.md)** -- built on this skill's procedure for
+  resolving the triggering item, but fires when the user is correcting a
+  *pattern* of over-asking rather than just handing back one decision. It
+  adds a standing in-session recalibration and a durable memory write that
+  `daytb` alone doesn't do -- reach for `dmmhyh` instead of `daytb` when the
+  user's complaint is about asking too much in general, not this one
+  question.
 
 ## Anti-patterns
 

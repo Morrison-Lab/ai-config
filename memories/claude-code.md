@@ -266,10 +266,6 @@
   approach turned a 63-line change into 427 insertions across 63 files
   before being reverted and redone surgically.)
 
-## ai-config's three context pools -- only one of them is worth splitting
-
-Split out to [`claude-code-context-pools.md`](claude-code-context-pools.md) (ai-config#694 pattern) at the 1200-line gate.
-
 ## Custom subagents (`.claude/agents/*.md`) — Bash is a write-access loophole
 
 The `tools:` frontmatter field (comma-separated, e.g. `tools: Bash, Read,
@@ -1039,21 +1035,25 @@ Re-run `ps -o comm= -p 1` before relying on any of it.
 - **Don't:** `wait` on a PID this shell did not spawn; it exits 127 and leaves
   the zombie in place.
 
-## `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList`/`TodoWrite` are off by default on current models (Claude Code v2.1.233+)
+## `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList`/`TodoWrite` availability depends on invocation context, not just model (Claude Code v2.1.233+)
 
-As of Claude Code v2.1.233 (2026-08-14), the built-in todo/task-tracking tool family (`TaskCreate`, `TaskGet`, `TaskUpdate`, `TaskList`, `TodoWrite`) is no longer available by default on Opus 4.8, Sonnet 5, Fable 5, Mythos 5, and newer models.
-Set `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` to bring them back.
-Confirmed empirically in a Sonnet 5 session on 2026-08-20: neither name appears in the top-level tool list nor in the deferred-tools `ToolSearch` catalog.
-`TaskOutput`/`TaskStop` are a different, still-present family (background **agent/job** management, not a personal to-do list) and don't substitute.
+Claude Code v2.1.233's release notes (2026-08-14) state the built-in todo/task-tracking tool family (`TaskCreate`, `TaskGet`, `TaskUpdate`, `TaskList`, `TodoWrite`) is "no longer available on Opus 4.8, Sonnet 5, Fable 5, Mythos 5, and newer models" by default (`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` restores them), and this was confirmed empirically in an **interactive CLI session** on Sonnet 5, 2026-08-20: neither name appeared in the top-level tool list nor in the deferred-tools `ToolSearch` catalog.
 
-This breaks an assumption baked into two `memories/preferences.md` bullets written before the change: "keep a live TaskList" and "the harness already nudges toward this" both describe a default that no longer holds on a current-model session unless the env var is set.
-Neither bullet is wrong for a session where the tools *are* present (an older model, or the env var);
-they're just no longer a safe default to assume.
+**But the absence does not generalize to every session on that model --- it may be scoped to invocation mode.**
+A `claude-review.yml` dispatch reviewing this very entry (also Sonnet 5, same date, via `claude-code-action`) reported the opposite: `TaskCreate`/`TaskGet`/`TaskList`/`TaskUpdate` appeared in *its* deferred-tools catalog, and the harness's own "task tools haven't been used recently" nudge fired mid-session.
+Same model family, same day, opposite result --- so the discriminator observed so far is invocation context (interactive CLI vs. a dispatched GitHub Actions review/agent session), not the model alone, and this has not been checked across enough contexts to state as a settled cross-context default.
+`TaskOutput`/`TaskStop` are a different, still-present family (background **agent/job** management, not a personal to-do list) and don't substitute, in either context observed so far.
 
-- **Do:** check whether `TaskCreate`/`TodoWrite` actually appear in this session's tool list before relying on the "keep a live TaskList" guidance, rather than assuming the harness nudge still fires.
-- **Do:** fall back to `CLAUDE.md`'s on-disk session lab notebook, or a plain scratchpad markdown checklist, for tracking multi-PR/subagent state when the task tools are absent.
-- **Don't:** brief a dispatched subagent to use `TaskCreate`/`TaskUpdate` without first confirming those tools are actually in *its* tool list --- a subagent runs the same model family and inherits the same default-off state as the conductor.
-- **Don't:** read the tools' absence as a bug;
-  it's the current default, reversible per-session with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
+This complicates an assumption baked into two `memories/preferences.md` bullets written before the change: "keep a live TaskList" and "the harness already nudges toward this" both describe a default that may no longer hold in an interactive CLI session, but has NOT been shown absent in a dispatched review/agent session.
+Neither bullet is wrong for a session where the tools *are* present (an older model, the env var, or apparently a dispatched review/agent context);
+check the session's own tool list before assuming either way, rather than generalizing from one session's finding.
+
+- **Do:** check whether `TaskCreate`/`TodoWrite` actually appear in *this specific session's* tool list before relying on --- or dismissing --- the "keep a live TaskList" guidance.
+- **Do:** fall back to `CLAUDE.md`'s on-disk session lab notebook, or a plain scratchpad markdown checklist, for tracking multi-PR/subagent state when the task tools are genuinely absent in this session.
+- **Don't:** brief a dispatched subagent to use `TaskCreate`/`TaskUpdate` without first confirming those tools are actually in *its* tool list --- availability appears to depend on invocation context, not just model family, so don't assume a subagent inherits the conductor's own tool-list state.
+- **Don't:** treat this entry's absence-finding as a settled cross-context default;
+  it is confirmed only for an interactive CLI session, and contradicted by at least one dispatched review session on the same day.
+
+See [Claude Code v2.1.233 release notes](https://github.com/anthropics/claude-code/releases/tag/v2.1.233), and the [Claude review on Morrison-Lab/ai-config#1732](https://github.com/Morrison-Lab/ai-config/pull/1732) that caught the overgeneralization above.
 
 See [Claude Code v2.1.233 release notes](https://github.com/anthropics/claude-code/releases/tag/v2.1.233).

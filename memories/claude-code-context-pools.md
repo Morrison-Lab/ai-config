@@ -1,4 +1,4 @@
-## ai-config's three context pools -- only one of them is worth splitting
+# ai-config's three context pools -- only one of them is worth splitting
 
 Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the 1200-line gate.
 

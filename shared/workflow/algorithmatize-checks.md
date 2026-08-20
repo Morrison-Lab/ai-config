@@ -516,3 +516,42 @@ PR replies said to match body text and timing --- both fuzzy --- when
 every reply already carried a mechanical marker, the Claude
 Code attribution footer, sitting unused in the same data. Caught only when
 asked directly why the sharper signal hadn't been the first idea.)
+
+## Anchor the discharge as carefully as the trigger --- it is the more expensive half
+
+A guard built from a transcript scan usually has two matchers: one that decides it should **fire**, and one that decides it is already **discharged**.
+The instinct is to spend the care on the trigger, because that is the one whose false positives are visible.
+That instinct is backwards.
+
+**A false trigger costs one note.
+A false discharge costs every remaining warning in the session.**
+The trigger is evaluated per event, so a wrong answer is wrong once.
+The discharge sets *state*: once something in the transcript looks like the check was run, the guard is silent from then on, and its silence is indistinguishable from compliance.
+That is the failure [`deterministic-tools`](../principles/deterministic-tools.md) warns about --- an instrument that has stopped measuring reports the same thing as an instrument reporting all-clear.
+
+Measured 2026-08-20 on [ai-config#1749](https://github.com/Morrison-Lab/ai-config/pull/1749).
+`warn-pr-create-without-dupe-check.py` anchored its trigger to a command position and carried a docstring paragraph explaining why --- this corpus quotes `gh pr create` constantly, so a substring matcher would fire on every reply citing the rule.
+Its discharge, in the same file, was a bare substring search:
+
+```
+echo 'run gh pr list first'                     discharged=True
+git commit -m 'mention gh pr view here'         discharged=True
+heredoc body containing gh pr list --repo o/r   discharged=True
+```
+
+The reviewer's sharpest observation was that the hook's own reminder text names `gh pr list --repo <owner>/<repo>` --- so the guard told the user to run the command that would have disarmed it.
+
+**Command-position anchoring is not sufficient on its own, because a heredoc body is full of line starts.**
+`^` matches inside quoted prose, so a fenced reproduction block in a PR comment satisfies the anchor.
+`hooks/no-unshipped-commit.py` has exactly this shape and fires permanently once a heredoc quotes a commit command ([#1775](https://github.com/Morrison-Lab/ai-config/issues/1775)).
+
+**The machinery already exists, which makes this a [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md) finding too.**
+`hooks/no-unauthorized-merge.py` solved the same problem across six review rounds, and carries `mask_heredocs` plus its `LEAD`/`PERMISSIVE_LEAD` pair for precisely this reason --- [`check-purpose-before-reusing`](check-purpose-before-reusing.md) records the rounds.
+Two newer hooks each re-derived a weaker version instead of reusing it.
+
+- **Do:** apply the same anchoring and the same heredoc masking to every matcher in a guard, including the discharge.
+- **Do:** reuse `no-unauthorized-merge.py`'s masking rather than re-deriving it, and say so when you deliberately do not.
+- **Do:** test the discharge against prose that quotes it, exactly as the trigger is tested.
+- **Don't:** reason about the trigger's self-reference trap and leave its sibling unexamined --- writing the paragraph is what makes the omission feel handled.
+- **Don't:** treat a command-position anchor as covering quoted text;
+  strip heredoc bodies first.

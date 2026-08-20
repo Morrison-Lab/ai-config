@@ -250,8 +250,8 @@ which is right when the worktree's own commits may be unique.
 A staged reversal of a fix that has already merged is the case where discarding
 is provably safe, and the deciding read is the content rather than any ancestry
 or SHA comparison, per
-[`fail-fast`](../shared/principles/fail-fast.md)'s "whether a change landed is
-decided by looking for the change":
+[`fail-fast.rationale`](../shared/principles/fail-fast.rationale.md)'s "whether
+a change landed is decided by looking for the change":
 
 ```bash
 git show origin/main:<path> | grep -n "<a string only that change introduced>"

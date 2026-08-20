@@ -378,7 +378,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="delegate-to-opencode-run-sidecar-work-on-a-free-or-local-model" class="level1">
 <h1>delegate-to-opencode — run sidecar work on a free or local model</h1>
 <p>The <code>opencode</code> CLI reaches two model tiers this corpus has no other route to: a hosted free tier (opencode Zen) and a fully local one (ollama). Both cost no quota at all, so work small enough for them should not spend Claude’s budget, codex’s window, or agy’s. The local tier also does something none of the other destinations can: it keeps the payload on the machine.</p>
-<p>Claude stays the orchestrator. It writes the prompt, runs the delegate, validates what comes back, and does the synthesis. This skill is the mechanism; the budget preference it plugs into lives in <code>memories/preferences.md</code> (“Delegate heavy work to a separately-billed CLI first”).</p>
+<p>Claude stays the orchestrator. It writes the prompt, runs the delegate, validates what comes back, and does the synthesis. This skill is the mechanism. The budget preference it plugs into lives in <code>memories/preferences.md</code> (“Delegate heavy work to a separately-billed CLI first”).</p>
 <section id="why-this-is-a-shell-out-and-not-a-subagent" class="level2">
 <h2 class="anchored" data-anchor-id="why-this-is-a-shell-out-and-not-a-subagent">Why this is a shell-out and not a subagent</h2>
 <p>The <code>Agent</code> tool’s <code>model</code> parameter is an enum of Claude aliases, and <code>.claude/agents/*.md</code> frontmatter takes the same aliases or <code>inherit</code>. There is no per-agent hook for a third-party endpoint, so the only route to opencode is Bash — the same shape <a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a> uses.</p>
@@ -423,7 +423,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Two things follow from opencode not being a metered plan at all, and they are what make its position unlike the other two:</p>
 <ul>
 <li><strong>It consumes no window, so there is no budget to conserve by skipping it.</strong> For work a small model can do, it goes ahead of codex and agy rather than behind them.</li>
-<li><strong>Capability is the binding constraint instead, and it is unmeasured here.</strong> The local ids carry their parameter counts (2B to 30B as of 2026-08-19); the hosted ids are preview names this corpus has not benchmarked. So every figure one returns gets re-derived, per the same treatment <code>preferences.md</code> records for <code>agy</code> after it read a file correctly and miscounted its lines.</li>
+<li><strong>Capability is the binding constraint instead, and it is unmeasured here.</strong> The local ids carry their parameter counts, 2B to 30B as of 2026-08-19. The hosted ids are preview names this corpus has not benchmarked. So every figure one returns gets re-derived, per the same treatment <code>preferences.md</code> records for <code>agy</code> after it read a file correctly and miscounted its lines.</li>
 </ul>
 <p>The practical shape is a filter rather than a queue: send what opencode can do to opencode, send what it cannot to codex or agy, and keep Claude for orchestration and the residue.</p>
 </section>
@@ -468,7 +468,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
 <li><strong><a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a></strong> — the same shell-out shape aimed at a metered frontier CLI. Read its steps 2 to 5 for the background runner and DONE-marker poll rather than duplicating them here. What does not carry over is its data-sensitivity trigger, which splits into the routing rule above.</li>
-<li><strong><a href="../../skills/select-model/SKILL.html"><code>select-model</code></a></strong> — picks <em>which Claude model</em> runs a task; this skill decides whether the task runs on Claude at all.</li>
+<li><strong><a href="../../skills/select-model/SKILL.html"><code>select-model</code></a></strong> — picks <em>which Claude model</em> runs a task. This skill decides whether the task runs on Claude at all.</li>
 <li><strong><a href="../../skills/agent-builder/SKILL.html"><code>agent-builder</code></a></strong> — an opencode model is a different model family from both Claude and codex, so it is a cheap cross-family second reader for that skill’s “paranoid reviewer” role. How much its agreement is worth is governed by <a href="../../shared/workflow/self-review-fallback.md"><code>self-review-fallback</code></a>’s cross-vendor section.</li>
 <li><strong><a href="../../skills/ums/SKILL.html"><code>ums</code></a></strong> — record new opencode mechanics here as they are measured, since the model list and the version above will go stale.</li>
 </ul>

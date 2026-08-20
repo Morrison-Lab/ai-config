@@ -2,7 +2,7 @@
 
 The `opencode` CLI reaches two model tiers this corpus has no other route to: a hosted free tier (opencode Zen) and a fully local one (ollama). Both cost no quota at all, so work small enough for them should not spend Claude’s budget, codex’s window, or agy’s. The local tier also does something none of the other destinations can: it keeps the payload on the machine.
 
-Claude stays the orchestrator. It writes the prompt, runs the delegate, validates what comes back, and does the synthesis. This skill is the mechanism; the budget preference it plugs into lives in `memories/preferences.md` (“Delegate heavy work to a separately-billed CLI first”).
+Claude stays the orchestrator. It writes the prompt, runs the delegate, validates what comes back, and does the synthesis. This skill is the mechanism. The budget preference it plugs into lives in `memories/preferences.md` (“Delegate heavy work to a separately-billed CLI first”).
 
 ## Why this is a shell-out and not a subagent
 
@@ -51,7 +51,7 @@ As in the codex skill, do not infer a data trigger from a repo merely holding se
 Two things follow from opencode not being a metered plan at all, and they are what make its position unlike the other two:
 
 - **It consumes no window, so there is no budget to conserve by skipping it.** For work a small model can do, it goes ahead of codex and agy rather than behind them.
-- **Capability is the binding constraint instead, and it is unmeasured here.** The local ids carry their parameter counts (2B to 30B as of 2026-08-19); the hosted ids are preview names this corpus has not benchmarked. So every figure one returns gets re-derived, per the same treatment `preferences.md` records for `agy` after it read a file correctly and miscounted its lines.
+- **Capability is the binding constraint instead, and it is unmeasured here.** The local ids carry their parameter counts, 2B to 30B as of 2026-08-19. The hosted ids are preview names this corpus has not benchmarked. So every figure one returns gets re-derived, per the same treatment `preferences.md` records for `agy` after it read a file correctly and miscounted its lines.
 
 The practical shape is a filter rather than a queue: send what opencode can do to opencode, send what it cannot to codex or agy, and keep Claude for orchestration and the residue.
 
@@ -106,7 +106,7 @@ The fix is to give every model that declares `limit.context` a `limit.output`, o
 ## Relationship to other skills
 
 - **[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md)** — the same shell-out shape aimed at a metered frontier CLI. Read its steps 2 to 5 for the background runner and DONE-marker poll rather than duplicating them here. What does not carry over is its data-sensitivity trigger, which splits into the routing rule above.
-- **[`select-model`](../../skills/select-model/SKILL.llms.md)** — picks *which Claude model* runs a task; this skill decides whether the task runs on Claude at all.
+- **[`select-model`](../../skills/select-model/SKILL.llms.md)** — picks *which Claude model* runs a task. This skill decides whether the task runs on Claude at all.
 - **[`agent-builder`](../../skills/agent-builder/SKILL.llms.md)** — an opencode model is a different model family from both Claude and codex, so it is a cheap cross-family second reader for that skill’s “paranoid reviewer” role. How much its agreement is worth is governed by [`self-review-fallback`](../../shared/workflow/self-review-fallback.md)’s cross-vendor section.
 - **[`ums`](../../skills/ums/SKILL.llms.md)** — record new opencode mechanics here as they are measured, since the model list and the version above will go stale.
 

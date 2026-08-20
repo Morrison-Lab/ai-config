@@ -897,7 +897,8 @@ Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for c
 Its two tiers cost nothing, so for work a small model can actually do it goes *ahead* of codex and agy rather than behind them: there is no budget to conserve by skipping it.
 Capability is the binding constraint in its place, and it is unmeasured here --- the local ids carry parameter counts from 2B to 30B, and the hosted ids are preview names nobody has benchmarked against this corpus's work.
 The local (`ollama/*`) tier is also the only destination anywhere in this ladder that keeps the payload on the machine, so it is the one route for work whose data must not leave.
-[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule; the tiers and version above were measured 2026-08-19 on opencode 1.18.15.
+[`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the mechanics and the hosted-versus-local routing rule.
+The tiers and version above were measured 2026-08-19 on opencode 1.18.15.
 `delegate-to-codex` operationalizes the codex mechanics (background runner plus DONE-marker poll, `--output-schema`, exhaustion detection, Claude fallback), and those transfer to `agy`, whose CLI exposes the same shape: `--print` for non-interactive, `--json-schema` for structured output, `--effort`, `--model`, and `--sandbox`.
 
 **`agy --print` CONSUMES THE NEXT TOKEN as its prompt, so a flag placed between the two becomes the prompt.**

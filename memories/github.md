@@ -473,7 +473,9 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   It fired every turn a PR opened or readied this session sat awaiting review, demanding a Copilot request -- the one action this override forbids -- so a session honoring the override never satisfied it and the demand repeated each turn.
   One Morrison-Lab/gha session spent over a dozen turns in this loop before the collision was recognized.
   That loop persisted even though each request POST succeeded, because the hook discharges only on a reviewer-request that is the **last simple command in the call** (its exit status is then unambiguous), and every turn chained a verify `gh pr view` after the POST, leaving it non-last.
-  Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids, so no discharge available to a session honoring the override was ever the right fix; the collision was in the hook's own demand rather than in how any session answered it.
+  Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids.
+  So no discharge available to a session honoring the override was ever the right fix.
+  The collision was in the hook's own demand rather than in how any session answered it.
   (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
 
   **Superseded 2026-08-19 (ai-config#1709): the script now honors this override itself, and nothing needs unregistering.**

@@ -902,3 +902,29 @@ Two things generalize.
 The guard's `success` and the job's `failure` were never in tension.
 They were two different steps' conclusions, and only a step enumeration distinguishes them.
 And the first diagnosis was right about the classifier and still incomplete about the symptom: the shape genuinely was unrecognized, and recognizing it changed nothing the reader could see until the propagation was fixed too.
+
+## A fragment's by-hand parsing advice mistaken for the script's own mechanism
+
+(Morrison-Lab/ai-config#1690, 2026-08-20: on Morrison-Lab/ai-config#1687, a
+round-2 review posted a **Ready for merge** verdict under a doubled heading,
+`### ### Verdict`.
+`check-pr-fully-clean.py` scored the PR not-clean, and the filed issue
+asserted the doubled heading had broken the script's "anchor on the last
+`### Verdict` heading" logic --- quoting this file's own by-hand parsing
+advice as if it described the script.
+
+It does not.
+`grep -n "Verdict" scripts/check-pr-fully-clean.py` shows the script matches
+verdict phrases with a regex, never a heading line, so nothing about a
+doubled `###` prefix was in a position to break anything it checks.
+The claim was falsified within the hour: round 3 on the same PR posted the
+identical doubled heading and scored CLEAN.
+What actually triggered the not-clean read was the plain quoted-phrase false
+positive this file already documents elsewhere --- the round-2 comment's own
+body quoted the *previous* round's "Needs more work" verdict while stating
+its own "Ready for merge" one, and the phrase match picked up the quote.
+
+The issue was retitled and the diagnosis retracted in a follow-up comment,
+which is what surfaced the gap this case exists to close: this file's
+by-hand guidance sits directly beside its description of the script, with
+nothing marking the boundary between them.)

@@ -469,15 +469,26 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   Every one also postdates the override rather than explaining why it was written --- `select(.submittedAt >= "2026-08-04")` returns 39 of 39, earliest `2026-08-04T04:38:12Z`.
   So requests are still being issued despite this override, and each one spends a request on a guaranteed non-verdict.
   That every one of those PRs merged on `claude-review` alone is the same practice slippage [`shared/workflow/flag-practice-slippage.md`](../shared/workflow/flag-practice-slippage.md) already records at eight PRs, met here at larger scale and still live; read that fragment for the argument rather than re-deriving it.
-  A `no-unreviewed-pr.py` `Stop` hook (ai-config#1041) enforces the opposite instruction and collides with this override while the quota is out.
-  It fires every turn a PR opened or readied this session sits awaiting review, demanding a Copilot request -- the one action this override forbids -- so a session that honors the override never satisfies it and the demand repeats each turn.
-  Unregister it from `~/.claude/settings.json`'s `Stop` hooks while Copilot is out.
-  The script stays and only the local registration goes.
-  Re-add it after September 2026 alongside re-enabling the request.
+  A `no-unreviewed-pr.py` `Stop` hook (ai-config#1041) enforces the opposite instruction, and until 2026-08-19 it collided with this override on every turn the quota was out.
+  It fired every turn a PR opened or readied this session sat awaiting review, demanding a Copilot request -- the one action this override forbids -- so a session honoring the override never satisfied it and the demand repeated each turn.
   One Morrison-Lab/gha session spent over a dozen turns in this loop before the collision was recognized.
   That loop persisted even though each request POST succeeded, because the hook discharges only on a reviewer-request that is the **last simple command in the call** (its exit status is then unambiguous), and every turn chained a verify `gh pr view` after the POST, leaving it non-last.
-  Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids, so unregistering is the right fix while the quota is out.
+  Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids.
+  So no discharge available to a session honoring the override was ever the right fix.
+  The collision was in the hook's own demand rather than in how any session answered it.
   (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
+
+  **Superseded 2026-08-19 (ai-config#1709): the script now honors this override itself, and nothing needs unregistering.**
+  `hooks/no-unreviewed-pr.py` carries `MORATORIUM_END = 2026-09-01`, matching the September 2026 expiry above, and returns before scanning while that date is still ahead --- so the collision is gone on every installation shape and the guard re-arms itself on the day the override names, with nobody having to remember.
+  Keep the two in step: extending the moratorium here means editing that constant in the same PR, or the memory and the hook start disagreeing again.
+
+  The remedy this paragraph used to give --- unregister it from `~/.claude/settings.json`'s `Stop` hooks --- covered only ONE installation shape, and it is worth recording why rather than just deleting it.
+  Where ai-config is installed as a **plugin**, the registration lives in ai-config's own `hooks/hooks.json` under `${CLAUDE_PLUGIN_ROOT}`, so there is nothing in the user's settings to remove: the edit succeeds, changes no behaviour, and the hook keeps firing.
+  A remedy that silently does nothing is worse than none, because it reads as applied.
+  The plugin shape is now the common one --- `d-morrison/rme#1074` migrates off the `.ai-config` submodule, and `Morrison-Lab/gha`'s `run-claude-review-attempt` installs the plugin for every review run --- which is the general lesson: a fix aimed at a local registration has to name which installation shape it assumes.
+
+  - **Do:** treat the hook's `MORATORIUM_END` as the switch, and move it and this memory together.
+  - **Don't:** unregister the hook from `~/.claude/settings.json` to quiet it --- that does nothing on a plugin install, and nothing is needed on any install now.
 
   **Restated and widened 2026-08-19: the moratorium covers ALL REPOS, not just Morrison-Lab.**
   The user said "stop requesting copilot reviews until september", then, asked about scope, "ALL REPOS".

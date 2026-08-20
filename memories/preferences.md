@@ -91,9 +91,14 @@
 - **Autonomously commit, push, and open PRs for completed changes**: When asked to implement, edit, or write up changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed in the working directory. Always finish the delivery cycle: stage and commit the changes (linking the tracking issue created per issue-first; see `shared/workflow/issue-first.md`), push the branch to origin, open a Pull Request (if one does not exist), request AI review (`@claude review` / review workflow), and drive to clean via ARDI. (User directive / CAI, 2026-08-18.)
 - When opening a GitHub PR, trigger AI review (`@claude review` / `@agy review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
   The one exception is `Lacaedemon/sparta`, which never requests human review, on AI review approval or on deadlock escalation alike.
-- **In `ai-config` (and any repo where reviews don't auto-trigger on PR creation), ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`) when done pushing code for the round.**
-  `ai-config` never auto-reviews on PR creation or push (see `memories/claude-review-dispatch.md`).
-  Do not wait to be asked "did you request claude review?", and never post a self-generated review summary comment to satisfy `check-pr-fully-clean.py` instead of running an authentic `@claude` review. (User correction, 2026-08-16.)
+- **In repos whose review workflow does not auto-trigger on PR activity, ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`) when done pushing code for the round.**
+  `ai-config` now auto-reviews ordinary in-repo PR opens and pushes via `pull_request`, so explicit dispatch is the exception rather than the default there.
+  Keep using the manual path when the automatic one cannot fire or was intentionally bypassed, such as an explicit `@claude review` request, a redispatch after an `@claude` agent push, or a skipped path like a fork PR.
+  Do not wait to be asked "did you request claude review?",
+  and never post a self-generated review summary comment
+  to satisfy `check-pr-fully-clean.py`
+  instead of running an authentic `@claude` review.
+  (User correction, 2026-08-16; updated 2026-08-20.)
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --
   create, push, and open the feature PR first. The PR must expose the exact SHA
@@ -138,7 +143,9 @@
 - Always ARDI an open PR/MR to a clean review verdict --- don't ask "want me to ARDI it?" first, just drive it to clean. An ARDI loop is NOT finished when you push fixes for a finding-bearing review or post an ARD summary -- it is only finished when a fresh, clean review evaluating that latest pushed commit arrives and confirms zero findings. (Still don't merge unless asked; "always ardi" means always drive to clean, not always merge.)
 - "Fully clean" (the ARDI/iterate terminal state) means BOTH: (1) all CI workflows AND check runs have finished with a passing outcome (success or skipped) --- across every workflow and every individual check run, not just required checks, not just the review job; includes non-gating checks like Coverage/codecov; never merge while any workflow or check run is still queued or in progress, AND (2) the latest review is totally clean --- no nits, evaluating the current HEAD SHA on the branch, and every item not directly Addressed is either Deferred to a tracked issue or Rebutted with a rebuttal that actually CONVINCED the reviewer (they didn't re-raise it).
   A rebuttal the reviewer still disputes does NOT count as clean.
-  **`mergeable_state: clean` is NOT Fully Clean**: GitHub API's `mergeable_state: clean` / `mergeStateStatus: CLEAN` indicates ONLY that git merge will succeed without merge conflicts. It does NOT mean CI has passed or that an AI/human review has approved the PR. NEVER merge a PR based on `mergeable_state: clean` without verifying both (1) all CI check runs are green, AND (2) an authentic clean review verdict evaluating the HEAD SHA has been received (triggering `@claude review` / `claude-code-review.yml` first in repos like `ai-config` where reviews do not auto-dispatch). (User correction, 2026-08-17.)
+  **`mergeable_state: clean` is NOT Fully Clean**: GitHub API's `mergeable_state: clean` / `mergeStateStatus: CLEAN` indicates ONLY that git merge will succeed without merge conflicts.
+  It does NOT mean CI has passed or that an AI/human review has approved the PR.
+  NEVER merge a PR based on `mergeable_state: clean` without verifying both (1) all CI check runs are green, AND (2) an authentic clean review verdict evaluating the HEAD SHA has been received (triggering `@claude review` / `claude-code-review.yml` when the repo's review workflow did not auto-dispatch for that round). (User correction, 2026-08-17.)
   Two gotchas when checking CI state: the field names/casing for these states vary by API surface (REST's lowercase `status`/`conclusion` vs `gh pr checks`'s uppercase `state`) --- don't hard-code one casing when scripting a check; and a workflow run blocked on `action_required` before any job starts can complete with zero check runs, invisible to a check-runs-only poll (`gh pr checks`, `get_check_runs`) --- and, verified directly against a real run, GitHub records NEITHER a matching commit/branch NOR a populated PR-linkage field for comment/dispatch-triggered runs, so no single `gh run list` filter reliably narrows to "runs for this PR" --- treat any such cross-check as best-effort, not exhaustive.
   See `shared/workflow/fully-clean.md` for the full detail.
   At fully-clean, every INLINE review thread is resolved, and the only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply to it).
@@ -364,18 +371,21 @@
 - When committing, stage the SPECIFIC files you touched --- NEVER `git add -A`.
   The working tree often holds unrelated in-flight edits (the user's own UMS/skill commits, another draft); `git add -A` silently sweeps those into your commit and onto your PR, bloating the review and extending the cycle.
   List paths explicitly, and `git status` before committing to confirm only intended files are staged. (Learned the hard way: a `git add -A` swept the user's `scout-peers` skill into an unrelated `/prune` PR, adding several extra review rounds.)
-- Run a local session in an isolated `git worktree` by DEFAULT, not directly in the shared working copy --- only use the working copy when the user explicitly says to.
+- **Always use a worktree; never the primary checkout.**
+  Every local session --- including gi/gii/ardia, simple single-file edits, and reads that will become writes --- starts by creating a dedicated worktree.
+  **Do:** `git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main` (or per the `session-lock` skill's `ai-session.sh worktree <branch>`) before any read or write, and clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
+  **Don't:** work directly in the shared/primary checkout, even for "just a quick read" or "just one file" --- reads often become writes, and the primary checkout is shared with concurrent sessions.
   This default holds for EVERY local session, not just substantial multi-file work or when the user flags the wd as "in use" / "do this in a separate repo", so parallel local AI agent sessions never step on or clobber each other's working directory or branch state.
   The ai-config working copy is often in use by CONCURRENT local AI agent sessions; untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
-  Create it off `origin/main` (`git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main`), not the shared wd.
-  Clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
   The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
   This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs --- that silently changes the branch out from under any other session or task pointed at that path.
-  Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.)
-- **A delegated subagent runs in the parent session's working tree, so the
-  branch-switching rule directly above governs your own agents, not only other
-  sessions.**
+  Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.) (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
+- **Don't touch anyone else's branch.**
+  **Do:** only push to or modify branches I created in my own worktree.
+  **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user --- even if the content looks worth keeping or the branch looks abandoned.
+  If a branch needs work that isn't mine, flag it and let the owner handle it. (User directive, 2026-08-19.)
+- **A delegated subagent runs in the parent session's working tree, so the "Use ONE worktree per branch/PR" rule above governs your own agents, not only other sessions.**
   The remedy is already written down: [`gip`](../skills/gip/SKILL.md) says to
   give every subagent `isolation: "worktree"`, and
   [`ultracode-merge-conflicts`](../shared/workflow/ultracode-merge-conflicts.md)
@@ -708,6 +718,9 @@
   `agent-builder` already covers the write-capable case via its **Bounded worker** archetype ("Worker-role archetypes" section --- granted `Edit`/`Write` for one scoped implementation task, with the exact file(s)/path glob it may touch named in the `description`) --- no generalizing or sibling builder needed; a developer/designer persona is scaffolded under that archetype, same as any other agent. (Corrected on ai-config#677 by `@claude` review, 2026-07-24: an earlier draft of this note claimed the opposite from reading only `agent-builder`'s frontmatter `description` --- which was itself stale --- without reading the rest of the file; always read a skill's full body, not just its description, before asserting a design gap.)
 - All agents --- the top-level session and every dispatched subagent --- should keep a to-do/task checklist (`TaskCreate`/`TaskUpdate`/`TaskList` when available) covering not just direct work items but also entries for managing subagents' work and for checking in on long-running background processes.
   Treat "waiting on a background job" and "watching a subagent" as tracked to-do items in their own right, not just implicit background state. (Learned on sparta 2026-07-24.)
+  **"When available" is load-bearing, not a hedge: as of Claude Code v2.1.233 these tools may be off by default in an interactive CLI session on Opus 4.8/Sonnet 5/Fable 5/Mythos 5 and newer** --- but a dispatched review/agent session (e.g. `claude-code-action`) has been observed with them present and the harness nudge firing, so availability appears to depend on invocation context as well as model.
+  Check the session's actual tool list before relying on this either way, and fall back to CLAUDE.md's on-disk lab notebook when they're genuinely absent.
+  See `memories/claude-code.md`'s "`TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList`/`TodoWrite` availability depends on invocation context" section.
 
 - When a request matches "add/build/create a skill" (skill-builder's own trigger phrases), invoke the `skill-builder` skill via the Skill tool rather than freehand-implementing the scaffold-and-ship flow.
   Skill-builder encodes steps that are easy to skip when done ad hoc: the extend-first check, running the four local validation scripts (`validate-skills.py`, `check-links.py`, `check-vendored-drift.py`, `markdownlint-cli2`) before pushing, registering any cited MCP tool in `tool-mappings.yml`, updating `skills.qmd`'s count from the actual `skills/` directory count (not a manual +1), cross-linking related skills, and explicitly requesting a human reviewer after AI review passes. (Learned on ai-config#338 --- the `prompt-me`/`pm` skill was built and shipped without invoking `skill-builder`, so none of those steps ran; CI happened to catch what the scripts would have.
@@ -770,7 +783,12 @@
 - **"You can merge X" authorizes the merge, not the branch-protection *bypass* (`gh pr merge --admin`) needed to merge past a required approving review --- the auto-mode classifier treats those as two separate grants.** When the user said "you can merge 317," a plain `gh pr merge --squash` was rejected by GitHub itself ("base branch policy prohibits the merge" --- protection requires an approving review, which the `@claude` bot comment doesn't satisfy), and the follow-up `--admin` was then denied by the classifier: the merge was authorized but the review/protection override was not.
   Recovery is to surface it as a blocker --- get a human approving review, or ask the user to *explicitly* authorize the `--admin` bypass --- not to keep retrying `--admin`.
   A concrete instance of `shared/workflow/review-verdict-pitfalls.md`'s rule that a required check/review failing is a stop-and-ask even under a merge grant. (Learned on ucdavis/bcs#317, 2026-07-09.)
-- When subscribed to two or more PRs at once (`subscribe_pr_activity` on several in the same session, or a stacked-PR chain), track each as a task with `TaskCreate`/`TaskUpdate` instead of holding their status only in chat prose. The harness already nudges toward this ("task tools haven't been used recently") whenever a session sits on unlogged concurrent work; use them rather than juggling several scheduled check-ins and webhook threads from memory alone. (Learned on ai-config#493/#498/#499, 2026-07-05: three concurrent PR watches were tracked only in chat text, exactly the case these tools are for.)
+- When subscribed to two or more PRs at once (`subscribe_pr_activity` on several in the same session, or a stacked-PR chain), track each as a task with `TaskCreate`/`TaskUpdate` instead of holding their status only in chat prose.
+  The harness already nudges toward this ("task tools haven't been used recently") whenever a session sits on unlogged concurrent work;
+  use them rather than juggling several scheduled check-ins and webhook threads from memory alone. (Learned on ai-config#493/#498/#499, 2026-07-05: three concurrent PR watches were tracked only in chat text, exactly the case these tools are for.)
+  **That harness nudge predates Claude Code v2.1.233, and whether it still fires now depends on invocation context, not just model** --- confirmed absent in an interactive CLI session, but a dispatched `claude-code-action` review session got the nudge on the same day (see `memories/claude-code.md`'s "availability depends on invocation context" section).
+  Check the session's own tool list rather than assuming either way;
+  where the tools are genuinely absent, track concurrent PR/stack status in CLAUDE.md's on-disk lab notebook instead.
 
 ## Output-highlighting taxonomy
 

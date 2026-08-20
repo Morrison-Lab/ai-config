@@ -532,6 +532,11 @@
 - Some skills are platform/global --- present in the Claude Code skill registry but with NO local `skills/<name>/` directory (e.g. `deep-research`).
   Cross-references to them are valid.
   Automated reviewers (Copilot, the `@claude` bot) may wrongly flag such a reference as a "non-existent skill"; check the available-skills list presented to the agent (the Claude Code skill registry) before treating a skill cross-ref as a broken link, then rebut the false positive. (ai-config#120 flagged it 4x.)
+- **Do not request Copilot code review on any PR, in any repo, until September 2026.**
+  Standing maintainer directive, restated and widened to all repos on 2026-08-19.
+  It outranks `hooks/no-unreviewed-pr.py` and `shared/workflow/pr-on-claim.md`'s request-the-reviewer step.
+  State the directive as the reason when a PR ships without one, and re-verify at the expiry.
+  Full statement, measurements, and Do/Don't pair: [`github.md`](github.md), "Restated and widened 2026-08-19".
 - Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review` / `@agy review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".

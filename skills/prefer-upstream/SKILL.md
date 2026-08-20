@@ -61,13 +61,15 @@ review-side application.
 | Upstream has heavy dependencies you don't want | ✅ | ❌ |
 | Learning exercise / pedagogical code | ✅ | ❌ |
 
-Every row of that table is a fact about the world. Before using one, check
-that it is: a constraint your own change authored --- "this script runs with
-no packages installed", "this PR decided not to add a dependency" --- belongs
-in none of those cells, because the change it would justify is what created
-it. Relax it (add the dependency, fix the CI job) and re-read the table
-against the relaxed environment. See the DRW fragment's "A constraint your own
-change authored is not evidence against an upstream".
+Every row of that table is a fact about the world.
+Before using one, check that it is.
+A constraint your own change authored --- "this script runs with no packages
+installed", "this PR decided not to add a dependency" --- belongs in none of
+those cells, because the change it would justify is what created it.
+Relax it (add the dependency, fix the CI job) and re-read the table against
+the relaxed environment.
+See the DRW fragment's "A constraint your own change authored is not evidence
+against an upstream".
 
 ## Process
 
@@ -79,8 +81,9 @@ change authored is not evidence against an upstream".
    dependencies? Compatible license?
 4. **Classify any constraint that rules a candidate out** as external (a
    platform limit, an upstream API, a license, a policy) or self-imposed (a
-   choice in this change or an earlier one of ours). Relax a self-imposed one
-   and re-evaluate; only an external one may stand as a reason.
+   choice in this change or an earlier one of ours).
+   Relax a self-imposed one and re-evaluate;
+   only an external one may stand as a reason.
 5. **Recommend** — if a good upstream exists, suggest it to the user before
    writing custom code. Include:
    - Package name and link

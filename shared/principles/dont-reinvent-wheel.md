@@ -273,11 +273,14 @@ the facts --- see
 So before a DRW verdict rests on a constraint, classify it:
 
 - **External** --- a platform limit, an upstream API, a license, a policy, a
-  requirement from outside this change. Reasoning from it is fine.
+  requirement from outside this change.
+  Reasoning from it is fine.
 - **Self-imposed** --- a choice made in this change, or in an earlier one of
-  ours. Challenge it, and usually relax it: add the dependency, install it in
-  CI, widen the environment. Only after the relaxation is shown to be
-  genuinely unavailable does the constraint become evidence.
+  ours.
+  Challenge it, and usually relax it: add the dependency, install it in CI,
+  widen the environment.
+  Only after the relaxation is shown to be genuinely unavailable does the
+  constraint become evidence.
 
 Relaxing it is normally cheap, which is the other half of why the excuse does
 not hold: adding a package to a CI job is a smaller change than the
@@ -327,9 +330,9 @@ search itself, which makes it worth flagging on its own.
   in its own right.
 - **Don't:** rely on review to catch a reimplementation --- a clean review is
   evidence that the code is good, not that it should exist.
-- **Don't:** read a helper's small size as exempting it. The near-exact
-  duplicates in the case below were one-liners, which is why writing them felt
-  cheaper than searching.
+- **Don't:** read a helper's small size as exempting it.
+  The near-exact duplicates in the case below were one-liners, which is why
+  writing them felt cheaper than searching.
 
 (`ucdavis/bcs#641`, 2026-08-19: the PR merged 30 hand-rolled static-analysis
 helpers into an R package --- an AST flattener, a symbol collector, a

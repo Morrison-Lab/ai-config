@@ -102,3 +102,42 @@ and a pull request opened on its premise.
 - **Don't:** read a specific, checkable-looking particular as a sign of rigour.
   Specificity is inherited from the artifact that was read,
   not from the one the claim is about.
+
+## A working-directory checkout is a fifth shape, and it stays silent
+
+The four shapes above each have a tell.
+A working-directory read has none: the path resolves, the file exists, and its contents are real bytes from a real commit.
+Nothing distinguishes reading `main` from reading a feature branch that happens to be checked out, so `cat <path>` in a repo you have open reads as consulting the repository rather than as consulting one revision of it.
+
+Two properties make it worse than an ordinary stale read.
+
+**The staleness is invisible in the direction that matters.**
+A file missing from the branch errors, and an empty file is obviously wrong.
+A file that is merely *older* returns a complete, coherent, plausible document --- frequently the document you remember, since a feature branch usually forked from a `main` you had already read.
+So the failure mode is not confusion but false confidence.
+
+**A shared checkout moves under you.**
+Another session, or a `@claude` bot reacting to PR activity, can switch branches or pull between your read and your next command, so the branch you verified once is not the branch you are still on.
+`git reflog` is what shows this after the fact; nothing shows it at the time.
+
+The check is one command, and it belongs *beside the read*, not once at session start:
+
+```bash
+git -C <repo> rev-parse --abbrev-ref HEAD     # which revision am I reading?
+git -C <repo> log --oneline -3 origin/HEAD -- <path>   # what does the default branch say?
+```
+
+Prefer `git show origin/<default-branch>:<path>` whenever the claim is about what the repository currently documents.
+It names the revision in the command, so the answer cannot drift between reading and citing, and it works regardless of what the checkout is doing.
+Resolve the default branch from the repo rather than assuming `main`.
+
+The consequence generalizes past reading.
+An assignment derived from a stale read is wrong in a way [`challenge-the-assignment`](challenge-the-assignment.md) cannot catch, because every premise check the recipient runs confirms a document that genuinely exists.
+When a brief, an issue body, or a review finding asserts what a repository says, cite the revision alongside the path.
+
+- **Do:** name the revision in the command when the claim is about what a repo currently says.
+- **Do:** re-check the branch beside each read in a shared checkout, rather than trusting a verification from earlier in the session.
+- **Don't:** treat a successful `cat` in a repo directory as evidence about that repo's default branch.
+- **Don't:** read plausibility as freshness --- a feature branch forked from a `main` you already read returns exactly what you expect.
+
+See [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md), "A stale branch read that produced two issues and a config edit".

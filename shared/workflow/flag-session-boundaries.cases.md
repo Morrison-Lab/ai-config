@@ -29,7 +29,9 @@ Once liveness is settled, switch that repo to `main` --- which is what the refus
 A session was asked whether opencode's free models could be used as subagents.
 It answered the question, discovered that the user's `~/.config/opencode/opencode.jsonc` was invalid and repaired it, verified two models end to end, posted a `💡 OFFER` to build a delegation skill, and closed with `**Stopping Point**: Clean stopping point reached --- no PR opened or pushed to by this session`.
 
-The user's reply was "that wasn't a real stopping point; you haven't finished anything".
+The user's reply:
+
+> that wasn't a real stopping point; you haven't finished anything
 
 Two rules failed at once, and they failed differently.
 
@@ -38,7 +40,8 @@ That rule was loaded and simply did not fire.
 Posing the offer and declaring the stop happened in the same message, and from the inside those read as two unrelated acts rather than as a contradiction --- the offer feels like generosity appended to a finished report, not like a question left open.
 
 The second failure had no rule pointed at it.
-`git log origin/main..HEAD` was empty and `git status --short` clean, so the branch carried nothing at all; the session's whole durable output was one untracked edit to a dotfile outside any repository.
+`git log origin/main..HEAD` was empty and `git status --short` clean.
+The branch carried nothing at all, and the session's whole durable output was one untracked edit to a dotfile outside any repository.
 Every disqualifier was genuinely absent, because a session that opens no PR cannot have an unmerged one.
 The declaration even enumerated that absence as its justification, which is what made it read as a check rather than as an omission.
 

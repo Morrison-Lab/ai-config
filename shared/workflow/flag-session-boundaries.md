@@ -36,11 +36,12 @@ The remedy converts it rather than excusing it: file it or commit it, and it bec
 
 - **Do:** name the specific thing that finished, in the declaration itself.
 - **Do:** run both checks --- boxed markers in this turn, and the commit range plus tree state --- before writing the word clean.
-- **Don't:** read "none of the disqualifiers apply" as "clean"; that list is necessary and not sufficient.
+- **Don't:** read "none of the disqualifiers apply" as "clean" --- that list is necessary and not sufficient.
 - **Don't:** declare a clean stopping point in a turn that also posts a `QUESTION`, `OFFER`, or `BLOCKER` box.
 - **Don't:** count exploration, diagnosis, or an uncommitted local change as a completion.
 
-(Directive from the user, 2026-08-19: "cai: that wasn't a real stopping point; you haven't finished anything".
+(Directive from the user, 2026-08-19:
+"cai: that wasn't a real stopping point; you haven't finished anything".
 See [`flag-session-boundaries.cases.md`](flag-session-boundaries.cases.md), "A clean declaration over a session that committed nothing".)
 
 **That PR clause is a bright line, not a judgment call, and it was narrowed deliberately.**

@@ -518,6 +518,11 @@ See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
 - [`growth-mindset`](growth-mindset.md) challenges a **limitation** you
   believe you are under.
   This challenges a **task** you believe you are under.
+- [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)'s
+  "A constraint your own change authored is not evidence against an upstream"
+  is one narrow instance, and the one where the premise check is hardest to
+  reach: the constraint is real, verified against a file, and still not a
+  reason, because the change being justified is what created it.
 - [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md),
   [`challenge-redundant-content`](challenge-redundant-content.md), and
   [`challenge-unnecessary-complexity`](challenge-unnecessary-complexity.md) are

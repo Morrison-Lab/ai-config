@@ -172,7 +172,7 @@ The measured failure is that it does not, and that nothing about the moment sugg
 
 Measured on `Morrison-Lab/wai`, 2026-08-19/20.
 Five branches attacked the same `check-non-standard-chars` failure across roughly five hours: `fix/replace-em-dashes` (20:14), `fix/replace-em-dashes-v2` (23:29), `fix/replace-all-non-standard-chars` (23:38), `fix/all-non-standard-chars` (00:16, which became #77), and `fix/ascii-punctuation` (01:16, which became #78).
-Three more addressed review findings on those.
+Three further branches --- `fix/fix-review-77`, `fix/fix-review-77-cleanup`, and `fix/fix-review-findings` --- addressed review findings on those five.
 Two reached PRs and duplicated each other.
 
 **The session that opened the fifth had filed the tracking issue minutes earlier.**
@@ -184,7 +184,7 @@ The more sessions working a repo, the likelier a collision and the less any sing
 So the check matters most exactly when the evidence for needing it is least visible, which is why judgment does not reach it and an instrument has to.
 
 **One of those duplicates was actively dangerous, not merely wasteful.** #77 was cut from an unrelated PR's branch while targeting `main`, so it carried that PR's content two review rounds stale.
-Merging it would have shipped a version its own reviewer had already rejected, under a title describing something else entirely.
+Merging it would have shipped a version of that PR's content which that PR's own reviewer had already rejected, under a title describing something else entirely.
 A duplicate is not always the cheaper of two equivalent paths;
 check what else the branch is carrying before picking one.
 

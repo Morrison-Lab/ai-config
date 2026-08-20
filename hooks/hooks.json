@@ -323,6 +323,13 @@
             "timeout": 10,
             "script": "no-unauthorized-merge.py",
             "why": "cai 2026-08-04 'I want a mechanistic prohibition, not just a guideline' -- mechanistically blocks unauthorized GitHub MCP PR merge operations (mcp__github__merge_pull_request and defensive auto-merge tool variants) at the PreToolUse boundary unless explicit permission is present."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
+            "timeout": 10,
+            "script": "warn-pr-create-without-dupe-check.py",
+            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request, and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
           }
         ]
       }

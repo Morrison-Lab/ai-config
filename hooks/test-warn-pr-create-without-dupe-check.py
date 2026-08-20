@@ -27,19 +27,19 @@ def check(label, got, want):
         failures.append(f"{label}: got {got!r}, want {want!r}")
 
 
-def write_transcript(commands):
-    """Build a transcript file whose tool_use blocks carry `commands`."""
+def write_transcript(commands, tool_name="Bash"):
+    """Build a transcript file whose tool_use blocks carry `commands`.
+
+    A command of None writes a bare tool_use with no input, which is how an
+    MCP call appears --- a name and nothing to pattern-match.
+    """
     fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
                                      encoding="utf-8")
     for cmd in commands:
-        fh.write(json.dumps({
-            "message": {
-                "content": [
-                    {"type": "tool_use", "name": "Bash",
-                     "input": {"command": cmd}}
-                ]
-            }
-        }) + "\n")
+        block = {"type": "tool_use", "name": tool_name, "input": {}}
+        if cmd is not None:
+            block["input"] = {"command": cmd}
+        fh.write(json.dumps({"message": {"content": [block]}}) + "\n")
     fh.close()
     return fh.name
 
@@ -70,6 +70,14 @@ check("with env prefix",
       hook.creates_pr("GH_TOKEN=x gh pr create --fill"), True)
 check("after pipe",
       hook.creates_pr("echo hi | gh pr create --body-file -"), True)
+# Command substitution and grouping are command positions too; capturing the
+# new PR's URL via $(...) is the idiomatic shape (#1749).
+check("inside command substitution",
+      hook.creates_pr("URL=$(gh pr create --fill)"), True)
+check("inside a brace group",
+      hook.creates_pr("{ gh pr create --fill; }"), True)
+check("inside a subshell",
+      hook.creates_pr("(gh pr create --fill)"), True)
 
 # The self-reference trap: prose that quotes the command must NOT fire.
 check("prose mentioning the command mid-sentence",
@@ -155,8 +163,16 @@ no_check = write_transcript(["git status", "git push"])
 with_list = write_transcript(["gh pr list --repo o/r", "git push"])
 with_view = write_transcript(["gh pr view 12 --json state"])
 with_search = write_transcript(["gh search prs --owner o 'em dash'"])
-with_mcp = write_transcript(["mcp__github__list_pull_requests"])
-with_mcp_read = write_transcript(["mcp__github__pull_request_read"])
+with_mcp = write_transcript([None], "mcp__github__list_pull_requests")
+with_mcp_read = write_transcript([None], "mcp__github__pull_request_read")
+# Prose that merely QUOTES a discharging command must not discharge it: an
+# unanchored discharge silences the guard for the whole session (#1749).
+prose_list = write_transcript(["echo 'run gh pr list first'"])
+prose_commit = write_transcript(["git commit -m 'mention gh pr view here'"])
+prose_heredoc = write_transcript(
+    ["cat > /tmp/x.md <<'EOF'\ngh pr list --repo o/r\nEOF"])
+chained_real = write_transcript(["git fetch && gh pr list --state open"])
+unrelated_mcp = write_transcript([None], "mcp__github__get_me")
 
 check("no dupe check in transcript",
       hook.transcript_has_dupe_check(no_check), False)
@@ -170,6 +186,16 @@ check("mcp list discharges",
       hook.transcript_has_dupe_check(with_mcp), True)
 check("mcp pull_request_read discharges",
       hook.transcript_has_dupe_check(with_mcp_read), True)
+check("unrelated mcp tool does not discharge",
+      hook.transcript_has_dupe_check(unrelated_mcp), False)
+check("prose quoting gh pr list does not discharge",
+      hook.transcript_has_dupe_check(prose_list), False)
+check("prose in a commit message does not discharge",
+      hook.transcript_has_dupe_check(prose_commit), False)
+check("prose in a heredoc body does not discharge",
+      hook.transcript_has_dupe_check(prose_heredoc), False)
+check("a chained real gh pr list still discharges",
+      hook.transcript_has_dupe_check(chained_real), True)
 
 # Fail-open cases.
 check("missing transcript path fails open",
@@ -228,8 +254,28 @@ for literal in ("123", "null", "[1,2]", '"a string"'):
     check(f"non-dict payload {literal} prints no traceback",
           "Traceback" in proc.stderr, False)
 
+# The MCP creation tool must trip the guard, since MCP reads discharge it.
+mcp_payload = json.dumps({
+    "tool_name": "mcp__github__create_pull_request",
+    "tool_input": {"title": "x"},
+    "transcript_path": no_check,
+})
+proc = subprocess.run([sys.executable, HOOK], input=mcp_payload,
+                      capture_output=True, text=True, timeout=10)
+check("mcp create fires without a dupe check", bool(proc.stdout.strip()), True)
+
+mcp_payload_ok = json.dumps({
+    "tool_name": "mcp__github__create_pull_request",
+    "tool_input": {"title": "x"},
+    "transcript_path": with_mcp,
+})
+proc = subprocess.run([sys.executable, HOOK], input=mcp_payload_ok,
+                      capture_output=True, text=True, timeout=10)
+check("mcp create silent when discharged", proc.stdout.strip(), "")
+
 for path in (no_check, with_list, with_view, with_search, with_mcp,
-             with_mcp_read):
+             with_mcp_read, prose_list, prose_commit, prose_heredoc,
+             chained_real, unrelated_mcp):
     os.unlink(path)
 
 if failures:

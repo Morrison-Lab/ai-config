@@ -104,21 +104,36 @@ import sys
 
 # `gh pr create` / `glab mr create` at a command position.
 RX_CREATE = re.compile(
-    r"(?:^|[;&|\n])\s*"
+    r"(?:^|[;&|\n({])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"      # env-assignment prefixes
     r"(?:gh\s+pr\s+create|glab\s+mr\s+create)\b",
     re.MULTILINE,
 )
 
-# Anything that could have surfaced an already-open PR.
+# A CLI command that could have surfaced an already-open PR. Anchored to a
+# command position and applied to heredoc-stripped text, exactly as RX_CREATE
+# is: an unanchored discharge is strictly worse than an unanchored trigger,
+# because prose that merely mentions `gh pr list` would silence the guard for
+# the rest of the session rather than emit one spurious note. Caught in review
+# on #1749, where this file's own reminder text contains the phrase.
 RX_DISCHARGE = re.compile(
-    r"gh\s+pr\s+(?:list|view|status)\b"
+    r"(?:^|[;&|\n({])\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    r"(?:gh\s+pr\s+(?:list|view|status)\b"
     r"|gh\s+search\s+prs\b"
-    r"|glab\s+mr\s+(?:list|view)\b"
-    r"|mcp__github__list_pull_requests"
-    r"|mcp__github__search_pull_requests"
-    r"|mcp__github__pull_request_read",
+    r"|glab\s+mr\s+(?:list|view)\b)",
+    re.MULTILINE,
 )
+
+# MCP tool NAMES have no command position, so they are matched exactly.
+MCP_DISCHARGE = (
+    "mcp__github__list_pull_requests",
+    "mcp__github__search_pull_requests",
+    "mcp__github__pull_request_read",
+)
+
+# The MCP equivalent of `gh pr create` (tool-mappings.md, CREATE_PR).
+MCP_CREATE = "mcp__github__create_pull_request"
 
 # A heredoc body is prose, not commands. Strip it before position matching.
 RX_HEREDOC = re.compile(
@@ -183,8 +198,11 @@ def transcript_has_dupe_check(transcript_path):
                     entry = json.loads(line)
                 except ValueError:
                     continue
-                for text in _tool_inputs(entry):
-                    if RX_DISCHARGE.search(text):
+                for kind, text in _tool_inputs(entry):
+                    if kind == "name":
+                        if text in MCP_DISCHARGE:
+                            return True
+                    elif RX_DISCHARGE.search(strip_heredocs(text)):
                         return True
     except OSError:
         return True
@@ -204,13 +222,13 @@ def _tool_inputs(entry):
             continue
         name = block.get("name")
         if isinstance(name, str):
-            yield name
+            yield ("name", name)
         payload = block.get("input")
         if isinstance(payload, dict):
             for key in ("command", "cmd", "CommandLine"):
                 value = payload.get(key)
                 if isinstance(value, str):
-                    yield value
+                    yield ("command", value)
 
 
 def main():
@@ -224,7 +242,20 @@ def main():
     if not isinstance(payload, dict):
         return 0  # fail open: the harness always sends an object
 
-    if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
+    tool_name = payload.get("tool_name")
+    if tool_name == MCP_CREATE:
+        # No command string to inspect; the tool itself is the creation.
+        if transcript_has_dupe_check(payload.get("transcript_path") or ""):
+            return 0
+        print(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "additionalContext": NOTE,
+            }
+        }))
+        return 0
+
+    if tool_name not in ("Bash", "bash", "run_command"):
         return 0
 
     tool_input = payload.get("tool_input")

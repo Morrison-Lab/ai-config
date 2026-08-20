@@ -72,8 +72,13 @@ same day on a dispatched run that ended
 `Execution failed: model unreachable`.
 That is not the transient outage this fragment otherwise teaches you to re-check
 each round --- re-checking it will never succeed.
-So `delegate-to-codex` is currently the corpus's **only** cross-vendor reviewer,
-which means the preference above now names one destination rather than a choice.
+So the pairing above is now Copilot and `delegate-to-codex`, and nothing else.
+Those two are not interchangeable, which is why the preference still needs
+reading rather than collapsing to one name.
+Copilot is **requested** on the PR, and answers only where the org's licensing
+reaches it.
+`delegate-to-codex` is the only cross-vendor reviewer this corpus can
+**dispatch** itself.
 [`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
 history rather than as an option; do not dispatch it, since a dispatch burns a
 run and leaves a red check for a reviewer that cannot answer.

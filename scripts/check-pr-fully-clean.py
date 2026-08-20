@@ -273,22 +273,42 @@ def strip_cited_finding_vocab(text: str) -> str:
     "citing a past verdict" from "a live finding that happens to reference
     the past" -- the two are lexically identical under that gate.
 
-    So this instead requires the bold span to sit in a fixed, tight SYNTACTIC
-    position: immediately followed (within a short punctuation/whitespace
-    separator) by ``reviewed at`` and a backtick-quoted commit SHA, e.g.
-    ``**Needs more work**, reviewed at `abc1234` ``. A live finding does not
-    describe itself that way -- "reviewed at a commit" is citation syntax,
-    not finding language -- and Finding 1's counter-example fails this
-    adjacency test (its bold span is followed by prose, not by "reviewed
-    at"), so it is correctly left alone. This is narrower than the wording-
-    only gate on purpose: it drops the un-anchored ``previous``/``prior``
-    round wording variant entirely rather than risk reopening the same
-    ambiguity, since only the SHA-anchored shape is grounded in an actual
-    observed case (#1752). Only the matched bold-plus-citation-suffix span is
-    blanked, never anything else in the surrounding text, so any unrelated
-    live finding nearby always survives. Must run BEFORE the code-span
-    stripping below, since the SHA citation is itself backtick-quoted and
-    would otherwise already be blanked by the time this runs.
+    A second version tightened the gate to SYNTACTIC adjacency -- the bold
+    span immediately followed by ``reviewed at `sha` `` -- reasoning that "a
+    live finding does not describe itself that way." Review on #1762 (round
+    2) refuted that claim by execution: a reviewer re-raising a
+    still-unresolved finding across rounds naturally cites the commit it was
+    FIRST flagged at, using the identical syntax --
+
+        (**Needs more work**, reviewed at `53f9acbf`) is still present
+        and unaddressed in this diff.
+
+    -- which the adjacency-only gate also silently erased. The syntax alone
+    can never disambiguate "citing a resolved past finding" from "citing
+    when a still-live finding was first raised", because both write the
+    identical ``**bold**, reviewed at `sha` `` fragment; only what comes
+    AFTER the citation says which one this is.
+
+    So the gate now also requires explicit RESOLUTION wording following the
+    citation within the same sentence -- ``is now Addressed`` (this corpus's
+    own ARD disposition vocabulary; #1752's actual comment reads "... is now
+    Addressed"), ``is now fixed/resolved``, ``has (since) been
+    fixed/addressed/resolved``, or ``no longer applies``. Only "still
+    present and unaddressed" (no resolution wording) fails this and is
+    correctly left alone; "is now Addressed" passes and blanks the citation.
+    This is deliberately grounded in the one wording actually observed
+    (#1752) rather than invented -- the safe direction, when the true
+    discriminator (was this specific finding actually resolved?) cannot be
+    determined from text alone, is to require the narrowest signal that
+    still covers the real case, not the broadest one that covers every
+    hypothetical phrasing.
+
+    Only the matched bold-plus-citation-suffix span is blanked, never the
+    resolution wording or anything else in the surrounding text, so an
+    unrelated live finding nearby always survives. Must run BEFORE the
+    code-span stripping below, since the SHA citation is itself
+    backtick-quoted and would otherwise already be blanked by the time this
+    runs.
 
     Spans are replaced with a space (not deleted) so surrounding text and the
     ``changes requested`` negation-prefix lookbehind stay separated.
@@ -298,13 +318,27 @@ def strip_cited_finding_vocab(text: str) -> str:
         # hide an incidentally-quoted genuine finding -- the unsafe direction.
         return m.group(0) if "**" in m.group(0) else " "
 
-    # A bold-labeled citation of a PAST verdict's SHA, in the one syntactic
-    # shape actually observed (#1752/#1760/#1762 finding 1). The bold span
-    # must be immediately adjacent to "reviewed at `sha`" -- not merely
-    # co-occurring anywhere nearby -- which is what keeps a live finding's
-    # own bold label from ever matching.
+    # A bold-labeled citation of a PAST verdict's SHA, gated on BOTH tight
+    # syntactic adjacency (the bold span immediately followed by "reviewed
+    # at `sha`") AND explicit resolution wording within the same sentence
+    # afterward (#1752/#1760/#1762 rounds 1-2). Neither signal alone is
+    # sufficient: adjacency alone still matches a live finding re-raised
+    # across rounds (round 2's finding), and wording alone still matches a
+    # live finding that happens to mention a prior round (round 1's
+    # finding). The lookahead scans past an optional closing paren and up to
+    # 40 characters, bounded by the end of the sentence, for the resolution
+    # phrase -- wide enough to cross ") is now Addressed." but not into the
+    # next sentence.
+    RESOLUTION_WORDING = (
+        r"(?:is\s+now\s+(?:addressed|fixed|resolved)"
+        r"|has\s+(?:since\s+)?been\s+(?:fixed|addressed|resolved)"
+        r"|no\s+longer\s+applies)"
+    )
     text = re.sub(
-        r"\*\*[^*\n]+\*\*[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`",
+        r"\*\*[^*\n]+\*\*"
+        r"(?=[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`"
+        r"\)?[^.!?\n]{0,40}\b" + RESOLUTION_WORDING + r"\b)"
+        r"[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`",
         " ",
         text,
         flags=re.IGNORECASE,

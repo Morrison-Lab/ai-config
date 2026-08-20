@@ -393,12 +393,38 @@ def main() -> int:
     # the tightened adjacency-based gate must leave it alone.
     check(
         "classify_verdict: a LIVE finding mentioning 'the previous round' "
-        "in its own text is NOT erased (#1762 finding 1 regression test)",
+        "in its own text is NOT erased (#1762 round-1 finding regression test)",
         checker.classify_verdict(
             "### Verdict\n**Ready for merge**\n\n"
             "(**Needs more work:** src/a.py:10 was flagged in the previous "
             "round and is still unfixed)"
         ) == "not-clean",
+    )
+    # #1762's round-2 finding: the adjacency-only gate (no resolution-wording
+    # requirement) ALSO regressed -- a still-unresolved finding re-raised
+    # across rounds naturally cites the commit it was first flagged at, in
+    # the identical "**bold**, reviewed at `sha`" syntax as a genuinely
+    # resolved citation. Only the trailing prose ("is now Addressed" vs "is
+    # still present") distinguishes the two.
+    check(
+        "classify_verdict: a LIVE finding using the SAME citation syntax as "
+        "a resolved one, but with 'still present/unaddressed' wording, is "
+        "NOT erased (#1762 round-2 finding regression test)",
+        checker.classify_verdict(
+            "The one finding from the previous review round "
+            "(**Needs more work**, reviewed at `53f9acbf`) is still present "
+            "and unaddressed in this diff."
+            "\n\n### Verdict\n**Ready for merge** -- no new issues found."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'has been fixed' is also recognized as "
+        "resolution wording, not just 'is now Addressed'",
+        checker.classify_verdict(
+            "The prior finding (**Needs more work**, reviewed at "
+            "`abc1234`) has been fixed in this round."
+            "\n\nVerdict: Ready for merge."
+        ) == "clean",
     )
     check(
         "classify_verdict: a bold-in-parens finding with NO citation wording "

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse reminder: an `Agent` brief that asserts corpus state owes a derivation.
+"""PreToolUse reminder: a brief that asserts corpus state owes a derivation.
 
 `shared/workflow/challenge-the-assignment.md` explains why a brief is the
 artifact where a false premise hides best.
@@ -24,6 +24,26 @@ particular it never emits `permissionDecision`, whose absence defers to the
 normal permission flow, and it never rewrites the prompt.
 The model is free to read the note, decide the claim was already verified, and
 launch the agent unchanged.
+
+WHICH TOOLS CARRY A BRIEF
+-------------------------
+`Agent`/`Task` are the obvious channel, and were the only one covered until
+2026-08-20. `SendMessage` is the other, and it is the higher-risk one: a
+follow-up message to an already-running agent is where CORRECTIONS and NEW
+premises land, so a false claim there arrives with the sender's authority and
+displaces what the recipient had already verified.
+
+Measured that day on `Morrison-Lab/ai-config#1795`: a coordinator sent a
+follow-up brief asserting "this repo's local check does not predict its own
+CI". It does --- `shared/writing/semantic-line-breaks.md` documents the
+runnable gate --- and the claim was never guarded, because it travelled by
+`SendMessage` rather than by `Agent`.
+
+Note the registration is half of the coverage. `hooks.json`'s matcher decides
+which payloads reach this script at all, so widening `BRIEF_TOOLS` without
+widening the matcher changes nothing. Until 2026-08-20 the matcher read
+`Agent` alone, which meant the `Task` branch above had never been reachable
+either.
 
 THE TWO INCIDENTS
 -----------------
@@ -598,6 +618,15 @@ def evaluate(prompt, tpath=""):
     return undischarged
 
 
+# The payload field carrying the brief, per tool.
+#
+# `Agent`/`Task` put it in `prompt`; `SendMessage` puts it in `message`.
+# Deriving this from each tool's own schema rather than assuming a shared name
+# is the point -- assuming `prompt` here would have silently covered nothing,
+# which is the failure this table exists to end.
+BRIEF_TOOLS = {"Agent": "prompt", "Task": "prompt", "SendMessage": "message"}
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -605,13 +634,18 @@ def main() -> int:
         return 0
     if not isinstance(payload, dict):
         return 0
-    if payload.get("tool_name") not in ("Agent", "Task"):
+    tool_name = payload.get("tool_name")
+    if tool_name not in BRIEF_TOOLS:
         return 0
 
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return 0
-    prompt = tool_input.get("prompt")
+    prompt = tool_input.get(BRIEF_TOOLS[tool_name])
+    # `SendMessage`'s `message` is a union: plain text, or a protocol dict
+    # (`shutdown_request` and friends). A dict carries no brief, so the
+    # isinstance check is the gate rather than a formality -- without it a
+    # protocol message would reach `evaluate` as a stringified dict.
     if not isinstance(prompt, str) or not prompt.strip():
         return 0
 
@@ -646,7 +680,7 @@ def main() -> int:
                 "additionalContext": NOTE.format(claims=listed),
             },
             "systemMessage": (
-                f"Agent brief asserts corpus state ({len(undischarged)} "
+                f"Brief asserts corpus state ({len(undischarged)} "
                 "underived claim(s)); verify or paste the deriving command."
             ),
         }))

@@ -487,7 +487,8 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   The same session measured what a request buys outside Morrison-Lab, and the answer is nothing.
   Four `requested_reviewers` POSTs for `copilot-pull-request-reviewer[bot]` on `ucdavis/bcs` PRs #648, #649, and #650 were all accepted --- HTTP **200** --- and every one produced **zero** Copilot reviews, with the pending request vanishing from both `gh pr view --json reviewRequests` and the `GET .../requested_reviewers` endpoint each time.
   That is the same 201-then-empty signature recorded above, at a third repo, so an accepted POST remains evidence about the API rather than about whether a review is coming.
-  The requests were accomplishing nothing before the directive; the directive only makes not sending them the stated position rather than a silent omission.
+  The requests were accomplishing nothing before the directive.
+  The directive only makes not sending them the stated position rather than a silent omission.
 
   **This outranks `hooks/no-unreviewed-pr.py`, which demands a Copilot request after every PR open, ready, or re-head.**
   That hook's docstring names two legitimate deferrals, a draft PR and a redaction PR.
@@ -499,7 +500,8 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   - **Do:** rely on `claude-review` plus self-review meanwhile, which is the no-reachable-external-reviewer fallback in `shared/workflow/self-review-fallback.md`.
   - **Don't:** read `hooks/no-unreviewed-pr.py`'s demand, or `shared/workflow/pr-on-claim.md`'s "request the external reviewer in the same stride", as overriding a standing user directive.
   - **Don't:** treat an accepted POST (200 or 201) as evidence the moratorium is over --- all four 2026-08-19 requests were accepted and none produced a review.
-  - **Don't:** let September 2026 pass without re-verifying; the expiry is part of the rule, not a footnote to it.
+  - **Don't:** let September 2026 pass without re-verifying.
+    The expiry is part of the rule, not a footnote to it.
 - **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
   when its output is not a terminal --- which is always, for an agent.**
   A cancellation and a real failure are therefore the same word in the column

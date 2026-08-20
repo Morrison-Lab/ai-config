@@ -1149,13 +1149,15 @@ The `find-ai-tells` skill (alias `ai-tells`) runs this same catalog on demand ag
 
 When a document explains a mechanically-enforced convention, its illustrative
 example sits inside the file the checker scans -- so writing the example the
-natural way trips the rule the passage is describing, and implicates the one
+natural way can trip the rule the passage is describing, and implicate the one
 passage meant to prevent it.
-Backticks, fenced blocks, and "for example" framing shield nothing from a
-line-oriented scanner.
-Render the example so it cannot match, say in the prose why it is spelled
-that way, and run the detector rather than re-reading: self-review confirms
-the claim, which was never the defect.
+Whether it does turns on the checker: backticks and fenced blocks shield
+nothing from a line-oriented scanner, and everything from a structure-aware
+one, so read it rather than assuming either way.
+Teach the checker about code regions when you own it (this repo's
+`scripts/lib/fences.py` is that fix), render the example so it cannot match
+when you do not, and either way run the detector rather than re-reading --
+self-review confirms the claim, which was never the defect.
 
 ## Writing style: cite sources thoroughly
 

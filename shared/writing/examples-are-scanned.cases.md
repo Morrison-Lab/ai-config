@@ -1,3 +1,5 @@
+# Case records: examples are scanned
+
 Case records for [`examples-are-scanned`](examples-are-scanned.md).
 
 ## A memory file documenting a wikilink rule broke it with its own examples
@@ -6,6 +8,12 @@ Case records for [`examples-are-scanned`](examples-are-scanned.md).
 `tests/testthat/test-claude-memories-wikilinks.R`, which scans raw
 `readLines()` output for a double-bracket link and fails when the named file
 does not exist in that directory.
+
+It is worth naming which kind of checker that is, since the fragment turns on
+the distinction: line-oriented, with no fence or code-span awareness at all.
+Nobody involved owned it during the incident, so the deform-the-example remedy
+was the only one available -- unlike this repo's own checkers, which strip code
+regions via `scripts/lib/fences.py` and would never have seen the examples.
 
 [#651](https://github.com/ucdavis/bcs/pull/651) added a memory file that hit
 this twice, in successive commits.

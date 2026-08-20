@@ -1186,3 +1186,63 @@ one ruleset, `main`, carrying `deletion,non_fast_forward,pull_request` and no
 Reading the `on:` blocks directly corrected two rows a first-pass recollection
 had wrong, neither of which changes the conclusion --- `antigravity-review.yml`
 also carries `issue_comment`, and `jules-review.yml` is comment-triggered.)
+
+## A workflow that posts the *last* assistant message loses the reply when a rule claims that slot
+
+`claude.yml`'s reply step selects the final assistant turn out of the
+execution file and posts it:
+
+```jq
+[.[] | select(type == "object" and .type == "assistant")] | last
+| (.message.content // []) | map(select(.type == "text") | .text) | join("\n\n")
+```
+
+That is fine until the agent follows a corpus requiring its **last** message to
+be a fixed marker --- ai-config's
+`shared/workflow/flag-session-boundaries.md` and its `**Stopping Point**`
+declaration.
+Two rules then claim one slot, and the declaration wins every time by
+construction, so the substantive answer is replaced by a one-line status
+marker.
+
+The loss is silent and unrecoverable: the run log does not carry the
+conversation, and no execution-file artifact is published.
+It is also self-concealing --- a stopping-point line reads like a completed
+task, so nothing in the thread shows that an answer went missing.
+Measured 2026-08-19 on `d-morrison/rme` after the ai-config plugin was
+installed there (rme#1076): the pre-plugin reply ran 1182 characters, the three
+post-plugin ones 233, 356 and 501, each beginning with the marker.
+One run diagnosed the bug itself and had its diagnosis swallowed by it.
+
+Two fixes, and both were needed.
+Upstream, `flag-session-boundaries.md` now scopes the declaration to
+interactive sessions and tells an agent whose last message a harness posts to
+fold it into the substantive reply instead (ai-config#1711).
+Consumer-side, [rme#1082](https://github.com/d-morrison/rme/pull/1082) made
+the selection a **slice-and-join** from the last substantive message onward
+rather than a pick.
+That shape is the load-bearing part: any test for "is this message only a
+declaration?" misjudges some message, and the two errors are not symmetric ---
+over-including costs redundant text, visibly, while under-including costs the
+answer, silently.
+Joining the tail can only ever add text, so a misjudgement degrades into noise
+instead of data loss.
+The same eagerness applies to the marker test itself; an earlier revision
+narrowed it to "single paragraph, or under 400 characters" for tidiness, which
+made a long declaration test as substantive, become the slice start, and
+exclude the real answer behind it --- reintroducing the exact loss.
+
+- **Do:** slice from the last substantive message onward when a workflow posts
+  an agent's reply, and keep any declaration test eager enough that refining it
+  can only ever match *more* messages.
+- **Do:** check what a consumer's reply step selects before installing a corpus
+  that constrains the agent's final message.
+- **Don't:** post a single picked message; a rule you do not control can occupy
+  that slot.
+- **Don't:** read a well-formed status line in a PR thread as evidence the
+  reply arrived intact.
+
+(Tracked as [rme#1081](https://github.com/d-morrison/rme/issues/1081).
+The two rules are individually reasonable and collide only when composed,
+which is the class of defect a memory catches and a code review of either side
+alone does not.)

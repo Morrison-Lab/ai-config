@@ -279,6 +279,13 @@ labelled one until the failing artifact's own output is read.
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 "A cause read off the step next to the one that failed".
 
+The same substitution happens to claims that are not about a failure's cause
+at all --- about what a plugin contains, where a file is read from, whether a
+mechanism runs --- where nothing frames a neighbour as a neighbour and this
+section does not fire.
+[`verify-the-right-artifact`](verify-the-right-artifact.md) is the general
+case, and names the shapes the substitution takes.
+
 ## A correction inherits its instrument, so a second reading is not a check
 
 "Illusions of knowing" above concerns a **single** reading whose scope went

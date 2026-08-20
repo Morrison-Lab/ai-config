@@ -1080,3 +1080,46 @@ file(s)` and listing all four; a `tail_lines`-capped fetch showed only the last
 two, and that partial read was mistaken for the checker's own output.
 An independent scan produced the right set anyway, so the fix was correct while
 the reason given for it was not.)
+
+## Diagnosing a stub/no-verdict `claude-code-review` run: download the execution artifact, don't stop at the job log
+
+A `review / claude-review` job's own stdout (`gh api repos/<owner>/<repo>/actions/jobs/<id>/logs`)
+shows only a summary around the failure --- the `{"type":"result",...,"permission_denials_count":N}`
+line, the guard's warning, the final `##[error]` --- with a gap between
+`"Claude Code initialized"` and that result line where every individual turn,
+tool call, and denial happened. That detail is written to
+`/home/runner/work/_temp/claude-execution-output.json` and uploaded as a workflow
+artifact (`claude-review-execution-<run-id>-<attempt>-attemptN`), not printed to
+the job log at all. As of this writing (gha#540 open, unmerged), the denied tool
+names are **not** yet surfaced in the job log --- this artifact download is the
+only working way to see them.
+
+To actually see *what* got denied, download and parse that artifact:
+
+```bash
+gh run download <run-id> --repo <owner>/<repo> \
+  -n claude-review-execution-<run-id>-1-attempt1 -D /tmp/claude-exec-artifact
+```
+
+It's a JSON array of the raw Claude Code SDK stream (`system`/`assistant`/`user`
+events). Build a `tool_use_id -> (name, input)` map from the `assistant` events'
+`tool_use` blocks, then walk the `user` events' `tool_result` blocks for
+`is_error: true` --- each one pairs back to the exact command and the exact
+denial message (e.g. "Output redirection to '...' was blocked", "This Bash
+command contains multiple operations..."). This is what actually explains a
+high `permission_denials_count`, which the job log alone never shows.
+
+(Morrison-Lab/gha#541, 2026-08-20: a `claude-review` run on `ucdavis/win#78`
+logged `permission_denials_count: 33` and no verdict. The job log alone gave no
+clue why. The downloaded artifact showed ~15 near-identical attempts to save a
+large PR diff to a file --- `gh pr diff 78 --repo ucdavis/win > /tmp/pr78.diff`
+and variants --- every one denied: chaining an allowlisted `gh pr diff` command
+with `;`/`&&`/a redirect makes the *whole* compound command require approval,
+and writing anywhere outside a very narrow "allowed working directory"
+(including `/tmp` and even `mkdir`-created subdirectories of the repo checkout
+itself) is a hard block, not a promptable permission. A related issue,
+Morrison-Lab/gha#370, hit the identical `permission_denials_count: 32` signature
+on a different repo but couldn't confirm the mechanism because that session's
+egress proxy blocked the artifact download from
+`productionresultssa5.blob.core.windows.net` --- worth trying again from a
+session without that restriction before assuming the artifact is unreachable.)

@@ -3,7 +3,8 @@
 [`gha-reusable-workflows.md`](gha-reusable-workflows.md) is where this belongs
 topically; this is a satellite file for two consumer-side findings rather than
 an addition there -- the same reason [`github-mcp-tools.md`](github-mcp-tools.md)
-split out of [`github.md`](github.md). Both were hit migrating a hand-rolled
+split out of [`github.md`](github.md).
+Both were hit migrating a hand-rolled
 `claude.yml`/`claude-code-review.yml` in a consumer repo to thin callers of
 `Morrison-Lab/gha`'s reusable versions (`d-morrison/qwt#135`).
 

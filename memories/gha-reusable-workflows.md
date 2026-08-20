@@ -24,18 +24,25 @@ Generic Actions-authoring material stays there.
   - **Branch-served Quarto needs `.nojekyll`** at the gh-pages root, or Jekyll strips Quarto's `_`-prefixed asset dirs.
     `quarto publish gh-pages` adds it automatically; `JamesIves` does not, so `@v2` touches one in before deploy.
   - **The repo's Pages *source* is a manual setting** — not changeable via the MCP tools or (in scoped sessions) the API.
-    Hand the flip to the user, and order it safely: deploy to `gh-pages` FIRST (populates root; live site keeps serving the old artifact), THEN flip the source, or the root 404s in between.
+    Hand the flip to the user,
+    and order it safely: deploy to `gh-pages` FIRST (populates root;
+    live site keeps serving the old artifact), THEN flip the source, or the root 404s in between.
 - **`lint-changed-lines.yml@v2`** (gha#276) — runs `lintr` on changed R files but filters the reported lints down to only the lines a PR **adds or modifies**, so a repo can adopt or tighten a lint rule *incrementally*: new and edited code must comply while untouched legacy code is left alone.
-  This is the answer to "a linter version bump (e.g. lintr 3.4.0's `indentation_linter` now matching the current tidyverse single-indent style) flags the whole repo" — don't disable the linter or reformat everything at once; adopt via this workflow and let the rule migrate file-by-file as code is touched.
+  This is the answer to "a linter version bump (e.g. lintr 3.4.0's `indentation_linter` now matching the current tidyverse single-indent style) flags the whole repo" — don't disable the linter or reformat everything at once;
+  adopt via this workflow and let the rule migrate file-by-file as code is touched.
   Caller stub is ~8 lines (`uses: d-morrison/gha/.github/workflows/lint-changed-lines.yml@v2`).
-  Implementation detail worth knowing when debugging false negatives: the reusable workflow checks out `github.event.pull_request.head.sha` (NOT the default `refs/pull/N/merge` ref) so on-disk line numbers match the head-relative line numbers in the GitHub "list PR files" `patch` field. serocalculator#564 is the first consumer.
+  Implementation detail worth knowing when debugging false negatives: the reusable workflow checks out `github.event.pull_request.head.sha` (NOT the default `refs/pull/N/merge` ref) so on-disk line numbers match the head-relative line numbers in the GitHub "list PR files" `patch` field.
+  serocalculator#564 is the first consumer.
 - **Convention:** ai-config (and d-morrison repos generally) call `d-morrison/gha` reusable workflows with `@v1` (not a SHA-pinned ref).
   SHA-pinning is the pattern for third-party actions only.
-- **gha's major tag slides ONLY on a manual `workflow_dispatch`, NOT on every merge to main** (`slide-major-tag.yml`; `on: workflow_dispatch:` only, gated `if: github.ref == 'refs/heads/main'`).
+- **gha's major tag slides ONLY on a manual `workflow_dispatch`, NOT on every merge to main**
+  (`slide-major-tag.yml`; `on: workflow_dispatch:` only, gated `if: github.ref == 'refs/heads/main'`).
   It re-points the major derived from the latest `vX.Y.Z` tag to HEAD when dispatched.
   So merging a fix or a new capability to `main` does **not** roll it out to `@v1`/`@v2` consumers on its own — the tag stays put until someone runs the workflow.
   This is deliberate (the workflow's own header comment: "the slide is a deliberate manual step, not an automatic reaction to every push" — merge, optionally canary a consumer at `@main`, then dispatch once confident).
-  Practical consequence: after merging a PR that adds/fixes a capability, a consumer PR that calls it at `@v2` keeps running the **pre-merge** tagged version until the human dispatches the slide — the same "can't self-verify before merge" bootstrapping gap gha's own `CLAUDE.md` describes, but persisting *after* merge too until the dispatch. (serocalculator#564 called gha's new `lint-changed-lines.yml@v2` right after gha#276 merged; it only picked up the real capability once the user manually dispatched `slide-major-tag`.)
+  Practical consequence: after merging a PR that adds/fixes a capability, a consumer PR that calls it at `@v2` keeps running the **pre-merge** tagged version until the human dispatches the slide — the same "can't self-verify before merge" bootstrapping gap gha's own `CLAUDE.md` describes, but persisting *after* merge too until the dispatch.
+  (serocalculator#564 called gha's new `lint-changed-lines.yml@v2` right after gha#276 merged;
+  it only picked up the real capability once the user manually dispatched `slide-major-tag`.)
   Because the slide is manual, a **breaking** change merging to main does NOT silently slide `v1` onto it — but when you DO dispatch after a breaking change, guard it with TWO tag moves so the slide doesn't break `v1`: (1) force `v1` back to the last non-breaking commit (`git tag -f v1 <sha>; git push --force origin refs/tags/v1`), and (2) create `v2.0.0` + `v2` at HEAD.
   Once `v2.0.0` exists it's the latest semver, so the slide moves `v2` thereafter and `v1` stays frozen.
   There is NO MCP tool to create tags/releases — use `git` (but see the 403 caveat below).
@@ -47,7 +54,8 @@ Generic Actions-authoring material stays there.
 - **A `workflow_call` reusable-workflow ref (`@v1`/`@v2`) resolves ONCE, at the run's original creation time, and stays pinned to that SHA across every re-run of that same run — even after the tag has since moved to a fix.**
   So if a consumer PR's `claude-code-review.yml` run first ran while `@v2` still pointed at a broken gha commit, re-running that same run (whether via the Actions UI "Re-run failed jobs" or a bot re-dispatch that happens to target the existing run rather than creating a new one) reproduces the identical pre-fix failure forever, no matter how many times you retry or how long ago the tag was fixed.
   **Diagnose by checking `run_attempt`** (> 1 means this is a re-run, not a fresh dispatch) **and `created_at`** (`mcp__github__actions_get`, `method: get_workflow_run` — compare against when the fix landed), then read `referenced_workflows[].sha` in the same response — it shows the ACTUAL resolved commit for that run, which you can diff against the tag's current `get_tag` SHA to confirm staleness.
-  **Only a genuinely NEW run (a new `run_id`) re-resolves the tag fresh** — a new commit (`pull_request: synchronize`) is the reliable trigger; an `@claude review` comment sometimes causes the bot to re-run the existing stale run instead of dispatching a new one (observed on UCD-SERG/serodynamics#193 — a direct `workflow_dispatch` via `actions_run_trigger` would have sidestepped this, but that call 403s in these sessions too, per the note above).
+  **Only a genuinely NEW run (a new `run_id`) re-resolves the tag fresh** — a new commit (`pull_request: synchronize`) is the reliable trigger;
+  an `@claude review` comment sometimes causes the bot to re-run the existing stale run instead of dispatching a new one (observed on UCD-SERG/serodynamics#193 — a direct `workflow_dispatch` via `actions_run_trigger` would have sidestepped this, but that call 403s in these sessions too, per the note above).
 - **Testing a reusable workflow that calls `anthropics/claude-code-action` (a review or agent workflow) before merge is DOUBLY constrained -- a branch-pinned caller cannot exercise the change even when it runs.**
   Two independent mechanisms both defeat the obvious "point a caller at the test branch and dispatch it" approach:
   1. **The action's own workflow-validation guard refuses to run unless the CALLER's workflow file is byte-identical to that repo's DEFAULT branch** (`Workflow validation failed ... must exist and have identical content to the version on the repository's default branch`).
@@ -61,12 +69,15 @@ Generic Actions-authoring material stays there.
      - **Don't:** re-dispatch `claude-review.yml` hoping the skip comment was a one-off.
   2. **A nested `uses: <owner>/<repo>/.github/actions/<x>@v2` composite ref inside the reusable workflow resolves at its OWN literal `@v2`, independent of the ref the reusable workflow was called at.**
      GitHub resolves each full-path `uses:@ref` independently, so SHA/branch-pinning a consumer's caller to a test branch runs the workflow FILE at that branch but still pulls the composite actions at `@v2` (the old code).
-     This is a different fact from the "resolves ONCE at run creation" bullet above (that one is about re-runs of one run; this is about which ref each nested reference picks up on a fresh run).
+     This is a different fact from the "resolves ONCE at run creation" bullet above (that one is about re-runs of one run;
+     this is about which ref each nested reference picks up on a fresh run).
      To exercise a change that lives in a nested composite action, you must ALSO temporarily bump the reusable workflow's own internal `@v2` refs to the test branch -- scaffolding you revert before merge. (gha#400 test, 2026-08-03.)
 - **`check-non-standard-chars` (the `chars` selftest job) scans only `.qmd` and `.R` files.**
-  Em dashes / smart quotes in workflow YAML comments, README, or example stubs pass; the SAME character in a `.qmd` fails CI (`U+2014` etc.).
+  Em dashes / smart quotes in workflow YAML comments, README, or example stubs pass;
+  the SAME character in a `.qmd` fails CI (`U+2014` etc.).
   When editing gha docs, keep `.qmd` ASCII (`-`/`;`, not `—`).
-- **403 caveat — scoped sessions can push ONLY the assigned branch; tag pushes are denied.**
+- **403 caveat — scoped sessions can push ONLY the assigned branch.**
+  Tag pushes are denied.
   In remote/web sessions the proxy rejects any ref that isn't the harness-assigned branch with `HTTP 403` — including `refs/tags/*`.
   **`git push --dry-run` gives a FALSE POSITIVE here** (it prints `* [new tag] …` because the negotiation succeeds, but the real push 403s on the ref update).
   So you cannot cut tags from such a session — hand the exact `git tag` + `git push` commands to the user instead.
@@ -75,14 +86,19 @@ Generic Actions-authoring material stays there.
   Beyond the tag-push case above, some sessions 403 on every write path to a given repo: `git push` to the assigned branch itself (not just other branches — and `git ls-remote` may show the assigned branch doesn't even exist on the remote yet, so the push 403s trying to create it), plus every GitHub MCP write tool — `push_files`/branch creation, `create_or_update_file` (contents API), and `add_issue_comment` — all returning `403 Resource not accessible by integration`.
   Confirm this conclusively by testing 2-3 *distinct* write endpoints (not just retrying the same one) before concluding read-only, since a single 403 could be a branch-scope issue (the case above) rather than a repo-wide one.
   Once confirmed: don't keep retrying — package the diff as a patch (`git format-patch`) and hand it to the user via `SendUserFile` instead of a pasted diff, so it's directly `git am`-able.
-  Because you can't push, watch for the user (or another session) to land an independently-derived fix rather than your literal patch — re-verify the actual merged diff before reporting status rather than assuming your patch was applied as-is. (Hit on ucdavis/fxtas#156: diagnosed a CI-breaking dependency issue, delivered the fix as two patch files since every write 403'd; the user filed their own issue/PR with a different fix for the same root cause and merged that instead.)
+  Because you can't push, watch for the user (or another session) to land an independently-derived fix rather than your literal patch —
+  re-verify the actual merged diff before reporting status rather than assuming your patch was applied as-is.
+  (Hit on ucdavis/fxtas#156: diagnosed a CI-breaking dependency issue, delivered the fix as two patch files since every write 403'd;
+  the user filed their own issue/PR with a different fix for the same root cause and merged that instead.)
 - **Input-forwarding checklist when adding an input to a gha composite action.**
   Adding a new `inputs:` entry to `<name>/action.yml` requires four coordinated updates:
   1. Expose it in the wrapping reusable workflow (`.github/workflows/<name>.yml`) under `on: workflow_call: inputs:`.
   2. Forward it in the reusable workflow's `uses: d-morrison/gha/<name>@v1` step's `with:` block.
   3. Update `examples/<name>.yml` (the caller stub) if the input is consumer-visible.
   4. Update the README table row for `<name>.yml` to list the new input under "Key inputs".
-  Missing any of these leaves the input wired only partway — consumers can't pass it through the reusable workflow even though it exists in the composite. (Caught by Copilot on gha#92: `fail-if-empty` was in the composite but not in README or examples; a separate pre-existing gap — the `fail` input — was filed as gha#93.)
+  Missing any of these leaves the input wired only partway — consumers can't pass it through the reusable workflow even though it exists in the composite.
+  (Caught by Copilot on gha#92: `fail-if-empty` was in the composite but not in README or examples;
+  a separate pre-existing gap — the `fail` input — was filed as gha#93.)
 - **Reusable workflow input descriptions say "workflow run", not "action."**
   A `workflow_call` wrapper is not a composite action — `inputs:` descriptions should say "Fail the workflow run …" not "Fail the action …".
   When copying an input description from `action.yml` into the wrapping `workflow_call` file, update "action" → "workflow run". (Fixed in gha#92: `fail-if-empty` description in `check-links.yml`.)
@@ -90,7 +106,8 @@ Generic Actions-authoring material stays there.
   A job that has started can only conclude `success` or `failure` — never `skipped`.
   The only way to get the gray skip icon on a check is a false `if:` on an *unstarted* job.
   Pattern for infrastructure conditions (quota exhaustion, pre-flight failures): have the main job succeed (exit 0) and set an output flag, then add a second gate job whose `if:` is false when the flag is set.
-  The gate job is what consumers watch in branch protection; it shows skipped (gray) on infra conditions and success on clean reviews.
+  The gate job is what consumers watch in branch protection;
+  it shows skipped (gray) on infra conditions and success on clean reviews.
   See gha#104 for the `require-review` job implementation.
 - **`mcp__github__get_job_logs` usage.**
   Two calling modes — use the right one:
@@ -99,7 +116,8 @@ Generic Actions-authoring material stays there.
     Without `return_content: true` the tool returns only a `logs_url` download link and `"Job logs are available for download"` — no actual log text.
   - All failed jobs in a run: pass `run_id` (number) + `failed_only: true` + `return_content: true`.
     Do NOT pass `job_id`.
-  The tool's error message ("job_id is required when failed_only is false") is misleading when you pass `failed_only: true` with `run_id`; the issue is actually conflicting parameters.
+  The tool's error message ("job_id is required when failed_only is false") is misleading when you pass `failed_only: true` with `run_id`;
+  the issue is actually conflicting parameters.
 - **A small `tail_lines` on `get_job_logs` can silently miss the real failure** when the log contains a few enormous single-line entries (e.g. a base64-encoded spinner GIF/PNG being curled and embedded in a PR comment) — the tool's "line" budget gets consumed by those giant lines before reaching earlier real steps, so `tail_lines: 60`/`120`/`300` can return only post-failure cleanup/reviewer-restore steps with no trace of the actual error.
   Escalate `tail_lines` (e.g. to 2000) and, once the result exceeds the token cap and gets saved to a file, grep/slice that file with `python3` (byte-offset search, not line-based) rather than trusting a small default tail.
   Cross-check with `mcp__github__actions_get` (`method: "get_workflow_job"` — confirmed in the live schema alongside `get_workflow_run`) for the per-step `conclusion` breakdown to know which step actually failed and roughly where in the log to look. (ai-config#403.)

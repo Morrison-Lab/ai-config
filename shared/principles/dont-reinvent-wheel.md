@@ -243,9 +243,20 @@ asking whether a verdict was posted, which is precisely why the wrong ref
 went unnoticed.
 The attribution was retracted on gha#391.)
 
+## When rolling our own is right
+
+This is a default, not an absolute rule.
+Build custom when the problem is genuinely project-specific, the
+existing option is unmaintained or license-incompatible, its API is
+wrong for the need, or the dependency is far heavier than the job
+(a heavy package for a one-liner).
+When you do build custom, note in the PR (or a code comment) that you
+checked and nothing fit, so the next reader doesn't re-run the search
+— and so the reviewer's DRW check below has its answer up front.
+
 ## A constraint your own change authored is not evidence against an upstream
 
-The escape hatches below are all statements about the world: nothing close
+The escape hatches above are all statements about the world: nothing close
 enough exists, the API is wrong, the dependency is too heavy, the package is
 unmaintained.
 Each is a fact you could have found before starting.
@@ -273,8 +284,10 @@ the facts --- see
 So before a DRW verdict rests on a constraint, classify it:
 
 - **External** --- a platform limit, an upstream API, a license, a policy, a
-  requirement from outside this change.
-  Reasoning from it is fine.
+  requirement from outside our control.
+  Not merely outside *this* change: a constraint an earlier change of ours
+  chose is still self-imposed.
+  Reasoning from an external one is fine.
 - **Self-imposed** --- a choice made in this change, or in an earlier one of
   ours.
   Challenge it, and usually relax it: add the dependency, install it in CI,
@@ -318,8 +331,8 @@ So treat the pre-write pass as the load-bearing one, and make it produce a
 written record: run [`prefer-upstream`](../../skills/prefer-upstream/SKILL.md)
 before writing a generic-looking helper, and put what you searched for and
 what you found in the PR body.
-The "checked, nothing fit" note that "When rolling our own is right" asks for
-is that record.
+The "checked, nothing fit" note that "When rolling our own is right" asks for,
+just above, is that record.
 Its absence is the one DRW signal a reviewer *can* see without doing the
 search itself, which makes it worth flagging on its own.
 
@@ -354,17 +367,6 @@ installed, so `rlang` was unreachable --- a constraint that same PR had
 authored.
 The maintainer's answer was "don't make excuses, install the packages needed"
 and "fix the CI job".)
-
-## When rolling our own is right
-
-This is a default, not an absolute rule.
-Build custom when the problem is genuinely project-specific, the
-existing option is unmaintained or license-incompatible, its API is
-wrong for the need, or the dependency is far heavier than the job
-(a heavy package for a one-liner).
-When you do build custom, note in the PR (or a code comment) that you
-checked and nothing fit, so the next reader doesn't re-run the search
-— and so the reviewer's DRW check below has its answer up front.
 
 ## In review
 

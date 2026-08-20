@@ -364,18 +364,21 @@
 - When committing, stage the SPECIFIC files you touched --- NEVER `git add -A`.
   The working tree often holds unrelated in-flight edits (the user's own UMS/skill commits, another draft); `git add -A` silently sweeps those into your commit and onto your PR, bloating the review and extending the cycle.
   List paths explicitly, and `git status` before committing to confirm only intended files are staged. (Learned the hard way: a `git add -A` swept the user's `scout-peers` skill into an unrelated `/prune` PR, adding several extra review rounds.)
-- Run a local session in an isolated `git worktree` by DEFAULT, not directly in the shared working copy --- only use the working copy when the user explicitly says to.
+- **Always use a worktree; never the primary checkout.**
+  Every local session --- including gi/gii/ardia, simple single-file edits, and reads that will become writes --- starts by creating a dedicated worktree.
+  **Do:** `git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main` (or per the `session-lock` skill's `ai-session.sh worktree <branch>`) before any read or write, and clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
+  **Don't:** work directly in the shared/primary checkout, even for "just a quick read" or "just one file" --- reads often become writes, and the primary checkout is shared with concurrent sessions.
   This default holds for EVERY local session, not just substantial multi-file work or when the user flags the wd as "in use" / "do this in a separate repo", so parallel local AI agent sessions never step on or clobber each other's working directory or branch state.
   The ai-config working copy is often in use by CONCURRENT local AI agent sessions; untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
-  Create it off `origin/main` (`git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main`), not the shared wd.
-  Clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
   The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
   This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs --- that silently changes the branch out from under any other session or task pointed at that path.
-  Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.)
-- **A delegated subagent runs in the parent session's working tree, so the
-  branch-switching rule directly above governs your own agents, not only other
-  sessions.**
+  Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.) (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
+- **Don't touch anyone else's branch.**
+  **Do:** only push to or modify branches I created in my own worktree.
+  **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user --- even if the content looks worth keeping or the branch looks abandoned.
+  If a branch needs work that isn't mine, flag it and let the owner handle it. (User directive, 2026-08-19.)
+- **A delegated subagent runs in the parent session's working tree, so the "Use ONE worktree per branch/PR" rule above governs your own agents, not only other sessions.**
   The remedy is already written down: [`gip`](../skills/gip/SKILL.md) says to
   give every subagent `isolation: "worktree"`, and
   [`ultracode-merge-conflicts`](../shared/workflow/ultracode-merge-conflicts.md)

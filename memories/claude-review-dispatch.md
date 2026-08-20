@@ -28,8 +28,9 @@ what a run does once it starts, split at the 1200-line gate.
   does not directly fire the review workflow.
 - A new push (`synchronize`) auto-fires a fresh review --- the normal path during
   an iterate loop.
-  A property of *those* repos, not a general one --- see "`ai-config` never
-  auto-reviews a PR on push" at the end of this file.
+  General again as of 2026-08-20, `ai-config` included --- see
+  "`ai-config` auto-reviews on push as of 2026-08-20, and did not before" later
+  in this file, and read its date before acting on it.
 - To force a fresh review on an existing PR **without a new commit**:
   - **workflow_dispatch** (preferred --- no extra PR timeline noise).
     Same

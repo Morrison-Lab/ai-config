@@ -371,6 +371,86 @@ def main() -> int:
             "Ready for merge. This PR widens coverage of \"Needs more work\" verdicts."
         ) == "clean",
     )
+    # A bold-labeled citation of a PAST verdict's SHA, in the exact shape
+    # from ai-config#1752 that #1760 fixes. Neither the code-span nor the
+    # quote handling touches this -- there are no quotes, and stripping the
+    # backticks first would hide the SHA gate this relies on.
+    check(
+        "classify_verdict: a bold-plus-SHA PAST-verdict citation is not a "
+        "verdict (#1760 strip, verbatim #1752 shape)",
+        checker.classify_verdict(
+            "The one finding from the previous review round "
+            "(**Needs more work**, reviewed at `53f9acbf`) is now Addressed."
+            "\n\n### Verdict\n**Ready for merge** -- no new issues found."
+        ) == "clean",
+    )
+    # #1762's finding 1: an EARLIER version of this gate keyed only on
+    # citation-shaped WORDING co-occurring anywhere in the parenthetical, and
+    # blanked the WHOLE span -- so a genuine, still-unaddressed finding that
+    # mentions "the previous round" in its own text was silently erased
+    # along with the citation. The bold span here is NOT immediately
+    # followed by "reviewed at `sha`" (it's followed by ordinary prose), so
+    # the tightened adjacency-based gate must leave it alone.
+    check(
+        "classify_verdict: a LIVE finding mentioning 'the previous round' "
+        "in its own text is NOT erased (#1762 round-1 finding regression test)",
+        checker.classify_verdict(
+            "### Verdict\n**Ready for merge**\n\n"
+            "(**Needs more work:** src/a.py:10 was flagged in the previous "
+            "round and is still unfixed)"
+        ) == "not-clean",
+    )
+    # #1762's round-2 finding: the adjacency-only gate (no resolution-wording
+    # requirement) ALSO regressed -- a still-unresolved finding re-raised
+    # across rounds naturally cites the commit it was first flagged at, in
+    # the identical "**bold**, reviewed at `sha`" syntax as a genuinely
+    # resolved citation. Only the trailing prose ("is now Addressed" vs "is
+    # still present") distinguishes the two.
+    check(
+        "classify_verdict: a LIVE finding using the SAME citation syntax as "
+        "a resolved one, but with 'still present/unaddressed' wording, is "
+        "NOT erased (#1762 round-2 finding regression test)",
+        checker.classify_verdict(
+            "The one finding from the previous review round "
+            "(**Needs more work**, reviewed at `53f9acbf`) is still present "
+            "and unaddressed in this diff."
+            "\n\n### Verdict\n**Ready for merge** -- no new issues found."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'has been fixed' is also recognized as "
+        "resolution wording, not just 'is now Addressed'",
+        checker.classify_verdict(
+            "The prior finding (**Needs more work**, reviewed at "
+            "`abc1234`) has been fixed in this round."
+            "\n\nVerdict: Ready for merge."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a bold-in-parens finding with NO citation wording "
+        "is still a real finding (#1760 safety direction)",
+        checker.classify_verdict(
+            "Found an issue (**Location:** foo.py:42) that still needs "
+            "fixing. Needs more work before merge."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: a bold-in-parens finding citing a SHA that is NOT "
+        "immediately adjacent to 'reviewed at' is still a real finding "
+        "(#1760/#1762 safety direction)",
+        checker.classify_verdict(
+            "Found a regression (**Bug:** off-by-one, introduced in "
+            "`abc1234`). Needs more work."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'reviewed' elsewhere in the sentence, not "
+        "adjacent to the bold span, does not trigger the strip",
+        checker.classify_verdict(
+            "(**Bug:** foo.py:10) -- this was reviewed at length and still "
+            "needs more work."
+        ) == "not-clean",
+    )
     check(
         "classify_verdict: findings win over a clean line in the same body",
         checker.classify_verdict("Ready for merge. But: Needs more work on the tests.") == "not-clean",

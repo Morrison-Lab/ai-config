@@ -16,7 +16,7 @@ Generic Actions-authoring material stays there.
     No `gh-pages` branch served.
   - **`@v2`** (gha#118) deploys to the **`gh-pages` branch** (`JamesIves/github-pages-deploy-action`, `clean-exclude: pr-preview/`, plus a `.nojekyll`).
     Repo setup: Settings → Pages → Source = **"Deploy from a branch", `gh-pages` / `(root)`**.
-    Caller grants `contents: write` (not `pages:write` + `id-token:write`), **even with `deploy: false`** (see the reusable-workflow permission rule below).
+    Caller grants `contents: write` (not `pages:write` + `id-token:write`), **even with `deploy: false`** (see the reusable-workflow permission rule in [`github-actions.md`](github-actions.md)).
   - **WHY the switch:** the gha PR-preview family (`preview-deploy`, `cleanup-pr-previews`) pushes previews to the `gh-pages` branch.
     A repo serves Pages from **one** source, so Actions-artifact publish + branch-based previews can't coexist — under Actions-source Pages, every `…/pr-preview/pr-N/` link 404s.
     `rossjrw/pr-preview-action` REQUIRES branch-based Pages.

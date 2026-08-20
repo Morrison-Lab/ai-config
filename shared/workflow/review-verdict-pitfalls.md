@@ -1209,3 +1209,64 @@ That slow run had neighbours at 9.0 and 11.7 minutes, both successful, so a
 neighbours check would have called it anomalous.
 The two costs are read from the PR's own cost comments, `$42.9192` on
 `31604997356` and `$5.9109` on `31608602196`.)
+
+**A ninth case, and the only one where the verdict is not-clean for a reason
+that has nothing to do with the diff: a review can block on its own
+still-running check.**
+The eight cases above all concern a verdict that misdescribes the *code*.
+This one describes the *PR's state*, correctly, from inside a run that cannot
+see itself.
+
+The shape is specific.
+The review body reports no findings at all --- every claim fact-checked, every
+citation resolved, nothing to flag --- and then the verdict line reads
+**Blocked on human review** or similar, on the stated grounds that some
+automated check has not finished.
+That check is the review's own run.
+A job cannot report its own completion from inside itself, so the reviewer sees
+one perpetually in-progress entry, correctly declines to call the PR clean over
+an unfinished check, and blocks.
+The check goes green moments later, when the job it belongs to ends.
+
+**Read the reason, not just the verdict word.**
+A strict reading of [`fully-clean`](fully-clean.md)'s criterion 2 treats any
+non-clean verdict as blocking, which is right for the eight cases above and
+wrong here: the blocking premise expires by the time you can act on it, so
+waiting for it to clear is waiting for something that already happened.
+The discriminator is whether the verdict names a **finding** or names a
+**pending check**.
+A finding is about the diff and survives; a pending check that is the
+reviewer's own run does not.
+
+**It still is not an approval, so do not merge on it.**
+The remedy is another round at the same head, which is cheap when the head has
+not moved and produces an ordinary verdict --- the second run sees the first
+run's check completed and has nothing left to block on.
+What makes that remedy fragile is head churn: a base-sync merge from a parallel
+session moves the head, so a verdict earned at one commit is not a verdict at
+the next, and a PR taking a sync every few minutes can invalidate verdicts
+faster than a round completes.
+Check the reviewed commit against the current head before spending a round, and
+if they differ, expect to spend another.
+
+- **Do:** classify a non-clean verdict by what it cites --- a finding about the
+  diff, or a check that has not finished.
+- **Do:** re-run at the same head when the only blocker was the reviewer's own
+  in-flight check.
+- **Don't:** report a PR ready on a "blocked" verdict, however self-referential
+  its reason.
+- **Don't:** treat the block as a standing state to wait out; nothing further
+  will happen to it on its own.
+
+(Measured 2026-08-20 on
+[ai-config#1744](https://github.com/Morrison-Lab/ai-config/pull/1744).
+Attempt 6 at head `5ec9cf26` reported "found nothing to flag" and then
+"**Blocked on human review** ... depends on that still-unresolved automated
+check", which was `review / claude-review` --- its own job, green within the
+minute.
+The head then moved to `2d263683` on a base-sync before that verdict could be
+used.
+Attempt 7 at the new head returned **Ready for merge** with zero findings,
+having re-verified every citation independently rather than inheriting the
+prior round's conclusion.
+The PR's content was identical across both, at 2 files and 39 insertions.)

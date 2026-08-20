@@ -119,6 +119,16 @@ SILENT = [
      "should have, but second person"),
     ([txt("The reviewer should have caught this earlier.")],
      "should have, but SOMEONE ELSE's gap"),
+    # PR #1752 review: `i\s+should` with no `\b` matched the trailing "i" of
+    # any word ending in that letter -- "the AI should", "the API should",
+    # "this semi should" all fired as if "I" were the subject. Pinned here so
+    # the boundary cannot regress.
+    ([txt("The AI should have caught this earlier.")],
+     "should have, but subject is 'the AI' not 'I' (word-boundary regression)"),
+    ([txt("The API should have returned an error here.")],
+     "should have, but subject is 'the API' not 'I' (word-boundary regression)"),
+    ([txt("This semi should have been replaced before merge.")],
+     "should have, but 'semi' merely ends in 'i' (word-boundary regression)"),
     ([txt("The rule fires on phrases like `I was wrong` in a message.")],
      "quoting the trigger inside inline code"),
     ([txt("The user wrote:\n\n> I was wrong about that\n\nso the rule applies.")],

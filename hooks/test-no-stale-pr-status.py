@@ -75,6 +75,40 @@ CASES = [
      "nothing pushed, so no reading can have gone stale"),
     ([PUSH, QUERY, say("Merged and tidied up.")], False,
      "no status assertion at all"),
+
+    ([QUERY, PUSH, say("PR #1689 is not fully clean -- the review check is still running.")], False,
+     "negated assertion in the same clause must not block"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("check-pr-fully-clean.py currently reports NOT clean (correctly "
+          "-- it only counts bot-authored verdicts toward its own 'fully "
+          "clean' determination by design).")], False,
+     "negation in an earlier clause of the same sentence, ASSERT phrase used referentially"),
+    ([QUERY, PUSH, say("Not ready to merge yet; still waiting on CI.")], False,
+     "negated 'ready to merge' must not block"),
+    ([QUERY, PUSH, say("493 isn't fully clean yet.")], False,
+     "contraction negation must not block -- the ASSERT phrase has to actually "
+     "appear in the sentence (isn't green never matches RX_ASSERT at all, so "
+     "that phrasing alone doesn't exercise the n't path)"),
+    ([QUERY, PUSH, say("This is green. Not fully clean, though -- one check is still pending.")], True,
+     "an unnegated assertion earlier in the message still blocks even when a later sentence is negated"),
+    ([QUERY, PUSH, say("Pushed. No findings remain, so the PR is ready to merge.")], True,
+     "bare 'no' attached to a different noun must not suppress the guard -- "
+     "this is a genuine stale-clean claim"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("There are no unresolved threads and #1689 is fully clean.")], True,
+     "bare 'no' earlier in the sentence must not suppress an unrelated ASSERT phrase"),
+
+    ([QUERY, PUSH, say("| #1690 | not clean |\n| #1689 | ready to merge |")], True,
+     "a bare newline must count as a sentence boundary -- a negation on one "
+     "table row must not suppress an unrelated claim on the next row"),
+    ([QUERY, PUSH, say("- #1690 not clean\n- #1689 ready to merge")], True,
+     "same as above for a bulleted list"),
+    ([QUERY, PUSH, say("**Not clean yet.** All checks green now.")], True,
+     "markdown bold-close punctuation right after the terminator must not "
+     "swallow the sentence boundary"),
+    ([QUERY, PUSH, say('Quoting the review: "not clean." All checks green now.')], True,
+     "a closing quote right after the terminator must not swallow the "
+     "sentence boundary either"),
 ]
 
 

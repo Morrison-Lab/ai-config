@@ -184,3 +184,49 @@ The push succeeded --- with a `remote: This repository moved` notice naming
 failed with the message above, and the `-R` form worked.
 The same repo recurred at PR #41 on 2026-08-05, with the identical push
 notice.)
+
+## An ISSUE transfers only within one owner, so a cross-owner move is a hand copy
+
+Everything above is about transferring a **repository**.
+An issue is the other thing people say "transfer" about, and it obeys a
+constraint the repository case does not: GitHub transfers an issue only
+between repositories owned by the **same** user or organization.
+So `d-morrison/<repo>` to `Morrison-Lab/<repo>` is not a transfer at all, and
+the two interfaces refuse it differently.
+`gh issue transfer` takes the destination as a positional argument and errors
+on it.
+The web UI has a repository picker, and the destination simply does not appear
+in it --- which reads as the repo being missing rather than as the operation
+being unavailable, and is the likelier of the two to be misdiagnosed as a
+permissions problem.
+
+That matters because the two owners here are one person's account and that
+person's org, so the move feels internal.
+It is not, and no permission level changes it.
+
+The hand copy is the whole remedy, and it has three parts, none optional:
+
+1. **File fresh in the destination**, carrying the original text rather than a
+   summary --- a pointer plus a paraphrase loses exactly the specifics a
+   transfer would have preserved.
+2. **Re-verify the original's claims against the destination repo** while
+   copying.
+   An issue filed from another repo's session cites line numbers and file
+   contents it could not read.
+   Those drift, and the copy is the moment to check them rather than to
+   propagate them.
+3. **Link both ways and close the original as transferred**, so the source
+   repo's tracker does not keep a live duplicate.
+
+- **Do:** treat a cross-owner "transfer" request as file-fresh-and-close, and
+  say in the new issue that it was hand-transferred and from where.
+- **Do:** re-derive any file/line claim the original made, since the original
+  session could not read the destination repo.
+- **Don't:** read a missing destination in the transfer picker as a
+  permissions problem --- same-owner is a hard constraint of the feature.
+- **Don't:** leave the source issue open once the copy exists.
+
+(`d-morrison/rme#1083` to `Morrison-Lab/ai-config#1709`, 2026-08-19.
+The original was filed in `rme` precisely because that session's write access
+was scoped there, with the body opening "Filed here for transfer to
+`Morrison-Lab/ai-config`" --- a transfer that was never available.)

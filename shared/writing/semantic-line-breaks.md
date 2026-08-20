@@ -134,8 +134,22 @@ Run it locally before pushing and fix what it names --- the script lives in a
 
 ```bash
 NLB_BASE_REF=origin/main \
+NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
   python3 <gha-checkout>/check-new-line-breaks/check-new-line-breaks.py
 ```
+
+**`NLB_PATHS_IGNORE` is the one input the local run needs and does not
+default to**, so a command without it over-reports on generated files this
+repo's workflow excludes --- the `codex-skills/` wrappers most of all, since
+they are machine-written and nobody is going to line-break them.
+Everything else the workflow passes is already the script's own default, so
+setting it changes nothing: `NLB_GLOBS` defaults to `*.md`, `NLB_FAIL` and
+`NLB_CLAUSE_BREAKS` to true, and `NLB_CLAUSE_MIN_LENGTH` to 80 (read off
+`check-new-line-breaks.py` at `d-morrison/gha` `430393d`, and confirmed
+against a passing job's own log, which prints every `NLB_*` value it used).
+The practical consequence is worth stating in the safe direction: the clause
+check that catches a long line with a mid-line semicolon **is** on by default
+locally, so a local run cannot silently under-report that case.
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)

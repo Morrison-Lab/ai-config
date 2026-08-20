@@ -1055,5 +1055,3 @@ check the session's own tool list before assuming either way, rather than genera
   it is confirmed only for an interactive CLI session, and contradicted by at least one dispatched review session on the same day.
 
 See [Claude Code v2.1.233 release notes](https://github.com/anthropics/claude-code/releases/tag/v2.1.233), and the [Claude review on Morrison-Lab/ai-config#1732](https://github.com/Morrison-Lab/ai-config/pull/1732) that caught the overgeneralization above.
-
-See [Claude Code v2.1.233 release notes](https://github.com/anthropics/claude-code/releases/tag/v2.1.233).

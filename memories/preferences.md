@@ -91,8 +91,22 @@
 - **Autonomously commit, push, and open PRs for completed changes**: When asked to implement, edit, or write up changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed in the working directory. Always finish the delivery cycle: stage and commit the changes (linking the tracking issue created per issue-first; see `shared/workflow/issue-first.md`), push the branch to origin, open a Pull Request (if one does not exist), request AI review (`@claude review` / review workflow), and drive to clean via ARDI. (User directive / CAI, 2026-08-18.)
 - When opening a GitHub PR, trigger AI review (`@claude review` / `@agy review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
   The one exception is `Lacaedemon/sparta`, which never requests human review, on AI review approval or on deadlock escalation alike.
-- **In repos whose review workflow does not auto-trigger on PR activity, ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`) when done pushing code for the round.**
-  `ai-config` now auto-reviews ordinary in-repo PR opens and pushes via `pull_request`, so explicit dispatch is the exception rather than the default there. Keep using the manual path when the automatic one cannot fire or was intentionally bypassed, such as an explicit `@claude review` request, a redispatch after an `@claude` agent push, or a skipped path like a fork PR. Do not wait to be asked "did you request claude review?", and never post a self-generated review summary comment to satisfy `check-pr-fully-clean.py` instead of running an authentic `@claude` review. (User correction, 2026-08-16; updated 2026-08-20.)
+- **In repos whose review workflow does not auto-trigger on PR activity,
+  ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`)
+  when done pushing code for the round.**
+  `ai-config` now auto-reviews ordinary in-repo PR opens and pushes
+  via `pull_request`,
+  so explicit dispatch is the exception rather than the default there.
+  Keep using the manual path when the automatic one cannot fire
+  or was intentionally bypassed,
+  such as an explicit `@claude review` request,
+  a redispatch after an `@claude` agent push,
+  or a skipped path like a fork PR.
+  Do not wait to be asked "did you request claude review?",
+  and never post a self-generated review summary comment
+  to satisfy `check-pr-fully-clean.py`
+  instead of running an authentic `@claude` review.
+  (User correction, 2026-08-16; updated 2026-08-20.)
 - Before dispatching an expensive external action from committed source -- for
   example, a pinned worktree build, release, deployment, or batch computation --
   create, push, and open the feature PR first. The PR must expose the exact SHA

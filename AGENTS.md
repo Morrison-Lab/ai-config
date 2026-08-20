@@ -21,7 +21,7 @@ scope restriction.
 
 ## No empty promises
 
-A commitment about your own future behaviour --- "going forward, I will X", "from now on I won't Y", "I'll always Z", "I won't do that again" --- must ship an implemented accountability mechanism in the same turn, or not be made at all.
+A commitment about your own future behaviour --- "going forward, I will X", "from now on I won't Y", "I'll always Z", "I won't do that again", "that is owed by me" --- must ship an implemented accountability mechanism in the same turn, or not be made at all.
 A written rule or memory entry is the minimum and is always available;
 a hook or equivalent guard is the right form when the condition is decidable automatically;
 a filed issue covers work someone has to schedule.

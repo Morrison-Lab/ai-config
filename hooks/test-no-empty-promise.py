@@ -305,6 +305,33 @@ CASES = [
      False, "a promise in an EARLIER turn is not re-blocked"),
     ([say("Going forward I'll do X."), TOOL_RESULT, WROTE_MEMORY],
      False, "a tool_result does not end the turn"),
+    # A promise stated as a DEBT rather than as a modal (#1792). No "I'll"
+    # appears anywhere in these, so every modal alternative above misses
+    # them, and the bookkeeping tone is what makes them pass self-review.
+    ([say("The UMS pass is owed by me.")],
+     True, "'owed by me' with no mechanism blocks"),
+    ([say("I owe you a hook for this one.")],
+     True, "'I owe you' with no mechanism blocks"),
+    ([say("I still owe that follow-up entry.")],
+     True, "'I still owe' with no mechanism blocks"),
+    ([say("We owe a tracking issue on this."), UNRELATED],
+     True, "'we owe' with unrelated tool work blocks"),
+    ([say("The UMS pass is owed by me."), WROTE_FRAGMENT],
+     False, "'owed by me' discharged by a fragment write"),
+    ([say("I owe a hook here."), FILED_ISSUE],
+     False, "'I owe' discharged by a filed issue"),
+
+    # The negatives that decide whether this alternative is usable at all.
+    # This corpus says "owed" constantly in ordinary rule prose, so a bare
+    # `owed` match would block every reply that cites those rules.
+    ([say("An owed UMS pass is pre-authorized sidecar work.")],
+     False, "'an owed UMS pass' names no owner and does not block"),
+    ([say("Say in the same reply that the pass is owed and when it runs.")],
+     False, "'the pass is owed' names no owner and does not block"),
+    ([say("That review is owed by the reviewer, not by me.")],
+     False, "'owed by' a third party does not block"),
+    ([say("I owed you an answer yesterday and gave it.")],
+     False, "past-tense 'owed' reports rather than promises"),
 ]
 
 

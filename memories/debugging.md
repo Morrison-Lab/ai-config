@@ -339,13 +339,12 @@ returned nothing and the citation was one step from being reported back to
 its author as dangling.
 The sentence was present verbatim the whole time.)
 
-**Third occurrence, 2026-08-20** (after ai-config#771): `never auto-reviews
-a PR on push`, quoted from the target, returned zero from `grep` in *both*
-`memories/debugging.md` and `memories/claude-review-dispatch.md`, wrapped across
-a line break in each; a `\s+`-tolerant regex over the full text found both.
-The remedy above was already written and simply not reached for, so what recurs
-is recall rather than knowledge --- and this machine's BSD `grep` rejects `-P`
-(`invalid option -- P`), confirming the portability caveat above.
+**Third occurrence, 2026-08-20** (after ai-config#771): `never auto-reviews a PR
+on push`, quoted from the target, returned zero from `grep` in *both* this file
+and `claude-review-dispatch.md`, split across a line break in each; a
+`\s+`-tolerant regex found both. The remedy above was already written and simply
+not reached for, so what recurs is recall, not knowledge --- and this machine's
+BSD `grep` rejects `-P` outright, confirming the portability caveat above.
 
 ## Writing robust bash scripts (recurring review findings)
 Lessons the reviewer flagged across the `session-lock` PR (d-morrison/ai-config#38) —

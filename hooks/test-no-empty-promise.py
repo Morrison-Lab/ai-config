@@ -38,6 +38,23 @@ FILED_ISSUE = {"type": "assistant", "message": {"content": [
      "input": {"command": "gh issue create -R o/r --title x --body y"}}]}}
 UNRELATED = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "name": "Bash", "input": {"command": "git status"}}]}}
+WROTE_VIA_BASH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "cat > shared/workflow/x.md <<'EOF'\nrule\nEOF"}}]}}
+DISPATCHED_UMS = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Task",
+     "input": {"prompt": "Run a ums pass recording this learning.",
+               "description": "owed UMS pass"}}]}}
+# Reads over rule surfaces -- ordinary work in this corpus, and the reason a
+# bare path match on any tool payload is unsound.
+READ_RULE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Read", "input": {"file_path": "CLAUDE.md"}}]}}
+GREP_RULE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Grep",
+     "input": {"pattern": "verdict", "path": "shared/workflow/ardi.md"}}]}}
+CAT_RULE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "cat shared/workflow/ardi.md | head -40"}}]}}
 PROMPT = {"type": "user", "message": {"content": [
     {"type": "text", "text": "next task please"}]}}
 TOOL_RESULT = {"type": "user", "message": {"content": [
@@ -79,9 +96,23 @@ CASES = [
      False, "filing the tracking issue discharges it"),
     ([say("Going forward I'll do X --- enforced by "
           "`hooks/no-empty-promise.py`, added in this PR.")],
-     False, "prose naming the mechanism in the same message discharges it"),
+     True, "prose naming the mechanism does NOT discharge it (review #1724)"),
+    ([say("Going forward I will add `hooks/no-foo.py` for it.")],
+     True, "the future-tense self-naming near-miss blocks (review #1724)"),
     ([say("Going forward I'll check `shared/` before writing anything.")],
      True, "a bare directory mention does NOT discharge the promise"),
+    ([WROTE_VIA_BASH, say("Going forward I'll do X.")],
+     False, "a shell heredoc write to a rule surface discharges it"),
+    ([DISPATCHED_UMS, say("Going forward I'll do X.")],
+     False, "dispatching the recording pass discharges it"),
+
+    # Reads must NOT discharge -- the second half of the same review finding.
+    ([say("Going forward, I will always check the rule first."), READ_RULE],
+     True, "reading CLAUDE.md does NOT discharge a promise (review #1724)"),
+    ([say("Going forward, I will always check the rule first."), GREP_RULE],
+     True, "grepping a shared/ fragment does NOT discharge it"),
+    ([say("Going forward, I will always check the rule first."), CAT_RULE],
+     True, "cat-ing a shared/ fragment does NOT discharge it"),
 
     # Near-misses that must pass.
     ([say("I'll open the PR now and report back.")],
@@ -109,8 +140,11 @@ CASES = [
      False, "a fenced example does not block"),
 
     # Ordering and turn scope.
-    ([WROTE_FRAGMENT, say("Separately, going forward I'll do X.")],
-     True, "mechanism work preceding the promise does not discharge it"),
+    # Order within the turn is deliberately not tested: the ordinary shape is
+    # to build the mechanism and then state the rule in the closing message,
+    # so requiring the write to come AFTER would block the correct case.
+    ([WROTE_FRAGMENT, say("Going forward I'll do X.")],
+     False, "a mechanism written EARLIER in the same turn discharges it"),
     ([say("Going forward I'll do X."), PROMPT, say("Here is the answer.")],
      False, "a promise in an EARLIER turn is not re-blocked"),
     ([say("Going forward I'll do X."), TOOL_RESULT, WROTE_MEMORY],

@@ -32,11 +32,17 @@ matched, and only when the same turn produced no durable mechanism.
 
 WHAT DISCHARGES IT
 ------------------
-Any durable, inspectable artifact written at or after the promise, in the same
-turn: a write to a rule surface (`CLAUDE.md`, `AGENTS.md`, `memories/`,
-`shared/`, `skills/`, `hooks/`, `.claude/settings.json`), a filed issue, or an
-invocation of `memorize`/`ums`. Prose naming such an artifact discharges it
-too, since reporting "added `hooks/x.py`" is how a discharged promise reads.
+A tool call in the same turn that actually SHIPS something durable: a write to
+a rule surface (`CLAUDE.md`, `AGENTS.md`, `memories/`, `shared/`, `skills/`,
+`hooks/`, `.claude/settings.json`), a filed issue, or a `memorize`/`ums`
+invocation. Order within the turn does not matter -- the mechanism is normally
+built before the closing message that states the rule.
+
+Prose does NOT discharge, and neither does a read. Both are the same mistake
+from opposite ends: a check keyed on a rule-surface path merely APPEARING
+would pass "going forward I'll add `hooks/x.py`" -- the exact near-miss this
+guard exists for -- and would also pass any turn that happened to `Read` or
+`grep` a rule file, which is most of them. See `discharges()`.
 
 There is deliberately no "not mechanizable" escape, unlike
 no-mistake-without-a-hook.py. That hook needs one because a one-off factual
@@ -156,6 +162,20 @@ MECHANISM_WORD = re.compile(
     re.I,
 )
 
+# Tools that WRITE. Lowercased at the comparison, since the same tool is
+# spelled `Write`/`Edit` by one harness and `create`/`edit` by another.
+WRITE_TOOLS = {
+    "write", "edit", "multiedit", "notebookedit",
+    "create", "update", "str_replace_editor", "apply_patch",
+}
+
+# What makes a shell command a write rather than a read.
+BASH_WRITE = re.compile(
+    r">>?[^&|]|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)\b"
+    r"|--write\b|\bpatch\b|\bmkdir\b|\b(?:mv|cp)\s",
+    re.I,
+)
+
 
 def records(path):
     with open(path, errors="ignore") as fh:
@@ -167,15 +187,22 @@ def records(path):
 
 
 def scan(path):
-    """Return (promise_text, promised_at, mechanism_at) for the current turn.
+    """Return (promise_text, mechanism_written) for the CURRENT turn.
 
-    Indices restart at each real user prompt, so "the same turn" is what the
+    Scope resets at each real user prompt, so "the same turn" is what the
     comparison actually tests. A promise left undischarged in an earlier turn
     was already blocked when it was composed; re-blocking it every turn after
     would wedge the session.
+
+    Order within the turn is deliberately NOT tested, which is where this
+    parts company with no-mistake-without-a-hook.py. That hook scans the whole
+    session, so it needs an index comparison for "after the admission" to mean
+    anything. Here the window is one turn, and the ordinary shape is to build
+    the mechanism first and state the rule in the closing message -- so
+    requiring the write to come after the promise would block the correct
+    case and pass almost nothing else.
     """
-    promise_txt, promise_at, mech_at = None, -1, -1
-    i = -1
+    promise_txt, mech = None, False
 
     for m in records(path):
         # A subagent's own turns are not my outgoing message.
@@ -192,14 +219,12 @@ def scan(path):
                 for b in blocks
             )
             if not is_tool_result:
-                promise_txt, promise_at, mech_at = None, -1, -1
-                i = -1
+                promise_txt, mech = None, False
             continue
 
         if kind != "assistant" or not isinstance(blocks, list):
             continue
 
-        i += 1
         for b in blocks:
             if not isinstance(b, dict):
                 continue
@@ -210,23 +235,58 @@ def scan(path):
                     continue
                 hit = PROMISE.search(visible_prose(raw))
                 if hit:
-                    promise_txt, promise_at = hit.group(0).strip(), i
-                # Discharge is read from the RAW text: a path naming the
-                # mechanism is normally written in backticks, which
-                # visible_prose strips.
-                if MECHANISM_PATH.search(raw):
-                    mech_at = i
+                    promise_txt = hit.group(0).strip()
 
             elif b.get("type") == "tool_use":
-                name = b.get("name") or ""
-                inp = b.get("input") or {}
-                if not isinstance(inp, dict):
-                    continue
-                blob = name + " " + json.dumps(inp)
-                if MECHANISM_PATH.search(blob) or MECHANISM_WORD.search(blob):
-                    mech_at = i
+                if discharges(b.get("name") or "", b.get("input") or {}):
+                    mech = True
 
-    return promise_txt, promise_at, mech_at
+    return promise_txt, mech
+
+
+def discharges(name, inp):
+    """Does this tool call actually SHIP a mechanism?
+
+    Naming a rule surface is not shipping one, in either direction:
+
+      * Prose does not discharge at all. The whole near-miss this guard
+        exists for is the promise that names its own mechanism in the future
+        tense ("going forward I'll add `hooks/x.py`"), and any check keyed on
+        the path appearing in the text passes exactly that sentence. There is
+        no real cost to dropping it: a mechanism built by a subagent still
+        shows up as this turn's `Agent` call, and one built by a skill shows
+        up as the `Skill` call.
+      * A READ does not discharge either. `Read`, `Grep`, and `cat` over a
+        rule surface are what ordinary work in this corpus looks like, so
+        matching any tool whose payload mentions such a path would discharge
+        nearly every turn.
+
+    So each tool kind is asked the question its own payload can answer.
+    """
+    if not isinstance(inp, dict):
+        return False
+    low = name.lower()
+
+    if low in WRITE_TOOLS:
+        target = " ".join(
+            str(inp.get(k, "")) for k in ("file_path", "path", "notebook_path")
+        )
+        return bool(MECHANISM_PATH.search(target))
+
+    if low == "bash":
+        cmd = str(inp.get("command", ""))
+        if MECHANISM_WORD.search(cmd):
+            return True
+        # A shell write needs BOTH a rule surface and something that writes to
+        # it, so `cat shared/workflow/ardi.md` reads as the read it is.
+        return bool(MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd))
+
+    if low in ("task", "agent", "skill"):
+        blob = " ".join(str(inp.get(k, "")) for k in
+                        ("prompt", "description", "skill", "args"))
+        return bool(MECHANISM_PATH.search(blob) or MECHANISM_WORD.search(blob))
+
+    return False
 
 
 def main() -> int:
@@ -243,19 +303,15 @@ def main() -> int:
         return 0
 
     try:
-        promise_txt, promise_at, mech_at = scan(path)
+        promise_txt, mech = scan(path)
     except Exception:
         return 0  # fail open
 
-    if promise_at < 0:
-        return 0
-    # `>=` rather than `>`: one message can both promise and ship the
-    # mechanism, and that is the ideal shape rather than a violation.
-    if mech_at >= promise_at:
+    if not promise_txt or mech:
         return 0
 
     key = hashlib.sha256(
-        f"{path}:{promise_txt}:{promise_at}".encode()).hexdigest()[:16]
+        f"{path}:{promise_txt}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-promise-{key}")
     if os.path.exists(sentinel):
         return 0

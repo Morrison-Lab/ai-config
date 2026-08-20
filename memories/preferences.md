@@ -773,7 +773,8 @@
   Recovery is to surface it as a blocker --- get a human approving review, or ask the user to *explicitly* authorize the `--admin` bypass --- not to keep retrying `--admin`.
   A concrete instance of `shared/workflow/review-verdict-pitfalls.md`'s rule that a required check/review failing is a stop-and-ask even under a merge grant. (Learned on ucdavis/bcs#317, 2026-07-09.)
 - When subscribed to two or more PRs at once (`subscribe_pr_activity` on several in the same session, or a stacked-PR chain), track each as a task with `TaskCreate`/`TaskUpdate` instead of holding their status only in chat prose.
-  The harness already nudges toward this ("task tools haven't been used recently") whenever a session sits on unlogged concurrent work; use them rather than juggling several scheduled check-ins and webhook threads from memory alone. (Learned on ai-config#493/#498/#499, 2026-07-05: three concurrent PR watches were tracked only in chat text, exactly the case these tools are for.)
+  The harness already nudges toward this ("task tools haven't been used recently") whenever a session sits on unlogged concurrent work;
+  use them rather than juggling several scheduled check-ins and webhook threads from memory alone. (Learned on ai-config#493/#498/#499, 2026-07-05: three concurrent PR watches were tracked only in chat text, exactly the case these tools are for.)
   **That harness nudge predates Claude Code v2.1.233 and no longer fires by default on a current-model session** --- `TaskCreate`/`TaskUpdate` are off by default there (see `memories/claude-code.md`'s "off by default" section).
   Where they're absent, track concurrent PR/stack status in CLAUDE.md's on-disk lab notebook instead.
 

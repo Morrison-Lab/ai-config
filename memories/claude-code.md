@@ -1047,11 +1047,13 @@ Confirmed empirically in a Sonnet 5 session on 2026-08-20: neither name appears 
 `TaskOutput`/`TaskStop` are a different, still-present family (background **agent/job** management, not a personal to-do list) and don't substitute.
 
 This breaks an assumption baked into two `memories/preferences.md` bullets written before the change: "keep a live TaskList" and "the harness already nudges toward this" both describe a default that no longer holds on a current-model session unless the env var is set.
-Neither bullet is wrong for a session where the tools *are* present (an older model, or the env var); they're just no longer a safe default to assume.
+Neither bullet is wrong for a session where the tools *are* present (an older model, or the env var);
+they're just no longer a safe default to assume.
 
 - **Do:** check whether `TaskCreate`/`TodoWrite` actually appear in this session's tool list before relying on the "keep a live TaskList" guidance, rather than assuming the harness nudge still fires.
 - **Do:** fall back to `CLAUDE.md`'s on-disk session lab notebook, or a plain scratchpad markdown checklist, for tracking multi-PR/subagent state when the task tools are absent.
 - **Don't:** brief a dispatched subagent to use `TaskCreate`/`TaskUpdate` without first confirming those tools are actually in *its* tool list --- a subagent runs the same model family and inherits the same default-off state as the conductor.
-- **Don't:** read the tools' absence as a bug; it's the current default, reversible per-session with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
+- **Don't:** read the tools' absence as a bug;
+  it's the current default, reversible per-session with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
 
 See [Claude Code v2.1.233 release notes](https://github.com/anthropics/claude-code/releases/tag/v2.1.233).

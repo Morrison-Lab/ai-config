@@ -67,3 +67,23 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Example**: Morrison-Lab/ai-config#1531: at `3a373100`, the body still claimed +31/-3 across 1 file at `685b5dc8`, while HEAD had moved to +35/-4 across 2 files.
 - **Canonical Rule**: See `shared/workflow/ardi.md` and `scripts/check-pr-body-figures.py` (Morrison-Lab/ai-config#1549).
 - **Fix**: Run `python3 scripts/check-pr-body-figures.py` to mechanically compare stated figures and derivation SHAs against the HEAD commit.
+
+## Pattern 8: Taking Shortcuts That Remove Features
+- **Mistake**: When fixing a bug or error, removing the feature that's broken rather than fixing it properly.
+- **Example**: matt.contracts SAP article had `format: html/docx/revealjs`
+  causing a build error.
+  Removed the format block entirely
+  instead of fixing it to use the correct pattern.
+- **Anti-pattern**: Deleting code/config that causes an error,
+  disabling a feature to make CI green,
+  commenting out a failing test,
+  removing a dependency instead of fixing the integration.
+- **Canonical Rule**: none states this case directly --- the nearest is
+  [`dont-incur-technical-debt.md`](../shared/principles/dont-incur-technical-debt.md)
+  ("shipping the version that routes around it"), which covers routing around a
+  needed change rather than deleting the feature that exposed it.
+  Tracked as a gap in Morrison-Lab/ai-config#1746.
+- **Fix**: Diagnose the root cause and fix it while preserving the feature.
+  If unsure how, use a subagent to research the correct approach
+  or check sibling repos for the working pattern.
+  The only valid reason to remove a feature is the user explicitly asking for it.

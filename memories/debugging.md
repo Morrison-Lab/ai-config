@@ -79,10 +79,11 @@ lines had accumulated — unrelated to fence state, but found in the same cycle.
   fresh review fetch; answering from chat can leave a landed review
   unread (gha#511, 2026-08-18).
 - **In repos whose review workflow carries a `pull_request` trigger.**
-  `Morrison-Lab/ai-config` does not, so a push there schedules no review at all
-  and polling never terminates --- see
-  [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "`ai-config` never
-  auto-reviews a PR on push" for the trigger table and the dispatch command.
+  `Morrison-Lab/ai-config` does again, as of #1707 on 2026-08-20, so a push
+  there does schedule a review and polling terminates normally --- see
+  [`claude-review-dispatch.md`](claude-review-dispatch.md)'s "`ai-config`
+  auto-reviews on push as of 2026-08-20, and did not before" for the dated
+  trigger table, and read its date rather than assuming either answer.
 - Poll until a review note appears that references your latest commit SHA.
 - Wait ~30-60s, then check. If nothing after ~2min, check pipeline status.
 - The iterate skill now has explicit polling instructions for both GitHub and GitLab.

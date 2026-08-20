@@ -114,6 +114,28 @@ check("unquoted heredoc word",
           "gh pr create --fill\n"
           "EOF"),
       False)
+# A real creation CHAINED ONTO THE OPENER LINE must still fire. Widening the
+# opener match to handle `cat <<'EOF' > file` first suppressed these, which is
+# the false-negative direction and the one this hook exists to catch (#1749).
+check("creation chained after the opener with &&",
+      hook.creates_pr(
+          "cat <<'EOF' > /tmp/b.md && gh pr create --body-file /tmp/b.md\n"
+          "body\n"
+          "EOF"),
+      True)
+check("creation chained after the opener with ;",
+      hook.creates_pr(
+          "cat <<'EOF' >> /tmp/b.md ; gh pr create --fill\n"
+          "body\n"
+          "EOF"),
+      True)
+check("heredoc piped straight into the creation",
+      hook.creates_pr(
+          "cat <<'EOF' | gh pr create --body-file -\n"
+          "body\n"
+          "EOF"),
+      True)
+
 # A real creation AFTER a heredoc block must still fire.
 check("real creation following a heredoc still fires",
       hook.creates_pr(
@@ -175,6 +197,15 @@ check("end-to-end silent on unrelated command",
       run_hook("git status", no_check), "")
 check("end-to-end silent on prose",
       run_hook("echo 'gh pr create'", no_check), "")
+
+# A truthy non-dict tool_input must not crash either (#1749).
+proc = subprocess.run(
+    [sys.executable, HOOK],
+    input=json.dumps({"tool_name": "Bash", "tool_input": "oops"}),
+    capture_output=True, text=True, timeout=10)
+check("non-dict tool_input exits 0", proc.returncode, 0)
+check("non-dict tool_input prints no traceback",
+      "Traceback" in proc.stderr, False)
 
 # A non-Bash tool must be ignored outright.
 proc = subprocess.run(

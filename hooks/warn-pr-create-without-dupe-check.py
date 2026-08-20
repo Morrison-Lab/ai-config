@@ -125,7 +125,7 @@ RX_HEREDOC = re.compile(
     # `<<WORD`, `<<'WORD'`, `<<-"WORD"`; then anything else on the opener line
     # (a redirect or a pipe may follow the opener, not only precede it); then
     # the body, up to a terminator that `<<-` allows to be tab-indented.
-    r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n"
+    r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?([^\n]*)\n"
     r".*?\n[ \t]*\1\b",
     re.DOTALL,
 )
@@ -151,8 +151,15 @@ another way, carry on --- this is a reminder, not a refusal.
 
 
 def strip_heredocs(command):
-    """Remove heredoc bodies so quoted prose cannot look like a command."""
-    return RX_HEREDOC.sub("", command)
+    """Remove heredoc BODIES, keeping the rest of the opener line.
+
+    Only the body is prose. The opener line's tail is still shell, and it
+    routinely carries the very command this hook looks for --- piping a heredoc
+    into `gh pr create --body-file -` is the idiomatic way to open a PR with a
+    multi-line body. Discarding that tail along with the body suppressed exactly
+    the commands the hook exists to catch (caught in review on #1749).
+    """
+    return RX_HEREDOC.sub(lambda m: m.group(2), command)
 
 
 def creates_pr(command):
@@ -220,7 +227,9 @@ def main():
     if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
         return 0
 
-    tool_input = payload.get("tool_input") or {}
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        tool_input = {}
     command = (tool_input.get("command")
                or tool_input.get("cmd")
                or tool_input.get("CommandLine")

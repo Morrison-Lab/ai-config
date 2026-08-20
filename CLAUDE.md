@@ -1271,6 +1271,26 @@ Distinct from `ardi`'s fixture bullets, which are about coverage (a fixture
 too thin to reach a branch) rather than about the inference drawn from one
 that works fine.
 
+## Verify the artifact the claim is about, not an adjacent one
+
+Three rules in this corpus each name one adjacent artifact that stands in for
+the real one: the fixture rule directly above,
+`metacognitive-monitoring`'s neighbouring step read for a failure's cause, and
+`fact-check-prose`'s published build read for the branch that produced it.
+The substitution is general, and outside those three situations none of the
+three loads.
+
+It is not lazy verification but thorough verification of the wrong object, so
+the evidence is real, the reasoning from it is sound, and nothing feels like a
+guess.
+The fragment names four recognizable shapes --- a cached copy for the origin, a
+checkout for the run, one half of a mechanism for the whole, a neighbour for
+the target --- and one test that works where confirming the claim cannot:
+ask what would have to be true for the claim to be **false**, and whether the
+artifact in hand could show it.
+
+[shared/workflow/verify-the-right-artifact.md](shared/workflow/verify-the-right-artifact.md)
+
 ## Challenge unnecessary complexity in review
 
 [shared/workflow/challenge-unnecessary-complexity.md](shared/workflow/challenge-unnecessary-complexity.md)

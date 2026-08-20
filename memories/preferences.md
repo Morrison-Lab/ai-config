@@ -61,6 +61,11 @@
   When a genuine gap exists, add real tests targeting the specific uncovered lines, not padding aimed at the percentage.
   Same pass, opposite direction: while touching a test file, look for redundant tests worth removing or consolidating --- near-duplicate cases that don't each pin something distinct --- and keep only the ones that are meaningful and important.
   Growing a suite and trimming it are the same review habit, not two separate ones. (Directive from the user, 2026-07-14, sparta gii-ffdb93 session --- led to the local `patch_coverage` tool in sparta#852, and to a redundancy pass over the new tests it and sparta#853 added before pushing.)
+- Pair every table of results with a figure visualizing the same data,
+  wherever feasible.
+  A table is precise but hard to scan for patterns;
+  a figure shows shape and trend at a glance.
+  Present both so the reader gets both precision and intuition.
 - ALWAYS record what I learn in memory/AI-instruction notes as I work (standing request).
 - Memories must NEVER be local-only
   (session memory, auto-memory, or local-only files).

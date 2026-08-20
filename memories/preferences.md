@@ -792,7 +792,7 @@
 - **A harness/tool-availability claim needs to be scoped to invocation context, not just model and date, before it goes into shared memory as a settled fact.**
   Do: state which kind of session produced the observation (interactive CLI vs. a dispatched review/agent session, e.g. `claude-code-action`) alongside the model and date, and hedge or re-check across contexts before generalizing from one.
   Don't: write "confirmed absent on Sonnet 5" (or similar) from a single session's tool list and let it stand as an unqualified default --- the same model, same day, running as a dispatched review job can show the opposite.
-  This is a distinct axis from `shared/writing/timestamp-volatile-claims.md`'s time-based staleness: two observations can both be current and still disagree, because they were taken in different invocation contexts rather than at different times. (Learned on ai-config#1732, 2026-08-20: a `TaskCreate`/`TodoWrite`-availability claim, confirmed empirically in an interactive CLI session, was contradicted by the PR's own dispatched `claude-review` run observing the opposite at the same model and date --- caught in round-1 review, not by self-check.)
+  This is a distinct axis from `shared/writing/timestamp-volatile-claims.md`'s time-based staleness: two observations can both be current and still disagree, because they were taken in different invocation contexts rather than at different times. (Generalized from the `TaskCreate`/`TodoWrite` incident recapped in the bullet above, ai-config#1732, 2026-08-20 --- caught in round-1 review, not by self-check.)
 
 ## Output-highlighting taxonomy
 

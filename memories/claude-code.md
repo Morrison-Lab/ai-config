@@ -1066,11 +1066,19 @@ The system prompt's "Scratchpad Directory" section names a path of the form
 `<uuid>` is the session id `check-mwc` reports as active when passed to it.
 
 Treat this as a working fallback, not a guaranteed match:
-`check-mwc` itself resolves the guard's own view of the session id from the
-`PreToolUse` hook payload (`session_id`/`sessionId`, then
-`conversation_id`/`conversationId`, then the transcript-path stem), which is a
-different resolution path than the scratchpad directory name, and the two
-are not documented as sourced from the same value.
+`check-mwc` itself only ever resolves its id from `--id`, `$AI_SESSION_ID`/
+`$CLAUDE_SESSION_ID`, or a single-live-session fallback (`ai-session.sh`'s
+`resolve_id_or_single_live()`) --- it never reads a hook payload at all, since
+it's a plain bash script with no such input.
+The `PreToolUse` hook payload resolution (`session_id`/`sessionId`, then
+`conversation_id`/`conversationId`, then the transcript-path stem) belongs to
+a separate component: `resolve_session_id()` in `hooks/no-unauthorized-merge.py`,
+the guard that actually gates the merge tool call.
+That is a different resolution path than the scratchpad directory name, and
+the two are not documented as sourced from the same value --- `check-mwc`'s
+own help text names this explicitly when the env vars are unset ("The
+pre-tool-use merge guard resolves session id from the harness hook
+payload..."), attributing it to the guard rather than to itself.
 Confirm with `check-mwc --id "<uuid>"` returning exit 0 before relying on it,
 and if a merge is still blocked after that, re-derive the id from a live
 merge attempt's own denial message rather than trusting the scratchpad guess

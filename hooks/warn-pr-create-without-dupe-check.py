@@ -66,6 +66,13 @@ A heredoc is the specific trap: writing an issue body that contains the words
 `gh pr create` on its own line puts the phrase at what looks like a command
 position. Clause 1 therefore strips heredoc bodies before matching.
 
+The stripper has to accept every shape the shell does, not the one that came to
+mind first. A redirect may follow the opener as readily as precede it
+(`cat <<'EOF' > file`, `cat <<'EOF' | tee file`), and `<<-` permits a
+tab-indented terminator. An earlier revision matched only `cat > file <<'EOF'`,
+and its tests covered only that form --- so the suite inherited the blind spot
+rather than exposing it. Caught in review on #1749.
+
 WHAT DISCHARGES IT
 ------------------
 Any earlier command that could surface an existing PR:
@@ -115,7 +122,11 @@ RX_DISCHARGE = re.compile(
 
 # A heredoc body is prose, not commands. Strip it before position matching.
 RX_HEREDOC = re.compile(
-    r"<<-?\s*'?\"?([A-Za-z_][A-Za-z0-9_]*)'?\"?\s*\n.*?\n\1\b",
+    # `<<WORD`, `<<'WORD'`, `<<-"WORD"`; then anything else on the opener line
+    # (a redirect or a pipe may follow the opener, not only precede it); then
+    # the body, up to a terminator that `<<-` allows to be tab-indented.
+    r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?[^\n]*\n"
+    r".*?\n[ \t]*\1\b",
     re.DOTALL,
 )
 
@@ -202,6 +213,9 @@ def main():
         print("warn-pr-create-without-dupe-check: unreadable hook input "
               f"({exc})", file=sys.stderr)
         return 0
+
+    if not isinstance(payload, dict):
+        return 0  # fail open: the harness always sends an object
 
     if payload.get("tool_name") not in ("Bash", "bash", "run_command"):
         return 0

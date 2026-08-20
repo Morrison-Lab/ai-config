@@ -88,6 +88,40 @@ check("heredoc body quoting it after &&",
           "git push && gh pr create\n"
           "MD"),
       False)
+# The opener may PRECEDE the redirect; an earlier revision only handled the
+# other order, and the tests only covered the order that worked (#1749).
+check("heredoc with redirect after the opener",
+      hook.creates_pr(
+          "cat <<'EOF' > /tmp/b.md\n"
+          "gh pr create --fill\n"
+          "EOF"),
+      False)
+check("heredoc piped to tee",
+      hook.creates_pr(
+          "cat <<'EOF' | tee /tmp/b.md\n"
+          "gh pr create --fill\n"
+          "EOF"),
+      False)
+check("<<- with a tab-indented terminator",
+      hook.creates_pr(
+          "cat <<-'EOF' > /tmp/b.md\n"
+          "gh pr create --fill\n"
+          "\tEOF"),
+      False)
+check("unquoted heredoc word",
+      hook.creates_pr(
+          "cat <<EOF > /tmp/b.md\n"
+          "gh pr create --fill\n"
+          "EOF"),
+      False)
+# A real creation AFTER a heredoc block must still fire.
+check("real creation following a heredoc still fires",
+      hook.creates_pr(
+          "cat <<'EOF' > /tmp/b.md\n"
+          "some body text\n"
+          "EOF\n"
+          "gh pr create --body-file /tmp/b.md"),
+      True)
 check("unrelated gh command", hook.creates_pr("gh pr list"), False)
 check("pr create as a substring of another word",
       hook.creates_pr("gh pr createfoo"), False)
@@ -154,6 +188,14 @@ proc = subprocess.run([sys.executable, HOOK], input="not json",
                       capture_output=True, text=True, timeout=10)
 check("malformed input exits 0", proc.returncode, 0)
 check("malformed input prints nothing to stdout", proc.stdout.strip(), "")
+
+# A well-formed but non-dict payload must also fail open, not traceback (#1749).
+for literal in ("123", "null", "[1,2]", '"a string"'):
+    proc = subprocess.run([sys.executable, HOOK], input=literal,
+                          capture_output=True, text=True, timeout=10)
+    check(f"non-dict payload {literal} exits 0", proc.returncode, 0)
+    check(f"non-dict payload {literal} prints no traceback",
+          "Traceback" in proc.stderr, False)
 
 for path in (no_check, with_list, with_view, with_search, with_mcp,
              with_mcp_read):

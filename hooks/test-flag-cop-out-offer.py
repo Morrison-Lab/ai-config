@@ -78,9 +78,15 @@ def run(events):
             [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True, env=env,
         )
-        # WARNS on stderr and must never block: assert both.
+        # Must never block, and must SURFACE the warning. Asserting on stderr
+        # alone cannot tell a surfaced warning from discarded output, so the
+        # positive signal is `systemMessage` on stdout.
         assert '"decision": "block"' not in r.stdout, "guard must never block"
-        return "flag-cop-out-offer" in r.stderr
+        if not r.stdout.strip():
+            return False
+        payload = json.loads(r.stdout)
+        assert "systemMessage" in payload, "warn-only Stop hook must emit systemMessage"
+        return "offer" in payload["systemMessage"].lower()
     finally:
         os.unlink(path)
 

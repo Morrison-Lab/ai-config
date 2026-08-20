@@ -111,6 +111,16 @@ def main() -> int:
     except Exception:
         pass
 
+    # A warn-only Stop hook must emit `systemMessage` on stdout: stderr alone
+    # can be discarded, so a guard that writes only there is indistinguishable
+    # from one that never fired. That is the failure this hook is about --
+    # something that looks like it is working and delivers nothing.
+    print(json.dumps({"systemMessage": (
+        f"Your reply closes on an offer to do work: \"{phrase}\". "
+        "Was that action already authorized? If so, do it and report in the "
+        "past tense -- an unanswered offer leaves no branch, no PR, no issue."
+    )}))
+
     sys.stderr.write(
         f"[hook: flag-cop-out-offer] Your reply closes on an offer: "
         f"\"{phrase}\".\n\n"

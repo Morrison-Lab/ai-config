@@ -371,6 +371,42 @@ def main() -> int:
             "Ready for merge. This PR widens coverage of \"Needs more work\" verdicts."
         ) == "clean",
     )
+    # A bold-labeled citation of a PAST verdict, bare in parentheses rather
+    # than in quotes -- the ai-config#1752 case that #1760 fixes. Neither the
+    # code-span nor the quote handling touches this shape.
+    check(
+        "classify_verdict: a bold-in-parens PAST-verdict citation is not a "
+        "verdict (#1760 strip, verbatim #1752 shape)",
+        checker.classify_verdict(
+            "The one finding from the previous review round "
+            "(**Needs more work**, reviewed at `53f9acbf`) is now Addressed."
+            "\n\n### Verdict\n**Ready for merge** -- no new issues found."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: 'previous round' wording also triggers the "
+        "bold-in-parens strip (#1760)",
+        checker.classify_verdict(
+            "The earlier finding (**Needs more work**, from the previous "
+            "round) is now fixed.\n\nVerdict: Ready for merge."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a bold-in-parens finding with NO citation wording "
+        "is still a real finding (#1760 safety direction)",
+        checker.classify_verdict(
+            "Found an issue (**Location:** foo.py:42) that still needs "
+            "fixing. Needs more work before merge."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: a bold-in-parens finding citing a SHA with no "
+        "citation wording is still a real finding (#1760 safety direction)",
+        checker.classify_verdict(
+            "Found a regression (**Bug:** off-by-one, introduced in "
+            "`abc1234`). Needs more work."
+        ) == "not-clean",
+    )
     check(
         "classify_verdict: findings win over a clean line in the same body",
         checker.classify_verdict("Ready for merge. But: Needs more work on the tests.") == "not-clean",

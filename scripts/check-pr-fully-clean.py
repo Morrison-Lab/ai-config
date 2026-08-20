@@ -248,6 +248,18 @@ def strip_cited_finding_vocab(text: str) -> str:
     preserved and still detected. Blanking less can only add safe-direction
     re-flags of a clean verdict; it never hides a real finding.
 
+    A THIRD citation shape, found on Morrison-Lab/ai-config#1752 (tracked as
+    #1760): a review narrating what changed since a prior round cites that
+    round's verdict as bold text inside a plain parenthetical, with no quotes
+    at all -- ``(**Needs more work**, reviewed at `abc1234`)``. Neither the
+    code-span nor the quote handling above touches this, because there ARE no
+    quotes. Blanking every bold-in-parens span would be unsafe -- a genuine
+    finding can legitimately read ``(**Location:** foo.py:42)`` -- so this is
+    gated on citation-shaped WORDING inside the same parenthetical
+    (``reviewed at``, or ``previous``/``prior``/``earlier``/``last`` next to
+    ``round``/``review``), not on the bold span alone. That wording is what a
+    citation of a past verdict carries and an ordinary finding does not.
+
     Spans are replaced with a space (not deleted) so surrounding text and the
     ``changes requested`` negation-prefix lookbehind stay separated.
     """
@@ -263,6 +275,19 @@ def strip_cited_finding_vocab(text: str) -> str:
     # Straight and curly double-quoted spans, within a line (bold-carrying spans kept).
     text = re.sub(r"\"[^\"\n]*\"", _blank_quote, text)
     text = re.sub("\u201c[^\u201d\n]*\u201d", _blank_quote, text)
+    # A bold-labeled citation of a PAST verdict, sitting bare in parentheses
+    # rather than in quotes (#1760). Gated on citation wording via lookahead so
+    # a genuine bold-labeled finding in parens is never blanked -- only a
+    # parenthetical that ALSO reads as citing a prior round is.
+    text = re.sub(
+        r"\((?=[^)\n]*\*\*[^*\n]+\*\*)"
+        r"(?=[^)\n]*\b(?:reviewed\s+at"
+        r"|(?:previous|prior|earlier|last)\s+(?:round|review))\b)"
+        r"[^)\n]*\)",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
     return text
 
 

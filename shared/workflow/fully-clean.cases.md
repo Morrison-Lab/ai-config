@@ -88,6 +88,51 @@ Passing `-R OWNER/REPO` explicitly avoids relying on the current working directo
    That is what disqualifies the candidate mechanisms above without supplying
    a replacement for them.)
 
+## The rollup gap dropping a FAILING run, and the rule failing at composition time
+
+The case above measured the disagreement on runs that were merely extra or
+in-flight. This one is the consequential version: the run the rollup dropped
+had `conclusion: failure`.
+
+`ucdavis/bcs#651` at `a5f4f3f2`, 2026-08-19. `gh pr checks` printed 21 rows,
+every one `pass`, with nothing pending. `commits/<sha>/check-runs?per_page=100`
+returned **24** runs, one of them:
+
+```text
+failure   review / antigravity-review
+```
+
+The PR was reported fully clean and ready to merge on the strength of the
+shorter list. `check-pr-fully-clean.py` caught it on the next turn, exiting 1
+with a single finding naming that run.
+
+Two things make this worth a second case record rather than a line appended to
+the first.
+
+**The omission is invisible by construction.** A short list and a clean list
+are the same observable. There is no gap in the output, no warning, and the
+counts look healthy -- 21 pass, 0 pending reads exactly like a finished head.
+Nothing about the reading announces that it could not see everything.
+
+**The prose rule already existed and was read the same session.** The rule
+directly above this one had been loaded into context, and the reporting error
+happened anyway, on a check whose failures had been *watched* three times
+earlier in that same session. Having seen the check red, the author reported a
+green count that did not contain it and did not notice the absence.
+
+That is the pattern [`deterministic-tools`](../principles/deterministic-tools.md)
+describes: a rule is consulted at read time and broken at composition time, so
+re-reading it does not reach the moment it breaks. The remedy was the hook
+`hooks/no-incomplete-check-enumeration.py`, which fires on the decidable
+condition -- a terminal clean claim, a `gh pr checks` reading, and no complete
+enumeration since the last push.
+
+- **Do:** take a clean verdict from `check-pr-fully-clean.py` or a paginated
+  `commits/<sha>/check-runs` read.
+- **Don't:** report a PR clean from `gh pr checks` counts, however current the
+  reading is -- currency and completeness are different properties, and only
+  one of them has a hook watching it.
+
 ## Criterion 2's verdict-vs-findings disagreement rate, measured
 
 (Sampled 2026-07-31 across 12 `Morrison-Lab/ai-config` PRs and 4 in

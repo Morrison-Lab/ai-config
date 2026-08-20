@@ -803,7 +803,8 @@ The message is what separates them:
   before rerunning when this message appears on a non-workflow PR.
   **Don't:** treat the message's "new repository" / "workflow changes" text as
   exhaustive, or spend `rerun_failed_jobs` before bringing the branch current.
-  See the self-mod skip bullet above for gha's own guard against the green form,
+  See the self-mod skip section in [`claude-review-dispatch.md`](claude-review-dispatch.md)
+  for gha's own guard against the green form,
   and `review-verdict-pitfalls.md` for the stale-branch red form.
 
 (Morrison-Lab/ai-config#981, 2026-07-31/2026-08-01: a non-workflow PR
@@ -839,7 +840,8 @@ workflow validation, where it skipped and exited 0 --- so its check reads
 `success` while the action never reviewed anything.
 Same repo, same secret, 15 seconds apart.
 
-That second run is also a worked example of the skip bullet above, and of how it
+That second run is also a worked example of the self-mod skip section, now in
+[`claude-review-dispatch.md`](claude-review-dispatch.md), and of how it
 misleads a careful reader.
 Round 2 of this PR's own review read that `success` conclusion and reported the
 sentence describing it as a fabricated claim, on the reasoning that a run which

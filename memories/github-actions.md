@@ -1,4 +1,4 @@
-# GitHub Actions authoring & the `Morrison-Lab/gha` reusable workflows
+# GitHub Actions authoring
 
 Generic Actions material: YAML authoring and the gotchas that bite any workflow.
 Reusable-workflow catalog: [`gha-reusable-workflows.md`](gha-reusable-workflows.md).

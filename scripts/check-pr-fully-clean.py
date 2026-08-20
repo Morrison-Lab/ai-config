@@ -150,6 +150,31 @@ def _is_bot_author(login: str) -> bool:
     )
 
 
+# Known review agent opening markers -- used to detect a review whose format the
+# classifier cannot read (Morrison-Lab/ai-config#1524).  The key is a lowercase
+# substring to match against the body; the value is a human-readable agent name.
+REVIEW_AGENT_MARKERS: Dict[str, str] = {
+    "**claude finished": "Claude",
+    "### \U0001f916 antigravity agent report": "Antigravity",
+    "verdict: block": "Jules",
+}
+
+
+def _detect_review_agent(body: str) -> Optional[str]:
+    """Return the agent name if *body* contains a known review agent marker.
+
+    Returns ``None`` when no marker matches -- which does NOT mean the comment
+    is not a review; it means the comment is not one of the agents whose format
+    we recognise.  A new agent or a format change lands here until its marker is
+    added to ``REVIEW_AGENT_MARKERS``.
+    """
+    body_lower = body.lower()
+    for marker, name in REVIEW_AGENT_MARKERS.items():
+        if marker in body_lower:
+            return name
+    return None
+
+
 def _resolve_run_head_sha(body: str, repo: str, branch: str = "") -> Optional[str]:
     """Extract a workflow run ID from a review comment body and return its head_sha.
 
@@ -438,6 +463,23 @@ def classify_verdict(body: str, state: str = "") -> str:
                 continue
             return "clean"
 
+    # A review from a known agent whose format the classifier cannot read is
+    # the dangerous third state (#1524): it is NOT "no review" (which triggers
+    # self-review fallback and wastes a round), and it is NOT "no verdict"
+    # (which is correctly skipped).  Report it as its own state so callers can
+    # distinguish it from both.
+    #
+    # Only fire when no pattern matched at all -- if a not-clean or clean
+    # pattern matched (even if later retracted by a negation/qualifier guard),
+    # the body is readable and should return "" rather than "unreadable".
+    if _detect_review_agent(body):
+        has_any_pattern_match = bool(
+            re.search("|".join(VERDICT_NOT_CLEAN_PATTERNS + VERDICT_CLEAN_PATTERNS),
+                       scan, re.IGNORECASE | re.MULTILINE)
+        )
+        if not has_any_pattern_match:
+            return "unreadable"
+
     return ""
 
 
@@ -449,6 +491,11 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     Items stating no verdict are skipped rather than treated as clearing,
     which is the distinction this check exists to enforce.
 
+    Items from a known review agent whose format cannot be classified are
+    reported as "unreadable" (#1524) -- distinct from both "no verdict" (skipped)
+    and "no review" (triggers self-review fallback).  A wrong answer here is
+    worse than an admitted one.
+
     Prints what it examined alongside what it found, so a zero here cannot be
     read as an all-clear when the real cause is that nothing was examined
     (fail-fast.md, "report what a check *examined*, not only what it *found*").
@@ -458,9 +505,13 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
     latest_verdict = ""
     latest_when = ""
     n_with_verdict = 0
+    unreadable_items = []
     for _kind, when, body, _oid, state, *_ in dated:
         verdict = classify_verdict(body, state)
-        if verdict:
+        if verdict == "unreadable":
+            agent = _detect_review_agent(body) or "unknown"
+            unreadable_items.append((when, agent))
+        elif verdict:
             n_with_verdict += 1
             latest_verdict, latest_when = verdict, when
 
@@ -474,7 +525,19 @@ def check_latest_verdict(all_items: List[tuple]) -> Tuple[bool, List[str]]:
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
             "and no later comment supersedes it with a clean verdict"
         ]
-    return True, []
+
+    # Unreadable reviews are reported but do NOT block -- they are a warning,
+    # not a verdict.  The caller surfaces them so a human (or a later agent
+    # session) can see that a review arrived but could not be read, rather than
+    # the misleading "no review" message that previously triggered a wasted
+    # self-review fallback round.
+    issues = []
+    for when, agent in unreadable_items:
+        issues.append(
+            f"NOTE: Review from {agent} ({when}) has a format the verdict "
+            "classifier cannot read -- not treated as 'no review'"
+        )
+    return True, issues
 
 
 def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str = "", branch: str = "") -> Tuple[bool, List[str]]:
@@ -629,7 +692,10 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
     if not has_findings and not issues:
         print(f"\u2713 Found clean review comment evaluating HEAD SHA {sha[:8]}")
 
-    return len(issues) == 0, issues
+    # NOTE-prefixed issues are informational (unreadable-format warnings) and
+    # do not block -- only real findings or missing reviews cause a failure.
+    blocking = [i for i in issues if not i.startswith("NOTE: ")]
+    return len(blocking) == 0, issues
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -665,9 +731,19 @@ def main():
 
     all_issues = ci_issues + review_issues
 
-    if all_issues:
+    # NOTE-prefixed issues are informational (unreadable-format warnings) and
+    # do not block -- only real findings or missing reviews cause a failure.
+    notes = [i for i in all_issues if i.startswith("NOTE: ")]
+    blocking = [i for i in all_issues if not i.startswith("NOTE: ")]
+
+    if notes:
+        print("\n\u2139\ufe0f Notes:")
+        for n in notes:
+            print(f"  - {n}")
+
+    if blocking:
         print("\n\u274c PR is NOT fully clean:")
-        for issue in all_issues:
+        for issue in blocking:
             print(f"  - {issue}")
         sys.exit(1)
 

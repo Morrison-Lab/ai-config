@@ -69,9 +69,29 @@ that requesting a reviewer is itself the exposure. See the "Redaction
 exemption" block below for that second one's two forms and why it is asserted
 rather than inferred.
 
+A THIRD deferral is legitimate, and unlike the other two it suspends the
+whole guard rather than one PR's obligation: a standing user directive not to
+request the reviewer at all. As of 2026-08-19 that is live -- Copilot review is
+off across ALL repos until September 2026 (memories/github.md, "Restated and
+widened 2026-08-19"). A user instruction outranks a hook, and every discharge
+this guard offers is the one action the directive forbids, so honoring it left
+the demand repeating on every turn -- the per-message dedup below stops one
+identical message re-firing, and does nothing about a demand that re-arms as
+the transcript grows, which is a different thing from the wedge that dedup
+prevents.
+
+The script now reads that directive itself, from `MORATORIUM_END` below, and
+`main` returns before scanning while it stands. Earlier revisions said to
+unregister the hook from the Stop hooks for the duration; do NOT rely on that
+now. It covers only a user-settings registration, and on a PLUGIN install the
+registration is this repo's own `hooks/hooks.json`, so there is nothing in
+`~/.claude/settings.json` to remove and unregistering silently does nothing
+(ai-config#1709).
+
 Fails OPEN on any parse trouble, and fires at most once per distinct message
 per transcript, so it cannot wedge a session.
 """
+import datetime
 import hashlib
 import json
 import os
@@ -79,6 +99,55 @@ import re
 import shlex
 import sys
 import tempfile
+
+# --- Copilot moratorium ----------------------------------------------------
+# Every discharge this guard offers is a Copilot reviewer request, so a
+# standing directive NOT to request Copilot leaves it with no satisfiable
+# demand at all. That directive is live: `memories/github.md` ("Restated and
+# widened 2026-08-19") forbids the request on ALL repos until September 2026.
+# A user instruction outranks a hook, so honoring it used to mean the demand
+# simply repeated every turn, on a session that was already doing the right
+# thing.
+#
+# The memory's prescribed remedy -- unregister the hook from
+# `~/.claude/settings.json` -- covers ONE installation shape. Where ai-config
+# is installed as a plugin the registration lives in this repo's own
+# `hooks/hooks.json` under `${CLAUDE_PLUGIN_ROOT}`, so there is nothing in the
+# user's settings to remove and the remedy silently does nothing
+# (ai-config#1709). That shape is now the common one: `d-morrison/rme#1074`
+# migrates off the submodule, and `Morrison-Lab/gha`'s
+# `run-claude-review-attempt` installs the plugin for every review run.
+#
+# So the switch belongs in the script, where both installation shapes read it.
+# It is a DATE rather than an env flag on purpose. An env flag has to be
+# unset by whoever remembers the quota returned, and a guard nobody remembers
+# to re-arm is a guard that is gone; a date re-arms itself on the day the
+# override itself names, which is the property
+# `shared/writing/timestamp-volatile-claims.md` asks of any claim whose truth
+# expires. Extending the moratorium is then an edit to this constant and to
+# the memory together, rather than a silent divergence between them.
+#
+# The guard is live ON the end date: the moratorium runs up to September 2026,
+# not through it.
+MORATORIUM_END = datetime.date(2026, 9, 1)
+
+
+def _today():
+    """Today's date, as its own function so a test can drive a fixed clock.
+
+    Deliberately NOT env-readable. A clock this guard reads from the
+    environment would be a one-variable bypass of the guard itself, which is
+    the same dangerous direction every discharge path here already refuses
+    (see shared/principles/fail-fast.md). Tests import the module and override
+    this name instead, which no session's environment can do.
+    """
+    return datetime.date.today()
+
+
+def moratorium_active(today=None):
+    """True while the Copilot request this guard demands is forbidden."""
+    return (today if today is not None else _today()) < MORATORIUM_END
+
 
 # Opening a PR, or taking a draft out of draft, via the CLI. The structured
 # harness/MCP tools are matched by NAME below, not by this pattern -- a
@@ -1581,6 +1650,11 @@ def scan(path):
 
 
 def main() -> int:
+    # Checked before the transcript is read: while the moratorium stands there
+    # is no request to demand, so there is nothing to scan for.
+    if moratorium_active():
+        return 0
+
     try:
         payload = json.load(sys.stdin)
         transcript = payload.get("transcript_path") or ""

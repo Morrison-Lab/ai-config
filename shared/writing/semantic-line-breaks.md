@@ -119,23 +119,52 @@ rather than accepting the joins.
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
 `_DEFAULT_CLAUSE_MIN_LENGTH` is 80.)
 
-**That check is advisory: it warns and exits 0, so a green CI job does not
-mean the diff is clean.**
-It emits `::warning::` annotations and a `N line(s) pack more than one
-sentence/clause` summary, then exits successfully, so the job it runs in
-reports success either way.
-Read its output rather than its color --- this is the same
-green-check-does-not-mean-clean-content pattern
-[`review-verdict-pitfalls`](../workflow/review-verdict-pitfalls.md) documents
-for review jobs, and it is easy to miss precisely because nothing turns red.
+**That check WAS advisory --- it warned and exited 0 --- and stopped being so
+on 2026-08-18.**
+`d-morrison/gha@e91b8bf` ("fail by default when violations are found",
+gha#508/#509) flipped `_DEFAULT_FAIL` to `True`, and this repo's `validate.yml`
+passes `NLB_FAIL: true` besides, so a violation now reddens the check rather
+than annotating a green one.
+Read this as a caution about the *file* as much as about the check: the
+advisory claim was measured on 2026-08-15 and was wrong three days later,
+which is the decay [`timestamp-volatile-claims`](timestamp-volatile-claims.md)
+exists for.
+
+The old advice --- read its output rather than its color --- is still worth
+keeping, because it now points the other way.
+A green job means the added lines passed, and it is the *local* run that can
+still say nothing: the script is diff-scoped, so a run against the wrong base
+reports a clean exit over a diff it never examined.
+
+**The sentence rule has no minimum line length; only the CLAUSE rule does.**
+`NLB_CLAUSE_MIN_LENGTH` (80) gates the mid-line-semicolon check alone, so a
+SHORT line carrying two sentences is flagged all the same.
+That asymmetry is the one worth remembering, because a hand-rolled pre-push
+scan naturally applies one length floor to both and then passes a line the
+gate rejects --- which is the specific way this was rediscovered, on the PR
+that added this very paragraph.
 Run it locally before pushing and fix what it names --- the script lives in a
 [`d-morrison/gha`](https://github.com/d-morrison/gha) checkout, at
 `check-new-line-breaks/check-new-line-breaks.py` relative to that repo's root:
 
 ```bash
 NLB_BASE_REF=origin/main \
+NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
   python3 <gha-checkout>/check-new-line-breaks/check-new-line-breaks.py
 ```
+
+**`NLB_PATHS_IGNORE` is the one input the local run needs and does not
+default to**, so a command without it over-reports on generated files this
+repo's workflow excludes --- the `codex-skills/` wrappers most of all, since
+they are machine-written and nobody is going to line-break them.
+Everything else the workflow passes is already the script's own default, so
+setting it changes nothing: `NLB_GLOBS` defaults to `*.md`, `NLB_FAIL` and
+`NLB_CLAUSE_BREAKS` to true, and `NLB_CLAUSE_MIN_LENGTH` to 80 (read off
+`check-new-line-breaks.py` at `d-morrison/gha` `430393d`, and confirmed
+against a passing job's own log, which prints every `NLB_*` value it used).
+The practical consequence is worth stating in the safe direction: the clause
+check that catches a long line with a mid-line semicolon **is** on by default
+locally, so a local run cannot silently under-report that case.
 (ai-config#725: a round of review fixes introduced 7 multi-sentence lines; the
 check flagged all 7 while `validate` stayed green, and the review bot did not
 catch them either --- they were found only by reading the check's own output.)

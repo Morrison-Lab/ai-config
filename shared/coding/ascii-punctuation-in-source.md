@@ -284,7 +284,6 @@ That worked example violates
 file's own rule --- splicing ASCII into ASCII cannot manufacture a glyph --- and
 it sits here because the *seam* mechanism is shared: both checks are
 diff-scoped, so both fire on the joined line and neither fires on either half.
-An em-dash arriving at a seam is the same shape with this file's subject.
 Nothing here is grandfathered, and the check is not being harsh --- the
 violation is new text you wrote, in the one place you were not looking.
 

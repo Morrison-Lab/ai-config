@@ -39,8 +39,9 @@ the retry step concludes `skipped`,
 so "two stubs back to back" never applies,
 and a manual re-run is the **first** retry rather than the second.
 
-What suppresses it is a parse failure rather than a real denial count,
-which is why nothing on the job page reads as a cause.
+A parse failure is ONE of the causes, not the cause:
+a genuinely parsed count above the threshold refuses the retry too, correctly.
+Read the count before concluding which you have.
 The retry is gated on `permission_denials_count`,
 and when that value cannot be parsed out of the execution result
 the workflow substitutes a fail-safe sentinel of `999999`,
@@ -53,8 +54,10 @@ so a review whose real denial count would have qualified
 is refused its second attempt.
 
 So read the retry step's own conclusion
-before deciding what a failed review means:
-`skipped` means one attempt, `failure` means two.
+before deciding what a failed review means.
+It is `skipped` when the gate refused, and `continue-on-error` is applied to it
+upstream, so a failed retry does not surface as `failure` there either --- which
+is why the denial count, not the step conclusion, is what classifies this.
 That is one API call,
 and it changes what a manual re-run is worth ---
 an independent second sample,

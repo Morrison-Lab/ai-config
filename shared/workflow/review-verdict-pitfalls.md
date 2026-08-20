@@ -1210,12 +1210,13 @@ neighbours check would have called it anomalous.
 The two costs are read from the PR's own cost comments, `$42.9192` on
 `31604997356` and `$5.9109` on `31608602196`.)
 
-**A ninth case, and the only one where the verdict is not-clean for a reason
-that has nothing to do with the diff: a review can block on its own
-still-running check.**
-The eight cases above all concern a verdict that misdescribes the *code*.
-This one describes the *PR's state*, correctly, from inside a run that cannot
-see itself.
+**A ninth case: a review can block on its own still-running check.**
+The eight cases above all turn on what a reviewer said about the *code* --- or,
+in the fifth and eighth, on its saying nothing at all.
+The seventh is the nearest neighbour, since its detector also fires on text
+outside the diff; it differs in that re-triggering cannot clear it.
+This one is a verdict that describes the *PR's state*, correctly, from inside a
+run that cannot see itself.
 
 The shape is specific.
 The review body reports no findings at all --- every claim fact-checked, every
@@ -1230,18 +1231,28 @@ The check goes green moments later, when the job it belongs to ends.
 
 **Read the reason, not just the verdict word.**
 A strict reading of [`fully-clean`](fully-clean.md)'s criterion 2 treats any
-non-clean verdict as blocking, which is right for the eight cases above and
-wrong here: the blocking premise expires by the time you can act on it, so
-waiting for it to clear is waiting for something that already happened.
+non-clean verdict as blocking, which is right wherever the verdict names a
+finding and wrong here: the blocking premise expires by the time you can act on
+it, so waiting for it to clear is waiting for something that already happened.
 The discriminator is whether the verdict names a **finding** or names a
 **pending check**.
 A finding is about the diff and survives; a pending check that is the
 reviewer's own run does not.
 
-**It still is not an approval, so do not merge on it.**
-The remedy is another round at the same head, which is cheap when the head has
-not moved and produces an ordinary verdict --- the second run sees the first
-run's check completed and has nothing left to block on.
+**That block still is not an approval, so do not merge on it.**
+The remedy is another round, which is cheap when the head has not moved.
+**Why a fresh run usually returns an ordinary verdict is not established, so do
+not assert a mechanism for it.**
+The structural property above applies to every run alike --- a second run's own
+check is in progress while it reads, exactly as the first one's was --- so
+"the next run sees the previous check completed" is not available as an
+explanation, and the observed case does not test it either: the round that
+cleared #1744 ran at a *moved* head, with its own check still in flight, and
+returned a clean verdict anyway.
+That points at the run-to-run instability [`fully-clean`](fully-clean.md)
+already documents rather than at anything about check visibility.
+Expect a re-run to usually clear it, and be prepared to spend another round
+when it does not.
 What makes that remedy fragile is head churn: a base-sync merge from a parallel
 session moves the head, so a verdict earned at one commit is not a verdict at
 the next, and a PR taking a sync every few minutes can invalidate verdicts
@@ -1251,8 +1262,9 @@ if they differ, expect to spend another.
 
 - **Do:** classify a non-clean verdict by what it cites --- a finding about the
   diff, or a check that has not finished.
-- **Do:** re-run at the same head when the only blocker was the reviewer's own
-  in-flight check.
+- **Do:** re-run when the only blocker was the reviewer's own in-flight check,
+  and treat a second block as a reason to look further rather than to keep
+  re-running.
 - **Don't:** report a PR ready on a "blocked" verdict, however self-referential
   its reason.
 - **Don't:** treat the block as a standing state to wait out; nothing further

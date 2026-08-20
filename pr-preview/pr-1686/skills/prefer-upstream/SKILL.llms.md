@@ -46,14 +46,14 @@ This skill is the search procedure for the don’t-reinvent-the-wheel (DRW) prin
 | Upstream has heavy dependencies you don’t want | ✅           | ❌           |
 | Learning exercise / pedagogical code           | ✅           | ❌           |
 
-Every row of that table is a fact about the world. Before using one, check that it is. A constraint your own change authored — “this script runs with no packages installed”, “this PR decided not to add a dependency” — belongs in none of those cells, because the change it would justify is what created it. Relax it (add the dependency, fix the CI job) and re-read the table against the relaxed environment. See the DRW fragment’s “A constraint your own change authored is not evidence against an upstream”.
+Most of those rows are facts about the world, but two are choices: “Upstream has heavy dependencies you don’t want” and “Learning exercise / pedagogical code”. A choice is a fine reason when it is the point of the work — pedagogical code is written in order to be written — and not when it exists only to rule the upstream out. So ask where the choice came from before either row decides anything. A constraint your own change authored — “this script runs with no packages installed”, “this PR decided not to add a dependency” — is the case that fails that test, because the change it would justify is what created it. Relax it (add the dependency, fix the CI job) and re-read the table against the relaxed environment. See the DRW fragment’s “A constraint your own change authored is not evidence against an upstream”.
 
 ## Process
 
 1.  **Identify the generic problem** — separate project-specific logic from the reusable utility layer
 2.  **Search** — check the relevant ecosystem orgs, package indices, and GitHub/GitLab
 3.  **Evaluate** — is it actively maintained? Good test coverage? Reasonable dependencies? Compatible license?
-4.  **Classify any constraint that rules a candidate out** as external (a platform limit, an upstream API, a license, a policy) or self-imposed (a choice in this change or an earlier one of ours). Relax a self-imposed one and re-evaluate; only an external one may stand as a reason.
+4.  **Classify any constraint that rules a candidate out** as external (a platform limit, an upstream API, a license, a policy) or self-imposed (a choice in this change or an earlier one of ours). Relax a self-imposed one and re-evaluate. It may stand as a reason only once relaxing it is shown to be genuinely unavailable — say who would have to authorize the relaxation when it is not yours to make, rather than treating your own lack of access as the constraint.
 5.  **Recommend** — if a good upstream exists, suggest it to the user before writing custom code. Include:
     - Package name and link
     - How it solves the problem

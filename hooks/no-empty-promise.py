@@ -311,8 +311,9 @@ def discharges(name, inp):
         #
         # MECHANISM_WORD survives because those tokens name an ACT --
         # `gh issue create`, `ums`, `memorize` -- rather than a location.
-        # The real evidence about a delegated write is the write itself,
-        # which scan() reads off the subagent's own tool calls.
+        # A delegated build discharges on the parent staging the artifact
+        # afterwards, per this function's docstring; scan() cannot see the
+        # subagent's own writes, so nothing here tries to.
         blob = " ".join(str(inp.get(k, "")) for k in
                         ("prompt", "description", "skill", "args"))
         return bool(MECHANISM_WORD.search(blob))

@@ -14,14 +14,6 @@ This looks superficially fine (green check, a comment exists) so it's easy to mi
 Re-running the same workflow can reproduce the same stub pattern repeatedly rather than self-resolving;
 if a retry doesn't help within a round or two, treat it as this failure mode and self-review rather than continuing to re-trigger.
 
-**High-denial stub (gha#198):** a specific, non-recovering subcase of the stub above.
-The review produces no verdict, and the `permission_denials_count` exceeds the retry threshold (default 5).
-The workflow correctly refuses to retry --- re-running this pattern has repeatedly NOT recovered --- so the PR is stuck: the reviewer runs, produces no verdict, and the self-review fallback doesn't satisfy `fully-clean`'s requirement for an external verdict.
-The denied tools will be logged in the workflow output once [gha#540](https://github.com/Morrison-Lab/gha/issues/540) lands, which will turn the diagnostic from "the reviewer gave up" into an actionable permissions gap.
-Treat this the same as a reviewer-down case: self-review immediately, then dispatch a cross-vendor reviewer (Antigravity, Copilot, Codex) as the external verdict --- re-dispatching the same reviewer won't help.
-Don't spend more than one manual re-run on this pattern ---
-two high-denial stubs back to back is conclusive.
-
 **No review workflow configured at all is a third failure mode, and the one nothing signals on its own.**
 Quota-skipped and a stub review both require a review workflow to exist and attempt to run.
 Some repos have none: no `@claude` job wired into CI at all, so there is nothing to time out, quota-skip, or stub.
@@ -35,6 +27,22 @@ Because a genuine config gap is a standing property of the repo rather than a on
 Then, before writing the check off as permanently broken, try one manual re-run of the failed job --- even after the workflow's own built-in same-run retry (e.g. gha#185's stub-retry) also stubbed.**
 Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.
 If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR.
+
+**High-denial stub (gha#198): the denial count gates the automatic retry, not the job's outcome, so it is a label rather than a prognosis.**
+A run whose parsed `permission_denials_count` exceeds `max_denials` (default 5) is classified as gha#198's pattern rather than gha#185's, and the workflow declines to mark it retryable.
+That decides only whether the run retries *itself*, in the same invocation.
+It says nothing about whether the manual re-run above will recover.
+
+Measured on 2026-08-20, both above the threshold and in opposite directions: [ai-config#1689](https://github.com/Morrison-Lab/ai-config/pull/1689)'s review completed and posted a real verdict at `permission_denials_count=72`, while [ai-config#1767](https://github.com/Morrison-Lab/ai-config/pull/1767) produced no verdict twice, at 12 and then 24.
+So a high count is not evidence that the reviewer has given up on this PR, and the one manual re-run stays worth spending.
+
+What the count cannot tell you is *which* tools were denied, and the log does not name them --- [gha#540](https://github.com/Morrison-Lab/gha/issues/540) is open to add that, and until it lands the cause of any particular high count is guesswork.
+So decide by the re-run's outcome rather than by the number: stop after a second no-verdict attempt, hand the external verdict to a cross-vendor reviewer, and report the PR blocked on that verdict rather than ready.
+
+- **Do:** read the denial count to classify which failure family you are in, then let the re-run's outcome decide what to do next.
+- **Do:** stop re-triggering after the second no-verdict attempt, and go cross-vendor for the external verdict.
+- **Don't:** call a high-denial run non-recovering --- one at 72 posted a real verdict the same day.
+- **Don't:** read the workflow's refusal to mark a run retryable as advice against the manual re-run; those are two different retries.
 
 Either way: don't wait on the bot indefinitely --- do the review yourself and keep driving to fully-clean.
 

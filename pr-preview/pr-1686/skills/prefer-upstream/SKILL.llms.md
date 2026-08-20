@@ -46,7 +46,7 @@ This skill is the search procedure for the don’t-reinvent-the-wheel (DRW) prin
 | Upstream has heavy dependencies you don’t want | ✅           | ❌           |
 | Learning exercise / pedagogical code           | ✅           | ❌           |
 
-Every row of that table is a fact about the world. Before using one, check that it is: a constraint your own change authored — “this script runs with no packages installed”, “this PR decided not to add a dependency” — belongs in none of those cells, because the change it would justify is what created it. Relax it (add the dependency, fix the CI job) and re-read the table against the relaxed environment. See the DRW fragment’s “A constraint your own change authored is not evidence against an upstream”.
+Every row of that table is a fact about the world. Before using one, check that it is. A constraint your own change authored — “this script runs with no packages installed”, “this PR decided not to add a dependency” — belongs in none of those cells, because the change it would justify is what created it. Relax it (add the dependency, fix the CI job) and re-read the table against the relaxed environment. See the DRW fragment’s “A constraint your own change authored is not evidence against an upstream”.
 
 ## Process
 

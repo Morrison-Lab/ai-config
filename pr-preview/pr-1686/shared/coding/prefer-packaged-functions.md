@@ -20,11 +20,13 @@ beat pulling in a package, and sometimes nothing fits --- but look first, and
 prefer the standard, well-known way over a bespoke one.
 
 One reason to skip a packaged function does not count: an environment your
-own change chose. "The script runs on a bare R, so `rlang` is unreachable" is
-not evidence that `rlang` does not fit when this change is what decided the
-script would run that way. Install the package, fix the CI job, and re-run the
-comparison. See the DRW fragment's "A constraint your own change authored is
-not evidence against an upstream".
+own change chose.
+"The script runs on a bare R, so `rlang` is unreachable" is not evidence that
+`rlang` does not fit when this change is what decided the script would run
+that way.
+Install the package, fix the CI job, and re-run the comparison.
+See the DRW fragment's "A constraint your own change authored is not evidence
+against an upstream".
 
 - **Do:** say whether a constraint ruling out a package is external or one of
   ours, before letting it decide.

@@ -1143,6 +1143,20 @@ The detector counterpart to the plain-prose guide above.
 
 The `find-ai-tells` skill (alias `ai-tells`) runs this same catalog on demand against any target text.
 
+## Writing style: an example of a checked pattern is itself checked
+
+[shared/writing/examples-are-scanned.md](shared/writing/examples-are-scanned.md)
+
+When a document explains a mechanically-enforced convention, its illustrative
+example sits inside the file the checker scans -- so writing the example the
+natural way trips the rule the passage is describing, and implicates the one
+passage meant to prevent it.
+Backticks, fenced blocks, and "for example" framing shield nothing from a
+line-oriented scanner.
+Render the example so it cannot match, say in the prose why it is spelled
+that way, and run the detector rather than re-reading: self-review confirms
+the claim, which was never the defect.
+
 ## Writing style: cite sources thoroughly
 
 [`shared/writing/citations.md`](shared/writing/citations.md)

@@ -249,7 +249,8 @@ habit-rather-than-slip claim above.)
 
 The rule above governs pronouns.
 A bare issue or PR reference --- `#1677`, with no owner or repo --- has the same structure and is easier to miss, because it looks like a precise citation rather than like a word waiting for an antecedent.
-GitHub resolves it against the repo it is *rendered* in; a reader resolves it against whatever repo the surrounding sentence named.
+GitHub resolves it against the repo it is *rendered* in;
+a reader resolves it against whatever repo the surrounding sentence named.
 When those differ, the sentence asserts something neither half of it says.
 
 The failure needs two ordinary, individually-true facts sitting next to each other.
@@ -268,7 +269,8 @@ Every cross-repo note breaks that, and cross-repo notes are what a memory corpus
 - **Do:** write `owner/repo#N` in any note whose surrounding text names a different repo than the one the reference belongs to.
 - **Do:** separate the session's location from the work's location when they differ, rather than picking one.
 - **Don't:** read "that number does not exist in the repo I searched" as proof the repo label is wrong --- check whether the *number* is unqualified first.
-- **Don't:** leave a bare `#N` in a memory or fragment merely because it resolves correctly where it currently lives; these files get quoted, migrated, and read from other repos.
+- **Don't:** leave a bare `#N` in a memory or fragment merely because it resolves correctly where it currently lives;
+  these files get quoted, migrated, and read from other repos.
 
 (Morrison-Lab/ai-config#1677, 2026-08-20: caught in review, with exactly the misdiagnosis described above --- the reviewer verified `#1677` exists in neither `d-morrison/wai` nor `Morrison-Lab/wai` and concluded the repo label was wrong.
 Three Example lines carried the same construction.)

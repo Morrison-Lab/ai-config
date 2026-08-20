@@ -100,6 +100,7 @@ with_list = write_transcript(["gh pr list --repo o/r", "git push"])
 with_view = write_transcript(["gh pr view 12 --json state"])
 with_search = write_transcript(["gh search prs --owner o 'em dash'"])
 with_mcp = write_transcript(["mcp__github__list_pull_requests"])
+with_mcp_read = write_transcript(["mcp__github__pull_request_read"])
 
 check("no dupe check in transcript",
       hook.transcript_has_dupe_check(no_check), False)
@@ -111,6 +112,8 @@ check("gh search prs discharges",
       hook.transcript_has_dupe_check(with_search), True)
 check("mcp list discharges",
       hook.transcript_has_dupe_check(with_mcp), True)
+check("mcp pull_request_read discharges",
+      hook.transcript_has_dupe_check(with_mcp_read), True)
 
 # Fail-open cases.
 check("missing transcript path fails open",
@@ -152,7 +155,8 @@ proc = subprocess.run([sys.executable, HOOK], input="not json",
 check("malformed input exits 0", proc.returncode, 0)
 check("malformed input prints nothing to stdout", proc.stdout.strip(), "")
 
-for path in (no_check, with_list, with_view, with_search, with_mcp):
+for path in (no_check, with_list, with_view, with_search, with_mcp,
+             with_mcp_read):
     os.unlink(path)
 
 if failures:

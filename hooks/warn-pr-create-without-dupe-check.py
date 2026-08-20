@@ -72,7 +72,8 @@ Any earlier command that could surface an existing PR:
 
     gh pr list, gh pr view, gh pr status, gh search prs
     glab mr list, glab mr view
-    mcp__github__list_pull_requests, mcp__github__search_pull_requests
+    mcp__github__list_pull_requests, mcp__github__search_pull_requests,
+    mcp__github__pull_request_read
 
 The discharge is deliberately generous --- session-wide rather than per-topic.
 [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md) warns
@@ -96,7 +97,7 @@ import sys
 
 # `gh pr create` / `glab mr create` at a command position.
 RX_CREATE = re.compile(
-    r"(?:^|[;&|\n]|&&|\|\|)\s*"
+    r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"      # env-assignment prefixes
     r"(?:gh\s+pr\s+create|glab\s+mr\s+create)\b",
     re.MULTILINE,
@@ -108,7 +109,8 @@ RX_DISCHARGE = re.compile(
     r"|gh\s+search\s+prs\b"
     r"|glab\s+mr\s+(?:list|view)\b"
     r"|mcp__github__list_pull_requests"
-    r"|mcp__github__search_pull_requests",
+    r"|mcp__github__search_pull_requests"
+    r"|mcp__github__pull_request_read",
 )
 
 # A heredoc body is prose, not commands. Strip it before position matching.

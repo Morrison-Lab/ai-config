@@ -717,6 +717,85 @@ own stubs named a workflow that did not exist yet.
 Found only by an ad-hoc `rev-parse` at the end of the tidy, after steps 1
 through 3 had already reported clean.)
 
+### 3.75. Register a merged hook, since the gate that forbade it earlier names no later moment
+
+If the merged PR touched `hooks/`, the merge did not arm anything.
+It placed a file and merged a manifest entry.
+On the non-plugin install path a hook fires only once
+`~/.claude/settings.json` binds it, and that binding is per-machine local
+state no merge can write.
+
+This step exists because README's activation gate creates a **deferred step
+with no owner**.
+"Never activate a new hook before its PR merges" is read by the author,
+before the PR is opened, and its matching action has to happen after the
+merge, on every consumer machine.
+Merging happens on GitHub, where nothing local prompts anything, so the owed
+registration is never refused and never scheduled --- it simply never
+happens.
+
+It shares its shape with step 3.5 above and differs in the half that decides
+what to do.
+Both are owed after a merge, and neither turns anything red.
+But 3.5's action force-moves a shared ref, so it is reserved for the human,
+whereas this one writes one machine's own settings file and is yours to
+perform now.
+Do not carry 3.5's "don't run it yourself" bullet over to this step; here
+that would leave the guard inert, which is the failure rather than the
+caution.
+
+Two lookups settle it:
+
+```bash
+git diff --name-only "$merge_base".."$merged_head" -- hooks/ | head
+python3 <ai-config-checkout>/scripts/install-hooks.py
+```
+
+The second is the instrument, and it is worth running on **any** ai-config
+merge rather than only one that touched `hooks/` --- it costs one command,
+prints `All hooks registered.` when there is nothing to do, and catches every
+hook that merged while someone else was driving.
+
+Then follow [`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md)
+point 3 for the rest, which already owns the mechanics: run
+`check-install.py --fix` first so the script is on disk before anything binds
+to it, check `enabledPlugins` before `--fix` since the plugin path already
+loads every hook and a second registration makes each one fire twice, compare
+the printed `examined N` against the current `hooks/hooks.json` before
+believing a clean report, and say that hooks connect at session start so a
+mid-session `--fix` arms nothing until a restart.
+
+**A hook cannot be the instrument for this one**, which is worth stating so
+nobody builds it.
+A guard that detects unregistered hooks is itself a hook, so on the non-plugin
+path it is unregistered in exactly the case it exists to catch, and on the
+plugin path --- where it would run --- registration is not needed at all.
+The detector is silent precisely when the condition holds, which is
+[`fail-fast`](../../shared/principles/fail-fast.md)'s pass-path-equals-failure-path
+shape.
+That is why this is a step in a skill rather than an entry in `hooks/`.
+
+- **Do:** run `install-hooks.py` as part of every ai-config post-merge sweep,
+  and report the `registered`/`missing`/`stale` counts rather than a verdict.
+- **Do:** register a hook whose PR just merged, since the gate's prohibition
+  expired at the merge and nothing else will do it.
+- **Don't:** read a merged hook as an active one --- merging places a file,
+  and only a binding makes it fire.
+- **Don't:** build a hook to detect this; it is unregistered exactly when the
+  condition is true.
+
+(Morrison-Lab/ai-config#1786, 2026-08-20: one machine reported
+`registered=15 missing=16 stale=0` against a 31-hook manifest.
+Among the sixteen inert guards was `flag-add-a-outside-pathspec.py`, and in
+the same session `git add -A ':!inst/extdata'` swept `SAS/program/` into a
+pushed `ucdavis/bcs` commit carrying a cleartext SAS credential and real
+`StudyID_c` values --- the verbatim mistake that hook was written to prevent,
+and whose docstring describes that exact command.
+`--fix` registered the missing sixteen, and a fed-payload test then confirmed
+the guard fires on the command and names `SAS/` in its output.
+Every rule needed to prevent this was already written and had been for weeks;
+what was missing was a moment at which anyone would run the command.)
+
 ### 4. Run UMS — learn from the PR's lifecycle
 
 Run the full `ums` procedure (invoke the `ums` skill by name), focused on what

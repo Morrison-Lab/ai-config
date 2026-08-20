@@ -501,6 +501,25 @@ mistake is the mechanism that is broken.
 - **Don't:** treat a passing test suite as authorization --- the tests
   establish that the mechanism works, never that it should exist.
 
+**The gate expires at the merge, and something has to say so.**
+A prohibition read before the PR opens has its matching action after the PR
+merges, on every consumer machine, at a moment nothing local announces.
+So "do not activate yet" without a matching "activate now" is not caution ---
+it is a deferred step with no owner, and the corpus measured it costing
+sixteen of thirty-one hooks on one machine
+([#1786](https://github.com/Morrison-Lab/ai-config/issues/1786), 2026-08-20),
+one of which would have caught a credential swept into a pushed commit that
+same session.
+
+[`post-merge`](skills/post-merge/SKILL.md)'s step 3.75 is that owner.
+It runs `install-hooks.py` on any ai-config merge and registers what the gate
+had been holding back.
+
+- **Do:** register the hook as part of the post-merge sweep, in the session
+  that merged it.
+- **Don't:** read the merge as the activation --- merging places a file and
+  merges a manifest entry; only a binding in `settings.json` makes it fire.
+
 (Corrected 2026-07-30: a `Stop` hook was written into `~/.claude/hooks/` and
 registered in `settings.json` before its PR was opened, so a guard able to
 block outgoing messages ran on the user's machine unreviewed.

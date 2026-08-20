@@ -729,8 +729,10 @@ Revisit as a check only if the pattern recurs.
 
 ## An insertion asserts something about the whole file, not just the added lines
 
-The two sections above each turn a sentence back on its own document, and both compare it against something *inside* the passage being written --- a figure the same passage reports, or the rule the contrast sentence is stating.
-This one compares the new text against a sentence it never touched.
+Two earlier sections in this file each turn a sentence back on its own document --- [`Check a general claim against the concrete numbers in the same document`](#check-a-general-claim-against-the-concrete-numbers-in-the-same-document) and [`A contrast sentence imports the neighbouring rule's parameters`](#a-contrast-sentence-imports-the-neighbouring-rules-parameters).
+Both compare the new text against something *inside* the passage being written --- a figure the same passage reports, or the rule the contrast sentence is stating.
+This one compares it against a sentence it never touched.
+They are named rather than counted to deliberately, since the section directly above this one ([`An availability claim about a repository is a state claim, not a safe default`](#an-availability-claim-about-a-repository-is-a-state-claim-not-a-safe-default)) is about verifying against **external** live state and is not one of them.
 
 Inserting a paragraph into an existing fragment publishes a file, not a paragraph.
 Whatever the insertion claims, the file now claims, alongside everything the file already said --- so a sentence a dozen lines away that **qualifies, bounds, or hedges the same phenomenon** is part of the assertion you are making, and contradicting it makes the fragment say both things at once.
@@ -764,4 +766,6 @@ Commit `4d1a979b` inserted a paragraph into [`self-review-fallback`](../workflow
 Thirteen lines below, untouched by the diff, the file already said that two stubs back to back is "still not conclusive" and that the failure modes behind stubs "don't always repeat".
 The automated reviewer read the same diff and reported only a tense problem on a different line.
 The insertion additionally re-listed a set of reviewer options the same file defines in another section, which [#1778](https://github.com/Morrison-Lab/ai-config/pull/1778) was concurrently editing.
-Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794), and corrected on the branch by `0cc398ca`.)
+Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794), and corrected on the branch by `0cc398ca`.
+This section's own first draft then committed the same error: it opened by describing "the two sections above", carrying that framing over from its neighbour, when the section directly above it argues the opposite of what the sentence attributed to it.
+The reviewer on [#1795](https://github.com/Morrison-Lab/ai-config/pull/1795) caught it, which is worth recording as evidence about the remedy rather than about the author --- naming a target beats counting to it, exactly as [`forward-references`](forward-references.md) says, and the count was wrong here because an unrelated section had been inserted between the two being counted.)

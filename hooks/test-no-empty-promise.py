@@ -63,6 +63,35 @@ SUBAGENT_WROTE = {"type": "assistant", "isSidechain": True, "message": {
 SUBAGENT_SAID = {"type": "assistant", "isSidechain": True, "message": {
     "content": [{"type": "text",
                  "text": "Going forward I will always do X."}]}}
+# --- Round-7 review fixtures. Each of these DISCHARGED or BLOCKED wrongly
+# before the fix, and none was reachable by the prior 44 cases, because every
+# read fixture happened to name a path with no `ums`/`memorize` in it.
+CAT_UMS_PATH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "cat shared/workflow/run-ums-proactively.md"}}]}}
+CAT_MEMORIZE_PATH = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "cat skills/memorize/SKILL.md"}}]}}
+DISPATCHED_READ_UMS = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Task",
+     "input": {"prompt": "Summarize what shared/workflow/run-ums-proactively.md says.",
+               "description": "read the fragment"}}]}}
+CAT_WITH_STDERR = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "cat shared/workflow/ardi.md 2>/dev/null | head -40"}}]}}
+CP_OUT_OF_RULE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "cp shared/workflow/a.md /tmp/"}}]}}
+# A write the permission system refused ships nothing.
+WRITE_ATTEMPT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "tu1", "name": "Write",
+     "input": {"file_path": "CLAUDE.md", "content": "x"}}]}}
+WRITE_DENIED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "tu1", "is_error": True,
+     "content": "Permission to use Write was denied"}]}}
+WRITE_OK = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "tu1", "content": "ok"}]}}
+
 # How a delegated build actually ends: the parent stages the artifact.
 STAGED_ARTIFACT = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "name": "Bash",
@@ -206,6 +235,38 @@ CASES = [
      False, "a blockquote does not block"),
     ([say("```\nFrom now on I won't skip it.\n```\nThat is a fenced example.")],
      False, "a fenced example does not block"),
+
+    # --- Round-7 review findings, all reproduced before fixing.
+    # F1: a bare `ums`/`memorize` matched inside a hyphenated PATH, so
+    # reading the corpus's most-cited fragments discharged a promise.
+    ([say("Going forward I'll do X."), CAT_UMS_PATH],
+     True, "cat of run-ums-proactively.md does NOT discharge (review #1724)"),
+    ([say("Going forward I'll do X."), CAT_MEMORIZE_PATH],
+     True, "cat of skills/memorize/SKILL.md does NOT discharge"),
+    ([say("Going forward I'll do X."), DISPATCHED_READ_UMS],
+     True, "a read-only dispatch naming a ums path does NOT discharge"),
+    # F2: `>` matched a stderr redirect, and cp/mv read OUT of a rule surface.
+    ([say("Going forward I'll do X."), CAT_WITH_STDERR],
+     True, "`2>/dev/null` on a read does NOT make it a write"),
+    ([say("Going forward I'll do X."), CP_OUT_OF_RULE],
+     True, "copying OUT of a rule surface does NOT discharge"),
+    # F3: the capability exclusion guarded only the always/never branch.
+    ([say("I won't be able to know the exact time again.")],
+     False, "a capability limit with 'again' does not block (review #1724)"),
+    ([say("We won't see that error again once the cache clears.")],
+     False, "a prediction with 'again' does not block"),
+    # F4: `every time`/`each time` are ordinary technical connectives here.
+    ([say("We will lose the summary every time compaction fires.")],
+     False, "descriptive 'every time' does not block (review #1724)"),
+    ([say("I will have to re-fetch each time the base moves.")],
+     False, "descriptive 'each time' does not block"),
+    # F5: an attempted write is not a shipped mechanism.
+    ([WRITE_ATTEMPT, WRITE_DENIED, say("Going forward I'll always do X.")],
+     True, "a DENIED write does not discharge (review #1724)"),
+    ([WRITE_ATTEMPT, WRITE_OK, say("Going forward I'll always do X.")],
+     False, "a successful write still discharges"),
+    ([WRITE_ATTEMPT, say("Going forward I'll always do X.")],
+     False, "a write with no result yet still discharges"),
 
     # Ordering and turn scope.
     # Order within the turn is deliberately not tested: the ordinary shape is

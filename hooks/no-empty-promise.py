@@ -110,15 +110,21 @@ PROMISE = re.compile(
     r"""(
     # Explicit temporal generalizer anywhere in the same sentence as a
     # first-person modal, in either order.
+    #
+    # `every time`/`each time` were here and are deliberately gone. They are
+    # ordinary technical connectives in this corpus -- "we will lose the
+    # summary every time compaction fires" describes a mechanism and promises
+    # nothing -- and no phrasing test separates that from a commitment. The
+    # commitment sense is already carried by `always`/`never` below. Removing
+    # the ambiguous generalizer beats narrowing it, per
+    # shared/workflow/learn-from-review-findings.md.
       (?:going\s+forward|from\s+now\s+on|from\s+here\s+on(?:\s+out)?
-       |henceforth|in\s+(?:the\s+)?future|next\s+time
-       |(?:every|each)\s+time)
+       |henceforth|in\s+(?:the\s+)?future|next\s+time)
       [^.!?\n]{0,80}?\b """ + _SUBJ + r"(?:" + _MODAL + r"|" + _NEG + r""")\b
     | \b """ + _SUBJ + r"(?:" + _MODAL + r"|" + _NEG + r""")\b
       [^.!?\n]{0,80}?
       (?:going\s+forward|from\s+now\s+on|from\s+here\s+on(?:\s+out)?
-       |henceforth|in\s+(?:the\s+)?future|next\s+time
-       |(?:every|each)\s+time)
+       |henceforth|in\s+(?:the\s+)?future|next\s+time)
 
     # "always"/"never" bound directly to the modal. The lookahead drops
     # capability statements -- "I'll never be able to know" is a limitation,
@@ -127,7 +133,9 @@ PROMISE = re.compile(
       (?:always|never)(?!\s+(?:be\s+able|know\b|have\s+access|see\b))
 
     # "I won't do that again" / "I will no longer do that".
-    | \b """ + _SUBJ + _NEG + r"""\b[^.!?\n]{0,80}?\bagain\b
+    | \b """ + _SUBJ + _NEG + r"""
+      (?!\s+(?:be\s+able|know\b|have\s+access|see\b|ever\s+see))
+      \b[^.!?\n]{0,80}?\bagain\b
     | \b """ + _SUBJ + _MODAL + r"""\s*no\s+longer\b
 
     # Bare performatives, which need no generalizer to be promises.
@@ -156,9 +164,18 @@ MECHANISM_PATH = re.compile(
 )
 
 # Filing the tracking issue, or invoking the skill that records the learning.
+# `\b` is the wrong boundary here: `-` and `/` are non-word characters, so
+# `\bums\b` matches INSIDE `shared/workflow/run-ums-proactively.md`, and
+# `cat`-ing that file discharged a promise. Anchor on path characters too.
+_NOT_PATH = r"(?<![\w./-])"
+_NOT_PATH_END = r"(?![\w./-])"
 MECHANISM_WORD = re.compile(
-    r"\bgh\s+issue\s+create\b|\bissue_write\b|\bglab\s+issue\s+create\b"
-    r"|\bums\b|update\s+memories|record[- ]learnings|\bmemorize\b",
+    r"\bgh\s+issue\s+create\b|\bglab\s+issue\s+create\b"
+    r"|" + _NOT_PATH + r"issue_write" + _NOT_PATH_END +
+    r"|" + _NOT_PATH + r"ums" + _NOT_PATH_END +
+    r"|update\s+memories"
+    r"|" + _NOT_PATH + r"record[- ]learnings" + _NOT_PATH_END +
+    r"|" + _NOT_PATH + r"memorize" + _NOT_PATH_END,
     re.I,
 )
 
@@ -171,10 +188,18 @@ WRITE_TOOLS = {
 
 # What makes a shell command a write rather than a read.
 BASH_WRITE = re.compile(
-    r">>?[^&|]|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)\b"
-    r"|--write\b|\bpatch\b|\bmkdir\b|\b(?:mv|cp)\s",
+    # A redirect, but NOT `2>`/`&>` (an fd-prefixed stderr redirect) and not
+    # one aimed at /dev/null -- `cat shared/x.md 2>/dev/null` is a read.
+    r"(?<![0-9&])>>?\s*(?!/dev/null)[^\s&|]"
+    r"|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)\b"
+    r"|--write\b|\bmkdir\b",
     re.I,
 )
+# `mv`/`cp` and a bare `patch` are deliberately absent. `cp shared/x.md /tmp/`
+# copies OUT of a rule surface and writes nothing to it, and the destination is
+# not decidable from a substring match -- so they discharged reads. Losing the
+# rare genuine `cp` INTO a rule surface costs a false positive, which this
+# guard's own block message tells the author how to clear in one command.
 
 
 def records(path):
@@ -202,7 +227,13 @@ def scan(path):
     requiring the write to come after the promise would block the correct
     case and pass almost nothing else.
     """
-    promise_txt, mech = None, False
+    promise_txt = None
+    # tool_use ids whose call LOOKED like a mechanism, pending their result.
+    # A call is only evidence once it did not come back an error: permission
+    # denial is an ordinary way for a write to fail, and an attempted write
+    # ships nothing.
+    pending = set()
+    failed = set()
 
     for m in records(path):
         kind = m.get("type")
@@ -224,8 +255,15 @@ def scan(path):
                 isinstance(b, dict) and b.get("type") == "tool_result"
                 for b in blocks
             )
+            for b in (blocks if isinstance(blocks, list) else []):
+                if not isinstance(b, dict) or b.get("type") != "tool_result":
+                    continue
+                if b.get("is_error"):
+                    failed.add(b.get("tool_use_id"))
             if not is_tool_result:
-                promise_txt, mech = None, False
+                promise_txt = None
+                pending.clear()
+                failed.clear()
             continue
 
         if kind != "assistant" or not isinstance(blocks, list):
@@ -245,9 +283,12 @@ def scan(path):
 
             elif b.get("type") == "tool_use":
                 if discharges(b.get("name") or "", b.get("input") or {}):
-                    mech = True
+                    pending.add(b.get("id"))
 
-    return promise_txt, mech
+    # A call with no result at all still counts: the Stop hook can fire before
+    # the result lands, and withholding discharge there would block a turn that
+    # did the work. Only an explicit error disqualifies.
+    return promise_txt, bool(pending - failed)
 
 
 def discharges(name, inp):

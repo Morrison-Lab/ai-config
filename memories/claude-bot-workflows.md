@@ -2,7 +2,7 @@
 
 The bot's own behaviour: what a run does, how it fails, and how to recover.
 Split out of [`github-actions.md`](github-actions.md), which keeps the
-generic Actions-authoring and reusable-workflow material.
+generic Actions-authoring material.
 
 Triggering a review, and what becomes of the reply it writes, live in
 [`claude-review-dispatch.md`](claude-review-dispatch.md).

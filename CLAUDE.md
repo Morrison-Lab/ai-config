@@ -48,6 +48,45 @@ It also applies to this entry: below is its own pair.
 - **Don't:** write only the corrected behaviour and leave the reader to infer which specific move it displaced.
 - **Don't:** state the pair so abstractly that no concrete action would violate it.
 
+## No empty promises
+
+[`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md)
+
+A commitment about my own future behaviour --- "going forward, I will X", "from
+now on I won't Y", "I'll always Z", "I won't do that again" --- must ship an
+**implemented accountability mechanism in the same turn**, or not be made at
+all.
+A memory or rule entry is the minimum and is always available; a hook is the
+right form when the condition is decidable from the transcript (the "memory +
+hook pair" the directive names); a filed issue covers work someone has to
+schedule.
+
+The promise is costless to produce and invisible to every instrument --- no file
+changes, no check turns red --- while reading exactly like accountability, which
+is why it needs a mechanism rather than an intention.
+It is worse than silence, too: silence leaves the problem visibly unaddressed,
+while a promise closes it on the record so nobody returns to it.
+
+The near-miss is the promise that names its own mechanism in the future tense
+("going forward I'll check this --- I'll add a hook for it"), which reads as
+compliance and satisfies nothing.
+The test is mechanical: if the sentence commits to future behaviour, something
+in the same turn must already exist that a later reader could open.
+
+There is no "not mechanizable" escape, unlike
+[`no-mistake-without-a-hook.py`](hooks/no-mistake-without-a-hook.py) --- the
+memory route is always open, so the honest alternative to building a mechanism
+is to drop the promise and state the plain fact.
+[`hooks/no-empty-promise.py`](hooks/no-empty-promise.py) is this rule's own
+mechanism: a `Stop` guard that blocks a forward-looking commitment when the turn
+wrote nothing durable.
+
+- **Do:** ship the mechanism in the same turn, and name it in the past tense.
+- **Do:** drop the promise and state the fact when no mechanism is worth
+  building.
+- **Don't:** end a turn carrying a promise and no durable artifact.
+- **Don't:** promise the mechanism itself in the future tense.
+
 ## Generalize instructions to every AI agent by default
 
 Unless the user explicitly scopes an instruction to one agent, project, or
@@ -100,6 +139,7 @@ it; use the correct private tracker and redact sensitive details when needed.
 @shared/workflow/flag-session-boundaries.md
 
 Proactively flag a good stopping point --- a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, an open question answered with nothing pending --- with the `⚠️ FLAG` tag, at the end of a turn's recap rather than mid-task.
+A clean stopping point requires that something actually finished, and the fragment's disqualifier list cannot tell you whether anything did --- so name the thing that finished, and read a turn that only explored as having completed nothing however few blockers it trips.
 Hold the flag while any PR this session opened or pushed to is still unmerged, per the bright line the fragment states in full; run `wrap-up`'s state sweep first rather than trusting memory, since a bot-opened PR or a leftover branch never entered the conversation.
 Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread; the fragment covers each option's tradeoff and the same menu applied at the moment of opening a *new* PR, not only at a stopping point.
 
@@ -124,7 +164,8 @@ When the current tier is clearly underpowered for the task ahead, say so and sug
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
 Two such budgets exist and the standing preference is to try both first: `codex` (ChatGPT plan, operationalized by `delegate-to-codex`) and `agy` (Google Antigravity).
-`memories/preferences.md`'s "Delegate heavy work to a separately-billed CLI first" carries the rule and the usage-window semantics.
+`opencode` is a third destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of both on cost and behind both on capability, per `delegate-to-opencode`.
+`memories/preferences.md`'s "Delegate heavy work to another CLI first" carries the rule and the usage-window semantics.
 Read it for one mechanical detail before invoking `agy`: `--print` consumes the next token as its prompt, so a flag placed between the two becomes the prompt and the real one is discarded, silently and with exit 0.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
@@ -1143,6 +1184,22 @@ The detector counterpart to the plain-prose guide above.
 
 The `find-ai-tells` skill (alias `ai-tells`) runs this same catalog on demand against any target text.
 
+## Writing style: an example of a checked pattern is itself checked
+
+[shared/writing/examples-are-scanned.md](shared/writing/examples-are-scanned.md)
+
+When a document explains a mechanically-enforced convention, its illustrative
+example sits inside the file the checker scans -- so writing the example the
+natural way can trip the rule the passage is describing, and implicate the one
+passage meant to prevent it.
+Whether it does turns on the checker: backticks and fenced blocks shield
+nothing from a line-oriented scanner, and everything from a structure-aware
+one, so read it rather than assuming either way.
+Teach the checker about code regions when you own it (this repo's
+`scripts/lib/fences.py` is that fix), render the example so it cannot match
+when you do not, and either way run the detector rather than re-reading --
+self-review confirms the claim, which was never the defect.
+
 ## Writing style: cite sources thoroughly
 
 [`shared/writing/citations.md`](shared/writing/citations.md)
@@ -1252,6 +1309,26 @@ result.
 Distinct from `ardi`'s fixture bullets, which are about coverage (a fixture
 too thin to reach a branch) rather than about the inference drawn from one
 that works fine.
+
+## Verify the artifact the claim is about, not an adjacent one
+
+Three rules in this corpus each name one adjacent artifact that stands in for
+the real one: the fixture rule directly above,
+`metacognitive-monitoring`'s neighbouring step read for a failure's cause, and
+`fact-check-prose`'s published build read for the branch that produced it.
+The substitution is general, and outside those three situations none of the
+three loads.
+
+It is not lazy verification but thorough verification of the wrong object, so
+the evidence is real, the reasoning from it is sound, and nothing feels like a
+guess.
+The fragment names four recognizable shapes --- a cached copy for the origin, a
+checkout for the run, one half of a mechanism for the whole, a neighbour for
+the target --- and one test that works where confirming the claim cannot:
+ask what would have to be true for the claim to be **false**, and whether the
+artifact in hand could show it.
+
+[shared/workflow/verify-the-right-artifact.md](shared/workflow/verify-the-right-artifact.md)
 
 ## Challenge unnecessary complexity in review
 

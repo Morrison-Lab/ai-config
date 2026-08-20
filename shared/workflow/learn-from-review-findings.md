@@ -33,6 +33,51 @@ What is not allowed is the silent third option: fix it, resolve the thread, and 
 (Morrison-Lab/ai-config#1065: the standing goal that "every PR gets a clean review on the first push --- learn from your mistakes so you don't repeat them, and algorithmatize whenever possible (e.g. through hooks or other scripts)."
 `hooks/remind-learn-from-review.py` is the trigger this fragment describes: it detects an accepted review finding in the transcript with no learning or mechanism recorded after it, and injects a reminder on the next prompt --- the external-correction sibling of `hooks/remind-ums-after-error.py`, which only ever adds context and never blocks.)
 
+A finding class that RECURS is evidence about your instrument, not about its threshold.
+Everything above treats findings one at a time: accept it, fix it, record the class, ask whether a check could catch it.
+That is the right loop while the findings are different.
+It says nothing about the case where the *same kind* of finding comes back, and that case wants the opposite response from the one the loop trains.
+
+The reflex when a finding recurs is to widen or tighten whatever you built the first time --- add the case the reviewer just showed you, and the round goes green.
+It always does.
+A narrowed heuristic passes the tests written from the finding that prompted it by construction, so the artifact reports success and the class survives inside it.
+That is what makes this invisible without a rule: nothing distinguishes "fixed the class" from "fixed the instance and re-armed the class", because both look like an accepted finding, a targeted patch, and a passing suite.
+
+So use recurrence itself as the signal.
+**The second time a reviewer raises the same class, stop asking what else the check should match and ask whether that kind of check can decide the question at all.**
+Those are different questions, and only the first one has an obvious next move --- which is exactly why the second one gets skipped.
+
+A reviewer's own wording is often the cheapest way to notice.
+"The same underlying defect class recurring for the third time", "this is the same issue as before", "a residual instance of" --- each names a recurrence the individual finding does not, and each is easy to read past while attending to the concrete case attached to it.
+Read the framing as a finding in its own right.
+
+Note the direction of travel, since a suggested fix pulls the other way.
+A reviewer who spots a recurrence still tends to propose a *narrowing*, because a narrowing is concrete and a redesign is not theirs to specify.
+Taking that suggestion is the fourth patch, not the fix, and declining it is not a rebuttal --- accept the finding, decline the remedy, and say which you are doing.
+
+The replacement is usually a different kind of evidence rather than a better pattern.
+Ask what would settle the question directly, and whether you can observe it: an artifact instead of a description of one, a derived count instead of a claim about a count, a tool call instead of the prose announcing it.
+Where no such evidence exists, say so and pick the failure direction deliberately, per [`fail-fast`](../principles/fail-fast.md) --- a bounded, nameable false positive beats a silent bypass, and both beat a heuristic nobody can characterize.
+
+This is [`deterministic-tools`](../principles/deterministic-tools.md)'s recurrence bar pointed the other way, and the two thresholds differ on purpose.
+That rule says the third time you do a judgment task by hand, build a tool.
+This one fires a round earlier: the **second** time your tool draws the same finding, the tool is wrong --- and the fact that it keeps *almost* working is the reason it survives that long.
+The asymmetry is the point rather than an oversight.
+Waiting for a third instance costs a whole extra round spent narrowing something that cannot work, which is precisely the delay this section exists to prevent;
+waiting for a third hand-run of a judgment call costs only that call.
+
+- **Do:** treat the second instance of a finding class as a question about the instrument, and say in the round which of the two questions you are answering.
+- **Do:** read a reviewer's "same issue as before" framing as a finding in its own right, separate from the case it arrives attached to.
+- **Do:** look for evidence you can observe directly before reaching for a better pattern.
+- **Don't:** apply a suggested narrowing just because the reviewer offered it --- a recurrence's proposed remedy is usually one more patch.
+- **Don't:** read a passing suite after a narrowing as evidence the class is closed;
+  the tests came from the instance.
+
+(Morrison-Lab/ai-config#1733, from three review rounds on #1724.
+Rounds 1 and 2 were answered by narrowing a wording heuristic, and round 3 found the same class again in bare nouns (`edit`, `update`, `record`, `author`, `patch`) that the round-2 verb pattern matched.
+The fix that held was deleting the heuristic and observing a subagent's actual writes instead.
+Both remedies the round-3 review suggested were a fourth narrowing, and each is defeated by a one-line rephrasing.)
+
 A manual action by someone else, on a PR you claimed, is the same trigger with nothing labelled a finding.
 The trigger above still needs a reviewer to state a defect.
 This is the version where nobody states anything.

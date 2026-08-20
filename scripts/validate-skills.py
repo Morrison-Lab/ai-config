@@ -176,6 +176,9 @@ NON_OPERATION_TOKENS = {
     "GITLAB_TOKEN",
     "NOT_CRAN",
     "NOT_PLANNED",
+    # env var: names the ollama endpoint, which delegate-to-opencode cites as
+    # one way the ollama provider ends up pointing off-machine
+    "OLLAMA_HOST",
     "PROJECT_ID",
     "PR_NUMBER",
     "REBASE_HEAD",

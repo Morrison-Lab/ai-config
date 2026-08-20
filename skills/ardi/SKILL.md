@@ -178,7 +178,7 @@ How depends on the repo's review trigger first, and on whether this round pushed
      To force a fresh review on an existing PR **without a new commit**, prefer `workflow_dispatch`: `gh workflow run claude-code-review.yml --ref <PR-branch> -f pr_number=<N>`.
      Without `gh`, use the REST `.../actions/workflows/claude-code-review.yml/dispatches` endpoint, or your GitHub MCP workflow-dispatch tool.
      Closing+reopening the PR also works (fires `reopened`) but adds timeline noise.
-     See [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md).
+     See [`memories/claude-review-dispatch.md`](../../memories/claude-review-dispatch.md).
    - **Marking a draft ready seconds after its final push is another cancel-in-progress race** --- the ready-event and synchronize runs fire a second apart and the cancellation can land on the newer (current-head) run; see [`pr-on-claim`](../../shared/workflow/pr-on-claim.md) for the diagnosis and the `gh run rerun` remedy.
    - **A review ends up canceled with no comment:** first check whether a **newer run for this same PR** is already in flight.
      Under `concurrency: cancel-in-progress` a fresh dispatch is what cancelled the old run, so a retry cancels the new one --- possibly a review a human just asked for, since `claude-bot.yml`'s `review-workflow-file` re-dispatches this very workflow into the same per-PR group.

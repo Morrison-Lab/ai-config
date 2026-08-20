@@ -137,3 +137,26 @@ round" was loaded in context throughout.
 [#902](https://github.com/Morrison-Lab/ai-config/issues/902) is the adjacent
 open issue, covering a one-shot wakeup whose named PR merged underneath it
 rather than a recurring brief carrying a capability claim forward.)
+
+## A supplied measurement carried a status-code confound
+
+(ucdavis/bcs, 2026-08-20: a session was handed "four POSTs, HTTP 200, zero
+Copilot reviews resulted" as evidence that requesting a reviewer buys
+nothing on that repo.
+The number was accurate and the conclusion drawn from it was not fully
+supported: `hooks/no-unreviewed-pr.py`'s `_argv_close` docstring documents
+that `POST /pulls/{n}/requested_reviewers` returns HTTP 200, rather than
+the success code, exactly when the PR was already merged or closed --- and
+adds nobody in that case, by design, not by failure.
+So a 200 across all four calls is at least partly explained by PR state
+rather than by the request mechanism being broken.
+
+Checking settled it only partway: ucdavis/bcs #648 closed at
+`2026-08-20T01:33:34Z` and #649 merged at `01:40:47Z`, both plausibly before
+the POSTs ran, while #650 stayed open throughout the window.
+Per-POST timings were never recorded, so the confound is confirmed to apply
+to some of the four calls, not shown to explain all of them.
+The brief's author had no way to see this from the count alone --- reading
+the status code as a confound required already knowing what it encodes,
+which is exactly why a supplied number needs re-deriving rather than only
+re-reading.)

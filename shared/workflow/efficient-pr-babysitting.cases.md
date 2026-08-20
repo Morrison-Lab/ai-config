@@ -29,7 +29,7 @@ Review round 1 caught the first draft of this record claiming batching bought
 rule it amends, four lines above it.
 The dispatch-only fact was already recorded in
 [`ardi.md`](ardi.md), [`pr-on-claim.md`](pr-on-claim.md), and
-[`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md),
+[`memories/claude-review-dispatch.md`](../../memories/claude-review-dispatch.md),
 so the gap was in the trigger rather than in the knowledge: every existing
 statement of it fires around a push, and none fires when the batching rule is
 invoked to withhold one.)

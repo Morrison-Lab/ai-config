@@ -190,3 +190,58 @@ scoped `--prune` is one of the ways you arrive there.
   bounded by each invocation's refspec, so a scoped fetch prunes nothing.
 - **Don't:** count a `--prune` you ran as having pruned the ref you care about;
   check which refspec it covered.
+
+## Disabling a hook by unregistering it assumes ONE installation shape, and does nothing on the other
+
+Point 2 above already records that the two installation paths are mutually
+exclusive: with the ai-config **plugin** enabled, every hook in
+`hooks/hooks.json` loads from the plugin root, and `install-hooks.py`'s
+`settings.json` bindings are the *other* path rather than an additional one.
+That is stated there as a hazard for **enabling** a hook --- run both and each
+one fires twice.
+
+The same fact has a quieter consequence in the opposite direction, and nothing
+above reaches it.
+The standard way to silence a hook is to delete its entry from
+`~/.claude/settings.json`.
+On a plugin install there is no such entry, so that edit removes nothing, the
+hook keeps firing, and **the edit itself succeeds** --- which is the whole
+problem.
+A remedy that errors gets fixed; a remedy that quietly no-ops gets recorded as
+applied, and the next reader inherits an instruction that has never once
+worked.
+
+The asymmetry with the enabling case is worth naming, because it is why the
+enabling hazard was noticed and this one was not.
+Double-firing is loud and immediate.
+A failed disable looks exactly like a hook you decided to keep.
+
+So when a hook has to stop firing for a reason that is not per-PR --- a
+standing directive, a moratorium, a repo where its demand is meaningless ---
+put the switch **in the script**, where both installation shapes read it, and
+prefer a self-expiring form over a flag somebody has to remember to clear.
+`hooks/no-unreviewed-pr.py`'s `MORATORIUM_END` is the worked example, and
+[`memories/github.md`](../../memories/github.md)'s Copilot-moratorium section
+carries that one incident's own record --- read this section for the general
+rule about installation shapes, and that one for what the moratorium requires
+of a session today.
+
+- **Do:** put a non-per-PR suppression in the hook script itself, so it holds
+  on a plugin install and a settings install alike.
+- **Do:** prefer a dated constant to an env flag when the reason for
+  suppression has a known expiry, so the guard re-arms without anyone
+  remembering.
+- **Don't:** prescribe "remove it from `~/.claude/settings.json`" without
+  naming the installation shape that assumes; on a plugin install it is a
+  no-op that reads as a fix.
+- **Don't:** treat an env-readable switch as equivalent --- a clock or a kill
+  flag the guard reads from the environment is a one-variable bypass of the
+  guard in production, which is the direction
+  [`fail-fast`](../principles/fail-fast.md) refuses for any discharge path.
+
+(`Morrison-Lab/ai-config#1709` / `#1710`, 2026-08-19: `memories/github.md`
+prescribed unregistering `no-unreviewed-pr.py` for the Copilot moratorium's
+duration.
+`grep -n no-unreviewed-pr ~/.claude/settings.json` returned nothing on the
+machine where the hook was firing every turn, because `hooks/hooks.json:349`
+supplied it under `${CLAUDE_PLUGIN_ROOT}`.)

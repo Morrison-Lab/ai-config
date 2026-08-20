@@ -13,6 +13,10 @@ so the create fixtures deliberately keep the number OUT of the command and
 put it in the result, the shape the position/number-in-command model got
 wrong.
 
+Every case runs against a PINNED clock, past the Copilot moratorium the
+subject now honours -- see `RUNNER` below for why the pin is injected by
+import rather than by an environment variable.
+
 Run: python3 hooks/test-no-unreviewed-pr.py hooks/no-unreviewed-pr.py
 """
 import importlib.util
@@ -23,6 +27,34 @@ import sys
 import tempfile
 
 HOOK = sys.argv[1]
+
+# The guard is inert while the Copilot moratorium stands (`MORATORIUM_END` in
+# the subject), so every case below would pass vacuously against the real
+# clock -- "no block" for the right reason and the wrong one are the same
+# observation. So the subject is driven at a fixed post-moratorium date.
+#
+# The date is injected by IMPORTING the subject and overriding its `_today`,
+# not by an environment variable the subject reads. A clock the subject read
+# from the environment would be a one-variable bypass of the guard in
+# production, which is exactly the dangerous direction its discharge paths
+# already refuse; a test-side override is unavailable to any session.
+RUNNER = """
+import datetime, importlib.util, sys
+spec = importlib.util.spec_from_file_location("_h", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+m._today = lambda: datetime.date.fromisoformat(sys.argv[2])
+sys.exit(m.main())
+"""
+
+# One day after the moratorium ends, so the guard is live for the cases that
+# are about anything else.
+AFTER = "2026-09-02"
+
+
+def hook_argv(when=AFTER):
+    """Subject invocation with the clock pinned to `when`."""
+    return [sys.executable, "-c", RUNNER, HOOK, when]
 
 _n = [0]
 
@@ -1105,7 +1137,7 @@ def _push_wording():
             fh.write(json.dumps(e) + "\n")
     try:
         out = subprocess.run(
-            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            hook_argv(), input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True,
             env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
         return "per-HEAD" in out and "pushed a new head" in out
@@ -1288,7 +1320,7 @@ def _redaction_wording():
             fh.write(json.dumps(e) + "\n")
     try:
         out = subprocess.run(
-            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            hook_argv(), input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True,
             env=dict(os.environ, TMPDIR=tempfile.mkdtemp())).stdout
         reason = json.loads(out).get("reason", "") if out.strip() else ""
@@ -1305,7 +1337,7 @@ def block_of(events):
             fh.write(json.dumps(e) + "\n")
     try:
         out = subprocess.run(
-            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            hook_argv(), input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True,
             env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
         ).stdout
@@ -1314,10 +1346,32 @@ def block_of(events):
         os.unlink(path)
 
 
-def obligations_of(events):
+def load_hook():
     spec = importlib.util.spec_from_file_location("_h", HOOK)
     hookmod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(hookmod)
+    return hookmod
+
+
+def blocks_at(when, events):
+    """Does the subject block on `events`, with its clock pinned to `when`?"""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        out = subprocess.run(
+            hook_argv(when), input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+        ).stdout
+        return "block" in out
+    finally:
+        os.unlink(path)
+
+
+def obligations_of(events):
+    hookmod = load_hook()
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         for e in events:
@@ -1357,7 +1411,7 @@ def main():
         for e in create("c") + [say("Opened it.")]:
             fh.write(json.dumps(e) + "\n")
     out = subprocess.run(
-        [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+        hook_argv(), input=json.dumps({"transcript_path": path}),
         capture_output=True, text=True,
         env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
     ).stdout
@@ -1374,7 +1428,7 @@ def main():
         failures += 1
 
     out = subprocess.run(
-        [sys.executable, HOOK], input='{"transcript_path": "/nonexistent"}',
+        hook_argv(), input='{"transcript_path": "/nonexistent"}',
         capture_output=True, text=True,
     )
     if out.returncode == 0 and "block" not in out.stdout:
@@ -1397,7 +1451,7 @@ def main():
             for e in events:
                 fh.write(json.dumps(e) + "\n")
         out = subprocess.run(
-            [sys.executable, HOOK], input=json.dumps({"transcript_path": p}),
+            hook_argv(), input=json.dumps({"transcript_path": p}),
             capture_output=True, text=True, env=env).stdout
         return "block" in out
 
@@ -1411,6 +1465,49 @@ def main():
     else:
         print(f"FAIL: sentinel scope wrong "
               f"(first={first} repeat={repeat} other={other})")
+        failures += 1
+
+    # --- the Copilot moratorium suspends the whole guard -------------------
+    # ai-config#1709. While the standing directive forbids the Copilot
+    # request, every discharge this guard offers is the one action forbidden,
+    # so the guard has to be inert rather than merely quieter. Same
+    # transcript, two clocks: the ONLY difference between these two is the
+    # date, which is what makes the second one evidence the first is silent
+    # for the moratorium's sake and not because the fixture stopped arming.
+    armed = create("c") + [say("Opened it.")]
+    if blocks_at("2026-08-31", armed):
+        print("FAIL: the guard still fires during the Copilot moratorium")
+        failures += 1
+    elif not blocks_at("2026-09-01", armed):
+        print("FAIL: the guard stays inert on the moratorium's end date")
+        failures += 1
+    else:
+        print("PASS: inert during the moratorium, live again on its end date")
+        passes += 1
+
+    hookmod = load_hook()
+    import datetime as _dt
+    bounds = (
+        hookmod.moratorium_active(_dt.date(2026, 8, 31)),
+        not hookmod.moratorium_active(hookmod.MORATORIUM_END),
+        not hookmod.moratorium_active(_dt.date(2027, 1, 1)),
+    )
+    if all(bounds):
+        print("PASS: moratorium_active is half-open -- live ON the end date")
+        passes += 1
+    else:
+        print(f"FAIL: moratorium_active boundaries wrong {bounds}")
+        failures += 1
+
+    # The subject's own clock must be the real one. A clock it read from the
+    # environment would let any session silence the guard by exporting a date,
+    # so the test's injection has to be a test-side override and nothing the
+    # subject itself offers.
+    if hookmod._today() == _dt.date.today():
+        print("PASS: the subject's default clock is the real date")
+        passes += 1
+    else:
+        print("FAIL: the subject's default clock is not date.today()")
         failures += 1
 
     if _redaction_wording():

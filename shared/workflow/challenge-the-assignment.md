@@ -33,7 +33,7 @@ suspicion lands on the check rather than on the instruction.
 The result is that the least examined input is the one determining everything
 else.
 
-## Three shapes, in rising order of how settled they look
+## Four shapes, in rising order of how settled they look
 
 **A convention document's own claims.**
 A `CLAUDE.md`, a design doc, a lab manual, a README.
@@ -57,6 +57,27 @@ from a set, and the set is the part you did not choose.
 Answering it well is not the same as answering it correctly, because the right
 answer may be neither, or both, or a third thing the options obscured.
 
+**A supplied measurement.**
+A brief can hand over a number rather than a claim or an instruction ---
+"four POSTs, HTTP 200, zero reviews resulted" --- offered as the evidence a
+conclusion already rests on.
+This looks the most settled of the four, because it arrives with a count
+attached, and a count reads as having already been checked.
+It has not: the number is real, but the measurement can carry a confound the
+person who ran it never saw, because seeing it required knowing something the
+measurement itself does not show.
+`POST /pulls/{n}/requested_reviewers` returning HTTP 200 rather than the
+success code is itself evidence the PR was already merged or closed when the
+call ran, and adds nobody --- so "four POSTs, HTTP 200, zero reviews
+resulted" is not evidence that requesting a reviewer buys nothing; it may be
+evidence that the four PRs were no longer open.
+The confound was invisible to whoever ran the measurement because seeing it
+required knowing what the status code encodes, which the count itself does
+not show.
+Re-deriving the measurement, not just re-reading it, is what a supplied
+number needs before it can settle anything --- check each PR's state at the
+time the call ran, not just the aggregate count.
+
 ## The check
 
 Keep it bounded, or it becomes paralysis and gets dropped.
@@ -76,6 +97,10 @@ state what the options share before picking one.
 An option set has a presupposition, and naming it is what makes rejecting it
 possible; unnamed, it is simply the shape of the question.
 
+For a supplied measurement, add a fourth: name what would have to be true
+about *how it was taken* for the number to mean what the brief says it
+means, and check that rather than the number itself.
+
 The point of writing rather than considering is that a consideration cannot
 fail.
 This is [`algorithmatize-checks`](algorithmatize-checks.md)'s judgment residue,
@@ -88,6 +113,9 @@ checkable by a reader, and a resolution to be thoughtful is not.
   or not.
 - **Do:** name what a posed choice's options presuppose, before answering
   within them.
+- **Do:** re-derive a supplied measurement --- check the conditions under
+  which it was taken --- rather than accepting the number and reasoning only
+  from it.
 - **Don't:** work around a wrong brief silently --- delivering something that
   quietly repairs the instruction reads as competence and leaves the error in
   place for the next reader.
@@ -97,6 +125,12 @@ checkable by a reader, and a resolution to be thoughtful is not.
 - **Don't:** answer a choice as posed when its options share a false
   presupposition, and don't stall on the choice either --- say which
   presupposition fails and what follows.
+- **Don't:** treat a supplied number as settled because it arrived with a
+  count attached --- a count that is real can still carry a confound the
+  measurer never saw.
+
+See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
+"A supplied measurement carried a status-code confound".
 
 ## When the work itself settles the premise, run it before writing anything
 

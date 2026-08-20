@@ -16,6 +16,14 @@ checked against one feels checked rather than guessed.
 It is not a source: see
 [`fixtures-are-not-evidence.md`](../workflow/fixtures-are-not-evidence.md).
 
+A fixture is one instance of a wider substitution: the artifact inspected is
+adjacent to the one the claim is about, so the evidence is genuine, the
+reasoning from it is sound, and the conclusion is false.
+The checks below all assume the object in hand is the object under discussion.
+[`verify-the-right-artifact.md`](../workflow/verify-the-right-artifact.md)
+covers confirming that, and the shapes the substitution takes when it is not
+so.
+
 ## What to check
 
 - **Factual claims.** Check each claim against the AI's own domain knowledge
@@ -537,6 +545,11 @@ local rendered tree, where the fix is a re-render rather than a wait.
 - **Don't:** treat a preview comment's timestamp, or the mere existence of a
   deployed page, as saying which commit it was built from.
 
+A CDN copy of the deployed site is a further step removed than the build is,
+and reading one for the branch's own bytes is the same substitution one layer
+out; see
+[`verify-the-right-artifact.md`](../workflow/verify-the-right-artifact.md).
+
 ## A block presented as program output is a claim, so capture it rather than composing it
 
 A fenced block introduced as what a command prints is a factual claim about
@@ -601,3 +614,115 @@ This entry's own first draft then quoted that `err()` line as
 `printf '%s\n' "$*" >&2`, composed from memory rather than read from the
 script --- caught in this fragment's own review, the failure mode illustrating
 itself.)
+
+## A contrast sentence imports the neighbouring rule's parameters
+
+[`Check a general claim against the concrete numbers in the same
+document`](#check-a-general-claim-against-the-concrete-numbers-in-the-same-document)
+above already turns a sentence back on its own document.
+This check does too, and differs in **what it compares against**: that one
+reads a stated rule against a figure the document reports elsewhere, while this
+one reads a contrast sentence's parameters against the rule that sentence is
+supposed to be stating.
+Not against the neighbour.
+The neighbour is where a wrong parameter comes *from*, never what you check
+against --- checking against it would flag every asymmetry this section goes on
+to sanction.
+
+The construction at risk is the one this corpus is built on: stating a rule by
+contrasting it with an adjacent rule.
+
+> That rule says the third time you do a judgment task by hand, build a tool.
+> This one says the third time your tool gets the same finding, the tool is wrong.
+
+The second sentence is wrong, and the rule it belongs to says so earlier in
+the same section --- its trigger is the **second** occurrence.
+The number came from the neighbour, whose bar genuinely is the third.
+Parallel structure is the mechanism: writing "That rule says X / This one says
+Y" pulls the shape of X into Y, and a parameter rides along inside the shape.
+
+**Three things conspire to hide it**, which is why it needs a named check rather
+than ordinary care.
+The imported parameter is *correct about the neighbour*, so the sentence
+survives a spot-check aimed at the neighbour rather than at your own rule.
+The contradiction sits far enough away to be invisible locally, so the paragraph
+reads fine on its own.
+And the parallelism makes the wrong value look deliberate --- third against
+third scans as a designed symmetry rather than as a slip.
+
+**The cost is highest in an auto-loaded instruction fragment**, where the reader
+is an agent rather than a person.
+A person who notices two thresholds asks which is right.
+An agent gets two sanctioned readings and may reasonably take the more permissive
+one --- which, in the case behind this entry, was exactly the behaviour the rule
+existed to prevent.
+
+So when a sentence contrasts your rule with another, **re-read your own rule's
+statement, not the neighbour's**, and confirm every number, threshold, scope, and
+disposition in the contrast matches it.
+Where the two genuinely differ, say that they differ and why, in the same
+breath.
+An unexplained asymmetry invites the next reader to "fix" it back into agreement.
+
+- **Do:** verify each parameter in a contrast sentence against your own rule's
+  statement, not against the rule you are contrasting with.
+- **Do:** state a deliberate asymmetry as deliberate, with its reason, so it is
+  not read as an oversight.
+- **Don't:** let parallel phrasing carry a neighbour's number, scope, or
+  threshold into your rule.
+- **Don't:** treat "that number is right for the other rule" as the check
+  having passed --- the question is whether it is right for yours.
+
+(Morrison-Lab/ai-config#1742, from the review of
+[#1735](https://github.com/Morrison-Lab/ai-config/pull/1735).
+The fragment added there stated its trigger as the second recurrence in both its
+rule statement and its Do/Don't pair, and as the third in the sentence
+contrasting it with
+[`deterministic-tools`](../principles/deterministic-tools.md).
+The construction is widespread here rather than incidental: `grep -rn "pointed
+the other way\|the mirror of\|inverts cleanly" shared/
+--exclude=fact-check-prose.md` returned 9 hits when this was written, and that is
+one phrasing family among several.
+The exclusion is load-bearing rather than tidy: this paragraph quotes the pattern
+it searches for, so a run that includes this file counts itself.)
+
+## An availability claim about a repository is a state claim, not a safe default
+
+The **Factual claims** bullet above already covers claims checkable against an
+external source.
+This is the shape that slips past it: a claim about a repository's or
+service's *current status* --- public or private, released or unreleased,
+open-source or not --- reads as a safe default rather than as a claim, because
+it lines up with intent rather than with anything actually asserted.
+
+Writing "open-source, available at `<URL>`" in a Code and Data Availability
+statement, a README, or similar prose feels natural when publication is
+planned or eventually expected.
+It is a claim about **state** in
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+taxonomy, and a claim about state gets re-queried, not recalled from what
+seems likely.
+A repository actively being developed toward eventual publication is not
+automatically public yet, and intent to publish is not evidence of the state
+now.
+
+Query the system directly before writing the claim: `gh api
+repos/<owner>/<repo> --jq .private`, or an unauthenticated fetch of the given
+URL.
+Neither a `DESCRIPTION` file's `URL:` field nor "most packages like this
+eventually go public" settles it, since both describe intent rather than the
+live state.
+
+- **Do:** verify a repository's or service's current visibility live, before
+  asserting it in an Availability statement, README, or similar prose.
+- **Do:** treat a live-looking URL offered as evidence of accessibility as
+  itself a claim needing the same check.
+- **Don't:** write an availability or open-source claim as a natural default
+  because publication is planned or intended.
+- **Don't:** infer current visibility from a config file's URL field, or from
+  what similar projects usually do.
+
+This is a first occurrence of this specific pattern, so it does not yet clear
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar for a dedicated instrument.
+Revisit as a check only if the pattern recurs.

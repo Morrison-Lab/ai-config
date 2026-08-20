@@ -469,15 +469,60 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   Every one also postdates the override rather than explaining why it was written --- `select(.submittedAt >= "2026-08-04")` returns 39 of 39, earliest `2026-08-04T04:38:12Z`.
   So requests are still being issued despite this override, and each one spends a request on a guaranteed non-verdict.
   That every one of those PRs merged on `claude-review` alone is the same practice slippage [`shared/workflow/flag-practice-slippage.md`](../shared/workflow/flag-practice-slippage.md) already records at eight PRs, met here at larger scale and still live; read that fragment for the argument rather than re-deriving it.
-  A `no-unreviewed-pr.py` `Stop` hook (ai-config#1041) enforces the opposite instruction and collides with this override while the quota is out.
-  It fires every turn a PR opened or readied this session sits awaiting review, demanding a Copilot request -- the one action this override forbids -- so a session that honors the override never satisfies it and the demand repeats each turn.
-  Unregister it from `~/.claude/settings.json`'s `Stop` hooks while Copilot is out.
-  The script stays and only the local registration goes.
-  Re-add it after September 2026 alongside re-enabling the request.
+  A `no-unreviewed-pr.py` `Stop` hook (ai-config#1041) enforces the opposite instruction, and until 2026-08-19 it collided with this override on every turn the quota was out.
+  It fired every turn a PR opened or readied this session sat awaiting review, demanding a Copilot request -- the one action this override forbids -- so a session honoring the override never satisfied it and the demand repeated each turn.
   One Morrison-Lab/gha session spent over a dozen turns in this loop before the collision was recognized.
   That loop persisted even though each request POST succeeded, because the hook discharges only on a reviewer-request that is the **last simple command in the call** (its exit status is then unambiguous), and every turn chained a verify `gh pr view` after the POST, leaving it non-last.
-  Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids, so unregistering is the right fix while the quota is out.
+  Running the POST as its own last command would discharge the hook, but that is still the Copilot request the override forbids.
+  So no discharge available to a session honoring the override was ever the right fix.
+  The collision was in the hook's own demand rather than in how any session answered it.
   (Reproduced on Morrison-Lab/ai-config#1128, 2026-08-04.)
+
+  **Superseded 2026-08-19 (ai-config#1709): the script now honors this override itself, and nothing needs unregistering.**
+  `hooks/no-unreviewed-pr.py` carries `MORATORIUM_END = 2026-09-01`, matching the September 2026 expiry above, and returns before scanning while that date is still ahead --- so the collision is gone on every installation shape and the guard re-arms itself on the day the override names, with nobody having to remember.
+  Keep the two in step: extending the moratorium here means editing that constant in the same PR, or the memory and the hook start disagreeing again.
+
+  The remedy this paragraph used to give --- unregister it from `~/.claude/settings.json`'s `Stop` hooks --- covered only ONE installation shape, and it is worth recording why rather than just deleting it.
+  Where ai-config is installed as a **plugin**, the registration lives in ai-config's own `hooks/hooks.json` under `${CLAUDE_PLUGIN_ROOT}`, so there is nothing in the user's settings to remove: the edit succeeds, changes no behaviour, and the hook keeps firing.
+  A remedy that silently does nothing is worse than none, because it reads as applied.
+  The plugin shape is now the common one --- `d-morrison/rme#1074` migrates off the `.ai-config` submodule, and `Morrison-Lab/gha`'s `run-claude-review-attempt` installs the plugin for every review run --- which is the general lesson: a fix aimed at a local registration has to name which installation shape it assumes.
+
+  - **Do:** treat the hook's `MORATORIUM_END` as the switch, and move it and this memory together.
+  - **Don't:** unregister the hook from `~/.claude/settings.json` to quiet it --- that does nothing on a plugin install, and nothing is needed on any install now.
+
+  The general form of that lesson --- any hook suppression aimed at a registration is blind to one of the two installation shapes --- lives in [`shared/workflow/keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md), beside the enabling-direction hazard it mirrors.
+
+  **Restated and widened 2026-08-19: the moratorium covers ALL REPOS, not just Morrison-Lab.**
+  The user said "stop requesting copilot reviews until september", then, asked about scope, "ALL REPOS".
+  So the paragraph above should be read with `ucdavis/bcs` and every other repo inside it, not only the Morrison-Lab org the 2026-08-04 measurement happened to cover.
+  The expiry is unchanged and deliberate: **September 2026**, after which re-verify the quota and re-enable the per-round request rather than letting the moratorium become permanent by default (`shared/writing/timestamp-volatile-claims.md`).
+
+  The same session tried four `requested_reviewers` POSTs for `copilot-pull-request-reviewer[bot]` on `ucdavis/bcs` PRs #648, #649, and #650.
+  Each was accepted with HTTP **200**, and each left zero Copilot reviews behind, the pending request absent from both `gh pr view --json reviewRequests` and the `GET .../requested_reviewers` endpoint.
+  Re-verified 2026-08-20: all three PRs still carry zero Copilot reviews and no pending Copilot request.
+
+  **Read that as weak evidence, not as the 201-then-empty signature above, and the reason is the status code.**
+  `hooks/no-unreviewed-pr.py`'s `_argv_close` docstring records that GitHub accepts this POST on a **merged or closed** PR with HTTP **200** and adds nobody, which is a different outcome from the **201** the signature above is defined by.
+  Two of the three PRs fit that reading: #648 was closed at `2026-08-20T01:33:34Z` and #649 merged at `01:40:47Z`, both plausibly before the POSTs.
+  #650 was open throughout and remains open, so at least one of the four is not explained that way, but the per-POST timings were not recorded and cannot now be recovered.
+  So this measurement does not establish that a Copilot request fails on a live PR outside Morrison-Lab.
+  It is not what the moratorium rests on either --- the maintainer's directive is --- and it is kept here only so a later reader does not re-derive it as fresh support.
+  A clean version of the experiment would POST once on a PR known to be open and record the status code beside the timestamp.
+
+  **This outranks `hooks/no-unreviewed-pr.py`, which demands a Copilot request after every PR open, ready, or re-head.**
+  That hook's docstring names two legitimate deferrals, a draft PR and a redaction PR.
+  A standing maintainer directive is a third, and it wins: a user instruction outranks a skill or a hook.
+  Say so in the PR or the recap when you defer on this ground, so the omission reads as a recorded deferral rather than as a missed step --- that is the whole reason to write it down, since silence and compliance look identical from outside.
+  Unregistering the hook, per the paragraph above, remains the fix for the turn-by-turn nag while the moratorium is live.
+
+  - **Do:** skip the `requested_reviewers` POST and `request_copilot_review` on every repo until September 2026, and state the directive as the reason when a PR ships without a Copilot request.
+  - **Do:** rely on `claude-review` plus self-review meanwhile, which is the same no-reachable-external-reviewer fallback the paragraph above already cites --- `shared/workflow/review-verdict-pitfalls.md`'s fifth case.
+    Withheld-by-policy is not literally unreachable, so the fit is by analogy rather than by definition.
+    Say which one applies when reporting a PR's review state.
+  - **Don't:** read `hooks/no-unreviewed-pr.py`'s demand, or `shared/workflow/pr-on-claim.md`'s "request the external reviewer in the same stride", as overriding a standing user directive.
+  - **Don't:** treat an accepted POST (200 or 201) as evidence the moratorium is over --- all four 2026-08-19 requests were accepted and none produced a review.
+  - **Don't:** let September 2026 pass without re-verifying.
+    The expiry is part of the rule, not a footnote to it.
 - **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
   when its output is not a terminal --- which is always, for an agent.**
   A cancellation and a real failure are therefore the same word in the column

@@ -788,6 +788,57 @@ and reached opposite, both wrong, conclusions.
 That is the tell that the evidence does not discriminate: it produced "quiet
 but alive" and "quiet and abandoned" from the identical two facts.
 
+**A harness-reported failure is not a snapshot, and there the question is what
+to salvage rather than whether the agent is alive.**
+Everything above concerns evidence that cannot discriminate --- a quiet
+worktree, an absent listing --- where the remedy is to ask.
+A `task-notification` carrying `status: failed` is a different kind of signal.
+It comes from the harness rather than from an inference of yours, so asking
+buys nothing and costs an agent spin-up aimed at a process already gone.
+
+The useful discovery is that a failed agent has often already pushed.
+An agent that stalls during its verification or reporting phase can have
+committed and pushed everything first, so the work sits safe on the remote
+while the *report* about it is what was lost.
+The report is also the only part that felt like the deliverable, which is why
+the failure reads as total.
+Reading it that way leads to redoing work that already landed, and a redo can
+diverge from what was actually pushed.
+
+Four reads settle what survived, before touching anything:
+
+```bash
+gh pr view <N> --json headRefOid --jq .headRefOid   # what the remote has
+git -C <worktree> rev-parse HEAD                    # what the worktree has
+git -C <worktree> status --short                    # uncommitted
+git -C <worktree> log --oneline @{u}..HEAD          # committed, unpushed
+```
+
+A matching remote and local head, an empty status, and an empty unpushed range
+together mean the work landed in full and only the reporting was lost.
+Then finish the remainder yourself rather than resuming the agent, and verify
+its changes against the tree rather than against its commit message --- the
+verification step is precisely the one that did not run.
+
+- **Do:** treat a harness `status: failed` as authoritative about the process,
+  and check what was pushed rather than asking a dead agent.
+- **Do:** re-verify a failed agent's work against the tree, since the checks it
+  was about to run are the missing ones.
+- **Don't:** redo work on the assumption a stalled agent lost it --- pushing
+  early is the whole point, and it usually worked.
+- **Don't:** apply the ask-don't-infer rule here.
+  That rule governs evidence which cannot discriminate, and a harness failure
+  signal discriminates.
+
+(Morrison-Lab/ai-config#1696, 2026-08-19: an agent addressing six review
+findings stalled on a 600s watchdog, its last line reading "Now the full check
+suite before a single push".
+It had already pushed --- remote head, worktree HEAD, and an empty unpushed
+range all agreed --- so the six fixes were intact and only the check suite, the
+disposition comment, and the re-review dispatch remained.
+Those were finished directly, and the PR merged as `f5059a84` after a clean
+second round.)
+
 **Long-stalled uncommitted work in a container-local worktree is still a real
 problem, and the fix is to ask, not to infer.**
 Uncommitted state in a worktree survives nothing --- not a container

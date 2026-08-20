@@ -38,7 +38,7 @@ The failure is not disregarding a rule but applying it where its premise does no
 [`challenge-the-assignment`](challenge-the-assignment.md) is the neighbouring rule, and it governs a premise inside a task you were handed rather than one inside a standing rule you invoked on your own initiative.
 
 Note where the gap actually sat, because it was not in the knowledge.
-[`ardi`](ardi.md) and [`pr-on-claim`](pr-on-claim.md) both already say to read the review workflow's `on:` block and to dispatch explicitly when it carries no push-based trigger, and [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md) owns the per-repo trigger facts.
+[`ardi`](ardi.md) and [`pr-on-claim`](pr-on-claim.md) both already say to read the review workflow's `on:` block and to dispatch explicitly when it carries no push-based trigger, and [`memories/claude-review-dispatch.md`](../../memories/claude-review-dispatch.md) owns the per-repo trigger facts.
 Every one of those fires around a push or a draft-to-ready transition.
 None fires when you invoke the batching rule to withhold one, which is the moment the premise needed checking.
 One read settles it, once per repo:

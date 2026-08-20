@@ -22,6 +22,22 @@ Threshold rationale (`--max-lines`, default below):
   parameter rather than a literal per
   `shared/coding/configurable-parameters.md`.
 
+WHAT "ADVISORY" DOES AND DOES NOT MEAN HERE
+-------------------------------------------
+Read this before concluding the cap is soft. THIS SCRIPT is advisory. The
+CORPUS is gated, from `test_check_memory_file_size.py`, whose final assertion
+calls `oversized_files("memories", DEFAULT_MAX_LINES)` on the live tree and
+exits 1 on any finding -- so a `validate` run goes red at "Run
+memory-file-size check tests", never at the step that runs this file. A PR
+that appends past 1200 lines cannot merge; it has to split first.
+
+The two statements are consistent and read as contradictory, which is why
+they are stated together: the advisory exit keeps THIS check from blocking an
+unrelated PR over a file it did not touch, while the test keeps the shipped
+default honest. `shared/workflow/batch-merge-and-resolve.cases.md` records an
+instance of the misreading, and `shared/writing/semantic-line-breaks.md` says
+it in one line: read the test suite itself, not this docstring.
+
 Advisory by default: always exits 0 unless `--strict` is passed. A memory
 file crossing a line count is a prompt to consider splitting, not a defect
 that should block an unrelated PR -- the same stance the repo's other

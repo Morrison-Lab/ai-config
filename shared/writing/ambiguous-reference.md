@@ -244,3 +244,44 @@ All four landed in that PR's commit `c57547567`, "Remove ambiguous pronoun
 referents; cite rme for the log-product result".
 One reported instance yielding three more on a sweep is the evidence for the
 habit-rather-than-slip claim above.)
+
+## A bare `#N` takes its repo from context, so it is a referent too
+
+The rule above governs pronouns.
+A bare issue or PR reference --- `#1677`, with no owner or repo --- has the same structure and is easier to miss, because it looks like a precise citation rather than like a word waiting for an antecedent.
+A human reader resolves it against whatever repo the surrounding sentence named,
+and when that is not the repo it belongs to, the sentence asserts something neither half of it says.
+
+**Inside a file there is no second resolver to catch it.**
+GitHub's autolinking does not run in repository files ---
+its own documentation says autolinked references are not created in wikis or in files in a repository ---
+so a bare `#1677` in a memory or fragment is inert text rather than a link.
+That strengthens the rule rather than weakening it:
+on a conversational surface a wrong bare `#N` at least renders as a link a reader can follow and find wrong,
+whereas in a file the reader's own assumption is the only resolver there is.
+
+The failure needs two ordinary, individually-true facts sitting next to each other.
+A memory entry recorded `wai session 2026-08-19: told user PR #1677 was on the branch`.
+The session's working directory really was `wai`, and the PR really was `Morrison-Lab/ai-config#1677` --- a session working one repo from another's checkout, which is routine.
+Composed, the line claims a `wai` PR that has never existed.
+
+**A reviewer checking it will confirm the error and misdiagnose the cause.**
+Searching `wai` for `#1677` correctly returns nothing, which reads as a mislabeled repo, so the natural fix is to relabel the session.
+That is wrong: the session label was accurate, and relabelling it would trade a false claim about the PR for a false claim about the session.
+The actual defect is an *unqualified* number, so the fix is to qualify it and keep both facts: write the session as ``2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`)``, with the reference itself written `Morrison-Lab/ai-config#1677`.
+
+The asymmetry worth remembering: a bare `#N` is safe exactly while the document, the repo, and the work are the same repo.
+Every cross-repo note breaks that, and cross-repo notes are what a memory corpus is mostly made of.
+
+[`memories/preferences.md`](../../memories/preferences.md) already carries the operational half of this for *posted* prose ---
+a PR comment, an issue, a commit message --- where GitHub really does resolve a bare `#N` to the current repo and produce a wrong link.
+This section is the file-side complement: same remedy, different mechanism, and no link to be wrong.
+
+- **Do:** write `owner/repo#N` in any note whose surrounding text names a different repo than the one the reference belongs to.
+- **Do:** separate the session's location from the work's location when they differ, rather than picking one.
+- **Don't:** read "that number does not exist in the repo I searched" as proof the repo label is wrong --- check whether the *number* is unqualified first.
+- **Don't:** leave a bare `#N` in a memory or fragment merely because it resolves correctly where it currently lives;
+  these files get quoted, migrated, and read from other repos.
+
+(Morrison-Lab/ai-config#1677, 2026-08-20: caught in review, with exactly the misdiagnosis described above --- the reviewer verified `#1677` exists in neither `d-morrison/wai` nor `Morrison-Lab/wai` and concluded the repo label was wrong.
+Three Example lines carried the same construction.)

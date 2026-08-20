@@ -23,3 +23,34 @@ Zero commits in `origin/main..<branch>`, plus absence from the remote, together 
 Resist adding an ancestry check beside the first of those.
 An empty `origin/main..<branch>` range is the same fact as `git merge-base --is-ancestor <branch> origin/main` succeeding, so running both confirms one thing twice rather than two things once.
 Once liveness is settled, switch that repo to `main` --- which is what the refusal is really asking for --- and then delete.
+
+## A clean declaration over a session that committed nothing
+
+A session was asked whether opencode's free models could be used as subagents.
+It answered the question, discovered that the user's `~/.config/opencode/opencode.jsonc` was invalid and repaired it, verified two models end to end, posted a `💡 OFFER` to build a delegation skill, and closed with `**Stopping Point**: Clean stopping point reached --- no PR opened or pushed to by this session`.
+
+The user's reply:
+
+> that wasn't a real stopping point; you haven't finished anything
+
+Two rules failed at once, and they failed differently.
+
+The `OFFER` was an unanswered question, which the disqualifier list has covered since the rule was written.
+That rule was loaded and simply did not fire.
+Posing the offer and declaring the stop happened in the same message, and from the inside those read as two unrelated acts rather than as a contradiction --- the offer feels like generosity appended to a finished report, not like a question left open.
+
+The second failure had no rule pointed at it.
+`git log origin/main..HEAD` was empty and `git status --short` clean.
+The branch carried nothing at all, and the session's whole durable output was one untracked edit to a dotfile outside any repository.
+Every *remaining* disqualifier was genuinely absent, because a session that opens no PR cannot have an unmerged one.
+Strike the offer from the record and the declaration is still wrong, which is what makes this a second failure rather than a restatement of the first.
+The declaration even enumerated that absence as its justification, which is what made it read as a check rather than as an omission.
+
+The repair is the completion half of the test, now stated explicitly in the fragment: name what finished.
+Applying it here yields nothing --- and "nothing finished" was available from the same two commands that produced "no PR opened", which is the point.
+The evidence was never missing.
+Only the question was.
+
+The follow-through matters as much as the rule.
+The offer was filed as [#1693](https://github.com/Morrison-Lab/ai-config/issues/1693) rather than left as chat prose, and that issue carries the dotfile repair as a Troubleshooting item for whatever implements it.
+Filing is what makes the difference here, not shipping: an issue is findable by a later reader whether or not the work it describes has landed yet, which is precisely the property the untracked dotfile edit lacked.

@@ -366,7 +366,8 @@
 - **AI memories, skills, and commands never stay local-only.**
   That covers session memory and auto-memory as well as local-only files:
   a scratchpad is not a home, so anything worth keeping must be committed and
-  pushed. When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
+  pushed.
+  When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
   A memory kept only under `~/.claude/projects/<path>/memory/` or `~/.codex/memories/` is invisible to other sessions, machines, and humans, and rots silently --- so migrate it.
   Capturing a learning isn't done until it's committed where the right audience will see it.
 - **A migrate-then-delete cleanup (copy content into a repo, THEN delete the local source) must verify the copy is both COMPLETE and CURRENT before deleting --- not just that it exists.**

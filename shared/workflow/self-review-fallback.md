@@ -33,16 +33,21 @@ A run whose parsed `permission_denials_count` exceeds `max_denials` (default 5) 
 That decides only whether the run retries *itself*, in the same invocation.
 It says nothing about whether the manual re-run above will recover.
 
-Measured on 2026-08-20, both above the threshold and in opposite directions: [ai-config#1689](https://github.com/Morrison-Lab/ai-config/pull/1689)'s review completed and posted a real verdict at `permission_denials_count=72`, while [ai-config#1767](https://github.com/Morrison-Lab/ai-config/pull/1767) produced no verdict twice, at 12 and then 24.
+Measured on 2026-08-20, both far above the threshold and in opposite directions: [job 96505024829](https://github.com/Morrison-Lab/ai-config/actions/runs/32391984929/job/96505024829) on [ai-config#1689](https://github.com/Morrison-Lab/ai-config/pull/1689) completed and posted a real verdict at `permission_denials_count=72`, while [ai-config#1767](https://github.com/Morrison-Lab/ai-config/pull/1767) produced no verdict twice, at 12 and then 24.
+Take such a figure from the job's own log rather than from the PR's comment history, which records 55 for a different attempt on that same PR --- the count is per attempt, so a PR-level number names no particular run.
 So a high count is not evidence that the reviewer has given up on this PR, and the one manual re-run stays worth spending.
 
-What the count cannot tell you is *which* tools were denied, and the log does not name them --- [gha#540](https://github.com/Morrison-Lab/gha/issues/540) is open to add that, and until it lands the cause of any particular high count is guesswork.
-So decide by the re-run's outcome rather than by the number: stop after a second no-verdict attempt, hand the external verdict to a cross-vendor reviewer, and report the PR blocked on that verdict rather than ready.
+What the count cannot tell you is *which* tools were denied, and the log does not name them.
+The execution-transcript artifact does, so download it rather than guessing --- [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md) carries the route, and it works today, independent of [gha#540](https://github.com/Morrison-Lab/gha/issues/540).
+What gha#540 would add is the names in the log itself, which saves the download rather than making the diagnosis possible.
+So decide by the re-run's outcome rather than by the number: stop after a second no-verdict attempt, get the external verdict from a cross-vendor reviewer, and report the PR blocked on that verdict rather than ready.
 
 - **Do:** read the denial count to classify which failure family you are in, then let the re-run's outcome decide what to do next.
-- **Do:** stop re-triggering after the second no-verdict attempt, and go cross-vendor for the external verdict.
+- **Do:** stop re-triggering after the second no-verdict attempt, and get the external verdict from a cross-vendor reviewer.
+- **Do:** download the execution artifact when you need to know which tools were denied, rather than inferring it from the count.
 - **Don't:** call a high-denial run non-recovering --- one at 72 posted a real verdict the same day.
 - **Don't:** read the workflow's refusal to mark a run retryable as advice against the manual re-run, which is a different retry.
+- **Don't:** keep re-triggering the same reviewer past the second no-verdict attempt, and don't report the PR ready on a self-review while a cross-vendor reviewer is reachable.
 
 Either way: don't wait on the bot indefinitely --- do the review yourself and keep driving to fully-clean.
 

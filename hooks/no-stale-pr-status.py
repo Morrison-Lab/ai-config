@@ -66,8 +66,21 @@ RX_FAIL_QUERY = re.compile(
 # than a fixed character window: a negation can sit in an earlier clause of
 # a long sentence (a parenthetical, a comma splice) well before the ASSERT
 # phrase itself.
+#
+# "n't" has no `\b` before it: `\b` requires a word-boundary transition, but
+# in every real contraction (isn't, aren't, doesn't, can't, won't) the
+# character before `n` is itself a word character, so a leading `\b` can
+# never match there and the contraction case silently never fires.
+#
+# Bare "no" is deliberately excluded. It reads like a negation but is
+# usually a determiner attached to a DIFFERENT noun in the sentence than the
+# ASSERT phrase ("No findings remain, so the PR is ready to merge." / "no
+# unresolved threads and #1689 is fully clean") -- both genuine stale-clean
+# claims this guard exists to catch, so treating "no" as a sentence-wide
+# negation signal silently disables the guard on exactly the phrasing this
+# repo's own recap convention uses most.
 RX_NEGATION = re.compile(
-    r"\b(not|n't|never|cannot|unable|no)\b", re.I,
+    r"\b(not|never|cannot|unable)\b|n['’]t\b", re.I,
 )
 # Sentence boundaries: a terminator followed by whitespace, or a blank line.
 # Deliberately coarse -- this only needs to find SOME earlier boundary, not

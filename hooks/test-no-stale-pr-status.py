@@ -85,10 +85,18 @@ CASES = [
      "negation in an earlier clause of the same sentence, ASSERT phrase used referentially"),
     ([QUERY, PUSH, say("Not ready to merge yet; still waiting on CI.")], False,
      "negated 'ready to merge' must not block"),
-    ([QUERY, PUSH, say("493 isn't green yet.")], False,
-     "contraction negation must not block"),
+    ([QUERY, PUSH, say("493 isn't fully clean yet.")], False,
+     "contraction negation must not block -- the ASSERT phrase has to actually "
+     "appear in the sentence (isn't green never matches RX_ASSERT at all, so "
+     "that phrasing alone doesn't exercise the n't path)"),
     ([QUERY, PUSH, say("This is green. Not fully clean, though -- one check is still pending.")], True,
      "an unnegated assertion earlier in the message still blocks even when a later sentence is negated"),
+    ([QUERY, PUSH, say("Pushed. No findings remain, so the PR is ready to merge.")], True,
+     "bare 'no' attached to a different noun must not suppress the guard -- "
+     "this is a genuine stale-clean claim"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("There are no unresolved threads and #1689 is fully clean.")], True,
+     "bare 'no' earlier in the sentence must not suppress an unrelated ASSERT phrase"),
 ]
 
 

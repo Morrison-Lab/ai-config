@@ -81,7 +81,7 @@ lines had accumulated — unrelated to fence state, but found in the same cycle.
 - **In repos whose review workflow carries a `pull_request` trigger.**
   `Morrison-Lab/ai-config` does not, so a push there schedules no review at all
   and polling never terminates --- see
-  [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "`ai-config` never
+  [`claude-review-dispatch.md`](claude-review-dispatch.md)'s "`ai-config` never
   auto-reviews a PR on push" for the trigger table and the dispatch command.
 - Poll until a review note appears that references your latest commit SHA.
 - Wait ~30-60s, then check. If nothing after ~2min, check pipeline status.

@@ -320,6 +320,27 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-silent-traceback.py\"",
+            "timeout": 10,
+            "script": "no-silent-traceback.py",
+            "why": "ai-config#1684: a Bash call can exit 0 while a heredoc or earlier command failed and left a Python traceback in the output. Warns, never blocks --- PostToolUse only fires on harness success, and the match is anchored at line start so prose quoting the phrase does not fire.",
+            "_note_warns_never_blocks": [
+              "Emits `additionalContext` and a `systemMessage` only; no",
+              "`permissionDecision` or `decision: block`.",
+              "",
+              "PostToolUseFailure is intentionally not hooked: a non-zero exit",
+              "is already visible without this guard."
+            ]
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

@@ -331,6 +331,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `no-unauthorized-merge.py` | `PreToolUse` (Bash, mcp__github__.*) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`, or GitHub MCP merge tools) unless an explicit `ALLOW_MERGE=1` assertion or active /mwc accompanies it |
 | `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
 | `no-placeholder-reply.py` | `Stop` | blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement), anchored on the whole message since this corpus quotes the banned string constantly, and deliberately silent on a claim about the *work* (`Nothing to report.`), which the same rule requires |
+| `no-silent-traceback.py` | `PostToolUse` (Bash) | warns, never blocks, when a successful Bash call's output carries a line-anchored Python traceback (ai-config#1684) |
 | `require-stopping-point.py` | `Stop` | blocks a final reply lacking an explicit clean or non-clean stopping-point declaration |
 | `no-misattributed-quote.py` | `Stop` | blocks a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 

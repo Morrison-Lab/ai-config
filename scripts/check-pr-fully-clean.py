@@ -253,12 +253,42 @@ def strip_cited_finding_vocab(text: str) -> str:
     round's verdict as bold text inside a plain parenthetical, with no quotes
     at all -- ``(**Needs more work**, reviewed at `abc1234`)``. Neither the
     code-span nor the quote handling above touches this, because there ARE no
-    quotes. Blanking every bold-in-parens span would be unsafe -- a genuine
-    finding can legitimately read ``(**Location:** foo.py:42)`` -- so this is
-    gated on citation-shaped WORDING inside the same parenthetical
-    (``reviewed at``, or ``previous``/``prior``/``earlier``/``last`` next to
-    ``round``/``review``), not on the bold span alone. That wording is what a
-    citation of a past verdict carries and an ordinary finding does not.
+    quotes.
+
+    A first version of this gated on citation-shaped WORDING anywhere in the
+    same parenthetical (``reviewed at``, or a ``previous``/``prior`` round)
+    and blanked the WHOLE parenthetical. Review on #1762 (finding 1)
+    confirmed that regresses: a genuine, still-unaddressed finding very
+    plausibly mentions "the previous round" in its OWN text while re-raising
+    it, and blanking the entire span erased that live finding along with the
+    citation --
+
+        (**Needs more work:** src/a.py:10 was flagged in the previous round
+        and is still unfixed)
+
+    -- which is exactly the unsafe direction line 269's ``_blank_quote``
+    comment and fully-clean.md both warn against: missing a not-clean signal,
+    not over-flagging, is the dangerous failure. Bold text plus citation
+    wording CO-OCCURRING anywhere in the parenthetical cannot distinguish
+    "citing a past verdict" from "a live finding that happens to reference
+    the past" -- the two are lexically identical under that gate.
+
+    So this instead requires the bold span to sit in a fixed, tight SYNTACTIC
+    position: immediately followed (within a short punctuation/whitespace
+    separator) by ``reviewed at`` and a backtick-quoted commit SHA, e.g.
+    ``**Needs more work**, reviewed at `abc1234` ``. A live finding does not
+    describe itself that way -- "reviewed at a commit" is citation syntax,
+    not finding language -- and Finding 1's counter-example fails this
+    adjacency test (its bold span is followed by prose, not by "reviewed
+    at"), so it is correctly left alone. This is narrower than the wording-
+    only gate on purpose: it drops the un-anchored ``previous``/``prior``
+    round wording variant entirely rather than risk reopening the same
+    ambiguity, since only the SHA-anchored shape is grounded in an actual
+    observed case (#1752). Only the matched bold-plus-citation-suffix span is
+    blanked, never anything else in the surrounding text, so any unrelated
+    live finding nearby always survives. Must run BEFORE the code-span
+    stripping below, since the SHA citation is itself backtick-quoted and
+    would otherwise already be blanked by the time this runs.
 
     Spans are replaced with a space (not deleted) so surrounding text and the
     ``changes requested`` negation-prefix lookbehind stay separated.
@@ -268,6 +298,17 @@ def strip_cited_finding_vocab(text: str) -> str:
         # hide an incidentally-quoted genuine finding -- the unsafe direction.
         return m.group(0) if "**" in m.group(0) else " "
 
+    # A bold-labeled citation of a PAST verdict's SHA, in the one syntactic
+    # shape actually observed (#1752/#1760/#1762 finding 1). The bold span
+    # must be immediately adjacent to "reviewed at `sha`" -- not merely
+    # co-occurring anywhere nearby -- which is what keeps a live finding's
+    # own bold label from ever matching.
+    text = re.sub(
+        r"\*\*[^*\n]+\*\*[ \t,;:-]{0,6}reviewed\s+at\s*`[0-9a-f]{7,40}`",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
     # Fenced code blocks first, spanning lines.
     text = strip_fences(text, replacement=" ")
     # Inline code spans (`...`), within a line.
@@ -275,19 +316,6 @@ def strip_cited_finding_vocab(text: str) -> str:
     # Straight and curly double-quoted spans, within a line (bold-carrying spans kept).
     text = re.sub(r"\"[^\"\n]*\"", _blank_quote, text)
     text = re.sub("\u201c[^\u201d\n]*\u201d", _blank_quote, text)
-    # A bold-labeled citation of a PAST verdict, sitting bare in parentheses
-    # rather than in quotes (#1760). Gated on citation wording via lookahead so
-    # a genuine bold-labeled finding in parens is never blanked -- only a
-    # parenthetical that ALSO reads as citing a prior round is.
-    text = re.sub(
-        r"\((?=[^)\n]*\*\*[^*\n]+\*\*)"
-        r"(?=[^)\n]*\b(?:reviewed\s+at"
-        r"|(?:previous|prior|earlier|last)\s+(?:round|review))\b)"
-        r"[^)\n]*\)",
-        " ",
-        text,
-        flags=re.IGNORECASE,
-    )
     return text
 
 

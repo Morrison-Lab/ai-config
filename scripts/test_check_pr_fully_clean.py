@@ -371,11 +371,12 @@ def main() -> int:
             "Ready for merge. This PR widens coverage of \"Needs more work\" verdicts."
         ) == "clean",
     )
-    # A bold-labeled citation of a PAST verdict, bare in parentheses rather
-    # than in quotes -- the ai-config#1752 case that #1760 fixes. Neither the
-    # code-span nor the quote handling touches this shape.
+    # A bold-labeled citation of a PAST verdict's SHA, in the exact shape
+    # from ai-config#1752 that #1760 fixes. Neither the code-span nor the
+    # quote handling touches this -- there are no quotes, and stripping the
+    # backticks first would hide the SHA gate this relies on.
     check(
-        "classify_verdict: a bold-in-parens PAST-verdict citation is not a "
+        "classify_verdict: a bold-plus-SHA PAST-verdict citation is not a "
         "verdict (#1760 strip, verbatim #1752 shape)",
         checker.classify_verdict(
             "The one finding from the previous review round "
@@ -383,13 +384,21 @@ def main() -> int:
             "\n\n### Verdict\n**Ready for merge** -- no new issues found."
         ) == "clean",
     )
+    # #1762's finding 1: an EARLIER version of this gate keyed only on
+    # citation-shaped WORDING co-occurring anywhere in the parenthetical, and
+    # blanked the WHOLE span -- so a genuine, still-unaddressed finding that
+    # mentions "the previous round" in its own text was silently erased
+    # along with the citation. The bold span here is NOT immediately
+    # followed by "reviewed at `sha`" (it's followed by ordinary prose), so
+    # the tightened adjacency-based gate must leave it alone.
     check(
-        "classify_verdict: 'previous round' wording also triggers the "
-        "bold-in-parens strip (#1760)",
+        "classify_verdict: a LIVE finding mentioning 'the previous round' "
+        "in its own text is NOT erased (#1762 finding 1 regression test)",
         checker.classify_verdict(
-            "The earlier finding (**Needs more work**, from the previous "
-            "round) is now fixed.\n\nVerdict: Ready for merge."
-        ) == "clean",
+            "### Verdict\n**Ready for merge**\n\n"
+            "(**Needs more work:** src/a.py:10 was flagged in the previous "
+            "round and is still unfixed)"
+        ) == "not-clean",
     )
     check(
         "classify_verdict: a bold-in-parens finding with NO citation wording "
@@ -400,11 +409,20 @@ def main() -> int:
         ) == "not-clean",
     )
     check(
-        "classify_verdict: a bold-in-parens finding citing a SHA with no "
-        "citation wording is still a real finding (#1760 safety direction)",
+        "classify_verdict: a bold-in-parens finding citing a SHA that is NOT "
+        "immediately adjacent to 'reviewed at' is still a real finding "
+        "(#1760/#1762 safety direction)",
         checker.classify_verdict(
             "Found a regression (**Bug:** off-by-one, introduced in "
             "`abc1234`). Needs more work."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'reviewed' elsewhere in the sentence, not "
+        "adjacent to the bold span, does not trigger the strip",
+        checker.classify_verdict(
+            "(**Bug:** foo.py:10) -- this was reviewed at length and still "
+            "needs more work."
         ) == "not-clean",
     )
     check(

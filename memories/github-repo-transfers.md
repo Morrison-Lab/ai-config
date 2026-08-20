@@ -191,10 +191,14 @@ Everything above is about transferring a **repository**.
 An issue is the other thing people say "transfer" about, and it obeys a
 constraint the repository case does not: GitHub transfers an issue only
 between repositories owned by the **same** user or organization.
-So `d-morrison/<repo>` to `Morrison-Lab/<repo>` is not a transfer at all ---
-`gh issue transfer` and the web UI's repository picker both simply do not
-offer the destination, which reads as the destination being missing rather
-than as the operation being unavailable.
+So `d-morrison/<repo>` to `Morrison-Lab/<repo>` is not a transfer at all, and
+the two interfaces refuse it differently.
+`gh issue transfer` takes the destination as a positional argument and errors
+on it.
+The web UI has a repository picker, and the destination simply does not appear
+in it --- which reads as the repo being missing rather than as the operation
+being unavailable, and is the likelier of the two to be misdiagnosed as a
+permissions problem.
 
 That matters because the two owners here are one person's account and that
 person's org, so the move feels internal.
@@ -206,9 +210,11 @@ The hand copy is the whole remedy, and it has three parts, none optional:
    summary --- a pointer plus a paraphrase loses exactly the specifics a
    transfer would have preserved.
 2. **Re-verify the original's claims against the destination repo** while
-   copying. An issue filed from another repo's session cites line numbers and
-   file contents it could not read; those drift, and the copy is the moment to
-   check them rather than to propagate them.
+   copying.
+   An issue filed from another repo's session cites line numbers and file
+   contents it could not read.
+   Those drift, and the copy is the moment to check them rather than to
+   propagate them.
 3. **Link both ways and close the original as transferred**, so the source
    repo's tracker does not keep a live duplicate.
 

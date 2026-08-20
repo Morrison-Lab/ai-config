@@ -220,7 +220,11 @@ So when a hook has to stop firing for a reason that is not per-PR --- a
 standing directive, a moratorium, a repo where its demand is meaningless ---
 put the switch **in the script**, where both installation shapes read it, and
 prefer a self-expiring form over a flag somebody has to remember to clear.
-`hooks/no-unreviewed-pr.py`'s `MORATORIUM_END` is the worked example.
+`hooks/no-unreviewed-pr.py`'s `MORATORIUM_END` is the worked example, and
+[`memories/github.md`](../../memories/github.md)'s Copilot-moratorium section
+carries that one incident's own record --- read this section for the general
+rule about installation shapes, and that one for what the moratorium requires
+of a session today.
 
 - **Do:** put a non-per-PR suppression in the hook script itself, so it holds
   on a plugin install and a settings install alike.

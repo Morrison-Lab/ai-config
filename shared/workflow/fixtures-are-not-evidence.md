@@ -6,6 +6,11 @@ imitates.
 Worked-example case records for the rules below live in
 [`fixtures-are-not-evidence.cases.md`](fixtures-are-not-evidence.cases.md), moved out of the auto-loaded context.
 
+A fixture is one adjacent artifact among several that get read in place of the
+thing a claim is about; see
+[`verify-the-right-artifact`](verify-the-right-artifact.md) for the general
+case and its other shapes.
+
 The circularity is invisible from the inside, which is what makes this worth
 a rule rather than a reminder.
 A test failing against a fixture feels exactly like a test failing against
@@ -423,3 +428,54 @@ rather than on the code.
   them is reachable --- the floor can sit above it.
 - **Don't:** drop a finding because its number was unattainable; re-derive the
   bound and keep the fix.
+
+## A regression fixture must contain something the bug would destroy
+
+The sections above concern what a fixture's *behaviour* licenses you to
+conclude.
+This one concerns a fixture that never exercised the bug at all, and so
+concluded nothing while appearing to.
+
+When the bug under test is **loss** --- content dropped, a record skipped, a
+branch never reached --- the fixture has to contain content the bug would
+actually destroy.
+A fixture built from only the *structure* that triggers the bug, with nothing
+of value positioned where the loss would occur, passes under both the buggy
+and the fixed code.
+It is green, it is named after the bug, and it discriminates nothing.
+
+That is worse than having no fixture, and the reason is the fixture's **name**.
+An untested path is at least visibly untested.
+A vacuous fixture converts it into an apparently-tested one, and every later
+reader --- including the author --- reads the green line as coverage and stops
+looking.
+The count goes up while the evidence does not.
+
+The check is mechanical, so run it rather than judging: **revert the fix, and
+confirm the fixture fails.**
+A regression fixture that passes against the unfixed code is not a regression
+fixture.
+Where reverting is awkward, ask the narrower question the revert would answer:
+*what, in this fixture, would be missing from the output if the bug were still
+present?*
+If the answer is "nothing", the fixture is asserting the bug's own behaviour.
+
+- **Do:** position real, identifiable content exactly where the loss would
+  happen, so the assertion can distinguish the two code paths.
+- **Do:** run the fixture against the unfixed code and confirm it fails.
+- **Do:** re-read the assertion against the fixture's own name --- when they
+  disagree, the name is usually the intent and the assertion is usually the
+  bug.
+- **Don't:** build a loss fixture out of the triggering structure alone; the
+  structure is the precondition, and the content is the test.
+- **Don't:** treat a rising fixture count as rising coverage without reading
+  what each one asserts.
+
+(Measured 2026-08-19 on [rme#1082](https://github.com/d-morrison/rme/pull/1082).
+A fixture named `"two consecutive declarations: reaches back past both"`
+asserted the buggy output rather than the fixed one: it supplied two trailing
+markers with **no message behind them**, so nothing existed for the lookback to
+reach back *to*, and it passed against code that could not reach back at all.
+The reviewer identified it precisely --- "the fixture likely only exercised two
+declarations with nothing substantive before them" --- and the replacement
+fixtures each place a real answer behind the run.)

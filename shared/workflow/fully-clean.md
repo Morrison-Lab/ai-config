@@ -459,6 +459,31 @@ nothing --- and it misreads in both directions at once.**
 - **Don't:** assume such a misread has a safe direction; one sweep produced a
   false-clean and a false-blocked.
 
+**That "anchor on the last `### Verdict` heading" line describes the by-hand
+method, not what `check-pr-fully-clean.py` itself does --- the script has no
+heading anchor at all.**
+It matches verdict *phrases* with a regex
+(`Verdict:\s*(?:Clean|Approved|Ready)\b` and its not-clean counterpart), never
+a `^###\s*Verdict` heading line, so a doubled or malformed `### Verdict`
+heading in a review comment cannot break something the script never checks.
+Reading this fragment's hand-parsing advice as a description of the script's
+own mechanism produces a confident, wrong claim about our own tooling ---
+worth naming because the fragment sits right next to the script it is easy to
+assume it summarizes.
+
+- **Do:** read `scripts/check-pr-fully-clean.py` itself when the claim under
+  test is about what the script does, even when this fragment already
+  describes the by-hand procedure.
+- **Do:** treat "anchor on the last `### Verdict` heading" as guidance for a
+  human parsing a comment, distinct from the script's own phrase-matching
+  logic.
+- **Don't:** infer the script's parsing mechanism from this fragment's
+  by-hand advice --- verify against the script's source before filing an
+  issue that names a mechanism.
+
+See [`fully-clean.cases.md`](fully-clean.cases.md),
+"A fragment's by-hand parsing advice mistaken for the script's own mechanism".
+
 **A review comment's header SHA can be stale, so take the reviewed commit from
 the run's own `head_sha`.**
 

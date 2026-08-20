@@ -13,7 +13,7 @@ Each heading names the rule the record supports.
 
 (Morrison-Lab/ai-config#1234, 2026-08-07: posting `@claude review` on this
 repo triggers `claude.yml` in agent mode, not the dedicated review workflow
-directly --- see `memories/claude-bot-workflows.md`'s note that this repo's
+directly --- see `memories/claude-review-dispatch.md`'s note that this repo's
 review has no push trigger.
 Run `31140546175`'s own agent turn reported `is_error: true`, `num_turns: 1`,
 `total_cost_usd: 0` --- the exact zero-cost signature this file's
@@ -87,6 +87,39 @@ Passing `-R OWNER/REPO` explicitly avoids relying on the current working directo
    measurement, so no in-progress filter does either.
    That is what disqualifies the candidate mechanisms above without supplying
    a replacement for them.)
+
+## The rollup gap dropping a FAILING run, and the rule failing at composition time
+
+The case above measured the disagreement on runs that were merely extra or in-flight.
+This one is the consequential version: the run the rollup dropped had `conclusion: failure`.
+
+`ucdavis/bcs#651` at `a5f4f3f2`, 2026-08-19.
+`gh pr checks` printed 21 rows, every one `pass`, with nothing pending.
+`commits/<sha>/check-runs?per_page=100` returned **24** runs, one of them:
+
+```text
+failure   review / antigravity-review
+```
+
+The PR was reported fully clean and ready to merge on the strength of the shorter list.
+`check-pr-fully-clean.py` caught it on the next turn, exiting 1 with a single finding naming that run.
+
+Two things make this worth a second case record rather than a line appended to the first.
+
+**The omission is invisible by construction.**
+A short list and a clean list are the same observable.
+There is no gap in the output, no warning, and the counts look healthy --- 21 pass, 0 pending reads exactly like a finished head.
+Nothing about the reading announces that it could not see everything.
+
+**The prose rule already existed and was read the same session.**
+The rule directly above this one had been loaded into context, and the reporting error happened anyway, on a check whose failures had been *watched* three times earlier in that same session.
+Having seen the check red, the author reported a green count that did not contain it and did not notice the absence.
+
+That is the pattern [`deterministic-tools`](../principles/deterministic-tools.md) describes: a rule is consulted at read time and broken at composition time, so re-reading it does not reach the moment it breaks.
+The remedy was the hook `hooks/no-incomplete-check-enumeration.py`, which fires on the decidable condition --- a terminal clean claim, a `gh pr checks` reading, and no complete enumeration since the last push.
+
+- **Do:** take a clean verdict from `check-pr-fully-clean.py` or a paginated `commits/<sha>/check-runs` read.
+- **Don't:** report a PR clean from `gh pr checks` counts, however current the reading is --- currency and completeness are different properties, and only one of them has a hook watching it.
 
 ## Criterion 2's verdict-vs-findings disagreement rate, measured
 
@@ -902,3 +935,29 @@ Two things generalize.
 The guard's `success` and the job's `failure` were never in tension.
 They were two different steps' conclusions, and only a step enumeration distinguishes them.
 And the first diagnosis was right about the classifier and still incomplete about the symptom: the shape genuinely was unrecognized, and recognizing it changed nothing the reader could see until the propagation was fixed too.
+
+## A fragment's by-hand parsing advice mistaken for the script's own mechanism
+
+(Morrison-Lab/ai-config#1690, 2026-08-20: on Morrison-Lab/ai-config#1687, a
+round-2 review posted a **Ready for merge** verdict under a doubled heading,
+`### ### Verdict`.
+`check-pr-fully-clean.py` scored the PR not-clean, and the filed issue
+asserted the doubled heading had broken the script's "anchor on the last
+`### Verdict` heading" logic --- quoting this file's own by-hand parsing
+advice as if it described the script.
+
+It does not.
+`grep -n "Verdict" scripts/check-pr-fully-clean.py` shows the script matches
+verdict phrases with a regex, never a heading line, so nothing about a
+doubled `###` prefix was in a position to break anything it checks.
+The claim was falsified within the hour: round 3 on the same PR posted the
+identical doubled heading and scored CLEAN.
+What actually triggered the not-clean read was the plain quoted-phrase false
+positive this file already documents elsewhere --- the round-2 comment's own
+body quoted the *previous* round's "Needs more work" verdict while stating
+its own "Ready for merge" one, and the phrase match picked up the quote.
+
+The issue was retitled and the diagnosis retracted in a follow-up comment,
+which is what surfaced the gap this case exists to close: this file's
+by-hand guidance sits directly beside its description of the script, with
+nothing marking the boundary between them.)

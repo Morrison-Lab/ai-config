@@ -169,6 +169,15 @@ WRITE_TOOLS = {
     "create", "update", "str_replace_editor", "apply_patch",
 }
 
+# A creation verb, for payloads that are PROSE rather than a file path -- a
+# dispatch brief, where the only evidence of intent is what the brief asks for.
+WRITE_VERB = re.compile(
+    r"\b(?:writ(?:e|es|ing)|creat(?:e|es|ing)|add(?:s|ing)?|append(?:s|ing)?"
+    r"|record(?:s|ing)?|register(?:s|ing)?|edit(?:s|ing)?|updat(?:e|es|ing)"
+    r"|implement(?:s|ing)?|author(?:s|ing)?|patch(?:es|ing)?)\b",
+    re.I,
+)
+
 # What makes a shell command a write rather than a read.
 BASH_WRITE = re.compile(
     r">>?[^&|]|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)\b"
@@ -282,9 +291,18 @@ def discharges(name, inp):
         return bool(MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd))
 
     if low in ("task", "agent", "skill"):
+        # A dispatch brief is prose, so it gets the same two-part test `bash`
+        # gets rather than a bare path match. MECHANISM_WORD alone suffices --
+        # `gh issue create`, `ums`, `memorize` are already actions. A path
+        # needs a creation verb beside it, so "read hooks/x.py and tell me
+        # what it does" reads as the read it is. (Review finding on #1724:
+        # this branch kept the mere-mention match every other branch had just
+        # shed, and subagent briefs cite rule-surface paths constantly.)
         blob = " ".join(str(inp.get(k, "")) for k in
                         ("prompt", "description", "skill", "args"))
-        return bool(MECHANISM_PATH.search(blob) or MECHANISM_WORD.search(blob))
+        if MECHANISM_WORD.search(blob):
+            return True
+        return bool(MECHANISM_PATH.search(blob) and WRITE_VERB.search(blob))
 
     return False
 

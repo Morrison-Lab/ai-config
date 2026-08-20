@@ -45,6 +45,21 @@ DISPATCHED_UMS = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "name": "Task",
      "input": {"prompt": "Run a ums pass recording this learning.",
                "description": "owed UMS pass"}}]}}
+DISPATCHED_WRITE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Task",
+     "input": {"prompt": "Write the new rule into shared/workflow/x.md.",
+               "description": "author the fragment"}}]}}
+# A read-only dispatch whose brief merely cites a rule surface. Subagent
+# briefs in this corpus cite such paths constantly, so this is the realistic
+# shape rather than a contrived one (review finding on #1724).
+DISPATCHED_READ = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Task",
+     "input": {"prompt": "Just read hooks/no-foo.py and tell me what it does.",
+               "description": "inspect hooks/no-foo.py"}}]}}
+DISPATCHED_READ_RULE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Task",
+     "input": {"prompt": "Summarize what CLAUDE.md says about worktrees.",
+               "description": "read CLAUDE.md"}}]}}
 # Reads over rule surfaces -- ordinary work in this corpus, and the reason a
 # bare path match on any tool payload is unsound.
 READ_RULE = {"type": "assistant", "message": {"content": [
@@ -105,6 +120,14 @@ CASES = [
      False, "a shell heredoc write to a rule surface discharges it"),
     ([DISPATCHED_UMS, say("Going forward I'll do X.")],
      False, "dispatching the recording pass discharges it"),
+    ([DISPATCHED_WRITE, say("Going forward I'll do X.")],
+     False, "dispatching an agent to WRITE the fragment discharges it"),
+    ([say("Going forward I will add `hooks/no-foo.py` for it."),
+      DISPATCHED_READ],
+     True, "a read-only dispatch citing a hook path does NOT discharge it"),
+    ([say("Going forward, I will always check the rule first."),
+      DISPATCHED_READ_RULE],
+     True, "a read-only dispatch citing CLAUDE.md does NOT discharge it"),
 
     # Reads must NOT discharge -- the second half of the same review finding.
     ([say("Going forward, I will always check the rule first."), READ_RULE],

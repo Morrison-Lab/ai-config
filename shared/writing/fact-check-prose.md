@@ -722,3 +722,44 @@ the other way\|the mirror of\|inverts cleanly" shared/
 one phrasing family among several.
 The exclusion is load-bearing rather than tidy: this paragraph quotes the pattern
 it searches for, so a run that includes this file counts itself.)
+
+## An availability claim about a repository is a state claim, not a safe default
+
+The **Factual claims** bullet above already covers claims checkable against an
+external source.
+This is the shape that slips past it: a claim about a repository's or
+service's *current status* --- public or private, released or unreleased,
+open-source or not --- reads as a safe default rather than as a claim, because
+it lines up with intent rather than with anything actually asserted.
+
+Writing "open-source, available at `<URL>`" in a Code and Data Availability
+statement, a README, or similar prose feels natural when publication is
+planned or eventually expected.
+It is a claim about **state** in
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+taxonomy, and a claim about state gets re-queried, not recalled from what
+seems likely.
+A repository actively being developed toward eventual publication is not
+automatically public yet, and intent to publish is not evidence of the state
+now.
+
+Query the system directly before writing the claim: `gh api
+repos/<owner>/<repo> --jq .private`, or an unauthenticated fetch of the given
+URL.
+Neither a `DESCRIPTION` file's `URL:` field nor "most packages like this
+eventually go public" settles it, since both describe intent rather than the
+live state.
+
+- **Do:** verify a repository's or service's current visibility live, before
+  asserting it in an Availability statement, README, or similar prose.
+- **Do:** treat a live-looking URL offered as evidence of accessibility as
+  itself a claim needing the same check.
+- **Don't:** write an availability or open-source claim as a natural default
+  because publication is planned or intended.
+- **Don't:** infer current visibility from a config file's URL field, or from
+  what similar projects usually do.
+
+This is a first occurrence of this specific pattern, so it does not yet clear
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar for a dedicated instrument.
+Revisit as a check only if the pattern recurs.

@@ -167,8 +167,14 @@ MECHANISM_PATH = re.compile(
 # `\b` is the wrong boundary here: `-` and `/` are non-word characters, so
 # `\bums\b` matches INSIDE `shared/workflow/run-ums-proactively.md`, and
 # `cat`-ing that file discharged a promise. Anchor on path characters too.
-_NOT_PATH = r"(?<![\w./-])"
-_NOT_PATH_END = r"(?![\w./-])"
+#
+# `.` is deliberately NOT excluded on its own. A first attempt used
+# `(?![\w./-])`, which also rejected a sentence-final period -- so `run ums.`
+# stopped discharging, which is the commonest phrasing of all. What
+# distinguishes a path is a dot with a word character AFTER it (`ums.md`),
+# not a dot at a full stop.
+_NOT_PATH = r"(?<![\w/-])"
+_NOT_PATH_END = r"(?![\w/-]|\.\w)"
 MECHANISM_WORD = re.compile(
     r"\bgh\s+issue\s+create\b|\bglab\s+issue\s+create\b"
     r"|" + _NOT_PATH + r"issue_write" + _NOT_PATH_END +

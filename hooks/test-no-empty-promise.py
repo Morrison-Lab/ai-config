@@ -245,6 +245,15 @@ CASES = [
      True, "cat of skills/memorize/SKILL.md does NOT discharge"),
     ([say("Going forward I'll do X."), DISPATCHED_READ_UMS],
      True, "a read-only dispatch naming a ums path does NOT discharge"),
+    # F1's own over-correction: `.` in the exclusion class rejected a
+    # sentence-final period, so the commonest phrasing stopped discharging.
+    ([say("Going forward I'll do X."), dispatch("Investigate this, then run ums.")],
+     False, "an action word before a full stop still discharges (review #1724)"),
+    ([say("Going forward I'll do X."), dispatch("File the issue, then memorize.")],
+     False, "'memorize.' at a sentence end still discharges"),
+    ([say("Going forward I'll do X."), dispatch("Open ums.md and summarize it.")],
+     True, "a dotted FILENAME still does not discharge"),
+
     # F2: `>` matched a stderr redirect, and cp/mv read OUT of a rule surface.
     ([say("Going forward I'll do X."), CAT_WITH_STDERR],
      True, "`2>/dev/null` on a read does NOT make it a write"),

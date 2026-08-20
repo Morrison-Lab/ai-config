@@ -341,10 +341,10 @@ The sentence was present verbatim the whole time.)
 
 **Third occurrence, 2026-08-20** (after ai-config#771): `never auto-reviews a PR
 on push`, quoted from the target, returned zero from `grep` in *both* this file
-and `claude-review-dispatch.md`, split across a line break in each, while a
+and `claude-review-dispatch.md` --- split across a line break in each, while a
 `\s+`-tolerant regex found both.
-The remedy above was already written and simply not reached for, so what recurs
-is recall rather than knowledge; this machine's BSD `grep` also rejects `-P`.
+The remedy above was already written and not reached for, so what recurs is
+recall rather than knowledge, and this machine's BSD `grep` also rejects `-P`.
 
 ## Writing robust bash scripts (recurring review findings)
 Lessons the reviewer flagged across the `session-lock` PR (d-morrison/ai-config#38) —

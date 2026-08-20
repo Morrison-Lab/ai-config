@@ -61,10 +61,18 @@
   When a genuine gap exists, add real tests targeting the specific uncovered lines, not padding aimed at the percentage.
   Same pass, opposite direction: while touching a test file, look for redundant tests worth removing or consolidating --- near-duplicate cases that don't each pin something distinct --- and keep only the ones that are meaningful and important.
   Growing a suite and trimming it are the same review habit, not two separate ones. (Directive from the user, 2026-07-14, sparta gii-ffdb93 session --- led to the local `patch_coverage` tool in sparta#852, and to a redundancy pass over the new tests it and sparta#853 added before pushing.)
+- Pair every table of results with a figure visualizing the same data,
+  wherever feasible.
+  A table is precise but hard to scan for patterns;
+  a figure shows shape and trend at a glance.
+  Present both so the reader gets both precision and intuition.
 - ALWAYS record what I learn in memory/AI-instruction notes as I work (standing request).
 - When recording a factual claim about tool/workflow behavior (an implementation detail or a causal explanation derived from a specific source), cite the source inline --- e.g., "(source: gha#70 PR body)" --- so future sessions can calibrate trust and verify if needed.
   Directly observed facts need no citation, but explanations inferred from a PR body, commit message, or doc do. (Learned on ai-config#118.)
-  Citing the source isn't the same as the citation being *accurate* --- before publishing, re-read the source and check the claim doesn't say more than the source actually establishes (a hedged "suggests"/"may" in the source shouldn't become an assertive "traces the root cause to X specifically" in the memory entry), and cross-check the new claim against related existing entries in the same file for consistency. (Learned on ai-config#482: a new bullet overstated what gha#173 had established, contradicting an existing gha#185/#187 bullet a few screens up in the same file --- caught by the PR's own review.)
+  Citing the source isn't the same as the citation being *accurate* --- before publishing, re-read the source and check the claim doesn't say more than the source actually establishes (a hedged "suggests"/"may" in the source shouldn't become an assertive "traces the root cause to X specifically" in the memory entry), and cross-check the new claim against related existing entries in the same file for consistency. (Learned on ai-config#482: a new bullet overstated what gha#173 had established, contradicting an existing gha#185/#187 bullet a few screens up in the same file --- caught by the PR's own review.
+  Recurred on ai-config#1779, 2026-08-20: a new bullet recorded a PR-authorization lesson from ucdavis/bcs, phrased as conditional on a repo-level grant.
+  That conditional phrasing restated --- and inadvertently narrowed --- three already-unconditional "always open the PR after pushing" bullets a few screens up in the same file.
+  A PR review caught it, and the fix folded the case record into the existing unconditional bullet as a citation rather than keeping a separate conditional one.)
 - Before rebutting --- or accepting --- a review finding that asserts a specific technical claim (a predicted CI failure, a language/tool behavior, "this pathspec/regex/API doesn't do what you think"), check the actual evidence for that exact claim rather than just re-reasoning about the tool's behavior in the abstract, and rather than trusting the reviewer's confidence as a proxy for correctness.
   A plausible-sounding mechanism (e.g. "Rd `\arguments{\item{name}{...}}` labels get spell-checked", or "git pathspec globs don't cross `/` by default") can be wrong for the specific tool/version in use; a real, controlled test against a case that actually distinguishes the claim from its negation is the authoritative signal, not a theory about what the tool probably does --- and this cuts both ways: accepting a false-but-confident finding wastes a fix cycle on a non-bug exactly as much as wrongly rebutting a true one does. (Learned on UCD-SERG/serodynamics#193: rebutted a claude[bot] WORDLIST finding by reading the Spellcheck job's actual log rather than debating the claim in the abstract.
   Learned again on sparta#852: a review claimed a git pathspec (`scripts/*.gd`) silently missed subdirectories; an initial "confirmation" test was flawed --- it diffed against a case with no subdirectory files present, so it couldn't have shown the bug either way --- and a rigorous test against a real commit touching `scripts/campaign/*.gd` showed the claim was false.
@@ -130,6 +138,13 @@
 - Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.
+  (Recurred on ucdavis/bcs, 2026-08-20, even with an explicit repo-level "Pull requests: standing authorization" section in that repo's own `CLAUDE.md`.
+  After finishing a manuscript edit, the session still asked whether more changes were coming before opening the PR ---
+  "cai: don't ask whether more changes are coming;
+  just open the PR immediately."
+  The repo-level grant was redundant with this already-unconditional rule;
+  the miss was not applying the existing rule, not a gap in its scope ---
+  so this generalizes to any repo/session carrying a standing "just do X" grant, not only one with its own explicit PR-authorization section.)
   - **Do:** put a markdown-linked `[#NNN](https://github.com/<owner>/<repo>/pull/NNN)` in the same turn's user-visible recap whenever you open, update, or hand off a PR --- lead with it when the user asked for status, a link, or whether work landed.
   - **Don't:** report only a branch name, a bare PR number, or prose like "PR is open" without the clickable URL, and don't make the user ask a second time for a link you already had. (User correction, 2026-08-20: status recap on [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) omitted the link until prompted.)
 - **Mark review-ready PRs ready before ending a delivery turn**, even when the harness opened them as drafts.
@@ -367,7 +382,12 @@
   The `@claude` bot review caught the drift in round 1.)
 - After adding or updating skills OR memory files in the ai-config repo, always commit and push everything to origin (on the current branch if a PR is already open, or create a new branch + PR if the change is out of scope).
   Never leave ANY changes in ai-config as local-only uncommitted edits --- including memory files.
-- **AI memories, skills, and commands never stay local-only.** When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file); PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
+- **AI memories, skills, and commands never stay local-only.**
+  That covers session memory and auto-memory as well as local-only files:
+  a scratchpad is not a home, so anything worth keeping must be committed and
+  pushed.
+  When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file);
+  PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
   A memory kept only under `~/.claude/projects/<path>/memory/` or `~/.codex/memories/` is invisible to other sessions, machines, and humans, and rots silently --- so migrate it.
   Capturing a learning isn't done until it's committed where the right audience will see it.
 - **A migrate-then-delete cleanup (copy content into a repo, THEN delete the local source) must verify the copy is both COMPLETE and CURRENT before deleting --- not just that it exists.**
@@ -385,7 +405,10 @@
   **Do:** `git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main` (or per the `session-lock` skill's `ai-session.sh worktree <branch>`) before any read or write, and clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
   **Don't:** work directly in the shared/primary checkout, even for "just a quick read" or "just one file" --- reads often become writes, and the primary checkout is shared with concurrent sessions.
   This default holds for EVERY local session, not just substantial multi-file work or when the user flags the wd as "in use" / "do this in a separate repo", so parallel local AI agent sessions never step on or clobber each other's working directory or branch state.
-  The ai-config working copy is often in use by CONCURRENT local AI agent sessions; untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
+  The ai-config working copy is often in use by CONCURRENT local AI agent sessions.
+  Untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
+  Create it off `origin/main` (`git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main`), not the shared wd.
+  Clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
   The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
   This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs --- that silently changes the branch out from under any other session or task pointed at that path.

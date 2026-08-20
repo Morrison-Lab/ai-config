@@ -58,6 +58,53 @@ RX_FAIL_QUERY = re.compile(
     re.I,
 )
 
+# A negation anywhere earlier in the same sentence as an ASSERT match means
+# the sentence is reporting the failing/negative state, not claiming the
+# clean one -- "PR is NOT fully clean" and "check-pr-fully-clean.py reports
+# NOT clean (... its own 'fully clean' determination ...)" both contain the
+# literal ASSERT phrase while stating the opposite. Sentence-scoped rather
+# than a fixed character window: a negation can sit in an earlier clause of
+# a long sentence (a parenthetical, a comma splice) well before the ASSERT
+# phrase itself.
+#
+# "n't" has no `\b` before it: `\b` requires a word-boundary transition, but
+# in every real contraction (isn't, aren't, doesn't, can't, won't) the
+# character before `n` is itself a word character, so a leading `\b` can
+# never match there and the contraction case silently never fires.
+#
+# Bare "no" is deliberately excluded. It reads like a negation but is
+# usually a determiner attached to a DIFFERENT noun in the sentence than the
+# ASSERT phrase ("No findings remain, so the PR is ready to merge." / "no
+# unresolved threads and #1689 is fully clean") -- both genuine stale-clean
+# claims this guard exists to catch, so treating "no" as a sentence-wide
+# negation signal silently disables the guard on exactly the phrasing this
+# repo's own recap convention uses most.
+RX_NEGATION = re.compile(
+    r"\b(not|never|cannot|unable)\b|n['\u2019]t\b", re.I,
+)
+# Sentence boundaries: a terminator (optionally followed by markdown/quote
+# closing punctuation, e.g. "yet.**" or "clean.\"") then whitespace or
+# end-of-string -- OR any single newline. A bare newline has to count on its
+# own, not just a blank line: a table row or list item ("| ... | not clean |
+# \n| ... | ready to merge |") is a full independent clause in this repo's
+# own recap conventions, and treating only a BLANK line as a break let a
+# negation on one row silently suppress an unrelated claim on the next.
+# Deliberately coarse -- this only needs to find SOME earlier boundary, not
+# parse prose correctly.
+RX_SENTENCE_BREAK = re.compile(r"[.!?][\"'\)\]*_`]*(?:\s|$)|\n")
+
+
+def find_unnegated_assert(text):
+    """Return the first ASSERT match not negated earlier in its sentence."""
+    for hit in RX_ASSERT.finditer(text):
+        sentence_start = 0
+        for boundary in RX_SENTENCE_BREAK.finditer(text, 0, hit.start()):
+            sentence_start = boundary.end()
+        preceding = text[sentence_start:hit.start()]
+        if not RX_NEGATION.search(preceding):
+            return hit
+    return None
+
 
 def scan(path):
     """Return (last_push_idx, last_query_idx, last_failing_query_idx, last_assistant_text)."""
@@ -119,7 +166,7 @@ def main() -> int:
 
     if not text:
         return 0
-    hit = RX_ASSERT.search(text)
+    hit = find_unnegated_assert(text)
     if not hit:
         return 0
 

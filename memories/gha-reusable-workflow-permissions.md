@@ -1,11 +1,9 @@
 # Two consumer-side gotchas when calling `Morrison-Lab/gha`'s Claude workflows
 
-`github-actions.md`'s "d-morrison/gha reusable workflows" section is where
-this belongs topically, but that file sits at the 1200-line size gate with
-zero headroom (`scripts/check-memory-file-size.py`), so this is a satellite
-file for two new findings rather than an addition there -- the same reason
-[`github-mcp-tools.md`](github-mcp-tools.md) split out of
-[`github.md`](github.md). Both were hit migrating a hand-rolled
+[`gha-reusable-workflows.md`](gha-reusable-workflows.md) is where this belongs
+topically; this stays a separate satellite file for two consumer-side
+findings rather than a merge into that file.
+Both were hit migrating a hand-rolled
 `claude.yml`/`claude-code-review.yml` in a consumer repo to thin callers of
 `Morrison-Lab/gha`'s reusable versions (`d-morrison/qwt#135`).
 

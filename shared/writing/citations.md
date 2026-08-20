@@ -456,8 +456,9 @@ line break --- [`memories/debugging.md`](../../memories/debugging.md)'s "An
 empty grep for one spelling is not evidence the concept is absent" owns that
 trap and its remedies.
 
-- **Do:** grep the corpus for a section's old title, whitespace-tolerantly,
-  in the same edit that renames it.
+- **Do:** search the corpus for a section's old title whitespace-tolerantly
+  (`grep -Pz` with a `\s+` pattern, or `rg -U`) in the same edit that renames
+  it --- not a literal `grep`, which is the trap two lines up.
 - **Do:** quote a title you are citing only if you have just read it, since a
   resolving link is no evidence about the text beside it.
 - **Don't:** read a green `check-links.py` as covering a quoted title --- it

@@ -95,16 +95,28 @@ heading or 'Verdict:' line anywhere in its output)` --- the stub signature the
 parent fragment already describes --- while the retry meant to recover it never
 ran.)
 
-**Third occurrence, 2026-08-20, on the PR documenting the first two.**
+**A near-miss worth recording, because the step shape is not the cause.**
 [#1757](https://github.com/Morrison-Lab/ai-config/pull/1757)'s own
-`review / claude-review` job (`96501751353`, run `32392491819`) reproduced the
-signature exactly: `Retry Claude Code Review after a stub result or action
-short-circuit` concluded `skipped`, `Resolve final review outcome` concluded
-`failure`, and `review / require-review` went red behind it.
-Three instances inside one day puts this past
+`review / claude-review` job (`96501751353`, run `32392491819`) shows the same
+three step outcomes --- retry `skipped`, `Resolve final review outcome`
+`failure`, `require-review` red --- and is **not** another instance of this
+defect.
+Its log reads `"permission_denials_count": 6` against `max_denials=5`, and the
+workflow says so itself: `this looks like gha#198's pattern, not gha#185's; not
+marking as retryable`.
+Grepping that log for `999999`, `could not be parsed`, `sentinel`, and
+`gha#370` returns zero.
+So the gate refused a retry on a genuinely measured count, which is the gate
+working rather than failing.
+
+This was first written up here as a third occurrence, and the count was used to
+argue the defect had cleared
 [`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence
-bar, so the retry-eligibility gate is a candidate for a fix in `gha` rather than
-for a sharper sentence here --- the sentinel defaults toward refusing a retry,
-which is the opposite of the direction a fail-safe should take when the cost of
-a wrong retry is one extra review and the cost of a wrong refusal is an
-unreviewed PR.
+bar.
+It had not.
+**The step signature is shared by at least two distinct causes**, so counting
+occurrences by signature inflates the count of either one --- and the inflated
+number was doing argumentative work, which is how a miscount becomes a wrong
+decision rather than a wrong sentence.
+Read the denial count before classifying: a parsed count above the threshold is
+gha#198, a `999999` sentinel over a real count of `0` is this defect.

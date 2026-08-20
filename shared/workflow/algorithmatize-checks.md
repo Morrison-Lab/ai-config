@@ -204,6 +204,58 @@ The section above says to test a guard against the incident that prompted it.
 - **Don't:** call an instrument trustworthy on a control that skipped its
   weakest step.
 
+## An edit that satisfies a checker can drop the artifact from what it examines
+
+The section above governs a control that never reaches the instrument's real
+input.
+This is the case where no control is missing and the instrument is correct:
+the **fix** is what shrinks the population, so the checker passes because it
+stopped looking at the thing you changed.
+
+It inverts the usual suspicion, which is why it needs naming.
+A checker going red, an edit to exactly what it named, and the checker going
+green is the most convincing sequence available --- the edit and the verdict
+change together, and causation feels established rather than assumed.
+The failure is also silent by construction, since a checker cannot report on a
+row it can no longer parse.
+
+**The tell is the population, not the verdict.**
+An instrument that says what it examined --- and this corpus requires that of
+any sweep, per [`fail-fast`](../principles/fail-fast.md)'s
+count-what-you-examined rule --- has already published the number that settles
+it.
+The rule is stated there for a sweep you *write*, and the gap is that it goes
+unapplied to a checker you merely *consume*, where the count reads as banner
+noise sitting above the answer you were waiting for.
+
+So when an edit turns a checker green, compare the population it reports
+before the edit against the population it reports after.
+A pass whose population shrank by exactly the artifact you edited is not a
+pass, and the arithmetic is usually a difference of one.
+
+- **Do:** read a consumed checker's reported population across the edit, not
+  only its verdict.
+- **Do:** treat a population that shrank by the artifact you touched as a
+  vacuous pass, and find why the checker stopped parsing it.
+- **Don't:** read red-then-green across your own edit as proof the edit was
+  right --- dropping out of scope produces the same transition.
+- **Don't:** apply the count-what-you-examined rule only to sweeps you author;
+  the checker you are consuming reports a population for the same reason.
+
+(Morrison-Lab/ai-config#1803, from
+[#1801](https://github.com/Morrison-Lab/ai-config/pull/1801), 2026-08-20.
+`scripts/check-hook-catalog.py` compares README's hook catalog against
+`hooks/hooks.json`, and correctly failed when a hook's matcher was widened.
+Editing README's row to `(Agent\|Task\|SendMessage)`, escaping the pipe so the
+markdown table would still render, made it pass --- the script's `ROW` regex has
+no `|` in its matcher character class, so the row stopped matching and the hook
+left the comparison entirely.
+Its own counts fell from 31 rows and 30 compared to 30 and 29, and nothing else
+in the output changed.
+The real fix was the repo's existing multi-matcher convention: one `hooks.json`
+group per matcher, comma-joined in README, which
+`no-unauthorized-merge.py` already uses.)
+
 ## Widening an instrument invalidates every figure it produced, not only the one that exposed it
 
 The section above ends where the control finally catches something.

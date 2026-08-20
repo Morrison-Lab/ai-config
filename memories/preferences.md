@@ -135,6 +135,13 @@
 - Always create a feature branch, push, and open a PR automatically upon completing task implementation in a repository --- never merge directly locally or stop without opening the PR ("always yes"). (User correction, 2026-08-04: "you should have opened a PR without me having to ask.")
 - Always open MRs/PRs after pushing --- never ask first ("always yes").
   After committing implementation work on a branch, never end a turn asking "Would you like me to push and open a PR?" or stopping short before creating the PR --- push, create the PR, trigger AI review when done pushing, and report the PR link in the past tense immediately.
+  (Recurred on ucdavis/bcs, 2026-08-20, even with an explicit repo-level "Pull requests: standing authorization" section in that repo's own `CLAUDE.md`.
+  After finishing a manuscript edit, the session still asked whether more changes were coming before opening the PR ---
+  "cai: don't ask whether more changes are coming;
+  just open the PR immediately."
+  The repo-level grant was redundant with this already-unconditional rule;
+  the miss was not applying the existing rule, not a gap in its scope ---
+  so this generalizes to any repo/session carrying a standing "just do X" grant, not only one with its own explicit PR-authorization section.)
 - **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`). Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration. Never finish or stop without stating whether or not a clean stopping point has been reached. (User corrections / directives, 2026-08-17, 2026-08-18.)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)

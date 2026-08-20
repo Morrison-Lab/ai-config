@@ -189,10 +189,14 @@ the record shows a defect identified and waved through rather than overlooked.
 The missing piece is structural rather than a lapse of nerve.
 A self-review has no second party to overrule the dismissal,
 which is exactly what the disposition vocabulary supplies everywhere else.
-[`ard`](../../skills/ard/SKILL.md) gives three dispositions and no fourth ---
+[`ard`](../../skills/ard/SKILL.md) has four dispositions and narrows to three
+for anything requesting a change, since Acknowledge is reserved for a comment
+that asks for nothing ---
 Address it,
 Rebut it with an argument you would be willing to post to a reviewer,
 or Defer it to a tracked issue.
+A defect you found yourself requests a change by construction, so the fourth
+is not available for it.
 "Not worth fixing" is a Defer with no issue behind it,
 and [`issue-first`](issue-first.md) already rules that out:
 an untracked deferral is a dropped request

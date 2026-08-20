@@ -10,8 +10,8 @@ what a run does once it starts, split at the 1200-line gate.
   `Morrison-Lab/psw`, moved there from `d-morrison/psw`): the review workflow
   is `.github/workflows/claude-code-review.yml`
   and the comment-triggered agent workflow is `.github/workflows/claude.yml`.
-  (ai-config's *own* bot uses different names — `claude-review.yml` /
-  `claude-bot.yml` — so don't infer these from *this* repo's `.github/workflows/`.)
+  (ai-config's *own* bot uses different names --- `claude-review.yml` /
+  `claude-bot.yml` --- so don't infer these from *this* repo's `.github/workflows/`.)
 - **`d-morrison/gha` itself (the shared workflow repo) is different:** the
   reusable workflow is `claude-code-review.yml` (no `workflow_dispatch`), and the
   dogfooding caller stub with `workflow_dispatch` is `claude-review.yml`.
@@ -24,18 +24,18 @@ what a run does once it starts, split at the 1200-line gate.
   synchronize, ready_for_review, reopened]`) and on `workflow_dispatch` (input
   `pr_number`).
   Posting an `@claude review` *comment* drives the separate agent
-  workflow `claude.yml` (which then re-dispatches a review after it pushes) — it
+  workflow `claude.yml` (which then re-dispatches a review after it pushes) --- it
   does not directly fire the review workflow.
 - A new push (`synchronize`) auto-fires a fresh review --- the normal path during
   an iterate loop.
   A property of *those* repos, not a general one --- see "`ai-config` never
   auto-reviews a PR on push" at the end of this file.
 - To force a fresh review on an existing PR **without a new commit**:
-  - **workflow_dispatch** (preferred — no extra PR timeline noise).
+  - **workflow_dispatch** (preferred --- no extra PR timeline noise).
     Same
     dispatch, three ways to send it:
     - **`gh`:** `gh workflow run claude-code-review.yml -f pr_number=<N>`
-      (dispatches the workflow as defined on the **default branch** — `gh`
+      (dispatches the workflow as defined on the **default branch** --- `gh`
       defaults `--ref` to it).
     - **REST** (remote/web sessions, no `gh`):
       `POST /repos/<owner>/<repo>/actions/workflows/claude-code-review.yml/dispatches`
@@ -53,28 +53,29 @@ what a run does once it starts, split at the 1200-line gate.
   `pull_request`-triggered check.**
   The dispatched run's check-runs attach to
   the **dispatch ref's SHA** (typically `main`, the default branch used to
-  invoke it), not the PR's actual head SHA — even though the run reviews and
+  invoke it), not the PR's actual head SHA --- even though the run reviews and
   comments on the right PR (it takes `pr_number` as an input and reads that
   PR's diff).
-  So after a stub/failed `pull_request`-triggered review (see
-  `mcp__github__actions_run_trigger` 403 below), posting `@claude review` or
+  So after a stub/failed `pull_request`-triggered review (see the
+  `mcp__github__actions_run_trigger` 403 in [`claude-bot-workflows.md`](claude-bot-workflows.md)'s
+  "@claude CI action"), posting `@claude review` or
   `/review` gets you a fresh, real verdict in the PR thread, but
   `review / claude-review` and any gate job on the PR's head SHA (checked via
-  `get_check_runs`, not `get_status` — see below) stay red.
+  `get_check_runs`, not `get_status` --- see below) stay red.
   Since reruns 403 in
   these sessions, the only way to get a fresh **gating** run is to push a new
   commit (an empty `git commit --allow-empty` is fine) so a real `pull_request`
   `synchronize` event fires against the actual head SHA. (Hit twice in one
-  session on gha#176: two consecutive genuine — not raced — stub reviews on the
+  session on gha#176: two consecutive genuine --- not raced --- stub reviews on the
   pinned dogfooding checker, each requiring an empty retrigger commit after the
   dispatched `/review` came back clean.)
-  - **The empty retrigger commit must be pushed by a HUMAN actor — a
+  - **The empty retrigger commit must be pushed by a HUMAN actor --- a
     bot-pushed one is silently skipped.**
     `claude-code-review.yml` (and the
     review-triggering workflows generally) gate on a bot-actor `if:` filter
     (e.g. `github.actor != 'github-actions[bot]'` / not a `[bot]` login), so a
-    `synchronize` event fired by a bot-authored push — e.g. the `@claude`
-    agent itself doing `git commit --allow-empty` on the PR — is *filtered
+    `synchronize` event fired by a bot-authored push --- e.g. the `@claude`
+    agent itself doing `git commit --allow-empty` on the PR --- is *filtered
     out* and never starts the gating `claude-review` run.
     The check stays red
     with no new run at all (not even a stub), which reads like nothing
@@ -83,7 +84,8 @@ what a run does once it starts, split at the 1200-line gate.
     push) to get the gating run to fire.
     So when you ask the `@claude` agent
     to "retrigger the review," it can't self-serve this: its own empty commit
-    is skipped, and it separately 403s on `rerun_failed_jobs` (below) — a
+    is skipped, and it separately 403s on `rerun_failed_jobs`
+    ([`claude-bot-workflows.md`](claude-bot-workflows.md)'s "@claude CI action") --- a
     human-actor push is the only lever left. (serocalculator#564, 2026-07-20:
     the agent's bot-pushed empty commit didn't fire the review; a
     human-actor empty commit did.)
@@ -144,25 +146,25 @@ what a run does once it starts, split at the 1200-line gate.
 - **A distinct stub-review signature: `is_error: false`, real `num_turns`/cost,
   but `permission_denials_count: 1` and no `Verdict` line.** (`permission_denials_count`
   is a field in the Claude Code SDK's runtime execution-output JSON, not
-  anything in this repo's own files — if a future SDK version renames it,
+  anything in this repo's own files --- if a future SDK version renames it,
   look for an equivalent counter in that JSON rather than assuming the
   signature vanished.)
   Not the
   quota-exhaustion case (`total_cost_usd==0 && num_turns==1`) and not a raced
-  cancellation (`conclusion: cancelled`) — the SDK call itself ran several
+  cancellation (`conclusion: cancelled`) --- the SDK call itself ran several
   turns and cost real money, but a denied tool call mid-run derailed it before
   it wrote a verdict.
-  Reproduced 3× identically on the same PR/diff (gha#180)
-  across both push-triggered and dispatched reruns — not random flakiness once
+  Reproduced 3x identically on the same PR/diff (gha#180)
+  across both push-triggered and dispatched reruns --- not random flakiness once
   it starts recurring on a given diff.
   **Root-caused and fixed in gha#185/#187:**
   agent mode's default `allowedTools` has no `WebFetch`/`WebSearch`, but the
   review prompt's own fact-checking instructions can still lead the agent to
   attempt one, and on denial it sometimes stopped instead of finishing.
   The
-  fix is prompt-only — tell the reviewer up front that network-fetch tools
+  fix is prompt-only --- tell the reviewer up front that network-fetch tools
   aren't available (so it doesn't try) and that a denied tool call is never a
-  reason to stop early — rather than widening `allowedTools`, since granting
+  reason to stop early --- rather than widening `allowedTools`, since granting
   broad `WebFetch` to a review-only job with secrets access raises its own
   prompt-injection/exfiltration question for a workflow shared across
   potentially-private consumer repos.
@@ -172,7 +174,7 @@ what a run does once it starts, split at the 1200-line gate.
   against domain knowledge and external sources" review guideline) is left
   as an open decision in gha#189, not decided unilaterally.
   - **The stub can recur across *unrelated* PRs in the same session/window,
-    not just repeatedly on one diff — treat a cluster as a
+    not just repeatedly on one diff --- treat a cluster as a
     session/service-level condition, not N independent diff bugs.**
     When two
     different PRs in different repos both stub within the same span
@@ -183,23 +185,25 @@ what a run does once it starts, split at the 1200-line gate.
     `require-review` check to the human, and stop re-triggering after one
     round.
     Both the app token and the `@claude` agent 403 on
-    `rerun_failed_jobs` (below), so neither you nor the agent can force a
-    fresh gating run without a human-actor push — which the human is doing
+    `rerun_failed_jobs` ([`claude-bot-workflows.md`](claude-bot-workflows.md)'s
+    "@claude CI action"), so neither you nor the agent can force a
+    fresh gating run without a human-actor push --- which the human is doing
     anyway when they decide to merge past the stubbed check.
 - **Diagnosing which tool call was denied requires the reusable workflow's
-  `show-full-output` input turned on for a re-run — the job log alone won't
+  `show-full-output` input turned on for a re-run --- the job log alone won't
   show it.**
   Same underlying hidden-output behavior as the
-  `show-full-output`/`show_full_output` note below (see there for the
+  `show-full-output`/`show_full_output` note in [`claude-bot-workflows.md`](claude-bot-workflows.md)'s
+  "@claude CI action" (see there for the
   input-vs-passthrough-parameter naming); worth restating here because it's
   the reason `permission_denials_count` in the final result confirms *that*
-  something was denied but never *what* — the turn-by-turn tool-call detail
+  something was denied but never *what* --- the turn-by-turn tool-call detail
   is exactly what stays hidden without it.
 - **Claude Code's tool-permission syntax scopes `WebFetch` by domain:**
   `WebFetch(domain:host)` (e.g. `WebFetch(domain:docs.anthropic.com)`), with
   wildcards like `WebFetch(domain:*.github.com)` (matches a subdomain at any
   depth, not the bare domain) or `WebFetch(domain:example.*)` (matches
-  `example.org`, i.e. a wildcard segment can't cross a `.` — `example.*`
+  `example.org`, i.e. a wildcard segment can't cross a `.` --- `example.*`
   does not match `example.evil.com`).
   Confirmed against the official docs:
   <https://code.claude.com/docs/en/permissions> (WebFetch section).
@@ -209,19 +213,19 @@ what a run does once it starts, split at the 1200-line gate.
   narrow, exfiltration-bounded fetch access instead of unrestricted
   `WebFetch` or none at all.
 
-## gha claude-code-review — self-modification skip guard (not a stub)
+## gha claude-code-review --- self-modification skip guard (not a stub)
 
 A PR that **edits `.github/workflows/claude-code-review.yml` itself** gets a
 fast (~9s) green `review / claude-review` job that posts **no review**: the
 reusable workflow detects the self-edit and deliberately skips
-("PR #N edits .github/workflows/claude-code-review.yml — skipping self-review
+("PR #N edits .github/workflows/claude-code-review.yml --- skipping self-review
 (the action 401s on workflow validation until merged; it runs after merge)"),
 and `require-review` tolerates the skip.
 Don't treat this as a stub review or
-re-trigger it — read the job log for the `::notice::` line to confirm, post a
+re-trigger it --- read the job log for the `::notice::` line to confirm, post a
 manual self-review with a verdict instead (per the do-the-review-yourself
 rule), and note the first genuine end-to-end run happens on the next PR after
-merge. (ucdavis/win#75, 2026-07-16 — the migration PR itself could never be
+merge. (ucdavis/win#75, 2026-07-16 --- the migration PR itself could never be
 bot-reviewed; win#69's post-merge sync then ran the migrated workflow live and
 it worked, including `check-latex-macros` and the cost report.)
 
@@ -258,7 +262,7 @@ Worth doing on purpose next time rather than by accident.)
 merged: the guard keys on the PR's changed-FILE list, so a `main`-merge that
 absorbs the edit clears it mid-PR.**
 The "cannot clear before merge" note above is about the *same* diff, and it
-holds — re-triggering never helps.
+holds --- re-triggering never helps.
 But when that workflow change lands on `main` via a different PR, merging
 `main` back in resolves those lines and drops the file out of this PR's diff
 entirely, so the next review run stops skipping and produces a real verdict.
@@ -268,14 +272,36 @@ merge and yields an actual external verdict.
 \#453; the `main`-merge shrank #450's diff back to its own five files and
 re-enabled a genuine bot review that had been unobtainable for hours.)
 
-## `ai-config` never auto-reviews a PR on push, and the absence is silent
+## `ai-config` auto-reviews on push as of 2026-08-20, and did not before
 
-Nothing here summons a reviewer when a PR is pushed: `validate` and `preview`
-fire on a PR event, and no reviewer does.
-So a PR reaches all-green CI, `mergeStateStatus: CLEAN`, and sits with zero
-reviews forever, because nobody asked.
+**Read this section's date before acting on it.**
+The repo's answer changed, and the reasoning that made the old answer worth
+recording is what survives rather than the answer itself.
 
-Derive it rather than recalling it; every row is one `on:` block that can change:
+Re-derived on the merged tree at `c329ac45`, which is
+[#1707](https://github.com/Morrison-Lab/ai-config/pull/1707), the change:
+
+| workflow | triggers |
+| --- | --- |
+| `claude-review.yml` | `pull_request` (`opened`, `synchronize`, `ready_for_review`, `reopened`), `workflow_dispatch` with input `pr_number` |
+| `claude-bot.yml` | `issue_comment`, `issues`, `pull_request_review`, `pull_request_review_comment` --- still **no `pull_request`** |
+| `antigravity-review.yml` | `issue_comment`, `workflow_dispatch` |
+| `jules-review.yml` | `issue_comment`, gated on an `@jules` mention |
+
+So an ordinary in-repo PR now gets a review on open and on every push, and
+explicit dispatch is the exception rather than the default:
+
+```bash
+gh workflow run claude-review.yml --repo Morrison-Lab/ai-config --ref <branch> -f pr_number=<N>
+```
+
+Reach for it when the automatic path cannot fire or was deliberately bypassed
+--- a fork PR, a redispatch after an `@claude` agent push, or an explicit
+review request in a comment.
+
+**Derive it rather than recalling it**, which is the part that does not expire.
+Every row above is one `on:` block, and one of them changed under a memory that
+had recorded it correctly:
 
 ```bash
 for f in .github/workflows/*.yml; do
@@ -285,52 +311,36 @@ for f in .github/workflows/*.yml; do
 done
 ```
 
-Every reviewer workflow, measured 2026-08-07:
-
-| workflow | triggers |
-| --- | --- |
-| `claude-bot.yml` | `issue_comment`, `pull_request_review_comment`, `issues: assigned`, `pull_request_review` --- **no `pull_request` at all** |
-| `claude-review.yml` | `workflow_dispatch` only, input `pr_number` |
-| `antigravity-review.yml` | `issue_comment`, `workflow_dispatch` |
-| `jules-review.yml` | `issue_comment`, gated on an `@jules` mention |
-
-The remedy is one command:
-
-```bash
-gh workflow run claude-review.yml --repo Morrison-Lab/ai-config --ref <branch> -f pr_number=<N>
-```
-
-**The contrary expectation is written down, correctly, for other repos.**
-This file's "Re-triggering the @claude PR *review*" section and
-[`debugging.md`](debugging.md)'s ARDI polling bullet both say a push auto-fires
-a review, and both are right about the content and package repos --- as is
-`Lacaedemon/sparta`, which re-enabled its own trigger in sparta#1122.
-So the question is not "does review fire on push" but "what does **this** repo
-trigger on".
-
-**The absence is silent and shaped like patience.**
-Green checks plus no review is indistinguishable from a review still running,
-so the natural response is to wait for something never scheduled.
+**What the old state taught is still worth keeping, because the failure it
+describes recurs wherever a repo lacks the trigger.**
+Between 2026-08-07 and #1707 this repo summoned no reviewer on a push at all,
+so a PR reached all-green CI, `mergeStateStatus: CLEAN`, and sat with zero
+reviews indefinitely because nobody had asked.
+That absence is **silent and shaped like patience**: green checks plus no
+review is indistinguishable from a review still running, so the natural
+response is to wait for something that was never scheduled.
 [`fully-clean`](../shared/workflow/fully-clean.md)'s criterion 2 separates "no
-findings" from "no verdict"; here nobody asked.
-Copilot is no fallback either: `repos/Morrison-Lab/ai-config/rulesets` returns
-one ruleset, `main`, carrying `deletion,non_fast_forward,pull_request` and no
-`copilot_code_review` rule.
+findings" from "no verdict"; there, nobody asked.
+Copilot was no fallback either --- `repos/Morrison-Lab/ai-config/rulesets`
+returned one ruleset, `main`, carrying `deletion,non_fast_forward,pull_request`
+and no `copilot_code_review` rule.
 
-- **Do:** dispatch `claude-review.yml` explicitly after opening a PR here, and
-  again after every push you want re-reviewed.
-- **Do:** derive a repo's review triggers from its own `on:` blocks before
-  concluding a review is late rather than absent.
-- **Don't:** wait on an ai-config review you did not dispatch --- green checks
-  plus an empty `reviews` array is the steady state, not a transient one.
-- **Don't:** carry a sibling repo's auto-review behaviour across; the two look
-  identical from the PR page.
+- **Do:** read a repo's own `on:` blocks before concluding a review is late
+  rather than absent, or absent rather than late.
+- **Do:** treat a dated trigger table as a measurement that expires, including
+  this one.
+- **Don't:** carry one repo's auto-review behaviour across to another; the two
+  look identical from the PR page.
+- **Don't:** read this repo's current auto-review as permanent either --- it
+  was added in one PR and can be removed in one.
 
 (2026-08-06/07: PRs #1219 and #1224 each reached all-green CI with
 `reviews: []` and stayed there until a review was dispatched by hand.
 Reading the `on:` blocks directly corrected two rows a first-pass recollection
-had wrong, neither of which changes the conclusion --- `antigravity-review.yml`
-also carries `issue_comment`, and `jules-review.yml` is comment-triggered.)
+had wrong, neither of which changed the conclusion --- `antigravity-review.yml`
+also carries `issue_comment`, and `jules-review.yml` is comment-triggered.
+2026-08-20: #1707 added the `pull_request` trigger, falsifying the section's
+own headline within two weeks of it being written.)
 
 ## A workflow that posts the *last* assistant message loses the reply when a rule claims that slot
 

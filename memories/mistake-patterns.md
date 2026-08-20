@@ -37,6 +37,18 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 - **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): commit → push → PR → share link, as one automatic sequence.
 - **Fix**: Before acting on a task, grep AGENTS.md and project CLAUDE.md for rules that apply. After a correction, record it in mistake-patterns.md (don't just say you'll remember — the next session won't have this conversation).
 
+## Pattern 5c: Declaring PR Ready When CI Is Failing or Incomplete
+- **Mistake**: Telling a user a PR is ready to merge without checking CI status, or saying "ready" when checks haven't finished.
+- **Example**: wai session 2026-08-19: told user PR #1677 was on the branch without checking that CI had failed (`new-line-breaks` check).
+- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean") and `fully-clean.md` — a PR is not ready until ALL CI checks pass AND review is clean.
+- **Fix**: Always run `gh pr checks <N>` or `gh pr view <N> --json statusCheckRollup` before declaring a PR ready. Never say "ready to merge" unless every check is green. If CI is failing, say so and fix it first.
+
+## Pattern 5d: Failing to Learn From Mistakes
+- **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it — so the next session makes the same mistake.
+- **Example**: wai session 2026-08-19: corrected three times (didn't push, didn't open PR, declared ready with failing CI). Each time acknowledged the fix but only recorded it after being told to, and the first two corrections weren't recorded at all until prompted.
+- **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work") plus the UMS principle: every correction is a learning to bank, not a conversation to end.
+- **Fix**: After any correction, immediately record it in `mistake-patterns.md` (or the appropriate memory file) with enough context that a cold reader can avoid it. Don't wait to be told to learn — the correction IS the instruction.
+
 ## Pattern 6: Answering the asked process question without fetching the PR
 - **Mistake**: Treating a "why didn't you wait / did you fix it / why no reply" question as chat-only, so a review that landed during that exchange stays unread.
 - **Example**: gha#511 (2026-08-18): answered the CI-wait question, never opened the Needs more work comment.

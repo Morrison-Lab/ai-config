@@ -9,19 +9,21 @@ If UMS hasn't run recently, run it *before* raising the flag rather than disclos
 **A clean stopping point requires that something finished, and the disqualifier list above cannot tell you whether anything did.**
 The rule's two halves read as one test and are not.
 The opening paragraph defines a stopping point by **completion** --- a task checkpointed or fully wrapped, a PR merged, an open question answered with nothing left pending.
-The paragraph above lists what **disqualifies** one.
+The paragraph beginning "Don't suggest it" lists what **disqualifies** one.
 Nothing marks that second list as necessary rather than sufficient, so "none of these apply" gets read as "clean", and the completion half is never consulted at all.
 
 The gap opens on the commonest turn shape there is: the one that only explored.
 A turn that answered a question conversationally, ran diagnostics, read code, or made a change it never committed has finished nothing by construction --- and it trips none of the disqualifiers either, because a session with no PR has no unmerged PR and a session with no CI run has nothing in flight.
 Absence of live state and presence of a completion are different facts about a session.
-A turn that produced neither is the only kind that can be mistaken for both, which is why this misreads in exactly the case where it is least deserved.
+A turn that produced neither is where the first gets read as the second, which is why this misreads in exactly the case where it is least deserved.
 
 So name the thing that finished, in the declaration itself.
 "No PR opened or pushed to by this session" is a true sentence answering the wrong question, and enumerating the disqualifiers that way is what makes the declaration read as checked.
 That is the near-miss: the check *looks* performed, in the specific vocabulary of the rule, while the question the rule exists to answer went unasked.
 
-**Two mechanical checks settle it, so run them instead of judging.**
+**Two mechanical checks refute it, so run them instead of judging.**
+Both are negative tests: each can show a declaration is wrong, and neither can establish that it is right.
+That is the same necessary-versus-sufficient shape as the disqualifier list, so passing both is not a verdict either --- naming what finished is the positive half, and nothing mechanical can supply it.
 
 **A boxed marker in the same turn contradicts the declaration.**
 A `QUESTION`, `OFFER`, or `BLOCKER` box is by definition something the user has not answered yet, which the disqualifier list already covers under "an unanswered question".

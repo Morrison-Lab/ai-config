@@ -62,7 +62,13 @@
   Same pass, opposite direction: while touching a test file, look for redundant tests worth removing or consolidating --- near-duplicate cases that don't each pin something distinct --- and keep only the ones that are meaningful and important.
   Growing a suite and trimming it are the same review habit, not two separate ones. (Directive from the user, 2026-07-14, sparta gii-ffdb93 session --- led to the local `patch_coverage` tool in sparta#852, and to a redundancy pass over the new tests it and sparta#853 added before pushing.)
 - ALWAYS record what I learn in memory/AI-instruction notes as I work (standing request).
-- Memories must NEVER be local-only (session memory, auto-memory, or local-only files). A reusable learning belongs in a version-controlled repo --- `ai-config` for cross-cutting rules, the specific repo for repo-specific conventions. Session memory is a scratchpad, not a home; anything worth keeping must be committed and pushed.
+- Memories must NEVER be local-only
+  (session memory, auto-memory, or local-only files).
+  A reusable learning belongs in a version-controlled repo ---
+  `ai-config` for cross-cutting rules,
+  the specific repo for repo-specific conventions.
+  Session memory is a scratchpad, not a home;
+  anything worth keeping must be committed and pushed.
 - When recording a factual claim about tool/workflow behavior (an implementation detail or a causal explanation derived from a specific source), cite the source inline --- e.g., "(source: gha#70 PR body)" --- so future sessions can calibrate trust and verify if needed.
   Directly observed facts need no citation, but explanations inferred from a PR body, commit message, or doc do. (Learned on ai-config#118.)
   Citing the source isn't the same as the citation being *accurate* --- before publishing, re-read the source and check the claim doesn't say more than the source actually establishes (a hedged "suggests"/"may" in the source shouldn't become an assertive "traces the root cause to X specifically" in the memory entry), and cross-check the new claim against related existing entries in the same file for consistency. (Learned on ai-config#482: a new bullet overstated what gha#173 had established, contradicting an existing gha#185/#187 bullet a few screens up in the same file --- caught by the PR's own review.)
@@ -367,7 +373,8 @@
   List paths explicitly, and `git status` before committing to confirm only intended files are staged. (Learned the hard way: a `git add -A` swept the user's `scout-peers` skill into an unrelated `/prune` PR, adding several extra review rounds.)
 - Run a local session in an isolated `git worktree` by DEFAULT, not directly in the shared working copy --- only use the working copy when the user explicitly says to.
   This default holds for EVERY local session, not just substantial multi-file work or when the user flags the wd as "in use" / "do this in a separate repo", so parallel local AI agent sessions never step on or clobber each other's working directory or branch state.
-  The ai-config working copy is often in use by CONCURRENT local AI agent sessions; untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
+  The ai-config working copy is often in use by CONCURRENT local AI agent sessions.
+  Untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
   Create it off `origin/main` (`git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main`), not the shared wd.
   Clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
   The `session-lock` skill (alias `deconflict-sessions`) tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.

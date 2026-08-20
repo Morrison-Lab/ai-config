@@ -75,6 +75,20 @@ CASES = [
      "nothing pushed, so no reading can have gone stale"),
     ([PUSH, QUERY, say("Merged and tidied up.")], False,
      "no status assertion at all"),
+
+    ([QUERY, PUSH, say("PR #1689 is not fully clean -- the review check is still running.")], False,
+     "negated assertion in the same clause must not block"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("check-pr-fully-clean.py currently reports NOT clean (correctly "
+          "-- it only counts bot-authored verdicts toward its own 'fully "
+          "clean' determination by design).")], False,
+     "negation in an earlier clause of the same sentence, ASSERT phrase used referentially"),
+    ([QUERY, PUSH, say("Not ready to merge yet; still waiting on CI.")], False,
+     "negated 'ready to merge' must not block"),
+    ([QUERY, PUSH, say("493 isn't green yet.")], False,
+     "contraction negation must not block"),
+    ([QUERY, PUSH, say("This is green. Not fully clean, though -- one check is still pending.")], True,
+     "an unnegated assertion earlier in the message still blocks even when a later sentence is negated"),
 ]
 
 

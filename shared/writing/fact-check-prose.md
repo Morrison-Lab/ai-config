@@ -723,6 +723,6 @@ live state.
   what similar projects usually do.
 
 This is a first occurrence of this specific pattern, so it does not yet clear
-[`algorithmatize-checks`](../workflow/algorithmatize-checks.md)'s
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
 third-occurrence bar for a dedicated instrument.
 Revisit as a check only if the pattern recurs.

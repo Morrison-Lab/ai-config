@@ -94,3 +94,17 @@ The check then reported `Claude review states no verdict (no '### Verdict'
 heading or 'Verdict:' line anywhere in its output)` --- the stub signature the
 parent fragment already describes --- while the retry meant to recover it never
 ran.)
+
+**Third occurrence, 2026-08-20, on the PR documenting the first two.**
+[#1757](https://github.com/Morrison-Lab/ai-config/pull/1757)'s own
+`review / claude-review` job (`96501751353`, run `32392491819`) reproduced the
+signature exactly: `Retry Claude Code Review after a stub result or action
+short-circuit` concluded `skipped`, `Resolve final review outcome` concluded
+`failure`, and `review / require-review` went red behind it.
+Three instances inside two days puts this past
+[`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence
+bar, so the retry-eligibility gate is a candidate for a fix in `gha` rather than
+for a sharper sentence here --- the sentinel defaults toward refusing a retry,
+which is the opposite of the direction a fail-safe should take when the cost of
+a wrong retry is one extra review and the cost of a wrong refusal is an
+unreviewed PR.

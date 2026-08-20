@@ -1055,3 +1055,23 @@ check the session's own tool list before assuming either way, rather than genera
   it is confirmed only for an interactive CLI session, and contradicted by at least one dispatched review session on the same day.
 
 See [Claude Code v2.1.233 release notes](https://github.com/anthropics/claude-code/releases/tag/v2.1.233), and the [Claude review on Morrison-Lab/ai-config#1732](https://github.com/Morrison-Lab/ai-config/pull/1732) that caught the overgeneralization above.
+
+## The scratchpad directory path's trailing UUID is a usable stand-in for the harness session id
+
+`skills/mwc/SKILL.md`'s `enable-mwc`/`check-mwc` need a `--id` unless
+`AI_SESSION_ID` or `CLAUDE_SESSION_ID` is set in the shell, which in an
+ordinary Claude Code session it usually is not.
+The system prompt's "Scratchpad Directory" section names a path of the form
+`/private/tmp/claude-<pid>/<sanitized-cwd>/<uuid>/scratchpad` --- that trailing
+`<uuid>` is the session id `check-mwc` reports as active when passed to it.
+
+Treat this as a working fallback, not a guaranteed match:
+`check-mwc` itself resolves the guard's own view of the session id from the
+`PreToolUse` hook payload (`session_id`/`sessionId`, then
+`conversation_id`/`conversationId`, then the transcript-path stem), which is a
+different resolution path than the scratchpad directory name, and the two
+are not documented as sourced from the same value.
+Confirm with `check-mwc --id "<uuid>"` returning exit 0 before relying on it,
+and if a merge is still blocked after that, re-derive the id from a live
+merge attempt's own denial message rather than trusting the scratchpad guess
+a second time.

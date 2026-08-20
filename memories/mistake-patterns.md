@@ -44,14 +44,14 @@ Quick-reference index of common failure patterns observed in agent sessions, wit
 
 ## Pattern 5c: Declaring PR Ready When CI Is Failing or Incomplete
 - **Mistake**: Telling a user a PR is ready to merge without checking CI status, or saying "ready" when checks haven't finished.
-- **Example**: wai session 2026-08-19: told user PR #1677 was on the branch without checking that CI had failed (`new-line-breaks` check).
-- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean") and `fully-clean.md` — a PR is not ready until ALL CI checks pass AND review is clean.
+- **Example**: wai session 2026-08-19: told user `Morrison-Lab/ai-config#1677` was on the branch without checking that CI had failed (`new-line-breaks` check).
+- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean") and `fully-clean.md` --- a PR is not ready until ALL CI checks pass AND review is clean.
 - **Fix**: Always run `gh pr checks <N>` before declaring a PR ready.
   Never say "ready to merge" unless every check is green.
   If CI is failing, say so and fix it first.
 
 ## Pattern 5d: Failing to Learn From Mistakes
-- **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it — so the next session makes the same mistake.
+- **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it --- so the next session makes the same mistake.
 - **Example**: wai session 2026-08-19:
   corrected three times (didn't push, didn't open PR, declared ready with failing CI).
   Each time acknowledged the fix but only recorded it after being told to.

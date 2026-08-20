@@ -100,6 +100,7 @@ it; use the correct private tracker and redact sensitive details when needed.
 @shared/workflow/flag-session-boundaries.md
 
 Proactively flag a good stopping point --- a checkpointed or wrapped multi-step task, a PR merged with no other in-flight work on this conversation, an open question answered with nothing pending --- with the `⚠️ FLAG` tag, at the end of a turn's recap rather than mid-task.
+A clean stopping point requires that something actually finished, and the fragment's disqualifier list cannot tell you whether anything did --- so name the thing that finished, and read a turn that only explored as having completed nothing however few blockers it trips.
 Hold the flag while any PR this session opened or pushed to is still unmerged, per the bright line the fragment states in full; run `wrap-up`'s state sweep first rather than trusting memory, since a bot-opened PR or a leftover branch never entered the conversation.
 Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread; the fragment covers each option's tradeoff and the same menu applied at the moment of opening a *new* PR, not only at a stopping point.
 

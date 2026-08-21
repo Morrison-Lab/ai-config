@@ -65,6 +65,19 @@ left alone; `--fix` never touches it.
 This checks the Claude consumer directory. `bootstrap.sh` also installs Codex
 wrappers into `~/.codex/skills` and skills into `~/.gemini`; those are not
 covered here rather than half-covered. `--consumer-dir` retargets the check.
+
+A symlink is `ok` when it resolves into ANY working tree of this repository, not
+only into the checkout this script happens to be running from. A linked worktree
+is a full checkout of the same repository, so a session working in one has a
+`scripts/` of its own; comparing only against that worktree classified every
+`~/.claude` symlink `misdirected` with nothing misinstalled (ai-config#1729).
+The question `ok` answers is whether a symlink tracks future pulls of this
+repository, and every one of its working trees does.
+
+Deliberately NOT resolved to the "main" worktree: `bootstrap.sh` links from its
+own directory, which can be any worktree, so treating the main one as the
+install source would assert something this script cannot check -- and would
+misreport an install made from a worktree as misdirected.
 """
 from __future__ import annotations
 
@@ -72,6 +85,7 @@ import argparse
 import hashlib
 import os
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -108,6 +122,47 @@ FIXABLE = ("stale", "unlinked", "missing")
 REPORT_ONLY = ("misdirected", "foreign")
 
 BACKUP_DIR_NAME = ".ai-config-backups"
+
+
+def repo_worktrees(path: Path) -> set[Path]:
+    """Every working tree of the repository containing `path`.
+
+    `git worktree list --porcelain -z` is used rather than the newline form:
+    `-z` separates attribute lines with NUL and records with a double NUL, and
+    emits paths raw, so a checkout path containing a newline parses correctly
+    instead of silently yielding a nonexistent directory.
+
+    Bare records carry a `bare` attribute and no working tree, so they are
+    skipped -- the `git clone --bare` plus worktrees layout lists the bare
+    repository FIRST, and admitting it would accept a `.git` directory as a
+    checkout. Measured 2026-08-21.
+
+    Returns an empty set whenever the answer is not established: `git` missing,
+    `path` not in a repository, or output in an unexpected shape. The caller
+    unions this with its own root, so an empty set leaves behaviour exactly as
+    it was before this resolution existed.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain", "-z"],
+            cwd=path, capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if result.returncode != 0:
+        return set()
+
+    found: set[Path] = set()
+    for record in result.stdout.split("\0\0"):
+        fields = [f for f in record.split("\0") if f]
+        if not fields or not fields[0].startswith("worktree "):
+            continue
+        if any(f == "bare" for f in fields):
+            continue
+        candidate = Path(fields[0][len("worktree "):]).resolve()
+        if candidate.is_dir():
+            found.add(candidate)
+    return found
 
 
 class Entry:
@@ -178,16 +233,56 @@ def child_names(path: Path, dirs_only: bool) -> set[str]:
     return names
 
 
-def resolves_into_repo(link: Path, repo_root: Path) -> bool:
+def matched_root(link: Path, repo_roots: set[Path]) -> Path | None:
+    """The most specific accepted working tree `link` resolves into, or None.
+
+    BOTH sides are resolved. Resolving only the link made the comparison unsound
+    whenever the checkout itself was reached through a symlink -- macOS routes
+    `/var` through `/private/var`, so a correct install under a temp or aliased
+    path compared unequal and every entry read `misdirected`. That is this
+    check's headline false positive, and it was invisible on Linux CI where the
+    aliasing does not occur.
+
+    Roots are resolved here rather than once by the caller because `classify()`
+    is called directly by `check-harness-installs.py` too, and a contract that
+    depends on the caller having normalized its input is one the next caller
+    breaks again.
+
+    MOST SPECIFIC, not first-matching, because accepted roots nest: this
+    repository keeps worktrees at `<repo>/.claude/worktrees/agent-<id>`, INSIDE
+    the main checkout, so a target under one of those matches both roots.
+    `repo_roots` is a set, so a first-match loop returned whichever root the
+    hash order happened to yield and its answer varied with `PYTHONHASHSEED` on
+    identical filesystem state. The deepest match is the true containing
+    checkout, and it is unique: two distinct roots can only both contain a
+    target when one is an ancestor of the other, which makes their part counts
+    differ.
+    """
     try:
         target = link.resolve()
     except OSError:
-        return False
-    return target == repo_root or repo_root in target.parents
+        return None
+
+    matches: list[Path] = []
+    for root in repo_roots:
+        try:
+            resolved_root = root.resolve()
+        except OSError:
+            continue
+        if target == resolved_root or resolved_root in target.parents:
+            matches.append(resolved_root)
+    if not matches:
+        return None
+    return max(matches, key=lambda root: len(root.parts))
+
+
+def resolves_into_repo(link: Path, repo_roots: set[Path]) -> bool:
+    """True when `link` resolves into any accepted working tree of this repo."""
+    return matched_root(link, repo_roots) is not None
 
 
 def classify(repo_path: Path | None, install_path: Path, group: str, name: str,
-             repo_root: Path) -> Entry:
+             repo_roots: set[Path]) -> Entry:
     """Compare one repo path against its installed counterpart."""
     installed_exists = install_path.is_symlink() or install_path.exists()
 
@@ -198,7 +293,7 @@ def classify(repo_path: Path | None, install_path: Path, group: str, name: str,
         return Entry(group, name, "missing", repo_path, install_path)
 
     if install_path.is_symlink():
-        if resolves_into_repo(install_path, repo_root):
+        if resolves_into_repo(install_path, repo_roots):
             return Entry(group, name, "ok", repo_path, install_path)
         return Entry(group, name, "misdirected", repo_path, install_path,
                      detail=os.readlink(install_path))
@@ -210,8 +305,35 @@ def classify(repo_path: Path | None, install_path: Path, group: str, name: str,
     return Entry(group, name, "stale", repo_path, install_path)
 
 
-def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
-    """Build the full verdict list, mirroring bootstrap.sh's install model."""
+def install_sources(entries: list["Entry"], repo_roots: set[Path]) -> set[Path]:
+    """Which accepted checkouts the installed symlinks actually resolve into.
+
+    Shares `matched_root()` with `resolves_into_repo()` rather than repeating the
+    predicate. The two had already drifted while both were being written: this
+    one compared against unresolved roots, and was safe only because every
+    caller happened to pass resolved ones.
+    """
+    sources: set[Path] = set()
+    for entry in entries:
+        if entry.status != "ok" or not entry.install_path.is_symlink():
+            continue
+        root = matched_root(entry.install_path, repo_roots)
+        if root is not None:
+            sources.add(root)
+    return sources
+
+
+def collect(repo_root: Path, consumer_dir: Path,
+            repo_roots: set[Path] | None = None) -> list[Entry]:
+    """Build the full verdict list, mirroring bootstrap.sh's install model.
+
+    `repo_root` is enumerated; `repo_roots` is the set of checkouts a symlink
+    may point into and still count as tracking this repo. They differ only when
+    the repository has more than one working tree. Defaulting to `{repo_root}`
+    keeps every caller that predates worktree support behaving identically.
+    """
+    if repo_roots is None:
+        repo_roots = {repo_root}
     entries: list[Entry] = []
 
     for src in sorted(repo_root.glob("*.md")):
@@ -223,7 +345,7 @@ def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
         # loop does not enable dotglob, so this skip keeps the two in step.
         if src.name.startswith("."):
             continue
-        entries.append(classify(src, consumer_dir / src.name, "", src.name, repo_root))
+        entries.append(classify(src, consumer_dir / src.name, "", src.name, repo_roots))
 
     for src in sorted(p for p in repo_root.iterdir() if p.is_dir()):
         if src.name.startswith(".") or src.name in EXCLUDED_DIRS:
@@ -234,7 +356,7 @@ def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
         # covers it, and its children need no enumeration -- they are the
         # repo's own files by construction.
         if dest.is_symlink() or not dest.exists():
-            entries.append(classify(src, dest, "", src.name, repo_root))
+            entries.append(classify(src, dest, "", src.name, repo_roots))
             continue
 
         # A real directory is already here, so bootstrap merges child by child
@@ -250,7 +372,7 @@ def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
             child_src = src / name
             entries.append(classify(
                 child_src if child_src.exists() else None,
-                dest / name, src.name, name, repo_root,
+                dest / name, src.name, name, repo_roots,
             ))
 
     return entries
@@ -362,7 +484,24 @@ def main() -> int:
         print(f"no consumer directory at {consumer_dir} -- nothing installed to check")
         return 0
 
-    entries = collect(repo_root, consumer_dir)
+    # A symlink into a sibling worktree of this same repository tracks its pulls
+    # exactly as one into this checkout does, so it is accepted too. Union, not
+    # replace: an empty result (git missing, not a repo) leaves the original
+    # single-root behaviour untouched.
+    repo_roots = {repo_root} | repo_worktrees(repo_root)
+
+    entries = collect(repo_root, consumer_dir, repo_roots)
+
+    # Never silent about the checkout the install actually points at, since a
+    # symlink into a sibling worktree now reads `ok` and the reader would
+    # otherwise have no way to see which checkout answered. Reported as the
+    # roots entries RESOLVED INTO rather than as the whole accepted set: this
+    # repository routinely has twenty-odd worktrees, and listing them on every
+    # session's first prompt is the noise README warns trains people to ignore
+    # the check.
+    for source in sorted(str(r) for r in install_sources(entries, repo_roots)
+                         if r != repo_root):
+        print(f"  installed from a sibling worktree of this repository: {source}")
 
     repaired: list[str] = []
     if args.fix:

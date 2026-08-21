@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -336,6 +337,251 @@ with tempfile.TemporaryDirectory() as raw:
     # Idempotency check: re-running when skills.json exists and registers path
     _, _, output_second = run_bootstrap_for_skills_json(tmp / "initial")
     check("re-running bootstrap reports skills.json already registered", "already registered" in output_second)
+
+
+# --- worktree acceptance (ai-config#1729) -----------------------------------
+#
+# A linked worktree is a full checkout of the same repository, so a session
+# working in one runs a `scripts/` of its own -- and every `~/.claude` symlink,
+# which points at whichever checkout `bootstrap.sh` ran from, then resolved
+# outside the single accepted root and read `misdirected` with nothing
+# misinstalled. The fixtures below are REAL git repositories with REAL linked
+# worktrees, because the resolution shells out to `git worktree list` and a stub
+# would test the test rather than the script.
+
+
+def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-c", "user.email=t@example.com", "-c", "user.name=t",
+         "-c", "commit.gpgsign=false", *args],
+        cwd=repo, capture_output=True, text=True,
+    )
+
+
+def make_repo_with_worktree(tmpdir: Path, linked_name: str = "linked"):
+    """A git repo carrying this script, plus one linked worktree.
+
+    No branch is created explicitly: `git init`'s default branch name varies by
+    git version and by user config, and `checkout -b main` fails outright when
+    it already matches. Nothing here depends on the name.
+    """
+    main = tmpdir / "repo"
+    (main / "scripts").mkdir(parents=True)
+    (main / "scripts" / "check-install.py").write_text(
+        SCRIPT.read_text(encoding="utf-8"), encoding="utf-8",
+    )
+    write(main / "CLAUDE.md", "root instructions\n")
+    write(main / "shared" / "note.md", "shared note\n")
+
+    git(main, "init", "-q")
+    git(main, "add", "-A")
+    git(main, "commit", "-q", "-m", "fixture")
+
+    linked = tmpdir / linked_name
+    git(main, "worktree", "add", "-q", str(linked), "-b", "wt")
+    return main, linked
+
+
+def install_from(source: Path, consumer: Path) -> None:
+    """Symlink a consumer directory at `source`, the way bootstrap.sh would."""
+    consumer.mkdir(parents=True, exist_ok=True)
+    os.symlink(source / "CLAUDE.md", consumer / "CLAUDE.md")
+    os.symlink(source / "shared", consumer / "shared")
+
+
+def run_from(checkout: Path, consumer: Path, *extra: str) -> subprocess.CompletedProcess:
+    """Invoke the copy of the script living inside `checkout`, with no --repo-root."""
+    return subprocess.run(
+        [sys.executable, str(checkout / "scripts" / "check-install.py"),
+         "--consumer-dir", str(consumer), *extra],
+        capture_output=True, text=True,
+    )
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    main_co, linked_co = make_repo_with_worktree(Path(tmp))
+    consumer = Path(tmp) / "consumer"
+    install_from(main_co, consumer)
+
+    check("negative control: the linked worktree fixture was actually created",
+          linked_co.is_dir() and (linked_co / "scripts").is_dir())
+
+    from_main = run_from(main_co, consumer)
+    check("install read from its own checkout is ok",
+          "0 misdirected" in from_main.stdout)
+    check("a same-checkout run stays silent about sibling worktrees",
+          "sibling worktree" not in from_main.stdout)
+
+    # The reported bug.
+    from_worktree = run_from(linked_co, consumer)
+    check("install read from a sibling worktree is ok, not misdirected",
+          "0 misdirected" in from_worktree.stdout)
+    check("a cross-worktree run names the checkout the install points at",
+          f"sibling worktree of this repository: {main_co.resolve()}"
+          in from_worktree.stdout)
+
+    # bootstrap.sh links from its OWN directory, which can be any worktree, so
+    # the reverse direction has to hold too. Resolving to git's "main" worktree
+    # would report this perfectly good install as misdirected.
+    other = Path(tmp) / "consumer-from-worktree"
+    install_from(linked_co, other)
+    reverse = run_from(main_co, other)
+    check("install made FROM a worktree is ok when read from the main checkout",
+          "0 misdirected" in reverse.stdout)
+
+    # The signature the fix must not erase: an unrelated target is still wrong.
+    stranger = Path(tmp) / "stranger"
+    (stranger / "shared").mkdir(parents=True)
+    write(stranger / "CLAUDE.md", "someone else's\n")
+    third = Path(tmp) / "consumer-stranger"
+    install_from(stranger, third)
+    unrelated = run_from(main_co, third)
+    check("negative control: a symlink into an unrelated tree is still misdirected",
+          "misdirected" in unrelated.stdout and "0 misdirected" not in unrelated.stdout)
+
+    check("repo_worktrees() finds both checkouts from the main one",
+          ci.repo_worktrees(main_co) == {main_co.resolve(), linked_co.resolve()})
+    check("repo_worktrees() finds both checkouts from the linked one",
+          ci.repo_worktrees(linked_co) == {main_co.resolve(), linked_co.resolve()})
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    # NESTED roots. This repository keeps worktrees at
+    # `<repo>/.claude/worktrees/agent-<id>` -- INSIDE the main checkout -- so a
+    # target under one matches BOTH roots. `repo_roots` is a set, so the old
+    # first-match loop returned whichever root hash order yielded, and its answer
+    # varied with PYTHONHASHSEED on identical filesystem state. Every other
+    # fixture here places the worktree as a SIBLING, which is why this never
+    # showed up. Reported by review on #1841.
+    root = Path(tmp)
+    outer, inner = root / "repo", root / "repo" / ".claude" / "worktrees" / "wt"
+    for d in (outer, inner):
+        (d / "shared").mkdir(parents=True, exist_ok=True)
+        write(d / "CLAUDE.md", f"instructions from {d.name}\n")
+    roots = {outer.resolve(), inner.resolve()}
+
+    link = root / "link-into-nested"
+    os.symlink(inner / "CLAUDE.md", link)
+
+    check("negative control: the two roots really do nest",
+          outer.resolve() in inner.resolve().parents)
+    check("negative control: the target matches both roots",
+          len([r for r in roots
+               if link.resolve() == r or r in link.resolve().parents]) == 2)
+    check("matched_root() returns the DEEPEST containing checkout",
+          ci.matched_root(link, roots) == inner.resolve())
+    check("a nested-root target is still accepted",
+          ci.resolves_into_repo(link, roots))
+
+    # Determinism, measured rather than argued: the same filesystem state must
+    # give the same answer under hash orders that reorder the set.
+    probe = (
+        "import importlib.util,sys;from pathlib import Path;"
+        "spec=importlib.util.spec_from_file_location('ci', sys.argv[1]);"
+        "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);"
+        "print(m.matched_root(Path(sys.argv[2]), "
+        "{Path(sys.argv[3]), Path(sys.argv[4])}))"
+    )
+    answers = set()
+    for seed in ("0", "1", "2", "3", "4", "5", "6", "7"):
+        env = dict(os.environ, PYTHONHASHSEED=seed)
+        answers.add(subprocess.run(
+            [sys.executable, "-c", probe, str(SCRIPT), str(link),
+             str(outer), str(inner)],
+            capture_output=True, text=True, env=env,
+        ).stdout.strip())
+    check("matched_root() is stable across PYTHONHASHSEED values",
+          answers == {str(inner.resolve())})
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    # BOTH sides of the comparison must be resolved. A checkout reached through
+    # a symlink -- macOS routes /var through /private/var, and an aliased ~/src
+    # does the same on any platform -- otherwise compares unequal, and a correct
+    # install reads `misdirected`. Invisible on Linux CI, which has no such
+    # aliasing, so it needs pinning here rather than being left to the fixture.
+    real = Path(tmp) / "real"
+    (real / "repo" / "shared").mkdir(parents=True)
+    write(real / "repo" / "CLAUDE.md", "root instructions\n")
+    write(real / "repo" / "shared" / "note.md", "shared note\n")
+    alias = Path(tmp) / "alias"
+    os.symlink(real, alias)
+
+    aliased_consumer = Path(tmp) / "aliased-consumer"
+    aliased_consumer.mkdir()
+    os.symlink(real / "repo" / "CLAUDE.md", aliased_consumer / "CLAUDE.md")
+    os.symlink(real / "repo" / "shared", aliased_consumer / "shared")
+
+    check("negative control: the alias really is a symlink to a different path",
+          alias.is_symlink() and alias.resolve() != alias)
+    aliased = {e.label: e.status
+               for e in ci.collect(alias / "repo", aliased_consumer)}
+    check("a repo root reached through a symlink is not misdirected",
+          aliased.get("CLAUDE.md") == "ok" and aliased.get("shared") == "ok")
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    # Outside any repository the answer is not established, so the helper
+    # declines rather than guessing and the caller keeps its own root.
+    outside = Path(tmp) / "not-a-repo"
+    outside.mkdir()
+    check("repo_worktrees() returns an empty set outside a git repository",
+          ci.repo_worktrees(outside) == set())
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    # `git clone --bare` plus worktrees is a common layout, and the bare
+    # repository is itself a listed record -- emitted FIRST. Admitting it would
+    # accept a `.git` directory as a checkout.
+    root = Path(tmp)
+    bare = root / "src.git"
+    git(root, "init", "-q", "--bare", str(bare))
+    seed = root / "seed"
+    seed.mkdir()
+    write(seed / "CLAUDE.md", "root instructions\n")
+    git(seed, "init", "-q")
+    git(seed, "add", "-A")
+    git(seed, "commit", "-q", "-m", "seed")
+    git(seed, "remote", "add", "origin", str(bare))
+    git(seed, "push", "-q", "origin", "HEAD:refs/heads/seeded")
+
+    bare_wt = root / "from-bare"
+    git(bare, "worktree", "add", "-q", str(bare_wt), "seeded")
+
+    # Resolved, because git reports the real path and macOS puts the temp dir
+    # behind the /var -> /private/var symlink.
+    listing = git(bare_wt, "worktree", "list", "--porcelain").stdout
+    check("negative control: the bare repo really is the first listed record",
+          bare_wt.is_dir()
+          and listing.startswith(f"worktree {bare.resolve()}\nbare"))
+    check("repo_worktrees() skips a bare record rather than admitting the .git dir",
+          ci.repo_worktrees(bare_wt) == {bare_wt.resolve()})
+
+
+try:
+    newline_root = Path(tempfile.mkdtemp()) / "we\nird"
+    newline_root.mkdir()
+    supports_newline_paths = newline_root.is_dir()
+except OSError:
+    supports_newline_paths = False
+
+if supports_newline_paths:
+    # `--porcelain` alone is newline-delimited, so a checkout path containing a
+    # newline splits mid-path and yields a directory that does not exist -- and
+    # the whole worktree silently drops out of the accepted set, recreating the
+    # false `misdirected`. `-z` emits raw paths with NUL separators.
+    base = newline_root
+    inner_main, inner_linked = make_repo_with_worktree(base)
+    check("negative control: the newline path really is on disk",
+          "\n" in str(inner_linked) and inner_linked.is_dir())
+    check("repo_worktrees() parses a checkout path containing a newline",
+          ci.repo_worktrees(inner_main)
+          == {inner_main.resolve(), inner_linked.resolve()})
+    shutil.rmtree(newline_root.parent, ignore_errors=True)
+else:
+    check("newline-path case skipped: filesystem rejects the name (reported, "
+          "not silently passed)", True)
+
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

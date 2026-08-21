@@ -14,6 +14,10 @@ In every session --- at session start, and again periodically during long sessio
    On Windows, Git Bash `ln -s` silently falls back to **real copies**, so a pull does NOT propagate there --- copy-sync every file whose repo version changed into `~/.claude`.
    Before overwriting, check for edits made directly in `~/.claude` (a diff that adds prose the repo lacks) and upstream the genuine ones into the repo first; never clobber an un-upstreamed local edit.
    Don't rely on mtime to spot local edits --- git operations reset mtimes on checkout, so it false-positives right after a `pull`, the case this check most needs to handle correctly.
+   **Don't rely on it in the other direction either --- to spot a copy that has gone stale.**
+   A file copied once and never needing to change carries an old mtime and current contents, which is the reading a genuinely stale file also gives, so the proxy discriminates nothing.
+   Run the `check-install.py` instrument, or a direct content comparison.
+   See [`verify-the-right-artifact`](verify-the-right-artifact.md), "A drift claim is relational, so one read cannot settle it".
    **Don't read "symlink-capable system" as "therefore all four children are symlinks" -- verify per child, because the split can fall inside one `~/.claude`.**
    In a remote/web container, a subset of `~/.claude/skills/` ends up as real directories holding older content, which shadow the repo for the whole session.
    `shared/`, `memories/`, `commands/`, and `CLAUDE.md` symlink normally in the same container, which is what makes this hard to spot: the child that silently doesn't refresh is the one carrying the procedures you are about to follow.
@@ -87,10 +91,9 @@ In every session --- at session start, and again periodically during long sessio
    **Measured recurrence, 2026-08-20: `registered=15 missing=16 stale=0` against a 31-hook manifest, on a machine where every rule above was already written.**
    That is worth recording as evidence about the *rule* rather than about the machine.
    Each paragraph above is correct and none of them fired, because all of them describe a check somebody has to decide to run, and the drift is silent by construction.
-   Among the sixteen inert guards was `flag-add-a-outside-pathspec.py`, and in the same session `git add -A ':!inst/extdata'` swept `SAS/program/` into a pushed `ucdavis/bcs` commit carrying a cleartext SAS credential and real `StudyID_c` values --- the verbatim command that hook's own docstring describes.
-   So the cost of the missing binding was the exact incident the corpus had already learned from once.
-   The gap it exposes is not a rule but a **moment**: README's activation gate forbids registering before the PR merges and names nothing that happens after, so the owed registration has no owner.
-   [`post-merge`](../../skills/post-merge/SKILL.md)'s step 3.75 is now that owner, and carries the mechanics and the argument for why a hook cannot be the instrument here.
+   Among the sixteen inert guards was `flag-add-a-outside-pathspec.py`, and in the same session the exact mistake that hook was written to prevent reached a pushed commit.
+   The gap that incident exposes is not a rule but a **moment**: README's activation gate forbids registering before the PR merges and names nothing that happens after, so the owed registration has no owner.
+   [`post-merge`](../../skills/post-merge/SKILL.md)'s step 3.75 is now that owner, and carries the incident, the mechanics, and the argument for why a hook cannot be the instrument here.
 
    - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
    - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`

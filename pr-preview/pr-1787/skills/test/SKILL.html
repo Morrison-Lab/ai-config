@@ -438,6 +438,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Shell (bash -n syntax check at minimum)</span></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> f <span class="kw">in</span> scripts/<span class="pp">*</span>.sh scripts/lib/<span class="pp">*</span>.sh<span class="kw">;</span> <span class="cf">do</span> <span class="fu">bash</span> <span class="at">-n</span> <span class="st">"</span><span class="va">$f</span><span class="st">"</span><span class="kw">;</span> <span class="cf">done</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Report pass/fail. If tests fail, investigate and fix before proceeding.</p>
+<section id="always-report-skip-alongside-pass-and-fail" class="level4">
+<h4 class="anchored" data-anchor-id="always-report-skip-alongside-pass-and-fail">Always report SKIP alongside PASS and FAIL</h4>
+<p>A pass and fail count says nothing about the tests that never executed, so “43 pass, 0 fail” can be exactly accurate while the suite has not been verified. Report all three numbers, and treat a non-zero skip count as an unmeasured population: say what was skipped and why before citing the run as evidence.</p>
+<p>Then ask what made them skip. A skip is usually keyed on a missing optional dependency (<code>skip_if_not_installed()</code>, <code>pytest.importorskip</code>), so an invocation that bypasses environment setup silently shrinks the suite while leaving the reported numbers looking healthy. In an R package, <code>R_PROFILE_USER=/dev/null</code> skips <code>renv/activate.R</code> and therefore the project library, so packages the tests gate on are absent and their tests skip. The same applies to any <code>--no-config</code> flag, a bare interpreter, or a container built without the optional extras.</p>
+<p>Before citing a run as verification, confirm it ran in the project’s real environment. Re-run without the bypass when the skip count is non-zero.</p>
+</section>
 </section>
 <section id="downstream-revdep-testing" class="level3">
 <h3 class="anchored" data-anchor-id="downstream-revdep-testing">4. Downstream / revdep testing</h3>
@@ -470,7 +476,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="report-results" class="level3">
 <h3 class="anchored" data-anchor-id="report-results">5. Report results</h3>
 <p>Summarize what was tested and the outcome:</p>
+<p>Always include the skip count for a unit-test run, per step 3.</p>
 <pre><code>✅ Tests passed:
+- devtools::test(): 40 pass, 0 fail, 0 skip
 - bash -n syntax check: all scripts OK
 - test.hac pipeline #NNNN: success (jobs: lint ✓, check-package ✓, claude-review ✓)
 

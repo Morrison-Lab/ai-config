@@ -203,6 +203,17 @@ your own conventions already covered".
       (`origin/main...HEAD`) --- a pre-commit run reports on the wrong tree, a
       later edit retires the lines an earlier run scanned, and a two-dot range
       re-attributes whatever `main` deleted to you.
+      The mirror direction fires at merge-decision time rather than at
+      line-scanning time, and reads as an emergency: a two-dot
+      `git diff origin/main` shows whatever `main` **added** as *your*
+      deletions, so a behind branch appears to be reverting a sibling PR that
+      just landed.
+      It is not.
+      A merge is three-way, so a file this branch never touched keeps `main`'s
+      version, and a deletion count in an untouched file means the branch is
+      behind rather than dangerous.
+      Settle it with `git merge-tree --write-tree origin/main <head>` and read
+      the resulting tree, rather than acting on the two-dot diff.
 - [ ] **The changelog entry and EVERY PR description this round touched were
       re-read** against the new behavior, not just the code --- none is in the
       diff, so no reviewer and no grep will catch a stale one.

@@ -123,6 +123,57 @@ once is the tell.**
 - **Don't:** read having delegated the check as having qualified the claim;
   that is the dispatched-verification bullet above, one audience over.
 
+## "At what moment was this true?" is one question wearing three disguises
+
+A **cause** claim gets asked what else explains it, and a **state** claim gets
+re-queried.
+Neither fires on a claim that was true when you learned it and false when you
+wrote it down, because nothing about such a sentence looks unchecked --- you
+did check, and the check has since expired.
+
+Three shapes recur, and the reason they need naming together is that fixing one
+does not make the next visible.
+Each looks like a different kind of problem:
+
+- **A citation to something not yet merged.**
+  Reads as a merge-order question, so the remedy that comes to mind is
+  sequencing or draft-gating.
+- **A citation to something already merged.**
+  Reads as a stale-fact question, so the remedy that comes to mind is a
+  timestamp.
+- **A citation to a branch in a state that branch has already left.**
+  Reads as a which-commit question, and is the least visible of the three,
+  because the PR number still resolves and the PR is still open.
+
+They are one question --- *at what moment was this true?* --- and answering it
+about the repository is not the same as answering it about the artifact you
+cited.
+A hedge naming `main` ("described as that PR proposed it, not as something
+`main` carries") is precise about the wrong axis: it guards the repository's
+state while saying nothing about whether the cited branch still looks like
+that.
+
+The cheap check is to write the moment into the sentence rather than reasoning
+about it.
+A claim carrying a date, a commit, or "as of" is one a later reader can falsify.
+A claim carrying a PR number alone is not, because the number keeps resolving
+long after the content moves.
+
+- **Do:** name the moment --- a commit, a date, or "the first draft of" --- in
+  any sentence describing code you do not control.
+- **Do:** ask when a claim was true, separately from whether it was true.
+- **Don't:** treat a hedge about `main` as covering the branch you cited.
+- **Don't:** read having fixed one staleness finding as evidence the others are
+  a different problem.
+
+(Morrison-Lab/ai-config#1777, 2026-08-20/21: three rounds, one class.
+Round 1 flagged a citation to unmerged #1749; round 2 a citation to
+`no-unshipped-commit.py` whose fix, #1807, had merged four hours before the
+citing commit; round 3 the same #1749 example, whose branch had anchored its
+discharge in `911f0ea8` at 11:40 --- eight minutes before that section's first
+commit at 11:48.
+Each was fixed on its own terms and none of the fixes generalized.)
+
 ## An action you recommend is a claim about state
 
 The four types above fire on an assertion, and the section above extends them

@@ -447,6 +447,29 @@ esac
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Three PRs reported clean by grepping the checker's own output".
 
+**Exit 0 is not the whole answer either: read the `verdict scan:` line the checker prints, because it can say `0 bore a verdict, latest = NONE` on a run that exits clean.**
+The three-way read above governs every status that is *not* 0, so it cannot reach this one --- the false clean arrives as exit **0**, the one value nothing above tells you to look behind.
+`check_latest_verdict()` blocks on `not-clean` alone, and an empty verdict is not `not-clean`, so a head reviewed by nobody takes the clean return.
+A reviewer's own **skip notice** is enough to occupy the slot.
+
+- **Do:** read the `verdict scan:` line on every invocation, including the ones that exit 0.
+- **Do:** treat `latest = NONE` as no review at all, and fall back per [`self-review-fallback`](self-review-fallback.md).
+- **Don't:** read exit 0 as "a reviewer approved this" --- it says only that nothing blocking was found, and an empty review history finds nothing.
+- **Don't:** count a skip notice as the review;
+  it is admitted as a review item and states no verdict, which is exactly the state that exits 0.
+
+**The author filter gates formal reviews and not comments, so a human-authored comment enters that same scan on body text alone.**
+The comment loop admits on `is_bot_author or is_review_header`, and `is_review_header` matches `### verdict`, `verdict:`, and `code review` with no author check --- so your own disposition comment, or any reply quoting a reviewer's verdict line, can be counted as a review item.
+Reading the formal-review loop and generalizing its author check to comments is [`verify-the-right-artifact`](verify-the-right-artifact.md)'s "a neighbour for the target" shape applied to source.
+
+- **Do:** read the loop that handles the artifact class you are making a claim about --- comments and formal reviews are separate populations here.
+- **Do:** check a comment's admission against its body markers, not its author.
+- **Don't:** generalize one loop's filter to a neighbouring loop in the same function.
+- **Don't:** read "no human comment appeared in `matching_items`" as evidence that human comments are excluded;
+  the SHA test is what excluded it.
+
+See [`fully-clean.rationale.md`](fully-clean.rationale.md) for both mechanisms, and [`fully-clean.cases.md`](fully-clean.cases.md), "A skip notice exits the checker clean over an empty verdict scan".
+
 **A verdict comment quotes verdict phrases, so a phrase search identifies
 nothing --- and it misreads in both directions at once.**
 

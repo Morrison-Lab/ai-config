@@ -591,6 +591,31 @@ account.
 - **Don't:** count another reviewer's quota refusal as corroboration; it is a
   different credential, so its exhaustion says nothing about yours.
 
+**The skip notice posted on the PR states that inference as prose, so the artifact hands you the diagnosis the section above tells you not to make.**
+Everything above governs a reading *you* perform on the result object.
+This is the same over-reading arriving pre-made, in a comment, under a `[!WARNING]` block:
+
+> **Claude review skipped --- API credential or quota unavailable.**
+> No `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` secret is configured, or account API quota is exhausted.
+
+That sentence is the guard's **fallback wording for a failure class**, not a finding about this run.
+It is emitted on an `is_error: true` execution failure that did no billable work, which is exactly the signature the section above establishes as necessary and not sufficient --- so the notice asserts, in words, the disjunction the numbers cannot support.
+
+Measured on [ai-config#1841](https://github.com/Morrison-Lab/ai-config/pull/1841), 2026-08-21: the notice was posted five times while the secret **was** configured and passed into the workflow, at `total_cost_usd: 0`, `duration_ms: 249`, and `permission_denials_count: 0`.
+Both of its named causes were unestablished, and the second was the one the reader is likeliest to act on, because a quota exhaustion is something you wait out.
+
+The two wrong next actions are the ones the wording proposes: rotating a secret that is present, or opening the billing page.
+Read the run's own `Run Claude Code Review` step instead, which is where an execution failure's actual error surfaces --- the guard prints its notice above that, on a branch that never asks.
+
+- **Do:** read the failing run's `Run Claude Code Review` step before acting on a skip notice.
+- **Do:** treat the notice as evidence that the run errored with no billable work, which is all its trigger condition establishes.
+- **Don't:** rotate a credential or check billing on the notice's wording alone;
+  on #1841 the secret was present and the account was not exhausted.
+- **Don't:** read a notice repeated across pushes as corroboration --- it is one condition firing repeatedly, not several observations agreeing.
+
+(Filed upstream as [Morrison-Lab/gha#561](https://github.com/Morrison-Lab/gha/issues/561), which proposes the notice distinguish its cases.
+[ai-config#1048](https://github.com/Morrison-Lab/ai-config/issues/1048) tracks the repo-wide failure it was masking.)
+
 **A check-run reading `failure` is a fact about one *attempt*, not about the
 whole `run_id` -- a later attempt of that same run can still resolve on its
 own, with nobody having triggered it.**

@@ -55,7 +55,7 @@ LISTING_ENTRY_OVERHEAD_CHARS = 8
 
 # How close to the cap counts as "nearly spent", expressed in ENTRIES rather
 # than characters. The budget is consumed by entry count rather than by verbose
-# descriptions -- as of this writing 186 entries average 43 chars each, and the
+# descriptions -- as of 2026-08-21, 186 entries average 43 chars each, and the
 # per-entry overhead alone is 19% of the cap -- so headroom is only meaningful
 # as "how many more skills fit". Deriving the threshold from the catalog's own
 # mean entry cost keeps it honest as the catalog changes, instead of pinning a

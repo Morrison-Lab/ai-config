@@ -88,7 +88,13 @@ def run_check_skill(tmpdir: Path, name: str, description: str):
 
 
 def run_listing_budget(tmpdir: Path, entries: list[tuple[str, str]]):
-    """Run the aggregate guard against a synthetic skill catalog."""
+    """Run the aggregate guard against a synthetic skill catalog.
+
+    Returns (errors, warnings) collected for that run, matching `run_check`
+    above. The guard reports over-budget as an error and near-budget as a
+    warning, so a caller that could only see one of the two would need a
+    second, near-identical harness to reach the other.
+    """
     paths = []
     for name, description in entries:
         skill_dir = tmpdir / name
@@ -105,32 +111,7 @@ def run_listing_budget(tmpdir: Path, entries: list[tuple[str, str]]):
     vs.warnings.clear()
     try:
         vs.check_listing_budget(paths, "synthetic/")
-        return list(vs.errors)
-    finally:
-        vs.ROOT = original_root
-        vs.errors.clear()
-        vs.warnings.clear()
-
-
-def run_listing_budget_warnings(tmpdir: Path, entries: list[tuple[str, str]]):
-    """Same, returning the WARNINGS rather than the errors."""
-    paths = []
-    for name, description in entries:
-        skill_dir = tmpdir / name
-        skill_dir.mkdir(parents=True)
-        skill_md = skill_dir / "SKILL.md"
-        skill_md.write_text(
-            f'---\nname: {name}\ndescription: "{description}"\n---\n\nbody\n',
-            encoding="utf-8",
-        )
-        paths.append(skill_md)
-    original_root = vs.ROOT
-    vs.ROOT = tmpdir
-    vs.errors.clear()
-    vs.warnings.clear()
-    try:
-        vs.check_listing_budget(paths, "synthetic/")
-        return list(vs.warnings)
+        return list(vs.errors), list(vs.warnings)
     finally:
         vs.ROOT = original_root
         vs.errors.clear()
@@ -250,7 +231,7 @@ def main() -> int:
             > vs.SKILL_LISTING_BUDGET_CHARS,
         )
         entries = [(f"skill-{index}", "x" * 1_000) for index in range(8)]
-        errs = run_listing_budget(tmp / "over-budget", entries)
+        errs, _ = run_listing_budget(tmp / "over-budget", entries)
         check(
             "aggregate listing over the context budget errors",
             len(errs) == 1 and "context budget" in errs[0],
@@ -287,7 +268,7 @@ def main() -> int:
         # the second half: a warning that fires on a comfortably-small catalog
         # would be indistinguishable from one that never fires at all.
         near = vs.SKILL_LISTING_BUDGET_CHARS - 40
-        warns = run_listing_budget_warnings(
+        _, warns = run_listing_budget(
             tmp / "near-cap", [("near", "x" * (near - 8 - len("near")))]
         )
         check(
@@ -298,11 +279,11 @@ def main() -> int:
             "near-cap warning names its largest consumer",
             len(warns) == 1 and "near" in warns[0],
         )
-        warns = run_listing_budget_warnings(
+        _, warns = run_listing_budget(
             tmp / "far-from-cap", [("small", "x" * 20)]
         )
         check("listing far below the cap does not warn", warns == [])
-        warns = run_listing_budget_warnings(tmp / "empty-catalog", [])
+        _, warns = run_listing_budget(tmp / "empty-catalog", [])
         check("empty catalog neither warns nor divides by zero", warns == [])
 
         # Boundary: exactly the limit passes, one character over fails --

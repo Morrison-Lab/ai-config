@@ -119,6 +119,48 @@ rather than accepting the joins.
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
 `_DEFAULT_CLAUSE_MIN_LENGTH` is 80.)
 
+**Third dated recurrence, 2026-08-21, and the tell is the tool's name.**
+An `ardia` sweep drove three PRs whose prose it had edited, ran
+`scripts/semantic-line-breaks.py` on each, read its silence as the gate being
+satisfied, and pushed.
+The gate then failed on `memories/preferences.md:151` --- a 197-character line
+with a mid-line semicolon, which the reformatter itself had produced by joining
+two hand-wrapped lines.
+A detector for the two documented rules, run afterwards across every branch that
+sweep had pushed, found the same violation on two more of them.
+
+Nothing about that sequence felt like skipping a step, which is why the existing
+Don't pair above did not fire.
+The reformatter is named for the convention, lives in this repo's own `scripts/`,
+and its silence is a positive-sounding all-clear --- so reaching for it reads as
+having checked rather than as having substituted one tool for another.
+That is [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+adjacent-artifact substitution, arriving through a tool whose name matches the
+check it is not.
+
+The laundering step is worth naming separately, because it is what let the error
+reach a reviewer.
+The sweep reported "`semantic-line-breaks.py` scoped to the added lines
+(canonical)" in a PR comment, which reads as a gate result and is not one.
+A verification sentence naming a tool is only as good as that tool's relationship
+to the check being claimed, and here there is none.
+
+**The same run corrected a false cause claim.**
+The sweep had already diagnosed a different PR's failure on this gate as the
+added line opening with `(`, and "fixed" it by joining the new text onto an
+existing case record --- deleting 8 lines to add 1, and leaving the semicolon in
+place, so the fix could not have worked.
+The real cause was the clause rule both times.
+Per [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+**cause** claim type, the question that would have caught it is what else
+produces a red gate on a one-line diff --- and the rule is documented directly
+above, so the answer was one read away.
+
+- **Do:** name the check you actually ran when reporting a line-break result,
+  and say whether it was the gate or the reformatter.
+- **Don't:** read the reformatter's silence as a gate pass --- it has no width
+  policy, so it is silent about precisely the violation it creates.
+
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
 `d-morrison/gha@e91b8bf` ("fail by default when violations are found",

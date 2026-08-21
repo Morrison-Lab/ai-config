@@ -35,7 +35,8 @@ Three effects: one immediate, one standing for the session, one durable across s
    Raise the bar for what counts as "worth asking about."
    Use [`away`](../away/SKILL.md)'s judgment-call vs. information-or-authorization split (its Scope and limits section) as the test: a judgment call -- which approach, whether a finding matters, how to scope something -- gets decided and reported, not asked.
    Only a genuine information-or-authorization gap (a fact only the user holds, or an action the safety rules require confirming) still stops for a question.
-3. **Persist the correction as feedback**, per step 4 below, so the next session starts already calibrated instead of relearning this from scratch.
+3. **Persist the correction as feedback**, so the next session starts already calibrated instead of relearning this from scratch.
+   This skill's Procedure makes that step mandatory rather than optional.
 
 Effects 2 and 3 are `dmmhyh`'s own contribution over plain `daytb`: `daytb` alone would only fix the one instance and leave both the in-session pattern and the cross-session recurrence untouched.
 

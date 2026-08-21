@@ -159,7 +159,7 @@ for everything still to come.
   it on a judgment call; it doesn't change when the tool itself is
   appropriate for the narrower information/authorization case that's still
   in scope.
-- **[`dmmhyh`](../dmmhyh/SKILL.md)** — reuses this skill's judgment-call vs. information-or-authorization split as its own in-session test, but presumes the user is *present* and is correcting a pattern of over-asking rather than announcing they're stepping away.
+- **[`dmmhyh`](../dmmhyh/SKILL.md)** --- reuses this skill's judgment-call vs. information-or-authorization split as its own in-session test, but presumes the user is *present* and is correcting a pattern of over-asking rather than announcing they're stepping away.
   It doesn't inherit `away`'s full suppression mode (no decision log, no `back` needed to end it) and it adds something `away` doesn't: a durable memory write so the correction survives past this session.
   The two compose -- granting both covers "stop asking me, and once you're back, keep not over-asking."
 

@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Decide current question yourself.">
+<meta name="description" content="Stop over-asking.">
 
 <title>skill – ai-config</title>
 <style>
@@ -311,7 +311,7 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#daytb-do-as-you-think-best" id="toc-daytb-do-as-you-think-best" class="nav-link active" data-scroll-target="#daytb-do-as-you-think-best">daytb – do as you think best</a>
+  <li><a href="#dmmhyh-dont-make-me-hold-your-hand" id="toc-dmmhyh-dont-make-me-hold-your-hand" class="nav-link active" data-scroll-target="#dmmhyh-dont-make-me-hold-your-hand">dmmhyh – don’t make me hold your hand</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
   <li><a href="#what-it-grants" id="toc-what-it-grants" class="nav-link" data-scroll-target="#what-it-grants">What it grants</a></li>
@@ -321,7 +321,7 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
   </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/daytb/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/daytb/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/dmmhyh/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/dmmhyh/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -330,59 +330,76 @@ ul.task-list li input[type="checkbox"] {
 
 
 
-<section id="daytb-do-as-you-think-best" class="level1">
-<h1>daytb – do as you think best</h1>
-<p>A one-shot grant of decision latitude. The user has read the question and is handing it back rather than answering it: pick the option you would have recommended, act on it, and say what you picked.</p>
+<section id="dmmhyh-dont-make-me-hold-your-hand" class="level1">
+<h1>dmmhyh – don’t make me hold your hand</h1>
+<p>A correction, not just a grant: the user is telling you that you’re asking for more guidance than the moment calls for – checking in, hedging with a question, or pausing for confirmation on something you had enough information to just decide. Three things happen when it fires: whatever is pending gets decided and acted on immediately, the threshold for asking at all moves up for the rest of the session, and the correction itself gets written down so it doesn’t have to be repeated in the next session.</p>
+<p>That third part is what separates this from <a href="../../skills/daytb/SKILL.html"><code>daytb</code></a>. A session-scoped recalibration is exactly the kind of promise about your own future behavior that <a href="../../shared/workflow/no-empty-promises.md"><code>no-empty-promises</code></a> rules out unless it ships a mechanism in the same turn – “I’ll ask less going forward” is costless to say and evaporates with the session. The mechanism here is the memory write in step 4: it is not optional, and it is not “the same thing, later.”</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li>The bare or slashed keyword <code>daytb</code>.</li>
-<li>The phrases it stands in for: “do as you think best”, “do as you see fit”, “do whatever you think is best”, “your call”, “you decide”, “up to you”, “I trust your judgment here”.</li>
-<li>A reply that answers a posed decision by declining to choose – “either is fine”, “whichever you prefer” – which is the same grant in different words.</li>
+<li>The bare or slashed keyword <code>dmmhyh</code>.</li>
+<li>The full phrase “don’t make me hold your hand” or close variants (“stop hand-holding”, “quit checking in”, “you don’t need to ask me that”, “you’re asking too much”, “just decide”, “figure it out yourself”).</li>
+<li>A pattern, not necessarily a single utterance: several small check-ins or hedged questions in a row on things that didn’t need one.</li>
 </ul>
 </section>
 <section id="what-it-grants" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-grants">What it grants</h2>
-<p>Latitude over <strong>the decision in front of you</strong>, and the ones that follow from it while the same task runs.</p>
-<p>It does not silence you. The user is present, so the point is to stop <em>asking</em> rather than to stop <em>reporting</em>: a decision made under <code>daytb</code> still gets stated, in the past tense, with the one reason that settled it. That is what keeps countermanding cheap.</p>
+<p>Three effects: one immediate, one standing for the session, one durable across sessions.</p>
+<ol type="1">
+<li><strong>Resolve the pending item now</strong>, using <a href="../../skills/daytb/SKILL.html"><code>daytb</code></a>’s procedure: pick the option you would have recommended, act, and report in the past tense.</li>
+<li><strong>Recalibrate for the rest of the session.</strong> Raise the bar for what counts as “worth asking about.” Use <a href="../../skills/away/SKILL.html"><code>away</code></a>’s judgment-call vs.&nbsp;information-or-authorization split (its Scope and limits section) as the test: a judgment call – which approach, whether a finding matters, how to scope something – gets decided and reported, not asked. Only a genuine information-or-authorization gap (a fact only the user holds, or an action the safety rules require confirming) still stops for a question.</li>
+<li><strong>Persist the correction as feedback</strong>, so the next session starts already calibrated instead of relearning this from scratch. This skill’s Procedure makes that step mandatory rather than optional.</li>
+</ol>
+<p>Effects 2 and 3 are <code>dmmhyh</code>’s own contribution over plain <code>daytb</code>: <code>daytb</code> alone would only fix the one instance and leave both the in-session pattern and the cross-session recurrence untouched.</p>
 </section>
 <section id="what-it-does-not-grant" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-does-not-grant">What it does not grant</h2>
 <ul>
-<li><strong>Not the rest of the session.</strong> <code>daytb</code> expires with the task it was given for. A later, unrelated decision is a fresh question. For a standing session-wide grant, that is <a href="../../skills/away/SKILL.html"><code>away</code></a>.</li>
-<li><strong>Not destructive or irreversible actions.</strong> A merge, a force-push, a deletion, anything outward-facing still needs its own explicit authorization. Merge authority specifically is <a href="../../skills/mwc/SKILL.html"><code>mwc</code></a>’s grant, not this one.</li>
-<li><strong>Not the safety rules.</strong> Everything that required confirmation before still does.</li>
-<li><strong>Not a licence to guess when you genuinely cannot judge.</strong> If proceeding either way would be unsafe, or the options differ on a fact only the user holds, say so plainly and ask the narrower question. That is rare – treat it as the exception it is, not an escape hatch.</li>
+<li><strong>Not merge or destructive-action authority.</strong> <a href="../../skills/mwc/SKILL.html"><code>mwc</code></a> is the separate grant for that. <code>dmmhyh</code> doesn’t imply it.</li>
+<li><strong>Not the safety rules.</strong> Everything in the system prompt’s action categories (destructive, explicit-permission-required) still applies.</li>
+<li><strong>Not permission to stop reporting.</strong> The recalibration is about <em>asking</em> less, not <em>saying</em> less – keep narrating decisions as they’re made. A silent decision is indistinguishable from an ignored request.</li>
+<li><strong>Not a one-time apology.</strong> Don’t just answer the triggering question and revert to the old asking frequency on the next one – the whole point is that the <em>next</em> several decisions get the same treatment, and that the pattern gets recorded so it doesn’t need re-teaching next time.</li>
 </ul>
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
 <ol type="1">
-<li><strong>Name the decision(s) the grant covers.</strong> Usually the one just posed. If several were queued behind it, they are covered too unless answering one moots the rest.</li>
-<li><strong>Choose the option you would have recommended.</strong> Apply the same criteria you would have written into a <code>🧭 RECOMMENDATION</code> box. If you had already stated a recommendation, take it – handing the decision back is agreement to it, not an invitation to reopen it.</li>
-<li><strong>Act.</strong></li>
-<li><strong>Report in the past tense</strong>: what you chose, and the single reason that decided it. One or two sentences. Name anything you deliberately did <em>not</em> do, so a silent omission does not read as an oversight.</li>
-<li><strong>Do not re-ask.</strong> A follow-up question about the same decision spends the round trip the grant existed to save.</li>
+<li><strong>Name what triggered it.</strong> State, in one clause, which question or hedge the user is reacting to – this confirms you understood the correction rather than just acknowledging it reflexively.</li>
+<li><strong>Decide and act on that item immediately</strong>, per <code>daytb</code>’s procedure.</li>
+<li><strong>State the recalibration explicitly, once</strong>: “noted – deciding more, asking less for the rest of this session” (or similar), so the shift is visible rather than assumed. For the remainder of the session, apply the away-style judgment-call test before drafting any question or hedge: if it’s a judgment call, decide. If it’s information or authorization only the user holds, ask – and say which bucket it’s in if it’s a close call, so the user can correct the calibration itself if you get it wrong.</li>
+<li><strong>Persist it – this step is mandatory, not optional.</strong> A <code>dmmhyh</code> firing is a user correction under <a href="../../skills/ums/SKILL.html"><code>ums</code></a>’s own trigger list (“A user correction is a mandatory immediate trigger”), so run its memory-write step now rather than only recalibrating in-session:
+<ul>
+<li><strong>Grep first</strong> (<code>memories/preferences.md</code> if the working repo is <code>ai-config</code>, otherwise wherever this user’s cross-project preferences live) for an existing entry on over-asking/hand-holding. If one exists, extend it in place and note the recurrence with a date, per <code>ums</code>’s own dedupe rule – don’t add a sibling bullet.</li>
+<li>If none exists, write one as a <strong>feedback</strong>-type entry: the specific thing you asked that didn’t need asking, <strong>why</strong> it didn’t need asking, and the Do/Don’t pair per <a href="../../CLAUDE.md"><code>CLAUDE.md</code></a>’s “Record both the pattern and the anti-pattern” – e.g.&nbsp;“Do: decide a reversible, in-scope judgment call without confirming. Don’t: pose a confirming question when you already have enough information to act.”</li>
+<li>Route the destination the way <code>ums</code>/<code>config-ai</code> already do: a cross-project preference goes to <code>ai-config</code>’s <code>memories/preferences.md</code> (via <code>memorize</code> if the working repo already is <code>ai-config</code>, via <code>push-memory</code> otherwise). A preference that’s genuinely scoped to one project stays in that project’s own memory.</li>
+<li><strong>On a third or later recorded occurrence of the same class of over-asking</strong>, treat it as <a href="../../shared/principles/deterministic-tools.md"><code>deterministic-tools</code></a>’s third-occurrence bar: a prose rule that keeps needing repeating is a rule not holding, so route through <a href="../../skills/config-ai/SKILL.html"><code>config-ai</code></a> to ask whether a decidable sub-pattern (e.g.&nbsp;a message that poses a confirming question and takes no other action) can become a hook, instead of only sharpening the wording again.</li>
+<li>Don’t let this block the rest of the turn – fold it into whatever UMS pass is already owed, or open the memory PR the same way any other UMS-triggered write would (see <code>ums</code>’s own procedure for the branch/commit/push/PR mechanics). Report it in the past tense, not as an intention: “recorded” is a UMS pass that ran, not one that’s queued.</li>
+</ul></li>
+<li><strong>If the user pushes back that you’re now deciding things you shouldn’t have</strong> (“that one needed a check”), don’t argue the general policy – narrow it for the rest of the session and note the exception, the same way <code>away</code>’s Scope and limits section honors a narrowed grant over the default. Note the narrowing in the same memory entry from step 4 if it reveals a boundary worth keeping (a class of question that genuinely should keep being asked).</li>
 </ol>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><a href="../../skills/away/SKILL.html"><code>away</code></a></strong> – the session-scoped sibling, and the one most easily confused with this. <code>away</code> presumes the user is <em>gone</em>: it suppresses questions for the rest of the session, keeps a decision log, and is revoked by <code>back</code>. <code>daytb</code> presumes the user is <em>here</em> and simply declining to adjudicate one thing, so it carries no session state and needs no counterpart. Reading <code>daytb</code> as <code>away</code> would silently suspend clarifying questions long after the user expected them back.</li>
-<li><strong><a href="../../skills/back/SKILL.html"><code>back</code></a></strong> – revokes <code>away</code>. Nothing revokes <code>daytb</code>, because it expires on its own.</li>
-<li><strong><a href="../../skills/mwc/SKILL.html"><code>mwc</code></a></strong> – the grant that <em>does</em> extend to merging. <code>daytb</code> deliberately stops short of it.</li>
-<li><strong><a href="../../skills/prompt-me/SKILL.html"><code>prompt-me</code></a> / <a href="../../skills/prompt-me-all/SKILL.html"><code>prompt-me-all</code></a></strong> – the opposite direction: surface the questions rather than resolve them.</li>
-<li><strong><a href="../../skills/dmmhyh/SKILL.html"><code>dmmhyh</code></a></strong> – built on this skill’s procedure for resolving the triggering item, but fires when the user is correcting a <em>pattern</em> of over-asking rather than just handing back one decision. It adds a standing in-session recalibration and a durable memory write that <code>daytb</code> alone doesn’t do – reach for <code>dmmhyh</code> instead of <code>daytb</code> when the user’s complaint is about asking too much in general, not this one question.</li>
+<li><strong><a href="../../skills/daytb/SKILL.html"><code>daytb</code></a></strong> – supplies the immediate-decision mechanics <code>dmmhyh</code> uses for the triggering item. <code>daytb</code> alone doesn’t change future behavior in-session or across sessions. <code>dmmhyh</code> layers both on top.</li>
+<li><strong><a href="../../skills/away/SKILL.html"><code>away</code></a></strong> – supplies the judgment-call vs.&nbsp;information-or-authorization split <code>dmmhyh</code> uses to decide what still gets asked in-session. <code>away</code> presumes the user is <em>gone</em>. <code>dmmhyh</code> presumes the user is <em>here</em> and is telling you to ask them less anyway. Where they overlap (both raise the decide-vs-ask threshold), <code>away</code>’s scope is broader (it also drops the requirement to report before the session ends, keeps a decision log, etc.) – <code>dmmhyh</code> doesn’t imply those extras, and doesn’t need <code>back</code> to end, since it isn’t a suppression mode. Both can be active at once without conflict.</li>
+<li><strong><a href="../../skills/ums/SKILL.html"><code>ums</code></a></strong> – owns the mechanics step 4 invokes: the scan-categorize-write-commit procedure, the grep-before-write dedupe rule, and the recurrence-count convention <code>dmmhyh</code> reuses rather than duplicating.</li>
+<li><strong><a href="../../skills/config-ai/SKILL.html"><code>config-ai</code></a></strong> – the escalation path step 4 reaches for once a class of over-asking has recurred enough to justify more than a memory bullet (a hook, most likely).</li>
+<li><strong><a href="../../shared/workflow/no-empty-promises.md"><code>no-empty-promises</code></a></strong> – the rule that makes step 4 mandatory rather than a nice-to-have: a session-only recalibration is a forward-looking commitment with no shipped mechanism, which is exactly what that rule forbids.</li>
+<li><strong><a href="../../skills/back/SKILL.html"><code>back</code></a></strong> – doesn’t revoke <code>dmmhyh</code>, since it never granted <code>away</code>’s suppression-of-questions mode. Revoking the recalibration is just the user asking more questions again or saying “ask me more” – no named counterpart needed, matching <code>daytb</code>’s no-counterpart design.</li>
+<li><strong><a href="../../skills/prompt-me/SKILL.html"><code>prompt-me</code></a> / <a href="../../skills/prompt-me-all/SKILL.html"><code>prompt-me-all</code></a></strong> – the opposite direction, surfacing queued questions rather than suppressing new ones. Unaffected by <code>dmmhyh</code>.</li>
 </ul>
 </section>
 <section id="anti-patterns" class="level2">
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
 <ul>
-<li>Treating it as session-wide, and quietly dropping clarifying questions for unrelated later work – that is <code>away</code>, and the user did not ask for it.</li>
-<li>Reading it as authorization to merge, delete, or publish.</li>
-<li>Choosing silently, so the user learns what was decided only by noticing the result later.</li>
-<li>Asking a confirming question anyway – “I’ll do X, unless you’d rather Y?” is the grant declined, not honoured.</li>
-<li>Reopening a recommendation you had already made, instead of simply taking it.</li>
+<li>Treating it as only fixing the one question in front of you and reverting to the same asking frequency immediately after – that is <code>daytb</code> without the correction <code>dmmhyh</code> exists to make.</li>
+<li>Recalibrating in-session (step 3) but skipping the memory write (step 4) – an unrecorded correction is exactly the empty promise <code>no-empty-promises</code> rules out, and the next session starts back at zero.</li>
+<li>Escalating it into a full <code>away</code> grant on your own – <code>dmmhyh</code> doesn’t presume the user is unavailable, so keep reporting decisions as you make them rather than batching a decision log for later.</li>
+<li>Reading it as authorization for a destructive or explicit-permission action – it only changes the threshold for <em>judgment</em> calls.</li>
+<li>Going silent instead of narrating – the fix for over-asking is deciding more, not communicating less.</li>
+<li>Arguing the correction instead of applying it, when the user’s complaint is about a pattern visible in the transcript.</li>
+<li>Writing a vague memory entry (“be more decisive”) instead of the specific Do/Don’t pair with the triggering instance – <code>ums</code>’s own anti-patterns already rule this out. <code>dmmhyh</code> doesn’t get an exemption.</li>
 </ul>
 
 
@@ -813,7 +830,7 @@ ul.task-list li input[type="checkbox"] {
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/daytb/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/daytb/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/dmmhyh/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/dmmhyh/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

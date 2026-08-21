@@ -39,6 +39,7 @@ Distinguish from a one-off “just proceed” on a single pending question — t
 - **`gi` / `gii` / `gia` / `gip`** — their own auto-proceed modes already skip the per-item confirmation and bypass blocked/oversized issues while surfacing the bypass; `away`’s step 2 generalizes that same skip-and-note pattern to genuinely ambiguous issues too, and extends the “don’t block” default to the whole session rather than one sweep.
 - **`ardi`** — still runs exactly as documented under `away`; a reviewer’s finding is either fixable/rebuttable/deferrable by judgment (covered) or a genuine impasse needing a **human** reviewer (still escalate per `ardi`’s own deadlock rule — `away` doesn’t let you override a stuck review yourself).
 - **`AskUserQuestion` tool** — `away` is what tells you *not* to reach for it on a judgment call; it doesn’t change when the tool itself is appropriate for the narrower information/authorization case that’s still in scope.
+- **[`dmmhyh`](../../skills/dmmhyh/SKILL.llms.md)** — reuses this skill’s judgment-call vs. information-or-authorization split as its own in-session test, but presumes the user is *present* and is correcting a pattern of over-asking rather than announcing they’re stepping away. It doesn’t inherit `away`’s full suppression mode (no decision log, no `back` needed to end it) and it adds something `away` doesn’t: a durable memory write so the correction survives past this session. The two compose – granting both covers “stop asking me, and once you’re back, keep not over-asking.”
 
 ## Anti-patterns
 

@@ -122,5 +122,7 @@ It had not.
 occurrences by signature inflates the count of either one --- and the inflated
 number was doing argumentative work, which is how a miscount becomes a wrong
 decision rather than a wrong sentence.
-Read the denial count before classifying: a parsed count above the threshold is
-gha#198, a `999999` sentinel over a real count of `0` is this defect.
+Read the denial count before classifying, and classify the second branch by
+cause rather than by the value observed: a parsed count above the threshold is
+gha#198, while a `999999` sentinel is this defect whatever the real count was,
+because the parse failed and so no count was measured at all.

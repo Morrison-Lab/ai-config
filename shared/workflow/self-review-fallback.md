@@ -75,9 +75,10 @@ is refused its second attempt.
 
 So read the retry step's own conclusion
 before deciding what a failed review means.
-It is `skipped` when the gate refused, and `continue-on-error` is applied to it
-upstream, so a failed retry does not surface as `failure` there either --- which
-is why the denial count, not the step conclusion, is what classifies this.
+It is `skipped` when the gate refused.
+`continue-on-error` is applied to the retry step upstream, so a retry that runs
+and fails may not surface as `failure` there either --- which is why the denial
+count, rather than the step conclusion, is what classifies this.
 That is one API call,
 and it changes what a manual re-run is worth ---
 an independent second sample,

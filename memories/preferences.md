@@ -148,7 +148,8 @@
   - **Do:** put a markdown-linked `[#NNN](https://github.com/<owner>/<repo>/pull/NNN)` in the same turn's user-visible recap whenever you open, update, or hand off a PR --- lead with it when the user asked for status, a link, or whether work landed.
   - **Don't:** report only a branch name, a bare PR number, or prose like "PR is open" without the clickable URL, and don't make the user ask a second time for a link you already had. (User correction, 2026-08-20: status recap on [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) omitted the link until prompted.)
 - **Mark review-ready PRs ready before ending a delivery turn**, even when the harness opened them as drafts.
-  The up-front empty-PR pattern opens a draft deliberately, and a PR-creation tool may default to draft on its own; `AGENTS.md` overrides both defaults once implementation is on the branch head and checks pass.
+  The up-front empty-PR pattern opens a draft deliberately, and a PR-creation tool may default to draft on its own;
+  `AGENTS.md` overrides both defaults once implementation is on the branch head and checks pass.
   - **Do:** before ending a turn that delivered completed work, query live PR state and flip draft to ready (`gh pr ready "<N>"` / `mcp__github__update_pull_request` with `draft=false`, per `tool-mappings.md`'s `MARK_PR_READY`) once the branch head carries the work and validate (or equivalent) is green --- then report the linked PR in past tense.
   - **Don't:** end a delivery recap with a review-ready PR still in draft because the tool default was draft or because you opened early for CI and forgot the final un-draft step. (User correction, 2026-08-20: [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) stayed draft after checks passed.)
   - **Don't:** un-draft a **deliberately draft-gated** dependent PR.

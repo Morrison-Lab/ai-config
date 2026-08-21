@@ -585,6 +585,58 @@ sentences and thereby manufactures the long-line-with-a-semicolon violation the
 CI gate rejects, which is how three commits failed that check in one day.
 That fragment's own Don't pair already said not to treat it as the check CI runs.)
 
+**A remedy you PROPOSE is the fifth shape, and it is the one no rule in this
+file or its neighbours currently watches.**
+Everything above governs an assignment's premises --- a convention document's,
+a brief's, a posed choice's, a supplied measurement's, and, in the section
+above, the ones you write into a brief yourself.
+A proposal is none of those.
+It names work that has not happened yet, so it asserts nothing in grammatical
+form, and its premises ride in subordinate clauses that read as setup:
+"drop the allowance, so the pre-written file is the only path".
+The main clause is a recommendation and trips no claim-type check.
+The subordinate clause is a **state** claim about a thing that may not exist.
+
+Two properties make this worse than the same claim stated plainly.
+A proposal invites debate about whether the change is a good idea, which is
+where the reader's attention goes, so the premise passes unexamined while the
+conclusion gets argued.
+And a proposal that removes a capability is only safe if its replacement
+already exists --- so a false premise here does not merely misinform, it
+converts a fix into a regression, and the regression is invisible until the
+capability is gone.
+
+The check is the one this file already prescribes, applied one clause deeper.
+Before proposing to remove, forbid, or replace something, derive the
+substitute.
+Open the file that would supply it.
+Not the issue describing it, not the docs, not your recollection of having
+seen it work --- the artifact, which is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s whole point.
+
+- **Do:** derive the replacement path before proposing to remove a capability,
+  and cite the file and line that supplies it.
+- **Do:** read a proposal's subordinate clauses as claims, since that is where
+  its premises live.
+- **Don't:** propose removing an allowance on the strength of a substitute you
+  have not opened.
+- **Don't:** read "this is only a suggestion" as lowering the bar --- a
+  proposal acted on is a change, and its premise was never re-checked.
+
+(`Morrison-Lab/gha#543`, 2026-08-21.
+The reviewer was exhausting its permission budget retrying variants of
+`gh pr diff ... > /tmp/pr.diff`, each denied as a compound command.
+The proposal made twice on that issue was to drop `Bash(gh pr diff:*)` from the
+reviewer's allowlist, so that the pre-written diff file would be the only path
+left.
+Reading `.github/actions/run-claude-review-attempt/action.yml` showed there was
+no pre-written diff file: the harness saves a command's output to a file only
+*after* the bare call succeeds, so removing the allowance would have starved
+the reviewer of the diff entirely rather than redirecting it to a file.
+`Morrison-Lab/gha#567` supplied the file instead --- a workflow step that saves
+the diff and passes its absolute path into the reviewer's prompt --- and left
+the allowance in place.)
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise

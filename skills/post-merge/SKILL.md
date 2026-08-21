@@ -744,8 +744,8 @@ Do not carry 3.5's "don't run it yourself" bullet over to this step; here
 that would leave the guard inert, which is the failure rather than the
 caution.
 
-Two lookups settle it, run in the ai-config checkout after step 3 has already
-put it on `main` and pulled:
+One lookup and two calls settle it, run in the ai-config checkout after step 3
+has already put it on `main` and pulled:
 
 ```bash
 git show --name-only --format= HEAD -- hooks/   # did this merge bring in a hook?
@@ -862,6 +862,10 @@ Do-Confirm; per
 - [ ] The merge actually landed (step 1's verification, not the notification).
 - [ ] The local branch is tidied and `main` is fast-forwarded.
 - [ ] Every deferred item has a filed follow-up issue.
+- [ ] If the merge brought in a hook, step 3.75 ran `install-hooks.py --fix`
+      and the counts are reported.
+      The bare invocation only reports, so "I ran install-hooks" is not
+      evidence that anything was registered.
 - [ ] **Killer item: step 4's UMS pass actually executed**, or was
       deliberately skipped under the recursion guard and that is stated.
       Marked because reporting this skill complete asserts that its final step
@@ -909,6 +913,10 @@ When this post-merge wrap-up completes the session's work **and no PR this sessi
   itself the learnings PR, restating lessons it already banked (see step 4's
   guard). The chain has to terminate somewhere.
 - ❌ Leaving deferred/acknowledged items without follow-up issues.
+- ❌ Reporting a hook PR wrapped up without step 3.75's `--fix` run -- the
+  hook is merged, documented, and inert, which is the deferred-step-with-no-owner
+  shape this skill's own step 3.75 exists to close, arriving one level up in the
+  checklist meant to catch it.
 - ❌ Calling a merge wrapped up in a release-gated repo without comparing the
   release ref against `main` (step 3.5) -- the merged docs pin a version
   consumers cannot resolve until a human slides the tag.

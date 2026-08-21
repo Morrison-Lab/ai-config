@@ -120,6 +120,28 @@ executed_fd_dup = transcript([EXECUTED_WITH_FD_DUP])
 indented_decoy = transcript(["git commit -m hook", INDENTED_DECOY_TERMINATOR])
 tab_terminator = transcript([TAB_TERMINATOR_IS_REAL])
 
+# --- ai-config#1807 review round 2: the same class, one token to the right --
+# WRITER and REDIRECT were matched against the WHOLE line, so a `cat`/`tee`
+# or a redirect belonging to a DIFFERENT command in the same pipeline or list
+# satisfied them. Both hide a real commit.
+PIPED_TO_SHELL = """cat <<'EOF' | bash 2>&1
+git commit -m real
+EOF"""
+
+SEPARATOR_THEN_SHELL = """cat notes.txt > /tmp/x; bash <<'EOF'
+git commit -m real
+EOF"""
+
+# The positive side of the same scoping: a writer reached through `&&` is
+# still a writer, so this must stay quoted rather than arming.
+WRITER_AFTER_SEPARATOR = """cd /x && cat > /tmp/i.md <<'EOF'
+git commit -m quoted
+EOF"""
+
+piped_to_shell = transcript([PIPED_TO_SHELL])
+separator_then_shell = transcript([SEPARATOR_THEN_SHELL])
+writer_after_separator = transcript([WRITER_AFTER_SEPARATOR])
+
 try:
     assert subject.pending_commit(unshipped) == "git commit -m hook"
     assert subject.pending_commit(pushed) is None
@@ -136,6 +158,9 @@ try:
     assert subject.pending_commit(executed_fd_dup) is not None, "2>&1 is not a file write"
     assert subject.pending_commit(indented_decoy) is not None, "an indented decoy is not a terminator"
     assert subject.pending_commit(tab_terminator) is None, "<<- strips leading tabs"
+    assert subject.pending_commit(piped_to_shell) is not None, "a heredoc piped to a shell executes"
+    assert subject.pending_commit(separator_then_shell) is not None, "another command's redirect is not this heredoc's"
+    assert subject.pending_commit(writer_after_separator) is None, "a writer reached through && is still a writer"
 finally:
     os.unlink(unshipped)
     os.unlink(pushed)
@@ -152,6 +177,10 @@ finally:
     os.unlink(executed_fd_dup)
     os.unlink(indented_decoy)
     os.unlink(tab_terminator)
+    os.unlink(piped_to_shell)
+    os.unlink(separator_then_shell)
+    os.unlink(writer_after_separator)
 print("PASS: an unshipped commit blocks, while push and PR creation discharge it")
 print("PASS: a heredoc written to a file is quoted text; an executed heredoc still arms")
 print("PASS: a redirect does not make a heredoc data, and only bash's own terminator ends one")
+print("PASS: WRITER and REDIRECT are scoped to the segment that owns the heredoc")

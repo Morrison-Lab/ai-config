@@ -28,17 +28,31 @@ CREATE = re.compile(r"(?:^|[;&|\n]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 # keeps arming the guard -- the unrecognised case fails toward the old
 # behaviour rather than toward a hole.
 HEREDOC_START = re.compile(r"(<<(-?))\s*(['\"]?)([A-Za-z_]\w*)\3")
-# A redirect token on the heredoc-start line. This is necessary and NOT
-# sufficient: `bash <<'EOF' > /tmp/log` redirects and still executes its body,
-# and `2>&1` is fd duplication rather than a file write at all. WRITER below
-# is what actually discriminates, so no fd-dup exclusion is spelled here --
-# it would be unreachable, and an unpinned line in a safety guard is worse
-# than an absent one.
+# Both tests below run against the pipeline/list SEGMENT that owns the
+# heredoc, never the whole line. Scoping is the whole game here: on a whole
+# line, `cat <<'EOF' | bash` finds `cat` and a redirect and calls an executed
+# heredoc "data", and `cat notes > /tmp/x; bash <<'EOF'` does the same across
+# a `;`. Both hide a real commit, which is the failure this guard exists to
+# prevent.
+SEPARATOR = re.compile(r"\|\||&&|[;&|]")
+# A redirect to a file, within the owning segment. Necessary, not sufficient.
 REDIRECT = re.compile(r"[12]?>>?\s*\S")
-# ...and the command word has to be one that WRITES its heredoc rather than
-# running it. Testing only for "a redirect somewhere on the line" is not
-# enough: `bash <<'EOF' > /tmp/log` redirects and still executes its body.
-WRITER = re.compile(r"(?:^|[;&|]|&&|\|\|)\s*(?:cat|tee)\b[^<]*$")
+# The owning segment's command word must WRITE its heredoc rather than run it.
+WRITER = re.compile(r"^\s*(?:cat|tee)\b")
+
+
+def _owning_segment(line, start):
+    """The pipeline/list segment containing the heredoc token.
+
+    Separators inside quotes are not honoured. That is deliberate: a
+    mis-split can only ever make the segment look LESS like a plain
+    `cat`/`tee` write, so the guard keeps arming -- the safe direction.
+    """
+    cuts = [0] + [m.end() for m in SEPARATOR.finditer(line)] + [len(line)]
+    for lo, hi in zip(cuts, cuts[1:]):
+        if lo <= start.start() < hi:
+            return line[lo:hi]
+    return line
 
 
 def _terminates(line, tag, dash):
@@ -53,8 +67,9 @@ def strip_quoted(command):
     while i < len(lines):
         line = lines[i]
         start = HEREDOC_START.search(line)
-        before = line[: start.start()] if start else ""
-        if start and REDIRECT.search(HEREDOC_START.sub("", line)) and WRITER.search(before):
+        segment = _owning_segment(line, start) if start else ""
+        if (start and WRITER.search(segment)
+                and REDIRECT.search(HEREDOC_START.sub("", segment))):
             kept.append(line)
             dash, tag = start.group(2), start.group(4)
             i += 1

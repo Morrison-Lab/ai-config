@@ -295,6 +295,28 @@ So before a DRW verdict rests on a constraint, classify it:
   Only after the relaxation is shown to be genuinely unavailable does the
   constraint become evidence.
 
+**A limit in a repo we administrate is self-imposed, however far upstream it
+sits**, and the word "upstream" in the external list above is what obscures
+that.
+A shared action, a reusable workflow, a lab package: each is upstream of the
+change in front of you and none of them is outside our control, so a
+compromise accepted to fit one is a decision rather than a requirement.
+
+The near-miss is sharper than the ordinary case, because the constraint is
+genuinely external **to this repository**.
+Nothing about the verification is wrong --- the tool really does only support
+those four options, and one read of its source confirms it --- so the
+classification passes every empirical check while landing in the wrong bucket.
+It also arrives disguised as scope discipline: extending the shared tool looks
+like widening the task, and accepting its limit looks like staying inside it.
+
+[`upstream-issues`](../workflow/upstream-issues.md) already draws the line this
+needs.
+A repo we administrate takes a PR from us directly, so the cost of relaxing
+the constraint is one more PR rather than an unbounded wait on a third party
+--- which is the fact that decides it, since a genuine external upstream may
+never merge.
+
 Relaxing it is normally cheap, which is the other half of why the excuse does
 not hold: adding a package to a CI job is a smaller change than the
 reimplementation it was being used to justify.
@@ -309,6 +331,11 @@ documented, verified, and yours.
   job --- and re-run the DRW comparison against the relaxed environment.
 - **Don't:** cite an environment your own change or an earlier one of ours
   chose as proof that an upstream package does not fit.
+- **Do:** open the upstream PR when the constraint lives in a repo we
+  administrate, and hold the consumer until it lands, rather than shipping the
+  compromise the constraint would force.
+- **Don't:** classify a limit as external because it sits in another
+  repository; ask who can merge a change to it.
 - **Don't:** treat having verified the constraint as having justified it.
   Confirming that the CI job installs nothing is the near-miss here: it looks
   like the check, and it answers a question nobody was disputing.

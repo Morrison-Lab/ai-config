@@ -435,6 +435,63 @@ invalidates every figure it produced".**
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 "A re-measurement with a different instrument".
 
+## A mechanism declining to act is a policy, not a prediction
+
+The claim types in *Key on claim type, because confidence cannot be the
+trigger* cover assertions you make about the world.
+This one is about a sentence a **safeguard** hands you, and the reason it slips
+past every check here is that it arrives already looking checked: a gate
+declined to do something, the gate is well-designed, and its refusal reads as a
+finding about whether the thing is possible.
+
+It is not.
+A guard that withholds a retry is answering a question about **its own**
+cost and benefit --- is another attempt worth the money, would it likely repeat
+--- and that question has a different subject from "can this succeed at all".
+Converting one into the other is an Inference-type overreach, but it is worth
+naming separately because the two sentences do not look adjacent.
+The gate says *I will not retry this*.
+You report *this cannot be reviewed*.
+
+**The guard's own prose is usually what supplies the false generality.**
+A well-written safeguard explains itself, and the explanation is phrased as a
+claim about the world because that is what motivates the policy.
+`check-review-execution.sh`'s comment says gha#198's pattern "has repeatedly
+NOT recovered", which is true of the **automatic same-run retry** it governs
+and reads as a statement about recovery generally.
+So the sentence you quote back is the guard's, which makes the report feel
+sourced rather than inferred.
+
+**Measured 2026-08-21 on Morrison-Lab/gha#555.**
+One commit, one workflow, one allowlist, three attempts: attempt 1
+quota-skipped, attempt 2 produced no verdict at 8 denials and was classified
+`high-denial` so the automatic retry was withheld, attempt 3 produced a
+complete review with two well-founded findings.
+On the strength of attempt 2 I reported the PR as structurally un-reviewable
+and told the user that re-running "only spends money".
+[`self-review-fallback`](self-review-fallback.md) already says the opposite in
+as many words --- the denial count "is a label rather than a prognosis", and
+"the one manual re-run stays worth spending" --- and records a run that posted
+a real verdict at 72 denials.
+The rule was loaded and did not fire, because nothing about reading a
+classification feels like making a claim.
+
+**The test is to name the decision the mechanism actually made.**
+Write its subject, then write yours, the way *A sound measurement does not
+license the claim standing next to it* does for measurements.
+"The workflow declined a same-run retry" and "no review can be obtained" have
+different subjects, and setting them side by side is enough.
+
+- **Do:** read a gate's refusal as a fact about the gate, and say which
+  decision it made.
+- **Do:** spend the cheap manual retry before reporting something unobtainable,
+  when the only evidence is a safeguard having declined.
+- **Don't:** quote a guard's rationale as evidence for a wider claim --- its
+  prose is written to justify a policy, not to bound what is possible.
+- **Don't:** treat a well-designed refusal as more informative than a poorly
+  designed one; the quality of the policy says nothing about the reach of the
+  claim.
+
 ## A sound measurement does not license the claim standing next to it
 
 The reachable-half and retraction-reach sections both concern a reading that
@@ -497,6 +554,60 @@ So write the population your command actually enumerated into the same sentence
 as the claim.
 "No branch contains it" and "no ref contains it" differ by one word, and the
 first is the one you measured.
+
+**A recurrence on
+[Morrison-Lab/gha#555](https://github.com/Morrison-Lab/gha/pull/555),
+2026-08-21, over that repository's root `README.md` --- in the shape where no
+near-synonym exists to slip on, because the noun was supplied rather than
+mistaken.**
+`branch` and `ref` are two named populations one word apart, so that case at
+least offers a wrong word to catch.
+Here the command named no population at all.
+`grep -c '^|' README.md`, run in a checkout of that repository, returned 46,
+and 46 was published as its capability table's row count --- but `grep` had
+enumerated *lines beginning with a pipe*,
+and "rows" was a noun I contributed from what I expected the file to contain.
+There was nothing to misread, which is why re-reading the sentence would not
+have helped.
+
+**The specific trap is that a whole-file pattern match silently unions every
+region that matches, and the claim is almost always about one region.**
+At the commit where the count was taken, that `README.md` held **three**
+disjoint runs of pipe-prefixed lines: the capability table, a blank line
+splitting it in two, and an unrelated table 158 lines further down.
+Enumerating **contiguous blocks** rather than counting lines gives
+`5 + 35 + 6`, which is where the 46 comes from -- 42 data rows and four
+header or separator lines, across a population the sentence described as one
+table.
+
+**The counts a reviewer later checked it against came from a different commit,
+which is the same error one layer up.**
+Two rounds of review were spent on this entry: the first because it never
+named the repository, the second because the figures it did give were drawn
+from more than one file state and presented as a single re-derivation.
+Deriving the whole sequence settles it, and is what should have been written
+the first time:
+
+| Commit | Pipe lines | Blocks |
+| --- | --- | --- |
+| pre-PR `main` | 45 | `5 + 34 + 6` |
+| where 46 was measured | 46 | `5 + 35 + 6` |
+| after the blank line was removed | 46 | `40 + 6` |
+
+The total is unchanged across the last two, which is precisely why an
+unstructured count could not see the defect it was being used to describe.
+
+The remedy is the same one this section already states, applied one step
+earlier: before writing the noun, ask what the command's unit actually was.
+A count is only about a table if something in the pipeline knew where the table
+ended.
+
+- **Do:** derive a count over the structure the claim names, not over a pattern
+  that happens to occur inside it.
+- **Do:** treat a whole-file scan as producing a union until you have shown the
+  file holds one matching region.
+- **Don't:** trust a number more because a command produced it --- the command
+  chose the unit, and you chose the noun.
 
 That makes this the **scope** claim type's composition-time counterpart rather
 than a rival to it.

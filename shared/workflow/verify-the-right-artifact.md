@@ -71,6 +71,33 @@ Recognizable in advance, which is the point of enumerating them:
   Derive any number you commit against the state of the branch you are
   committing it to.
 
+**A document that delegates carries claims about its delegate, and those are
+the ones nobody checks.**
+The shapes above are all about verifying a *claim you are making*.
+This is about the claims a **delegating** document makes structurally, just by
+saying "run X's steps 1 through 3" --- because that sentence quietly asserts
+what those steps do.
+Writing it feels like pointing rather than asserting, which is why no
+claim-checking instinct fires on it.
+
+The concrete failure: a skill built around "one confirmation, no mutation
+before it" told the reader to run another skill's steps 1 through 3, and step 2
+of that range ran a real `git worktree prune`.
+The guarantee at the centre of the design was false, and every internal check
+passed, because the skill was self-consistent --- the falsehood lived in the
+*other* file.
+
+So when you delegate to a numbered range, open that range and read it.
+Any property you assert about it --- that it mutates nothing, that it is
+read-only, that it asks before acting --- is a claim about a file you did not
+write, and it decays when that file changes without touching yours.
+
+- **Do:** read every step you delegate to before describing what it does.
+- **Do:** state the invariant that survives the delegate's actual behaviour,
+  rather than the one you wish it had.
+- **Don't:** treat "run X steps N through M" as a pointer; it is an assertion
+  about N through M.
+
 ## The test
 
 Confirming the claim against what you read cannot detect this,

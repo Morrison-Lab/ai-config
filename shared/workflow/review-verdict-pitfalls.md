@@ -1282,3 +1282,67 @@ Attempt 7 at the new head returned **Ready for merge** with zero findings,
 having re-verified every citation independently rather than inheriting the
 prior round's conclusion.
 The PR's content was identical across both, at 2 files and 39 insertions.)
+
+**A verdict that writes out its own discharging condition is the same block, and
+it is the form that gets merged on.**
+The case above is stated over a **bare** block --- a verdict naming a pending
+check and stopping there.
+The commoner shape names the check *and* says what would clear it: "Once
+`review / claude-review` completes green with no new findings, this PR meets
+this repo's `fully-clean.md` bar", or "Whoever reads this next should query that
+job's conclusion themselves rather than relying on any characterization here."
+
+Read as an instruction, that is an invitation to finish the reviewer's sentence.
+It is not one, and the distinction is worth stating because nothing about the
+wording signals it.
+A reviewer can hand off a **fact-check** --- go read the job's conclusion, which
+is a question with one right answer.
+It cannot hand off the **verdict**, because a verdict is a judgment it did not
+reach, and the conditional is a prediction about what it *would* have concluded
+rather than a conclusion.
+Querying the job is the right action either way; treating your answer as the
+reviewer's approval is the step that does not follow.
+
+The near-miss is what makes this worth a rule rather than more care.
+Discharging the condition **is** a real verification: you read the job's
+`conclusion`, it is `success`, the reviewer's own stated bar is met, and you can
+show your work.
+So the merge arrives carrying evidence, and every check you naturally run
+afterwards asks whether the *reasoning* was sound --- which it was.
+None asks whether the question was already settled.
+
+The cost of compliance is one re-run at an unmoved head, a few minutes.
+The cost of skipping it is not reconstructible afterwards: the PR never received
+an unconditional approval, so "merged clean" is false of it, and nothing in the
+merged history says so.
+
+- **Do:** re-run when a verdict states a condition you could discharge, exactly
+  as for a bare block.
+- **Do:** query the job's conclusion --- that part the reviewer really did hand
+  off.
+- **Don't:** read a stated discharging condition as a conditional approval; a
+  reviewer cannot pre-authorize a verdict it never reached.
+- **Don't:** treat "I verified the condition and showed my work" as closing the
+  gap --- that is what the condition invites, and it is not what it grants.
+
+(Measured 2026-08-21 on ai-config
+[#1749](https://github.com/Morrison-Lab/ai-config/pull/1749) and
+[#1791](https://github.com/Morrison-Lab/ai-config/pull/1791), merged this way
+28 seconds apart at `131f1377` and `d0682800` ---
+`07:12:00Z` and `07:12:28Z`, read from each PR's own `merged_at`.
+Both verdicts read **Needs more work** and named the reviewer's own
+`review / claude-review` job as the sole blocker;
+both jobs had concluded `success` before the merge, verified from the check-runs
+endpoint.
+The session that merged them never consulted this section.
+It recognized the shape, reasoned the case out from first principles, and
+reproduced this case's own "Read the reason, not just the verdict word"
+argument --- that the blocking premise expires before you can act on it.
+That is the premise this fragment grants and then rejects.
+Reaching the midpoint of a settled argument reads from the inside as having
+thought it through.
+Tracked as [#1827](https://github.com/Morrison-Lab/ai-config/issues/1827), where
+the alternative reading --- that a stated condition amounts to a conditional
+approval --- was considered and declined:
+a rule that survives only until someone finds its own reasoning persuasive is
+not doing any work.)

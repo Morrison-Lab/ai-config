@@ -853,7 +853,12 @@ corpus entry claimed two events were "ninety minutes" apart; review derived the
 real gap as about twenty-nine minutes from `17:12:39Z` and `17:41:36Z`.
 Two PRs later, on [#1840](https://github.com/Morrison-Lab/ai-config/pull/1840),
 the PR body said a dependency had merged "four hours ago"; review derived
-**fourteen** minutes, from a merge at `18:14:25Z` and a commit at `18:29:14Z`.
+**about fifteen minutes** --- 14m49s --- from a merge at `18:14:25Z` and a
+commit at `18:29:14Z`.
+The first draft of this entry said "fourteen", having floored the subtraction
+and reported the floor as the value, which is the same error one order smaller:
+deriving a number is not the whole of it, and an integer division is an
+estimate wearing a computation's clothes.
 The second figure was not inherited from anywhere --- unlike the first, which at
 least came from an earlier comment, it was generated whole.
 Both were wrong in the same direction.)

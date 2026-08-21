@@ -458,6 +458,24 @@ while the recovery command in `skills/ardi/SKILL.md` and `memories/preferences.m
 carried it --- so the routine path used every round lacked the fix that the
 rarely-taken path had.)
 
+## A third-party push cancels an idle-dispatched review
+
+(`Morrison-Lab/ai-config#1841`, 2026-08-21, all times UTC:
+
+- `22:13:44` --- `claude-review.yml` was dispatched with `pr_number=1841`.
+  The PR head was `158a82f2`, and nothing had been pushed since `21:39` --- no per-push rhythm was in play.
+  Run `32532076386`, `event=workflow_dispatch`, `headBranch=main`.
+- `22:17:02` --- run `32532310435` was created on branch `fix/check-install-worktree`, `event=pull_request`.
+  Cause: the `@claude` bot pushed `c29ecbd2`, a merge of `main` (`bd92faad`) into the PR branch --- a `synchronize` event.
+- The dispatched run ended `cancelled` (`updated=22:17:41`): `gather-context` succeeded, `review / claude-review` was cancelled, `review / require-review` failed.
+
+The right response was to do nothing.
+The newer `pull_request`-triggered run superseded at a newer, better head, and it went on to post the real verdict.
+Re-dispatching at that point would have cancelled the survivor instead.
+
+This is the mirror of the direction [`memories/github-actions.md`](../../memories/github-actions.md)'s "A caller with no `concurrency:` block can still have its runs cancelled" section measured the day the config changed: there, on `Morrison-Lab/ai-config#1724` (2026-08-20, the same day `claude-review.yml` gained the `pull_request` trigger), a `workflow_dispatch` run cancelled a `pull_request` run.
+Here a `pull_request` run cancelled a `workflow_dispatch` run, one day later, with no per-push rhythm on the dispatching session's side at all --- the push that triggered the cancelling run came from the `@claude` bot's own `main`-sync, not from any push of this session's.)
+
 ## A cancelled dispatch that fired a failure webhook against the superseded SHA
 
 (`Morrison-Lab/ai-config#1526`, 2026-08-16: a review was dispatched with

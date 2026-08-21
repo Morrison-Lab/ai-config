@@ -526,7 +526,7 @@ That instinct is backwards.
 **A false trigger usually costs one note.
 A false discharge costs every remaining warning in the session, always.**
 The qualifier is load-bearing, and the case record here breaches it.
-A trigger is evaluated per event, so a wrong answer is normally wrong once --- but a trigger that matches *durable* transcript content re-matches on every later turn, which is why `no-unshipped-commit.py` fires permanently rather than once.
+A trigger is evaluated per event, so a wrong answer is normally wrong once --- but a trigger that matches *durable* transcript content re-matches on every later turn, which is why `no-unshipped-commit.py` fired permanently rather than once until that shape was fixed.
 So the asymmetry is not that a trigger cannot fire forever.
 It is that a discharge fires forever *by design*: it is the matcher whose whole job is to set state, so a wrong answer there is unrecoverable rather than merely repeated.
 The discharge sets that *state*: once something in the transcript looks like the check was run, the guard is silent from then on, and its silence is indistinguishable from compliance.
@@ -546,7 +546,9 @@ The reviewer's sharpest observation was that the hook's own reminder text names 
 
 **Command-position anchoring is not sufficient on its own, because a heredoc body is full of line starts.**
 `^` matches inside quoted prose, so a fenced reproduction block in a PR comment satisfies the anchor.
-`hooks/no-unshipped-commit.py` has exactly this shape and fires permanently once a heredoc quotes a commit command ([#1775](https://github.com/Morrison-Lab/ai-config/issues/1775)).
+`hooks/no-unshipped-commit.py` had exactly this shape, and fired permanently once a heredoc quoted a commit command ([#1775](https://github.com/Morrison-Lab/ai-config/issues/1775)).
+That one is fixed: [#1807](https://github.com/Morrison-Lab/ai-config/pull/1807) merged 2026-08-21 and added `strip_quoted`, which masks a heredoc body written by `cat`/`tee` into a redirect before the trigger scans it.
+The example is kept in the past tense because the shape is the point, and because a present-tense claim about a hook's current behaviour is exactly what goes stale --- as this sentence did, four hours after that PR merged.
 
 **The machinery already exists, which makes this a [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md) finding too.**
 `hooks/no-unauthorized-merge.py` solved the same problem across six review rounds, and carries `mask_heredocs` plus its `LEAD`/`PERMISSIVE_LEAD` pair for precisely this reason --- [`check-purpose-before-reusing`](check-purpose-before-reusing.md) records the rounds.

@@ -34,7 +34,7 @@ check.
 
 ## A premise you were handed is still a claim
 
-All four types above describe assertions **you** generate, so all four trigger
+All five types above describe assertions **you** generate, so all five trigger
 on the act of writing one.
 
 - **Do:** restate a load-bearing premise explicitly and name what would
@@ -128,7 +128,7 @@ once is the tell.**
 
 ## An action you recommend is a claim about state
 
-The four types above fire on an assertion, and the section above extends them
+The five types above fire on an assertion, and the section above extends them
 to a premise you were handed.
 
 - **Do:** re-query an artifact's state immediately before recommending an
@@ -492,11 +492,16 @@ each makes the run faster, so the habit reinforces itself.
   sits inside --- completeness is a property of the population the command
   took, not of the one your sentence names.
 - **Don't:** cite a green test run whose skip count you did not read --- a
-  suite where a third of the tests never executed has not reported that they
-  pass.
-- **Don't:** reach for [`grep-is-not-coverage`](grep-is-not-coverage.md) here.
-  That fragment governs a **null** result read as nonexistence, where this
-  fires on a positive result read as a neighbouring fact.
+  suite where roughly a quarter of the tests never executed (15 of 58) has
+  not reported that they pass.
+- **Don't:** treat [`grep-is-not-coverage`](grep-is-not-coverage.md) as a
+  rival rule here.
+  That fragment is the **null-result** instance of this shape --- a zero-hit
+  search read as evidence about a pattern --- so it is the sharper tool when
+  the measurement returned nothing, and this section is the general form.
+  Instance 4 is itself a null result, so both reach it.
+  Finding a positive result read as a neighbouring fact is the case only this
+  section covers.
 
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 "Five sound measurements, five claims beside them".

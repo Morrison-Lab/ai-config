@@ -546,8 +546,9 @@ the 503 diagnosis predicted and the `PR_NUMBER` diagnosis ruled out.
 ## Five sound measurements, five claims beside them
 
 `ucdavis/bcs`, 2026-08-19/20.
-One session produced the same error five times, in five unrelated domains,
-each instance surviving self-review.
+One session produced the same error five times, across five distinct claims
+--- instances 2 and 3 arose within the same investigation, the rest in
+unrelated domains --- each instance surviving self-review.
 The recurrence is what makes it a case record: per
 [`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence
 bar, a third instance is the point at which the shape gets written down rather
@@ -592,8 +593,8 @@ Which one is current is a separate fact the session did not hold, and the
 maintainer confirmed the extract actually used was the correct one --- the
 documentation relied on for the retraction was the stale half.
 
-Instances 3 and 4 are the two that fix the shape as an inference error rather
-than as optimism.
+Instance 3 is the one that fixes the shape as an inference error rather than
+as optimism.
 Here the overreach ran toward **alarm**: it retracted a true result, in public,
 on the strength of a sound measurement of something else.
 A rule watching for over-claiming would have passed it, and the act of
@@ -654,8 +655,13 @@ renv active              : requireNamespace("arrow") -> TRUE
 
 Re-running with renv active, after fixing the test, gave 40 pass, 0 fail, 0
 skip.
-A suite in which a third of the tests did not execute has not reported that
-they pass.
+The two runs' totals are not comparable --- 43 passed plus 15 skipped is 58,
+against 40 --- and this record does not establish what changed between them,
+so the load-bearing figure is the 0 skip rather than either pass count.
+Reporting them as comparable would be this section's own error committed
+inside its own case record.
+A suite in which roughly a quarter of the tests did not execute (15 of 58) has
+not reported that they pass.
 
 The second lesson is in *why* the skip happened.
 `R_PROFILE_USER=/dev/null` is a documented workaround in that project, and its

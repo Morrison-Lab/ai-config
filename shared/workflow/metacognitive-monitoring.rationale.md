@@ -39,13 +39,13 @@ check.
 Claim **type** can, because it is observable in the sentence you are about to
 write:
 
-The four are worth keeping as a list rather than collapsing into "check your
+The five are worth keeping as a list rather than collapsing into "check your
 claims", because each names a different *repair*, and the repair is the part
 that is easy to skip.
 
 ## A premise you were handed is still a claim
 
-All four types above describe assertions **you** generate, so all four trigger
+All five types above describe assertions **you** generate, so all five trigger
 on the act of writing one.
 A premise supplied by the user triggers on nothing.
 It arrives as context rather than as a claim, you did not reason your way to
@@ -295,7 +295,7 @@ ends up protected while the person does not.
 
 ## An action you recommend is a claim about state
 
-The four types above fire on an assertion, and the section above extends them
+The five types above fire on an assertion, and the section above extends them
 to a premise you were handed.
 Both are things somebody states.
 A recommendation states nothing about the world.
@@ -848,8 +848,8 @@ It is a check on **subject agreement** between two sentences you already hold.
 Writing "the measurement establishes X" forces X to be stated at the width the
 instrument actually supports, and setting the claim beside it exposes any
 subject the instrument never mentioned.
-In all three recorded instances the two sentences name different subjects
-outright --- a function's behaviour versus a directory's contents, a model
+In the first three recorded instances the two sentences name different
+subjects outright --- a function's behaviour versus a directory's contents, a model
 versus a population, a difference versus a currency --- so no judgment about
 degree is needed.
 
@@ -864,8 +864,10 @@ to see, because nothing about the sentence changes register.
 `git branch -r --contains <sha>` is a complete and correct enumeration of the
 branches containing a commit.
 Reporting it as no ref containing that commit is one word wider, and the
-excluded members --- `refs/pull/<N>/head`, notes, tags, the reflog --- are
-precisely where the answer lived.
+excluded members --- `refs/pull/<N>/head`, notes, tags --- are precisely
+where the answer lived.
+(The reflog is not in that set at all: it lives outside `refs/` entirely, so
+it is not a ref the wider word would have covered either.)
 The default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so
 `refs/pull/*` is never fetched into a clone at all, which means the null result
 was guaranteed independently of the fact being claimed.

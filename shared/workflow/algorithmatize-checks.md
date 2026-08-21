@@ -575,10 +575,10 @@ A performance regression test asserts something about the *code*.
 `perf_counter` answers a question about the *machine*: it counts the time a measured span spends descheduled, waiting for a core, alongside the time spent computing.
 On an idle laptop those are nearly the same number, which is why a wall-clock bound looks calibrated right up until it runs somewhere busy.
 
-`time.process_time()`, and the `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)` beneath it, counts CPU actually consumed and does not advance while the process waits for a core.
+`time.process_time()` counts CPU actually consumed and does not advance while the process waits for a core.
 That is the property that makes a reading reproducible across machines and across load, and it is a property of the instrument rather than of the statistic computed from it.
 
-Measured on `hooks/test-no-unauthorized-merge.py` under six busy-loops on four cores, against byte-identical code:
+Measured on `offending()` in `hooks/no-unauthorized-merge.py`, under six busy-loops on four cores, against byte-identical code:
 
 | clock | growth ratio over eight runs |
 | --- | --- |
@@ -588,8 +588,16 @@ Measured on `hooks/test-no-unauthorized-merge.py` under six busy-loops on four c
 The same scan's wall-clock figure had already been reported at 342ms, 1122ms and 2115ms on three machines, a 6x spread with nothing about the scanner changed, across four separate issue filings ([#1314](https://github.com/Morrison-Lab/ai-config/issues/1314), [#1396](https://github.com/Morrison-Lab/ai-config/issues/1396), [#1785](https://github.com/Morrison-Lab/ai-config/issues/1785), [#1796](https://github.com/Morrison-Lab/ai-config/issues/1796)).
 Four reports of one defect is itself the tell that the instrument was wrong rather than the code under it.
 
+Two limits are worth knowing before reaching for it.
+
 The one thing CPU time cannot see is a span that blocks on I/O instead of burning cycles, so keep a wall-clock ceiling where the measured code can block.
 For a pure-CPU scan it cannot, and a CPU-time ceiling is the honest one.
+
+Its resolution is also platform-dependent, which matters when the measured span is short.
+Do not assume it, and do not generalize from the machine in front of you: read `time.get_clock_info('process_time')`, which reports the implementation and resolution for the interpreter actually running.
+On the Linux container this was measured on it reports `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)` at `1e-09`.
+CPython uses a different call on Windows, whose effective granularity is coarse enough to quantize a span of a few tens of milliseconds.
+Size the baseline to clear that granularity by a wide margin, and fail loudly when it does not rather than dividing by a number the clock could not measure.
 
 - **Do:** time a performance regression test with `process_time`, and label the reported figure as CPU so a reader knows which clock produced it.
 - **Do:** keep a wall-clock ceiling only where the measured code can actually block.

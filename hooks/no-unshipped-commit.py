@@ -11,6 +11,49 @@ COMMIT = re.compile(r"(?:^|[;&|\n]\s*)git\s+commit\b", re.MULTILINE)
 PUSH = re.compile(r"(?:^|[;&|\n]\s*)git\s+push\b", re.MULTILINE)
 CREATE = re.compile(r"(?:^|[;&|\n]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 
+# A heredoc body redirected INTO A FILE is text, not commands: `cat > x <<'EOF'
+# ... EOF` writes the lines rather than running them. A corpus about git
+# workflow quotes git commands inside issue and PR bodies constantly, and a
+# line-oriented scan cannot tell a quoted example from an executed one --
+# shared/writing/examples-are-scanned.md states exactly this, and names
+# teaching the checker about quoted regions as the fix where we own it.
+#
+# Measured on ai-config#1806: filing an issue whose body quoted
+# `pr-on-claim.md`'s own start-commit mechanic armed this guard, and the same
+# command's `gh issue create` did not disarm it, so a fully-pushed session was
+# told to push.
+#
+# ONLY the file-redirect form is stripped. `bash <<'EOF' ... EOF` genuinely
+# executes its body, so a heredoc this does not recognise as a file write
+# keeps arming the guard -- the unrecognised case fails toward the old
+# behaviour rather than toward a hole.
+HEREDOC_START = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_]\w*)\1")
+REDIRECT = re.compile(r"[12]?>>?\s*\S")
+
+
+def strip_quoted(command):
+    """Drop heredoc bodies written to a file rather than executed."""
+    lines = command.split("\n")
+    kept, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        start = HEREDOC_START.search(line)
+        if start and REDIRECT.search(HEREDOC_START.sub("", line)):
+            kept.append(line)
+            tag = start.group(2)
+            i += 1
+            # Drop the body AND the terminator: neither is executed, and the
+            # terminator line carries nothing this scans for. Keeping it was
+            # an equivalent mutant -- no assertion could pin it, so it was
+            # untestable code rather than tested code.
+            while i < len(lines) and lines[i].strip() != tag:
+                i += 1
+            i += 1
+            continue
+        kept.append(line)
+        i += 1
+    return "\n".join(kept)
+
 
 def pending_commit(path):
     pending = None
@@ -32,9 +75,10 @@ def pending_commit(path):
                     if block.get("name") not in {"Bash", "bash", "run_command"}:
                         continue
                     command = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or (block.get("input") or {}).get("CommandLine") or "")
-                    if COMMIT.search(command):
+                    scanned = strip_quoted(command)
+                    if COMMIT.search(scanned):
                         pending = command
-                    if pending and (PUSH.search(command) or CREATE.search(command)):
+                    if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
                         pending = None
     except Exception:
         return None

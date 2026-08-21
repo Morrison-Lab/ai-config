@@ -328,6 +328,7 @@ drawing it, and `merge`, `wait`, `cost`, and `land` each appear zero times in
 it.
 The file had been read; the attribution was still wrong.
 A reviewer caught it, and both refuting commands took under a minute.)
+
 (`ai-config#697`, 2026-07-24: a review flagged a `docs.github.com` URL as
 "likely fabricated" and a quote as "likely a paraphrase".
 The frontmatter listed both of the reviewer's proposed URLs as

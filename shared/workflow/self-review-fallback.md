@@ -28,6 +28,75 @@ Then, before writing the check off as permanently broken, try one manual re-run 
 Two stubs back to back is a stronger signal than one, but it's still not conclusive: a separately-triggered re-run (`rerun_failed_jobs` via the GitHub Actions API/MCP tool, not just re-reading the same run) is an independent LLM invocation, and the failure modes behind stubs (permission-denial spirals, timing) don't always repeat.
 If the check is a **required** one, spend the one manual re-run before reporting the workflow as broken for that PR.
 
+**High-denial stub (gha#198): the denial count gates the automatic retry, not the job's outcome, so it is a label rather than a prognosis.**
+A run whose parsed `permission_denials_count` exceeds `max_denials` (default 5) is classified as gha#198's pattern rather than gha#185's, and the workflow declines to mark it retryable.
+That decides only whether the run retries *itself*, in the same invocation.
+It says nothing about whether the manual re-run above will recover.
+
+Measured on 2026-08-20, both far above the threshold and in opposite directions: [job 96505024829](https://github.com/Morrison-Lab/ai-config/actions/runs/32391984929/job/96505024829) on [ai-config#1689](https://github.com/Morrison-Lab/ai-config/pull/1689) completed and posted a real verdict at `permission_denials_count=72`, while [ai-config#1767](https://github.com/Morrison-Lab/ai-config/pull/1767) produced no verdict twice, at 12 and then 24.
+Take such a figure from the job's own log rather than from the PR's comment history, which records 55 for a different attempt on that same PR --- the count is per attempt, so a PR-level number names no particular run.
+So a high count is not evidence that the reviewer has given up on this PR, and the one manual re-run stays worth spending.
+
+What the count cannot tell you is *which* tools were denied, and the log does not name them.
+The execution-transcript artifact does, so download it rather than guessing --- [`memories/claude-bot-workflows.md`](../../memories/claude-bot-workflows.md) carries the route, and it works today, independent of [gha#540](https://github.com/Morrison-Lab/gha/issues/540).
+What gha#540 would add is the names in the log itself, which saves the download rather than making the diagnosis possible.
+So decide by the re-run's outcome rather than by the number: stop after a second no-verdict attempt, get the external verdict from a cross-vendor reviewer, and report the PR blocked on that verdict rather than ready.
+
+- **Do:** read the denial count to classify which failure family you are in, then let the re-run's outcome decide what to do next.
+- **Do:** stop re-triggering after the second no-verdict attempt, and get the external verdict from a cross-vendor reviewer.
+- **Do:** download the execution artifact when you need to know which tools were denied, rather than inferring it from the count.
+- **Don't:** call a high-denial run non-recovering --- one at 72 posted a real verdict the same day.
+- **Don't:** read the workflow's refusal to mark a run retryable as advice against the manual re-run, which is a different retry.
+- **Don't:** keep re-triggering the same reviewer past the second no-verdict attempt, and don't report the PR ready on a self-review while a cross-vendor reviewer is reachable.
+
+**The built-in retry can be `skipped` rather than stubbing,
+and then only one attempt ever ran.**
+The "two stubs back to back" paragraph above anticipates the workflow's own same-run retry
+*running and also stubbing*,
+which is the case where two independent attempts agree.
+A second signature reaches the same red check
+having spent one attempt rather than two:
+the retry step concludes `skipped`,
+so "two stubs back to back" never applies,
+and a manual re-run is the **first** retry rather than the second.
+
+A parse failure is ONE of the causes, not the cause:
+a genuinely parsed count above the threshold refuses the retry too, correctly.
+Read the count before concluding which you have.
+When the count cannot be parsed out of the execution result
+the workflow substitutes a fail-safe sentinel of `999999`,
+far above the stub-retry threshold of `5`,
+so the run takes the gha#198 branch described above
+without any real count ever having been measured.
+Note which way the sentinel errs.
+It defaults toward *not* retrying,
+so a review whose real denial count would have qualified
+is refused its second attempt.
+
+So read the retry step's own conclusion
+before deciding what a failed review means.
+It is `skipped` when the gate refused.
+`continue-on-error` is applied to the retry step upstream, so a retry that runs
+and fails may not surface as `failure` there either --- which is why the denial
+count, rather than the step conclusion, is what classifies this.
+Reading that step conclusion is one API call --- `actions/jobs/<id>`, not
+the job log the denial count comes from ---
+and it changes what a manual re-run is worth ---
+an independent second sample,
+rather than a third after two that already agreed.
+
+- **Do:** read the retry step's conclusion, and say whether the review was
+  attempted once or twice.
+- **Do:** spend the manual re-run on a `skipped` retry, since no second
+  attempt has happened yet.
+- **Don't:** read a red review check as "the retry also stubbed" --- that is
+  one of two signatures, and the other spent half as many attempts.
+- **Don't:** treat `999999` as a denial count; it is the parser's failure
+  value, not a measurement.
+
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md),
+"The stub-retry skipped on a sentinel denial count".
+
 Either way: don't wait on the bot indefinitely --- do the review yourself and keep driving to fully-clean.
 
 **Self-review is the immediate fallback so the PR never stalls --
@@ -59,10 +128,30 @@ This corpus already makes the identical argument about **instruments**, so exten
 Two consequences follow.
 
 **When chasing a second reviewer, prefer a different vendor.**
-Copilot beside `claude-review` is the common pairing, and the corpus already owns two more:
-[`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) wires up the Google Antigravity review workflow, and
-[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) runs a separately-billed ChatGPT-plan CLI.
+Copilot beside `claude-review` is the common pairing, and
+[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) runs a
+separately-billed ChatGPT-plan CLI.
 Re-dispatching the reviewer that already ran is the weakest of the available options, since it re-reads the same diff through the same model.
+
+**Antigravity is not one of these any more, and the difference matters here more
+than anywhere else.**
+It is permanently out of service (user directive, 2026-08-20), confirmed the
+same day on a dispatched run that ended
+`request failed (code 429): Your prepayment credits are depleted` and
+`Execution failed: model unreachable`.
+That is not the transient outage this fragment otherwise teaches you to re-check
+each round --- re-checking it will never succeed.
+So the pairing above is now Copilot and `delegate-to-codex`, and nothing else.
+Those two are not interchangeable, which is why the preference still needs
+reading rather than collapsing to one name.
+Copilot is **requested** on the PR, and answers only where the org's licensing
+reaches it.
+`delegate-to-codex` is the only cross-vendor reviewer this corpus can
+**dispatch** itself.
+[`agy-review-workflow`](../../skills/agy-review-workflow/SKILL.md) is kept as
+history rather than as an option; do not dispatch it, since a dispatch burns a
+run and leaves a red check for a reviewer that cannot answer.
+Tracked as ai-config#1776.
 
 **Read a cross-vendor disagreement as a prompt to check the item yourself.**
 A split means one reviewer surfaced something the other's approach did not, so the item is worth verifying rather than settling by majority or by whichever reviewer you trust more.
@@ -124,3 +213,45 @@ This is the fallback-specific sharpening of "Apply the same review standards the
 - **Don't:** let a fallback self-review stop at structural checks (dogfood, ASCII, line breaks) and report "no findings".
 - **Don't:** read "the bot was down" as permission for a lighter review than the bot itself would have given.
 
+
+**A defect the self-review SURFACES and then dismisses
+is worse than one it misses.**
+The section above governs the defect a shallow pass never notices.
+This one gets noticed, written down in the review body,
+and closed out on your own judgment ---
+"the exposure is narrow", "not worth another boundary change" ---
+which reads as proportionate scoping
+rather than as a decision to ship a defect you have already found.
+
+It is worse than the miss on two counts.
+The observation was already made,
+so acting on it was the cheapest it was ever going to be,
+and the dismissal spends that for nothing.
+And the written finding *documents that you knew*,
+so when an external reviewer then demonstrates it,
+the record shows a defect identified and waved through rather than overlooked.
+
+The missing piece is structural rather than a lapse of nerve.
+A self-review has no second party to overrule the dismissal,
+which is exactly what the disposition vocabulary supplies everywhere else.
+[`ard`](../../skills/ard/SKILL.md) has four dispositions and narrows to three
+for anything requesting a change, since Acknowledge is reserved for a comment
+that asks for nothing ---
+Address it,
+Rebut it with an argument you would be willing to post to a reviewer,
+or Defer it to a tracked issue.
+A defect you found yourself requests a change by construction, so the fourth
+is not available for it.
+"Not worth fixing" is a Defer with no issue behind it,
+and [`issue-first`](issue-first.md) already rules that out:
+an untracked deferral is a dropped request
+wearing the vocabulary of scope discipline.
+
+- **Do:** give every defect your own self-review names one of the three
+  dispositions, in writing.
+- **Do:** file the issue in the same round when you defer, so a narrowness
+  judgment is one someone else can disagree with.
+- **Don't:** close a finding you raised yourself on your own estimate of its
+  blast radius.
+- **Don't:** read "I mentioned it in the review" as having handled it ---
+  naming a defect is the input to a disposition, not one of them.

@@ -674,3 +674,45 @@ figures the split produced, each from `git show <sha>:<path> | wc -c`:
 
 (`ucdavis/bcs`, 2026-08-13: a reviewer flagged issue numbers in source comments, a `CLAUDE.md` violation, on the base PR of a two-PR stack.
 All three of that PR's files were swept and fixed; the stacked PR's file carried the same violation, was never in the search space, and was therefore never swept.)
+
+## The fix for a finding reproducing that finding one level up
+
+(`Morrison-Lab/ai-config#1787`, 2026-08-21, reconstructed from that PR's
+commit list and posted reviews rather than from recollection.
+
+An early round found a code block whose undefined variables made it silently
+degenerate to `HEAD..HEAD` --- a step that looked like it ran and decided
+nothing.
+A later round found that nothing in the skill's completion checklist gated on
+that step, which is the same defect one level up: a step no checklist item
+covers can be skipped while the skill is reported complete.
+Commit `f2c3fdc1` added the gating bullet --- and wrote it as "if the merge
+brought in a hook", a condition the step's own body calls informational and
+explicitly says decides nothing.
+So the fix for "nothing gates on this step" shipped a gate that excuses the
+step, in the same commit, for the same reason the finding existed.
+Two rounds later, at `f90e7362`, the reviewer found it, and `99db8414` fixed
+it.
+
+What makes this hard to self-catch is that the fix is *written in the
+vocabulary of the thing it corrects*, so re-reading it confirms the topic
+rather than the claim.
+A bullet about not skipping a step, which itself contains a skip condition,
+reads as being about skip conditions and therefore as correct.
+Distinct from the partially-applied fix above: there the survivors are
+elsewhere and the corrected siblings hide them, whereas here the survivor is
+inside the correction.
+
+**The first draft of this entry got the chronology backwards, and that is
+part of the record.**
+It said the bullet was fixed first and the neighbouring step-number citation
+found afterwards, and called that citation "the third" of its kind.
+Both are false: `f90e7362` fixed the citation **before** `99db8414` fixed the
+bullet, and the PR carried exactly two step-number citation errors, not three
+--- the bullet's own defect is a gating-conditional bug, not a citation.
+A reviewer caught it on the entry itself.
+The lesson is narrow and worth keeping: a case record written from memory of
+a lifecycle you personally drove is not a record, and the ordering is the
+part that memory reshapes, because the fixes feel simultaneous in a way the
+commits are not.
+Reconstruct the sequence from the commit list before writing it down.)

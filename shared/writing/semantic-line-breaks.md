@@ -317,6 +317,50 @@ output.
 went into the PR body; the same content flagged 7 lines the moment it was
 run again after committing.)
 
+**A third dirty-tree symptom, and the only one that flags a line you never
+touched: the line NUMBERS come from the commit and the line CONTENT comes
+from the tree.**
+Both cases around this one describe the check reporting the *committed*
+state --- vacuously clean, or stale.
+This one reports a line that is unchanged in both states and appears in
+neither's diff, which is why it reads as a checker bug rather than as the
+run-after-committing rule firing again.
+
+The mechanism is one function boundary.
+`_added_line_numbers()` derives its line numbers from
+`git diff --unified=0 <base>...HEAD`, so they are numbered against **HEAD**.
+`find_violations()` then does `path.read_text()` and indexes
+`lines[line_no - 1]`, which is the **working tree**.
+An uncommitted insertion above shifts every later line, so the two
+snapshots disagree by exactly that many lines and the check classifies a
+neighbour it was never pointed at.
+
+That is [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)
+inside a single instrument: an index from one artifact, content from
+another.
+It also explains why the flagged line is often a long pre-existing one ---
+the corpus has many, and any of them can drift under the cursor.
+
+- **Do:** commit, then re-run, before believing a flag on a line your diff
+  does not contain.
+- **Do:** check whether the reported line appears in `git diff -U0` at all;
+  absent means the numbering is off, not that the checker is wrong about
+  the line's contents.
+- **Don't:** hand-edit the flagged line --- it is someone else's line, and
+  editing it makes a pre-existing violation yours.
+- **Don't:** file it as a checker bug; the check is documented to diff
+  `<base>...HEAD` and never claimed to read the tree consistently.
+
+(Measured 2026-08-21 on
+[ai-config#1787](https://github.com/Morrison-Lab/ai-config/pull/1787).
+A dirty-tree run flagged `skills/post-merge/SKILL.md:916`, an anti-pattern
+bullet about force-pulling a diverged checkout, roughly 140 lines from the
+nearest edit.
+`git diff origin/main -- <path>` did not contain it and `git diff -U0` put
+it outside every added hunk;
+the merge base carried it verbatim.
+Committing and re-running cleared it with no edit to that line.)
+
 **On a branch that already has commits, the same mistake reports the opposite
 symptom: the violations you just fixed, quoted in their pre-edit form.**
 The case above assumes nothing is committed yet, so `HEAD` equals the base

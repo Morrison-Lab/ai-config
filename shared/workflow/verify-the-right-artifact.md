@@ -221,3 +221,51 @@ Neither feeling is evidence, and both suppress the impulse to run the command.
 See
 [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md),
 "A stale install diagnosed from an mtime and an absence".
+
+**The interpreter's own defaults are a fifth adjacent artifact, and a failed
+reproduction is where they stand in for the code.**
+The four shapes above all substitute one *file* or *run* for another.
+This one substitutes the **environment** for the program, and it arrives
+disguised as diligence: you were told a defect exists, you tried to see it
+yourself rather than taking the claim on faith, and nothing happened.
+
+"Could not reproduce" is then a claim about the code, and the evidence
+supports only a claim about the machine.
+The direction is what makes it dangerous.
+A failed reproduction closes the question --- the reported defect goes away,
+the reporter is quietly downgraded, and no further check fires, because
+there is no longer anything to check.
+
+The tell is a defect whose trigger is a **default** rather than an input:
+a decoder's error handler, a locale, a shell option, a umask, a timezone.
+Those are configured outside the program, so the program is identical on
+both machines and only one of them can show the bug.
+
+The remedy is to force the condition rather than to hope for it.
+Ask what setting has to hold for the report to be true, read that setting,
+and set it explicitly before concluding anything.
+
+- **Do:** read the setting the reported defect depends on, and say what it
+  was on the machine where the reproduction failed.
+- **Do:** force the condition and re-run before writing "cannot reproduce".
+- **Don't:** treat a clean run as evidence about the code when the trigger
+  is an ambient default.
+- **Don't:** let a failed reproduction retire a report; it retires one
+  environment.
+
+(Measured 2026-08-21 on
+[ai-config#1784](https://github.com/Morrison-Lab/ai-config/pull/1784).
+A review reported that `run_cli`'s `sys.stdin.read()` could raise
+`UnicodeDecodeError` on a non-UTF-8 diff, the third of three reads in that
+function and the one a prior round's `errors="replace"` fix had missed.
+Piping non-UTF-8 bytes to the unfixed hook exited 0 and reported no
+findings.
+`sys.stdin.errors` in that container is `surrogateescape`, not `strict`, and
+stayed `surrogateescape` under `PYTHONUTF8=0` with an explicit
+`en_US.UTF-8` locale, so the crash could not occur there at all.
+`PYTHONIOENCODING=utf-8:strict` reproduced it on the first try ---
+`'utf-8' codec can't decode byte 0xff in position 47` --- and the fixed hook
+exited 0 on the same input.
+Stopping at the first attempt would have reported the finding
+unreproducible, a true statement about the container and a false one about
+the code.)

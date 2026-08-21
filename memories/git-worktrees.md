@@ -961,3 +961,38 @@ of the two sessions should keep driving.
 Its analysis was right at every step, including its verification that the
 commit it had not made was the better fix; only its premise was false, and the
 orchestrator had supplied it.)
+
+## `git push -u origin HEAD` from a worktree publishes the worktree's own branch name
+
+`pr-on-claim`'s mechanics block ends with `git push -u origin HEAD`, which is
+correct where you are on the PR's branch and wrong from a scratch worktree.
+`HEAD` resolves to the **local** branch name, and a worktree cut for a PR is
+routinely named after the PR number (`wt-1787`) rather than after the PR's
+branch --- so the push creates a new remote ref that looks like a real branch,
+succeeds, and prints a `* [new branch]` line that reads as success.
+
+The commit still has to be pushed again to the right ref afterwards, so the PR
+is fine; what is left behind is a stray ref nobody will recognize.
+
+**Deleting it may not be available to you**, which is what turns a slip into a
+tracked issue.
+From a remote session the delete push failed
+(`send-pack: unexpected disconnect`) and the REST delete returned **403**, so
+the ref stayed.
+
+- **Do:** push an explicit refspec from a worktree ---
+  `git push origin HEAD:<pr-branch>` --- rather than relying on `HEAD`'s local
+  name.
+- **Do:** file the cleanup when you cannot delete the stray ref yourself,
+  rather than leaving it for whoever next lists branches.
+- **Don't:** read `* [new branch]` as confirmation you pushed where you meant
+  to; it is confirmation you pushed somewhere new.
+- **Don't:** assume `-u` is harmless because the commit is correct --- the
+  commit is not what goes astray.
+
+(Morrison-Lab/ai-config#1826, 2026-08-21: a review fix for #1787 was pushed
+from a worktree whose local branch was `wt-1787`, creating
+`refs/heads/wt-1787` at `74995e3c`.
+The same commit reached `feat/register-hooks-after-merge` seconds later via an
+explicit refspec, so the PR was unaffected;
+the stray ref could not be deleted from that session and was filed instead.)

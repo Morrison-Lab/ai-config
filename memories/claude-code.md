@@ -734,7 +734,7 @@ bullet entirely. Caught by a bot review reading the actual diff, then
 independently reconfirmed with `git diff origin/main -- <path>` before
 trusting the follow-up fix.)
 
-## Scripted block move — a marker-delimited range carries its neighbours
+## Scripted block move --- a marker-delimited range carries its neighbours
 
 The mirror of the two-step-move entry above.
 That one loses content; this one takes content nobody asked it to take, and

@@ -1008,6 +1008,85 @@ def main() -> int:
     check("a missing PR number exits 2, distinct from 'not clean'",
           exit_code_of(lambda: checker.parse_args([])) == 2)
 
+    # --- workflow status notices are not reviews (ai-config#1719) -----------
+    #
+    # Measured on ai-config#1841 (2026-08-21): its review quota-skipped four
+    # times, and the checker reported FULLY CLEAN because a skip notice was
+    # admitted as a review, matched HEAD through its own `View run` link, and
+    # carried no finding vocabulary. Five of the six distinct bot comment
+    # shapes on that PR and its siblings are notices rather than reviews.
+    notices = {
+        "dispatch": "\U0001f440 **Claude Review Dispatched** -- [run](https://x) reviewing PR #1.",
+        "quota skip": "> [!WARNING]\n> **Claude review skipped -- API credential or quota unavailable.** [View run](https://x)",
+        "did not finish": "> [!CAUTION]\n> **Claude review did not finish: no verdict, and the denial count was too high to retry.**",
+        "cost": "\U0001f4b0 **Cost:** $2.5898 ([review](https://x)) -- [run](https://x)",
+        "pr preview": "[PR Preview Action](https://github.com/rossjrw/pr-preview-action) v1.8.1 :---: Preview removed.",
+    }
+    for label, body in notices.items():
+        check(f"{label} notice is not admitted as a review",
+              checker.is_non_review_notice(body))
+
+    real_review = (
+        "**Claude finished review** -- [View run](https://x)\n\n"
+        "## Code review\n\nAll good.\n\n### Verdict\n\n**Ready for merge**"
+    )
+    check("negative control: a real review is NOT excluded",
+          not checker.is_non_review_notice(real_review))
+
+    # The precedence case. A review of THIS corpus routinely quotes the notices,
+    # because the notices are what these checks are about -- so a prefix-window
+    # match alone would turn a false clean into a false "no review at HEAD".
+    review_quoting_notices = (
+        "**Claude finished review** -- [View run](https://x)\n\n"
+        "The run posted a \U0001f440 **Claude Review Dispatched** notice and then a "
+        "**Claude review skipped** warning.\n\n### Verdict\n\n**Ready for merge**"
+    )
+    check("a real review that QUOTES a notice stays a review",
+          not checker.is_non_review_notice(review_quoting_notices))
+    check("negative control: that body really does contain a notice marker",
+          "claude review dispatched" in review_quoting_notices.lower())
+
+    # A notice marker far into a non-agent body is a mention, not a notice, so
+    # the window has to bound the match rather than the whole body.
+    late_mention = ("Some analysis.\n\n" + ("x" * 300)
+                    + "\n\n\U0001f440 **Claude Review Dispatched**")
+    check("a notice marker beyond the prefix window is a mention, not a notice",
+          not checker.is_non_review_notice(late_mention))
+    check("negative control: the late mention really is past the window",
+          late_mention.lower().index("claude review dispatched")
+          > checker.NOTICE_PREFIX_WINDOW)
+
+    # End-to-end: the #1841 scenario driven through check_review_comments, not
+    # just through the helper. This is the shape that reported FULLY CLEAN --
+    # a skip notice citing the head SHA, and nothing else.
+    skip_at_head = {
+        "createdAt": "2026-08-21T21:13:36Z",
+        "author": {"login": "github-actions"},
+        "body": ("> [!WARNING]\n> **Claude review skipped -- API credential or "
+                 "quota unavailable.** Re-trigger by pushing. Reviewed sha123. "
+                 "[View run](https://x)"),
+    }
+    mock_skip_only = json.dumps({"comments": [skip_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_skip_only):
+        skip_ok, skip_issues = checker.check_review_comments("1841", "sha123", TEST_REPO)
+    check("a skip notice alone does NOT report clean",
+          not skip_ok and len(skip_issues) > 0)
+    check("and it is reported as no review, not as a clean one",
+          any("No automated review" in i or "No review comment" in i
+              for i in skip_issues))
+
+    # Negative control on that fixture: the same body WITHOUT the notice marker
+    # is admitted and does read clean, so the assertion above is about the
+    # marker rather than about some other property of the fixture.
+    control = dict(skip_at_head,
+                   body="### \U0001f916 Antigravity Agent Report (Code-Review)\n\n"
+                        "Reviewed HEAD sha123.\n\nVerdict: Clean")
+    with patch.object(checker, "run_cmd",
+                      return_value=json.dumps({"comments": [control], "reviews": []})):
+        ctrl_ok, _ = checker.check_review_comments("1841", "sha123", TEST_REPO)
+    check("negative control: a real review on the same fixture DOES read clean",
+          ctrl_ok)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

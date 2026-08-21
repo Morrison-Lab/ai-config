@@ -160,6 +160,32 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
 }
 
 
+# Workflow STATUS notices, which are not reviews. Every one of these is posted
+# by `github-actions[bot]`, so the comment-admission test below -- bot author OR
+# a review-header marker -- admits them all on author alone, and a notice that
+# happens to carry no finding vocabulary then reads as a clean review.
+#
+# Measured on ai-config#1841, #1845 and #1853 (2026-08-21): of the six distinct
+# bot comment shapes those PRs carry, exactly ONE is a review. A PR whose review
+# quota-skipped four times reported FULLY CLEAN, because the skip notice was
+# admitted, matched HEAD through its own `View run` link, and contained no
+# findings (ai-config#1719).
+#
+# Matched against a PREFIX WINDOW rather than the whole body, because this
+# corpus quotes these strings constantly -- a real review discussing a dispatch
+# notice must stay a review. A notice always leads with its marker; a review
+# always leads with `**Claude finished`, which is deliberately absent here.
+NON_REVIEW_NOTICE_MARKERS = (
+    "claude review dispatched",
+    "claude review skipped",
+    "claude review did not finish",
+    "[pr preview action]",
+    "**cost:**",
+)
+
+NOTICE_PREFIX_WINDOW = 200
+
+
 def _detect_review_agent(body: str) -> Optional[str]:
     """Return the agent name if *body* contains a known review agent marker.
 
@@ -173,6 +199,26 @@ def _detect_review_agent(body: str) -> Optional[str]:
         if marker in body_lower:
             return name
     return None
+
+
+def is_non_review_notice(body: str) -> bool:
+    """True when *body* is a workflow status notice rather than a review.
+
+    A known review-agent marker takes PRECEDENCE and settles it immediately: a
+    real review that DISCUSSES a dispatch or skip notice -- which any review of
+    this corpus routinely does, since the notices are what these checks are
+    about -- must stay a review. Without that precedence a review quoting
+    `Claude Review Dispatched` in its opening paragraph was excluded outright,
+    turning a false clean into a false "no review at this HEAD".
+
+    Only then is the prefix window consulted. A notice leads with its marker,
+    so a window bounds the match rather than letting a mention anywhere in a
+    long body decide.
+    """
+    if _detect_review_agent(body):
+        return False
+    head = body[:NOTICE_PREFIX_WINDOW].lower()
+    return any(marker in head for marker in NON_REVIEW_NOTICE_MARKERS)
 
 
 def _resolve_run_head_sha(body: str, repo: str, branch: str = "") -> Optional[str]:
@@ -660,6 +706,10 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         author_login = (c.get("author") or {}).get("login", "")
 
         if "ard review disposition summary" in body_lower:
+            continue
+
+        # A workflow status notice is not a review, whoever posted it.
+        if is_non_review_notice(body):
             continue
 
         is_bot_author = _is_bot_author(author_login)

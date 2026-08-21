@@ -336,8 +336,7 @@ of its factual claims as you would a line of the diff.
 
 - **Do:** re-read and correct the body before reporting a PR ready, after the
   last push rather than before it.
-- **Don't:** leave a body asserting a verification the diff has since outgrown
-  --- under a squash merge, that text is what survives.
+- **Don't:** leave a body asserting a verification the diff has since outgrown.
 
 (Same day, both PRs.
 gha#550's body still read "the fixture suite unchanged and passing" after a

@@ -608,9 +608,10 @@ the diff did not touch cannot be attached as an inline comment, so it appears
 in the verdict body alone.
 Inline threads produce a visible checklist and a body-only finding produces
 nothing to tick off, so "all threads resolved" reads as "round handled".
-A **PR title** is the pure case, being out-of-diff by construction --- and
-under a squash merge it becomes the permanent commit subject, so an
-overclaiming title outlives the PR page it was raised on.
+A **PR title** is the pure case, being out-of-diff by construction --- and on a
+multi-commit PR a squash merge takes its commit subject from that title under
+GitHub's default, so an overclaiming title can outlive the PR page it was
+raised on.
 
 The remedy is mechanical, and it is a count rather than a judgment: before
 pushing, re-read the verdict body **and** re-fetch the thread list, then state
@@ -626,7 +627,7 @@ Say explicitly which are deferred, per [`issue-first`](issue-first.md).
 - **Don't:** treat a correct, complete disposition of one finding as evidence
   about the round --- that is a per-finding claim wearing a per-round shape.
 
-(Measured twice in ninety minutes on 2026-08-21, in both available shapes.
+(Measured twice within half an hour on 2026-08-21, in both available shapes.
 On [ai-config#1833](https://github.com/Morrison-Lab/ai-config/pull/1833) round
 1 posted two inline findings; the first was fixed and pushed, and round 2
 opened by re-raising the second --- "the text at this location is essentially
@@ -637,4 +638,8 @@ claiming work that had been deferred to another issue.
 All three threads were addressed, resolved, and pushed; the body-only one was
 missed.
 The second occurrence came after the first had already been written up, which
-is the argument for a count rather than for intending to look harder.)
+is the argument for a count rather than for intending to look harder.
+The two are anchored by the re-raise at 17:12:39Z and by noticing the second
+miss at 17:41:36Z --- derived from the PR timestamps rather than carried over
+from a figure quoted in a live comment, which is how "ninety minutes" reached
+the first draft of this entry.)

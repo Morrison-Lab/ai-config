@@ -1,18 +1,18 @@
 ---
-name: "claude-agent-workflow"
-description: "Add or update claude.yml workflow."
+name: "dmmhyh"
+description: "Stop over-asking."
 ---
 
-# claude-agent-workflow (Codex wrapper)
+# dmmhyh (Codex wrapper)
 
 This is a generated Codex wrapper around the canonical ai-config Claude skill.
 
-Source: [skills/claude-agent-workflow/SKILL.md](../../skills/claude-agent-workflow/SKILL.md)
+Source: [skills/dmmhyh/SKILL.md](../../skills/dmmhyh/SKILL.md)
 
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
-The source lives at `skills/claude-agent-workflow/SKILL.md` in the same ai-config checkout as this wrapper.
-If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/claude-agent-workflow`, resolve the symlink target for this wrapper directory first, then read `../../skills/claude-agent-workflow/SKILL.md` relative to that real directory.
+The source lives at `skills/dmmhyh/SKILL.md` in the same ai-config checkout as this wrapper.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/dmmhyh`, resolve the symlink target for this wrapper directory first, then read `../../skills/dmmhyh/SKILL.md` relative to that real directory.
 Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.

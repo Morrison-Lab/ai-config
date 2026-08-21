@@ -233,8 +233,13 @@ def run(prompt, recs, sentinel_dir=None, tool_name="Agent"):
     own = sentinel_dir is None
     if own:
         sentinel_dir = tempfile.mkdtemp()
-    payload = {"tool_name": tool_name,
-               "tool_input": {"prompt": prompt, "subagent_type": "general-purpose"}}
+    if tool_name == "SendMessage":
+        # Derived from the tool's own schema, not assumed to match `prompt`:
+        # SendMessage carries its brief in `message`, beside a `to`.
+        tool_input = {"to": "worker", "message": prompt}
+    else:
+        tool_input = {"prompt": prompt, "subagent_type": "general-purpose"}
+    payload = {"tool_name": tool_name, "tool_input": tool_input}
     if tpath:
         payload["transcript_path"] = tpath
     try:
@@ -307,6 +312,104 @@ finally:
 for got, want, desc in seq:
     wrong += got != want
     print(f"  {got:<7} {desc}")
+
+# ------------------------------------------------------------- SendMessage
+#
+# The channel the guard did not cover until 2026-08-20. A follow-up message to
+# a running agent is where corrections and NEW premises land, so it is the
+# higher-risk brief, and it was the unguarded one.
+#
+# The false-positive direction is weighted deliberately here. This hook only
+# warns, so a miss costs one unverified premise, while a warn on every routine
+# ping gets the whole guard tuned out -- which is why ordinary traffic
+# outnumbers the firing cases below.
+print("\nSendMessage (the follow-up-brief channel):")
+
+# Text known to fire on its own; reused as the protocol dict's `reason` so
+# that case can discriminate a stringifying mutant.
+PROTOCOL_REASON = "`shared/workflow/ardi.md` covers the merged-PR case."
+
+SM_REMIND = [
+    (INCIDENT_1, "a corpus-state claim sent as a follow-up message"),
+    ("Correction to my last message: `shared/workflow/fully-clean.md` "
+     "already documents the three-valued exit status, so drop that half.",
+     "a CORRECTION carrying a fresh underived premise"),
+]
+
+# Ordinary coordination traffic. None of it asserts corpus state, and the
+# guard must stay silent on all of it.
+SM_SILENT = [
+    ("Status ping -- where are you on the PR?", "a status ping"),
+    ("Stop what you are doing and report back.", "a stop-and-report"),
+    ("Thanks, that is exactly what I needed.", "a thank-you"),
+    ("Nice catch on the contradiction. Ship it.", "an acknowledgement"),
+    ("Please also request Copilot on that PR when you get a chance.",
+     "a plain instruction naming no file"),
+    ("Two more things after this one: rerun the tests, then push.",
+     "a queued-work note"),
+    ("I ran `grep -c quota CLAUDE.md` and got 6, so use 6 not 5.",
+     "a claim that PASTES its own deriving command"),
+]
+
+for prompt, desc in SM_REMIND:
+    v = run(prompt, None, tool_name="SendMessage")
+    wrong += v != "REMIND"
+    print(f"  {v:<7} {desc}")
+for prompt, desc in SM_SILENT:
+    v = run(prompt, None, tool_name="SendMessage")
+    wrong += v != "silent"
+    print(f"  {v:<7} {desc}")
+
+# A protocol message is a dict, not prose, and must fail open and silent rather
+# than reach `evaluate` as a stringified dict.
+#
+# Two things make this case discriminate, and it pinned NOTHING without both:
+#   - `reason` carries text that genuinely fires as a plain string, so a mutant
+#     that stringifies the dict has something to fire on.
+#   - a FRESH TMPDIR. A nonexistent TMPDIR silently falls back to /tmp, where
+#     the sentinel from an earlier identical claim suppresses the second run --
+#     which reads as the mutant being caught when nothing ran.
+_pd = tempfile.mkdtemp()
+try:
+    proto = subprocess.run(
+        ["python3", HOOK],
+        input=json.dumps({"tool_name": "SendMessage",
+                          "tool_input": {"to": "lead", "message": {
+                              "type": "shutdown_request",
+                              "reason": PROTOCOL_REASON}}}),
+        capture_output=True, text=True, env=dict(os.environ, TMPDIR=_pd))
+finally:
+    shutil.rmtree(_pd, ignore_errors=True)
+ok = proto.returncode == 0 and not proto.stdout.strip()
+wrong += not ok
+print(f"  {'silent' if ok else 'BROKE':<7} a protocol dict message is not prose")
+SM_EXTRA = 1
+
+# Guard the guard: if PROTOCOL_REASON ever stops firing on its own, the case
+# above passes for the wrong reason and silently stops testing anything.
+_ctl = run(PROTOCOL_REASON, None, tool_name="SendMessage")
+wrong += _ctl != "REMIND"
+print(f"  {_ctl:<7} control: that same text DOES fire as a plain string")
+SM_EXTRA += 1
+
+# Registration is half the coverage: widening BRIEF_TOOLS without widening
+# hooks.json's matcher would leave every case above unreachable in production.
+# Assert the binding itself, so the suite cannot pass on a guard nothing calls.
+# Resolved from THIS FILE, not from HOOK: a mutation run passes a temp copy as
+# HOOK, and pathing off it crashed the suite for a reason unrelated to the
+# mutant -- which reads as the mutant being caught when it is not.
+_hj = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "hooks.json"), encoding="utf-8"))
+_matchers = [e.get("matcher", "") for e in _hj["hooks"].get("PreToolUse", [])
+             if any("remind-brief-premises" in json.dumps(h)
+                    for h in e.get("hooks", []))]
+# One group per matcher is this repo's convention (check-hook-catalog.py joins
+# them for README), so aggregate ACROSS groups rather than per group.
+reg_ok = set(_matchers) >= {"Agent", "Task", "SendMessage"}
+wrong += not reg_ok
+print(f"  {'ok    ' if reg_ok else 'WRONG '} hooks.json matcher covers all of "
+      f"BRIEF_TOOLS (got {_matchers})")
+SM_EXTRA += 1
 
 # --------------------------------------------------- clause-isolation mutants
 #
@@ -443,7 +546,8 @@ ok = diff == {","}
 wrong += not ok
 print(f"  {'ok   ' if ok else 'WRONG'}  the two windows differ by exactly ',' (got {diff or 'nothing'})")
 
-total = 1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + len(seq) + len(MUTANTS)
+total = (1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + len(seq)
+         + len(SM_REMIND) + len(SM_SILENT) + SM_EXTRA + len(MUTANTS))
 print(f"\n{total - wrong}/{total} correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

@@ -427,9 +427,10 @@ surprising one, and it arrives at the moment it will be acted on.
 When a change adds a second path to a decision the code already makes --- a
 new discharge condition, an extra early return, an alternative source for a
 value --- the new path starts with **no** preconditions.
-Every gate the original path accumulated has to be restated on it deliberately,
-and the ones that matter are the gates nobody remembers are there, because they
-were added by earlier fixes rather than by the original design.
+Every gate the original path carries has to be restated on it deliberately,
+and the ones that matter are the gates that are invisible *from the new
+branch* --- their absence there looks like nothing at all, whether they came
+from the original design or from a later fix.
 
 The reason this survives review is that both branches are individually correct.
 The old one still carries its checks.

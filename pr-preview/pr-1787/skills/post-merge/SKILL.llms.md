@@ -343,7 +343,7 @@ The instrument is worth running on **any** ai-config merge rather than only one 
 
 Then follow [`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md) point 2, the `~/.claude` consumer copies, which already owns the mechanics: run `check-install.py --fix` first so the script is on disk before anything binds to it, check `enabledPlugins` before `--fix` since the plugin path already loads every hook and a second registration makes each one fire twice, compare the printed `examined N` against the current `hooks/hooks.json` before believing a clean report, and say that hooks connect at session start so a mid-session `--fix` arms nothing until a restart.
 
-**A hook cannot be the instrument for this one**, which is worth stating so nobody builds it. A guard that detects unregistered hooks is itself a hook, so on the non-plugin path it is unregistered in exactly the case it exists to catch, and on the plugin path — where it would run — registration is not needed at all. The detector is silent precisely when the condition holds, which is [`fail-fast`](../../shared/principles/fail-fast.md)’s pass-path-equals-failure-path shape. That is why this is a step in a skill rather than an entry in `hooks/`.
+**A hook cannot be the instrument that BOOTSTRAPS this**, which is worth stating so nobody reaches for one first. A guard that detects unregistered hooks is itself a hook, so on a machine where nothing is bound it is silent exactly when the condition holds, which is [`fail-fast`](../../shared/principles/fail-fast.md)’s pass-path-equals-failure-path shape. The limit stops there, and the measured incident is what shows where: at `registered=15 missing=16` a detector among the fifteen would have caught the sixteen. So a hook can catch later drift and cannot catch its own first registration — and on the plugin path, where it always runs, none is owed anyway. That is why the owner is a step in a skill, with a hook available at most as a secondary check on top of it.
 
 - **Do:** run `install-hooks.py` as part of every ai-config post-merge sweep, and report the `registered`/`missing`/`stale` counts rather than a verdict.
 - **Do:** register a hook whose PR just merged, since the gate’s prohibition expired at the merge and nothing else will do it.
@@ -377,7 +377,7 @@ The local branch is tidied and `main` is fast-forwarded.
 
 Every deferred item has a filed follow-up issue.
 
-If the merge brought in a hook, step 3.75 ran `install-hooks.py --fix` and the counts are reported. The bare invocation only reports, so “I ran install-hooks” is not evidence that anything was registered.
+Step 3.75 ran `install-hooks.py --fix` on this ai-config merge, and the counts are reported. Not conditional on the merge having touched `hooks/`: that lookup is informational, and the drift it catches is usually owed by someone else’s merge rather than by this one. The bare invocation only reports, so “I ran install-hooks” is not evidence that anything was registered.
 
 **Killer item: step 4’s UMS pass actually executed**, or was deliberately skipped under the recursion guard and that is stated. Marked because reporting this skill complete asserts that its final step ran, and the recorded failure is a `post-merge` run reported done whose UMS step never happened — which discards the learnings rather than delaying them. Naming what UMS changed (or that nothing durable emerged) is the evidence; “ran UMS” on its own is not.
 
@@ -404,7 +404,7 @@ Then a linked summary: the merged PR, the auto-closed issue, any deferred follow
 - ❌ Skipping UMS on a normal PR — the just-merged PR is exactly when the lessons are freshest.
 - ❌ Recursing UMS on a UMS PR — running UMS again when the just-merged PR was itself the learnings PR, restating lessons it already banked (see step 4’s guard). The chain has to terminate somewhere.
 - ❌ Leaving deferred/acknowledged items without follow-up issues.
-- ❌ Reporting a hook PR wrapped up without step 3.75’s `--fix` run – the hook is merged, documented, and inert, which is the deferred-step-with-no-owner shape this skill’s own step 3.75 exists to close, arriving one level up in the checklist meant to catch it.
+- ❌ Reporting an ai-config merge wrapped up without step 3.75’s `--fix` run – whatever hooks are owed stay merged, documented, and inert, which is the deferred-step-with-no-owner shape this skill’s own step 3.75 exists to close, arriving one level up in the checklist meant to catch it.
 - ❌ Calling a merge wrapped up in a release-gated repo without comparing the release ref against `main` (step 3.5) – the merged docs pin a version consumers cannot resolve until a human slides the tag.
 - ❌ Reporting “all cleaned up” while a stacked sibling branch dangles unmentioned.
 - ❌ Treating the whole cascade-scan hit list as work caused by this merge, without intersecting it against the merge’s own deleted and renamed paths (step 1.5’s own step 2) — on an old backlog that claims other people’s stale PRs for no reason.

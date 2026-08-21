@@ -230,7 +230,15 @@ def main() -> int:
             vs.listing_chars([("a", "x" * (vs.SKILL_LISTING_BUDGET_CHARS - 8))])
             > vs.SKILL_LISTING_BUDGET_CHARS,
         )
-        entries = [(f"skill-{index}", "x" * 1_000) for index in range(8)]
+        # Derive the entry count from the cap rather than hard-coding a
+        # total that happens to exceed it. A literal 8 entries was 8,120
+        # chars: over the old 8,000 cap and under the 9,000 it became in
+        # #1853, so this test silently stopped testing what it claims the
+        # moment the constant moved, and failed rather than adapting.
+        over_budget_count = vs.SKILL_LISTING_BUDGET_CHARS // 1_000 + 1
+        entries = [
+            (f"skill-{index}", "x" * 1_000) for index in range(over_budget_count)
+        ]
         errs, _ = run_listing_budget(tmp / "over-budget", entries)
         check(
             "aggregate listing over the context budget errors",

@@ -329,7 +329,7 @@ This step exists because README’s activation gate creates a **deferred step wi
 
 It shares its shape with step 3.5 above and differs in the half that decides what to do. Both are owed after a merge, and neither turns anything red. But 3.5’s action force-moves a shared ref, so it is reserved for the human, whereas this one writes one machine’s own settings file and is yours to perform now. Do not carry 3.5’s “don’t run it yourself” bullet over to this step; here that would leave the guard inert, which is the failure rather than the caution.
 
-One lookup and two calls settle it, run in the ai-config checkout after step 3 has already put it on `main` and pulled:
+One lookup and two calls settle it, run in the ai-config checkout after step 2 has already put it on `main` and pulled:
 
 ``` bash
 git show --name-only --format= HEAD -- hooks/   # did this merge bring in a hook?

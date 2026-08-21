@@ -191,9 +191,71 @@ to a premise you were handed.
 - **Don't:** build one from the recap's own status table, however recently
   that table was assembled.
 
+## A removal proposal's premise is about the substitute, not about the artifact you are acting on
+
+The section above is keyed on the **object** of the recommendation: re-query
+the artifact's state before recommending an action on it.
+That check is sound and it cannot reach a proposal to remove, forbid, or
+replace something, because such a proposal's load-bearing premise is not about
+its object at all.
+It is about the **substitute** --- the path that would carry the work once the
+object is gone.
+
+So the check passes and the premise stays unchecked.
+Re-querying the object confirms exactly what you already believed, which
+supplies the sensation of having verified while the claim that decides whether
+the proposal is safe was never opened.
+[`verify-the-right-artifact`](verify-the-right-artifact.md) names that shape in
+its opening paragraph: "It is thorough verification of the wrong object."
+
+Two things make it worse than the same claim stated plainly.
+The premise rides in a subordinate clause --- "drop the allowance, so the
+pre-written file is the only path" --- while the main clause is a
+recommendation, so a reader's attention goes to whether the change is a good
+idea rather than to whether the second half is true.
+And removal is the one direction with no soft failure: a proposal that adds
+something on a false premise is merely useless, whereas one that removes a
+capability whose replacement does not exist converts a fix into a regression,
+invisible until the capability is gone.
+
+- **Do:** open the artifact that would supply the substitute before proposing
+  to remove, forbid, or replace something, and cite the file and line.
+- **Do:** read a proposal's subordinate clauses as claims, since that is where
+  a removal's premises live.
+- **Don't:** count re-querying the object as having checked the proposal ---
+  for a removal those are different artifacts.
+- **Don't:** read "this is only a suggestion" as lowering the bar; a proposal
+  acted on is a change, and its premise is not re-checked at the moment it is
+  carried out.
+
+(`Morrison-Lab/gha#543`, 2026-08-21.
+The reviewer was exhausting its permission budget retrying variants of
+`gh pr diff ... > /tmp/pr.diff`, each denied as a compound command.
+The proposal made twice on that issue was to drop `Bash(gh pr diff:*)` from the
+reviewer's allowlist, so that the pre-written diff file would be the only path
+left.
+The allowlist was exactly as believed, so re-querying it would have confirmed
+the proposal rather than refuting it.
+Reading `.github/actions/run-claude-review-attempt/action.yml` --- the
+substitute --- showed there was no pre-written diff file: the harness saves a
+command's output to a file only *after* the bare call succeeds, so removing the
+allowance would have starved the reviewer of the diff entirely.
+`Morrison-Lab/gha#567` supplied the file instead and left the allowance in
+place.
+
+The first draft of this entry, in `Morrison-Lab/ai-config#1861`, opened by
+calling this a shape "no rule in this file or its neighbours currently
+watches".
+The section directly above it already did, and the reviewer found it.
+That is the same error one level up --- a corpus-gap claim asserted rather than
+derived, which
+[`grep-is-not-coverage`](grep-is-not-coverage.md) exists to prevent --- so the
+entry is written here, as a narrowing of that section, rather than elsewhere as
+a new one.)
+
 ## Calling your own note stale is a state claim about that note
 
-The section above finds a state claim hidden inside a recommendation.
+The two sections above find a state claim hidden inside a recommendation.
 
 - **Do:** open the file before saying it is stale, and quote the line you
   believe is wrong.

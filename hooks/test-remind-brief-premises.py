@@ -360,8 +360,6 @@ for prompt, desc in SM_SILENT:
     wrong += v != "silent"
     print(f"  {v:<7} {desc}")
 
-# A protocol message is a dict, not prose. It must fail open and silent rather
-# than reach `evaluate` as a stringified dict.
 # A protocol message is a dict, not prose, and must fail open and silent rather
 # than reach `evaluate` as a stringified dict.
 #

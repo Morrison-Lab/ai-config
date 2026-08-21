@@ -53,7 +53,8 @@ It also applies to this entry: below is its own pair.
 [`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md)
 
 A commitment about my own future behaviour --- "going forward, I will X", "from
-now on I won't Y", "I'll always Z", "I won't do that again" --- must ship an
+now on I won't Y", "I'll always Z", "I won't do that again", "that is owed
+by me" --- must ship an
 **implemented accountability mechanism in the same turn**, or not be made at
 all.
 A memory or rule entry is the minimum and is always available; a hook is the
@@ -163,10 +164,11 @@ So the lever there is to **recommend** a change rather than make one.
 When the current tier is clearly underpowered for the task ahead, say so and suggest escalating via `/model` or `select-model`.
 When a long stretch of ahead-of-time-known mechanical work doesn't need the current tier, say so and prefer delegating it instead.
 That means a cheaper-tier subagent, or a separately-billed agent CLI before spending this session's own quota, rather than burning the conductor's tier on it.
-Two such budgets exist and the standing preference is to try both first: `codex` (ChatGPT plan, operationalized by `delegate-to-codex`) and `agy` (Google Antigravity).
-`opencode` is a third destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of both on cost and behind both on capability, per `delegate-to-opencode`.
-`memories/preferences.md`'s "Delegate heavy work to another CLI first" carries the rule and the usage-window semantics.
-Read it for one mechanical detail before invoking `agy`: `--print` consumes the next token as its prompt, so a flag placed between the two becomes the prompt and the real one is discarded, silently and with exit 0.
+One such budget remains, and the standing preference is to try it first: `codex` (ChatGPT plan, operationalized by `delegate-to-codex`).
+`agy` (Google Antigravity) was the second and is permanently out of service (user directive, 2026-08-20), so route nothing to it.
+ai-config#1776 tracks the retirement.
+`opencode` is a further destination and is not separately billed at all --- its free and local tiers cost nothing, so it comes ahead of codex on cost and behind it on capability, per `delegate-to-opencode`.
+`memories/preferences.md`'s "Delegate heavy work to another CLI first" carries the rule and the usage-window semantics, and keeps the `agy` mechanics as history rather than as a destination.
 Ground the recommendation in `assess-model-fit`/`select-model` rather than a guess.
 
 **Compaction.**
@@ -695,7 +697,7 @@ If you and the reviewer reach an impasse on a single item (your rebuttal didn't 
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
-1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment or `@agy review` / dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
+1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
 3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 

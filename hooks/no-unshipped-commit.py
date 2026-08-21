@@ -27,7 +27,13 @@ CREATE = re.compile(r"(?:^|[;&|\n]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 # executes its body, so a heredoc this does not recognise as a file write
 # keeps arming the guard -- the unrecognised case fails toward the old
 # behaviour rather than toward a hole.
-HEREDOC_START = re.compile(r"(<<(-?))\s*(['\"]?)([A-Za-z_]\w*)\3")
+# `(?<!<)` rejects the second `<` of a `<<<` HERESTRING. Without it,
+# `cat <<< hello` parses as a heredoc with tag `hello`; a herestring has no
+# body and no terminator line, so the terminator search runs off the end of
+# the command and swallows EVERY remaining line -- unbounded trailing text,
+# not one heredoc body. `cat <<< "$v" > /tmp/out` is an ordinary way to write
+# a literal to a file, so this is reachable rather than contrived.
+HEREDOC_START = re.compile(r"(?<!<)(<<(-?))\s*(['\"]?)([A-Za-z_]\w*)\3")
 # Both tests below run against the pipeline/list SEGMENT that owns the
 # heredoc, never the whole line. Scoping is the whole game here: on a whole
 # line, `cat <<'EOF' | bash` finds `cat` and a redirect and calls an executed

@@ -142,6 +142,21 @@ piped_to_shell = transcript([PIPED_TO_SHELL])
 separator_then_shell = transcript([SEPARATOR_THEN_SHELL])
 writer_after_separator = transcript([WRITER_AFTER_SEPARATOR])
 
+# --- ai-config#1807 review round 3: a `<<<` HERESTRING is not a heredoc -----
+# `HEREDOC_START.search()` could begin matching at the SECOND `<`, reading
+# `cat <<< hello` as a heredoc tagged `hello`. A herestring has no body and no
+# terminator, so the terminator search ran off the end and swallowed every
+# remaining line -- unbounded trailing text, strictly worse than rounds 1-2,
+# which lost one heredoc body each.
+HERESTRING_BAREWORD = """cat <<< hello > /tmp/f
+git commit -m real"""
+
+HERESTRING_QUOTED = """cat <<< "literal" > /tmp/out
+git commit -m real"""
+
+herestring_bareword = transcript([HERESTRING_BAREWORD])
+herestring_quoted = transcript([HERESTRING_QUOTED])
+
 try:
     assert subject.pending_commit(unshipped) == "git commit -m hook"
     assert subject.pending_commit(pushed) is None
@@ -161,6 +176,8 @@ try:
     assert subject.pending_commit(piped_to_shell) is not None, "a heredoc piped to a shell executes"
     assert subject.pending_commit(separator_then_shell) is not None, "another command's redirect is not this heredoc's"
     assert subject.pending_commit(writer_after_separator) is None, "a writer reached through && is still a writer"
+    assert subject.pending_commit(herestring_bareword) is not None, "<<< is a herestring, not a heredoc"
+    assert subject.pending_commit(herestring_quoted) is not None, "a quoted herestring operand is not a tag"
 finally:
     os.unlink(unshipped)
     os.unlink(pushed)
@@ -180,7 +197,10 @@ finally:
     os.unlink(piped_to_shell)
     os.unlink(separator_then_shell)
     os.unlink(writer_after_separator)
+    os.unlink(herestring_bareword)
+    os.unlink(herestring_quoted)
 print("PASS: an unshipped commit blocks, while push and PR creation discharge it")
 print("PASS: a heredoc written to a file is quoted text; an executed heredoc still arms")
 print("PASS: a redirect does not make a heredoc data, and only bash's own terminator ends one")
 print("PASS: WRITER and REDIRECT are scoped to the segment that owns the heredoc")
+print("PASS: a <<< herestring is not mistaken for a heredoc")

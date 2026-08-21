@@ -512,13 +512,17 @@ one of which would have caught a credential swept into a pushed commit that
 same session.
 
 [`post-merge`](skills/post-merge/SKILL.md)'s step 3.75 is that owner.
-It runs `install-hooks.py` on any ai-config merge and registers what the gate
-had been holding back.
+It runs `install-hooks.py --fix` on any ai-config merge, which is the call that
+registers what the gate had been holding back --- the bare invocation only
+reports.
 
 - **Do:** register the hook as part of the post-merge sweep, in the session
   that merged it.
-- **Don't:** read the merge as the activation --- merging places a file and
-  merges a manifest entry; only a binding in `settings.json` makes it fire.
+- **Don't:** read the merge as the activation **on the non-plugin path** ---
+  there, merging places a file and merges a manifest entry, and only a binding
+  in `settings.json` makes it fire.
+  On the plugin path the merge genuinely is the activation, as the plugin
+  section above already says, and no registration is owed.
 
 (Corrected 2026-07-30: a `Stop` hook was written into `~/.claude/hooks/` and
 registered in `settings.json` before its PR was opened, so a guard able to

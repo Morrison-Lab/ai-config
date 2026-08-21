@@ -744,20 +744,31 @@ Do not carry 3.5's "don't run it yourself" bullet over to this step; here
 that would leave the guard inert, which is the failure rather than the
 caution.
 
-Two lookups settle it:
+Two lookups settle it, run in the ai-config checkout after step 3 has already
+put it on `main` and pulled:
 
 ```bash
-git diff --name-only "$merge_base".."$merged_head" -- hooks/ | head
-python3 <ai-config-checkout>/scripts/install-hooks.py
+git show --name-only --format= HEAD -- hooks/   # did this merge bring in a hook?
+python3 scripts/install-hooks.py                # report: registered / missing / stale
+python3 scripts/install-hooks.py --fix          # the call that actually registers
 ```
 
-The second is the instrument, and it is worth running on **any** ai-config
-merge rather than only one that touched `hooks/` --- it costs one command,
-prints `All hooks registered.` when there is nothing to do, and catches every
-hook that merged while someone else was driving.
+**`--fix` is the load-bearing flag.**
+A bare `install-hooks.py` only reports, and says so itself
+(`Re-run with --fix to register the missing hooks.`), so a step that stops
+there leaves the guard exactly as inert as before --- which is this step's own
+failure mode, performed while looking like compliance.
+
+The instrument is worth running on **any** ai-config merge rather than only one
+that touched `hooks/` --- it costs one command, prints `All hooks registered.`
+when there is nothing to do, and catches every hook that merged while someone
+else was driving.
+The first lookup is informational and reads `HEAD` because a squash merge puts
+the merged content in one commit; it decides nothing, so do not skip the
+instrument when it comes back empty.
 
 Then follow [`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md)
-point 3 for the rest, which already owns the mechanics: run
+point 2, the `~/.claude` consumer copies, which already owns the mechanics: run
 `check-install.py --fix` first so the script is on disk before anything binds
 to it, check `enabledPlugins` before `--fix` since the plugin path already
 loads every hook and a second registration makes each one fire twice, compare

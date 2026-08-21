@@ -90,9 +90,7 @@ In every session --- at session start, and again periodically during long sessio
    Among the sixteen inert guards was `flag-add-a-outside-pathspec.py`, and in the same session `git add -A ':!inst/extdata'` swept `SAS/program/` into a pushed `ucdavis/bcs` commit carrying a cleartext SAS credential and real `StudyID_c` values --- the verbatim command that hook's own docstring describes.
    So the cost of the missing binding was the exact incident the corpus had already learned from once.
    The gap it exposes is not a rule but a **moment**: README's activation gate forbids registering before the PR merges and names nothing that happens after, so the owed registration has no owner.
-   [`post-merge`](../../skills/post-merge/SKILL.md)'s step 3.75 is now that owner.
-   **Do not build a hook for this.**
-   A guard detecting unregistered hooks is itself a hook, so on the non-plugin path it is unregistered in exactly the case it exists to catch, and on the plugin path registration is not needed at all --- the detector is silent precisely when the condition holds.
+   [`post-merge`](../../skills/post-merge/SKILL.md)'s step 3.75 is now that owner, and carries the mechanics and the argument for why a hook cannot be the instrument here.
 
    - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
    - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`

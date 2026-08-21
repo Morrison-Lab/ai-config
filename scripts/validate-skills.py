@@ -59,11 +59,11 @@ MARKETPLACE_DESCRIPTION_LIMIT = 1024
 #
 # 9,000 is the same 1% reasoning re-priced against a 225k-token budget, and it
 # is deliberately a modest step rather than a comfortable one: it restores
-# about 21 skills of runway, which is enough that a normal PR stops tripping
+# about 23 skills of runway, which is enough that a normal PR stops tripping
 # the cap and short enough that the catalog's growth stays visible.
 #
 # This buys time; it does not fix the cause. The budget is consumed by ENTRY
-# COUNT, not by verbose descriptions -- per-entry overhead alone is ~19% of
+# COUNT, not by verbose descriptions -- per-entry overhead alone is ~16.5% of
 # the cap -- so the lever that actually scales is having fewer entries. Alias
 # directories are the obvious candidates, being a second listing entry apiece
 # for a skill already listed; ai-config#1852 tracks that work. If routing
@@ -74,7 +74,7 @@ LISTING_ENTRY_OVERHEAD_CHARS = 8
 # How close to the cap counts as "nearly spent", expressed in ENTRIES rather
 # than characters. The budget is consumed by entry count rather than by verbose
 # descriptions -- as of 2026-08-21, 186 entries average 43 chars each, and the
-# per-entry overhead alone is 19% of the cap -- so headroom is only meaningful
+# per-entry overhead alone is 16.5% of the cap -- so headroom is only meaningful
 # as "how many more skills fit". Deriving the threshold from the catalog's own
 # mean entry cost keeps it honest as the catalog changes, instead of pinning a
 # character count that silently stops meaning what it meant.

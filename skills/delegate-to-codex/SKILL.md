@@ -126,6 +126,16 @@ codex exec -C <repo> -s read-only --skip-git-repo-check \
 Verify these flags against your installed `codex-cli` version (`codex exec
 --help`) — flag names can shift between releases.
 
+**Omit `-m`.**
+A ChatGPT-account login does not reach every model the CLI will accept on the command line, and the refusal comes from the API rather than from argument parsing, so the flag is accepted and the run dies afterwards.
+Measured 2026-08-21: `codex exec -m gpt-5.1-codex-max` returned `400 invalid_request_error: The 'gpt-5.1-codex-max' model is not supported when using Codex with a ChatGPT account.`
+The same command with no `-m` ran normally.
+Reach for `-m` only against an API-key login, and treat a `400` naming the account type as settled rather than retryable.
+
+**Don't wrap the call in `timeout`.**
+It is a GNU coreutils binary and is absent on macOS, so the wrapper fails before codex starts --- and it fails in a way that reads like codex failing.
+The background-orchestrator pattern below is the portable answer to a long run, and it is the one this skill already prescribes.
+
 **codex takes ~2–4 min per task, which exceeds the foreground tool timeout** —
 so for multi-item or long work, run a **background orchestrator** and poll a
 DONE marker (a `nohup … &` launcher returns immediately, so its completion

@@ -361,6 +361,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `flag-cop-out-offer.py` | `Stop` | warns when a reply *closes* on an offer to do work (`say the word`, `want me to`, `unless you'd rather`), so the author answers whether the action was already authorized; warns rather than blocks because authorization is not lexically decidable and asking before a merge or force-push is correct, and is tail-anchored because the failure is a recap that closes on an offer |
 | `no-placeholder-reply.py` | `Stop` | blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement), anchored on the whole message since this corpus quotes the banned string constantly, and deliberately silent on a claim about the *work* (`Nothing to report.`), which the same rule requires |
 | `require-stopping-point.py` | `Stop` | blocks a final reply lacking an explicit clean or non-clean stopping-point declaration |
+| `flag-stale-adjacent-comment.py` | `PreToolUse` (Bash) | warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one |
 | `no-misattributed-quote.py` | `Stop` | blocks a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 
 For agent-independent monitoring across all projects and sessions, install the

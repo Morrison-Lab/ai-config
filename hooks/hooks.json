@@ -275,6 +275,13 @@
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
             "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal, and that rule is consulted at read time while the omission happens at composition time. Measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Warns rather than blocks -- a duplicate PR is cheap to close and a blocked PR creation is expensive, since creating the PR is the very act that makes work visible to other sessions. Anchored on a command position with heredoc bodies stripped, because this corpus quotes `gh pr create` constantly. Fails open. Tracked as #1748."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-adjacent-comment.py\"",
+            "timeout": 15,
+            "script": "flag-stale-adjacent-comment.py",
+            "why": "shared/workflow/learn-from-review-findings.md, from ucdavis/bcs#679. Warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one."
           }
         ]
       },

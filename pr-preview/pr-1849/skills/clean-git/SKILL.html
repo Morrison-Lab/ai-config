@@ -353,7 +353,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#the-overlap-this-skill-has-to-resolve" id="toc-the-overlap-this-skill-has-to-resolve" class="nav-link" data-scroll-target="#the-overlap-this-skill-has-to-resolve">The overlap this skill has to resolve</a></li>
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
-  <li><a href="#classify-both-passes-no-mutation" id="toc-classify-both-passes-no-mutation" class="nav-link" data-scroll-target="#classify-both-passes-no-mutation">1. Classify, both passes, no mutation</a></li>
+  <li><a href="#classify-both-passes" id="toc-classify-both-passes" class="nav-link" data-scroll-target="#classify-both-passes">1. Classify, both passes</a></li>
   <li><a href="#present-one-combined-plan-wait-for-confirmation" id="toc-present-one-combined-plan-wait-for-confirmation" class="nav-link" data-scroll-target="#present-one-combined-plan-wait-for-confirmation">2. Present one combined plan — wait for confirmation</a></li>
   <li><a href="#execute-worktrees-then-branches" id="toc-execute-worktrees-then-branches" class="nav-link" data-scroll-target="#execute-worktrees-then-branches">3. Execute — worktrees, then branches</a></li>
   <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">4. Report</a></li>
@@ -410,9 +410,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<section id="classify-both-passes-no-mutation" class="level3">
-<h3 class="anchored" data-anchor-id="classify-both-passes-no-mutation">1. Classify, both passes, no mutation</h3>
-<p>Run <a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> steps 1 through 3. Run <a href="../../skills/clean-branches/SKILL.html"><code>clean-branches</code></a> steps 1 through 3 and step 8’s local enumeration. Neither pass removes, deletes, rebases, or pushes anything yet.</p>
+<section id="classify-both-passes" class="level3">
+<h3 class="anchored" data-anchor-id="classify-both-passes">1. Classify, both passes</h3>
+<p>Run <a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> steps 1 through 3. Run <a href="../../skills/clean-branches/SKILL.html"><code>clean-branches</code></a> steps 1 through 3 and step 8’s local enumeration.</p>
+<p><strong>Neither pass touches a live worktree, branch, or remote before the gate — with one exception, and it is worth naming rather than rounding off.</strong> <code>clean-worktrees</code> step 2 runs <code>git worktree prune -v</code> for real, not <code>--dry-run</code>, so a mutation has already happened by the time the plan is presented.</p>
+<p>It is safe by construction rather than by convention: <code>git worktree prune</code> only drops administrative records for worktrees whose directory is <strong>already gone from disk</strong>, so there is no state it can destroy and nothing a confirmation could protect. Say so in the plan anyway, per step 2’s <code>Pruned stubs</code> line. A silent mutation under a heading promising none is how a reader stops believing the rest of the guarantees.</p>
+<p>The invariant the gate actually protects is therefore narrower than “no mutation”, and stating it precisely is what makes it worth anything: <strong>nothing that can lose work happens before confirmation.</strong></p>
 <p>Derive the <code>INLINE</code> set from the worktree classification:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> worktree list <span class="at">--porcelain</span> <span class="kw">|</span> <span class="fu">awk</span> <span class="st">'/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print $2"\t"p}'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
@@ -420,6 +423,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="present-one-combined-plan-wait-for-confirmation">2. Present one combined plan — wait for confirmation</h3>
 <pre><code>## Git Cleanup Plan --- &lt;timestamp&gt;
 
+### Pruned stubs (already done --- records for directories already gone)
 ### Worktrees to remove (branch deleted inline)
 ### Worktrees flagged --- dirty / unpushed (left alone)
 ### Branches to delete --- remote

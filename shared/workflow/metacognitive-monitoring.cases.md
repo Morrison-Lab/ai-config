@@ -543,17 +543,17 @@ A 503 is transient, so a re-run should simply work.
 A single `rerun_failed_jobs` recovered the run and the verdict posted, which
 the 503 diagnosis predicted and the `PR_NUMBER` diagnosis ruled out.
 
-## Four sound measurements, four claims beside them
+## Five sound measurements, five claims beside them
 
 `ucdavis/bcs`, 2026-08-19/20.
-One session produced the same error four times, in four unrelated domains,
+One session produced the same error five times, in five unrelated domains,
 each instance surviving self-review.
 The recurrence is what makes it a case record: per
 [`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence
 bar, a third instance is the point at which the shape gets written down rather
 than fixed one more time.
-The fourth arrived while this entry was being written, which is itself evidence
-about how easily the shape passes self-review.
+The fourth and fifth arrived while this entry was being written, which is
+itself evidence about how easily the shape passes self-review.
 
 **Instance 1 --- a verified mechanism, an unverified instance.**
 Roxygen prose claimed that this repo's own symbol tracer beats
@@ -608,7 +608,7 @@ the maintainer as the commit being "no longer reachable from any remote ref",
 with the exposure closed as far as git could close it.
 `check-secrets` flagged the same six findings on the next PR.
 
-This is the sharpest of the four, because the measurement has no defect at all.
+This is the sharpest of the five, because the measurement has no defect at all.
 `git branch -r --contains` correctly enumerates the branches containing a
 commit, and it returned the right answer for that question.
 The claim was about **refs**.
@@ -618,8 +618,7 @@ permanently, and closing a PR or deleting its branch does not remove it.
 The default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so
 `refs/pull/*` is never fetched and `git branch -r` cannot see it whatever the
 repository state.
-The other three instances admit an argument that the measurement was
-incomplete.
+The other instances admit an argument that the measurement was incomplete.
 Here it was complete and correct for its own scope, and the scope was silently
 widened by one word in the sentence that reported it.
 
@@ -633,3 +632,38 @@ Writing the population into the sentence is the whole fix, and it costs one
 word.
 "No branch contains it" and "no ref contains it" differ by one word, and the
 first is what the command established.
+
+**Instance 5 --- an accurate pass and fail count, reported as the suite
+passing.**
+A default path was changed, the affected test files were run, and "43 pass, 0
+fail" was reported as evidence the change was safe.
+A reviewer then found a test the change had broken.
+
+The count was accurate.
+The **skip** count was never read: 15 tests were skipped, and the skipped set
+contained exactly the broken test.
+It skipped because `skip_if_not_installed("arrow")` fired, and `arrow` was
+absent because the verification command carried `R_PROFILE_USER=/dev/null` ---
+a habit picked up as a workaround for an unrelated renv startup failure.
+Measured both ways in `ucdavis/bcs` on 2026-08-20:
+
+```
+R_PROFILE_USER=/dev/null : requireNamespace("arrow") -> FALSE
+renv active              : requireNamespace("arrow") -> TRUE
+```
+
+Re-running with renv active, after fixing the test, gave 40 pass, 0 fail, 0
+skip.
+A suite in which a third of the tests did not execute has not reported that
+they pass.
+
+The second lesson is in *why* the skip happened.
+`R_PROFILE_USER=/dev/null` is a documented workaround in that project, and its
+side effect is invisible at the call site.
+It changes which packages are available, hence which tests run, while changing
+nothing about the number that gets reported.
+That generalizes past R.
+Any flag that skips environment setup --- a `--no-config`, a bare interpreter,
+a container built without the optional extras --- can shrink what is being
+measured without shrinking the figure reported.
+The shrunken run is usually the faster one, so the habit is self-reinforcing.

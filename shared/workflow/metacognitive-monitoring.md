@@ -452,6 +452,23 @@ population in the claim is the one you meant.
 This fires when the command's population and the sentence's population are two
 different sets, and the sentence never names either.
 
+**A test suite is the commonest place to meet the population gap, because the
+tool reports two of its three numbers.**
+"43 pass, 0 fail" can be exactly accurate and still not say the suite passes,
+when 15 tests skipped and the skipped set holds the one your change broke.
+So report `SKIP` alongside `PASS` and `FAIL`, always, and treat a non-zero skip
+count as an unmeasured population rather than as a footnote.
+
+The reason the skips happen deserves its own look, because it is usually a flag
+you added for an unrelated reason.
+`R_PROFILE_USER=/dev/null` bypasses renv, which changes which packages are
+installed, which changes which tests execute --- and none of that is visible at
+the call site or in the number that comes back.
+Any "skip the environment setup" flag can do this: a `--no-config`, a bare
+interpreter, a container built without the optional extras.
+Each shrinks what is being measured without shrinking the figure reported, and
+each makes the run faster, so the habit reinforces itself.
+
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.
 - **Do:** measure the illustrating instance separately whenever a verified
@@ -462,6 +479,10 @@ different sets, and the sentence never names either.
 - **Do:** write the population your command enumerated into the sentence that
   reports it --- branches rather than refs, tracked files rather than files,
   open PRs rather than PRs.
+- **Do:** report a test run's skip count in the same sentence as its pass and
+  fail counts, and say what a non-zero one excluded.
+- **Do:** ask what an environment-bypassing flag removes from the run before
+  citing that run as verification.
 - **Don't:** let a real measurement lend its credibility to the sentence
   standing next to it --- adjacency in a paragraph is not support.
 - **Don't:** treat a retraction as exempt.
@@ -470,12 +491,15 @@ different sets, and the sentence never names either.
 - **Don't:** read a correct, complete enumeration as covering the superset it
   sits inside --- completeness is a property of the population the command
   took, not of the one your sentence names.
+- **Don't:** cite a green test run whose skip count you did not read --- a
+  suite where a third of the tests never executed has not reported that they
+  pass.
 - **Don't:** reach for [`grep-is-not-coverage`](grep-is-not-coverage.md) here.
   That fragment governs a **null** result read as nonexistence, where this
   fires on a positive result read as a neighbouring fact.
 
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
-"Four sound measurements, four claims beside them".
+"Five sound measurements, five claims beside them".
 
 ## Writing is the instrument, when the claim can be wrong
 

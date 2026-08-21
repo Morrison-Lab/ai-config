@@ -855,11 +855,11 @@ degree is needed.
 
 ### The subset case, and why it is the sharpest form
 
-Three of the four recorded instances join two subjects that are plainly
+Three of the five recorded instances join two subjects that are plainly
 different kinds of thing --- a function's behaviour and a directory's contents,
 a model and a population, a difference and a currency.
-The fourth joins a set to a **superset of itself**, and that is harder to see,
-because nothing about the sentence changes register.
+The fourth and fifth join a set to a **superset of itself**, and that is harder
+to see, because nothing about the sentence changes register.
 
 `git branch -r --contains <sha>` is a complete and correct enumeration of the
 branches containing a commit.
@@ -879,6 +879,25 @@ single noun.
 It also produces a claim a reader can falsify without re-running anything,
 which is the property [`grep-is-not-coverage`](grep-is-not-coverage.md) asks
 for when it says to report the query rather than the conclusion.
+
+The fifth instance shows the superset can be created by the **instrument's own
+reporting format** rather than by a word choice.
+A test runner returns three numbers and the habit reports two, so the omitted
+one is what defines the unmeasured population.
+That makes the skipped set invisible in a way the branch-versus-ref case is
+not: there the wider noun at least appears in the sentence, whereas here
+nothing in "43 pass, 0 fail" hints that a third number exists.
+
+Its second lesson belongs to the **default** claim type rather than to this
+section, and is worth naming because the two compound.
+`R_PROFILE_USER=/dev/null` was an unexamined default, inherited from an
+unrelated workaround, and its effect was to change the population the
+measurement covered.
+So an unexamined default upstream produced the population gap downstream, and
+the reported figure moved not at all.
+That is the general hazard with any environment-bypassing flag: it shrinks what
+is measured while leaving the shape of the result unchanged, and it makes the
+run faster, which is what turns a one-off workaround into a habit.
 
 ### Why this is not mechanizable
 
@@ -903,6 +922,29 @@ A reviewer can see whether the two sentences were written and whether their
 subjects match, which is a property of the prose.
 That is a review check rather than a hook, and it is where this rule is
 enforceable.
+
+### The one decidable sub-case, and why it still is not a hook
+
+The skip-count instance is the exception to the paragraph above, and saying so
+is what keeps the general claim honest.
+"A message reports a testthat PASS and FAIL count from a run that had skips"
+**is** decidable, unlike "does this claim follow from that evidence".
+
+It is still the wrong thing to mechanize, for two reasons that are about the
+instrument rather than about the principle.
+A hook would have to parse prose to find the reported counts, and a prose
+parser is exactly the brittle detector
+[`algorithmatize-checks`](algorithmatize-checks.md) warns against building.
+It would miss a count written as "all green" and fire on one quoted from a log.
+And it would have to know the run's real skip count, which is not in the
+transcript it can see.
+
+The robust form is upstream of the report: run the tests with an invocation
+that prints all three numbers, and carry all three into the sentence.
+That makes the habit and the tooling the same act, and it fails safe, because
+a runner that prints `SKIP` alongside `FAIL` cannot report a suite as passing
+while hiding what did not execute.
+[`test`](../../skills/test/SKILL.md)'s reporting step carries that instruction.
 
 ## Writing is the instrument, when the claim can be wrong
 

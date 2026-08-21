@@ -594,6 +594,44 @@ question has no fixed vocabulary.
   round 1 still left two more rounds' worth of instances for reviewers to
   find, each worded differently enough that the grep never touched it.
 
+**Why a partially-applied fix is harder to spot than an unapplied one.**
+The entry above gives the remedy and treats the difficulty as a matching
+problem --- the grep missed instances whose wording varied.
+There is a second reason it keeps not firing, and it is not about matching at
+all: the instances you *did* fix become evidence that the class was handled.
+
+An unapplied fix leaves a defect with nothing around it.
+A partially-applied one leaves a defect flanked by corrected siblings, and
+those siblings read as a completed sweep --- so re-reading the area confirms
+the fix rather than exposing the gap.
+The area looks *more* finished than it did before, which is the opposite of
+what the remaining instance needs.
+
+Measured on [ai-config#1810](https://github.com/Morrison-Lab/ai-config/pull/1810),
+2026-08-21, where the same shape survived three separate rounds in one PR:
+
+| round | the instance left behind | what concealed it |
+|---|---|---|
+| 2 | one "installed" that should read "available" | its two siblings had already been corrected |
+| 3 | `four claim types` in a third file | the two files in the diff were both swept |
+| 4 | "notes, tags ... precisely where the answer lived" | the reflog half of the same sentence was fixed |
+
+Each was found by a reviewer, never by re-reading, and each fix made the next
+one less visible rather than more.
+The third is the sharpest: half a sentence was corrected and the other half of
+the same sentence was not.
+
+The remedy is the entry above's, unchanged --- derive the population and read
+it end to end.
+What this adds is when to distrust the feeling that you already have: a fix
+that touched several instances is exactly the state in which the survivors are
+invisible, so the sweep is most owed at the moment it feels least necessary.
+
+- **Do:** re-derive the population after a multi-instance fix, not only after
+  a reviewer finds a second instance.
+- **Don't:** read corrected siblings as evidence the class is exhausted ---
+  they are evidence about themselves and nothing else.
+
 ## The unit of repair is the figure, across every artifact carrying the twin
 
 (`Lacaedemon/sparta#1222` and `#1225`, both 2026-08-07, both touching exactly

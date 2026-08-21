@@ -97,10 +97,15 @@ The session had *also* flagged, in the same reply as the edit, that `delay: 1500
 The evidence that would have settled it was in the repo it had already opened.
 
 What exposed it was reading `main` for an unrelated reason: the table looked nothing like the one quoted an hour earlier.
-`git reflog` then showed a concurrent session had run `checkout: moving from docs/opencode-ollama-setup to main` **after** the original read, so even a branch check at read time would have gone stale --- which is why the fragment puts the check beside each read rather than once per session.
 
+`git reflog` then showed a concurrent session had run `checkout: moving from docs/opencode-ollama-setup to main` **after** the original read.
+That timing matters, and it cuts *for* the fragment's remedy rather than against it: a `rev-parse --abbrev-ref HEAD` run beside the original read would have returned `docs/opencode-ollama-setup` and caught the whole thing.
+The check was not performed at all, so nothing about this incident tests whether checking once per session would have sufficed.
+What the reflog does establish is the separate hazard the fragment's second property names --- the branch moved mid-session, so a check performed at the *first* read would not have described the checkout by the time of a later one.
+
+The live config was then reverted to the backup taken before the edit, byte-identical, restoring all 29 entries to 64,000.
 Re-derived against `main`'s table afterwards, all 41 live entries matched it exactly, with zero mismatches.
-The configuration had been correct the whole time.
+The configuration had been correct the whole time, and the session's own edit was the only thing that had ever made it diverge.
 
 The generalizable point is not that the branch was wrong.
 It is that **a plausible answer is the expected output of this failure**: `docs/opencode-ollama-setup` forked from a `main` the corpus had already described, so the stale table matched prior expectation better than the current one did.

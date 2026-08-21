@@ -105,9 +105,10 @@ and a pull request opened on its premise.
 
 ## A working-directory checkout is a fifth shape, and it stays silent
 
-The four shapes above each have a tell.
-A working-directory read has none: the path resolves, the file exists, and its contents are real bytes from a real commit.
-Nothing distinguishes reading `main` from reading a feature branch that happens to be checked out, so `cat <path>` in a repo you have open reads as consulting the repository rather than as consulting one revision of it.
+Shape 1 already names "a stale local checkout" among its examples, so this is a sharpening of that shape rather than a wholly new one.
+What it adds is the *tell*, which shape 1 leaves implicit: its remedy, go to the authoritative store, presumes you already suspect the copy, and that presumption is exactly what fails here.
+A working-directory read offers nothing to raise the suspicion: the path resolves, the file exists, and its contents are real bytes from a real commit.
+Nothing distinguishes reading the default branch from reading a feature branch that happens to be checked out, so `cat <path>` in a repo you have open reads as consulting the repository rather than as consulting one revision of it.
 
 Two properties make it worse than an ordinary stale read.
 
@@ -120,16 +121,25 @@ So the failure mode is not confusion but false confidence.
 Another session, or a `@claude` bot reacting to PR activity, can switch branches or pull between your read and your next command, so the branch you verified once is not the branch you are still on.
 `git reflog` is what shows this after the fact; nothing shows it at the time.
 
-The check is one command, and it belongs *beside the read*, not once at session start:
+The cheap check is one command, and it belongs *beside the read*, not once at session start:
 
 ```bash
 git -C <repo> rev-parse --abbrev-ref HEAD     # which revision am I reading?
-git -C <repo> log --oneline -3 origin/HEAD -- <path>   # what does the default branch say?
 ```
 
-Prefer `git show origin/<default-branch>:<path>` whenever the claim is about what the repository currently documents.
-It names the revision in the command, so the answer cannot drift between reading and citing, and it works regardless of what the checkout is doing.
+The better move is to skip the checkout altogether whenever the claim is about what the repository currently documents, and read the revision by name:
+
+```bash
+git -C <repo> fetch -q origin
+DEF=$(git -C <repo> remote show origin | sed -n 's/.*HEAD branch: //p')
+git -C <repo> show "origin/$DEF:<path>"
+```
+
+This names the revision in the command, so the bytes you read and the revision you cite cannot come apart, and it answers correctly whatever the checkout is doing.
 Resolve the default branch from the repo rather than assuming `main`.
+
+The `fetch` is load-bearing rather than tidiness.
+`origin/<default-branch>` is a remote-tracking ref, so it is only as current as the last fetch --- without one, this substitutes a different stale artifact for the right one, which is this whole fragment's failure mode wearing the remedy's clothes.
 
 The consequence generalizes past reading.
 An assignment derived from a stale read is wrong in a way [`challenge-the-assignment`](challenge-the-assignment.md) cannot catch, because every premise check the recipient runs confirms a document that genuinely exists.

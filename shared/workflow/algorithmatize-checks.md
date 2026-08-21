@@ -453,11 +453,23 @@ did not compute.**
   harness.
 
 **An eighth outcome belongs to the FIXTURE rather than to the mutant or the
-matrix: the mutation applied faithfully, and a SIBLING member of the same
-alternation caught the input anyway.**
-Every outcome above asks whether the mutation was real.
-This one grants that it was, and asks whether the input could ever have
-reached the clause under test.
+matrix: the mutation applied faithfully, its own designated case ran, and a
+SIBLING member of the same alternation produced the same observable anyway.**
+
+Every outcome above asks whether a mutation applied, was faithful, or was
+credited to the right row.
+The pass-condition entry directly above asks a nearer question still --- whether
+the case that flipped is the one written for this clause --- and answers it by
+designating that case per mutation.
+**This one starts where that remedy ends, and the two are easy to conflate
+because both end in a row that scores clean.**
+There, the designated case is never reached, so the clause is unmeasured and
+the fix is to score the right case.
+Here the designated case IS reached and the clause IS exercised; the row scores
+clean because a sibling clause produces the same result for the same input.
+Scoring a different case cannot help, because the case is already the right
+one.
+The fix is a different input.
 
 The shape is a chain of alternatives that all guard one property --- a
 redaction pipeline, a validator running several patterns, a dispatcher trying
@@ -491,6 +503,8 @@ first, before concluding the clause is redundant.
   observation is produced by a fixture that never reached it.
 - **Don't:** trust a fixture written the realistic way --- realism is what
   makes it reachable by several clauses at once.
+- **Don't:** reach for the pass-condition entry's remedy here; designating the
+  case per mutation is already satisfied, and the sibling still absorbs it.
 
 (Measured on `Morrison-Lab/gha#548`, 2026-08-21, three times in one session on
 one chain.

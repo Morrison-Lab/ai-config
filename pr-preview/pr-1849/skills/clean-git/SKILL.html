@@ -404,8 +404,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Compute the worktree plan.</li>
 <li>Derive <code>INLINE</code> — the set of branches attached to worktrees classified dead, which the worktree pass will delete itself.</li>
 <li>Compute the branch plan.</li>
-<li>Subtract <code>INLINE</code> from the branch plan’s delete list, and report the subtracted count rather than dropping it silently.</li>
+<li>Subtract <code>INLINE</code> from the branch plan’s <strong>local</strong> delete list only, and report the subtracted count rather than dropping it silently.</li>
 </ol>
+<p><code>clean-worktrees</code> step 5 deletes with <code>git branch -d</code>, which is a <strong>local</strong> delete and never touches a remote ref. So subtracting <code>INLINE</code> from the remote list would report a stale <code>origin/&lt;branch&gt;</code> as handled while nothing in either pass deletes it. The remote list passes through untouched.</p>
 <p>A branch in <code>INLINE</code> that the branch pass had classified <strong>active</strong> is a contradiction between the two skills, not a subtraction. Stop and surface it.</p>
 </section>
 <section id="procedure" class="level2">
@@ -416,8 +417,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p><strong>Neither pass touches a live worktree, branch, or remote before the gate — with one exception, and it is worth naming rather than rounding off.</strong> <code>clean-worktrees</code> step 2 runs <code>git worktree prune -v</code> for real, not <code>--dry-run</code>, so a mutation has already happened by the time the plan is presented.</p>
 <p>It is safe by construction rather than by convention: <code>git worktree prune</code> only drops administrative records for worktrees whose directory is <strong>already gone from disk</strong>, so there is no state it can destroy and nothing a confirmation could protect. Say so in the plan anyway, per step 2’s <code>Pruned stubs</code> line. A silent mutation under a heading promising none is how a reader stops believing the rest of the guarantees.</p>
 <p>The invariant the gate actually protects is therefore narrower than “no mutation”, and stating it precisely is what makes it worth anything: <strong>nothing that can lose work happens before confirmation.</strong></p>
-<p>Derive the <code>INLINE</code> set from the worktree classification:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> worktree list <span class="at">--porcelain</span> <span class="kw">|</span> <span class="fu">awk</span> <span class="st">'/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print $2"\t"p}'</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Derive the <code>INLINE</code> set. The command below is <strong>not</strong> <code>INLINE</code> — it is the raw worktree-to-branch mapping, every worktree included:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> worktree list <span class="at">--porcelain</span> <span class="dt">\</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">awk</span> <span class="st">'/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print $2"\t"p}'</span> <span class="dt">\</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="op">&gt;</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/wt-branches.tsv"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>INLINE</code> is the subset whose <strong>worktree</strong> <code>clean-worktrees</code> step 3 classified <strong>Dead</strong>, so intersect that mapping against the dead-worktree paths from step 1 before using it anywhere.</p>
+<p>Using the raw mapping as <code>INLINE</code> breaks the sweep immediately rather than subtly, which is worth stating because it looks like a shortcut that would merely over-subtract. Every live worktree appears in it, including the main checkout and the one you are standing in. Their branches are <code>Active</code> to the branch pass by construction, so the contradiction rule below fires on the first one and halts a sweep that had nothing wrong with it.</p>
 </section>
 <section id="present-one-combined-plan-wait-for-confirmation" class="level3">
 <h3 class="anchored" data-anchor-id="present-one-combined-plan-wait-for-confirmation">2. Present one combined plan — wait for confirmation</h3>
@@ -430,13 +435,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 ### Branches to delete --- local
 ### Branches to rebase + open MR (stale)
 ### Skipped --- active / new / current
-### Subtracted from the branch pass (deleted inline by the worktree pass): &lt;N&gt;</code></pre>
+### Subtracted from the branch pass LOCAL list (deleted inline by the worktree pass): &lt;N&gt;</code></pre>
 <p>One confirmation covers the whole plan. Do not proceed on silence.</p>
 </section>
 <section id="execute-worktrees-then-branches" class="level3">
 <h3 class="anchored" data-anchor-id="execute-worktrees-then-branches">3. Execute — worktrees, then branches</h3>
 <p>Run <code>clean-worktrees</code> steps 5 and 6. Then run <code>clean-branches</code> steps 5 through 8.</p>
-<p>Re-derive the branch list between the two. The worktree pass has just changed it, and step 1’s plan is a prediction rather than a fact. A branch that was in <code>INLINE</code> and is still present after the worktree pass means that worktree removal failed — report it, do not delete the branch here.</p>
+<p>Re-derive the branch list between the two. The worktree pass has just changed it, and step 1’s plan is a prediction rather than a fact. A branch that was in <code>INLINE</code> and is still present after the worktree pass has <strong>two</strong> possible causes, and they call for opposite responses:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> worktree list <span class="at">--porcelain</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-Fq</span> <span class="st">"worktree </span><span class="va">$path</span><span class="st">"</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> STILL-THERE <span class="kw">||</span> <span class="bu">echo</span> REMOVED</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li><strong>The worktree is gone.</strong> Then removal succeeded and <code>git branch -d</code> simply refused. That is routine rather than exceptional: <code>clean-worktrees</code> step 5 documents the refusal at length for squash-merged branches, and measured an 18/11 <code>-d</code>/<code>-D</code> split across a 29-branch sweep. Leave it to the branch pass, which is equipped to confirm the merge and escalate to <code>-D</code>.</li>
+<li><strong>The worktree is still there.</strong> Then removal genuinely failed, and the safety rule below applies.</li>
+</ul>
+<p>Distinguishing them matters because the safety rule stops the branch pass on a worktree failure. Reading every surviving branch as a failure would abort the whole sweep on the commonest outcome there is.</p>
 </section>
 <section id="report" class="level3">
 <h3 class="anchored" data-anchor-id="report">4. Report</h3>

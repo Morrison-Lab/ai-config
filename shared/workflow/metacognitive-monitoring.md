@@ -437,7 +437,8 @@ See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 
 ## A mechanism declining to act is a policy, not a prediction
 
-The claim types above cover assertions you make about the world.
+The claim types in *Key on claim type, because confidence cannot be the
+trigger* cover assertions you make about the world.
 This one is about a sentence a **safeguard** hands you, and the reason it slips
 past every check here is that it arrives already looking checked: a gate
 declined to do something, the gate is well-designed, and its refusal reads as a
@@ -476,8 +477,8 @@ The rule was loaded and did not fire, because nothing about reading a
 classification feels like making a claim.
 
 **The test is to name the decision the mechanism actually made.**
-Write its subject, then write yours, the way the section below does for
-measurements.
+Write its subject, then write yours, the way *A sound measurement does not
+license the claim standing next to it* does for measurements.
 "The workflow declined a same-run retry" and "no review can be obtained" have
 different subjects, and setting them side by side is enough.
 
@@ -554,21 +555,25 @@ as the claim.
 "No branch contains it" and "no ref contains it" differ by one word, and the
 first is the one you measured.
 
-**A recurrence, 2026-08-21, in the shape where no near-synonym exists to slip
-on: the noun was supplied rather than mistaken.**
+**A recurrence on
+[Morrison-Lab/gha#555](https://github.com/Morrison-Lab/gha/pull/555),
+2026-08-21, over that repository's root `README.md` --- in the shape where no
+near-synonym exists to slip on, because the noun was supplied rather than
+mistaken.**
 `branch` and `ref` are two named populations one word apart, so that case at
 least offers a wrong word to catch.
 Here the command named no population at all.
-`grep -c '^|' README.md` returned 46, and 46 was published as the capability
-table's row count --- but `grep` had enumerated *lines beginning with a pipe*,
+`grep -c '^|' README.md`, run in a checkout of that repository, returned 46,
+and 46 was published as its capability table's row count --- but `grep` had
+enumerated *lines beginning with a pipe*,
 and "rows" was a noun I contributed from what I expected the file to contain.
 There was nothing to misread, which is why re-reading the sentence would not
 have helped.
 
 **The specific trap is that a whole-file pattern match silently unions every
 region that matches, and the claim is almost always about one region.**
-`README.md` carries two pipe-tables: the capability table at lines 44-83, and
-an unrelated one 160 lines later.
+That `README.md` carries two pipe-tables: the capability table at lines 44-83,
+and an unrelated one 160 lines later.
 The count summed both.
 A reviewer caught it, and re-deriving it by enumerating **contiguous blocks**
 rather than counting lines gave 38 data rows in the table the claim was about,

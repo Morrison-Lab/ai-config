@@ -53,6 +53,16 @@ MARKETPLACE_DESCRIPTION_LIMIT = 1024
 SKILL_LISTING_BUDGET_CHARS = 8_000
 LISTING_ENTRY_OVERHEAD_CHARS = 8
 
+# How close to the cap counts as "nearly spent", expressed in ENTRIES rather
+# than characters. The budget is consumed by entry count rather than by verbose
+# descriptions -- as of 2026-08-21, 186 entries average 43 chars each, and the
+# per-entry overhead alone is 19% of the cap -- so headroom is only meaningful
+# as "how many more skills fit". Deriving the threshold from the catalog's own
+# mean entry cost keeps it honest as the catalog changes, instead of pinning a
+# character count that silently stops meaning what it meant.
+SKILL_LISTING_WARN_ENTRIES = 6
+TOP_CONSUMERS_REPORTED = 5
+
 
 def parse_frontmatter(text: str, where: str):
     match = FRONTMATTER.match(text)
@@ -114,6 +124,30 @@ def listing_chars(entries: list[tuple[str, str]]) -> int:
     )
 
 
+def top_listing_consumers(
+    entries: list[tuple[str, str]], limit: int = TOP_CONSUMERS_REPORTED
+) -> list[tuple[int, str]]:
+    """The entries costing the most listing budget, largest first.
+
+    Ties break on name so the reported order is stable across runs. A check
+    that names different offenders on two runs over the same catalog would be
+    read as flapping rather than as a tie.
+    """
+    costs = [
+        (len(name) + len(description) + LISTING_ENTRY_OVERHEAD_CHARS, name)
+        for name, description in entries
+    ]
+    costs.sort(key=lambda pair: (-pair[0], pair[1]))
+    return costs[:limit]
+
+
+def describe_consumers(entries: list[tuple[str, str]]) -> str:
+    """Render the biggest consumers, so a budget message names an offender."""
+    return ", ".join(
+        f"{name} ({cost} chars)" for cost, name in top_listing_consumers(entries)
+    )
+
+
 def check_listing_budget(skill_mds: list[Path], label: str) -> None:
     """Reject a catalog whose metadata would exceed Claude's routing budget."""
     entries = []
@@ -128,13 +162,37 @@ def check_listing_budget(skill_mds: list[Path], label: str) -> None:
         if isinstance(name, str) and isinstance(description, str):
             entries.append((name, description))
     total = listing_chars(entries)
+    overhead = len(entries) * LISTING_ENTRY_OVERHEAD_CHARS
     if total > SKILL_LISTING_BUDGET_CHARS:
         errors.append(
             f"{label}: skill listing is {total} chars, over the "
-            f"{SKILL_LISTING_BUDGET_CHARS}-char context budget"
+            f"{SKILL_LISTING_BUDGET_CHARS}-char context budget by "
+            f"{total - SKILL_LISTING_BUDGET_CHARS}. "
+            f"{len(entries)} entries, of which {overhead} chars is per-entry "
+            f"overhead. Largest: {describe_consumers(entries)}"
         )
     else:
         print(f"  {label} listing: {total}/{SKILL_LISTING_BUDGET_CHARS} chars")
+
+    # Warn BEFORE the cap is breached. Without this the failure lands on
+    # whoever adds the next skill rather than on whoever spent the budget,
+    # and its message names no offender -- so the fix reached for under time
+    # pressure is to shorten whatever description that author happens to be
+    # holding, which is the wrong lever (#1702).
+    headroom = SKILL_LISTING_BUDGET_CHARS - total
+    mean_entry = total / len(entries) if entries else 0
+    if 0 <= headroom < SKILL_LISTING_WARN_ENTRIES * mean_entry:
+        fits = int(headroom // mean_entry)
+        room = (
+            "not enough for one more entry"
+            if fits == 0
+            else f"room for about {fits} more"
+        )
+        warnings.append(
+            f"{label}: skill listing has {headroom} chars of headroom, "
+            f"{room} at the current mean of {mean_entry:.0f} chars per entry. "
+            f"Largest: {describe_consumers(entries)}"
+        )
 
 
 def check_skills() -> None:

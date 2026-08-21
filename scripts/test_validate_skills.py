@@ -88,7 +88,13 @@ def run_check_skill(tmpdir: Path, name: str, description: str):
 
 
 def run_listing_budget(tmpdir: Path, entries: list[tuple[str, str]]):
-    """Run the aggregate guard against a synthetic skill catalog."""
+    """Run the aggregate guard against a synthetic skill catalog.
+
+    Returns (errors, warnings) collected for that run, matching `run_check`
+    above. The guard reports over-budget as an error and near-budget as a
+    warning, so a caller that could only see one of the two would need a
+    second, near-identical harness to reach the other.
+    """
     paths = []
     for name, description in entries:
         skill_dir = tmpdir / name
@@ -102,12 +108,14 @@ def run_listing_budget(tmpdir: Path, entries: list[tuple[str, str]]):
     original_root = vs.ROOT
     vs.ROOT = tmpdir
     vs.errors.clear()
+    vs.warnings.clear()
     try:
         vs.check_listing_budget(paths, "synthetic/")
-        return list(vs.errors)
+        return list(vs.errors), list(vs.warnings)
     finally:
         vs.ROOT = original_root
         vs.errors.clear()
+        vs.warnings.clear()
 
 
 def main() -> int:
@@ -223,11 +231,60 @@ def main() -> int:
             > vs.SKILL_LISTING_BUDGET_CHARS,
         )
         entries = [(f"skill-{index}", "x" * 1_000) for index in range(8)]
-        errs = run_listing_budget(tmp / "over-budget", entries)
+        errs, _ = run_listing_budget(tmp / "over-budget", entries)
         check(
             "aggregate listing over the context budget errors",
             len(errs) == 1 and "context budget" in errs[0],
         )
+
+        # The message has to name an offender. Without this the failure lands
+        # on whoever adds the next skill and points at nobody, which is the
+        # whole complaint in #1702.
+        check(
+            "over-budget error names its largest consumer",
+            len(errs) == 1 and "skill-0" in errs[0],
+        )
+        check(
+            "over-budget error reports the per-entry overhead",
+            len(errs) == 1
+            and str(len(entries) * vs.LISTING_ENTRY_OVERHEAD_CHARS) in errs[0],
+        )
+
+        # Ties must break deterministically, or the reported offenders differ
+        # between two runs over the same catalog and read as flapping.
+        tied = [("b-skill", "x" * 50), ("a-skill", "x" * 50), ("c-skill", "x" * 50)]
+        check(
+            "top consumers break ties on name, not dict order",
+            [name for _, name in vs.top_listing_consumers(tied)]
+            == ["a-skill", "b-skill", "c-skill"],
+        )
+        check(
+            "top consumers are capped at the reported limit",
+            len(vs.top_listing_consumers([(f"s{i}", "x" * 10) for i in range(50)]))
+            == vs.TOP_CONSUMERS_REPORTED,
+        )
+
+        # Warn BEFORE the cap breaks, and only then. The negative control is
+        # the second half: a warning that fires on a comfortably-small catalog
+        # would be indistinguishable from one that never fires at all.
+        near = vs.SKILL_LISTING_BUDGET_CHARS - 40
+        _, warns = run_listing_budget(
+            tmp / "near-cap", [("near", "x" * (near - 8 - len("near")))]
+        )
+        check(
+            "listing near the cap warns before it breaks",
+            len(warns) == 1 and "headroom" in warns[0],
+        )
+        check(
+            "near-cap warning names its largest consumer",
+            len(warns) == 1 and "near" in warns[0],
+        )
+        _, warns = run_listing_budget(
+            tmp / "far-from-cap", [("small", "x" * 20)]
+        )
+        check("listing far below the cap does not warn", warns == [])
+        _, warns = run_listing_budget(tmp / "empty-catalog", [])
+        check("empty catalog neither warns nor divides by zero", warns == [])
 
         # Boundary: exactly the limit passes, one character over fails --
         # proves the guard fires on ">", not ">=", the real limit.

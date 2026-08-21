@@ -532,6 +532,59 @@ one who has to write it that way.
 See [`challenge-the-assignment.cases.md`](challenge-the-assignment.cases.md),
 "A recurring brief re-asserted a blocker nobody re-tested".
 
+**A follow-up message is a brief, and it is the higher-risk one --- the guard
+covered only the opening one until 2026-08-20.**
+The section above and the rest of this fragment describe a premise inside the
+brief that *starts* an agent's work.
+`hooks/remind-brief-premises.py` mechanizes exactly that, and it worked: it
+fired on an `Agent` launch and got the launch brief's one corpus claim verified
+before the work began.
+
+The claim that was actually wrong went by a different channel.
+It arrived as a `SendMessage` to the already-running agent, and the hook's
+tool-name gate accepted `Agent` and `Task` only, so nothing looked at it.
+
+Note which way the risk runs, because it is the opposite of what the coverage
+assumed.
+A follow-up message is where **corrections and new premises** land --- it exists
+to change what the recipient believes --- so a false claim in one does not merely
+go unchecked, it *displaces* something the recipient may already have verified,
+and it arrives with the sender's authority freshly attached.
+The opening brief is read by an agent with no context and every reason to
+question it.
+A mid-flight correction is read by an agent that has already accepted the
+sender as a reliable narrator.
+
+The rule was in force and correct throughout.
+What failed was its coverage, so the fix is coverage rather than a new rule:
+the guard now reads `SendMessage`'s `message` field alongside `Agent`/`Task`'s
+`prompt`, and `hooks.json` binds all three matchers.
+Registration is half of that --- widening the script without widening the
+matcher would have changed nothing, and the `Task` branch had in fact been
+unreachable the whole time for exactly that reason.
+
+- **Do:** apply this fragment's premise check to a follow-up message you send,
+  not only to the brief that opened the task.
+- **Do:** re-derive a claim before sending it as a correction, since a
+  correction is trusted more than the thing it corrects.
+- **Don't:** treat a guard's silence as coverage without checking which tools
+  its matcher actually binds.
+- **Don't:** read "the rule exists and I follow it" as sufficient --- both were
+  true here, on the channel the mechanism did not watch.
+
+(Morrison-Lab/ai-config#1795, 2026-08-20.
+A coordinator's follow-up message asserted that this repo's local check does not
+predict its own CI, and instructed filing an issue on that basis.
+It does predict it: [`semantic-line-breaks`](../writing/semantic-line-breaks.md)
+already documents the runnable `gha` gate, which reproduced CI's failure verbatim
+on `bb533295` and passed on `5643a872`.
+The same message's other half was right, and is the reusable part --- the belief
+that `scripts/semantic-line-breaks.py --write` is the pre-push gate is wrong in a
+way that bites: the script has no width policy, so it JOINS hand-wrapped
+sentences and thereby manufactures the long-line-with-a-semicolon violation the
+CI gate rejects, which is how three commits failed that check in one day.
+That fragment's own Don't pair already said not to treat it as the check CI runs.)
+
 ## Relationship to neighbouring rules
 
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise

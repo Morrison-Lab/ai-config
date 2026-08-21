@@ -297,13 +297,42 @@
               "_comment and README): the plugin loads it on enable, and",
               "install-hooks.py --fix registers it for a non-plugin install."
             ]
-          },
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-brief-premises.py\"",
             "timeout": 10,
             "script": "remind-brief-premises.py",
-            "why": "shared/workflow/challenge-the-assignment.md -- remind when an Agent brief asserts corpus state that nothing derived. Injects rather than blocks."
+            "why": "shared/workflow/challenge-the-assignment.md -- reminds when a brief asserts corpus state that nothing derived. Covers SendMessage as well as Agent/Task: a follow-up message to a running agent is where corrections and new premises land, so it is the higher-risk brief (ai-config#1795). Split from the Agent-matcher group so flag-unassigned-worktree.py, which is Agent-only by nature, is not widened with it. Injects rather than blocks."
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-brief-premises.py\"",
+            "timeout": 10,
+            "script": "remind-brief-premises.py",
+            "why": "shared/workflow/challenge-the-assignment.md -- reminds when a brief asserts corpus state that nothing derived. Covers SendMessage as well as Agent/Task: a follow-up message to a running agent is where corrections and new premises land, so it is the higher-risk brief (ai-config#1795). Split from the Agent-matcher group so flag-unassigned-worktree.py, which is Agent-only by nature, is not widened with it. Injects rather than blocks."
+          }
+        ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-brief-premises.py\"",
+            "timeout": 10,
+            "script": "remind-brief-premises.py",
+            "why": "shared/workflow/challenge-the-assignment.md -- reminds when a brief asserts corpus state that nothing derived. Covers SendMessage as well as Agent/Task: a follow-up message to a running agent is where corrections and new premises land, so it is the higher-risk brief (ai-config#1795). Split from the Agent-matcher group so flag-unassigned-worktree.py, which is Agent-only by nature, is not widened with it. Injects rather than blocks."
           }
         ]
       },

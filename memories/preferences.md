@@ -97,7 +97,7 @@
   This is the memory-file record of the triggers in `CLAUDE.md`'s "Run UMS proactively, as learnings accumulate" section (a corrected understanding and a false claim about state both fire immediately); see that section for the full rationale and case records. (User directive / CAI, 2026-08-05).
 - **Proactive Immediate Fixes for Self-Acknowledged / Realized Mistakes (In-Flight Work & Directives)**: Whenever realizing, discovering, or acknowledging a mistake, bug, gap, missed instruction, or oversight in your own in-flight work or directive-following (whether self-discovered or pointed out by the user), take immediate, proactive corrective action to fix it permanently (implement the fix/skill/memory update, commit on a dedicated branch, open a PR, request review, and drive to clean) in the exact same turn without waiting for a user prompt or follow-up instruction. (For out-of-scope codebase bugs discovered incidentally, file a tracking issue per `report-mistakes-proactively` instead). (User directive / correction, 2026-08-17.)
 - **Autonomously commit, push, and open PRs for completed changes**: When asked to implement, edit, or write up changes in a repository on a worktree/feature branch, do not finish the round by leaving modified files sitting uncommitted or unpushed in the working directory. Always finish the delivery cycle: stage and commit the changes (linking the tracking issue created per issue-first; see `shared/workflow/issue-first.md`), push the branch to origin, open a Pull Request (if one does not exist), request AI review (`@claude review` / review workflow), and drive to clean via ARDI. (User directive / CAI, 2026-08-18.)
-- When opening a GitHub PR, trigger AI review (`@claude review` / `@agy review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
+- When opening a GitHub PR, trigger AI review (`@claude review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
   The one exception is `Lacaedemon/sparta`, which never requests human review, on AI review approval or on deadlock escalation alike.
 - **In repos whose review workflow does not auto-trigger on PR activity, ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`) when done pushing code for the round.**
   `ai-config` now auto-reviews ordinary in-repo PR opens and pushes via `pull_request`, so explicit dispatch is the exception rather than the default there.
@@ -169,7 +169,12 @@
 - After creating a PR in a remote/web session (where PR-activity subscription is available), always subscribe to its CI/review activity (`subscribe_pr_activity`) and follow through --- autofix CI failures and address review comments per the ARD framework --- without asking first.
   Keep following until the PR is merged or closed (or I say stop).
   Don't ask "want me to watch it?"; just do it.
-- **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review` / `@agy review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn. If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`). If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke `self-review-fallback` per [`shared/workflow/self-review-fallback.md`](../shared/workflow/self-review-fallback.md); otherwise fix any dispatch/workflow failures discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes. Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer. (User directive / CAI, 2026-08-17.)
+- **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn.
+  If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`).
+  If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke `self-review-fallback` per [`shared/workflow/self-review-fallback.md`](../shared/workflow/self-review-fallback.md).
+  Otherwise fix any dispatch/workflow failures discovered along the way and schedule another timer to maintain continuous monitoring until a review lands, self-review fallback triggers, or CI completes.
+  Never finish a turn leaving in-flight PRs unmonitored without an active scheduled timer.
+  (User directive / CAI, 2026-08-17.)
 
 
 - When there's a well-scoped next step --- a filed follow-up issue, a sequenced item, an obvious continuation of the current work --- just start it; don't pause to ask "want me to keep going?" first.
@@ -570,7 +575,7 @@
   It outranks `hooks/no-unreviewed-pr.py` and `shared/workflow/pr-on-claim.md`'s request-the-reviewer step.
   State the directive as the reason when a PR ships without one, and re-verify at the expiry.
   Full statement, measurements, and Do/Don't pair: [`github.md`](github.md), "Restated and widened 2026-08-19".
-- Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review` / `@agy review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
+- Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
   On workflows with `concurrency: cancel-in-progress` (d-morrison/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
@@ -922,6 +927,16 @@ Both were caught by the `@claude` review bot, not by me --- mentally (or actuall
 
 ## Delegate heavy work to another CLI first --- codex, agy, and now opencode
 
+> [!IMPORTANT]
+> **`agy` (Google Antigravity) is permanently out of service** (user
+> directive, 2026-08-20), confirmed the same day on a dispatched run that
+> ended `request failed (code 429): Your prepayment credits are depleted` and
+> `Execution failed: model unreachable`.
+> Route nothing to it.
+> The mechanics below are kept as measured history rather than as a live
+> destination, so read the ladder as `opencode`, then `codex`, then Claude.
+> Tracked as ai-config#1776.
+
 For heavy, parallelizable **read / draft / verify** work (deep multi-file reading, scoping a backlog, auditing many files, drafting N artifacts, adversarial verification), route it to another agent CLI and spend that budget **before** Claude/Workflow tokens.
 Two of those CLIs are separately-billed plans with usage windows, and the third is free.
 Claude stays the orchestrator (writes prompts, assembles stages, integrates outputs) and is the fallback for any stage the delegate can't finish.
@@ -933,7 +948,7 @@ A third, `opencode`, is free and sits outside that window logic entirely.**
 | CLI | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `agy` (Google Antigravity) | Antigravity | none yet --- mechanics below; the skill is worth writing |
+| `agy` (Google Antigravity) | Antigravity --- **retired, out of service** | none, and none is wanted --- the mechanics below are history |
 | `opencode` | free hosted (opencode Zen) or local (ollama) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 
 Exhaust the *current usage window* of each metered CLI --- roughly 5 hours for codex --- then fall back to Claude until it resets.
@@ -986,7 +1001,7 @@ So a delegate having genuinely done the work does not make the figures it report
 `google-antigravity/antigravity-cli` #76 (closed, 1.0.0) reports `--print` silently emitting nothing on a non-TTY, and #318 (open, 1.0.6) reports it hanging there.
 Neither matches the symptom above --- ours returns prompt content promptly on 1.1.13 --- but both are worth knowing before trusting a headless run, since each fails silently in its own way.
 
-- **Do:** route heavy read/draft/verify work to `codex` and `agy` before Claude, and keep the prompt immediately after `--print` or bind it with `=`.
+- **Do:** route heavy read/draft/verify work to `codex` before Claude, and, where an old `agy` invocation still has to be read, keep the prompt immediately after `--print` or bind it with `=`.
 - **Do:** re-verify any figure a delegate reports, since `agy` miscounted a 73-line file by one while reading it correctly.
 - **Don't:** put another flag between `--print` and the prompt --- that flag becomes the prompt, and the exit status is still 0.
 - **Don't:** read "we have agy quota" as "agy is usable".

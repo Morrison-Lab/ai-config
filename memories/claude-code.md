@@ -766,9 +766,10 @@ the lines immediately outside both boundaries at the source and destination.
 
 (Learned on `Morrison-Lab/gha#547`, 2026-08-21: a step was relocated with a
 Python extraction whose end boundary was the *next* step's `- name:` line, so
-the comment between them travelled too. It ended up describing an unrelated
-step while the step it documented lost its explanation. Every check passed;
-caught by a bot review reading the diff.)
+the comment between them travelled too.
+It ended up describing an unrelated step, while the step it documented lost
+its explanation.
+Every check passed; caught by a bot review reading the diff.)
 
 ## `codex exec`: the auto-mode classifier denies `--sandbox danger-full-access`
 

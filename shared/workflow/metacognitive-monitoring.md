@@ -572,13 +572,30 @@ have helped.
 
 **The specific trap is that a whole-file pattern match silently unions every
 region that matches, and the claim is almost always about one region.**
-That `README.md` carries two pipe-tables: the capability table at lines 44-83,
-and an unrelated one 160 lines later.
-The count summed both.
-A reviewer caught it, and re-deriving it by enumerating **contiguous blocks**
-rather than counting lines gave 38 data rows in the table the claim was about,
-four in the other, and 34 orphaned lines below the blank line that split the
-first --- three different numbers, none of them 46.
+At the commit where the count was taken, that `README.md` held **three**
+disjoint runs of pipe-prefixed lines: the capability table, a blank line
+splitting it in two, and an unrelated table 158 lines further down.
+Enumerating **contiguous blocks** rather than counting lines gives
+`5 + 35 + 6`, which is where the 46 comes from -- 42 data rows and four
+header or separator lines, across a population the sentence described as one
+table.
+
+**The counts a reviewer later checked it against came from a different commit,
+which is the same error one layer up.**
+Two rounds of review were spent on this entry: the first because it never
+named the repository, the second because the figures it did give were drawn
+from more than one file state and presented as a single re-derivation.
+Deriving the whole sequence settles it, and is what should have been written
+the first time:
+
+| Commit | Pipe lines | Blocks |
+| --- | --- | --- |
+| pre-PR `main` | 45 | `5 + 34 + 6` |
+| where 46 was measured | 46 | `5 + 35 + 6` |
+| after the blank line was removed | 46 | `40 + 6` |
+
+The total is unchanged across the last two, which is precisely why an
+unstructured count could not see the defect it was being used to describe.
 
 The remedy is the same one this section already states, applied one step
 earlier: before writing the noun, ask what the command's unit actually was.

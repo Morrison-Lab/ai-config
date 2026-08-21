@@ -72,6 +72,45 @@ The check that separates them is
 `claude plugin list` or the install manifest,
 never a closer reading of the checkout in the working directory.
 
+## A stale branch read that produced two issues and a config edit
+
+Measured 2026-08-20, `Morrison-Lab/wai` and `Morrison-Lab/ai-config`.
+
+A session was asked whether a set of Databricks model-serving endpoints was configured correctly.
+The user pointed at `wai` as the repo holding the notes, and the session ran `cat chapters/ai-tools/byok-vscode-databricks.qmd` in `~/Documents/GitHub/wai`.
+
+That checkout was on `docs/opencode-ollama-setup`, which predates [wai#75](https://github.com/Morrison-Lab/wai/pull/75).
+The branch's version of the chapter carries a per-model table giving `context_length` values of 1,000,000 for the Claude 5 family.
+`main`'s version replaced it with a quota-aware table prescribing **64,000** context, 16,000 output, and a 15,000 ms delay for the Claude, GPT-5, and Gemini tiers, so that one client stays inside a 200,000 ITPM / 20,000 OTPM workspace quota.
+
+Nothing about the read announced the discrepancy.
+The file existed, parsed, and described the right subject in the right vocabulary.
+
+Downstream, before the branch was checked:
+
+- 29 of 41 entries in the live VS Code `settings.json` were rewritten from 64,000 to provider maximums --- reversing a deliberate quota policy.
+- [ai-config#1747](https://github.com/Morrison-Lab/ai-config/issues/1747) was filed asserting the live config had "drifted".
+- [wai#79](https://github.com/Morrison-Lab/wai/issues/79) was filed asserting the chapter's table was missing endpoints, when `main`'s table is organized by quota tier and covers them by group.
+- A branch, a draft PR ([wai#80](https://github.com/Morrison-Lab/wai/pull/80)), and a claim comment were created on that premise.
+
+The session had *also* flagged, in the same reply as the edit, that `delay: 15000` beside `retry.interval_ms: 15000` "reads like a deliberate rate-limit throttle" --- and then overrode its own flag.
+The evidence that would have settled it was in the repo it had already opened.
+
+What exposed it was reading `main` for an unrelated reason: the table looked nothing like the one quoted an hour earlier.
+
+`git reflog` then showed a concurrent session had run `checkout: moving from docs/opencode-ollama-setup to main` **after** the original read.
+That timing matters, and it cuts *for* the fragment's remedy rather than against it: a `rev-parse --abbrev-ref HEAD` run beside the original read would have returned `docs/opencode-ollama-setup` and caught the whole thing.
+The check was not performed at all, so nothing about this incident tests whether checking once per session would have sufficed.
+What the reflog does establish is the separate hazard the fragment's second property names --- the branch moved mid-session, so a check performed at the *first* read would not have described the checkout by the time of a later one.
+
+The live config was then reverted to the backup taken before the edit, byte-identical, restoring all 29 entries to 64,000.
+Re-derived against `main`'s table afterwards, all 41 live entries matched it exactly, with zero mismatches.
+The configuration had been correct the whole time, and the session's own edit was the only thing that had ever made it diverge.
+
+The generalizable point is not that the branch was wrong.
+It is that **a plausible answer is the expected output of this failure**: `docs/opencode-ollama-setup` forked from a `main` the corpus had already described, so the stale table matched prior expectation better than the current one did.
+Confirmation felt like recognition.
+
 ## A stale install diagnosed from an mtime and an absence
 
 Measured on `Morrison-Lab/ai-config`, 2026-08-21 (UTC).

@@ -120,13 +120,15 @@ The per-push rule above governs your own pushing rhythm colliding with your own 
 The concurrency group is keyed on the PR number alone, not on who triggered the run or how, so a **third party's** push into the same PR branch cancels your dispatch exactly as a push of your own would --- even when you have pushed nothing since dispatching.
 On a repo with an active `@claude` agent, the bot itself is such a third party: reacting to review activity, it can push a `main`-sync merge into the PR branch (see [`claim-pr`](claim-pr.md)'s note on this), which is a `synchronize` event and, on a repo that reviews on push, schedules a fresh review run in the same group --- cancelling yours.
 
-The tell: your dispatched run reads `cancelled`, its `headBranch` is the default branch (a `workflow_dispatch` run's ref, not the PR branch), and a newer `pull_request`-event run exists for the same PR, at a newer head.
+The tell: your dispatched run reads `cancelled`, its `headBranch` is whatever ref you dispatched against --- the default branch if you omitted `--ref`, the PR branch if you passed it, so this conjunct alone proves nothing --- and a newer `pull_request`-event run exists for the same PR, at a newer head.
 The right response is to do nothing --- the cancellation is benign, since the newer run supersedes at a better head, and re-dispatching would cancel *that* one instead.
 
-- **Do:** before treating a cancelled dispatch as a lost review, check for a newer `pull_request`-triggered run on the same PR; its existence and its head are the whole explanation.
+- **Do:** before treating a cancelled dispatch as a lost review, check for a newer `pull_request`-triggered run on the same PR.
+  Its existence and its head are the whole explanation.
 - **Do:** re-fetch the PR branch head before concluding a dispatch failed --- a head that moved without you pushing explains a cancellation the per-push rule above cannot.
 - **Don't:** re-dispatch to "fix" a cancelled run that a newer, better-placed run already superseded --- that cancels the survivor instead.
-- **Don't:** read `require-review: failure` on the cancelled run as a live problem; it is a side effect of the superseded run, and the newer run supplies the real verdict.
+- **Don't:** read `require-review: failure` on the cancelled run as a live problem.
+  It is a side effect of the superseded run, and the newer run supplies the real verdict.
 
 See [`ardi.cases.md`](ardi.cases.md), "A third-party push cancels an idle-dispatched review".
 

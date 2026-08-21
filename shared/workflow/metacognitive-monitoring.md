@@ -462,7 +462,7 @@ count as an unmeasured population rather than as a footnote.
 The reason the skips happen deserves its own look, because it is usually a flag
 you added for an unrelated reason.
 `R_PROFILE_USER=/dev/null` bypasses renv, which changes which packages are
-installed, which changes which tests execute --- and none of that is visible at
+available, which changes which tests execute --- and none of that is visible at
 the call site or in the number that comes back.
 Any "skip the environment setup" flag can do this: a `--no-config`, a bare
 interpreter, a container built without the optional extras.

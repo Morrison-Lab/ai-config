@@ -56,7 +56,7 @@ opencode instead reads ai-config through its ordinary config fields plus convent
   ```json
   {
     "$schema": "https://opencode.ai/config.json",
-    "instructions": ["AGENTS.md", "CLAUDE.md", ".ai-config/CLAUDE.md"],
+    "instructions": ["AGENTS.md", "CLAUDE.md", ".ai-config/AGENTS.md", ".ai-config/CLAUDE.md"],
     "skills": {
       "paths": [".ai-config/skills", ".ai-config/shared/sembr-skills/skills"]
     },
@@ -68,7 +68,6 @@ opencode instead reads ai-config through its ordinary config fields plus convent
   ```
 
   To make ai-config available to opencode in **every** project, copy or symlink `skills/` into `~/.config/opencode/skills/` and add `instructions` entries to `~/.config/opencode/opencode.json`.
-
 
 ### Codex wrappers
 

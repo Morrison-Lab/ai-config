@@ -517,20 +517,23 @@ every reply already carried a mechanical marker, the Claude
 Code attribution footer, sitting unused in the same data. Caught only when
 asked directly why the sharper signal hadn't been the first idea.)
 
-## Anchor the discharge as carefully as the trigger --- it is the more expensive half
+## Anchor the discharge as carefully as the trigger --- the discharge is the more expensive half
 
 A guard built from a transcript scan usually has two matchers: one that decides it should **fire**, and one that decides it is already **discharged**.
 The instinct is to spend the care on the trigger, because that is the one whose false positives are visible.
 That instinct is backwards.
 
-**A false trigger costs one note.
-A false discharge costs every remaining warning in the session.**
-The trigger is evaluated per event, so a wrong answer is wrong once.
-The discharge sets *state*: once something in the transcript looks like the check was run, the guard is silent from then on, and its silence is indistinguishable from compliance.
+**A false trigger usually costs one note.
+A false discharge costs every remaining warning in the session, always.**
+The qualifier is load-bearing, and the case record here breaches it.
+A trigger is evaluated per event, so a wrong answer is normally wrong once --- but a trigger that matches *durable* transcript content re-matches on every later turn, which is why `no-unshipped-commit.py` fires permanently rather than once.
+So the asymmetry is not that a trigger cannot fire forever.
+It is that a discharge fires forever *by design*: it is the matcher whose whole job is to set state, so a wrong answer there is unrecoverable rather than merely repeated.
+The discharge sets that *state*: once something in the transcript looks like the check was run, the guard is silent from then on, and its silence is indistinguishable from compliance.
 That is the failure [`deterministic-tools`](../principles/deterministic-tools.md) warns about --- an instrument that has stopped measuring reports the same thing as an instrument reporting all-clear.
 
-Measured 2026-08-20 on [ai-config#1749](https://github.com/Morrison-Lab/ai-config/pull/1749).
-`warn-pr-create-without-dupe-check.py` anchored its trigger to a command position and carried a docstring paragraph explaining why --- this corpus quotes `gh pr create` constantly, so a substring matcher would fire on every reply citing the rule.
+Measured 2026-08-20 on [ai-config#1749](https://github.com/Morrison-Lab/ai-config/pull/1749), which was open at the time of writing --- so the file below is described as that PR proposed it, not as something `main` carries.
+`warn-pr-create-without-dupe-check.py`, in the state that PR put it in, anchored its trigger to a command position and carried a docstring paragraph explaining why --- this corpus quotes `gh pr create` constantly, so a substring matcher would fire on every reply citing the rule.
 Its discharge, in the same file, was a bare substring search:
 
 ```

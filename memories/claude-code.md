@@ -734,6 +734,42 @@ bullet entirely. Caught by a bot review reading the actual diff, then
 independently reconfirmed with `git diff origin/main -- <path>` before
 trusting the follow-up fix.)
 
+## Scripted block move — a marker-delimited range carries its neighbours
+
+The mirror of the two-step-move entry above.
+That one loses content; this one takes content nobody asked it to take, and
+its stated fix does not catch this case: "check the moved content is present
+at its new location" passes cleanly here, because the block *did* arrive
+intact.
+
+Moving a region by script --- extract from marker A to marker B, re-insert
+elsewhere --- takes everything between the two markers, including whatever
+happens to sit just before marker B.
+A comment above the step you chose as the end boundary is the common one,
+since a comment is *attached* to what follows it by convention and *adjacent*
+to it by text, and only the second is visible to a range extraction.
+
+Two things make it hard to see afterwards.
+The diff renders as one moved region rather than a delete here and an add
+there, so nothing in it reads as "this comment changed owner".
+And the result is well-formed --- the comment is still a comment, still above
+a step --- so a syntax check, a linter, and a YAML parse all pass.
+
+The check is to diff for what *else* moved: after a scripted relocation,
+confirm the block's first and last lines are the ones you intended, and read
+the lines immediately outside both boundaries at the source and destination.
+
+- **Do:** choose boundaries that exclude a preceding comment, or re-read both
+  edges of the extracted range before writing.
+- **Don't:** treat "the moved block is intact at its destination" as
+  sufficient --- that is the other entry's check, and it is silent here.
+
+(Learned on `Morrison-Lab/gha#547`, 2026-08-21: a step was relocated with a
+Python extraction whose end boundary was the *next* step's `- name:` line, so
+the comment between them travelled too. It ended up describing an unrelated
+step while the step it documented lost its explanation. Every check passed;
+caught by a bot review reading the diff.)
+
 ## `codex exec`: the auto-mode classifier denies `--sandbox danger-full-access`
 
 Claude Code's auto-mode permission classifier **denies** a `codex exec` invoked

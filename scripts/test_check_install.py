@@ -337,5 +337,129 @@ with tempfile.TemporaryDirectory() as raw:
     _, _, output_second = run_bootstrap_for_skills_json(tmp / "initial")
     check("re-running bootstrap reports skills.json already registered", "already registered" in output_second)
 
+
+# --- worktree resolution (ai-config#1729) -----------------------------------
+#
+# A linked worktree carries its own `scripts/`, so `REPO_ROOT` resolves to the
+# worktree rather than to the checkout `bootstrap.sh` installed from, and every
+# `~/.claude` symlink then reads `misdirected` with nothing misinstalled. The
+# fixture below is a REAL git repository with a REAL linked worktree, because
+# the resolution shells out to `git worktree list` -- a stubbed one would test
+# the test rather than the script.
+
+
+def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-c", "user.email=t@example.com", "-c", "user.name=t",
+         "-c", "commit.gpgsign=false", *args],
+        cwd=repo, capture_output=True, text=True,
+    )
+
+
+def make_worktree_fixture(tmpdir: Path) -> tuple[Path, Path, Path]:
+    """A git repo holding this script under scripts/, plus a linked worktree.
+
+    Returns (main_checkout, linked_worktree, consumer_dir). The consumer dir is
+    installed the way bootstrap.sh installs it: symlinks into the MAIN
+    checkout, which is what makes the worktree run interesting.
+    """
+    main = tmpdir / "repo"
+    (main / "scripts").mkdir(parents=True)
+    (main / "scripts" / "check-install.py").write_text(
+        SCRIPT.read_text(encoding="utf-8"), encoding="utf-8",
+    )
+    write(main / "CLAUDE.md", "root instructions\n")
+    write(main / "shared" / "note.md", "shared note\n")
+
+    # No explicit branch is created: `git init`'s default branch name varies by
+    # git version and by user config, and `checkout -b main` fails outright when
+    # it already matches. Nothing here depends on the name.
+    git(main, "init", "-q")
+    git(main, "add", "-A")
+    git(main, "commit", "-q", "-m", "fixture")
+
+    linked = tmpdir / "linked"
+    git(main, "worktree", "add", "-q", str(linked), "-b", "wt")
+
+    # Untracked, so it exists in the main checkout and in NO worktree. This
+    # reproduces the second half of ai-config#1729: the worktree run enumerated
+    # one entry fewer than the main run (15 versus 16), because a top-level
+    # entry is enumerated from the repo side only. It is what makes the
+    # entry-count assertion below load-bearing rather than vacuous.
+    write(main / "local-only" / "note.md", "untracked local build output\n")
+
+    consumer = tmpdir / "consumer"
+    consumer.mkdir()
+    os.symlink(main / "CLAUDE.md", consumer / "CLAUDE.md")
+    os.symlink(main / "shared", consumer / "shared")
+    os.symlink(main / "local-only", consumer / "local-only")
+    return main, linked, consumer
+
+
+def run_from(checkout: Path, consumer: Path, *extra: str) -> subprocess.CompletedProcess:
+    """Invoke the copy of the script living inside `checkout`, no --repo-root."""
+    return subprocess.run(
+        [sys.executable, str(checkout / "scripts" / "check-install.py"),
+         "--consumer-dir", str(consumer), *extra],
+        capture_output=True, text=True,
+    )
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    main_co, linked_co, wt_consumer = make_worktree_fixture(Path(tmp))
+
+    worktree_created = linked_co.is_dir() and (linked_co / "scripts").is_dir()
+    check("negative control: the linked worktree fixture was actually created",
+          worktree_created)
+
+    # Negative control for the assertion itself. Comparing against the linked
+    # worktree explicitly MUST still report misdirected -- that is the bug's
+    # signature, and a test that cannot produce it cannot detect its absence.
+    forced = run_cli(linked_co, wt_consumer)
+    check("negative control: an explicit worktree root still reports misdirected",
+          "misdirected" in forced.stdout and "0 misdirected" not in forced.stdout)
+
+    from_main = run_from(main_co, wt_consumer)
+    check("main checkout reports no misdirected entries",
+          "0 misdirected" in from_main.stdout)
+
+    from_worktree = run_from(linked_co, wt_consumer)
+    check("run from a linked worktree reports no misdirected entries",
+          "0 misdirected" in from_worktree.stdout)
+    def entry_count(stdout: str) -> str:
+        return stdout.split("checked ")[-1].split(" installed")[0]
+
+    check("negative control: the main run enumerates the untracked entry",
+          entry_count(from_main.stdout) == "4")
+    check("run from a linked worktree enumerates the same entries as main",
+          entry_count(from_worktree.stdout) == entry_count(from_main.stdout))
+    check("run from a linked worktree names the main worktree as its base",
+          str(main_co.resolve()) in from_worktree.stdout)
+    check("run from a linked worktree says which worktree it is running in",
+          "linked worktree" in from_worktree.stdout)
+    check("run from the main checkout stays silent about worktrees",
+          "linked worktree" not in from_main.stdout)
+
+    # An explicit --repo-root is a deliberate retarget and must be taken
+    # literally, or the flag's only purpose is silently defeated.
+    explicit = run_from(linked_co, wt_consumer, "--repo-root", str(linked_co))
+    check("--repo-root is honoured literally, not resolved to the main worktree",
+          "misdirected" in explicit.stdout and "0 misdirected" not in explicit.stdout)
+
+    check("main_worktree() finds the main checkout from a linked worktree",
+          ci.main_worktree(linked_co) == main_co.resolve())
+    check("main_worktree() is identity from the main checkout",
+          ci.main_worktree(main_co) == main_co.resolve())
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    # Outside any repository the answer is not established, so the helper
+    # declines rather than guessing, and the caller keeps its own root.
+    outside = Path(tmp) / "not-a-repo"
+    outside.mkdir()
+    check("main_worktree() returns None outside a git repository",
+          ci.main_worktree(outside) is None)
+
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

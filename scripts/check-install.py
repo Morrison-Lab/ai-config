@@ -65,6 +65,13 @@ left alone; `--fix` never touches it.
 This checks the Claude consumer directory. `bootstrap.sh` also installs Codex
 wrappers into `~/.codex/skills` and skills into `~/.gemini`; those are not
 covered here rather than half-covered. `--consumer-dir` retargets the check.
+
+The comparison base is the repository's **main worktree**, because that is the
+checkout `bootstrap.sh` installed from. A linked worktree carries a `scripts/`
+of its own, so a run started there would otherwise compare against the worktree
+and report every entry `misdirected` with nothing misinstalled -- on essentially
+every session, since `CLAUDE.md` mandates a worktree for multi-file work
+(ai-config#1729). `--repo-root` overrides the base and is taken literally.
 """
 from __future__ import annotations
 
@@ -72,6 +79,7 @@ import argparse
 import hashlib
 import os
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -108,6 +116,42 @@ FIXABLE = ("stale", "unlinked", "missing")
 REPORT_ONLY = ("misdirected", "foreign")
 
 BACKUP_DIR_NAME = ".ai-config-backups"
+
+
+def main_worktree(path: Path) -> Path | None:
+    """The main worktree of the repository containing `path`, or None.
+
+    A linked worktree is a full checkout of the same repository, so a session
+    working in one has a `scripts/` of its own -- and `REPO_ROOT` therefore
+    resolves to the worktree rather than to the checkout `bootstrap.sh`
+    installed from. Every `~/.claude` symlink then resolves outside that root
+    and reads `misdirected`, with nothing actually misinstalled (ai-config#1729).
+
+    `git worktree list --porcelain` names the main worktree on its first
+    `worktree ` line. It is used in preference to `git rev-parse
+    --git-common-dir`'s parent, which is only the main worktree when the common
+    directory happens to be `<main>/.git` -- untrue for a bare repository and
+    for `--separate-git-dir`.
+
+    Returns None whenever the answer is not established: `git` missing, `path`
+    not in a repository, or output in an unexpected shape. The caller keeps its
+    original root in that case, which is the correct base for every
+    non-worktree install, and prints the root it settled on either way.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=path, capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.splitlines():
+        if line.startswith("worktree "):
+            candidate = Path(line[len("worktree "):]).resolve()
+            return candidate if candidate.is_dir() else None
+    return None
 
 
 class Entry:
@@ -335,8 +379,9 @@ def main() -> int:
         help="directory bootstrap.sh installs into (default: $CLAUDE_HOME or ~/.claude)",
     )
     parser.add_argument(
-        "--repo-root", default=str(REPO_ROOT),
-        help="ai-config checkout to compare against (default: this script's repo)",
+        "--repo-root", default=None,
+        help="ai-config checkout to compare against (default: the main worktree "
+             "of this script's repo, since that is what bootstrap.sh installed from)",
     )
     parser.add_argument(
         "--fix", action="store_true",
@@ -350,10 +395,27 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    repo_root = Path(args.repo_root).resolve()
     consumer_dir = Path(args.consumer_dir).expanduser()
 
+    if args.repo_root is not None:
+        # An explicit root is taken literally. Retargeting the check at some
+        # other checkout is the whole point of the flag, and resolving it to a
+        # main worktree would quietly defeat that.
+        repo_root = Path(args.repo_root).resolve()
+    else:
+        # Default: compare against the checkout the consumer directory was
+        # installed from, which is the repository's MAIN worktree. Running from
+        # a linked worktree otherwise reports every entry `misdirected` with
+        # nothing misinstalled (ai-config#1729), and the resulting noise trains
+        # everyone to ignore the one check that catches a real breakage.
+        repo_root = main_worktree(REPO_ROOT) or REPO_ROOT
+
     print(f"ai-config install check: {consumer_dir} vs {repo_root}")
+    if repo_root != REPO_ROOT:
+        # Never silent: the comparison base decides every verdict below, so a
+        # reader in a worktree has to be able to see which checkout answered.
+        print(f"  (running from a linked worktree at {REPO_ROOT}; "
+              f"comparing against the main worktree above)")
 
     if not consumer_dir.is_dir():
         # Not a defect: CI runners and fresh machines have no install yet.

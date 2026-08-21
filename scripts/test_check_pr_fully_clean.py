@@ -1008,6 +1008,150 @@ def main() -> int:
     check("a missing PR number exits 2, distinct from 'not clean'",
           exit_code_of(lambda: checker.parse_args([])) == 2)
 
+    # --- workflow status notices are not reviews (ai-config#1719) -----------
+    #
+    # Measured on ai-config#1841 (2026-08-21): its review quota-skipped four
+    # times, and the checker reported FULLY CLEAN because a skip notice was
+    # admitted as a review, matched HEAD through its own `View run` link, and
+    # carried no finding vocabulary. Five of the six distinct bot comment
+    # shapes on that PR and its siblings are notices rather than reviews.
+    notices = {
+        "dispatch": "\U0001f440 **Claude Review Dispatched** -- [run](https://x) reviewing PR #1.",
+        "quota skip": "> [!WARNING]\n> **Claude review skipped -- API credential or quota unavailable.** [View run](https://x)",
+        "did not finish": "> [!CAUTION]\n> **Claude review did not finish: no verdict, and the denial count was too high to retry.**",
+        "cost": "\U0001f4b0 **Cost:** $2.5898 ([review](https://x)) -- [run](https://x)",
+        "pr preview": "[PR Preview Action](https://github.com/rossjrw/pr-preview-action) v1.8.1 :---: Preview removed.",
+    }
+    for label, body in notices.items():
+        check(f"{label} notice is not admitted as a review",
+              checker.is_non_review_notice(body))
+
+    real_review = (
+        "**Claude finished review** -- [View run](https://x)\n\n"
+        "## Code review\n\nAll good.\n\n### Verdict\n\n**Ready for merge**"
+    )
+    check("negative control: a real review is NOT excluded",
+          not checker.is_non_review_notice(real_review))
+
+    # The precedence case. A review of THIS corpus routinely quotes the notices,
+    # because the notices are what these checks are about -- so a prefix-window
+    # match alone would turn a false clean into a false "no review at HEAD".
+    review_quoting_notices = (
+        "**Claude finished review** -- [View run](https://x)\n\n"
+        "The run posted a \U0001f440 **Claude Review Dispatched** notice and then a "
+        "**Claude review skipped** warning.\n\n### Verdict\n\n**Ready for merge**"
+    )
+    check("a real review that QUOTES a notice stays a review",
+          not checker.is_non_review_notice(review_quoting_notices))
+    check("negative control: that body really does contain a notice marker",
+          "claude review dispatched" in review_quoting_notices.lower())
+
+    # A notice marker far into a non-agent body is a mention, not a notice, so
+    # the window has to bound the match rather than the whole body.
+    late_mention = ("Some analysis.\n\n" + ("x" * 300)
+                    + "\n\n\U0001f440 **Claude Review Dispatched**")
+    check("a notice marker beyond the prefix window is a mention, not a notice",
+          not checker.is_non_review_notice(late_mention))
+    check("negative control: the late mention really is past the window",
+          late_mention.lower().index("claude review dispatched")
+          > checker.NOTICE_PREFIX_WINDOW)
+
+    # End-to-end: the #1841 scenario driven through check_review_comments, not
+    # just through the helper. This is the shape that reported FULLY CLEAN --
+    # a skip notice citing the head SHA, and nothing else.
+    skip_at_head = {
+        "createdAt": "2026-08-21T21:13:36Z",
+        "author": {"login": "github-actions"},
+        "body": ("> [!WARNING]\n> **Claude review skipped -- API credential or "
+                 "quota unavailable.** Re-trigger by pushing. Reviewed sha123. "
+                 "[View run](https://x)"),
+    }
+    mock_skip_only = json.dumps({"comments": [skip_at_head], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_skip_only):
+        skip_ok, skip_issues = checker.check_review_comments("1841", "sha123", TEST_REPO)
+    check("a skip notice alone does NOT report clean",
+          not skip_ok and len(skip_issues) > 0)
+    check("and it is reported as no review, not as a clean one",
+          any("No automated review" in i or "No review comment" in i
+              for i in skip_issues))
+
+    # Negative control, MINIMAL: the identical body with only the marker phrase
+    # deleted. It must read clean, which is what proves the assertion above is
+    # about the marker rather than about some other property of the fixture.
+    #
+    # The earlier version of this control substituted a whole different body (an
+    # Antigravity report with an explicit `Verdict: Clean`), so it routed through
+    # the precedence branch and never exercised the marker window at all. A
+    # mutation check found it inert: with NON_REVIEW_NOTICE_MARKERS replaced by
+    # absurd values it still passed. Caught by review on ai-config#1862, and it
+    # is the reason this control now differs from the fixture by one phrase.
+    control = dict(skip_at_head,
+                   body=skip_at_head["body"].replace("Claude review skipped", "Status"))
+    check("negative control differs from the fixture by only the marker phrase",
+          "claude review skipped" not in control["body"].lower()
+          and len(control["body"]) > 0.8 * len(skip_at_head["body"]))
+    with patch.object(checker, "run_cmd",
+                      return_value=json.dumps({"comments": [control], "reviews": []})):
+        ctrl_ok, _ = checker.check_review_comments("1841", "sha123", TEST_REPO)
+    check("negative control: the same body without the marker DOES read clean",
+          ctrl_ok)
+
+    # --- review findings on #1862 ------------------------------------------
+    #
+    # Finding 1. self-review-fallback.md tells a session to post a fallback
+    # self-review when the reviewer quota-skips, and the natural opening names
+    # the notice it stands in for. The precedence guard used the 3 narrow agent
+    # markers while ADMISSION used a wider body-marker set, so such a review was
+    # dropped entirely -- verdict and all. A dropped `Needs more work` is worse
+    # than the false clean this PR exists to fix, since it also erases the
+    # verdict from check_latest_verdict's history.
+    fallback_self_review = (
+        "The reviewer posted `Claude review skipped -- API quota exhausted`, so "
+        "I am posting a fallback self-review.\n\n### Verdict: Needs more work"
+    )
+    check("a self-review QUOTING the skip notice is not excluded",
+          not checker.is_non_review_notice(fallback_self_review))
+    check("negative control: it carries no known agent marker, so the wide "
+          "body-marker predicate is what saves it",
+          checker._detect_review_agent(fallback_self_review) is None
+          and checker.has_review_body_marker(fallback_self_review))
+    check("and it still classifies as not-clean",
+          checker.classify_verdict(fallback_self_review) == "not-clean")
+
+    # The two predicates must not drift apart again: anything wide enough to be
+    # ADMITTED as a review must be wide enough to be PROTECTED from exclusion.
+    for marker in checker.REVIEW_BODY_MARKERS:
+        body = f"\U0001f440 **Claude Review Dispatched** and {marker} here"
+        check(f"a body carrying the admission marker {marker!r} is not excluded",
+              not checker.is_non_review_notice(body))
+
+    # Finding 2. The AGENT workflow's quota notice, a distinct shape from the
+    # review workflow's, documented in the same fragment.
+    spend_limit = {
+        "createdAt": "2026-08-21T21:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": "You've hit your org's monthly spend limit. Reviewed sha123. [View run](https://x)",
+    }
+    check("the spend-limit notice is not admitted as a review",
+          checker.is_non_review_notice(spend_limit["body"]))
+    with patch.object(checker, "run_cmd",
+                      return_value=json.dumps({"comments": [spend_limit], "reviews": []})):
+        spend_ok, spend_issues = checker.check_review_comments("1841", "sha123", TEST_REPO)
+    check("a spend-limit notice alone does NOT report clean",
+          not spend_ok and len(spend_issues) > 0)
+
+    # Every KNOWN REVIEW AGENT must be protected from notice exclusion too.
+    # Review on #1862 observed that the `_detect_review_agent(body) or` clause is
+    # redundant today, since each agent marker happens to contain a body marker.
+    # That is a coincidence of the current tables rather than an invariant, so
+    # this pins the property the clause exists for: it passes today through
+    # either branch, and keeps passing if an agent marker is added that no body
+    # marker covers.
+    for agent_marker in checker.REVIEW_AGENT_MARKERS:
+        body = f"\U0001f440 **Claude Review Dispatched**\n\n{agent_marker} ..."
+        check(f"a body carrying the agent marker {agent_marker!r} is not excluded",
+              not checker.is_non_review_notice(body))
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

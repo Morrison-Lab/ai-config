@@ -160,6 +160,61 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
 }
 
 
+# Workflow STATUS notices, which are not reviews. Every one of these is posted
+# by `github-actions[bot]`, so the comment-admission test below -- bot author OR
+# a review-header marker -- admits them all on author alone, and a notice that
+# happens to carry no finding vocabulary then reads as a clean review.
+#
+# Measured on ai-config#1841, #1845 and #1853 (2026-08-21): of the six distinct
+# bot comment shapes those PRs carry, exactly ONE is a review. A PR whose review
+# quota-skipped four times reported FULLY CLEAN, because the skip notice was
+# admitted, matched HEAD through its own `View run` link, and contained no
+# findings (ai-config#1719).
+#
+# Matched against a PREFIX WINDOW rather than the whole body, because this
+# corpus quotes these strings constantly -- a real review discussing a dispatch
+# notice must stay a review. A notice always leads with its marker; a review
+# always leads with `**Claude finished`, which is deliberately absent here.
+NON_REVIEW_NOTICE_MARKERS = (
+    "claude review dispatched",
+    "claude review skipped",
+    "claude review did not finish",
+    # The AGENT workflow's quota shape, distinct from the review workflow's
+    # wording above. self-review-fallback.md documents both and says "Both mean
+    # no bot will respond on this run", so covering one and not the other left
+    # the identical false clean reachable through the other notice
+    # (review finding on ai-config#1862). scripts/pr-sweep.py's REFUSAL_MARKERS
+    # already carried "spend limit" for the same reason.
+    "spend limit",
+    "[pr preview action]",
+    "**cost:**",
+)
+
+NOTICE_PREFIX_WINDOW = 200
+
+# The body markers that make a comment look like a review regardless of author.
+# Shared by the admission test and by is_non_review_notice()'s precedence guard,
+# because those two must agree: anything wide enough to be ADMITTED as a review
+# has to be wide enough to be PROTECTED from notice exclusion. They disagreed
+# once, and a self-review opening by quoting the skip notice it was standing in
+# for -- which self-review-fallback.md tells you to write -- was dropped
+# entirely, verdict and all (review finding on ai-config#1862).
+REVIEW_BODY_MARKERS = (
+    "\U0001f916",
+    "### \U0001f916",
+    "code review",
+    "**claude finished",
+    "### verdict",
+    "verdict:",
+)
+
+
+def has_review_body_marker(body: str) -> bool:
+    """True when *body* carries a marker that makes it read as a review."""
+    body_lower = body.lower()
+    return any(marker in body_lower for marker in REVIEW_BODY_MARKERS)
+
+
 def _detect_review_agent(body: str) -> Optional[str]:
     """Return the agent name if *body* contains a known review agent marker.
 
@@ -173,6 +228,33 @@ def _detect_review_agent(body: str) -> Optional[str]:
         if marker in body_lower:
             return name
     return None
+
+
+def is_non_review_notice(body: str) -> bool:
+    """True when *body* is a workflow status notice rather than a review.
+
+    A known review-agent marker takes PRECEDENCE and settles it immediately: a
+    real review that DISCUSSES a dispatch or skip notice -- which any review of
+    this corpus routinely does, since the notices are what these checks are
+    about -- must stay a review. Without that precedence a review quoting
+    `Claude Review Dispatched` in its opening paragraph was excluded outright,
+    turning a false clean into a false "no review at this HEAD".
+
+    Only then is the prefix window consulted. A notice leads with its marker,
+    so a window bounds the match rather than letting a mention anywhere in a
+    long body decide.
+    """
+    # The agent check is redundant TODAY -- every REVIEW_AGENT_MARKERS entry
+    # happens to contain a REVIEW_BODY_MARKERS entry, so the second call decides
+    # every case. It stays because the redundancy is a coincidence of the current
+    # marker values, not an invariant: a new agent marker that is not a superset
+    # of some body marker would recreate the precedence gap this round existed to
+    # close. A test pins the property rather than leaving it to whoever edits the
+    # marker tables next.
+    if _detect_review_agent(body) or has_review_body_marker(body):
+        return False
+    head = body[:NOTICE_PREFIX_WINDOW].lower()
+    return any(marker in head for marker in NON_REVIEW_NOTICE_MARKERS)
 
 
 def _resolve_run_head_sha(body: str, repo: str, branch: str = "") -> Optional[str]:
@@ -662,6 +744,10 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         if "ard review disposition summary" in body_lower:
             continue
 
+        # A workflow status notice is not a review, whoever posted it.
+        if is_non_review_notice(body):
+            continue
+
         is_bot_author = _is_bot_author(author_login)
         # "**claude finished" and "### verdict" are the canonical review markers
         # CLAUDE.md prescribes ("Completed runs start the body with
@@ -672,7 +758,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # review comments were posted under a human login and both verdict-bearing
         # ones carried "### Verdict" -- so admission failed, all_items was empty,
         # and every body-content criterion below was evaluated over nothing.
-        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "**claude finished", "### verdict", "verdict:"))
+        is_review_header = has_review_body_marker(body)
 
         if is_bot_author or is_review_header:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))

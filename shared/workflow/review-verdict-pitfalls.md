@@ -1270,6 +1270,19 @@ if they differ, expect to spend another.
 - **Don't:** treat the block as a standing state to wait out; nothing further
   will happen to it on its own.
 
+(Measured 2026-08-20 on
+[ai-config#1744](https://github.com/Morrison-Lab/ai-config/pull/1744).
+Attempt 6 at head `5ec9cf26` reported "found nothing to flag" and then
+"**Blocked on human review** ... depends on that still-unresolved automated
+check", which was `review / claude-review` --- its own job, green within the
+minute.
+The head then moved to `2d263683` on a base-sync before that verdict could be
+used.
+Attempt 7 at the new head returned **Ready for merge** with zero findings,
+having re-verified every citation independently rather than inheriting the
+prior round's conclusion.
+The PR's content was identical across both, at 2 files and 39 insertions.)
+
 **A verdict that writes out its own discharging condition is the same block, and
 it is the form that gets merged on.**
 The case above is stated over a **bare** block --- a verdict naming a pending
@@ -1314,17 +1327,18 @@ merged history says so.
 
 (Measured 2026-08-21 on ai-config
 [#1749](https://github.com/Morrison-Lab/ai-config/pull/1749) and
-[#1791](https://github.com/Morrison-Lab/ai-config/pull/1791), which were merged
-this way minutes apart, at `131f1377` and `d0682800`.
+[#1791](https://github.com/Morrison-Lab/ai-config/pull/1791), merged this way
+28 seconds apart at `131f1377` and `d0682800` ---
+`07:12:00Z` and `07:12:28Z`, read from each PR's own `merged_at`.
 Both verdicts read **Needs more work** and named the reviewer's own
 `review / claude-review` job as the sole blocker;
 both jobs had concluded `success` before the merge, verified from the check-runs
 endpoint.
 The session that merged them never consulted this section.
 It recognized the shape, reasoned the case out from first principles, and
-reproduced the argument two paragraphs above --- that the blocking premise
-expires before you can act on it --- which this fragment grants and then
-rejects.
+reproduced this case's own "Read the reason, not just the verdict word"
+argument --- that the blocking premise expires before you can act on it.
+That is the premise this fragment grants and then rejects.
 Reaching the midpoint of a settled argument reads from the inside as having
 thought it through.
 Tracked as [#1827](https://github.com/Morrison-Lab/ai-config/issues/1827), where
@@ -1332,16 +1346,3 @@ the alternative reading --- that a stated condition amounts to a conditional
 approval --- was considered and declined:
 a rule that survives only until someone finds its own reasoning persuasive is
 not doing any work.)
-
-(Measured 2026-08-20 on
-[ai-config#1744](https://github.com/Morrison-Lab/ai-config/pull/1744).
-Attempt 6 at head `5ec9cf26` reported "found nothing to flag" and then
-"**Blocked on human review** ... depends on that still-unresolved automated
-check", which was `review / claude-review` --- its own job, green within the
-minute.
-The head then moved to `2d263683` on a base-sync before that verdict could be
-used.
-Attempt 7 at the new head returned **Ready for merge** with zero findings,
-having re-verified every citation independently rather than inheriting the
-prior round's conclusion.
-The PR's content was identical across both, at 2 files and 39 insertions.)

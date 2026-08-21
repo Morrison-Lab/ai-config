@@ -853,6 +853,33 @@ outright --- a function's behaviour versus a directory's contents, a model
 versus a population, a difference versus a currency --- so no judgment about
 degree is needed.
 
+### The subset case, and why it is the sharpest form
+
+Three of the four recorded instances join two subjects that are plainly
+different kinds of thing --- a function's behaviour and a directory's contents,
+a model and a population, a difference and a currency.
+The fourth joins a set to a **superset of itself**, and that is harder to see,
+because nothing about the sentence changes register.
+
+`git branch -r --contains <sha>` is a complete and correct enumeration of the
+branches containing a commit.
+Reporting it as no ref containing that commit is one word wider, and the
+excluded members --- `refs/pull/<N>/head`, notes, tags, the reflog --- are
+precisely where the answer lived.
+The default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so
+`refs/pull/*` is never fetched into a clone at all, which means the null result
+was guaranteed independently of the fact being claimed.
+That is the same "could this check have returned anything else, if the claim
+were true" question the retraction-reach section asks, arriving here through a
+sound positive-scope command rather than through a mis-pointed one.
+
+Naming the population is a cheaper remedy than the two-sentence test and covers
+this case exactly, because the two sentences would otherwise differ only in a
+single noun.
+It also produces a claim a reader can falsify without re-running anything,
+which is the property [`grep-is-not-coverage`](grep-is-not-coverage.md) asks
+for when it says to report the query rather than the conclusion.
+
 ### Why this is not mechanizable
 
 Stating the limit explicitly, per

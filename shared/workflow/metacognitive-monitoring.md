@@ -433,6 +433,25 @@ Composing them is cheap, and it is the whole of the remedy --- what defeats
 every other check here is that such a claim never presents itself as
 unsupported.
 
+**Where the two subjects are the same kind of thing, the test reduces to naming
+the population, and the widening is usually one word.**
+`git branch -r --contains <sha>` enumerates the **branches** containing a
+commit, correctly and completely.
+Reporting that as no **ref** containing it silently enlarges the population to
+a superset --- one whose excluded members, `refs/pull/<N>/head` among them, are
+exactly the ones the question turned on.
+So write the population your command actually enumerated into the same sentence
+as the claim.
+"No branch contains it" and "no ref contains it" differ by one word, and the
+first is the one you measured.
+
+That makes this the **scope** claim type's composition-time counterpart rather
+than a rival to it.
+Scope says to check the population instead of recalling it, and assumes the
+population in the claim is the one you meant.
+This fires when the command's population and the sentence's population are two
+different sets, and the sentence never names either.
+
 - **Do:** write what the measurement establishes and what you are claiming as
   two separate sentences, and confirm the second does not reach past the first.
 - **Do:** measure the illustrating instance separately whenever a verified
@@ -440,17 +459,23 @@ unsupported.
   about which files exhibit it.
 - **Do:** name the axis a provenance or freshness check covered, because such a
   check usually settles one axis and is silent about the others.
+- **Do:** write the population your command enumerated into the sentence that
+  reports it --- branches rather than refs, tracked files rather than files,
+  open PRs rather than PRs.
 - **Don't:** let a real measurement lend its credibility to the sentence
   standing next to it --- adjacency in a paragraph is not support.
 - **Don't:** treat a retraction as exempt.
   Concluding that something is *wrong* from a measurement that established only
   a *difference* is this same overreach pointed the other way.
+- **Don't:** read a correct, complete enumeration as covering the superset it
+  sits inside --- completeness is a property of the population the command
+  took, not of the one your sentence names.
 - **Don't:** reach for [`grep-is-not-coverage`](grep-is-not-coverage.md) here.
   That fragment governs a **null** result read as nonexistence, where this
   fires on a positive result read as a neighbouring fact.
 
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
-"Three sound measurements, three claims beside them".
+"Four sound measurements, four claims beside them".
 
 ## Writing is the instrument, when the claim can be wrong
 

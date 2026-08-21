@@ -543,15 +543,17 @@ A 503 is transient, so a re-run should simply work.
 A single `rerun_failed_jobs` recovered the run and the verdict posted, which
 the 503 diagnosis predicted and the `PR_NUMBER` diagnosis ruled out.
 
-## Three sound measurements, three claims beside them
+## Four sound measurements, four claims beside them
 
 `ucdavis/bcs`, 2026-08-19/20.
-One session produced the same error three times, in three unrelated domains,
+One session produced the same error four times, in four unrelated domains,
 each instance surviving self-review.
 The recurrence is what makes it a case record: per
 [`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence
 bar, a third instance is the point at which the shape gets written down rather
 than fixed one more time.
+The fourth arrived while this entry was being written, which is itself evidence
+about how easily the shape passes self-review.
 
 **Instance 1 --- a verified mechanism, an unverified instance.**
 Roxygen prose claimed that this repo's own symbol tracer beats
@@ -590,9 +592,44 @@ Which one is current is a separate fact the session did not hold, and the
 maintainer confirmed the extract actually used was the correct one --- the
 documentation relied on for the retraction was the stale half.
 
-Instance 3 is the one that fixes the shape as an inference error rather than as
-optimism.
+Instances 3 and 4 are the two that fix the shape as an inference error rather
+than as optimism.
 Here the overreach ran toward **alarm**: it retracted a true result, in public,
 on the strength of a sound measurement of something else.
 A rule watching for over-claiming would have passed it, and the act of
 retracting made it feel more careful than the claim it replaced.
+
+**Instance 4 --- a complete enumeration of branches, reported as an
+enumeration of refs.**
+A commit carrying a leaked credential (`5da971a1`) was squash-merged and its
+PR closed.
+`git branch -r --contains 5da971a1` returned nothing, and that was reported to
+the maintainer as the commit being "no longer reachable from any remote ref",
+with the exposure closed as far as git could close it.
+`check-secrets` flagged the same six findings on the next PR.
+
+This is the sharpest of the four, because the measurement has no defect at all.
+`git branch -r --contains` correctly enumerates the branches containing a
+commit, and it returned the right answer for that question.
+The claim was about **refs**.
+Branches are a proper subset of refs, and the excluded subset is the one that
+decides this particular question: GitHub retains `refs/pull/<N>/head`
+permanently, and closing a PR or deleting its branch does not remove it.
+The default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so
+`refs/pull/*` is never fetched and `git branch -r` cannot see it whatever the
+repository state.
+The other three instances admit an argument that the measurement was
+incomplete.
+Here it was complete and correct for its own scope, and the scope was silently
+widened by one word in the sentence that reported it.
+
+The consequence was operational rather than only epistemic.
+The conclusion licensed a recommendation *against* adding `.gitleaksignore`
+entries, on the reasoning that squashing would clear the finding.
+It does not, so the repository carries a permanently red security check until
+the allowlist lands --- the opposite of what was advised.
+
+Writing the population into the sentence is the whole fix, and it costs one
+word.
+"No branch contains it" and "no ref contains it" differ by one word, and the
+first is what the command established.

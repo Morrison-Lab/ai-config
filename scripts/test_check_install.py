@@ -446,6 +446,32 @@ with tempfile.TemporaryDirectory() as tmp:
 
 
 with tempfile.TemporaryDirectory() as tmp:
+    # BOTH sides of the comparison must be resolved. A checkout reached through
+    # a symlink -- macOS routes /var through /private/var, and an aliased ~/src
+    # does the same on any platform -- otherwise compares unequal, and a correct
+    # install reads `misdirected`. Invisible on Linux CI, which has no such
+    # aliasing, so it needs pinning here rather than being left to the fixture.
+    real = Path(tmp) / "real"
+    (real / "repo" / "shared").mkdir(parents=True)
+    write(real / "repo" / "CLAUDE.md", "root instructions\n")
+    write(real / "repo" / "shared" / "note.md", "shared note\n")
+    alias = Path(tmp) / "alias"
+    os.symlink(real, alias)
+
+    aliased_consumer = Path(tmp) / "aliased-consumer"
+    aliased_consumer.mkdir()
+    os.symlink(real / "repo" / "CLAUDE.md", aliased_consumer / "CLAUDE.md")
+    os.symlink(real / "repo" / "shared", aliased_consumer / "shared")
+
+    check("negative control: the alias really is a symlink to a different path",
+          alias.is_symlink() and alias.resolve() != alias)
+    aliased = {e.label: e.status
+               for e in ci.collect(alias / "repo", aliased_consumer)}
+    check("a repo root reached through a symlink is not misdirected",
+          aliased.get("CLAUDE.md") == "ok" and aliased.get("shared") == "ok")
+
+
+with tempfile.TemporaryDirectory() as tmp:
     # Outside any repository the answer is not established, so the helper
     # declines rather than guessing and the caller keeps its own root.
     outside = Path(tmp) / "not-a-repo"

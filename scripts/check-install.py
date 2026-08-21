@@ -234,12 +234,32 @@ def child_names(path: Path, dirs_only: bool) -> set[str]:
 
 
 def resolves_into_repo(link: Path, repo_roots: set[Path]) -> bool:
-    """True when `link` resolves into any accepted working tree of this repo."""
+    """True when `link` resolves into any accepted working tree of this repo.
+
+    BOTH sides are resolved. Resolving only the link made the comparison unsound
+    whenever the checkout itself was reached through a symlink -- macOS routes
+    `/var` through `/private/var`, so a correct install under a temp or aliased
+    path compared unequal and every entry read `misdirected`. That is this
+    check's headline false positive, and it was invisible on Linux CI where the
+    aliasing does not occur.
+
+    Roots are resolved here rather than once by the caller because `classify()`
+    is called directly by `check-harness-installs.py` too, and a contract that
+    depends on the caller having normalized its input is one that will be broken
+    again by the next caller.
+    """
     try:
         target = link.resolve()
     except OSError:
         return False
-    return any(target == root or root in target.parents for root in repo_roots)
+    for root in repo_roots:
+        try:
+            resolved_root = root.resolve()
+        except OSError:
+            continue
+        if target == resolved_root or resolved_root in target.parents:
+            return True
+    return False
 
 
 def classify(repo_path: Path | None, install_path: Path, group: str, name: str,

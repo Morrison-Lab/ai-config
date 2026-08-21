@@ -112,7 +112,12 @@ _SLASH = ("//", "/*", "*")
 COMMENT_MARKERS = {
     ".py": _HASH, ".sh": _HASH, ".bash": _HASH, ".zsh": _HASH,
     ".sbatch": _HASH, ".slurm": _HASH,
-    ".r": _HASH, ".rmd": _HASH, ".qmd": _HASH,
+    ".r": _HASH,
+    # .Rmd/.qmd are Markdown-derived: outside an R code chunk `#` starts a
+    # HEADING, not a comment, so mapping them to _HASH reproduces exactly
+    # the false positive `.md` is special-cased to avoid. Use the HTML
+    # comment marker, which is the only comment form valid in their prose.
+    ".rmd": ("<!--",), ".qmd": ("<!--",),
     ".yml": _HASH, ".yaml": _HASH, ".toml": _HASH, ".cfg": _HASH,
     ".ini": _HASH, ".conf": _HASH, ".pl": _HASH, ".rb": _HASH,
     ".mk": _HASH, ".dockerfile": _HASH, ".gitignore": _HASH,
@@ -322,7 +327,14 @@ def _git_diff(stages_tracked):
     args = ["git", "diff", f"-U{WINDOW}"]
     args.append("HEAD" if stages_tracked else "--cached")
     try:
-        out = subprocess.run(args, capture_output=True, text=True, timeout=10)
+        # errors="replace" is load-bearing, not tidiness. This is the first
+        # guard in the family to pipe raw file CONTENT through text=True
+        # (the siblings read only git-quote-escaped `git status` paths), so
+        # a staged non-UTF-8 byte would raise UnicodeDecodeError -- a
+        # ValueError, which the except below does not catch -- and crash the
+        # hook, breaking the fail-open guarantee the docstring promises.
+        out = subprocess.run(args, capture_output=True, text=True,
+                             timeout=10, errors="replace")
     except (OSError, subprocess.SubprocessError):
         return None
     if out.returncode != 0:
@@ -362,7 +374,8 @@ def run_cli(argv):
     """Read a unified diff from a file or stdin; exit 1 on any finding."""
     target = argv[0]
     try:
-        diff_text = sys.stdin.read() if target == "-" else open(target).read()
+        diff_text = (sys.stdin.read() if target == "-"
+                     else open(target, errors="replace").read())
     except OSError as exc:
         print(f"flag-stale-adjacent-comment: cannot read {target} ({exc})",
               file=sys.stderr)

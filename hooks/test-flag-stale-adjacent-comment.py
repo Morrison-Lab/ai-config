@@ -5,9 +5,13 @@ block above `#SBATCH --array=1-25%6`, and that directive changed to `%20`,
 reproduced as the unified diff `git diff --cached -U10` would emit for it.
 Per `shared/workflow/algorithmatize-checks.md`'s "Test the instrument against
 the incident that prompted it, verbatim", the fixture carries the real comment
-text rather than a summary -- including the `192G` arithmetic, which is a
-SECOND stale literal the check happens to catch, and the `32G`, which is NOT
-stale and must not be reported.
+text rather than a summary -- including the `192G` arithmetic and the `32G`,
+neither of which is reported.
+`192` is not caught and structurally cannot be: it never appears on a REMOVED
+line, only inside the unchanged comment, and M3 builds `old_lits` as
+`removed_lits - added_lits`, so a literal that is never removed can never
+become old. The check reports exactly one literal here, `6`, which the
+incident-literal assertion below pins.
 
 Most cases run against `findings()` over a diff string, because the detector
 is pure over the diff. Two cases run the hook end-to-end through its JSON
@@ -63,7 +67,7 @@ INCIDENT = hunk("data-raw/ab507bs-imp.sbatch", """\
  # node with an unkillable process stuck on network I/O.
 -#SBATCH --array=1-25%6
 +#SBATCH --array=1-25%20
- #SBATCH --mem=32G
+ #SBATCH --mem-per-cpu=32G
 """)
 
 # Case 2 -- negative control: the comment was updated in the same diff, so the
@@ -148,6 +152,15 @@ MARKDOWN_HEADING = hunk("docs/notes.md", """\
 +version = 20
 """)
 
+# A .qmd is Markdown-derived, so `#` opens a heading rather than a comment.
+# Mapping .rmd/.qmd to `#` reproduced markdown_heading's false positive one
+# extension over; this pins the fix.
+QUARTO_HEADING = hunk("analysis/report.qmd", """\
+ # Release 6 notes
+-version = 6
++version = 20
+""")
+
 CASES = [
     ("incident", INCIDENT, True),
     ("comment_updated_too", UPDATED_TOO, False),
@@ -159,6 +172,7 @@ CASES = [
     ("bare_word", BARE_WORD, False),
     ("substring_only", SUBSTRING_ONLY, False),
     ("markdown_heading", MARKDOWN_HEADING, False),
+    ("quarto_heading", QUARTO_HEADING, False),
 ]
 
 
@@ -179,7 +193,7 @@ STALE_FILE = """\
 # setup/output .rds files -- an unbounded array here previously drained a
 # node with an unkillable process stuck on network I/O.
 #SBATCH --array=1-25%{cap}
-#SBATCH --mem=32G
+#SBATCH --mem-per-cpu=32G
 """
 
 
@@ -232,10 +246,12 @@ def end_to_end_results():
 MUTATIONS = [
     # M3: stop subtracting the added literals, so any literal on a removed
     # line counts as "old" -- `literal_survives` starts reporting.
-    # `comment_updated_too` does NOT flip, and deliberately is not claimed to:
-    # its comment moved in the same diff, so there is no CONTEXT comment line
-    # for M5 to search, and M3 never gets consulted. Its coverage comes from
-    # the M5 marker mutation instead.
+    # `comment_updated_too` does NOT flip, and deliberately is not claimed to.
+    # The reason is narrower than "M3 is never consulted": UPDATED_TOO's first
+    # line `#!/bin/bash` IS an unchanged comment line, so M5 finds it and M3
+    # does run. It does not flip because `_boundary_match("6", "#!/bin/bash")`
+    # is False -- the literal simply does not occur in the shebang text.
+    # Its coverage comes from the M5 marker mutation instead.
     ("M3 old-literal subtraction",
      "old_lits = removed_lits - added_lits",
      "old_lits = removed_lits",
@@ -252,11 +268,13 @@ MUTATIONS = [
      "    return literal in text",
      {"substring_only"}),
     # M5: treat every file's `#` as a comment marker regardless of extension,
-    # so a Markdown heading is read as a comment.
+    # so a Markdown heading is read as a comment. Both Markdown-derived cases
+    # flip, which is what pins .rmd/.qmd to the HTML comment marker rather than
+    # to `#`.
     ("M5 per-extension markers",
      'COMMENT_MARKERS.get(ext, DEFAULT_MARKERS)',
      'DEFAULT_MARKERS',
-     {"markdown_heading"}),
+     {"markdown_heading", "quarto_heading"}),
 ]
 
 
@@ -352,7 +370,9 @@ def main():
 
     failures += run_mutations(baseline)
 
-    total = len(CASES) + len(MUTATIONS) + 6
+    # +5: 2 incident-literal checks and 3 end-to-end checks. Was +6, which
+    # reported 20 while printing 19 PASS lines.
+    total = len(CASES) + len(MUTATIONS) + 5
     if failures:
         print(f"{failures} failure(s) across {total} checks")
         return 1

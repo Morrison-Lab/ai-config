@@ -119,6 +119,11 @@ rule, since every other session still runs on the prose alone.
 
 ## Offering to hand over work you have already finished
 
+The general rule is [`no-cop-out-offers`](no-cop-out-offers.md), which covers
+any offer to do already-authorized work and carries the `Stop` hook this
+section anticipates.
+This section is the sharpest instance of it: the artifact already exists.
+
 Both sections above concern work not yet done, where the offer at least
 proposes spending something.
 The version that survives them offers an artifact that **already exists**:

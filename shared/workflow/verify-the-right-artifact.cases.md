@@ -110,3 +110,58 @@ The configuration had been correct the whole time, and the session's own edit wa
 The generalizable point is not that the branch was wrong.
 It is that **a plausible answer is the expected output of this failure**: `docs/opencode-ollama-setup` forked from a `main` the corpus had already described, so the stale table matched prior expectation better than the current one did.
 Confirmation felt like recognition.
+
+## A stale install diagnosed from an mtime and an absence
+
+Measured on `Morrison-Lab/ai-config`, 2026-08-21 (UTC).
+
+[#1812](https://github.com/Morrison-Lab/ai-config/issues/1812) was filed
+claiming `~/.claude/hooks/` had gone stale,
+so merged hook fixes were not reaching the running guards.
+Two observations were reasoned from:
+the installed `no-unshipped-commit.py` was dated 2026-08-18,
+and it contained zero occurrences of `strip_quoted`,
+a function the issue asserted `main` "has carried".
+
+Both readings were accurate.
+Neither supported the staleness-at-that-moment conclusion.
+
+The narrower wording is deliberate, because #1812 asserted two things and only
+one of them is refuted here.
+Its claim that the copy was *already* stale when filed is false, as the
+comparison below shows.
+Its claim that a copy cannot track future merges is **true**, and the table
+confirms it three minutes later: nothing had drifted at 01:17, and two of 61
+files had by 01:20, once #1807 merged.
+A blanket refutation would dismiss the half the record's own data supports.
+
+The deciding comparison, against `main` as it stood when the issue was filed
+(`fbe10c53^`):
+
+```
+total=61 identical=61 drifted=0
+```
+
+`strip_quoted` was absent because `main` had never carried it.
+It existed only on
+[#1807](https://github.com/Morrison-Lab/ai-config/pull/1807),
+still unmerged at that moment.
+
+The issue was filed at 01:17:14Z and closed at 01:18:54Z, once the direct `cmp` comparison ran.
+
+### The mtime read identically on both sides of the transition
+
+PR [#1807](https://github.com/Morrison-Lab/ai-config/pull/1807)
+merged at 01:20:48Z, two minutes after the issue closed,
+and `main`'s copy of that hook changed.
+The installed copy did not.
+
+| Time (UTC) | Event | Installed mtime | Drifted |
+|---|---|---|---|
+| 01:17:14 | #1812 filed | 2026-08-18 18:44:59 | 0 of 61 |
+| 01:20:48 | #1807 merged | 2026-08-18 18:44:59 | 2 of 61 |
+
+The same file with the same mtime was current before 01:20 and stale after it,
+which is the whole argument against the proxy in one measurement:
+an instrument reading the same value in both states
+has not measured either.

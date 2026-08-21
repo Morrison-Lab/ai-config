@@ -271,6 +271,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
+            "timeout": 10,
+            "script": "warn-pr-create-without-dupe-check.py",
+            "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal, and that rule is consulted at read time while the omission happens at composition time. Measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Warns rather than blocks -- a duplicate PR is cheap to close and a blocked PR creation is expensive, since creating the PR is the very act that makes work visible to other sessions. Anchored on a command position with heredoc bodies stripped, because this corpus quotes `gh pr create` constantly. Fails open. Tracked as #1748."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-stale-adjacent-comment.py\"",
             "timeout": 15,
             "script": "flag-stale-adjacent-comment.py",
@@ -352,6 +359,13 @@
             "timeout": 10,
             "script": "no-unauthorized-merge.py",
             "why": "cai 2026-08-04 'I want a mechanistic prohibition, not just a guideline' -- mechanistically blocks unauthorized GitHub MCP PR merge operations (mcp__github__merge_pull_request and defensive auto-merge tool variants) at the PreToolUse boundary unless explicit permission is present."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
+            "timeout": 10,
+            "script": "warn-pr-create-without-dupe-check.py",
+            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request, and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
           }
         ]
       }
@@ -435,6 +449,13 @@
             "timeout": 10,
             "script": "no-placeholder-reply.py",
             "why": "CLAUDE.md 'Always produce a reply --- never end a turn silently' -- blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement). The rule names the exact string in a Do/Don't pair and the lapse still recurred three times in one session (ai-config#1579), each time on resuming after a context-window summary, which reads like a report and so makes the work it describes feel already reported. Anchored on the WHOLE message rather than a substring, because this corpus quotes the banned string constantly; and a claim about the WORK (`Nothing to report.`, `No change.`) is deliberately not matched, since a no-change tick is behaviour the same section requires."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-cop-out-offer.py\"",
+            "timeout": 10,
+            "script": "flag-cop-out-offer.py",
+            "why": "shared/workflow/no-cop-out-offers.md -- warns when a reply CLOSES on an offer to do work (`say the word`, `want me to`, `unless you'd rather`). Directive from the user 2026-08-20 after verified analysis results sat in an unpushed local branch for hours behind `say the word and I'll push`, for a push a standing authorization already covered; an earlier `unless you'd rather` in the same session stalled work 2.5 hours against a hard deadline. WARNS rather than blocks: whether the action was already authorized is not lexically decidable, and asking before a merge or force-push is correct. Tail-anchored, because the failure is a recap that closes on an offer and because this corpus quotes the phrases constantly."
           },
           {
             "type": "command",

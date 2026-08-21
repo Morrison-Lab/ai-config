@@ -542,3 +542,134 @@ reproduce it and the fix would be a dispatch or workflow-input change.
 A 503 is transient, so a re-run should simply work.
 A single `rerun_failed_jobs` recovered the run and the verdict posted, which
 the 503 diagnosis predicted and the `PR_NUMBER` diagnosis ruled out.
+
+## Five sound measurements, five claims beside them
+
+`ucdavis/bcs`, 2026-08-19/20.
+One session produced the same error five times, across five distinct claims
+--- instances 2 and 3 arose within the same investigation, the rest in
+unrelated domains --- each instance surviving self-review.
+The recurrence is what makes it a case record: per
+[`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence
+bar, a third instance is the point at which the shape gets written down rather
+than fixed one more time.
+The fourth and fifth arrived while this entry was being written, which is
+itself evidence about how easily the shape passes self-review.
+
+**Instance 1 --- a verified mechanism, an unverified instance.**
+Roxygen prose claimed that this repo's own symbol tracer beats
+`codetools::findGlobals()`, because "a bare `map()` relies on the standalone
+import, which `data-raw/` does".
+The mechanism half was measured: code was run confirming that `findGlobals()`
+drops namespace-qualified call heads, so `purrr::map()` never reaches the
+standalone `map()`.
+The instance half was not.
+The one `data-raw/` file carrying bare `map()` calls has `library(purrr)` above
+them, so it does not rely on the standalone import at all.
+A reviewer caught it.
+The measurement establishes a fact about `findGlobals()`.
+The claim was about the contents of a directory.
+
+**Instance 2 --- a freshness check that settled the model, reported as
+settling the data.**
+An analysis artifact was regenerated, and its freshness was verified by
+checking that its coefficient terms matched the current model specification ---
+`age_monthly` present, the obsolete `age2` and `age75` absent.
+That check is sound, and it proves the artifact came from the current
+**model**.
+The numbers were then reported as "verified".
+The check says nothing about which **population** was fed in, and the
+population was the live question.
+One measurement, two axes, and only one of them measured.
+
+**Instance 3 --- a measured difference, read as a measured direction.**
+Following on from instance 2, two candidate data extracts were compared, and
+the comparison was run correctly: they are different populations, differing in
+sites and by roughly 410,000 participants, with neither a subset of the other.
+From that, the session concluded the analysis had run on the *wrong* extract
+and publicly retracted the numbers.
+The comparison establishes only that the two **differ**.
+Which one is current is a separate fact the session did not hold, and the
+maintainer confirmed the extract actually used was the correct one --- the
+documentation relied on for the retraction was the stale half.
+
+Instance 3 is the one that fixes the shape as an inference error rather than
+as optimism.
+Here the overreach ran toward **alarm**: it retracted a true result, in public,
+on the strength of a sound measurement of something else.
+A rule watching for over-claiming would have passed it, and the act of
+retracting made it feel more careful than the claim it replaced.
+
+**Instance 4 --- a complete enumeration of branches, reported as an
+enumeration of refs.**
+A commit carrying a leaked credential (`5da971a1`) was squash-merged and its
+PR closed.
+`git branch -r --contains 5da971a1` returned nothing, and that was reported to
+the maintainer as the commit being "no longer reachable from any remote ref",
+with the exposure closed as far as git could close it.
+`check-secrets` flagged the same six findings on the next PR.
+
+This is the sharpest of the five, because the measurement has no defect at all.
+`git branch -r --contains` correctly enumerates the branches containing a
+commit, and it returned the right answer for that question.
+The claim was about **refs**.
+Branches are a proper subset of refs, and the excluded subset is the one that
+decides this particular question: GitHub retains `refs/pull/<N>/head`
+permanently, and closing a PR or deleting its branch does not remove it.
+The default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so
+`refs/pull/*` is never fetched and `git branch -r` cannot see it whatever the
+repository state.
+The other instances admit an argument that the measurement was incomplete.
+Here it was complete and correct for its own scope, and the scope was silently
+widened by one word in the sentence that reported it.
+
+The consequence was operational rather than only epistemic.
+The conclusion licensed a recommendation *against* adding `.gitleaksignore`
+entries, on the reasoning that squashing would clear the finding.
+It does not, so the repository carries a permanently red security check until
+the allowlist lands --- the opposite of what was advised.
+
+Writing the population into the sentence is the whole fix, and it costs one
+word.
+"No branch contains it" and "no ref contains it" differ by one word, and the
+first is what the command established.
+
+**Instance 5 --- an accurate pass and fail count, reported as the suite
+passing.**
+A default path was changed, the affected test files were run, and "43 pass, 0
+fail" was reported as evidence the change was safe.
+A reviewer then found a test the change had broken.
+
+The count was accurate.
+The **skip** count was never read: 15 tests were skipped, and the skipped set
+contained exactly the broken test.
+It skipped because `skip_if_not_installed("arrow")` fired, and `arrow` was
+absent because the verification command carried `R_PROFILE_USER=/dev/null` ---
+a habit picked up as a workaround for an unrelated renv startup failure.
+Measured both ways in `ucdavis/bcs` on 2026-08-20:
+
+```
+R_PROFILE_USER=/dev/null : requireNamespace("arrow") -> FALSE
+renv active              : requireNamespace("arrow") -> TRUE
+```
+
+Re-running with renv active, after fixing the test, gave 40 pass, 0 fail, 0
+skip.
+The two runs' totals are not comparable --- 43 passed plus 15 skipped is 58,
+against 40 --- and this record does not establish what changed between them,
+so the load-bearing figure is the 0 skip rather than either pass count.
+Reporting them as comparable would be this section's own error committed
+inside its own case record.
+A suite in which roughly a quarter of the tests did not execute (15 of 58) has
+not reported that they pass.
+
+The second lesson is in *why* the skip happened.
+`R_PROFILE_USER=/dev/null` is a documented workaround in that project, and its
+side effect is invisible at the call site.
+It changes which packages are available, hence which tests run, while changing
+nothing about the number that gets reported.
+That generalizes past R.
+Any flag that skips environment setup --- a `--no-config`, a bare interpreter,
+a container built without the optional extras --- can shrink what is being
+measured without shrinking the figure reported.
+The shrunken run is usually the faster one, so the habit is self-reinforcing.

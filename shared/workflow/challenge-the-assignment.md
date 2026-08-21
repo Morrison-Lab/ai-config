@@ -590,7 +590,7 @@ That fragment's own Don't pair already said not to treat it as the check CI runs
 - [`metacognitive-monitoring`](metacognitive-monitoring.md) governs a premise
   stated as background fact, and the claims you generate yourself.
   This governs the instruction, which asserts nothing and so trips none of its
-  four claim types.
+  five claim types.
   Its stripping pass is the nearest authoring-side rule, and the section above
   says why it does not reach a load-bearing premise.
 - [`derive-dont-enumerate`](derive-dont-enumerate.md) also tells an author to

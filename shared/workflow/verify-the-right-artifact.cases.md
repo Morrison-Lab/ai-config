@@ -147,7 +147,7 @@ It existed only on
 [#1807](https://github.com/Morrison-Lab/ai-config/pull/1807),
 still unmerged at that moment.
 
-The issue was filed at 01:17:14Z and closed at 01:18:54Z, once the loop ran.
+The issue was filed at 01:17:14Z and closed at 01:18:54Z, once the direct `cmp` comparison ran.
 
 ### The mtime read identically on both sides of the transition
 

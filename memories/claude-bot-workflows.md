@@ -589,16 +589,12 @@ not block `claude-review`.)
   retrying from a session without that restriction before assuming the
   artifact is unreachable.
 - **`permission_denials_count` is per-attempt (per job), not per-PR.**
-  A single PR can carry multiple `review/claude-review` jobs (manual re-runs,
-  workflow retries), each with its own denial count.
-  Example: `ai-config#1689` had `permission_denials_count=55` on one attempt
-  (run 32391984929, cited in PR comment) and `72` on another (job 96505024829,
-  from execution-log parse) --- the 72-denial job posted a real verdict.
-  Meanwhile `ai-config#1767` produced no verdict at 12 and then 24.
-  A high count on one job is not evidence the reviewer has given up on the
-  PR --- the manual re-run is still worth spending.
-  When citing a count, name the job id, not just the PR.
-  (2026-08-20, measured during `ai-config#1788` review.)
+  See [`self-review-fallback.md`](../shared/workflow/self-review-fallback.md)'s
+  "High-denial stub (gha#198)" for the full treatment, measured examples,
+  and the do/don't bullets.
+  The one addition: when citing a count, name the job id, not just the PR,
+  because different attempts on the same PR can carry materially different
+  counts. (2026-08-20.)
 - **A `claude-code-review` false-positive "stub" is also possible on a review that actually completed and posted a real, correctly-formatted verdict — distinct from the gha#185 background-agent-fanout pattern above.** `check-review-execution.sh`'s stub-detector scans only `type=="text"` content blocks for a line matching `^[[:space:]>*_#-]*verdict\b` (grep, anchored to line-start) — it does not look inside `tool_use` block arguments. If the agent's final free-text message merely *narrates* what it posted ("Posted the inline finding and a summary comment ending in `### Verdict: Ready for merge`.") rather than repeating the verdict as its own standalone line, the word "verdict" only appears mid-sentence, so the anchored regex correctly does *not* match it — even though the actual GitHub comment (posted via a tool call earlier in the same transcript) has a perfectly-formed `### Verdict` heading. This false stub classification then triggers an unnecessary retry, and if THAT retry genuinely stubs (e.g. the gha#185 pattern), the overall check reports `failure` on a PR that already had a valid, complete review. Diagnose by downloading both attempts' execution-transcript artifacts (see the note above) and checking attempt 1's own posted PR comment directly, not just its final "result" text. Filed with full evidence as `d-morrison/gha#218` (`Lacaedemon/sparta` PR #615, 2026-07-03) rather than reopening #185, since the mechanism (a scanning gap, not a fanout-and-never-resume) is distinct.
 - **Both bullets above presuppose `@v2`: at `@v1` the execution artifact is
   never produced at all, so its absence is not an access problem.**

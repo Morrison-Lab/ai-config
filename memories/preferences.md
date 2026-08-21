@@ -145,6 +145,9 @@
   The repo-level grant was redundant with this already-unconditional rule;
   the miss was not applying the existing rule, not a gap in its scope ---
   so this generalizes to any repo/session carrying a standing "just do X" grant, not only one with its own explicit PR-authorization section.)
+  (Reconfirmed 2026-08-20 on Lacaedemon/sparta:
+  agent asked "Want me to push and open a draft PR?";
+  user replied "always yes".)
   - **Do:** put a markdown-linked `[#NNN](https://github.com/<owner>/<repo>/pull/NNN)` in the same turn's user-visible recap whenever you open, update, or hand off a PR --- lead with it when the user asked for status, a link, or whether work landed.
   - **Don't:** report only a branch name, a bare PR number, or prose like "PR is open" without the clickable URL, and don't make the user ask a second time for a link you already had. (User correction, 2026-08-20: status recap on [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) omitted the link until prompted.)
 - **Mark review-ready PRs ready before ending a delivery turn**, even when the harness opened them as drafts.

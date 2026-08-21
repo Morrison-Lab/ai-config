@@ -79,7 +79,8 @@ It is `skipped` when the gate refused.
 `continue-on-error` is applied to the retry step upstream, so a retry that runs
 and fails may not surface as `failure` there either --- which is why the denial
 count, rather than the step conclusion, is what classifies this.
-That is one API call,
+Reading that step conclusion is one API call --- `actions/jobs/<id>`, not
+the job log the denial count comes from ---
 and it changes what a manual re-run is worth ---
 an independent second sample,
 rather than a third after two that already agreed.

@@ -283,7 +283,8 @@ That worked example violates
 [`semantic-line-breaks`](../writing/semantic-line-breaks.md) rather than this
 file's own rule --- splicing ASCII into ASCII cannot manufacture a glyph --- and
 it sits here because the *seam* mechanism is shared: both checks are
-diff-scoped, so both fire on the joined line and neither fires on either half.
+diff-scoped, so each evaluates the joined line rather than either half, and a
+violation the halves did not carry is one the join can introduce.
 Nothing here is grandfathered, and the check is not being harsh --- the
 violation is new text you wrote, in the one place you were not looking.
 

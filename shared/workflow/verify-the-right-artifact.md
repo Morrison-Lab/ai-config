@@ -43,7 +43,7 @@ and about **mechanism**
 (whether a cache is ever read),
 in exactly the same shape.
 
-## The four shapes
+## The five shapes
 
 Recognizable in advance, which is the point of enumerating them:
 
@@ -63,6 +63,13 @@ Recognizable in advance, which is the point of enumerating them:
   A directory that happens to contain the files you expected
   is not thereby the path they are read from.
   It can coincide today and diverge tomorrow.
+- **A future state for the present one.**
+  A figure computed against what a tree *will* contain,
+  written into a file whose own instrument reports what it contains *now*.
+  The two sit inches apart on the page, so a reader compares them directly
+  and the prose loses.
+  Derive any number you commit against the state of the branch you are
+  committing it to.
 
 ## The test
 
@@ -222,9 +229,9 @@ See
 [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md),
 "A stale install diagnosed from an mtime and an absence".
 
-**The interpreter's own defaults are a fifth adjacent artifact, and a failed
+**The interpreter's own defaults are a sixth adjacent artifact, and a failed
 reproduction is where they stand in for the code.**
-The four shapes above all substitute one *file* or *run* for another.
+The five shapes above all substitute one *file* or *run* for another.
 This one substitutes the **environment** for the program, and it arrives
 disguised as diligence: you were told a defect exists, you tried to see it
 yourself rather than taking the claim on faith, and nothing happened.

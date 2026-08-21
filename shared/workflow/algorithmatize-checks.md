@@ -532,8 +532,9 @@ It is that a discharge fires forever *by design*: it is the matcher whose whole 
 The discharge sets that *state*: once something in the transcript looks like the check was run, the guard is silent from then on, and its silence is indistinguishable from compliance.
 That is the failure [`deterministic-tools`](../principles/deterministic-tools.md) warns about --- an instrument that has stopped measuring reports the same thing as an instrument reporting all-clear.
 
-Measured 2026-08-20 on [ai-config#1749](https://github.com/Morrison-Lab/ai-config/pull/1749), which was open at the time of writing --- so the file below is described as that PR proposed it, not as something `main` carries.
-`warn-pr-create-without-dupe-check.py`, in the state that PR put it in, anchored its trigger to a command position and carried a docstring paragraph explaining why --- this corpus quotes `gh pr create` constantly, so a substring matcher would fire on every reply citing the rule.
+Measured 2026-08-20 on [ai-config#1749](https://github.com/Morrison-Lab/ai-config/pull/1749).
+**The state described below is that PR's first draft, not its current head and not anything `main` carries.**
+The draft anchored its trigger to a command position and carried a docstring paragraph explaining why --- this corpus quotes `gh pr create` constantly, so a substring matcher would fire on every reply citing the rule.
 Its discharge, in the same file, was a bare substring search:
 
 ```
@@ -543,6 +544,13 @@ heredoc body containing gh pr list --repo o/r   discharged=True
 ```
 
 The reviewer's sharpest observation was that the hook's own reminder text names `gh pr list --repo <owner>/<repo>` --- so the guard told the user to run the command that would have disarmed it.
+
+**That draft's bug is fixed, and the timing is the point rather than a caveat.**
+`ca4a5651` added heredoc stripping at 09:57 and `911f0ea8` anchored the discharge at 11:40, both on #1749's own branch.
+Its head now reads `RX_DISCHARGE.search(strip_heredocs(text))`, so none of the three lines above still evaluates `True` there.
+This section's first commit landed at 11:48 --- **eight minutes after** the anchoring fix --- so the example was already historical when it was first written, and saying otherwise took three review rounds to catch.
+Keep it as a worked example anyway: the discharge really was a bare substring search, the reviewer really did find it, and a bug fixed within the hour is still the bug this section is about.
+What is not safe is the present tense.
 
 **Command-position anchoring is not sufficient on its own, because a heredoc body is full of line starts.**
 `^` matches inside quoted prose, so a fenced reproduction block in a PR comment satisfies the anchor.

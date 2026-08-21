@@ -28,6 +28,6 @@ alwaysApply: true
 - Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
 
 ## Request review and drive every started PR to clean
-- Request AI review (`@claude review` / `@agy review`) after completing code pushes.
+- Request AI review (`@claude review`) after completing code pushes.
 - Run `ardi` / review loop to drive CI to clean.
 - Request human review ONLY after AI approval or deadlock.

@@ -74,15 +74,21 @@ Every other step in both jobs was `success` or `skipped`, which is
 [`fully-clean`](fully-clean.md)'s "a job's conclusion is set by whichever step
 failed" in its plainest form.
 
-The job log carries the cause in three consecutive lines:
+The job log carries the cause across these lines, one intervening line
+elided:
 
 ```
 permission_denials_count could not be parsed from execution result
   (got 'MISSING'); defaulting to sentinel 999999 (gha#370).
+[...]
 permission_denials_count=999999 (stub-retry max_denials=5)
 permission_denials_count=999999 exceeds the stub-retry threshold (5) ---
   this looks like gha#198's pattern, not gha#185's; not marking as retryable.
 ```
+
+The elided line is `check-review-execution.sh`'s unconditional
+`permission_denials_count=<n> (max_denials=<n>)` at line 184, a near-duplicate
+of the line following it that differs only by the `stub-retry ` qualifier.
 
 The execution result's own summary earlier in the same log reads
 `"permission_denials_count": 0`, so the real count was well inside the
@@ -105,7 +111,8 @@ short-circuit` `skipped`, `Resolve final review outcome` `failure` --- and is
 (`require-review` went red behind it, as it does whenever the review job fails,
 but that is a separate JOB (`96502554966`) rather than a fourth step, so it is
 no part of the signature.)
-Its log reads `"permission_denials_count": 6` against `max_denials=5`, and the
+The claude-review job's log reads `"permission_denials_count": 6` against
+`max_denials=5`, and the
 workflow says so itself: `this looks like gha#198's pattern, not gha#185's; not
 marking as retryable`.
 Grepping that log for `999999`, `could not be parsed`, `sentinel`, and

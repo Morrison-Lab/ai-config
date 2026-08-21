@@ -446,6 +446,55 @@ with tempfile.TemporaryDirectory() as tmp:
 
 
 with tempfile.TemporaryDirectory() as tmp:
+    # NESTED roots. This repository keeps worktrees at
+    # `<repo>/.claude/worktrees/agent-<id>` -- INSIDE the main checkout -- so a
+    # target under one matches BOTH roots. `repo_roots` is a set, so the old
+    # first-match loop returned whichever root hash order yielded, and its answer
+    # varied with PYTHONHASHSEED on identical filesystem state. Every other
+    # fixture here places the worktree as a SIBLING, which is why this never
+    # showed up. Reported by review on #1841.
+    root = Path(tmp)
+    outer, inner = root / "repo", root / "repo" / ".claude" / "worktrees" / "wt"
+    for d in (outer, inner):
+        (d / "shared").mkdir(parents=True, exist_ok=True)
+        write(d / "CLAUDE.md", f"instructions from {d.name}\n")
+    roots = {outer.resolve(), inner.resolve()}
+
+    link = root / "link-into-nested"
+    os.symlink(inner / "CLAUDE.md", link)
+
+    check("negative control: the two roots really do nest",
+          outer.resolve() in inner.resolve().parents)
+    check("negative control: the target matches both roots",
+          len([r for r in roots
+               if link.resolve() == r or r in link.resolve().parents]) == 2)
+    check("matched_root() returns the DEEPEST containing checkout",
+          ci.matched_root(link, roots) == inner.resolve())
+    check("a nested-root target is still accepted",
+          ci.resolves_into_repo(link, roots))
+
+    # Determinism, measured rather than argued: the same filesystem state must
+    # give the same answer under hash orders that reorder the set.
+    probe = (
+        "import importlib.util,sys;from pathlib import Path;"
+        "spec=importlib.util.spec_from_file_location('ci', sys.argv[1]);"
+        "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);"
+        "print(m.matched_root(Path(sys.argv[2]), "
+        "{Path(sys.argv[3]), Path(sys.argv[4])}))"
+    )
+    answers = set()
+    for seed in ("0", "1", "2", "3", "4", "5", "6", "7"):
+        env = dict(os.environ, PYTHONHASHSEED=seed)
+        answers.add(subprocess.run(
+            [sys.executable, "-c", probe, str(SCRIPT), str(link),
+             str(outer), str(inner)],
+            capture_output=True, text=True, env=env,
+        ).stdout.strip())
+    check("matched_root() is stable across PYTHONHASHSEED values",
+          answers == {str(inner.resolve())})
+
+
+with tempfile.TemporaryDirectory() as tmp:
     # BOTH sides of the comparison must be resolved. A checkout reached through
     # a symlink -- macOS routes /var through /private/var, and an aliased ~/src
     # does the same on any platform -- otherwise compares unequal, and a correct

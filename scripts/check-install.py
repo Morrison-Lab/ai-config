@@ -233,8 +233,8 @@ def child_names(path: Path, dirs_only: bool) -> set[str]:
     return names
 
 
-def resolves_into_repo(link: Path, repo_roots: set[Path]) -> bool:
-    """True when `link` resolves into any accepted working tree of this repo.
+def matched_root(link: Path, repo_roots: set[Path]) -> Path | None:
+    """The most specific accepted working tree `link` resolves into, or None.
 
     BOTH sides are resolved. Resolving only the link made the comparison unsound
     whenever the checkout itself was reached through a symlink -- macOS routes
@@ -245,21 +245,40 @@ def resolves_into_repo(link: Path, repo_roots: set[Path]) -> bool:
 
     Roots are resolved here rather than once by the caller because `classify()`
     is called directly by `check-harness-installs.py` too, and a contract that
-    depends on the caller having normalized its input is one that will be broken
-    again by the next caller.
+    depends on the caller having normalized its input is one the next caller
+    breaks again.
+
+    MOST SPECIFIC, not first-matching, because accepted roots nest: this
+    repository keeps worktrees at `<repo>/.claude/worktrees/agent-<id>`, INSIDE
+    the main checkout, so a target under one of those matches both roots.
+    `repo_roots` is a set, so a first-match loop returned whichever root the
+    hash order happened to yield and its answer varied with `PYTHONHASHSEED` on
+    identical filesystem state. The deepest match is the true containing
+    checkout, and it is unique: two distinct roots can only both contain a
+    target when one is an ancestor of the other, which makes their part counts
+    differ.
     """
     try:
         target = link.resolve()
     except OSError:
-        return False
+        return None
+
+    matches: list[Path] = []
     for root in repo_roots:
         try:
             resolved_root = root.resolve()
         except OSError:
             continue
         if target == resolved_root or resolved_root in target.parents:
-            return True
-    return False
+            matches.append(resolved_root)
+    if not matches:
+        return None
+    return max(matches, key=lambda root: len(root.parts))
+
+
+def resolves_into_repo(link: Path, repo_roots: set[Path]) -> bool:
+    """True when `link` resolves into any accepted working tree of this repo."""
+    return matched_root(link, repo_roots) is not None
 
 
 def classify(repo_path: Path | None, install_path: Path, group: str, name: str,
@@ -287,19 +306,20 @@ def classify(repo_path: Path | None, install_path: Path, group: str, name: str,
 
 
 def install_sources(entries: list["Entry"], repo_roots: set[Path]) -> set[Path]:
-    """Which accepted checkouts the installed symlinks actually resolve into."""
+    """Which accepted checkouts the installed symlinks actually resolve into.
+
+    Shares `matched_root()` with `resolves_into_repo()` rather than repeating the
+    predicate. The two had already drifted while both were being written: this
+    one compared against unresolved roots, and was safe only because every
+    caller happened to pass resolved ones.
+    """
     sources: set[Path] = set()
     for entry in entries:
         if entry.status != "ok" or not entry.install_path.is_symlink():
             continue
-        try:
-            target = entry.install_path.resolve()
-        except OSError:
-            continue
-        for root in repo_roots:
-            if target == root or root in target.parents:
-                sources.add(root)
-                break
+        root = matched_root(entry.install_path, repo_roots)
+        if root is not None:
+            sources.add(root)
     return sources
 
 

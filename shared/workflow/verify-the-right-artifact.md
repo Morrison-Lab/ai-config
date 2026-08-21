@@ -269,3 +269,79 @@ exited 0 on the same input.
 Stopping at the first attempt would have reported the finding
 unreproducible, a true statement about the container and a false one about
 the code.)
+
+**Documentation for a capability describes a SURFACE, and your code may reach
+that capability through a different one.**
+
+The shapes above substitute a cached copy for an origin, a checkout for a run,
+half a mechanism for the whole, a neighbour for the target.
+This is a fifth: the documentation is correct, your reading of it is correct,
+every quotation checks out --- and it describes the feature as reached through
+a surface your code does not use.
+
+The tell is a capability documented for a **settings file, an API, or a
+library call** while your code exercises it through a **CLI flag, a wrapper, or
+another entry point**.
+That the second surface accepts the first's syntax is a separate proposition,
+and documentation routinely leaves it unstated because it is obvious to whoever
+implemented both.
+
+It matters more than an ordinary unchecked assumption because of how it fails.
+An unparsed rule is usually **dropped rather than rejected**, so the change is
+a no-op that looks shipped: nothing errors, the diff reads correctly, review
+passes, and the concern is retired.
+
+Verifying it needs a **negative control**, and that is the part most likely to
+be skipped, because running the thing and seeing no complaint feels like a
+test.
+It is not: a surface that silently ignores every unknown rule is quiet for the
+same reason a working one is.
+Pair the real input with one the documentation says must be refused.
+If the refusal is announced and yours is not, the silence means something.
+
+- **Do:** name the surface your code actually uses, and verify against it
+  rather than against the one the docs describe.
+- **Do:** run a known-bad input alongside, so silence is evidence rather than
+  absence.
+- **Don't:** read a correct quotation of a syntax as evidence that your caller
+  parses it.
+- **Don't:** ship a mechanism whose failure mode is a silent no-op on the
+  strength of documentation alone.
+
+(Measured 2026-08-21 on [gha#550](https://github.com/Morrison-Lab/gha/pull/550).
+`code.claude.com/docs/en/permissions` documents `Tool(param:value)` deny rules;
+every quotation in the diff was checked against the live page and all were
+accurate.
+The action passes its rules through `--disallowedTools`, which the page never
+mentions.
+On Claude Code 2.1.238 both rules were accepted with no warning --- and the
+control is what made that informative, since `Bash(command:rm *)`, which the
+same page says is ignored, answered
+`targets command as a raw string and will not match` on that same CLI.)
+
+**A PR body is prose no check reads, so it goes stale silently while the diff
+moves underneath it.**
+
+A near relative, and the one that bites after the work is finished rather than
+during it.
+Every claim a PR body makes about its own diff --- what is tested, what is
+unchanged, what was verified --- was true when written and is unmaintained
+thereafter.
+No CI job compares the two, and a reviewer reads the body as context rather
+than as a claim to check, so it is the one artifact in the review loop with no
+detector at all.
+
+Re-read the body at the moment you would report the PR ready, and treat each
+of its factual claims as you would a line of the diff.
+
+- **Do:** re-read and correct the body before reporting a PR ready, after the
+  last push rather than before it.
+- **Don't:** leave a body asserting a verification the diff has since outgrown
+  --- under a squash merge, that text is what survives.
+
+(Same day, both PRs.
+gha#550's body still read "the fixture suite unchanged and passing" after a
+push that added two fixtures, and "there is no offline test" after a push that
+added one.
+ai-config#1833's body still carried, verbatim, all three prose defects that
+three review rounds had just corrected in the file it was describing.)

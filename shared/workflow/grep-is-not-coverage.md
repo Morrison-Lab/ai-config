@@ -361,6 +361,14 @@ This fragment governs how to *report* what that search found.
 [`challenge-redundant-content`](challenge-redundant-content.md) is the
 review-side counterpart, for the duplicate that gets written anyway.
 
+The general case is
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A sound
+measurement does not license the claim standing next to it", which covers any
+sound measurement followed by a claim it does not establish.
+This fragment is the **null-result** instance of that shape, and the one worth
+stating separately because a clean zero-hit result reads as thoroughness
+rather than as evidence about a pattern.
+
 (Morrison-Lab/ai-config#950, 2026-07-30: three claims of the form "the corpus
 does not cover this" were made in one session on the evidence of a phrase
 grep returning nothing.

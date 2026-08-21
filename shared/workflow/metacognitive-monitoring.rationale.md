@@ -795,6 +795,88 @@ It does not transfer when two revisions stay live at once, because then the
 earlier figure is not stale --- it is still the answer to a question somebody
 is asking.
 
+## A sound measurement does not license the claim standing next to it
+
+The two sections above concern instruments whose **reach** was the problem: a
+scope narrower than it looked, or an input that could not have held the
+evidence.
+This concerns an instrument with no problem at all.
+The command is right, the scope is right, the reading is right --- and the
+sentence written next to the result asserts a different proposition.
+
+### Why it survives every check in this file
+
+Each of those checks asks a question about the evidence, and the evidence
+answers well.
+Was a command run?
+Yes.
+Was its scope examined?
+Yes.
+Did it return what it appeared to return?
+Yes.
+Nothing in the sequence asks whether the **conclusion** is a conclusion *from*
+that evidence, which is the only step that failed.
+
+The credibility transfer is what makes it invisible from the inside.
+Measuring is the expensive part of a paragraph, so it is what the writer
+remembers doing, and recency plus effort attach the felt confidence to the
+whole passage rather than to the one sentence that earned it.
+That is the same "lack of effort mistaken for understanding" inversion this
+file records from the Wikipedia article, running in the opposite direction:
+there an absence of effort licensed a claim, here a genuine effort licenses a
+neighbouring one.
+
+### Why optimism bias is the wrong frame
+
+The obvious reading is that a verified mechanism makes the writer over-claim.
+That reading predicts the error only ever runs toward confidence, and it does
+not.
+A measurement establishing that two candidate inputs are *different* can
+license "we used the wrong one" just as readily as a measurement of agreement
+licenses "this is correct" --- and the retraction case is the harder one to
+catch, because withdrawing your own published figure is the most
+rigorous-feeling act available.
+[`fully-clean`](fully-clean.md) makes the same point about a checker's exit
+status failing toward alarm rather than toward clean, and notes that both
+directions come from reading a multi-valued answer as a two-valued one.
+This is the prose form of that.
+
+### Why the two-sentence test works
+
+It is not a check on the world, and it costs no query.
+It is a check on **subject agreement** between two sentences you already hold.
+Writing "the measurement establishes X" forces X to be stated at the width the
+instrument actually supports, and setting the claim beside it exposes any
+subject the instrument never mentioned.
+In all three recorded instances the two sentences name different subjects
+outright --- a function's behaviour versus a directory's contents, a model
+versus a population, a difference versus a currency --- so no judgment about
+degree is needed.
+
+### Why this is not mechanizable
+
+Stating the limit explicitly, per
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "Limits", so that nobody
+builds the guard and then quietly disables it.
+
+The condition is a semantic relation between a tool result and a
+natural-language sentence: does this claim follow from that evidence.
+No lexical or structural property decides it.
+A hook keyed on "a factual assertion appears within N turns of a tool call"
+would fire on nearly every paragraph this corpus produces, since reporting
+findings next to the commands that produced them is the behaviour the rest of
+the corpus **requires**.
+Its false-positive rate would be close to its firing rate, which is the
+condition [`deterministic-tools`](../principles/deterministic-tools.md) names
+for leaving a check as judgment.
+
+The checkable proxy is the same one the reachable-half section settles for:
+**coverage of the form**, not correctness of the inference.
+A reviewer can see whether the two sentences were written and whether their
+subjects match, which is a property of the prose.
+That is a review check rather than a hook, and it is where this rule is
+enforceable.
+
 ## Writing is the instrument, when the claim can be wrong
 
 The article establishes that self-assessment is unreliable and that confidence

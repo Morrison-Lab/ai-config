@@ -542,3 +542,57 @@ reproduce it and the fix would be a dispatch or workflow-input change.
 A 503 is transient, so a re-run should simply work.
 A single `rerun_failed_jobs` recovered the run and the verdict posted, which
 the 503 diagnosis predicted and the `PR_NUMBER` diagnosis ruled out.
+
+## Three sound measurements, three claims beside them
+
+`ucdavis/bcs`, 2026-08-19/20.
+One session produced the same error three times, in three unrelated domains,
+each instance surviving self-review.
+The recurrence is what makes it a case record: per
+[`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence
+bar, a third instance is the point at which the shape gets written down rather
+than fixed one more time.
+
+**Instance 1 --- a verified mechanism, an unverified instance.**
+Roxygen prose claimed that this repo's own symbol tracer beats
+`codetools::findGlobals()`, because "a bare `map()` relies on the standalone
+import, which `data-raw/` does".
+The mechanism half was measured: code was run confirming that `findGlobals()`
+drops namespace-qualified call heads, so `purrr::map()` never reaches the
+standalone `map()`.
+The instance half was not.
+The one `data-raw/` file carrying bare `map()` calls has `library(purrr)` above
+them, so it does not rely on the standalone import at all.
+A reviewer caught it.
+The measurement establishes a fact about `findGlobals()`.
+The claim was about the contents of a directory.
+
+**Instance 2 --- a freshness check that settled the model, reported as
+settling the data.**
+An analysis artifact was regenerated, and its freshness was verified by
+checking that its coefficient terms matched the current model specification ---
+`age_monthly` present, the obsolete `age2` and `age75` absent.
+That check is sound, and it proves the artifact came from the current
+**model**.
+The numbers were then reported as "verified".
+The check says nothing about which **population** was fed in, and the
+population was the live question.
+One measurement, two axes, and only one of them measured.
+
+**Instance 3 --- a measured difference, read as a measured direction.**
+Following on from instance 2, two candidate data extracts were compared, and
+the comparison was run correctly: they are different populations, differing in
+sites and by roughly 410,000 participants, with neither a subset of the other.
+From that, the session concluded the analysis had run on the *wrong* extract
+and publicly retracted the numbers.
+The comparison establishes only that the two **differ**.
+Which one is current is a separate fact the session did not hold, and the
+maintainer confirmed the extract actually used was the correct one --- the
+documentation relied on for the retraction was the stale half.
+
+Instance 3 is the one that fixes the shape as an inference error rather than as
+optimism.
+Here the overreach ran toward **alarm**: it retracted a true result, in public,
+on the strength of a sound measurement of something else.
+A rule watching for over-claiming would have passed it, and the act of
+retracting made it feel more careful than the claim it replaced.

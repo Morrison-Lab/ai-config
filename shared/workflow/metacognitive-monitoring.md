@@ -26,6 +26,9 @@ check.
   Check the population rather than the sample that came to mind.
 - **Cause** --- it failed because, this is flaky, that change broke it.
   Ask what else produces the same observation.
+- **Inference** --- this measurement shows, therefore.
+  State what the measurement establishes and what you are claiming as two
+  sentences, and check the second is not wider than or beside the first.
 - **An unexamined default** --- a flag, a template, a glob, a base ref.
   Name it and decide it, rather than inheriting it silently.
 
@@ -381,6 +384,74 @@ invalidates every figure it produced".**
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 "A re-measurement with a different instrument".
 
+## A sound measurement does not license the claim standing next to it
+
+The two sections above both concern a reading that was narrower than it looked
+--- a scope left unexamined, or an instrument whose input could not have held
+the evidence.
+This concerns a measurement that is entirely sound, correctly scoped, and
+correctly read, followed by a sentence asserting something it does not
+establish.
+The evidence is real.
+The step from the evidence to the claim is what fails, and nothing in the
+surrounding paragraph marks that step as having been taken.
+
+**The near-miss: having measured something makes the whole surrounding
+paragraph feel measured.**
+The measurement is usually the expensive part, so the diligence behind it is
+genuine and recent, and the sentences written just afterwards inherit its tone
+whether or not they inherit its support.
+That is the reachable-half inversion above at sentence scale rather than at
+document scale --- and here the neighbouring claim need not be a *wider*
+version of the measured one.
+It is routinely a different proposition altogether: a mechanism verified and an
+instance asserted, a provenance verified along one axis and reported along
+another, a difference measured and a direction concluded.
+
+**The overreach has no preferred direction, so watching for over-confidence
+misses half of it.**
+It reaches toward confidence when the neighbouring claim flatters the work, and
+toward alarm when the claim condemns it.
+A measurement showing two inputs differ can license a retraction exactly as
+easily as an approval, and the half that arrives as a retraction is dressed as
+rigour.
+
+**The test is two sentences written side by side.**
+State what the measurement establishes.
+State the claim.
+Then check that the claim is neither wider than the first sentence nor beside
+it:
+
+> The measurement establishes that `findGlobals()` drops namespace-qualified
+> call heads.
+> The claim is that a particular directory contains bare `map()` calls relying
+> on the standalone import.
+
+Set out that way the gap is visible with no further checking, because the two
+sentences have different subjects.
+Composing them is cheap, and it is the whole of the remedy --- what defeats
+every other check here is that such a claim never presents itself as
+unsupported.
+
+- **Do:** write what the measurement establishes and what you are claiming as
+  two separate sentences, and confirm the second does not reach past the first.
+- **Do:** measure the illustrating instance separately whenever a verified
+  mechanism is illustrated by one, since the mechanism's evidence says nothing
+  about which files exhibit it.
+- **Do:** name the axis a provenance or freshness check covered, because such a
+  check usually settles one axis and is silent about the others.
+- **Don't:** let a real measurement lend its credibility to the sentence
+  standing next to it --- adjacency in a paragraph is not support.
+- **Don't:** treat a retraction as exempt.
+  Concluding that something is *wrong* from a measurement that established only
+  a *difference* is this same overreach pointed the other way.
+- **Don't:** reach for [`grep-is-not-coverage`](grep-is-not-coverage.md) here.
+  That fragment governs a **null** result read as nonexistence, where this
+  fires on a positive result read as a neighbouring fact.
+
+See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
+"Three sound measurements, three claims beside them".
+
 ## Writing is the instrument, when the claim can be wrong
 
 The article establishes that self-assessment is unreliable and that confidence
@@ -396,8 +467,8 @@ write the thing that can be wrong.
 
 ## Do and don't
 
-- **Do:** classify each assertion as state, scope, cause, or default before it
-  goes out, and re-measure any that is not from this turn.
+- **Do:** classify each assertion as state, scope, cause, inference, or default
+  before it goes out, and re-measure any that is not from this turn.
 - **Do:** name the falsifying command beside a claim, and run it when it is
   cheap.
 - **Do:** treat a fluent, undeliberated answer as owing an alternative you can

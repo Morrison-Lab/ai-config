@@ -454,9 +454,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <ul>
 <li><strong><a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> / <code>cw</code></strong> — the first pass. Run it alone when only worktrees are in question.</li>
 <li><strong><a href="../../skills/clean-branches/SKILL.html"><code>clean-branches</code></a> / <code>cb</code></strong> — the second pass. Run it alone in a repo with no worktrees.</li>
-<li><strong><a href="../../skills/wrap-up/SKILL.html"><code>wrap-up</code></a></strong> — its state sweep surfaces leftover worktrees and branches; this is the skill it hands off to.</li>
-<li><strong><a href="../../skills/post-merge/SKILL.html"><code>post-merge</code></a></strong> — per-PR tidy-up; this is the repo-wide bulk form.</li>
-<li><strong><a href="../../skills/session-lock/SKILL.html"><code>session-lock</code></a></strong> — creates the worktrees swept here; its registry is what keeps a live session’s worktree off the plan.</li>
+<li><strong><a href="../../skills/wrap-up/SKILL.html"><code>wrap-up</code></a></strong> — its state sweep surfaces leftover worktrees and branches. This is the skill it hands off to.</li>
+<li><strong><a href="../../skills/post-merge/SKILL.html"><code>post-merge</code></a></strong> — per-PR tidy-up. This is the repo-wide bulk form.</li>
+<li><strong><a href="../../skills/session-lock/SKILL.html"><code>session-lock</code></a></strong> — creates the worktrees swept here. Its registry is what keeps a live session’s worktree off the plan.</li>
 </ul>
 <p>Do not confuse this with <strong><code>clear-all</code></strong>, which is an alias for <a href="../../skills/gia/SKILL.html"><code>gia</code></a> and does something entirely unrelated — opening PRs for every issue and driving them to clean. The two names are one letter apart on purpose-avoidance grounds: this skill is deliberately <strong>not</strong> called <code>clean-all</code>.</p>
 </section>

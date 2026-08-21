@@ -88,9 +88,9 @@ Three that the combined form makes easier to get wrong:
 
 - **[`clean-worktrees`](../../skills/clean-worktrees/SKILL.llms.md) / `cw`** — the first pass. Run it alone when only worktrees are in question.
 - **[`clean-branches`](../../skills/clean-branches/SKILL.llms.md) / `cb`** — the second pass. Run it alone in a repo with no worktrees.
-- **[`wrap-up`](../../skills/wrap-up/SKILL.llms.md)** — its state sweep surfaces leftover worktrees and branches; this is the skill it hands off to.
-- **[`post-merge`](../../skills/post-merge/SKILL.llms.md)** — per-PR tidy-up; this is the repo-wide bulk form.
-- **[`session-lock`](../../skills/session-lock/SKILL.llms.md)** — creates the worktrees swept here; its registry is what keeps a live session’s worktree off the plan.
+- **[`wrap-up`](../../skills/wrap-up/SKILL.llms.md)** — its state sweep surfaces leftover worktrees and branches. This is the skill it hands off to.
+- **[`post-merge`](../../skills/post-merge/SKILL.llms.md)** — per-PR tidy-up. This is the repo-wide bulk form.
+- **[`session-lock`](../../skills/session-lock/SKILL.llms.md)** — creates the worktrees swept here. Its registry is what keeps a live session’s worktree off the plan.
 
 Do not confuse this with **`clear-all`**, which is an alias for [`gia`](../../skills/gia/SKILL.llms.md) and does something entirely unrelated — opening PRs for every issue and driving them to clean. The two names are one letter apart on purpose-avoidance grounds: this skill is deliberately **not** called `clean-all`.
 

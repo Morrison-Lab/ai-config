@@ -260,6 +260,74 @@ and reasonably concludes the quote was misremembered.
 Name the exact source file and the branch the quote comes from,
 and say whether the claim survives the other branch's wording.
 That converts a citation a reader has to trust into one they can check.
+
+## A paraphrase-only attribution is invisible to every check above
+
+Everything above verifies a **quote**.
+`grep -c "<the quoted sentence>"` settles fidelity outright, splice detection
+reads the two side by side, and the version-conditional case asks which branch
+the wording came from.
+All three need a quoted sentence to operate on.
+
+So the citation that carries no quote passes all of them by default.
+"`upstream-issues` already draws the line this needs",
+"the lab manual requires this",
+"`fail-fast` says the same thing" ---
+each attributes an argument to a source without reproducing anything from it,
+so there is nothing to grep and nothing to compare.
+The instrument does not fail; it never engages.
+
+It is more dangerous than a misquote, because a paraphrase **launders**.
+A quote that has drifted still shows a reader the words and lets them
+disagree.
+A paraphrase reports the source's *conclusion* in your own voice, so a reader
+gets your reading of it with the source's authority attached, and the only way
+to check is to go read the file --- which is exactly what the citation was
+offering to save them.
+
+The failure is not carelessness about a source you never opened.
+The likelier case is the one that feels safest: you **did** read the file, a
+sentence in it genuinely bears on the topic, and what you wrote is what you
+took away rather than what it says.
+Attribution drifts between reading and writing, and rereading your own sentence
+cannot detect it, because it is a claim about the *other* file.
+
+**So quote the sentence you are relying on, or attribute nothing.**
+When a source is worth citing for an argument, one clause of it is worth
+pasting --- and the paste is what makes every instrument above apply.
+When you cannot find a sentence to quote, that is the finding: make the
+argument in your own voice and cite the source for what it does supply.
+
+Two mechanical checks, both cheap:
+
+- Grep the cited file for the **claim's own load-bearing words**, not for the
+  topic.
+  A citation asserting a source weighs merge cost is refuted by
+  `grep -oiwc` returning zero for `merge`, `wait`, `cost`, and `land`.
+- Read the cited file's sentence on the subject and check its **direction**.
+  A source can address your topic and conclude the opposite, which is the case
+  a topic-level grep confirms rather than catches.
+
+- **Do:** paste the sentence you are attributing an argument to, so the
+  quote-fidelity instruments above can run at all.
+- **Do:** grep the cited file for the claim's load-bearing words before
+  writing "already establishes" or "already draws the line".
+- **Don't:** attribute a conclusion to a source in your own words --- that is
+  the form no check above can see.
+- **Don't:** treat having read the file as having verified the attribution;
+  the drift happens between reading and writing.
+
+(Measured 2026-08-21 on
+[ai-config#1847](https://github.com/Morrison-Lab/ai-config/pull/1847).
+A passage claimed `upstream-issues.md` "already draws the line this needs"
+between a repo we administrate and a genuine external upstream.
+That file's only sentence on the subject runs the other way ---
+"The same judgment applies to repos we administrate, rather than being a
+courtesy owed only to strangers" --- collapsing the distinction rather than
+drawing it, and `merge`, `wait`, `cost`, and `land` each appear zero times in
+it.
+The file had been read; the attribution was still wrong.
+A reviewer caught it, and both refuting commands took under a minute.)
 (`ai-config#697`, 2026-07-24: a review flagged a `docs.github.com` URL as
 "likely fabricated" and a quote as "likely a paraphrase".
 The frontmatter listed both of the reviewer's proposed URLs as

@@ -1114,6 +1114,18 @@ Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding a
 <!-- Not yet shared with the lab manual; edit shared/coding/errexit-is-not-uniform.md, not here. -->
 [`shared/coding/errexit-is-not-uniform.md`](shared/coding/errexit-is-not-uniform.md)
 
+## Coding: an empty bash associative-array subscript is fatal, not a miss
+
+<!-- Not yet shared with the lab manual; edit shared/coding/bash-associative-arrays.md, not here. -->
+[`shared/coding/bash-associative-arrays.md`](shared/coding/bash-associative-arrays.md)
+
+`${arr["$k"]:-}` tolerates a missing key and not an empty one, so the `:-`
+default cannot guard a validator whose key is derived (`"${stem##*.}"`, a
+`cut` field, a regex capture) --- it dies on exactly the malformed input it
+exists to reject.
+Test the key for emptiness first in an `||` chain, so short-circuiting
+prevents the expansion.
+
 ## Coding: avoid hard-coding data with an external source of truth
 
 <!-- Shared with the lab manual; edit shared/coding/avoid-hardcoding-external-data.md, not here. -->

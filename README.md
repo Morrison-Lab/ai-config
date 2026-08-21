@@ -43,6 +43,43 @@ In a Claude Code session, type `/` and confirm the skills appear (e.g.
 - **Global Plugin**: `bootstrap.sh` symlinks `plugins/ai-config` to `~/.gemini/config/plugins/ai-config` and registers `~/.gemini/config/plugins.json` and `skills.json`.
 - **Workspace Plugin**: Opening this repository directly in Antigravity automatically discovers `.agents/skills.json` and `.agents/plugins.json` to load all skills, rules (`AGENTS.md`), and plugin features.
 
+### opencode
+
+[opencode](https://opencode.ai) has no skills-bundle "plugin" — its `plugin`
+config field loads JavaScript/TypeScript event-hook modules, not skills, rules,
+or agents. opencode instead reads ai-config through its ordinary config fields
+plus convention-based discovery (`.claude/skills/`, `.agents/skills/`,
+`.opencode/agents/`):
+
+- **This repo.** The root [`opencode.json`](opencode.json) wires opencode when
+  you run it inside ai-config: `instructions` loads `AGENTS.md`/`CLAUDE.md`,
+  `skills.paths` adds `skills/` and the vendored `shared/sembr-skills/skills`,
+  `references` exposes `shared/` and `memories/`, and the subagents in
+  [`.opencode/agents/`](.opencode/agents) are auto-discovered.
+- **Another repo (consumer).** A project that vendors ai-config at `.ai-config/`
+  (as [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) does via
+  `tools/bootstrap-ai-config.sh` + a pinned `.ai-config-ref`) points its own
+  `opencode.json` at that checkout — the opencode analogue of the Claude plugin
+  and the `.agents/*.json` Antigravity/Gemini config:
+
+  ```json
+  {
+    "$schema": "https://opencode.ai/config.json",
+    "instructions": ["AGENTS.md", "CLAUDE.md", ".ai-config/CLAUDE.md"],
+    "skills": {
+      "paths": [".ai-config/skills", ".ai-config/shared/sembr-skills/skills"]
+    },
+    "references": {
+      "shared":   { "path": ".ai-config/shared",   "description": "ai-config shared fragments" },
+      "memories": { "path": ".ai-config/memories", "description": "ai-config memories" }
+    }
+  }
+  ```
+
+  To make ai-config available to opencode in **every** project, copy or symlink
+  `skills/` into `~/.config/opencode/skills/` and add `instructions` entries to
+  `~/.config/opencode/opencode.json`.
+
 
 ### Codex wrappers
 

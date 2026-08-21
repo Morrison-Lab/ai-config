@@ -195,6 +195,55 @@ the run whose `event` is `pull_request`.
 - **Don't:** conclude the gate passed from a green check run alone --- confirm
   it was the `pull_request`-triggered one.
 
+**The disagreement has a second, sharper form: the gate splits a boundary the
+reformatter leaves whole.**
+The clause case above is the reformatter doing too much, joining wrapped lines
+the gate then flags.
+This is the reformatter doing too little, leaving two sentences on one line that
+the gate then flags as `Line packs more than one sentence`.
+The two tools carry different sentence-boundary rules.
+`scripts/semantic-line-breaks.py` has one break regex, `_SENT_BREAK_RE`, whose
+lookahead demands an uppercase letter or markup after the period, so a sentence
+ending in `.` before a lowercase word is no boundary to it.
+The gate carries that same branch plus a second one the reformatter lacks,
+`_SENT_BREAK_LOWER_RE` (reported in `d-morrison/gha` #389, added by gha#425), matching
+`(?<=[a-z][a-z])([.!?])\s+(?=[a-z])` --- a period after two lowercase letters,
+then a space, then a lowercase word.
+So `...rules, or agents. opencode instead reads...` is one line to the
+reformatter and two sentences to the gate, because the lowercased brand name
+`opencode` follows the period after `agents`.
+The reformatter does worse than fail to propose the split.
+It **undoes** the split once you have made it.
+`split_sentences()` collapses whitespace before applying `_SENT_BREAK_RE`, so a
+hand-break at a lowercase-follower boundary is joined back onto one line ---
+the reformatter reverts the very fix the gate is asking for.
+
+That makes this case an exception to the remedy the section above gives.
+"Read the reformatter's preview and apply its sentence splits by hand" is sound
+for every boundary the reformatter can see, and silently destructive here,
+because re-running it after a correct hand-break restores the violation.
+The neighbouring guard rail does not cover it either: "don't accept a join that
+puts a wrapped sentence back on one line" is framed around the **clause** rule,
+and this is the **sentence** rule.
+
+- **Do:** run the real `check-new-line-breaks.py` locally to catch a
+  lowercase-follower boundary, and hand-break after the period.
+- **Do:** treat a `.` before a lowercased package or brand name (`opencode`,
+  `renv`) opening a sentence as a boundary the gate will split.
+- **Don't:** read the reformatter leaving a line whole as evidence the gate
+  passes it --- the reformatter has no lowercase-follower branch.
+- **Don't:** re-run the reformatter over a hand-broken lowercase boundary.
+  It will rejoin it, and the rejoin is silent.
+
+(Both mechanisms verified by source, read on 2026-08-21:
+the reformatter's single `_SENT_BREAK_RE` in `scripts/semantic-line-breaks.py`,
+and the gate's `_SENT_BREAK_LOWER_RE` at `check-new-line-breaks.py:140` in a
+fresh clone of `d-morrison/gha`, whose own `CLAUDE.md` records that gha#425
+closed gha#389 by adding that branch.
+The rejoin was reproduced directly rather than inferred: calling `reformat()`
+on `"...or agents.\nopencode instead reads..."` returns the two lines joined
+into one.)
+
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
 `d-morrison/gha@e91b8bf` ("fail by default when violations are found",

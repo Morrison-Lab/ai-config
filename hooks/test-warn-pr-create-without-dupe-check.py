@@ -172,6 +172,13 @@ prose_commit = write_transcript(["git commit -m 'mention gh pr view here'"])
 prose_heredoc = write_transcript(
     ["cat > /tmp/x.md <<'EOF'\ngh pr list --repo o/r\nEOF"])
 chained_real = write_transcript(["git fetch && gh pr list --state open"])
+# A parenthetical aside inside a quoted argument must not discharge. `(` and
+# `{` are deliberately absent from RX_DISCHARGE's separator class for this
+# reason: they are ordinary in prose, unlike `;`/`&`/`|`/newline, and a false
+# discharge silences the guard for the session (#1749, third round).
+paren_prose = write_transcript(
+    ['git commit -m "fix: document (gh pr list) usage in the hook"'])
+brace_prose = write_transcript(['echo "note {gh pr view} usage"'])
 unrelated_mcp = write_transcript([None], "mcp__github__get_me")
 
 check("no dupe check in transcript",
@@ -196,6 +203,10 @@ check("prose in a heredoc body does not discharge",
       hook.transcript_has_dupe_check(prose_heredoc), False)
 check("a chained real gh pr list still discharges",
       hook.transcript_has_dupe_check(chained_real), True)
+check("a parenthetical aside in a commit message does not discharge",
+      hook.transcript_has_dupe_check(paren_prose), False)
+check("a brace aside in a quoted argument does not discharge",
+      hook.transcript_has_dupe_check(brace_prose), False)
 
 # Fail-open cases.
 check("missing transcript path fails open",

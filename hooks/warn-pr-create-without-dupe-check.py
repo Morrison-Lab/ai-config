@@ -111,13 +111,24 @@ RX_CREATE = re.compile(
 )
 
 # A CLI command that could have surfaced an already-open PR. Anchored to a
-# command position and applied to heredoc-stripped text, exactly as RX_CREATE
-# is: an unanchored discharge is strictly worse than an unanchored trigger,
-# because prose that merely mentions `gh pr list` would silence the guard for
-# the rest of the session rather than emit one spurious note. Caught in review
-# on #1749, where this file's own reminder text contains the phrase.
+# command position and applied to heredoc-stripped text, as RX_CREATE is: an
+# unanchored discharge is strictly worse than an unanchored trigger, because
+# prose that merely mentions `gh pr list` would silence the guard for the rest
+# of the session rather than emit one spurious note. Caught in review on #1749,
+# where this file's own reminder text contains the phrase.
+#
+# The separator class is DELIBERATELY NARROWER than RX_CREATE's: it omits `(`
+# and `{`. Those two were added to RX_CREATE to catch real command-position
+# uses -- `$(gh pr create)`, `{ gh pr create; }`, `(gh pr create)` -- but this
+# module cannot parse shell quoting, so it cannot tell a subshell from a
+# parenthesis inside an already-open quoted argument. Unlike `;`, `&`, `|` and
+# a newline, a parenthetical aside is ordinary inside prose, so
+# `git commit -m "document (gh pr list) usage"` would match. On the trigger
+# side that costs one spurious note; here it silences the guard for the
+# session, which is the asymmetry the paragraph above is about. Losing the
+# genuine `(gh pr list)` shape costs one note, and is the cheap direction.
 RX_DISCHARGE = re.compile(
-    r"(?:^|[;&|\n({])\s*"
+    r"(?:^|[;&|\n])\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
     r"(?:gh\s+pr\s+(?:list|view|status)\b"
     r"|gh\s+search\s+prs\b"

@@ -595,7 +595,7 @@ For a pure-CPU scan it cannot, and a CPU-time ceiling is the honest one.
 
 Its resolution is also platform-dependent, which matters when the measured span is short.
 Do not assume it, and do not generalize from the machine in front of you: read `time.get_clock_info('process_time')`, which reports the implementation and resolution for the interpreter actually running.
-On the Linux container this was measured on it reports `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)` at `1e-09`.
+On the Linux container these figures were measured on, that call returns `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)` at `1e-09`.
 CPython uses a different call on Windows, whose effective granularity is coarse enough to quantize a span of a few tens of milliseconds.
 Size the baseline to clear that granularity by a wide margin, and fail loudly when it does not rather than dividing by a number the clock could not measure.
 

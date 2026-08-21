@@ -268,6 +268,13 @@
             "timeout": 10,
             "script": "no-handrolled-verdict-parse.py",
             "why": "shared/workflow/ardi.md mandates check-pr-fully-clean.py as verdict authority. PreToolUse guard that refuses hand-rolled regex/grep verdict parses of review comments without running the script or setting ALLOW_HANDROLLED_VERDICT_PARSE=1."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
+            "timeout": 10,
+            "script": "warn-pr-create-without-dupe-check.py",
+            "why": "pr-on-claim.md makes an issue's cross-referenced open PRs the authoritative in-flight signal, and that rule is consulted at read time while the omission happens at composition time. Measured on Morrison-Lab/wai 2026-08-19/20: five branches fixed the same CI failure across five hours, two reaching duplicate PRs (#77, #78). Warns rather than blocks -- a duplicate PR is cheap to close and a blocked PR creation is expensive, since creating the PR is the very act that makes work visible to other sessions. Anchored on a command position with heredoc bodies stripped, because this corpus quotes `gh pr create` constantly. Fails open. Tracked as #1748."
           }
         ]
       },
@@ -345,6 +352,13 @@
             "timeout": 10,
             "script": "no-unauthorized-merge.py",
             "why": "cai 2026-08-04 'I want a mechanistic prohibition, not just a guideline' -- mechanistically blocks unauthorized GitHub MCP PR merge operations (mcp__github__merge_pull_request and defensive auto-merge tool variants) at the PreToolUse boundary unless explicit permission is present."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
+            "timeout": 10,
+            "script": "warn-pr-create-without-dupe-check.py",
+            "why": "Dual-registered with the Bash entry, following no-unauthorized-merge.py's precedent. tool-mappings.md maps CREATE_PR to mcp__github__create_pull_request, and CLAUDE.md mandates that substitute in remote sessions -- so registering only under Bash let a remote session discharge the guard via MCP reads while never being able to trip it via MCP creation."
           }
         ]
       }

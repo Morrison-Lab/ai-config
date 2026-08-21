@@ -164,3 +164,35 @@ run it again with a new branch name for each new issue. Forgetting leaves the
 working tree on issue 1's branch, so issue 2's edits land in the same
 commit/PR as issue 1's --- silently, since nothing errors (there's no reused
 branch name here to trigger `git checkout -b`'s own "already exists" error).
+
+**The open-PR check fails silently in the one situation it exists for, and a hook now carries it.**
+
+Every rule above assumes the check gets run.
+The measured failure is that it does not, and that nothing about the moment suggests it was skipped.
+
+Measured on `Morrison-Lab/wai`, 2026-08-19/20.
+Five branches attacked the same `check-non-standard-chars` failure across roughly five hours: `fix/replace-em-dashes` (20:14), `fix/replace-em-dashes-v2` (23:29), `fix/replace-all-non-standard-chars` (23:38), `fix/all-non-standard-chars` (00:16, which became #77), and `fix/ascii-punctuation` (01:16, which became #78).
+Three further branches --- `fix/fix-review-77`, `fix/fix-review-77-cleanup`, and `fix/fix-review-findings` --- addressed review findings on those five.
+Two reached PRs and duplicated each other.
+
+**The session that opened the fifth had filed the tracking issue minutes earlier.**
+That is the whole difficulty.
+Filing an issue and opening a PR against it is the issue-first workflow performed correctly, so it reads as compliance from the inside --- there is no moment that feels like skipping a step, because the skipped step is a *query about other people* rather than anything in your own sequence.
+
+**The parallelism runs the wrong way, too.**
+The more sessions working a repo, the likelier a collision and the less any single session can observe it.
+So the check matters most exactly when the evidence for needing it is least visible, which is why judgment does not reach it and an instrument has to.
+
+**One of those duplicates was actively dangerous, not merely wasteful.** #77 was cut from an unrelated PR's branch while targeting `main`, so it carried that PR's content two review rounds stale.
+Merging it would have shipped a version of that PR's content which that PR's own reviewer had already rejected, under a title describing something else entirely.
+A duplicate is not always the cheaper of two equivalent paths;
+check what else the branch is carrying before picking one.
+
+- **Do:** run `gh pr list --repo <owner>/<repo> --state open --search "<keywords>"` before creating a PR, not only before claiming an issue.
+- **Do:** check what a duplicate branch is *based on* before choosing between it and yours --- a branch cut from another PR ships that PR's content too.
+- **Don't:** read "I filed the issue and am opening its PR" as evidence the in-flight check ran;
+  those are different steps and only one of them looks at other sessions.
+- **Don't:** treat a low collision probability as a reason to skip it --- the probability is unobservable from inside a single session.
+
+`hooks/warn-pr-create-without-dupe-check.py` mechanizes this, per [`algorithmatize-checks`](algorithmatize-checks.md).
+It warns rather than blocks: a duplicate PR is cheap to close, while a blocked `gh pr create` interrupts the one action that makes work visible to other sessions.

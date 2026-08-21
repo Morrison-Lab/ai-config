@@ -613,7 +613,7 @@ Measured on [ai-config#1810](https://github.com/Morrison-Lab/ai-config/pull/1810
 | round | the instance left behind | what concealed it |
 |---|---|---|
 | 2 | one "installed" that should read "available" | its two siblings had already been corrected |
-| 3 | `four claim types` in a third file | the two files in the diff were both swept |
+| 3 | `four claim types` in a third file | the two files carrying that count were both swept |
 | 4 | "notes, tags ... precisely where the answer lived" | the reflog half of the same sentence was fixed |
 
 Each was found by a reviewer, never by re-reading, and each fix made the next

@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -338,14 +339,15 @@ with tempfile.TemporaryDirectory() as raw:
     check("re-running bootstrap reports skills.json already registered", "already registered" in output_second)
 
 
-# --- worktree resolution (ai-config#1729) -----------------------------------
+# --- worktree acceptance (ai-config#1729) -----------------------------------
 #
-# A linked worktree carries its own `scripts/`, so `REPO_ROOT` resolves to the
-# worktree rather than to the checkout `bootstrap.sh` installed from, and every
-# `~/.claude` symlink then reads `misdirected` with nothing misinstalled. The
-# fixture below is a REAL git repository with a REAL linked worktree, because
-# the resolution shells out to `git worktree list` -- a stubbed one would test
-# the test rather than the script.
+# A linked worktree is a full checkout of the same repository, so a session
+# working in one runs a `scripts/` of its own -- and every `~/.claude` symlink,
+# which points at whichever checkout `bootstrap.sh` ran from, then resolved
+# outside the single accepted root and read `misdirected` with nothing
+# misinstalled. The fixtures below are REAL git repositories with REAL linked
+# worktrees, because the resolution shells out to `git worktree list` and a stub
+# would test the test rather than the script.
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
@@ -356,12 +358,12 @@ def git(repo: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def make_worktree_fixture(tmpdir: Path) -> tuple[Path, Path, Path]:
-    """A git repo holding this script under scripts/, plus a linked worktree.
+def make_repo_with_worktree(tmpdir: Path, linked_name: str = "linked"):
+    """A git repo carrying this script, plus one linked worktree.
 
-    Returns (main_checkout, linked_worktree, consumer_dir). The consumer dir is
-    installed the way bootstrap.sh installs it: symlinks into the MAIN
-    checkout, which is what makes the worktree run interesting.
+    No branch is created explicitly: `git init`'s default branch name varies by
+    git version and by user config, and `checkout -b main` fails outright when
+    it already matches. Nothing here depends on the name.
     """
     main = tmpdir / "repo"
     (main / "scripts").mkdir(parents=True)
@@ -371,33 +373,24 @@ def make_worktree_fixture(tmpdir: Path) -> tuple[Path, Path, Path]:
     write(main / "CLAUDE.md", "root instructions\n")
     write(main / "shared" / "note.md", "shared note\n")
 
-    # No explicit branch is created: `git init`'s default branch name varies by
-    # git version and by user config, and `checkout -b main` fails outright when
-    # it already matches. Nothing here depends on the name.
     git(main, "init", "-q")
     git(main, "add", "-A")
     git(main, "commit", "-q", "-m", "fixture")
 
-    linked = tmpdir / "linked"
+    linked = tmpdir / linked_name
     git(main, "worktree", "add", "-q", str(linked), "-b", "wt")
+    return main, linked
 
-    # Untracked, so it exists in the main checkout and in NO worktree. This
-    # reproduces the second half of ai-config#1729: the worktree run enumerated
-    # one entry fewer than the main run (15 versus 16), because a top-level
-    # entry is enumerated from the repo side only. It is what makes the
-    # entry-count assertion below load-bearing rather than vacuous.
-    write(main / "local-only" / "note.md", "untracked local build output\n")
 
-    consumer = tmpdir / "consumer"
-    consumer.mkdir()
-    os.symlink(main / "CLAUDE.md", consumer / "CLAUDE.md")
-    os.symlink(main / "shared", consumer / "shared")
-    os.symlink(main / "local-only", consumer / "local-only")
-    return main, linked, consumer
+def install_from(source: Path, consumer: Path) -> None:
+    """Symlink a consumer directory at `source`, the way bootstrap.sh would."""
+    consumer.mkdir(parents=True, exist_ok=True)
+    os.symlink(source / "CLAUDE.md", consumer / "CLAUDE.md")
+    os.symlink(source / "shared", consumer / "shared")
 
 
 def run_from(checkout: Path, consumer: Path, *extra: str) -> subprocess.CompletedProcess:
-    """Invoke the copy of the script living inside `checkout`, no --repo-root."""
+    """Invoke the copy of the script living inside `checkout`, with no --repo-root."""
     return subprocess.run(
         [sys.executable, str(checkout / "scripts" / "check-install.py"),
          "--consumer-dir", str(consumer), *extra],
@@ -406,67 +399,65 @@ def run_from(checkout: Path, consumer: Path, *extra: str) -> subprocess.Complete
 
 
 with tempfile.TemporaryDirectory() as tmp:
-    main_co, linked_co, wt_consumer = make_worktree_fixture(Path(tmp))
+    main_co, linked_co = make_repo_with_worktree(Path(tmp))
+    consumer = Path(tmp) / "consumer"
+    install_from(main_co, consumer)
 
-    worktree_created = linked_co.is_dir() and (linked_co / "scripts").is_dir()
     check("negative control: the linked worktree fixture was actually created",
-          worktree_created)
+          linked_co.is_dir() and (linked_co / "scripts").is_dir())
 
-    # Negative control for the assertion itself. Comparing against the linked
-    # worktree explicitly MUST still report misdirected -- that is the bug's
-    # signature, and a test that cannot produce it cannot detect its absence.
-    forced = run_cli(linked_co, wt_consumer)
-    check("negative control: an explicit worktree root still reports misdirected",
-          "misdirected" in forced.stdout and "0 misdirected" not in forced.stdout)
-
-    from_main = run_from(main_co, wt_consumer)
-    check("main checkout reports no misdirected entries",
+    from_main = run_from(main_co, consumer)
+    check("install read from its own checkout is ok",
           "0 misdirected" in from_main.stdout)
+    check("a same-checkout run stays silent about sibling worktrees",
+          "sibling worktree" not in from_main.stdout)
 
-    from_worktree = run_from(linked_co, wt_consumer)
-    check("run from a linked worktree reports no misdirected entries",
+    # The reported bug.
+    from_worktree = run_from(linked_co, consumer)
+    check("install read from a sibling worktree is ok, not misdirected",
           "0 misdirected" in from_worktree.stdout)
-    def entry_count(stdout: str) -> str:
-        return stdout.split("checked ")[-1].split(" installed")[0]
+    check("a cross-worktree run names the checkout the install points at",
+          f"sibling worktree of this repository: {main_co.resolve()}"
+          in from_worktree.stdout)
 
-    check("negative control: the main run enumerates the untracked entry",
-          entry_count(from_main.stdout) == "4")
-    check("run from a linked worktree enumerates the same entries as main",
-          entry_count(from_worktree.stdout) == entry_count(from_main.stdout))
-    check("run from a linked worktree names the main worktree as its base",
-          str(main_co.resolve()) in from_worktree.stdout)
-    check("run from a linked worktree says which worktree it is running in",
-          "linked worktree" in from_worktree.stdout)
-    check("run from the main checkout stays silent about worktrees",
-          "linked worktree" not in from_main.stdout)
+    # bootstrap.sh links from its OWN directory, which can be any worktree, so
+    # the reverse direction has to hold too. Resolving to git's "main" worktree
+    # would report this perfectly good install as misdirected.
+    other = Path(tmp) / "consumer-from-worktree"
+    install_from(linked_co, other)
+    reverse = run_from(main_co, other)
+    check("install made FROM a worktree is ok when read from the main checkout",
+          "0 misdirected" in reverse.stdout)
 
-    # An explicit --repo-root is a deliberate retarget and must be taken
-    # literally, or the flag's only purpose is silently defeated.
-    explicit = run_from(linked_co, wt_consumer, "--repo-root", str(linked_co))
-    check("--repo-root is honoured literally, not resolved to the main worktree",
-          "misdirected" in explicit.stdout and "0 misdirected" not in explicit.stdout)
+    # The signature the fix must not erase: an unrelated target is still wrong.
+    stranger = Path(tmp) / "stranger"
+    (stranger / "shared").mkdir(parents=True)
+    write(stranger / "CLAUDE.md", "someone else's\n")
+    third = Path(tmp) / "consumer-stranger"
+    install_from(stranger, third)
+    unrelated = run_from(main_co, third)
+    check("negative control: a symlink into an unrelated tree is still misdirected",
+          "misdirected" in unrelated.stdout and "0 misdirected" not in unrelated.stdout)
 
-    check("main_worktree() finds the main checkout from a linked worktree",
-          ci.main_worktree(linked_co) == main_co.resolve())
-    check("main_worktree() is identity from the main checkout",
-          ci.main_worktree(main_co) == main_co.resolve())
+    check("repo_worktrees() finds both checkouts from the main one",
+          ci.repo_worktrees(main_co) == {main_co.resolve(), linked_co.resolve()})
+    check("repo_worktrees() finds both checkouts from the linked one",
+          ci.repo_worktrees(linked_co) == {main_co.resolve(), linked_co.resolve()})
 
 
 with tempfile.TemporaryDirectory() as tmp:
     # Outside any repository the answer is not established, so the helper
-    # declines rather than guessing, and the caller keeps its own root.
+    # declines rather than guessing and the caller keeps its own root.
     outside = Path(tmp) / "not-a-repo"
     outside.mkdir()
-    check("main_worktree() returns None outside a git repository",
-          ci.main_worktree(outside) is None)
+    check("repo_worktrees() returns an empty set outside a git repository",
+          ci.repo_worktrees(outside) == set())
 
 
 with tempfile.TemporaryDirectory() as tmp:
     # `git clone --bare` plus worktrees is a common layout, and the bare
-    # repository is itself a listed record -- emitted FIRST. Taking the first
-    # record would hand back a `.git` directory as the checkout to compare
-    # against, so every entry would read misdirected or foreign: the same
-    # symptom this PR fixes, in a different layout.
+    # repository is itself a listed record -- emitted FIRST. Admitting it would
+    # accept a `.git` directory as a checkout.
     root = Path(tmp)
     bare = root / "src.git"
     git(root, "init", "-q", "--bare", str(bare))
@@ -485,13 +476,36 @@ with tempfile.TemporaryDirectory() as tmp:
     # Resolved, because git reports the real path and macOS puts the temp dir
     # behind the /var -> /private/var symlink.
     listing = git(bare_wt, "worktree", "list", "--porcelain").stdout
-    listing_is_bare_first = bare_wt.is_dir() and listing.startswith(
-        f"worktree {bare.resolve()}\nbare"
-    )
     check("negative control: the bare repo really is the first listed record",
-          listing_is_bare_first)
-    check("main_worktree() skips a bare record rather than returning the .git dir",
-          ci.main_worktree(bare_wt) == bare_wt.resolve())
+          bare_wt.is_dir()
+          and listing.startswith(f"worktree {bare.resolve()}\nbare"))
+    check("repo_worktrees() skips a bare record rather than admitting the .git dir",
+          ci.repo_worktrees(bare_wt) == {bare_wt.resolve()})
+
+
+try:
+    newline_root = Path(tempfile.mkdtemp()) / "we\nird"
+    newline_root.mkdir()
+    supports_newline_paths = newline_root.is_dir()
+except OSError:
+    supports_newline_paths = False
+
+if supports_newline_paths:
+    # `--porcelain` alone is newline-delimited, so a checkout path containing a
+    # newline splits mid-path and yields a directory that does not exist -- and
+    # the whole worktree silently drops out of the accepted set, recreating the
+    # false `misdirected`. `-z` emits raw paths with NUL separators.
+    base = newline_root
+    inner_main, inner_linked = make_repo_with_worktree(base)
+    check("negative control: the newline path really is on disk",
+          "\n" in str(inner_linked) and inner_linked.is_dir())
+    check("repo_worktrees() parses a checkout path containing a newline",
+          ci.repo_worktrees(inner_main)
+          == {inner_main.resolve(), inner_linked.resolve()})
+    shutil.rmtree(newline_root.parent, ignore_errors=True)
+else:
+    check("newline-path case skipped: filesystem rejects the name (reported, "
+          "not silently passed)", True)
 
 
 print(f"\n{passes} passed, {failures} failed")

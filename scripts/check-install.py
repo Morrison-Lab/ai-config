@@ -66,13 +66,18 @@ This checks the Claude consumer directory. `bootstrap.sh` also installs Codex
 wrappers into `~/.codex/skills` and skills into `~/.gemini`; those are not
 covered here rather than half-covered. `--consumer-dir` retargets the check.
 
-The comparison base is the repository's **main worktree**, because that is the
-checkout `bootstrap.sh` installed from. A linked worktree carries a `scripts/`
-of its own, so a run started there would otherwise compare against the worktree
-and report every entry `misdirected` with nothing misinstalled -- on essentially
-every session, since `memories/preferences.md` requires a dedicated worktree for
-EVERY local session in this repo, not just for multi-file work (ai-config#1729).
-`--repo-root` overrides the base and is taken literally.
+A symlink is `ok` when it resolves into ANY working tree of this repository, not
+only into the checkout this script happens to be running from. A linked worktree
+is a full checkout of the same repository, so a session working in one has a
+`scripts/` of its own; comparing only against that worktree classified every
+`~/.claude` symlink `misdirected` with nothing misinstalled (ai-config#1729).
+The question `ok` answers is whether a symlink tracks future pulls of this
+repository, and every one of its working trees does.
+
+Deliberately NOT resolved to the "main" worktree: `bootstrap.sh` links from its
+own directory, which can be any worktree, so treating the main one as the
+install source would assert something this script cannot check -- and would
+misreport an install made from a worktree as misdirected.
 """
 from __future__ import annotations
 
@@ -119,61 +124,45 @@ REPORT_ONLY = ("misdirected", "foreign")
 BACKUP_DIR_NAME = ".ai-config-backups"
 
 
-def main_worktree(path: Path) -> Path | None:
-    """The main worktree of the repository containing `path`, or None.
+def repo_worktrees(path: Path) -> set[Path]:
+    """Every working tree of the repository containing `path`.
 
-    A linked worktree is a full checkout of the same repository, so a session
-    working in one has a `scripts/` of its own -- and `REPO_ROOT` therefore
-    resolves to the worktree rather than to the checkout `bootstrap.sh`
-    installed from. Every `~/.claude` symlink then resolves outside that root
-    and reads `misdirected`, with nothing actually misinstalled (ai-config#1729).
+    `git worktree list --porcelain -z` is used rather than the newline form:
+    `-z` separates attribute lines with NUL and records with a double NUL, and
+    emits paths raw, so a checkout path containing a newline parses correctly
+    instead of silently yielding a nonexistent directory.
 
-    `git worktree list --porcelain` names it. That is used in preference to
-    `git rev-parse --git-common-dir`'s parent, which is the main worktree only
-    when the common directory happens to be `<main>/.git` -- untrue for a bare
-    repository and for `--separate-git-dir`.
+    Bare records carry a `bare` attribute and no working tree, so they are
+    skipped -- the `git clone --bare` plus worktrees layout lists the bare
+    repository FIRST, and admitting it would accept a `.git` directory as a
+    checkout. Measured 2026-08-21.
 
-    The FIRST record is not always the answer. A bare repository is itself a
-    listed record, so the common `git clone --bare` plus worktrees layout emits
-    it first, and taking it would hand back a `.git` directory as the checkout
-    to compare against. Records are separated by a blank line and carry a bare
-    `bare` attribute line, so bare records are skipped and the first record with
-    an actual working tree wins. Measured 2026-08-21:
-
-        worktree /tmp/src.git
-        bare
-
-        worktree /tmp/wt1
-        HEAD 0560a745...
-        branch refs/heads/wt1
-
-    Returns None whenever the answer is not established: `git` missing, `path`
-    not in a repository, a bare-only listing, or output in an unexpected shape.
-    The caller keeps its original root in that case, which is the correct base
-    for every non-worktree install, and prints the root it settled on either way.
+    Returns an empty set whenever the answer is not established: `git` missing,
+    `path` not in a repository, or output in an unexpected shape. The caller
+    unions this with its own root, so an empty set leaves behaviour exactly as
+    it was before this resolution existed.
     """
     try:
         result = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"],
+            ["git", "worktree", "list", "--porcelain", "-z"],
             cwd=path, capture_output=True, text=True, timeout=10,
         )
     except (OSError, subprocess.SubprocessError):
-        return None
+        return set()
     if result.returncode != 0:
-        return None
+        return set()
 
-    candidate: Path | None = None
-    for line in result.stdout.splitlines():
-        if line.startswith("worktree "):
-            candidate = Path(line[len("worktree "):]).resolve()
-        elif line.strip() == "bare":
-            # This record has no working tree; keep reading for one that does.
-            candidate = None
-        elif not line.strip() and candidate is not None:
-            # Blank line ends a record, and this one was not bare.
-            return candidate if candidate.is_dir() else None
-    # A listing with no trailing blank line still has to yield its last record.
-    return candidate if candidate is not None and candidate.is_dir() else None
+    found: set[Path] = set()
+    for record in result.stdout.split("\0\0"):
+        fields = [f for f in record.split("\0") if f]
+        if not fields or not fields[0].startswith("worktree "):
+            continue
+        if any(f == "bare" for f in fields):
+            continue
+        candidate = Path(fields[0][len("worktree "):]).resolve()
+        if candidate.is_dir():
+            found.add(candidate)
+    return found
 
 
 class Entry:
@@ -244,16 +233,17 @@ def child_names(path: Path, dirs_only: bool) -> set[str]:
     return names
 
 
-def resolves_into_repo(link: Path, repo_root: Path) -> bool:
+def resolves_into_repo(link: Path, repo_roots: set[Path]) -> bool:
+    """True when `link` resolves into any accepted working tree of this repo."""
     try:
         target = link.resolve()
     except OSError:
         return False
-    return target == repo_root or repo_root in target.parents
+    return any(target == root or root in target.parents for root in repo_roots)
 
 
 def classify(repo_path: Path | None, install_path: Path, group: str, name: str,
-             repo_root: Path) -> Entry:
+             repo_roots: set[Path]) -> Entry:
     """Compare one repo path against its installed counterpart."""
     installed_exists = install_path.is_symlink() or install_path.exists()
 
@@ -264,7 +254,7 @@ def classify(repo_path: Path | None, install_path: Path, group: str, name: str,
         return Entry(group, name, "missing", repo_path, install_path)
 
     if install_path.is_symlink():
-        if resolves_into_repo(install_path, repo_root):
+        if resolves_into_repo(install_path, repo_roots):
             return Entry(group, name, "ok", repo_path, install_path)
         return Entry(group, name, "misdirected", repo_path, install_path,
                      detail=os.readlink(install_path))
@@ -276,8 +266,34 @@ def classify(repo_path: Path | None, install_path: Path, group: str, name: str,
     return Entry(group, name, "stale", repo_path, install_path)
 
 
-def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
-    """Build the full verdict list, mirroring bootstrap.sh's install model."""
+def install_sources(entries: list["Entry"], repo_roots: set[Path]) -> set[Path]:
+    """Which accepted checkouts the installed symlinks actually resolve into."""
+    sources: set[Path] = set()
+    for entry in entries:
+        if entry.status != "ok" or not entry.install_path.is_symlink():
+            continue
+        try:
+            target = entry.install_path.resolve()
+        except OSError:
+            continue
+        for root in repo_roots:
+            if target == root or root in target.parents:
+                sources.add(root)
+                break
+    return sources
+
+
+def collect(repo_root: Path, consumer_dir: Path,
+            repo_roots: set[Path] | None = None) -> list[Entry]:
+    """Build the full verdict list, mirroring bootstrap.sh's install model.
+
+    `repo_root` is enumerated; `repo_roots` is the set of checkouts a symlink
+    may point into and still count as tracking this repo. They differ only when
+    the repository has more than one working tree. Defaulting to `{repo_root}`
+    keeps every caller that predates worktree support behaving identically.
+    """
+    if repo_roots is None:
+        repo_roots = {repo_root}
     entries: list[Entry] = []
 
     for src in sorted(repo_root.glob("*.md")):
@@ -289,7 +305,7 @@ def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
         # loop does not enable dotglob, so this skip keeps the two in step.
         if src.name.startswith("."):
             continue
-        entries.append(classify(src, consumer_dir / src.name, "", src.name, repo_root))
+        entries.append(classify(src, consumer_dir / src.name, "", src.name, repo_roots))
 
     for src in sorted(p for p in repo_root.iterdir() if p.is_dir()):
         if src.name.startswith(".") or src.name in EXCLUDED_DIRS:
@@ -300,7 +316,7 @@ def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
         # covers it, and its children need no enumeration -- they are the
         # repo's own files by construction.
         if dest.is_symlink() or not dest.exists():
-            entries.append(classify(src, dest, "", src.name, repo_root))
+            entries.append(classify(src, dest, "", src.name, repo_roots))
             continue
 
         # A real directory is already here, so bootstrap merges child by child
@@ -316,7 +332,7 @@ def collect(repo_root: Path, consumer_dir: Path) -> list[Entry]:
             child_src = src / name
             entries.append(classify(
                 child_src if child_src.exists() else None,
-                dest / name, src.name, name, repo_root,
+                dest / name, src.name, name, repo_roots,
             ))
 
     return entries
@@ -401,9 +417,8 @@ def main() -> int:
         help="directory bootstrap.sh installs into (default: $CLAUDE_HOME or ~/.claude)",
     )
     parser.add_argument(
-        "--repo-root", default=None,
-        help="ai-config checkout to compare against (default: the main worktree "
-             "of this script's repo, since that is what bootstrap.sh installed from)",
+        "--repo-root", default=str(REPO_ROOT),
+        help="ai-config checkout to compare against (default: this script's repo)",
     )
     parser.add_argument(
         "--fix", action="store_true",
@@ -417,27 +432,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    repo_root = Path(args.repo_root).resolve()
     consumer_dir = Path(args.consumer_dir).expanduser()
 
-    if args.repo_root is not None:
-        # An explicit root is taken literally. Retargeting the check at some
-        # other checkout is the whole point of the flag, and resolving it to a
-        # main worktree would quietly defeat that.
-        repo_root = Path(args.repo_root).resolve()
-    else:
-        # Default: compare against the checkout the consumer directory was
-        # installed from, which is the repository's MAIN worktree. Running from
-        # a linked worktree otherwise reports every entry `misdirected` with
-        # nothing misinstalled (ai-config#1729), and the resulting noise trains
-        # everyone to ignore the one check that catches a real breakage.
-        repo_root = main_worktree(REPO_ROOT) or REPO_ROOT
-
     print(f"ai-config install check: {consumer_dir} vs {repo_root}")
-    if repo_root != REPO_ROOT:
-        # Never silent: the comparison base decides every verdict below, so a
-        # reader in a worktree has to be able to see which checkout answered.
-        print(f"  (running from a linked worktree at {REPO_ROOT}; "
-              f"comparing against the main worktree above)")
 
     if not consumer_dir.is_dir():
         # Not a defect: CI runners and fresh machines have no install yet.
@@ -446,7 +444,24 @@ def main() -> int:
         print(f"no consumer directory at {consumer_dir} -- nothing installed to check")
         return 0
 
-    entries = collect(repo_root, consumer_dir)
+    # A symlink into a sibling worktree of this same repository tracks its pulls
+    # exactly as one into this checkout does, so it is accepted too. Union, not
+    # replace: an empty result (git missing, not a repo) leaves the original
+    # single-root behaviour untouched.
+    repo_roots = {repo_root} | repo_worktrees(repo_root)
+
+    entries = collect(repo_root, consumer_dir, repo_roots)
+
+    # Never silent about the checkout the install actually points at, since a
+    # symlink into a sibling worktree now reads `ok` and the reader would
+    # otherwise have no way to see which checkout answered. Reported as the
+    # roots entries RESOLVED INTO rather than as the whole accepted set: this
+    # repository routinely has twenty-odd worktrees, and listing them on every
+    # session's first prompt is the noise README warns trains people to ignore
+    # the check.
+    for source in sorted(str(r) for r in install_sources(entries, repo_roots)
+                         if r != repo_root):
+        print(f"  installed from a sibling worktree of this repository: {source}")
 
     repaired: list[str] = []
     if args.fix:

@@ -130,15 +130,25 @@ The two tools carry different sentence-boundary rules.
 lookahead demands an uppercase letter or markup after the period, so a sentence
 ending in `.` before a lowercase word is no boundary to it.
 The gate carries that same branch plus a second one the reformatter lacks,
-`_SENT_BREAK_LOWER_RE` (added in `d-morrison/gha` #389), matching
+`_SENT_BREAK_LOWER_RE` (reported in `d-morrison/gha` #389, added by gha#425), matching
 `(?<=[a-z][a-z])([.!?])\s+(?=[a-z])` --- a period after two lowercase letters,
 then a space, then a lowercase word.
 So `...rules, or agents. opencode instead reads...` is one line to the
 reformatter and two sentences to the gate, because the lowercased brand name
 `opencode` follows the period after `agents`.
-The reformatter's preview cannot surface this split, since the branch that makes
-it is absent from the reformatter --- so reading that preview, the remedy the
-section above gives, is blind to exactly this case.
+The reformatter does worse than fail to propose the split.
+It **undoes** the split once you have made it.
+`split_sentences()` collapses whitespace before applying `_SENT_BREAK_RE`, so a
+hand-break at a lowercase-follower boundary is joined back onto one line ---
+the reformatter reverts the very fix the gate is asking for.
+
+That makes this case an exception to the remedy the section above gives.
+"Read the reformatter's preview and apply its sentence splits by hand" is sound
+for every boundary the reformatter can see, and silently destructive here,
+because re-running it after a correct hand-break restores the violation.
+The neighbouring guard rail does not cover it either: "don't accept a join that
+puts a wrapped sentence back on one line" is framed around the **clause** rule,
+and this is the **sentence** rule.
 
 - **Do:** run the real `check-new-line-breaks.py` locally to catch a
   lowercase-follower boundary, and hand-break after the period.
@@ -146,13 +156,17 @@ section above gives, is blind to exactly this case.
   `renv`) opening a sentence as a boundary the gate will split.
 - **Don't:** read the reformatter leaving a line whole as evidence the gate
   passes it --- the reformatter has no lowercase-follower branch.
+- **Don't:** re-run the reformatter over a hand-broken lowercase boundary.
+  It will rejoin it, and the rejoin is silent.
 
-(Both mechanisms verified by source, read at `main` on 2026-08-20:
+(Both mechanisms verified by source, read on 2026-08-21:
 the reformatter's single `_SENT_BREAK_RE` in `scripts/semantic-line-breaks.py`,
-and the gate's added `_SENT_BREAK_LOWER_RE` in `d-morrison/gha`'s
-`check-new-line-breaks.py`.
-Corroborated by two `check-new-line-breaks` CI failures on the offending
-README.md line.)
+and the gate's `_SENT_BREAK_LOWER_RE` at `check-new-line-breaks.py:140` in a
+fresh clone of `d-morrison/gha`, whose own `CLAUDE.md` records that gha#425
+closed gha#389 by adding that branch.
+The rejoin was reproduced directly rather than inferred: calling `reformat()`
+on `"...or agents.\nopencode instead reads..."` returns the two lines joined
+into one.)
 
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**

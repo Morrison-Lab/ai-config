@@ -4,7 +4,7 @@ outlive it.
 
 So: **no empty promises.**
 Every commitment of the form "going forward, I will X", "from now on I won't Y",
-"I'll always Z", "I won't do that again" must ship an **implemented
+"I'll always Z", "I won't do that again", "that is owed by me" must ship an **implemented
 accountability mechanism in the same turn** --- or not be made at all.
 
 ## Why this needs a rule rather than more care
@@ -110,6 +110,30 @@ An undischarged promise is wrong to send, and delivering it first buys nothing
 - **Don't:** read an apology, an explanation, or a restatement of the rule as a
   mechanism.
   None of them survives the conversation.
+
+## The debt phrasing is the same promise, and it reads as bookkeeping
+
+Every example above is a **modal**: "I will", "I won't", "I'll always", "I'm going to".
+A commitment can drop the modal entirely and state itself as an outstanding debt instead --- "the UMS pass is owed by me", "I owe you a hook for this", "I still owe that follow-up".
+
+Those commit to future behaviour exactly as the modal forms do, and they are harder to catch from the inside.
+The sentence reads as bookkeeping rather than as a pledge, so naming the debt feels like the diligent move --- which is what an unbacked promise always feels like at the moment of making it.
+The trade is the one this rule already rejects, and it is arguably worse here: costless to produce, invisible to every instrument, and it closes the item on the record so nobody returns to it.
+
+The remedy is unchanged.
+Ship the mechanism in the same turn and name it in the past tense, or drop the debt language and state the plain fact --- that the work was not done, and whether anything tracks it.
+
+[`hooks/no-empty-promise.py`](../../hooks/no-empty-promise.py) matches this form too, anchored on a first-person **owner** rather than on the word alone.
+That anchoring is load-bearing rather than fussy: this corpus says "an owed UMS pass" and "the pass is owed" in ordinary rule prose, so a matcher keyed on bare `owed` would block every reply that cites those rules --- the trap [`hooks/no-placeholder-reply.py`](../../hooks/no-placeholder-reply.py) avoids by anchoring on the whole message rather than a substring.
+So "an owed UMS pass" stays clean, and "owed by me" does not.
+
+- **Do:** file the issue, write the memory, or do the work, then say the debt is discharged.
+- **Do:** say plainly that something was not done, and name what tracks it, when nothing durable followed.
+- **Don't:** write "owed by me", "I owe", or "I still owe" into a turn that wrote nothing durable.
+- **Don't:** read the absence of a modal as the absence of a promise.
+
+(Directive from the user, 2026-08-20: "'Owed by me' is another phrase indicating a broken promise".
+Tracked as ai-config#1792.)
 
 (Directive from the user, `cai`, 2026-08-19: "no empty promises; every promise
 ('going forward, I will/won't' etc) must be accompanied by an implemented

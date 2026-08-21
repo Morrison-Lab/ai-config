@@ -74,11 +74,28 @@ Stop and surface it.
 
 ## Procedure
 
-### 1. Classify, both passes, no mutation
+### 1. Classify, both passes
 
 Run [`clean-worktrees`](../clean-worktrees/SKILL.md) steps 1 through 3.
 Run [`clean-branches`](../clean-branches/SKILL.md) steps 1 through 3 and step 8's local enumeration.
-Neither pass removes, deletes, rebases, or pushes anything yet.
+
+**Neither pass touches a live worktree, branch, or remote before the gate ---
+with one exception, and it is worth naming rather than rounding off.**
+`clean-worktrees` step 2 runs `git worktree prune -v` for real, not
+`--dry-run`, so a mutation has already happened by the time the plan is
+presented.
+
+It is safe by construction rather than by convention: `git worktree prune`
+only drops administrative records for worktrees whose directory is **already
+gone from disk**, so there is no state it can destroy and nothing a
+confirmation could protect.
+Say so in the plan anyway, per step 2's `Pruned stubs` line.
+A silent mutation under a heading promising none is how a reader stops
+believing the rest of the guarantees.
+
+The invariant the gate actually protects is therefore narrower than "no
+mutation", and stating it precisely is what makes it worth anything:
+**nothing that can lose work happens before confirmation.**
 
 Derive the `INLINE` set from the worktree classification:
 
@@ -91,6 +108,7 @@ git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch /{sub("refs/hea
 ```
 ## Git Cleanup Plan --- <timestamp>
 
+### Pruned stubs (already done --- records for directories already gone)
 ### Worktrees to remove (branch deleted inline)
 ### Worktrees flagged --- dirty / unpushed (left alone)
 ### Branches to delete --- remote

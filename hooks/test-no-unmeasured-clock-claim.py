@@ -56,6 +56,13 @@ HOOK_CLOCK_UNPARSEABLE = {"type": "user", "content":
                           "UserPromptSubmit hook success: Current time -- "
                           "local: (unavailable)"}
 
+# This hook's own source (or its tests) echoed into a tool_result. It quotes
+# the marker, so it must not supply a VALUE -- reading the file would otherwise
+# inject a fabricated reading. See shared/writing/examples-are-scanned.md.
+HOOK_SOURCE_READ = {"type": "assistant", "message": {"content": [
+    {"type": "tool_result", "content":
+     "RX_HOOK_CLOCK = ... # Current time -- local: 2026-08-21 15:02:20 PDT"}]}}
+
 # Work that is not a clock read, however much it looks like one.
 GIT_LOG = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
@@ -113,8 +120,9 @@ CASES = [
     #     it. The whole point of capturing the value rather than the position.
     ([hook_clock("14:48:23"), say("as of 15:22 PDT, three PRs open")], True,
      "#1848 incident: claim 34 min AHEAD of the injected reading, same turn"),
-    ([hook_clock("15:02:20"), say("as of 14:20 PDT")], True,
-     "claim well behind the injected reading has expired"),
+    ([hook_clock("15:02:20"), say("as of 14:20 PDT")], False,
+     "a time BEHIND the reading is not fired on -- a past time read off an "
+     "artifact is prescribed behavior and is indistinguishable by value"),
     ([hook_clock("14:48:23"), say("as of 14:48 PDT")], False,
      "claim equal to the injected reading is quoting it"),
     ([hook_clock("14:48:50"), say("as of 14:49 PDT")], False,
@@ -129,6 +137,23 @@ CASES = [
      "an injected line with no readable value falls back to counting as a read"),
     ([hook_clock("14:48:23"), say("first recap"), say("as of 15:22 PDT")], True,
      "a departing claim fires from a later message too"),
+
+    # --- review round 1 on #1850: the three regressions the value
+    #     comparison introduced, each traced by the reviewer ---
+    ([hook_clock("14:48:23"), say("first recap"), say("as of 14:48 PDT")], True,
+     "a STALE reading must not discharge by numeric proximity -- that is the "
+     "#1848 bug in a new shape"),
+    ([hook_clock("08:18:00"),
+      say("Scheduled. I'll check back at 08:22 PT (~4 min).")], False,
+     "CLAUDE.md's own prescribed scheduled-check-in sentence states a future "
+     "time and must not fire"),
+    ([hook_clock("15:02:20"),
+      say("The next wakeup fires at 15:30 PT.")], False,
+     "a wakeup time is ahead of the clock by design, not by invention"),
+    ([hook_clock("14:48:23"), HOOK_SOURCE_READ, say("as of 14:48 PDT")], False,
+     "reading this hook's source must not poison the measured value"),
+    ([hook_clock("14:48:23"), HOOK_SOURCE_READ, say("as of 15:02 PDT")], True,
+     "and must not let an invented time near the poisoned value pass either"),
 
     # --- the near-miss that would make this guard misfire ---
     ([say("earlier"), UPDATE_CMD, say("18:30 PDT")], True,

@@ -90,9 +90,12 @@ RX_CLOCK_READ = re.compile(
 # explicitly tells you to trust.
 RX_HOOK_CLOCK = re.compile(r"Current time\s*--\s*local:", re.I)
 
-# The value that line carries, e.g. "Current time -- local: 2026-08-21 15:02:20
-# PDT". Captured so a claim can be compared against it rather than merely
-# counted as "a reading happened".
+# The value that line carries. The example is deliberately written with
+# placeholders rather than a real timestamp: a literal one would match the
+# regex directly below it, so reading, grepping, or diffing THIS FILE during
+# ordinary work would inject a fabricated reading into the transcript the
+# guard scans. `shared/writing/examples-are-scanned.md` names exactly that.
+# Shape: "Current time -- local: <YYYY-MM-DD> <HH:MM:SS> <PDT|PST>".
 RX_HOOK_CLOCK_VALUE = re.compile(
     r"Current time\s*--\s*local:\s*\d{4}-\d{2}-\d{2}\s+"
     r"([01]?\d|2[0-3]):([0-5]\d)",
@@ -103,6 +106,23 @@ RX_HOOK_CLOCK_VALUE = re.compile(
 # quoting it. Wide enough for a recap that rounds seconds away or is composed a
 # moment later; far tighter than the drift that makes a timestamp misleading.
 TOLERANCE_MIN = 2
+
+# Only a claim running AHEAD of the last measurement is fired on, and the
+# asymmetry is deliberate rather than an oversight.
+#
+# Ahead is decidable: the turn cannot have run forward of the clock, so a time
+# later than the last reading was not observed. Behind is not. A past time read
+# off an artifact -- a merge timestamp, a committer date, a job's `startedAt` --
+# is exactly what this guard's own warning text tells you to do, and it is
+# indistinguishable by value from a stale recap. Firing on it would flag the
+# prescribed behavior, and a guard that flags what the rule requires gets
+# switched off, taking the real cases with it.
+RX_FUTURE_REFERENCE = re.compile(
+    r"\b(?:check(?:ing)?\s+back|check\s*-?\s*in|schedul\w*|wake\s*up|"
+    r"wakeup|fires?\s+at|due\s+at|runs?\s+at|will\s+run|next\s+run|"
+    r"re-?arm\w*|poll\w*\s+again)\b",
+    re.I,
+)
 
 
 def _claim_minutes(claim):
@@ -136,8 +156,16 @@ def scan(path):
     `opaque_clock_idx` counts only reads whose VALUE this guard cannot see -- a
     `date` invocation, whose output lands in a later tool_result the scan does
     not attribute back to it. Those still discharge by position.
-    `measured_minutes` is the value of the most recent injected reading, which
-    can be compared against the claim instead.
+    `measured` is `(index, minutes)` for the most recent injected reading, or
+    None. It carries its index because a value with no position reopens the
+    very bug this guard was fixed for: a session-start reading restated as
+    "now" many turns later would discharge by numeric proximity alone.
+
+    The injected marker is honoured ONLY in a user/system turn, which is how
+    the harness delivers it. A `tool_result` quoting the same marker is ignored
+    entirely -- neither a value nor a position -- because this file and its
+    tests both quote it, so an ordinary `Read` of either would otherwise
+    discharge the guard or inject a fabricated reading.
     """
     last_clock = -1
     last_assistant = -1
@@ -162,7 +190,7 @@ def scan(path):
                 if RX_HOOK_CLOCK.search(blocks):
                     got = RX_HOOK_CLOCK_VALUE.search(blocks)
                     if got:
-                        measured = int(got.group(1)) * 60 + int(got.group(2))
+                        measured = (i, int(got.group(1)) * 60 + int(got.group(2)))
                     else:
                         last_clock = i
                 continue
@@ -177,15 +205,12 @@ def scan(path):
                         b.get("input") or {})
                     if RX_CLOCK_READ.search(blob):
                         last_clock = i
-                elif btype == "tool_result":
-                    content_text = json.dumps(
-                        b.get("content") or b.get("text") or "")
-                    if RX_HOOK_CLOCK.search(content_text):
-                        got = RX_HOOK_CLOCK_VALUE.search(content_text)
-                        if got:
-                            measured = int(got.group(1)) * 60 + int(got.group(2))
-                        else:
-                            last_clock = i
+                # A tool_result is deliberately not scanned for the injected
+                # marker at all, by value or by position. File content echoed
+                # into one is not a reading of the clock, whatever it quotes,
+                # and this file and its tests both quote it -- so counting it
+                # would let an ordinary `Read` of this hook discharge the guard.
+                # A real `date` run is still caught, on its tool_use above.
                 elif btype == "text":
                     if role == "assistant" and b.get("text", "").strip():
                         prev_assistant = last_assistant
@@ -195,7 +220,8 @@ def scan(path):
                             b.get("text", "")):
                         got = RX_HOOK_CLOCK_VALUE.search(b.get("text", ""))
                         if got:
-                            measured = int(got.group(1)) * 60 + int(got.group(2))
+                            measured = (
+                                i, int(got.group(1)) * 60 + int(got.group(2)))
                         else:
                             last_clock = i
     return last_clock, prev_assistant, text, measured
@@ -223,19 +249,28 @@ def main() -> int:
 
     detail = (
         "no clock read appears in this transcript since your previous message")
-    if measured is not None:
+
+    # A value is usable only when the reading it came from is itself in this
+    # turn. An older one has expired exactly as a `date` invocation would have.
+    if measured is not None and measured[0] > prev_assistant:
         claimed = _claim_minutes(hit.group(0))
         if claimed is None:
             return 0  # fail open on a claim shape we cannot compare
-        skew = _skew(claimed, measured)
-        if abs(skew) <= TOLERANCE_MIN:
-            return 0  # quoting the injected reading, which the rule prescribes
-        measured_hhmm = f"{measured // 60:02d}:{measured % 60:02d}"
-        direction = "ahead of" if skew > 0 else "behind"
+        skew = _skew(claimed, measured[1])
+        if skew <= TOLERANCE_MIN:
+            # Quoting the reading, or citing a past time off an artifact.
+            # Both are prescribed behavior; see RX_FUTURE_REFERENCE's comment.
+            return 0
+        if RX_FUTURE_REFERENCE.search(text):
+            # A scheduled check-in states a time that has not happened yet, and
+            # CLAUDE.md requires stating it. It is ahead of the clock by
+            # design, not by invention.
+            return 0
+        measured_hhmm = f"{measured[1] // 60:02d}:{measured[1] % 60:02d}"
         detail = (
             f"the last measured reading in this transcript is "
-            f"{measured_hhmm}, so the stated time runs {abs(skew)} minutes "
-            f"{direction} it"
+            f"{measured_hhmm}, so the stated time runs {skew} minutes ahead "
+            f"of it and cannot have been observed"
         )
 
     key = hashlib.sha256(text.encode()).hexdigest()[:16]

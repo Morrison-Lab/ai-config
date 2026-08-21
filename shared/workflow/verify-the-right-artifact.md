@@ -163,8 +163,9 @@ because the section's own Do line is singular:
 "state which artifact a claim rests on, then read *that* one".
 A drift claim rests on two, and reading either one satisfies that sentence.
 
-Two proxies stand in for the missing read, and both are metadata
-rather than content.
+Two proxies stand in for the missing read, and neither one reads the source.
+That is the shared defect, and it is not "metadata rather than content" --- the
+second proxy is a content read, of the wrong side.
 
 **An mtime.**
 It records when a write happened, not whether contents lag a source.
@@ -198,7 +199,9 @@ a verdict the repo already computes.
 
 **A diagnosis that resolves an irritation deserves the deriving query
 before it deserves an issue.**
-The false one here was satisfying twice over:
+The false half here --- the claim that the copy was already stale, as
+distinct from the true claim that a copy cannot track later merges --- was
+satisfying twice over:
 it explained an incident that had already cost three blocked turns,
 and it assigned the cause to infrastructure rather than to
 an unmerged fix of my own.

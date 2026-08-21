@@ -124,7 +124,16 @@ and it contained zero occurrences of `strip_quoted`,
 a function the issue asserted `main` "has carried".
 
 Both readings were accurate.
-Neither supported the conclusion.
+Neither supported the staleness-at-that-moment conclusion.
+
+The narrower wording is deliberate, because #1812 asserted two things and only
+one of them is refuted here.
+Its claim that the copy was *already* stale when filed is false, as the
+comparison below shows.
+Its claim that a copy cannot track future merges is **true**, and the table
+confirms it three minutes later: nothing had drifted at 01:17, and two of 61
+files had by 01:20, once #1807 merged.
+A blanket refutation would dismiss the half the record's own data supports.
 
 The deciding comparison, against `main` as it stood when the issue was filed
 (`fbe10c53^`):

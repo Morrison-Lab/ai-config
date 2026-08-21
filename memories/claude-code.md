@@ -737,10 +737,15 @@ trusting the follow-up fix.)
 ## Scripted block move --- a marker-delimited range carries its neighbours
 
 The mirror of the two-step-move entry above.
-That one loses content; this one takes content nobody asked it to take, and
-its stated fix does not catch this case: "check the moved content is present
-at its new location" passes cleanly here, because the block *did* arrive
-intact.
+That one loses content; this one takes content nobody asked it to take.
+Neither half of that entry's fix is sufficient here, and they fail
+differently.
+Its "check specifically that the moved content is **present** at its new
+location" passes outright, because the block *did* arrive intact --- what
+came along with it is the problem.
+Its "diff the result against the base branch" does surface the evidence, but
+does not flag it, for the reason this entry is about: the change renders as
+one moved region rather than as a removal and an addition.
 
 Moving a region by script --- extract from marker A to marker B, re-insert
 elsewhere --- takes everything between the two markers, including whatever

@@ -452,6 +452,74 @@ did not compute.**
   otherwise surprising result across a corpus whose members vary --- suspect the
   harness.
 
+**An eighth outcome belongs to the FIXTURE rather than to the mutant or the
+matrix: the mutation applied faithfully, its own designated case ran, and a
+SIBLING member of the same alternation produced the same observable anyway.**
+
+Every outcome above asks whether a mutation applied, was faithful, or was
+credited to the right row.
+The pass-condition entry directly above asks a nearer question still --- whether
+the case that flipped is the one written for this clause --- and answers it by
+designating that case per mutation.
+**This one starts where that remedy ends, and the two are easy to conflate
+because both end in a row that scores clean.**
+There, the designated case is never reached, so the clause is unmeasured and
+the fix is to score the right case.
+Here the designated case IS reached and the clause IS exercised; the row scores
+clean because a sibling clause produces the same result for the same input.
+Scoring a different case cannot help, because the case is already the right
+one.
+The fix is a different input.
+
+The shape is a chain of alternatives that all guard one property --- a
+redaction pipeline, a validator running several patterns, a dispatcher trying
+matchers in order.
+Any input written the natural way tends to satisfy more than one of them, so
+deleting the clause you meant to test changes nothing observable and the row
+scores clean.
+It reads as redundancy, which is the dangerous misreading: the honest reading
+is that the clause is untested.
+
+**The natural fixture is the trap, and writing a better one is not obvious
+in advance.**
+A credential in an `Authorization:` header is caught by a header pattern
+whatever vendor prefix it carries; the same credential in URL userinfo is
+caught by a userinfo pattern.
+Both are the *realistic* way to write the case, which is why the fixture gets
+written that way and why the confound survives review.
+
+**Its own detector is the mutation sweep, run across every clause rather than
+the one you changed.**
+A single mutation looks fine; the matrix is what shows one row silently
+passing while its neighbours fail.
+Read a row that stays green when its clause is deleted as a fixture problem
+first, before concluding the clause is redundant.
+
+- **Do:** construct each fixture so that exactly one clause can match it, and
+  confirm by deleting that clause and watching only its own row go red.
+- **Do:** sweep every clause, not only the ones a change touched --- the sweep
+  is what exposes a pre-existing clause that no fixture reaches.
+- **Don't:** read a clean row as evidence the clause is redundant; the same
+  observation is produced by a fixture that never reached it.
+- **Don't:** trust a fixture written the realistic way --- realism is what
+  makes it reachable by several clauses at once.
+- **Don't:** reach for the pass-condition entry's remedy here; designating the
+  case per mutation is already satisfied, and the sibling still absorbs it.
+
+(Measured on `Morrison-Lab/gha#548`, 2026-08-21, three times in one session on
+one chain, across two rewrites of the fixture set --- the first relocating the
+confound, the second finally removing it.
+An Anthropic-key fixture written as `Authorization: Bearer sk-ant-...` passed
+with the `sk-ant-` pattern deleted, because a generic header pattern caught it.
+The GitHub-token fixture beside it, written the same way, passed with the
+`gh[pousr]_` pattern deleted, for the same reason.
+Rewritten into URL userinfo, that same fixture passed with `gh[pousr]_` deleted
+again --- now because the userinfo pattern caught it.
+Rewritten once more as a bare file write, both isolated.
+The same sweep showed a pre-existing `github_pat_` pattern --- a second regex,
+distinct from the `gh[pousr]_` one above --- that no fixture reached at all:
+deleting it turned nothing red, and it had been shipped that way.)
+
 **A component that stops failing under mutation is a question, not a cleanup.**
 
 - **Do:** treat a zero mutation score on an existing component as a missing test

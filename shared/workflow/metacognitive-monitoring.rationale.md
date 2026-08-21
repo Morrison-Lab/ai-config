@@ -797,9 +797,10 @@ is asking.
 
 ## A sound measurement does not license the claim standing next to it
 
-The two sections above concern instruments whose **reach** was the problem: a
-scope narrower than it looked, or an input that could not have held the
-evidence.
+The reachable-half and retraction-reach sections concern instruments whose
+**reach** was the problem: a scope narrower than it looked, or an input that
+could not have held the evidence.
+Neither sits immediately above this one, so they are named rather than counted.
 This concerns an instrument with no problem at all.
 The command is right, the scope is right, the reading is right --- and the
 sentence written next to the result asserts a different proposition.

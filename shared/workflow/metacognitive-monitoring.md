@@ -386,9 +386,11 @@ See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 
 ## A sound measurement does not license the claim standing next to it
 
-The two sections above both concern a reading that was narrower than it looked
---- a scope left unexamined, or an instrument whose input could not have held
-the evidence.
+The reachable-half and retraction-reach sections both concern a reading that
+was narrower than it looked --- a scope left unexamined, or an instrument whose
+input could not have held the evidence.
+Naming them rather than counting back is deliberate: neither is adjacent to
+this section, and a positional reference would point at the wrong pair.
 This concerns a measurement that is entirely sound, correctly scoped, and
 correctly read, followed by a sentence asserting something it does not
 establish.

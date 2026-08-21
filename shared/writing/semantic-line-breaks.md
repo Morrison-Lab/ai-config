@@ -161,6 +161,40 @@ above, so the answer was one read away.
 - **Don't:** read the reformatter's silence as a gate pass --- it has no width
   policy, so it is silent about precisely the violation it creates.
 
+**A green check run named for this gate may never have run it, and both runs
+carry the same name.**
+The reformatter trap above is about the wrong *tool*.
+This is about the right tool reporting success without measuring anything, and
+it is harder to catch because there is nothing to notice: the check run is
+green, its name is correct, and it sits in the same list as the real one.
+
+The workflow's base-ref input is `github.event.pull_request.base.sha` on a
+pull request and empty otherwise, which is deliberate --- it makes a push to
+`main` skip cleanly instead of scanning the whole tree
+(`.github/workflows/validate.yml`, the `new-line-breaks` job's own comment).
+The consequence for a *branch* push is the part worth stating: that run has no
+base ref either, so it skips the diff scan and concludes `success` having
+examined nothing.
+
+A PR therefore shows **two** check runs called
+`new-line-breaks / check-new-line-breaks`.
+Only the `pull_request`-triggered one is a verdict.
+The `push`-triggered one is green unconditionally, so reading either one, or
+reading "the check is green", answers a question it was never asked.
+
+The asymmetry that makes this dangerous: the vacuous run can only ever say
+success, so it never disagrees with a real failure loudly enough to notice ---
+a red PR-triggered run and a green push-triggered run coexist in the same list,
+and the green one is not evidence of anything.
+Distinguish them by the triggering event rather than by the name, and prefer
+the run whose `event` is `pull_request`.
+
+- **Do:** read the triggering event of a `new-line-breaks` run before treating
+  it as a verdict, since a PR carries one real run and one vacuous one under
+  the same name.
+- **Don't:** conclude the gate passed from a green check run alone --- confirm
+  it was the `pull_request`-triggered one.
+
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
 `d-morrison/gha@e91b8bf` ("fail by default when violations are found",

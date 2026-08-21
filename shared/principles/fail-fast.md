@@ -661,6 +661,49 @@ rather than a site.**
 See [`fail-fast.cases.md`](fail-fast.cases.md), "A documented enabling procedure
 naming one of two required steps".
 
+**A protective list and the test that proves it works are one artifact, so
+adding a member to the list without adding its probe leaves the new member
+outside the very net the list exists to be part of.**
+
+The two lists look nothing alike from the inside, which is why this slips.
+Adding the member is the task, and it is complete and correct on its own
+terms: the entry is right, the thing is protected, the check passes.
+The test file is somewhere else, usually in another directory, and nothing
+about the edit points at it.
+So the protection appears to be in place, and only the *proof* that it is in
+place has a hole -- which is exactly the state a partial guard supplies for
+free, one level up.
+
+It is worse than a plain missing test.
+A list of this kind is added to precisely when something newly needs
+protecting, so the untested member is always the newest and least-understood
+one, and a passing suite now reports on every member except the one whose
+protection nobody has ever confirmed.
+
+The shape is not specific to any one file.
+A `.gitignore` guarding restricted data, a secret-scanner rule set, a
+`CODEOWNERS` entry, a lint exclusion, an ignore list in CI: each has, or
+should have, a test that asserts the list actually does its job, and each
+grows one member at a time.
+
+- **Do:** extend the list's own test in the same commit that extends the list,
+  with a probe naming the new member.
+- **Do:** confirm the probe fails when the list entry is removed, so it proves
+  the protection rather than the file's existence.
+- **Don't:** treat adding the member as the whole edit -- the member is
+  protected and unproven until its probe exists.
+- **Don't:** read a green suite as covering a member added after the suite was
+  written; the suite enumerates, and an enumeration cannot grow by itself.
+
+(`ucdavis/bcs#679`, 2026-08-20: `hong/` was added to `inst/extdata/.gitignore`
+with no matching probe in `tests/testthat/test-restricted-paths-ignored.R`.
+That test is layer 2 of a five-layer protection scheme bcs's `CLAUDE.md`
+documents as having been built after a real PHI-and-credential incident on
+2026-07-30, and its whole purpose is that a restricted path added without a
+matching ignore rule fails CI rather than waiting to be noticed.
+The new path sat outside it.
+An AI reviewer caught the gap.)
+
 ## A guard's discharge fires on positive success, not the absence of failure
 
 The section above is about a guard that runs on too few sites.

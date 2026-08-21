@@ -88,6 +88,13 @@ In every session --- at session start, and again periodically during long sessio
    - **Don't:** treat a merged guard as an active one.
      Merging places a file, and only a binding in `settings.json` makes it fire.
 
+   **Measured recurrence, 2026-08-20: `registered=15 missing=16 stale=0` against a 31-hook manifest, on a machine where every rule above was already written.**
+   That is worth recording as evidence about the *rule* rather than about the machine.
+   Each paragraph above is correct and none of them fired, because all of them describe a check somebody has to decide to run, and the drift is silent by construction.
+   Among the sixteen inert guards was `flag-add-a-outside-pathspec.py`, and in the same session the exact mistake that hook was written to prevent reached a pushed commit.
+   The gap that incident exposes is not a rule but a **moment**: README's activation gate forbids registering before the PR merges and names nothing that happens after, so the owed registration has no owner.
+   [`post-merge`](../../skills/post-merge/SKILL.md)'s step 3.75 is now that owner, and carries the incident, the mechanics, and the argument for why a hook cannot be the instrument here.
+
    - **Do:** run both instruments each session, in the order place-then-bind, and report the two counts separately.
    - **Do:** compare `install-hooks.py`'s `examined N` against the current `hooks/hooks.json` before believing `All hooks registered.`
    - **Don't:** read `check-install.py`'s `N/N ok` as meaning the guards are active --- it never looked at `settings.json`.

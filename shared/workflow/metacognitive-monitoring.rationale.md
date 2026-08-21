@@ -864,9 +864,12 @@ to see, because nothing about the sentence changes register.
 
 `git branch -r --contains <sha>` is a complete and correct enumeration of the
 branches containing a commit.
-Reporting it as no ref containing that commit is one word wider, and the
-excluded members --- `refs/pull/<N>/head`, notes, tags --- are precisely
-where the answer lived.
+Reporting it as no ref containing that commit is one word wider, and that
+wider word excludes `refs/pull/<N>/head`, notes, and tags.
+`refs/pull/<N>/head` is where the answer lived.
+The other two were merely excluded and had nothing to do with this question,
+which is worth separating: claiming all three were where the answer lived
+would be this section's own error, committed in the sentence describing it.
 (The reflog is not in that set at all: it lives outside `refs/` entirely, so
 it is not a ref the wider word would have covered either.)
 The default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so

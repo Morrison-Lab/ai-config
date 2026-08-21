@@ -674,3 +674,26 @@ figures the split produced, each from `git show <sha>:<path> | wc -c`:
 
 (`ucdavis/bcs`, 2026-08-13: a reviewer flagged issue numbers in source comments, a `CLAUDE.md` violation, on the base PR of a two-PR stack.
 All three of that PR's files were swept and fixed; the stacked PR's file carried the same violation, was never in the search space, and was therefore never swept.)
+
+## The fix for a finding reproducing that finding one level up
+
+(`Morrison-Lab/ai-config#1787`, 2026-08-21, three consecutive rounds.
+Round A fixed a code block whose undefined variables made it silently
+degenerate to `HEAD..HEAD` --- a step that looked like it ran and decided
+nothing.
+Round B added a completion-checklist bullet for that step, since nothing
+gated on it;
+the bullet was written as "if the merge brought in a hook", which the step's
+own body two paragraphs above calls informational and says decides nothing.
+Round C fixed the bullet, and the reviewer then found the neighbouring
+citation pointing at the wrong step number --- the third citation error in a
+PR whose previous two rounds had each fixed one.
+
+What makes this hard to self-catch is that each fix is *written in the
+vocabulary of the thing it corrects*, so re-reading it confirms the topic
+rather than the claim.
+A bullet about not skipping a step, which itself contains a skip condition,
+reads as being about skip conditions and therefore as correct.
+Distinct from the partially-applied fix above: there the survivors are
+elsewhere and the corrected siblings hide them, whereas here the survivor is
+inside the correction.)

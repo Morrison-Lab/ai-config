@@ -452,6 +452,57 @@ did not compute.**
   otherwise surprising result across a corpus whose members vary --- suspect the
   harness.
 
+**An eighth outcome belongs to the FIXTURE rather than to the mutant or the
+matrix: the mutation applied faithfully, and a SIBLING member of the same
+alternation caught the input anyway.**
+Every outcome above asks whether the mutation was real.
+This one grants that it was, and asks whether the input could ever have
+reached the clause under test.
+
+The shape is a chain of alternatives that all guard one property --- a
+redaction pipeline, a validator running several patterns, a dispatcher trying
+matchers in order.
+Any input written the natural way tends to satisfy more than one of them, so
+deleting the clause you meant to test changes nothing observable and the row
+scores clean.
+It reads as redundancy, which is the dangerous misreading: the honest reading
+is that the clause is untested.
+
+**The natural fixture is the trap, and writing a better one is not obvious
+in advance.**
+A credential in an `Authorization:` header is caught by a header pattern
+whatever vendor prefix it carries; the same credential in URL userinfo is
+caught by a userinfo pattern.
+Both are the *realistic* way to write the case, which is why the fixture gets
+written that way and why the confound survives review.
+
+**Its own detector is the mutation sweep, run across every clause rather than
+the one you changed.**
+A single mutation looks fine; the matrix is what shows one row silently
+passing while its neighbours fail.
+Read a row that stays green when its clause is deleted as a fixture problem
+first, before concluding the clause is redundant.
+
+- **Do:** construct each fixture so that exactly one clause can match it, and
+  confirm by deleting that clause and watching only its own row go red.
+- **Do:** sweep every clause, not only the ones a change touched --- the sweep
+  is what exposes a pre-existing clause that no fixture reaches.
+- **Don't:** read a clean row as evidence the clause is redundant; the same
+  observation is produced by a fixture that never reached it.
+- **Don't:** trust a fixture written the realistic way --- realism is what
+  makes it reachable by several clauses at once.
+
+(Measured on `Morrison-Lab/gha#548`, 2026-08-21, three times in one session on
+one chain.
+An Anthropic-key fixture written as `Authorization: Bearer sk-ant-...` passed
+with the `sk-ant-` pattern deleted, because a generic header pattern caught it.
+Rewritten into URL userinfo, the modern-PAT fixture then passed with the
+GitHub-prefix pattern deleted, because the userinfo pattern caught it.
+Rewritten again as a bare file write, both isolated.
+The same sweep showed a pre-existing `github_pat_` pattern that no fixture
+reached at all --- deleting it turned nothing red, and it had been shipped that
+way.)
+
 **A component that stops failing under mutation is a question, not a cleanup.**
 
 - **Do:** treat a zero mutation score on an existing component as a missing test

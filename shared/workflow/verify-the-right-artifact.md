@@ -275,7 +275,7 @@ that capability through a different one.**
 
 The shapes above substitute a cached copy for an origin, a checkout for a run,
 half a mechanism for the whole, a neighbour for the target.
-This is a fifth: the documentation is correct, your reading of it is correct,
+This is another: the documentation is correct, your reading of it is correct,
 every quotation checks out --- and it describes the feature as reached through
 a surface your code does not use.
 

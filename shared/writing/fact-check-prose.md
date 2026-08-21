@@ -806,3 +806,54 @@ The insertion additionally re-listed a set of reviewer options the same file def
 Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794), and corrected on the branch by `0cc398ca`.
 This section's own first draft then committed the same error: it opened by describing "the two sections above", carrying that framing over from its neighbour, when the section directly above it argues the opposite of what the sentence attributed to it.
 The reviewer on [#1795](https://github.com/Morrison-Lab/ai-config/pull/1795) caught it, which is worth recording as evidence about the remedy rather than about the author --- naming a target beats counting to it, exactly as [`forward-references`](forward-references.md) says, and the count was wrong here because an unrelated section had been inserted between the two being counted.)
+
+## An elapsed-time claim is a computation, not a memory
+
+The section on claims inherited from upstream discussion covers a figure you
+took from somewhere.
+This covers the figure you took from nowhere: "an hour ago", "earlier today",
+"four hours later".
+
+It is the one quantity that feels **observed** rather than derived, because you
+were present for the interval.
+Nothing about writing it prompts a check, in the way a version number or a file
+count does --- those are obviously lookups, and a duration feels like something
+you already know.
+
+**You do not know it.**
+An agent's sense of elapsed time is anchored to turns and tokens rather than to
+a clock, and those run at no fixed rate against wall time.
+A stretch of many tool calls reads as long whether it took four minutes or
+forty.
+
+**The error has a direction**, which makes it worth more than a general warning.
+Both figures measured below were **over**-estimates, by factors of three and
+eighteen.
+The bias runs one way because the felt duration tracks work done, and dense work
+compresses into little clock time.
+So treat your own elapsed-time estimate as an upper bound at best, and derive
+the number.
+
+Both endpoints are almost always recorded --- a commit timestamp, a merge event,
+a comment's `created_at`, a run's `started_at`.
+Subtract them.
+
+- **Do:** derive a duration from two recorded timestamps, and cite them.
+- **Do:** read a duration you are about to write as a claim of the same kind as
+  a version number, since both are lookups wearing different clothes.
+- **Don't:** report elapsed time from the sense of how much happened --- that
+  measures the work, not the interval.
+- **Don't:** treat "I was there for it" as evidence; presence is what makes this
+  feel exempt.
+
+(Measured twice on 2026-08-21, in one session, after the first had already been
+corrected.
+On [ai-config#1838](https://github.com/Morrison-Lab/ai-config/pull/1838) a
+corpus entry claimed two events were "ninety minutes" apart; review derived the
+real gap as about twenty-nine minutes from `17:12:39Z` and `17:41:36Z`.
+Two PRs later, on [#1840](https://github.com/Morrison-Lab/ai-config/pull/1840),
+the PR body said a dependency had merged "four hours ago"; review derived
+**fourteen** minutes, from a merge at `18:14:25Z` and a commit at `18:29:14Z`.
+The second figure was not inherited from anywhere --- unlike the first, which at
+least came from an earlier comment, it was generated whole.
+Both were wrong in the same direction.)

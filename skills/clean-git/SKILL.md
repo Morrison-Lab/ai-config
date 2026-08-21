@@ -65,8 +65,14 @@ The orchestrator resolves this by **subtraction**, not by suppression:
 2. Derive `INLINE` --- the set of branches attached to worktrees classified dead,
    which the worktree pass will delete itself.
 3. Compute the branch plan.
-4. Subtract `INLINE` from the branch plan's delete list,
+4. Subtract `INLINE` from the branch plan's **local** delete list only,
    and report the subtracted count rather than dropping it silently.
+
+`clean-worktrees` step 5 deletes with `git branch -d`, which is a **local**
+delete and never touches a remote ref.
+So subtracting `INLINE` from the remote list would report a stale
+`origin/<branch>` as handled while nothing in either pass deletes it.
+The remote list passes through untouched.
 
 A branch in `INLINE` that the branch pass had classified **active** is a
 contradiction between the two skills, not a subtraction.
@@ -97,11 +103,28 @@ The invariant the gate actually protects is therefore narrower than "no
 mutation", and stating it precisely is what makes it worth anything:
 **nothing that can lose work happens before confirmation.**
 
-Derive the `INLINE` set from the worktree classification:
+Derive the `INLINE` set.
+The command below is **not** `INLINE` --- it is the raw worktree-to-branch
+mapping, every worktree included:
 
 ```bash
-git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print $2"\t"p}'
+git worktree list --porcelain \
+  | awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print $2"\t"p}' \
+  > "$TMP/wt-branches.tsv"
 ```
+
+`INLINE` is the subset whose **worktree** `clean-worktrees` step 3 classified
+**Dead**, so intersect that mapping against the dead-worktree paths from step 1
+before using it anywhere.
+
+Using the raw mapping as `INLINE` breaks the sweep immediately rather than
+subtly, which is worth stating because it looks like a shortcut that would
+merely over-subtract.
+Every live worktree appears in it, including the main checkout and the one you
+are standing in.
+Their branches are `Active` to the branch pass by construction, so the
+contradiction rule below fires on the first one and halts a sweep that had
+nothing wrong with it.
 
 ### 2. Present one combined plan --- wait for confirmation
 
@@ -115,7 +138,7 @@ git worktree list --porcelain | awk '/^worktree /{p=$2} /^branch /{sub("refs/hea
 ### Branches to delete --- local
 ### Branches to rebase + open MR (stale)
 ### Skipped --- active / new / current
-### Subtracted from the branch pass (deleted inline by the worktree pass): <N>
+### Subtracted from the branch pass LOCAL list (deleted inline by the worktree pass): <N>
 ```
 
 One confirmation covers the whole plan.
@@ -129,8 +152,27 @@ Then run `clean-branches` steps 5 through 8.
 Re-derive the branch list between the two.
 The worktree pass has just changed it,
 and step 1's plan is a prediction rather than a fact.
-A branch that was in `INLINE` and is still present after the worktree pass
-means that worktree removal failed --- report it, do not delete the branch here.
+A branch that was in `INLINE` and is still present after the worktree pass has
+**two** possible causes, and they call for opposite responses:
+
+```bash
+git worktree list --porcelain | grep -Fq "worktree $path" && echo STILL-THERE || echo REMOVED
+```
+
+- **The worktree is gone.**
+  Then removal succeeded and `git branch -d` simply refused.
+  That is routine rather than exceptional: `clean-worktrees` step 5 documents
+  the refusal at length for squash-merged branches, and measured an 18/11
+  `-d`/`-D` split across a 29-branch sweep.
+  Leave it to the branch pass, which is equipped to confirm the merge and
+  escalate to `-D`.
+- **The worktree is still there.**
+  Then removal genuinely failed, and the safety rule below applies.
+
+Distinguishing them matters because the safety rule stops the branch pass on a
+worktree failure.
+Reading every surviving branch as a failure would abort the whole sweep on the
+commonest outcome there is.
 
 ### 4. Report
 

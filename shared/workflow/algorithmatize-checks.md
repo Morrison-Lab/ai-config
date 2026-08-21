@@ -507,8 +507,8 @@ first, before concluding the clause is redundant.
   case per mutation is already satisfied, and the sibling still absorbs it.
 
 (Measured on `Morrison-Lab/gha#548`, 2026-08-21, three times in one session on
-one chain, across two rewrites of the fixture set --- each rewrite relocating
-the confound rather than removing it.
+one chain, across two rewrites of the fixture set --- the first relocating the
+confound, the second finally removing it.
 An Anthropic-key fixture written as `Authorization: Bearer sk-ant-...` passed
 with the `sk-ant-` pattern deleted, because a generic header pattern caught it.
 The GitHub-token fixture beside it, written the same way, passed with the

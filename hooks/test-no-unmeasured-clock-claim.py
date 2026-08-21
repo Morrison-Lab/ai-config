@@ -43,6 +43,26 @@ HOOK_CLOCK = {"type": "user", "content":
               "UserPromptSubmit hook success: Current time -- local: "
               "2026-08-16 18:55:51 PDT | UTC: 2026-08-17T01:55:51Z"}
 
+def hook_clock(stamp, date="2026-08-21"):
+    """The injected reading, at a chosen time."""
+    return {"type": "user", "content":
+            f"UserPromptSubmit hook success: Current time -- local: "
+            f"{date} {stamp} PDT | UTC: 2026-08-21T22:00:00Z"}
+
+
+# The injected line with no parseable timestamp -- the value capture must fall
+# back to counting it as a read rather than treating it as no read at all.
+HOOK_CLOCK_UNPARSEABLE = {"type": "user", "content":
+                          "UserPromptSubmit hook success: Current time -- "
+                          "local: (unavailable)"}
+
+# This hook's own source (or its tests) echoed into a tool_result. It quotes
+# the marker, so it must not supply a VALUE -- reading the file would otherwise
+# inject a fabricated reading. See shared/writing/examples-are-scanned.md.
+HOOK_SOURCE_READ = {"type": "assistant", "message": {"content": [
+    {"type": "tool_result", "content":
+     "RX_HOOK_CLOCK = ... # Current time -- local: 2026-08-21 15:02:20 PDT"}]}}
+
 # Work that is not a clock read, however much it looks like one.
 GIT_LOG = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
@@ -95,6 +115,45 @@ CASES = [
      "no time of day at all"),
     ([DATE, say("earlier"), say("see the 18:30 entry")], False,
      "a bare time with no Pacific marker is not a present-tense claim"),
+
+    # --- ai-config#1848: the reading is present, and the claim departs from
+    #     it. The whole point of capturing the value rather than the position.
+    ([hook_clock("14:48:23"), say("as of 15:22 PDT, three PRs open")], True,
+     "#1848 incident: claim 34 min AHEAD of the injected reading, same turn"),
+    ([hook_clock("15:02:20"), say("as of 14:20 PDT")], False,
+     "a time BEHIND the reading is not fired on -- a past time read off an "
+     "artifact is prescribed behavior and is indistinguishable by value"),
+    ([hook_clock("14:48:23"), say("as of 14:48 PDT")], False,
+     "claim equal to the injected reading is quoting it"),
+    ([hook_clock("14:48:50"), say("as of 14:49 PDT")], False,
+     "rounding seconds up stays within tolerance"),
+    ([hook_clock("23:58:00"), say("as of 00:24 PDT")], True,
+     "wraparound: past midnight is still ahead, not 23 hours behind"),
+    ([hook_clock("23:59:30"), say("as of 00:00 PDT")], False,
+     "wraparound within tolerance does not fire"),
+    ([hook_clock("14:48:23"), DATE, say("as of 15:22 PDT")], False,
+     "a `date` run in this turn discharges even when a stale reading exists"),
+    ([HOOK_CLOCK_UNPARSEABLE, say("as of 15:22 PDT")], False,
+     "an injected line with no readable value falls back to counting as a read"),
+    ([hook_clock("14:48:23"), say("first recap"), say("as of 15:22 PDT")], True,
+     "a departing claim fires from a later message too"),
+
+    # --- review round 1 on #1850: the three regressions the value
+    #     comparison introduced, each traced by the reviewer ---
+    ([hook_clock("14:48:23"), say("first recap"), say("as of 14:48 PDT")], True,
+     "a STALE reading must not discharge by numeric proximity -- that is the "
+     "#1848 bug in a new shape"),
+    ([hook_clock("08:18:00"),
+      say("Scheduled. I'll check back at 08:22 PT (~4 min).")], False,
+     "CLAUDE.md's own prescribed scheduled-check-in sentence states a future "
+     "time and must not fire"),
+    ([hook_clock("15:02:20"),
+      say("The next wakeup fires at 15:30 PT.")], False,
+     "a wakeup time is ahead of the clock by design, not by invention"),
+    ([hook_clock("14:48:23"), HOOK_SOURCE_READ, say("as of 14:48 PDT")], False,
+     "reading this hook's source must not poison the measured value"),
+    ([hook_clock("14:48:23"), HOOK_SOURCE_READ, say("as of 15:02 PDT")], True,
+     "and must not let an invented time near the poisoned value pass either"),
 
     # --- the near-miss that would make this guard misfire ---
     ([say("earlier"), UPDATE_CMD, say("18:30 PDT")], True,

@@ -253,6 +253,53 @@ and set it explicitly before concluding anything.
 - **Don't:** let a failed reproduction retire a report; it retires one
   environment.
 
+**A sixth: the fact that a check ran, standing in for what the check found.**
+The five above all substitute one artifact for another --- a file, a run, an
+environment.
+This one keeps the right artifact and reads the wrong property off it.
+A guard asks "was a measurement taken?" when the rule it enforces asks "is the
+value you stated the one that was measured?", and the two questions come apart
+the moment a measurement is taken and then departed from.
+
+It is the hardest of the six to see from the inside, because the guard is
+**correct on every case anyone thought to test**.
+A session with no measurement fires, a session quoting its measurement stays
+silent, and both are the intended behavior --- so the test matrix is green and
+the missing case is the one nobody wrote, since it requires imagining evidence
+being present and ignored rather than absent.
+
+The tell is an instrument whose state is a **position, a flag, or a count**
+where the rule is about a **value**.
+An index recording that a reading occurred cannot distinguish quoting it from
+contradicting it.
+Neither can a boolean "the linter ran", a count of checks executed, or a
+timestamp proving a job started.
+
+The remedy is to ask what the guard would have to compare in order to be
+wrong.
+If the answer names a value the guard never captures, the guard is measuring
+its own execution rather than the property.
+
+- **Do:** capture the value a check produces, not only the fact that it ran,
+  wherever the rule is stated in terms of that value.
+- **Do:** write the test where the evidence is present and the claim departs
+  from it, which is the case a green matrix is least likely to contain.
+- **Don't:** read a passing guard as covering a rule whose subject it never
+  reads.
+- **Don't:** treat "the check is registered and did not fire" as evidence the
+  claim was sound.
+
+(Measured 2026-08-21, on this repo's own
+[`hooks/no-unmeasured-clock-claim.py`](../../hooks/no-unmeasured-clock-claim.py).
+It exists to catch a stated Pacific time nobody measured, was registered and
+running, and stayed silent while a recap claimed `15:22 PDT` against an
+injected reading of `14:48:23 PDT` --- 34 minutes ahead, and in the future at
+the moment it was written.
+Its `scan()` recorded each reading as a line *index* and never captured the
+timestamp, so `main()` compared positions.
+Sixteen existing tests passed, none of them a departing claim.
+Tracked as [ai-config#1848](https://github.com/Morrison-Lab/ai-config/issues/1848).)
+
 (Measured 2026-08-21 on
 [ai-config#1784](https://github.com/Morrison-Lab/ai-config/pull/1784).
 A review reported that `run_cli`'s `sys.stdin.read()` could raise

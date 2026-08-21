@@ -507,15 +507,18 @@ first, before concluding the clause is redundant.
   case per mutation is already satisfied, and the sibling still absorbs it.
 
 (Measured on `Morrison-Lab/gha#548`, 2026-08-21, three times in one session on
-one chain.
+one chain, across two rewrites of the fixture set --- each rewrite relocating
+the confound rather than removing it.
 An Anthropic-key fixture written as `Authorization: Bearer sk-ant-...` passed
 with the `sk-ant-` pattern deleted, because a generic header pattern caught it.
-Rewritten into URL userinfo, the modern-PAT fixture then passed with the
-GitHub-prefix pattern deleted, because the userinfo pattern caught it.
-Rewritten again as a bare file write, both isolated.
-The same sweep showed a pre-existing `github_pat_` pattern that no fixture
-reached at all --- deleting it turned nothing red, and it had been shipped that
-way.)
+The GitHub-token fixture beside it, written the same way, passed with the
+`gh[pousr]_` pattern deleted, for the same reason.
+Rewritten into URL userinfo, that same fixture passed with `gh[pousr]_` deleted
+again --- now because the userinfo pattern caught it.
+Rewritten once more as a bare file write, both isolated.
+The same sweep showed a pre-existing `github_pat_` pattern --- a second regex,
+distinct from the `gh[pousr]_` one above --- that no fixture reached at all:
+deleting it turned nothing red, and it had been shipped that way.)
 
 **A component that stops failing under mutation is a question, not a cleanup.**
 

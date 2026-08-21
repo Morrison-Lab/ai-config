@@ -71,3 +71,49 @@ because the file was not the disputed object.
 The check that separates them is
 `claude plugin list` or the install manifest,
 never a closer reading of the checkout in the working directory.
+
+## A stale install diagnosed from an mtime and an absence
+
+Measured on `Morrison-Lab/ai-config`, 2026-08-21 (UTC).
+
+[#1812](https://github.com/Morrison-Lab/ai-config/issues/1812) was filed
+claiming `~/.claude/hooks/` had gone stale,
+so merged hook fixes were not reaching the running guards.
+Two observations were reasoned from:
+the installed `no-unshipped-commit.py` was dated 2026-08-18,
+and it contained zero occurrences of `strip_quoted`,
+a function the issue asserted `main` "has carried".
+
+Both readings were accurate.
+Neither supported the conclusion.
+
+The deciding comparison, against `main` as it stood when the issue was filed
+(`fbe10c53^`):
+
+```
+total=61 identical=61 drifted=0
+```
+
+`strip_quoted` was absent because `main` had never carried it.
+It existed only on
+[#1807](https://github.com/Morrison-Lab/ai-config/pull/1807),
+still unmerged at that moment.
+
+The issue was filed at 01:17:14Z and closed at 01:18:54Z, once the loop ran.
+
+### The mtime read identically on both sides of the transition
+
+PR [#1807](https://github.com/Morrison-Lab/ai-config/pull/1807)
+merged at 01:20:48Z, two minutes after the issue closed,
+and `main`'s copy of that hook changed.
+The installed copy did not.
+
+| Time (UTC) | Event | Installed mtime | Drifted |
+|---|---|---|---|
+| 01:17:14 | #1812 filed | 2026-08-18 18:44:59 | 0 of 61 |
+| 01:20:48 | #1807 merged | 2026-08-18 18:44:59 | 2 of 61 |
+
+The same file with the same mtime was current before 01:20 and stale after it,
+which is the whole argument against the proxy in one measurement:
+an instrument reading the same value in both states
+has not measured either.

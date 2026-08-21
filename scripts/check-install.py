@@ -70,8 +70,9 @@ The comparison base is the repository's **main worktree**, because that is the
 checkout `bootstrap.sh` installed from. A linked worktree carries a `scripts/`
 of its own, so a run started there would otherwise compare against the worktree
 and report every entry `misdirected` with nothing misinstalled -- on essentially
-every session, since `CLAUDE.md` mandates a worktree for multi-file work
-(ai-config#1729). `--repo-root` overrides the base and is taken literally.
+every session, since `memories/preferences.md` requires a dedicated worktree for
+EVERY local session in this repo, not just for multi-file work (ai-config#1729).
+`--repo-root` overrides the base and is taken literally.
 """
 from __future__ import annotations
 

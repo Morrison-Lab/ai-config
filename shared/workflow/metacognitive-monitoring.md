@@ -602,3 +602,60 @@ write the thing that can be wrong.
 
 - [`algorithmatize-checks`](algorithmatize-checks.md) says to build the
   instrument rather than reason.
+
+## A summary written above the account it summarizes escapes the re-read
+
+The claim types above are monitored where they are asserted.
+This is a claim whose **position** suppresses the check: a clause that
+generalizes over an account, placed above it.
+
+It is read as a heading rather than as an assertion.
+So verification attaches to the purpose it was written for --- reconciling a
+count, introducing a list, framing a section --- and never to the content it
+quantifies over.
+Both feel like the same act from the inside, which is why re-reading the
+passage does not catch it.
+
+Three things make it likelier than an ordinary scope claim.
+
+**It is usually the newest text in the passage**, written last, to close a
+finding or tidy a transition.
+It therefore gets the least scrutiny at exactly the moment the surrounding
+prose has just been checked most carefully, and that recent care reads as
+having covered it.
+
+**It is written to solve a different problem than the one it creates.**
+A clause added to fix an arithmetic mismatch is checked against the
+arithmetic, which is what it was for.
+Whether it is *true of every member below* is a question nobody asked, because
+that was never the clause's job.
+
+**The reader's error is silent.**
+A wrong summary above a correct account does not confuse anyone --- it tells
+them something false and hands them consistent-looking detail to confirm it.
+
+The trigger is lexical, so use it rather than judging: a **quantifier
+introduced while fixing something else** --- "each", "every", "always", "in
+both cases", "throughout" --- is a new claim, and its population is the text
+below it.
+Check it against every member, not against the problem that prompted it.
+
+- **Do:** check a summarizing clause against each item it generalizes over,
+  and separately from whatever it was added to fix.
+- **Do:** treat a quantifier you introduced while addressing a finding as an
+  unverified assertion, not as part of the fix.
+- **Don't:** read position as licence --- a clause above an account is a claim
+  about the account, not a label for it.
+- **Don't:** let "I just checked this passage carefully" cover the sentence
+  written after that check.
+
+(Measured 2026-08-21 on
+[ai-config#1833](https://github.com/Morrison-Lab/ai-config/pull/1833).
+Round 1 found a citation claiming three events and narrating two.
+The fix restored the missing event and added a lead-in: "across two rewrites of
+the fixture set --- each rewrite relocating the confound rather than removing
+it."
+Three lines below, the same parenthetical reads "Rewritten once more as a bare
+file write, both isolated" --- the second rewrite *removed* the confound.
+Round 3 raised it as a self-contradiction introduced by round 2's fix.
+The arithmetic the clause was added for was correct throughout.)

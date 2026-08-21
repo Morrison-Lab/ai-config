@@ -39,13 +39,13 @@ check.
 Claim **type** can, because it is observable in the sentence you are about to
 write:
 
-The four are worth keeping as a list rather than collapsing into "check your
+The five are worth keeping as a list rather than collapsing into "check your
 claims", because each names a different *repair*, and the repair is the part
 that is easy to skip.
 
 ## A premise you were handed is still a claim
 
-All four types above describe assertions **you** generate, so all four trigger
+All five types above describe assertions **you** generate, so all five trigger
 on the act of writing one.
 A premise supplied by the user triggers on nothing.
 It arrives as context rather than as a claim, you did not reason your way to
@@ -295,7 +295,7 @@ ends up protected while the person does not.
 
 ## An action you recommend is a claim about state
 
-The four types above fire on an assertion, and the section above extends them
+The five types above fire on an assertion, and the section above extends them
 to a premise you were handed.
 Both are things somebody states.
 A recommendation states nothing about the world.
@@ -794,6 +794,163 @@ It holds while one instrument has a before and an after.
 It does not transfer when two revisions stay live at once, because then the
 earlier figure is not stale --- it is still the answer to a question somebody
 is asking.
+
+## A sound measurement does not license the claim standing next to it
+
+The reachable-half and retraction-reach sections concern instruments whose
+**reach** was the problem: a scope narrower than it looked, or an input that
+could not have held the evidence.
+Neither sits immediately above this one, so they are named rather than counted.
+This concerns an instrument with no problem at all.
+The command is right, the scope is right, the reading is right --- and the
+sentence written next to the result asserts a different proposition.
+
+### Why it survives every check in this file
+
+Each of those checks asks a question about the evidence, and the evidence
+answers well.
+Was a command run?
+Yes.
+Was its scope examined?
+Yes.
+Did it return what it appeared to return?
+Yes.
+Nothing in the sequence asks whether the **conclusion** is a conclusion *from*
+that evidence, which is the only step that failed.
+
+The credibility transfer is what makes it invisible from the inside.
+Measuring is the expensive part of a paragraph, so it is what the writer
+remembers doing, and recency plus effort attach the felt confidence to the
+whole passage rather than to the one sentence that earned it.
+That is the same "lack of effort mistaken for understanding" inversion this
+file records from the Wikipedia article, running in the opposite direction:
+there an absence of effort licensed a claim, here a genuine effort licenses a
+neighbouring one.
+
+### Why optimism bias is the wrong frame
+
+The obvious reading is that a verified mechanism makes the writer over-claim.
+That reading predicts the error only ever runs toward confidence, and it does
+not.
+A measurement establishing that two candidate inputs are *different* can
+license "we used the wrong one" just as readily as a measurement of agreement
+licenses "this is correct" --- and the retraction case is the harder one to
+catch, because withdrawing your own published figure is the most
+rigorous-feeling act available.
+[`fully-clean`](fully-clean.md) makes the same point about a checker's exit
+status failing toward alarm rather than toward clean, and notes that both
+directions come from reading a multi-valued answer as a two-valued one.
+This is the prose form of that.
+
+### Why the two-sentence test works
+
+It is not a check on the world, and it costs no query.
+It is a check on **subject agreement** between two sentences you already hold.
+Writing "the measurement establishes X" forces X to be stated at the width the
+instrument actually supports, and setting the claim beside it exposes any
+subject the instrument never mentioned.
+In the first three recorded instances the two sentences name different
+subjects outright --- a function's behaviour versus a directory's contents, a model
+versus a population, a difference versus a currency --- so no judgment about
+degree is needed.
+
+### The subset case, and why it is the sharpest form
+
+Three of the five recorded instances join two subjects that are plainly
+different kinds of thing --- a function's behaviour and a directory's contents,
+a model and a population, a difference and a currency.
+The fourth and fifth join a set to a **superset of itself**, and that is harder
+to see, because nothing about the sentence changes register.
+
+`git branch -r --contains <sha>` is a complete and correct enumeration of the
+branches containing a commit.
+Reporting it as no ref containing that commit is one word wider, and that
+wider word excludes `refs/pull/<N>/head`, notes, and tags.
+`refs/pull/<N>/head` is where the answer lived.
+The other two were merely excluded and had nothing to do with this question,
+which is worth separating: claiming all three were where the answer lived
+would be this section's own error, committed in the sentence describing it.
+(The reflog is not in that set at all: it lives outside `refs/` entirely, so
+it is not a ref the wider word would have covered either.)
+The default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so
+`refs/pull/*` is never fetched into a clone at all, which means the null result
+was guaranteed independently of the fact being claimed.
+That is the same "could this check have returned anything else, if the claim
+were true" question the retraction-reach section asks, arriving here through a
+sound positive-scope command rather than through a mis-pointed one.
+
+Naming the population is a cheaper remedy than the two-sentence test and covers
+this case exactly, because the two sentences would otherwise differ only in a
+single noun.
+It also produces a claim a reader can falsify without re-running anything,
+which is the property [`grep-is-not-coverage`](grep-is-not-coverage.md) asks
+for when it says to report the query rather than the conclusion.
+
+The fifth instance shows the superset can be created by the **instrument's own
+reporting format** rather than by a word choice.
+A test runner returns three numbers and the habit reports two, so the omitted
+one is what defines the unmeasured population.
+That makes the skipped set invisible in a way the branch-versus-ref case is
+not: there the wider noun at least appears in the sentence, whereas here
+nothing in "43 pass, 0 fail" hints that a third number exists.
+
+Its second lesson belongs to the **default** claim type rather than to this
+section, and is worth naming because the two compound.
+`R_PROFILE_USER=/dev/null` was an unexamined default, inherited from an
+unrelated workaround, and its effect was to change the population the
+measurement covered.
+So an unexamined default upstream produced the population gap downstream, and
+the reported figure moved not at all.
+That is the general hazard with any environment-bypassing flag: it shrinks what
+is measured while leaving the shape of the result unchanged, and it makes the
+run faster, which is what turns a one-off workaround into a habit.
+
+### Why this is not mechanizable
+
+Stating the limit explicitly, per
+[`algorithmatize-checks`](algorithmatize-checks.md)'s "Limits", so that nobody
+builds the guard and then quietly disables it.
+
+The condition is a semantic relation between a tool result and a
+natural-language sentence: does this claim follow from that evidence.
+No lexical or structural property decides it.
+A hook keyed on "a factual assertion appears within N turns of a tool call"
+would fire on nearly every paragraph this corpus produces, since reporting
+findings next to the commands that produced them is the behaviour the rest of
+the corpus **requires**.
+Its false-positive rate would be close to its firing rate, which is the
+condition [`deterministic-tools`](../principles/deterministic-tools.md) names
+for leaving a check as judgment.
+
+The checkable proxy is the same one the reachable-half section settles for:
+**coverage of the form**, not correctness of the inference.
+A reviewer can see whether the two sentences were written and whether their
+subjects match, which is a property of the prose.
+That is a review check rather than a hook, and it is where this rule is
+enforceable.
+
+### The one decidable sub-case, and why it still is not a hook
+
+The skip-count instance is the exception to the paragraph above, and saying so
+is what keeps the general claim honest.
+"A message reports a testthat PASS and FAIL count from a run that had skips"
+**is** decidable, unlike "does this claim follow from that evidence".
+
+It is still the wrong thing to mechanize, for two reasons that are about the
+instrument rather than about the principle.
+A hook would have to parse prose to find the reported counts, and a prose
+parser is exactly the brittle detector
+[`algorithmatize-checks`](algorithmatize-checks.md) warns against building.
+It would miss a count written as "all green" and fire on one quoted from a log.
+And it would have to know the run's real skip count, which is not in the
+transcript it can see.
+
+The robust form is upstream of the report: run the tests with an invocation
+that prints all three numbers, and carry all three into the sentence.
+That makes the habit and the tooling the same act, and it fails safe, because
+a runner that prints `SKIP` alongside `FAIL` cannot report a suite as passing
+while hiding what did not execute.
+[`test`](../../skills/test/SKILL.md)'s reporting step carries that instruction.
 
 ## Writing is the instrument, when the claim can be wrong
 

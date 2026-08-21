@@ -63,6 +63,29 @@ for f in scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
 
 Report pass/fail. If tests fail, investigate and fix before proceeding.
 
+#### Always report SKIP alongside PASS and FAIL
+
+A pass and fail count says nothing about the tests that never executed, so
+"43 pass, 0 fail" can be exactly accurate while the suite has not been
+verified.
+Report all three numbers, and treat a non-zero skip count as an unmeasured
+population: say what was skipped and why before citing the run as evidence.
+
+Then ask what made them skip.
+A skip is usually keyed on a missing optional dependency
+(`skip_if_not_installed()`, `pytest.importorskip`), so an invocation that
+bypasses environment setup silently shrinks the suite while leaving the
+reported numbers looking healthy.
+In an R package, `R_PROFILE_USER=/dev/null` skips `renv/activate.R` and
+therefore the project library, so packages the tests gate on are absent and
+their tests skip.
+The same applies to any `--no-config` flag, a bare interpreter, or a
+container built without the optional extras.
+
+Before citing a run as verification, confirm it ran in the project's real
+environment.
+Re-run without the bypass when the skip count is non-zero.
+
 ### 4. Downstream / revdep testing
 
 When the change is to shared infrastructure (CI templates, shared scripts),
@@ -105,8 +128,11 @@ Poll every 30–60 seconds until status is `success`, `failed`, or `canceled`.
 
 Summarize what was tested and the outcome:
 
+Always include the skip count for a unit-test run, per step 3.
+
 ```
 ✅ Tests passed:
+- devtools::test(): 40 pass, 0 fail, 0 skip
 - bash -n syntax check: all scripts OK
 - test.hac pipeline #NNNN: success (jobs: lint ✓, check-package ✓, claude-review ✓)
 

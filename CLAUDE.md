@@ -245,6 +245,9 @@ The same bare-keyword reading applies to the judgment-grant keywords, which are 
 `away` is the session-scoped version, presuming I am not there to answer at all, and `back` revokes it.
 `mwc` is the separate grant covering merge authority, which none of the others extend to.
 Read a bare "do as you think best" as `daytb`, not as `away` -- the session-wide reading suspends clarifying questions long after I expected them back.
+`dmmhyh` ("don't make me hold your hand") is a correction rather than a proactive grant: it fires when I'm asking for more guidance than the moment calls for.
+It resolves the pending item like `daytb`, raises the decide-vs-ask threshold for the rest of the session like `away`'s judgment-call test, and -- unlike either -- writes the correction down as a memory entry so it doesn't have to be re-taught next session.
+See [`dmmhyh`](skills/dmmhyh/SKILL.md).
 
 ## Link PRs in tables
 
@@ -302,6 +305,33 @@ Prefixed, no box (informational, frequent):
 Keep the markers stable so they become muscle memory.
 The set-apart ❓ **QUESTION** format also gives the `prompt-me` / `prompt-me-all` skills a reliable signal to key off when they sweep the transcript for unanswered questions later.
 The user may tune the emoji set; the full taxonomy and rationale live in `memories/preferences.md`.
+
+## Never close a reply by offering to do work you are already allowed to do
+
+[shared/workflow/no-cop-out-offers.md](shared/workflow/no-cop-out-offers.md)
+
+"Say the word and I'll push."
+"Want me to kick off the re-run?"
+Each reads as courtesy and delivers nothing: the work does not happen, you
+spend a turn, and the reply reported nothing.
+
+The phrase is not the defect --- asking before a merge, a force-push, or a
+deletion is correct, and those sentences look identical.
+What decides it is whether the action was **already authorized**, by a
+standing instruction, a `daytb`/`away` grant, or your having asked for the
+outcome earlier.
+When it was, the offer is avoidance wearing courtesy, and the cost is
+asymmetric: an unwanted action is cheap to revert, while an unanswered offer
+leaves no branch, no PR, no issue --- nothing another session could find.
+
+`hooks/flag-cop-out-offer.py` is the instrument.
+It warns rather than blocks, because authorization is not lexically decidable.
+
+- **Do:** perform the authorized action and report it in the past tense.
+- **Do:** ask plainly, with no offer wording, when the action is genuinely
+  unauthorized and destructive or outward-facing.
+- **Don't:** attach a user-conditional to work a standing instruction covers.
+- **Don't:** close a status recap with an offer --- that is where this hides.
 
 ## Always produce a reply --- never end a turn silently
 

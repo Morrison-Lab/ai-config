@@ -43,6 +43,31 @@ In a Claude Code session, type `/` and confirm the skills appear (e.g.
 - **Global Plugin**: `bootstrap.sh` symlinks `plugins/ai-config` to `~/.gemini/config/plugins/ai-config` and registers `~/.gemini/config/plugins.json` and `skills.json`.
 - **Workspace Plugin**: Opening this repository directly in Antigravity automatically discovers `.agents/skills.json` and `.agents/plugins.json` to load all skills, rules (`AGENTS.md`), and plugin features.
 
+### opencode
+
+[opencode](https://opencode.ai) has no skills-bundle "plugin" --- its `plugin` config field loads JavaScript/TypeScript event-hook modules, not skills, rules, or agents.
+opencode instead reads ai-config through its ordinary config fields plus convention-based discovery (`.claude/skills/`, `.agents/skills/`, `.opencode/agents/`):
+
+- **This repo.**
+  The root [`opencode.json`](opencode.json) wires opencode when you run it inside ai-config: `instructions` loads `AGENTS.md`/`CLAUDE.md`, `skills.paths` adds `skills/` and the vendored `shared/sembr-skills/skills`, `references` exposes `shared/` and `memories/`, and the subagents in [`.opencode/agents/`](.opencode/agents) are auto-discovered.
+- **Another repo (consumer).**
+  A project that vendors ai-config at `.ai-config/` (as [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) does via `tools/bootstrap-ai-config.sh` + a pinned `.ai-config-ref`) can point its own `opencode.json` at that checkout --- the opencode analogue of the Claude plugin and the `.agents/*.json` Antigravity/Gemini config:
+
+  ```json
+  {
+    "$schema": "https://opencode.ai/config.json",
+    "instructions": ["AGENTS.md", "CLAUDE.md", ".ai-config/AGENTS.md", ".ai-config/CLAUDE.md"],
+    "skills": {
+      "paths": [".ai-config/skills", ".ai-config/shared/sembr-skills/skills"]
+    },
+    "references": {
+      "shared":   { "path": ".ai-config/shared",   "description": "ai-config shared fragments" },
+      "memories": { "path": ".ai-config/memories", "description": "ai-config memories" }
+    }
+  }
+  ```
+
+  To make ai-config available to opencode in **every** project, copy or symlink `skills/` into `~/.config/opencode/skills/` and add `instructions` entries to `~/.config/opencode/opencode.json`.
 
 ### Codex wrappers
 
@@ -329,11 +354,14 @@ the rule is consulted when it is *read* and broken when a message is
 | `flag-add-a-outside-pathspec.py` | `PreToolUse` (Bash) | warns, never blocks, when `git add -A`/`--all`/`.` sweeps in an untracked file its own exclusion pathspec does not cover |
 | `flag-reset-hard-uncommitted-work.py` | `PreToolUse` (Bash) | warns, never blocks, when `git reset --hard` is about to discard tracked, uncommitted changes |
 | `no-handrolled-verdict-parse.py` | `PreToolUse` (Bash) | blocks matching a verdict phrase against a PR's review comments when `check-pr-fully-clean.py` has not answered for that PR |
+| `warn-pr-create-without-dupe-check.py` | `PreToolUse` (Bash, mcp__github__.*) | warns when a command creates a PR and no earlier command in the session could have surfaced an already-open one; warns rather than blocks, since a duplicate PR is cheap to close and a blocked creation is not |
 | `no-unmeasured-clock-claim.py` | `Stop` | warns, never blocks, when a reply states a Pacific clock time and no clock read appears since the previous message |
 | `no-unauthorized-merge.py` | `PreToolUse` (Bash, mcp__github__.*) | blocks a PR/MR merge command (`gh pr merge`, `glab mr merge`, `gh api .../merge`, or GitHub MCP merge tools) unless an explicit `ALLOW_MERGE=1` assertion or active /mwc accompanies it |
 | `no-whole-file-punct-replace.py` | `PreToolUse` (Bash) | blocks a whole-file glyph replace, which converts pre-existing glyphs on untouched lines and buries the real change in a mechanical diff |
+| `flag-cop-out-offer.py` | `Stop` | warns when a reply *closes* on an offer to do work (`say the word`, `want me to`, `unless you'd rather`), so the author answers whether the action was already authorized; warns rather than blocks because authorization is not lexically decidable and asking before a merge or force-push is correct, and is tail-anchored because the failure is a recap that closes on an offer |
 | `no-placeholder-reply.py` | `Stop` | blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement), anchored on the whole message since this corpus quotes the banned string constantly, and deliberately silent on a claim about the *work* (`Nothing to report.`), which the same rule requires |
 | `require-stopping-point.py` | `Stop` | blocks a final reply lacking an explicit clean or non-clean stopping-point declaration |
+| `flag-stale-adjacent-comment.py` | `PreToolUse` (Bash) | warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one |
 | `no-misattributed-quote.py` | `Stop` | blocks a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
 
 For agent-independent monitoring across all projects and sessions, install the

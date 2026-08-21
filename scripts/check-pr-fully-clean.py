@@ -244,6 +244,13 @@ def is_non_review_notice(body: str) -> bool:
     so a window bounds the match rather than letting a mention anywhere in a
     long body decide.
     """
+    # The agent check is redundant TODAY -- every REVIEW_AGENT_MARKERS entry
+    # happens to contain a REVIEW_BODY_MARKERS entry, so the second call decides
+    # every case. It stays because the redundancy is a coincidence of the current
+    # marker values, not an invariant: a new agent marker that is not a superset
+    # of some body marker would recreate the precedence gap this round existed to
+    # close. A test pins the property rather than leaving it to whoever edits the
+    # marker tables next.
     if _detect_review_agent(body) or has_review_body_marker(body):
         return False
     head = body[:NOTICE_PREFIX_WINDOW].lower()

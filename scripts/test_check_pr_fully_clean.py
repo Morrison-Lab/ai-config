@@ -1140,6 +1140,18 @@ def main() -> int:
     check("a spend-limit notice alone does NOT report clean",
           not spend_ok and len(spend_issues) > 0)
 
+    # Every KNOWN REVIEW AGENT must be protected from notice exclusion too.
+    # Review on #1862 observed that the `_detect_review_agent(body) or` clause is
+    # redundant today, since each agent marker happens to contain a body marker.
+    # That is a coincidence of the current tables rather than an invariant, so
+    # this pins the property the clause exists for: it passes today through
+    # either branch, and keeps passing if an agent marker is added that no body
+    # marker covers.
+    for agent_marker in checker.REVIEW_AGENT_MARKERS:
+        body = f"\U0001f440 **Claude Review Dispatched**\n\n{agent_marker} ..."
+        check(f"a body carrying the agent marker {agent_marker!r} is not excluded",
+              not checker.is_non_review_notice(body))
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

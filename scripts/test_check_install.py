@@ -461,5 +461,38 @@ with tempfile.TemporaryDirectory() as tmp:
           ci.main_worktree(outside) is None)
 
 
+with tempfile.TemporaryDirectory() as tmp:
+    # `git clone --bare` plus worktrees is a common layout, and the bare
+    # repository is itself a listed record -- emitted FIRST. Taking the first
+    # record would hand back a `.git` directory as the checkout to compare
+    # against, so every entry would read misdirected or foreign: the same
+    # symptom this PR fixes, in a different layout.
+    root = Path(tmp)
+    bare = root / "src.git"
+    git(root, "init", "-q", "--bare", str(bare))
+    seed = root / "seed"
+    seed.mkdir()
+    write(seed / "CLAUDE.md", "root instructions\n")
+    git(seed, "init", "-q")
+    git(seed, "add", "-A")
+    git(seed, "commit", "-q", "-m", "seed")
+    git(seed, "remote", "add", "origin", str(bare))
+    git(seed, "push", "-q", "origin", "HEAD:refs/heads/seeded")
+
+    bare_wt = root / "from-bare"
+    git(bare, "worktree", "add", "-q", str(bare_wt), "seeded")
+
+    # Resolved, because git reports the real path and macOS puts the temp dir
+    # behind the /var -> /private/var symlink.
+    listing = git(bare_wt, "worktree", "list", "--porcelain").stdout
+    listing_is_bare_first = bare_wt.is_dir() and listing.startswith(
+        f"worktree {bare.resolve()}\nbare"
+    )
+    check("negative control: the bare repo really is the first listed record",
+          listing_is_bare_first)
+    check("main_worktree() skips a bare record rather than returning the .git dir",
+          ci.main_worktree(bare_wt) == bare_wt.resolve())
+
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

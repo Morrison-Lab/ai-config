@@ -127,16 +127,29 @@ def main_worktree(path: Path) -> Path | None:
     installed from. Every `~/.claude` symlink then resolves outside that root
     and reads `misdirected`, with nothing actually misinstalled (ai-config#1729).
 
-    `git worktree list --porcelain` names the main worktree on its first
-    `worktree ` line. It is used in preference to `git rev-parse
-    --git-common-dir`'s parent, which is only the main worktree when the common
-    directory happens to be `<main>/.git` -- untrue for a bare repository and
-    for `--separate-git-dir`.
+    `git worktree list --porcelain` names it. That is used in preference to
+    `git rev-parse --git-common-dir`'s parent, which is the main worktree only
+    when the common directory happens to be `<main>/.git` -- untrue for a bare
+    repository and for `--separate-git-dir`.
+
+    The FIRST record is not always the answer. A bare repository is itself a
+    listed record, so the common `git clone --bare` plus worktrees layout emits
+    it first, and taking it would hand back a `.git` directory as the checkout
+    to compare against. Records are separated by a blank line and carry a bare
+    `bare` attribute line, so bare records are skipped and the first record with
+    an actual working tree wins. Measured 2026-08-21:
+
+        worktree /tmp/src.git
+        bare
+
+        worktree /tmp/wt1
+        HEAD 0560a745...
+        branch refs/heads/wt1
 
     Returns None whenever the answer is not established: `git` missing, `path`
-    not in a repository, or output in an unexpected shape. The caller keeps its
-    original root in that case, which is the correct base for every
-    non-worktree install, and prints the root it settled on either way.
+    not in a repository, a bare-only listing, or output in an unexpected shape.
+    The caller keeps its original root in that case, which is the correct base
+    for every non-worktree install, and prints the root it settled on either way.
     """
     try:
         result = subprocess.run(
@@ -147,11 +160,19 @@ def main_worktree(path: Path) -> Path | None:
         return None
     if result.returncode != 0:
         return None
+
+    candidate: Path | None = None
     for line in result.stdout.splitlines():
         if line.startswith("worktree "):
             candidate = Path(line[len("worktree "):]).resolve()
+        elif line.strip() == "bare":
+            # This record has no working tree; keep reading for one that does.
+            candidate = None
+        elif not line.strip() and candidate is not None:
+            # Blank line ends a record, and this one was not bare.
             return candidate if candidate.is_dir() else None
-    return None
+    # A listing with no trailing blank line still has to yield its last record.
+    return candidate if candidate is not None and candidate.is_dir() else None
 
 
 class Entry:

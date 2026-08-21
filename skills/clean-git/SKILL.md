@@ -140,11 +140,18 @@ Three that the combined form makes easier to get wrong:
 
 ## Relationship to other skills
 
-- **[`clean-worktrees`](../clean-worktrees/SKILL.md) / `cw`** --- the first pass. Run it alone when only worktrees are in question.
-- **[`clean-branches`](../clean-branches/SKILL.md) / `cb`** --- the second pass. Run it alone in a repo with no worktrees.
-- **[`wrap-up`](../wrap-up/SKILL.md)** --- its state sweep surfaces leftover worktrees and branches; this is the skill it hands off to.
-- **[`post-merge`](../post-merge/SKILL.md)** --- per-PR tidy-up; this is the repo-wide bulk form.
-- **[`session-lock`](../session-lock/SKILL.md)** --- creates the worktrees swept here; its registry is what keeps a live session's worktree off the plan.
+- **[`clean-worktrees`](../clean-worktrees/SKILL.md) / `cw`** --- the first pass.
+  Run it alone when only worktrees are in question.
+- **[`clean-branches`](../clean-branches/SKILL.md) / `cb`** --- the second pass.
+  Run it alone in a repo with no worktrees.
+- **[`wrap-up`](../wrap-up/SKILL.md)** --- its state sweep surfaces leftover
+  worktrees and branches.
+  This is the skill it hands off to.
+- **[`post-merge`](../post-merge/SKILL.md)** --- per-PR tidy-up.
+  This is the repo-wide bulk form.
+- **[`session-lock`](../session-lock/SKILL.md)** --- creates the worktrees swept
+  here.
+  Its registry is what keeps a live session's worktree off the plan.
 
 Do not confuse this with **`clear-all`**, which is an alias for
 [`gia`](../gia/SKILL.md) and does something entirely unrelated ---

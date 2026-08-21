@@ -512,9 +512,11 @@ one of which would have caught a credential swept into a pushed commit that
 same session.
 
 [`post-merge`](skills/post-merge/SKILL.md)'s step 3.75 is that owner.
-It runs `install-hooks.py --fix` on any ai-config merge, which is the call that
+On the non-plugin path it runs `install-hooks.py --fix`, which is the call that
 registers what the gate had been holding back --- the bare invocation only
 reports.
+On a plugin-enabled machine nothing is owed, and `--fix` there double-registers
+every hook rather than helping, per the mutually-exclusive section above.
 
 - **Do:** register the hook as part of the post-merge sweep, in the session
   that merged it.

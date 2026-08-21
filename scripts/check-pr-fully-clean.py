@@ -179,11 +179,40 @@ NON_REVIEW_NOTICE_MARKERS = (
     "claude review dispatched",
     "claude review skipped",
     "claude review did not finish",
+    # The AGENT workflow's quota shape, distinct from the review workflow's
+    # wording above. self-review-fallback.md documents both and says "Both mean
+    # no bot will respond on this run", so covering one and not the other left
+    # the identical false clean reachable through the other notice
+    # (review finding on ai-config#1862). scripts/pr-sweep.py's REFUSAL_MARKERS
+    # already carried "spend limit" for the same reason.
+    "spend limit",
     "[pr preview action]",
     "**cost:**",
 )
 
 NOTICE_PREFIX_WINDOW = 200
+
+# The body markers that make a comment look like a review regardless of author.
+# Shared by the admission test and by is_non_review_notice()'s precedence guard,
+# because those two must agree: anything wide enough to be ADMITTED as a review
+# has to be wide enough to be PROTECTED from notice exclusion. They disagreed
+# once, and a self-review opening by quoting the skip notice it was standing in
+# for -- which self-review-fallback.md tells you to write -- was dropped
+# entirely, verdict and all (review finding on ai-config#1862).
+REVIEW_BODY_MARKERS = (
+    "\U0001f916",
+    "### \U0001f916",
+    "code review",
+    "**claude finished",
+    "### verdict",
+    "verdict:",
+)
+
+
+def has_review_body_marker(body: str) -> bool:
+    """True when *body* carries a marker that makes it read as a review."""
+    body_lower = body.lower()
+    return any(marker in body_lower for marker in REVIEW_BODY_MARKERS)
 
 
 def _detect_review_agent(body: str) -> Optional[str]:
@@ -215,7 +244,7 @@ def is_non_review_notice(body: str) -> bool:
     so a window bounds the match rather than letting a mention anywhere in a
     long body decide.
     """
-    if _detect_review_agent(body):
+    if _detect_review_agent(body) or has_review_body_marker(body):
         return False
     head = body[:NOTICE_PREFIX_WINDOW].lower()
     return any(marker in head for marker in NON_REVIEW_NOTICE_MARKERS)
@@ -722,7 +751,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # review comments were posted under a human login and both verdict-bearing
         # ones carried "### Verdict" -- so admission failed, all_items was empty,
         # and every body-content criterion below was evaluated over nothing.
-        is_review_header = any(marker in body_lower for marker in ("\ud83e\udd16", "### 🤖", "code review", "**claude finished", "### verdict", "verdict:"))
+        is_review_header = has_review_body_marker(body)
 
         if is_bot_author or is_review_header:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login))

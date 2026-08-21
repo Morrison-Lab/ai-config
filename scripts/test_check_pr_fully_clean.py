@@ -1075,17 +1075,70 @@ def main() -> int:
           any("No automated review" in i or "No review comment" in i
               for i in skip_issues))
 
-    # Negative control on that fixture: the same body WITHOUT the notice marker
-    # is admitted and does read clean, so the assertion above is about the
-    # marker rather than about some other property of the fixture.
+    # Negative control, MINIMAL: the identical body with only the marker phrase
+    # deleted. It must read clean, which is what proves the assertion above is
+    # about the marker rather than about some other property of the fixture.
+    #
+    # The earlier version of this control substituted a whole different body (an
+    # Antigravity report with an explicit `Verdict: Clean`), so it routed through
+    # the precedence branch and never exercised the marker window at all. A
+    # mutation check found it inert: with NON_REVIEW_NOTICE_MARKERS replaced by
+    # absurd values it still passed. Caught by review on ai-config#1862, and it
+    # is the reason this control now differs from the fixture by one phrase.
     control = dict(skip_at_head,
-                   body="### \U0001f916 Antigravity Agent Report (Code-Review)\n\n"
-                        "Reviewed HEAD sha123.\n\nVerdict: Clean")
+                   body=skip_at_head["body"].replace("Claude review skipped", "Status"))
+    check("negative control differs from the fixture by only the marker phrase",
+          "claude review skipped" not in control["body"].lower()
+          and len(control["body"]) > 0.8 * len(skip_at_head["body"]))
     with patch.object(checker, "run_cmd",
                       return_value=json.dumps({"comments": [control], "reviews": []})):
         ctrl_ok, _ = checker.check_review_comments("1841", "sha123", TEST_REPO)
-    check("negative control: a real review on the same fixture DOES read clean",
+    check("negative control: the same body without the marker DOES read clean",
           ctrl_ok)
+
+    # --- review findings on #1862 ------------------------------------------
+    #
+    # Finding 1. self-review-fallback.md tells a session to post a fallback
+    # self-review when the reviewer quota-skips, and the natural opening names
+    # the notice it stands in for. The precedence guard used the 3 narrow agent
+    # markers while ADMISSION used a wider body-marker set, so such a review was
+    # dropped entirely -- verdict and all. A dropped `Needs more work` is worse
+    # than the false clean this PR exists to fix, since it also erases the
+    # verdict from check_latest_verdict's history.
+    fallback_self_review = (
+        "The reviewer posted `Claude review skipped -- API quota exhausted`, so "
+        "I am posting a fallback self-review.\n\n### Verdict: Needs more work"
+    )
+    check("a self-review QUOTING the skip notice is not excluded",
+          not checker.is_non_review_notice(fallback_self_review))
+    check("negative control: it carries no known agent marker, so the wide "
+          "body-marker predicate is what saves it",
+          checker._detect_review_agent(fallback_self_review) is None
+          and checker.has_review_body_marker(fallback_self_review))
+    check("and it still classifies as not-clean",
+          checker.classify_verdict(fallback_self_review) == "not-clean")
+
+    # The two predicates must not drift apart again: anything wide enough to be
+    # ADMITTED as a review must be wide enough to be PROTECTED from exclusion.
+    for marker in checker.REVIEW_BODY_MARKERS:
+        body = f"\U0001f440 **Claude Review Dispatched** and {marker} here"
+        check(f"a body carrying the admission marker {marker!r} is not excluded",
+              not checker.is_non_review_notice(body))
+
+    # Finding 2. The AGENT workflow's quota notice, a distinct shape from the
+    # review workflow's, documented in the same fragment.
+    spend_limit = {
+        "createdAt": "2026-08-21T21:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": "You've hit your org's monthly spend limit. Reviewed sha123. [View run](https://x)",
+    }
+    check("the spend-limit notice is not admitted as a review",
+          checker.is_non_review_notice(spend_limit["body"]))
+    with patch.object(checker, "run_cmd",
+                      return_value=json.dumps({"comments": [spend_limit], "reviews": []})):
+        spend_ok, spend_issues = checker.check_review_comments("1841", "sha123", TEST_REPO)
+    check("a spend-limit notice alone does NOT report clean",
+          not spend_ok and len(spend_issues) > 0)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

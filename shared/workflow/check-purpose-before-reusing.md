@@ -199,6 +199,53 @@ carried, restored one round at a time: the per-reviewer
 Each sibling guard had its own documented rationale one screen away when the
 minimal query was written.)
 
+**The sibling is sometimes not a separate artifact but the other branch of the
+same decision**,
+and this form of the failure is harder to see.
+Above, two blocks do the same kind of job in different places,
+so the sibling is visibly a model to copy from.
+Here there is one decision with two paths to it ---
+a new discharge condition, an extra early return,
+an alternative source for a value ---
+and the guard the old path carries is a precondition on the *decision*,
+not a detail of the old branch.
+Nothing marks it as inheritable,
+because from inside the new branch its absence looks like nothing at all.
+
+**The omission is especially likely in a fix.**
+A new branch added to correct a bug exists precisely to handle a case the old
+one got wrong,
+so deliberate differences from the old path are the point ---
+which is exactly what makes a dropped guard look intentional.
+
+The clause-by-clause diff above still applies,
+asked of the **older** branch.
+What must be true before it fires?
+Does the new path require it too?
+Reading the new branch alone cannot answer either question.
+Then write the test they imply:
+exercise the new path with the old path's precondition violated.
+That is the cross-branch case a branch-local test is likely to miss,
+and it is where this recurred.
+
+- **Do:** treat the other branch of a shared decision as a sibling, not only a
+  neighbouring block.
+- **Don't:** exempt a bug fix --- it is the case where the omission is most
+  likely and reads most like a decision.
+
+(Morrison-Lab/ai-config#1850, 2026-08-21: a guard comparing a claimed clock
+time gained a second discharge path, reading a captured value where the
+existing path read a position.
+The existing path required the reading to be newer than the previous message;
+the new one carried no position at all, so a reading from hours earlier
+discharged any later claim that happened to land within tolerance --- which is
+the bug the PR existed to fix, in a new shape.
+The missing gate was invisible from inside either path: the position-reading
+path carried it as an ordinary condition, and the value-reading path simply
+never mentioned it.
+The reviewer located the missing gate by asking what the position-reading path
+required.)
+
 ## Reusing a CLAIM: its truth conditions travel with the question, not the sentence
 
 Every section above reuses a **structure** --- a template, a directory tree, a

@@ -26,12 +26,15 @@ check.
   Check the population rather than the sample that came to mind.
 - **Cause** --- it failed because, this is flaky, that change broke it.
   Ask what else produces the same observation.
+- **Inference** --- this measurement shows, therefore.
+  State what the measurement establishes and what you are claiming as two
+  sentences, and check the second is not wider than or beside the first.
 - **An unexamined default** --- a flag, a template, a glob, a base ref.
   Name it and decide it, rather than inheriting it silently.
 
 ## A premise you were handed is still a claim
 
-All four types above describe assertions **you** generate, so all four trigger
+All five types above describe assertions **you** generate, so all five trigger
 on the act of writing one.
 
 - **Do:** restate a load-bearing premise explicitly and name what would
@@ -176,7 +179,7 @@ Each was fixed on its own terms and none of the fixes generalized.)
 
 ## An action you recommend is a claim about state
 
-The four types above fire on an assertion, and the section above extends them
+The five types above fire on an assertion, and the section above extends them
 to a premise you were handed.
 
 - **Do:** re-query an artifact's state immediately before recommending an
@@ -432,6 +435,130 @@ invalidates every figure it produced".**
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 "A re-measurement with a different instrument".
 
+## A sound measurement does not license the claim standing next to it
+
+The reachable-half and retraction-reach sections both concern a reading that
+was narrower than it looked --- a scope left unexamined, or an instrument whose
+input could not have held the evidence.
+Naming them rather than counting back is deliberate: neither is adjacent to
+this section, and a positional reference would point at the wrong pair.
+This concerns a measurement that is entirely sound, correctly scoped, and
+correctly read, followed by a sentence asserting something it does not
+establish.
+The evidence is real.
+The step from the evidence to the claim is what fails, and nothing in the
+surrounding paragraph marks that step as having been taken.
+
+**The near-miss: having measured something makes the whole surrounding
+paragraph feel measured.**
+The measurement is usually the expensive part, so the diligence behind it is
+genuine and recent, and the sentences written just afterwards inherit its tone
+whether or not they inherit its support.
+That is the reachable-half inversion above at sentence scale rather than at
+document scale --- and here the neighbouring claim need not be a *wider*
+version of the measured one.
+It is routinely a different proposition altogether: a mechanism verified and an
+instance asserted, a provenance verified along one axis and reported along
+another, a difference measured and a direction concluded.
+
+**The overreach has no preferred direction, so watching for over-confidence
+misses half of it.**
+It reaches toward confidence when the neighbouring claim flatters the work, and
+toward alarm when the claim condemns it.
+A measurement showing two inputs differ can license a retraction exactly as
+easily as an approval, and the half that arrives as a retraction is dressed as
+rigour.
+
+**The test is two sentences written side by side.**
+State what the measurement establishes.
+State the claim.
+Then check that the claim is neither wider than the first sentence nor beside
+it:
+
+> The measurement establishes that `findGlobals()` drops namespace-qualified
+> call heads.
+> The claim is that a particular directory contains bare `map()` calls relying
+> on the standalone import.
+
+Set out that way the gap is visible with no further checking, because the two
+sentences have different subjects.
+Composing them is cheap, and it is the whole of the remedy --- what defeats
+every other check here is that such a claim never presents itself as
+unsupported.
+
+**Where the two subjects are the same kind of thing, the test reduces to naming
+the population, and the widening is usually one word.**
+`git branch -r --contains <sha>` enumerates the **branches** containing a
+commit, correctly and completely.
+Reporting that as no **ref** containing it silently enlarges the population to
+a superset --- one whose excluded members, `refs/pull/<N>/head` among them, are
+exactly the ones the question turned on.
+So write the population your command actually enumerated into the same sentence
+as the claim.
+"No branch contains it" and "no ref contains it" differ by one word, and the
+first is the one you measured.
+
+That makes this the **scope** claim type's composition-time counterpart rather
+than a rival to it.
+Scope says to check the population instead of recalling it, and assumes the
+population in the claim is the one you meant.
+This fires when the command's population and the sentence's population are two
+different sets, and the sentence never names either.
+
+**A test suite is the commonest place to meet the population gap, because the
+tool reports two of its three numbers.**
+"43 pass, 0 fail" can be exactly accurate and still not say the suite passes,
+when 15 tests skipped and the skipped set holds the one your change broke.
+So report `SKIP` alongside `PASS` and `FAIL`, always, and treat a non-zero skip
+count as an unmeasured population rather than as a footnote.
+
+The reason the skips happen deserves its own look, because it is usually a flag
+you added for an unrelated reason.
+`R_PROFILE_USER=/dev/null` bypasses renv, which changes which packages are
+available, which changes which tests execute --- and none of that is visible at
+the call site or in the number that comes back.
+Any "skip the environment setup" flag can do this: a `--no-config`, a bare
+interpreter, a container built without the optional extras.
+Each shrinks what is being measured without shrinking the figure reported, and
+each makes the run faster, so the habit reinforces itself.
+
+- **Do:** write what the measurement establishes and what you are claiming as
+  two separate sentences, and confirm the second does not reach past the first.
+- **Do:** measure the illustrating instance separately whenever a verified
+  mechanism is illustrated by one, since the mechanism's evidence says nothing
+  about which files exhibit it.
+- **Do:** name the axis a provenance or freshness check covered, because such a
+  check usually settles one axis and is silent about the others.
+- **Do:** write the population your command enumerated into the sentence that
+  reports it --- branches rather than refs, tracked files rather than files,
+  open PRs rather than PRs.
+- **Do:** report a test run's skip count in the same sentence as its pass and
+  fail counts, and say what a non-zero one excluded.
+- **Do:** ask what an environment-bypassing flag removes from the run before
+  citing that run as verification.
+- **Don't:** let a real measurement lend its credibility to the sentence
+  standing next to it --- adjacency in a paragraph is not support.
+- **Don't:** treat a retraction as exempt.
+  Concluding that something is *wrong* from a measurement that established only
+  a *difference* is this same overreach pointed the other way.
+- **Don't:** read a correct, complete enumeration as covering the superset it
+  sits inside --- completeness is a property of the population the command
+  took, not of the one your sentence names.
+- **Don't:** cite a green test run whose skip count you did not read --- a
+  suite where roughly a quarter of the tests never executed (15 of 58) has
+  not reported that they pass.
+- **Don't:** treat [`grep-is-not-coverage`](grep-is-not-coverage.md) as a
+  rival rule here.
+  That fragment is the **null-result** instance of this shape --- a zero-hit
+  search read as evidence about a pattern --- so it is the sharper tool when
+  the measurement returned nothing, and this section is the general form.
+  Instance 4 is itself a null result, so both reach it.
+  Finding a positive result read as a neighbouring fact is the case only this
+  section covers.
+
+See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
+"Five sound measurements, five claims beside them".
+
 ## Writing is the instrument, when the claim can be wrong
 
 The article establishes that self-assessment is unreliable and that confidence
@@ -447,8 +574,8 @@ write the thing that can be wrong.
 
 ## Do and don't
 
-- **Do:** classify each assertion as state, scope, cause, or default before it
-  goes out, and re-measure any that is not from this turn.
+- **Do:** classify each assertion as state, scope, cause, inference, or default
+  before it goes out, and re-measure any that is not from this turn.
 - **Do:** name the falsifying command beside a claim, and run it when it is
   cheap.
 - **Do:** treat a fluent, undeliberated answer as owing an alternative you can

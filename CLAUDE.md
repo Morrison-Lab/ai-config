@@ -1366,10 +1366,9 @@ three loads.
 It is not lazy verification but thorough verification of the wrong object, so
 the evidence is real, the reasoning from it is sound, and nothing feels like a
 guess.
-The fragment names five recognizable shapes --- a cached copy for the origin, a
+The fragment names four recognizable shapes --- a cached copy for the origin, a
 checkout for the run, one half of a mechanism for the whole, a neighbour for
-the target, and a future state for the present one --- and one test that works
-where confirming the claim cannot:
+the target --- and one test that works where confirming the claim cannot:
 ask what would have to be true for the claim to be **false**, and whether the
 artifact in hand could show it.
 

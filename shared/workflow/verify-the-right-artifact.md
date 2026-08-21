@@ -43,7 +43,7 @@ and about **mechanism**
 (whether a cache is ever read),
 in exactly the same shape.
 
-## The five shapes
+## The four shapes
 
 Recognizable in advance, which is the point of enumerating them:
 
@@ -63,13 +63,6 @@ Recognizable in advance, which is the point of enumerating them:
   A directory that happens to contain the files you expected
   is not thereby the path they are read from.
   It can coincide today and diverge tomorrow.
-- **A future state for the present one.**
-  A figure computed against what a tree *will* contain,
-  written into a file whose own instrument reports what it contains *now*.
-  The two sit inches apart on the page, so a reader compares them directly
-  and the prose loses.
-  Derive any number you commit against the state of the branch you are
-  committing it to.
 
 **A document that delegates carries claims about its delegate, and those are
 the ones nobody checks.**
@@ -86,6 +79,18 @@ of that range ran a real `git worktree prune`.
 The guarantee at the centre of the design was false, and every internal check
 passed, because the skill was self-consistent --- the falsehood lived in the
 *other* file.
+
+(Measured 2026-08-21 on
+[ai-config#1849](https://github.com/Morrison-Lab/ai-config/pull/1849),
+[review comment](https://github.com/Morrison-Lab/ai-config/pull/1849#discussion_r3834408153).
+The delegating skill is `skills/clean-git/SKILL.md`, added by that PR, and the
+delegate is [`clean-worktrees`](../../skills/clean-worktrees/SKILL.md) step 2,
+which runs `git worktree prune -v` rather than `--dry-run`.
+Note that a grep of `main` cannot corroborate this while #1849 is unmerged,
+since the delegating skill does not exist there yet --- which is the case for
+citing the PR rather than the file.
+Fixed in `c59ae986` by narrowing the gate's invariant to "nothing that can lose
+work happens before confirmation".)
 
 So when you delegate to a numbered range, open that range and read it.
 Any property you assert about it --- that it mutates nothing, that it is
@@ -256,9 +261,9 @@ See
 [`verify-the-right-artifact.cases.md`](verify-the-right-artifact.cases.md),
 "A stale install diagnosed from an mtime and an absence".
 
-**The interpreter's own defaults are a sixth adjacent artifact, and a failed
+**The interpreter's own defaults are a fifth adjacent artifact, and a failed
 reproduction is where they stand in for the code.**
-The five shapes above all substitute one *file* or *run* for another.
+The four shapes above all substitute one *file* or *run* for another.
 This one substitutes the **environment** for the program, and it arrives
 disguised as diligence: you were told a defect exists, you tried to see it
 yourself rather than taking the claim on faith, and nothing happened.
@@ -399,6 +404,33 @@ On Claude Code 2.1.238 both rules were accepted with no warning --- and the
 control is what made that informative, since `Bash(command:rm *)`, which the
 same page says is ignored, answered
 `targets command as a raw string and will not match` on that same CLI.)
+
+**A seventh: a future state for the present one.**
+The six above all substitute one artifact, environment, or property for
+another that exists *now*.
+This one substitutes a state of the **same** artifact at a *different time* ---
+what the tree will contain once some other branch lands.
+
+The figure is not wrong when written, which is what makes it durable.
+It is wrong when read, because it is committed to a file whose own instrument
+reports the present number a few lines below, so a reader compares the two
+directly and the prose loses.
+
+- **Do:** derive any number you commit against the state of the branch you are
+  committing it to, not the state you expect after some other PR merges.
+- **Do:** re-run the file's own checker and quote what it prints, when the file
+  ships one.
+- **Don't:** compute against a listing, count, or size that only exists on
+  another branch.
+
+(Measured 2026-08-21 on
+[ai-config#1853](https://github.com/Morrison-Lab/ai-config/pull/1853).
+A source comment claimed "about 21 skills of runway", derived from a listing of
+8,070 --- the value once
+[#1849](https://github.com/Morrison-Lab/ai-config/pull/1849)'s entry lands ---
+in a file whose own validator printed `7998/9000` on that branch.
+The reviewer re-derived it as `1002 // 43 = 23` and the figure was corrected in
+`653dc9df`.)
 
 **A PR body is prose no check reads, so it goes stale silently while the diff
 moves underneath it.**

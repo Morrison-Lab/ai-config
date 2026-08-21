@@ -113,9 +113,28 @@ git worktree list --porcelain \
   > "$TMP/wt-branches.tsv"
 ```
 
-`INLINE` is the subset whose **worktree** `clean-worktrees` step 3 classified
-**Dead**, so intersect that mapping against the dead-worktree paths from step 1
-before using it anywhere.
+`INLINE` is the subset whose **worktree** [`clean-worktrees`](../clean-worktrees/SKILL.md)
+step 3 classified **Dead**.
+Every other step number on this page belongs to *this* skill, so that one is
+labelled with its file and the rest are not.
+
+Write those Dead paths out, then intersect:
+
+```bash
+# One Dead worktree path per line, from clean-worktrees step 3's classification.
+printf '%s\n' "${DEAD_WORKTREE_PATHS[@]}" | sort -u > "$TMP/dead-worktrees.txt"
+
+# INLINE: the branch column, kept only where the worktree column is Dead.
+awk -F'\t' 'NR==FNR { dead[$0]; next } $2 in dead { print $1 }' \
+  "$TMP/dead-worktrees.txt" "$TMP/wt-branches.tsv" \
+  | sort -u > "$TMP/inline.txt"
+```
+
+Give it the negative control every filter needs: `wc -l` both files, and
+confirm `inline.txt` is shorter than `wt-branches.tsv` whenever any live
+worktree exists.
+An `INLINE` the same length as the raw mapping means the filter did not run,
+which is the failure the next paragraph describes.
 
 Using the raw mapping as `INLINE` breaks the sweep immediately rather than
 subtly, which is worth stating because it looks like a shortcut that would

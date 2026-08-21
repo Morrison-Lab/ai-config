@@ -990,7 +990,8 @@ Matching the comment loop's marker tuple against each body shows five admitted o
 
 so it matched both `### verdict` and `verdict:`.
 The 4226-character self-review matched no marker and was never admitted.
-Neither human comment contains `158a82f2` or its 7-character prefix, so neither reached `matching_items`; and the admitted one bore no verdict because its verdict phrase sits inside a code span that `strip_cited_finding_vocab` blanks before `classify_verdict()` reads it, while `is_review_header` had matched the raw body.
+Neither human comment contains `158a82f2` or its 7-character prefix, so neither reached `matching_items`.
+The admitted one bore no verdict because its verdict phrase sits inside a code span that `strip_cited_finding_vocab` blanks before `classify_verdict()` reads it, while `is_review_header` had matched the raw body.
 
 The prior claim that only bot authors are admitted came from reading the formal-review loop --- which does consult `_is_bot_author` alone, for the reason its own in-code comment gives --- and generalizing it one loop up.
 Tracked as ai-config#1719, which gained the skip-notice trigger the same day, and ai-config#1798.)

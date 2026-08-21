@@ -752,7 +752,8 @@ Four independent decisions have to line up for that, and every one of them is th
 
 1. A quota-or-credential **skip notice** is posted by `github-actions[bot]`, so the comment loop's author test admits it.
 2. The notice carries a `View run` link, and `_resolve_run_head_sha` resolves that run's `head_sha` to HEAD --- so a comment stating explicitly that no review happened is counted as a review *evaluating HEAD*.
-   That resolution is the right fix for the stale-body-SHA problem this file documents; it simply has no opinion about what the comment says.
+   That resolution is the right fix for the stale-body-SHA problem this file documents.
+   It simply has no opinion about what the comment says.
 3. The notice contains none of `finding_patterns`, so the HEAD-matching half prints its tick.
 4. `check_latest_verdict()` returns `True`, because it blocks on exactly one value --- `not-clean` --- and an empty verdict is not that value.
 
@@ -761,7 +762,8 @@ What the exit status then does is collapse "nothing objected" and "nobody looked
 
 The printed scan line is therefore the load-bearing surface rather than a progress message, and the script says so itself.
 `check_latest_verdict()`'s docstring states that it prints what it examined alongside what it found, "so a zero here cannot be read as an all-clear when the real cause is that nothing was examined", citing [`fail-fast`](../principles/fail-fast.md).
-The instrument already reports the distinction; only the exit status discards it.
+The instrument already reports the distinction.
+Only the exit status discards it.
 
 So `0 bore a verdict` and `latest = NONE` mean **unreviewed**, which is [`self-review-fallback`](self-review-fallback.md)'s territory.
 Note that this is the fragment's own skip-notice rule reaching one layer down: a skip notice does not supersede prior findings, and it equally does not constitute the review that criterion 2 requires --- but the instrument built to enforce criterion 2 counts it as one.

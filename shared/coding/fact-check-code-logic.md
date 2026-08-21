@@ -320,7 +320,8 @@ grep -rn '\.classify(\|\.collect(' --include='*.py' .
 - **Do:** grep for every function the change touched, since one edit usually moves more than one signature.
 - **Do:** run the *importing* module's tests too, not only the edited module's.
 - **Don't:** substitute reasoning about the callers you can name --- that enumerates the sample and reports it as the population.
-- **Don't:** grep for the import statement and stop; a dynamically loaded module has no import line to match.
+- **Don't:** grep for the import statement and stop;
+  a dynamically loaded module has no import line to match.
 
 (Morrison-Lab/ai-config#1841, 2026-08-21: `classify()` in `scripts/check-install.py` gained a required `repo_roots: set[Path]` parameter.
 The session hook and the CI job were both traced and both correct.

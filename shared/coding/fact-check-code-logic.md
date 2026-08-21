@@ -300,6 +300,32 @@ Two habits make it pay off beyond the one check:
   [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md)
   applies to prose.
 
+## A signature change's caller set is derived by grep, never from the callers you can see
+
+Adding or retyping a parameter on a shared function changes every call site at once, and the call sites are not a property of the file you are editing.
+Another module in the same repo can load yours and call it while your file says nothing about it, so a careful and entirely correct reading of the code in front of you enumerates a strict **subset** of the population --- and does it in a way that feels like diligence, because the reasoning about each caller you did name was sound.
+
+That is [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s scope claim in its most mechanical form.
+"The callers" is a claim about a population, the population is one grep away, and per [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) a decidable check does not get spent on reasoning.
+
+**Key the grep on the call, not on the import.**
+A module can be loaded dynamically --- `importlib.util.spec_from_file_location` is the usual Python form, and a script whose filename contains a hyphen can only be loaded that way --- so there is no `import <module>` line to find, and a grep for one returns nothing while reading exactly like a clean result.
+Search for every function whose signature the change touched, not only the one you edited:
+
+```bash
+grep -rn '\.classify(\|\.collect(' --include='*.py' .
+```
+
+- **Do:** derive the caller set with a grep keyed on the call, before pushing a signature change.
+- **Do:** grep for every function the change touched, since one edit usually moves more than one signature.
+- **Do:** run the *importing* module's tests too, not only the edited module's.
+- **Don't:** substitute reasoning about the callers you can name --- that enumerates the sample and reports it as the population.
+- **Don't:** grep for the import statement and stop; a dynamically loaded module has no import line to match.
+
+(Morrison-Lab/ai-config#1841, 2026-08-21: `classify()` in `scripts/check-install.py` gained a required `repo_roots: set[Path]` parameter.
+The session hook and the CI job were both traced and both correct.
+`scripts/check-harness-installs.py` loads the module through `spec_from_file_location` and calls `ci.classify()` and `ci.collect()`, was never searched for, and CI failed with `TypeError: 'PosixPath' object is not iterable`.)
+
 ## A "safe because X never happens" comment needs its own counter-example before it ships
 
 When a fix's safety rests on a claim that some input shape "never" happens or "is not realistic phrasing" --- a live finding won't describe itself this way, a user never types that --- construct the counter-example yourself and run it through the actual code before writing the comment, not after a reviewer does it for you.

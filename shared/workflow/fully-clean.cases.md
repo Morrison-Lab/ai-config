@@ -961,3 +961,36 @@ The issue was retitled and the diagnosis retracted in a follow-up comment,
 which is what surfaced the gap this case exists to close: this file's
 by-hand guidance sits directly beside its description of the script, with
 nothing marking the boundary between them.)
+
+## A skip notice exits the checker clean over an empty verdict scan
+
+(Morrison-Lab/ai-config#1841, 2026-08-21, head `158a82f2`.
+Reproduced live rather than reasoned about:
+
+```
+$ python3 scripts/check-pr-fully-clean.py 1841 -R Morrison-Lab/ai-config
+  verdict scan: examined 6 dated automated review item(s), 0 bore a verdict, latest = NONE
+✓ Found clean review comment evaluating HEAD SHA 158a82f2
+✅ Morrison-Lab/ai-config#1841 is FULLY CLEAN on HEAD 158a82f2!
+$ echo $?
+0
+```
+
+No reviewer had produced a verdict on that PR at any head.
+The PR carried seven comments: five identical 363-character `claude-review` skip notices from `github-actions`, and two from `d-morrison` at 4226 and 4804 characters.
+The notice reads "**Claude review skipped --- API credential or quota unavailable.**" followed by a `View run` link, and it is that link the checker resolves --- the run's `head_sha` equals HEAD, so a comment stating explicitly that no review happened is admitted as a review evaluating HEAD.
+It carries none of `finding_patterns`, so the HEAD-matching half prints its tick, and `check_latest_verdict()` returns `True` because an empty verdict is not `not-clean`.
+
+Six items rather than seven is the second finding, and it names which loop admits what.
+Matching the comment loop's marker tuple against each body shows five admitted on author and exactly one on body text: the 4804-character `d-morrison` comment, whose first line is
+
+```
+## ARD --- cross-vendor review (Codex / GPT-5.1, `### Verdict: Needs more work`)
+```
+
+so it matched both `### verdict` and `verdict:`.
+The 4226-character self-review matched no marker and was never admitted.
+Neither human comment contains `158a82f2` or its 7-character prefix, so neither reached `matching_items`; and the admitted one bore no verdict because its verdict phrase sits inside a code span that `strip_cited_finding_vocab` blanks before `classify_verdict()` reads it, while `is_review_header` had matched the raw body.
+
+The prior claim that only bot authors are admitted came from reading the formal-review loop --- which does consult `_is_bot_author` alone, for the reason its own in-code comment gives --- and generalizing it one loop up.
+Tracked as ai-config#1719, which gained the skip-notice trigger the same day, and ai-config#1798.)

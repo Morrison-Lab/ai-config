@@ -743,3 +743,41 @@ verdict --- the "eight numbered cases" this file used to walk through
 inline --- now live in
 [`review-verdict-pitfalls.md`](review-verdict-pitfalls.md), split out per
 ai-config#1236 once that material pushed this file past the size gate.
+
+## Exit 0 is not the whole answer either: read the `verdict scan:` line
+
+**Exit 0 is not the whole answer either: read the `verdict scan:` line the checker prints, because it can say `0 bore a verdict, latest = NONE` on a run that exits clean.**
+
+Four independent decisions have to line up for that, and every one of them is the script working as designed --- which is why reading the source afterwards confirms the behaviour rather than correcting it, and why no part of the run looks wrong at the time.
+
+1. A quota-or-credential **skip notice** is posted by `github-actions[bot]`, so the comment loop's author test admits it.
+2. The notice carries a `View run` link, and `_resolve_run_head_sha` resolves that run's `head_sha` to HEAD --- so a comment stating explicitly that no review happened is counted as a review *evaluating HEAD*.
+   That resolution is the right fix for the stale-body-SHA problem this file documents; it simply has no opinion about what the comment says.
+3. The notice contains none of `finding_patterns`, so the HEAD-matching half prints its tick.
+4. `check_latest_verdict()` returns `True`, because it blocks on exactly one value --- `not-clean` --- and an empty verdict is not that value.
+
+The last step is deliberate and correct on its own terms: a long, evidence-dense comment that never concludes must not supersede an earlier verdict, which is why `classify_verdict()` returns `""` rather than guessing.
+What the exit status then does is collapse "nothing objected" and "nobody looked" into the same 0.
+
+The printed scan line is therefore the load-bearing surface rather than a progress message, and the script says so itself.
+`check_latest_verdict()`'s docstring states that it prints what it examined alongside what it found, "so a zero here cannot be read as an all-clear when the real cause is that nothing was examined", citing [`fail-fast`](../principles/fail-fast.md).
+The instrument already reports the distinction; only the exit status discards it.
+
+So `0 bore a verdict` and `latest = NONE` mean **unreviewed**, which is [`self-review-fallback`](self-review-fallback.md)'s territory.
+Note that this is the fragment's own skip-notice rule reaching one layer down: a skip notice does not supersede prior findings, and it equally does not constitute the review that criterion 2 requires --- but the instrument built to enforce criterion 2 counts it as one.
+
+## The author filter gates formal reviews and not comments
+
+**The author filter gates formal reviews and not comments, so a human-authored comment enters that same scan on body text alone.**
+
+Only the formal-review loop consults `_is_bot_author` on its own, and its in-code comment gives the reason: a formal review carries a real `commit.oid`, so admitting one attributes it to HEAD with no body-content check --- hence the tight author gate there.
+Comments have no oid, so they are admitted first on markers and matched to HEAD afterwards.
+The asymmetry is a consequence of that design rather than an oversight, which is what makes the wrong generalization so easy: the strict loop's rule reads like the function's rule.
+
+Admission and classification also read **different copies of the same body**.
+`is_review_header` matches the raw body, while `classify_verdict()` scans `strip_cited_finding_vocab(body)`.
+A comment can therefore be admitted *because* it quotes a verdict inside a code span and then contribute no verdict, since the span it was admitted on is blanked before classification.
+Both rules are behaving correctly and they compose badly: the quoted-vocabulary guard (#1202) does its job, and the population it guards was widened by a marker test it never sees.
+
+What keeps such a comment out of `matching_items` afterwards is only whether it cites the current SHA --- a property of what you wrote, not of who you are.
+So "no human comment appeared in `matching_items`" is evidence about that comment's text and not about the filter.

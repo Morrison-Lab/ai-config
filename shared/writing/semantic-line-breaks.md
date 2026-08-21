@@ -119,6 +119,82 @@ rather than accepting the joins.
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
 `_DEFAULT_CLAUSE_MIN_LENGTH` is 80.)
 
+**Third dated recurrence, 2026-08-21, and the tell is the tool's name.**
+An `ardia` sweep drove three PRs whose prose it had edited, ran
+`scripts/semantic-line-breaks.py` on each, read its silence as the gate being
+satisfied, and pushed.
+The gate then failed on `memories/preferences.md:151` --- a 197-character line
+with a mid-line semicolon, which the reformatter itself had produced by joining
+two hand-wrapped lines.
+A detector for the two documented rules, run afterwards across every branch that
+sweep had pushed, found the same violation on two more of them.
+
+Nothing about that sequence felt like skipping a step, which is why the existing
+Don't pair above did not fire.
+The reformatter is named for the convention, lives in this repo's own `scripts/`,
+and its silence is a positive-sounding all-clear --- so reaching for it reads as
+having checked rather than as having substituted one tool for another.
+That is [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md)'s
+adjacent-artifact substitution, arriving through a tool whose name matches the
+check it is not.
+
+The laundering step is worth naming separately, because it is what let the error
+reach a reviewer.
+The sweep reported "`semantic-line-breaks.py` scoped to the added lines
+(canonical)" in a PR comment, which reads as a gate result and is not one.
+A verification sentence naming a tool is only as good as that tool's relationship
+to the check being claimed, and here there is none.
+
+**The same run corrected a false cause claim.**
+The sweep had already diagnosed a different PR's failure on this gate as the
+added line opening with `(`, and "fixed" it by joining the new text onto an
+existing case record --- deleting 8 lines to add 1, and leaving the semicolon in
+place, so the fix could not have worked.
+The real cause was the clause rule both times.
+Per [`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+**cause** claim type, the question that would have caught it is what else
+produces a red gate on a one-line diff --- and the rule is documented directly
+above, so the answer was one read away.
+
+- **Do:** name the check you actually ran when reporting a line-break result,
+  and say whether it was the gate or the reformatter.
+- **Don't:** read the reformatter's silence as a gate pass --- it has no width
+  policy, so it is silent about precisely the violation it creates.
+
+**A green check run named for this gate may never have run it, and both runs
+carry the same name.**
+The reformatter trap above is about the wrong *tool*.
+This is about the right tool reporting success without measuring anything, and
+it is harder to catch because there is nothing to notice: the check run is
+green, its name is correct, and it sits in the same list as the real one.
+
+The workflow's base-ref input is `github.event.pull_request.base.sha` on a
+pull request and empty otherwise, which is deliberate --- it makes a push to
+`main` skip cleanly instead of scanning the whole tree
+(`.github/workflows/validate.yml`, the `new-line-breaks` job's own comment).
+The consequence for a *branch* push is the part worth stating: that run has no
+base ref either, so it skips the diff scan and concludes `success` having
+examined nothing.
+
+A PR therefore shows **two** check runs called
+`new-line-breaks / check-new-line-breaks`.
+Only the `pull_request`-triggered one is a verdict.
+The `push`-triggered one is green unconditionally, so reading either one, or
+reading "the check is green", answers a question it was never asked.
+
+The asymmetry that makes this dangerous: the vacuous run can only ever say
+success, so it never disagrees with a real failure loudly enough to notice ---
+a red PR-triggered run and a green push-triggered run coexist in the same list,
+and the green one is not evidence of anything.
+Distinguish them by the triggering event rather than by the name, and prefer
+the run whose `event` is `pull_request`.
+
+- **Do:** read the triggering event of a `new-line-breaks` run before treating
+  it as a verdict, since a PR carries one real run and one vacuous one under
+  the same name.
+- **Don't:** conclude the gate passed from a green check run alone --- confirm
+  it was the `pull_request`-triggered one.
+
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
 `d-morrison/gha@e91b8bf` ("fail by default when violations are found",
@@ -132,9 +208,13 @@ exists for.
 
 The old advice --- read its output rather than its color --- is still worth
 keeping, because it now points the other way.
-A green job means the added lines passed, and it is the *local* run that can
-still say nothing: the script is diff-scoped, so a run against the wrong base
-reports a clean exit over a diff it never examined.
+A green **`pull_request`-triggered** job means the added lines passed.
+Two other green results mean nothing was examined, and both come from the same
+cause --- the script is diff-scoped, so a run against the wrong base, or against
+no base at all, reports a clean exit over a diff it never looked at.
+The local run does this when pointed at the wrong base ref.
+The push-triggered CI job does it unconditionally, as the section above
+records.
 
 **The sentence rule has no minimum line length; only the CLAUSE rule does.**
 `NLB_CLAUSE_MIN_LENGTH` (80) gates the mid-line-semicolon check alone, so a

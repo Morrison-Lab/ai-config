@@ -28,3 +28,6 @@ _site/
 .quarto/
 
 **/*.quarto_ipynb
+
+# Scratch diffs from review tooling (`gh pr diff > N.patch`). Never tracked.
+*.patch

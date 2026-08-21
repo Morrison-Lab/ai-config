@@ -188,6 +188,17 @@ A guard you cannot explain skipping is one you skipped by not looking.
 - **Don't:** read "my new block works" as evidence it is finished --- the
   sibling's guards exist for the inputs the happy path never shows.
 
+(Morrison-Lab/ai-config#1490, 2026-08-15/16: a human-review query was added
+beside two siblings --- the Copilot query and the `CHANGES_REQUESTED` check
+--- in `pr-status`/`pr-status-all`.
+Four of the PR's eight review findings were guards those siblings already
+carried, restored one round at a time: the per-reviewer
+`group_by(.user.login)` reduction (round 1), the `DISMISSED` carve-out
+(round 2), the self-contained `head=` fence (round 3), and
+`set -o pipefail` (round 4).
+Each sibling guard had its own documented rationale one screen away when the
+minimal query was written.)
+
 **The sibling is sometimes not a separate artifact but the other branch of the
 same decision**,
 and this form of the failure is harder to see.
@@ -229,21 +240,11 @@ The existing path required the reading to be newer than the previous message;
 the new one carried no position at all, so a reading from hours earlier
 discharged any later claim that happened to land within tolerance --- which is
 the bug the PR existed to fix, in a new shape.
-The position-reading path and the value-reading path were each internally
-consistent, so neither looked wrong on its own.
+The missing gate was invisible from inside either path: the position-reading
+path carried it as an ordinary condition, and the value-reading path simply
+never mentioned it.
 The reviewer located the missing gate by asking what the position-reading path
 required.)
-
-(Morrison-Lab/ai-config#1490, 2026-08-15/16: a human-review query was added
-beside two siblings --- the Copilot query and the `CHANGES_REQUESTED` check
---- in `pr-status`/`pr-status-all`.
-Four of the PR's eight review findings were guards those siblings already
-carried, restored one round at a time: the per-reviewer
-`group_by(.user.login)` reduction (round 1), the `DISMISSED` carve-out
-(round 2), the self-contained `head=` fence (round 3), and
-`set -o pipefail` (round 4).
-Each sibling guard had its own documented rationale one screen away when the
-minimal query was written.)
 
 ## Reusing a CLAIM: its truth conditions travel with the question, not the sentence
 

@@ -659,3 +659,64 @@ Three lines below, the same parenthetical reads "Rewritten once more as a bare
 file write, both isolated" --- the second rewrite *removed* the confound.
 Round 3 raised it as a self-contradiction introduced by round 2's fix.
 The arithmetic the clause was added for was correct throughout.)
+
+## A rule that names one direction is read as naming all of them
+
+The **scope** claim type above is monitored against a population you choose.
+This is the case where a *rule* chose it for you, and chose too narrowly.
+
+A convention that says "audit the downstream steps", "check the callers",
+"grep the sibling files" names a direction, and following it feels like having
+audited rather than like having audited *one axis*.
+Two properties make the gap invisible from the inside.
+
+**Finding something confirms the direction, not the coverage.**
+An audit that turns up a real defect is the strongest possible evidence that
+you were right to run it, and no evidence at all about the axes you did not
+run.
+The reward lands on the wrong proposition, and a fruitful check is therefore
+*more* likely to be treated as complete than a fruitless one.
+
+**A named direction supplies its own stopping point.**
+A rule with no direction leaves you asking when to stop; a rule that says
+"downstream" answers that question, so the search terminates on having
+satisfied the wording rather than on having covered the thing the wording was
+protecting.
+
+The remedy is to derive the population the rule is a proxy for, before
+following it.
+"Audit the downstream steps" is a proxy for *everything that decides something
+about this path*.
+So ask what decides, and let that produce the list --- callers above,
+steps below, and any sibling branch of a conditional that mentions the event
+and predates the new case.
+
+**Widen the rule when a direction it omits produces a defect**, rather than
+only fixing the defect.
+A rule that has been shown to name a proper subset of its own purpose will
+mislead its next reader in exactly the way it misled you, and the incident is
+the only occasion anyone will have the evidence to correct it.
+
+- **Do:** name the population the rule stands in for, then enumerate it.
+- **Do:** treat a direction the rule omits as a defect in the rule, and widen
+  it in the same pass.
+- **Don't:** read a direction-naming rule as an inventory --- it is one axis
+  chosen by whoever last hit a problem.
+- **Don't:** let a productive audit settle whether the audit was complete;
+  those are different claims, and the first is what makes the second feel
+  answered.
+
+(Measured 2026-08-21 on
+[`Morrison-Lab/gha#552`](https://github.com/Morrison-Lab/gha/pull/552), which
+added a new trigger path to a reusable workflow.
+That repo's convention reads "widening a job's trusted-author `if:` gate to
+admit a new event type needs a downstream-step audit, not just the gate
+itself".
+I ran it, and it found a real defect: a gate below the change would have stood
+the new path down, so the trigger could never have fired.
+Review then found two more of the same shape, in the two directions the rule
+does not name --- a caller gate *above* the change that never admitted the
+event, leaving the input silently inert, and *sideways*, a sibling branch of an
+unrelated ternary that told every such run it had been triggered by a mention
+that did not exist.
+Three defects, one shape, one direction named.)

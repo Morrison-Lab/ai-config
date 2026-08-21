@@ -827,8 +827,8 @@ A stretch of many tool calls reads as long whether it took four minutes or
 forty.
 
 **The error has a direction**, which makes it worth more than a general warning.
-Both figures measured below were **over**-estimates, by factors of three and
-eighteen.
+Both figures measured below were **over**-estimates, by factors of about three
+and about sixteen.
 The bias runs one way because the felt duration tracks work done, and dense work
 compresses into little clock time.
 So treat your own elapsed-time estimate as an upper bound at best, and derive
@@ -855,10 +855,20 @@ Two PRs later, on [#1840](https://github.com/Morrison-Lab/ai-config/pull/1840),
 the PR body said a dependency had merged "four hours ago"; review derived
 **about fifteen minutes** --- 14m49s --- from a merge at `18:14:25Z` and a
 commit at `18:29:14Z`.
-The first draft of this entry said "fourteen", having floored the subtraction
-and reported the floor as the value, which is the same error one order smaller:
-deriving a number is not the whole of it, and an integer division is an
-estimate wearing a computation's clothes.
 The second figure was not inherited from anywhere --- unlike the first, which at
 least came from an earlier comment, it was generated whole.
-Both were wrong in the same direction.)
+Both were wrong in the same direction.
+
+This entry then needed three review rounds to get its own arithmetic right,
+which is the strongest evidence it has.
+The first draft said "fourteen", having floored the subtraction and reported the
+floor as the value.
+The second gave the over-estimate factor as eighteen where 240/14.82 is about
+sixteen --- a ratio nobody had computed, sitting in the sentence that says to
+compute ratios.
+Neither was caught by writing carefully about the very discipline they violate;
+both were caught by review.
+So: deriving a number is not the whole of it.
+An integer division is an estimate wearing a computation's clothes, and a figure
+derived FROM derived figures needs its own arithmetic run rather than an
+eyeball.)

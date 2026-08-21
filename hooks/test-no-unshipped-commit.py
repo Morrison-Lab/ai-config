@@ -85,6 +85,41 @@ executed_heredoc = transcript([EXECUTED_HEREDOC])
 quoted_then_real = transcript([QUOTED_THEN_REAL])
 quoted_push = transcript(["git commit -m hook", QUOTED_PUSH_DOES_NOT_DISCHARGE])
 
+# --- ai-config#1807 review round 1: two false NEGATIVES in the first fix ----
+# Both let a real unpushed commit past the guard, which is strictly worse than
+# the false positive being fixed: that one over-blocked, these under-block.
+
+# A heredoc-start line can redirect AND still execute its body. Testing only
+# for "a redirect somewhere on the line" classified these as data.
+EXECUTED_WITH_FILE_REDIRECT = """bash <<'EOF' > /tmp/log
+git commit -m real
+EOF"""
+
+# `2>&1` is fd duplication, not a file write at all.
+EXECUTED_WITH_FD_DUP = """bash <<'EOF' 2>&1
+git commit -m real
+EOF"""
+
+# bash terminates a plain `<<TAG` only on a line EQUAL to TAG. An indented
+# decoy is body text to bash, but `.strip()` accepted it as a terminator,
+# ending the strip early and exposing a quoted `git push` -- which then
+# discharged a genuinely pending commit. The mirror of QUOTED_PUSH above.
+INDENTED_DECOY_TERMINATOR = """cat > /tmp/n.md <<'EOF'
+  EOF
+git push origin main
+EOF
+gh issue create --repo o/r --title x --body-file /tmp/n.md"""
+
+# `<<-TAG` strips leading TABS, so a tab-indented terminator is real.
+TAB_TERMINATOR_IS_REAL = """cat > /tmp/n.md <<-'EOF'
+git commit -m quoted
+\tEOF"""
+
+executed_redirect = transcript([EXECUTED_WITH_FILE_REDIRECT])
+executed_fd_dup = transcript([EXECUTED_WITH_FD_DUP])
+indented_decoy = transcript(["git commit -m hook", INDENTED_DECOY_TERMINATOR])
+tab_terminator = transcript([TAB_TERMINATOR_IS_REAL])
+
 try:
     assert subject.pending_commit(unshipped) == "git commit -m hook"
     assert subject.pending_commit(pushed) is None
@@ -97,6 +132,10 @@ try:
     assert subject.pending_commit(executed_heredoc) is not None, "an executed heredoc must still arm"
     assert subject.pending_commit(quoted_then_real) is not None, "a real commit after a quoted one must arm"
     assert subject.pending_commit(quoted_push) is not None, "a quoted push must not discharge"
+    assert subject.pending_commit(executed_redirect) is not None, "bash <<EOF > file still executes"
+    assert subject.pending_commit(executed_fd_dup) is not None, "2>&1 is not a file write"
+    assert subject.pending_commit(indented_decoy) is not None, "an indented decoy is not a terminator"
+    assert subject.pending_commit(tab_terminator) is None, "<<- strips leading tabs"
 finally:
     os.unlink(unshipped)
     os.unlink(pushed)
@@ -109,5 +148,10 @@ finally:
     os.unlink(executed_heredoc)
     os.unlink(quoted_then_real)
     os.unlink(quoted_push)
+    os.unlink(executed_redirect)
+    os.unlink(executed_fd_dup)
+    os.unlink(indented_decoy)
+    os.unlink(tab_terminator)
 print("PASS: an unshipped commit blocks, while push and PR creation discharge it")
 print("PASS: a heredoc written to a file is quoted text; an executed heredoc still arms")
+print("PASS: a redirect does not make a heredoc data, and only bash's own terminator ends one")

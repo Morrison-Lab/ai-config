@@ -27,8 +27,23 @@ CREATE = re.compile(r"(?:^|[;&|\n]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 # executes its body, so a heredoc this does not recognise as a file write
 # keeps arming the guard -- the unrecognised case fails toward the old
 # behaviour rather than toward a hole.
-HEREDOC_START = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_]\w*)\1")
+HEREDOC_START = re.compile(r"(<<(-?))\s*(['\"]?)([A-Za-z_]\w*)\3")
+# A redirect token on the heredoc-start line. This is necessary and NOT
+# sufficient: `bash <<'EOF' > /tmp/log` redirects and still executes its body,
+# and `2>&1` is fd duplication rather than a file write at all. WRITER below
+# is what actually discriminates, so no fd-dup exclusion is spelled here --
+# it would be unreachable, and an unpinned line in a safety guard is worse
+# than an absent one.
 REDIRECT = re.compile(r"[12]?>>?\s*\S")
+# ...and the command word has to be one that WRITES its heredoc rather than
+# running it. Testing only for "a redirect somewhere on the line" is not
+# enough: `bash <<'EOF' > /tmp/log` redirects and still executes its body.
+WRITER = re.compile(r"(?:^|[;&|]|&&|\|\|)\s*(?:cat|tee)\b[^<]*$")
+
+
+def _terminates(line, tag, dash):
+    """Match bash's heredoc terminator rule exactly."""
+    return (line.lstrip("\t") if dash else line) == tag
 
 
 def strip_quoted(command):
@@ -38,15 +53,22 @@ def strip_quoted(command):
     while i < len(lines):
         line = lines[i]
         start = HEREDOC_START.search(line)
-        if start and REDIRECT.search(HEREDOC_START.sub("", line)):
+        before = line[: start.start()] if start else ""
+        if start and REDIRECT.search(HEREDOC_START.sub("", line)) and WRITER.search(before):
             kept.append(line)
-            tag = start.group(2)
+            dash, tag = start.group(2), start.group(4)
             i += 1
             # Drop the body AND the terminator: neither is executed, and the
             # terminator line carries nothing this scans for. Keeping it was
             # an equivalent mutant -- no assertion could pin it, so it was
             # untestable code rather than tested code.
-            while i < len(lines) and lines[i].strip() != tag:
+            # bash's real termination rule, not `.strip()`. A plain `<<TAG`
+            # terminates only on a line equal to TAG with NO surrounding
+            # whitespace; `<<-TAG` strips leading TABS only. `.strip()` was
+            # looser than both, so an indented decoy `  EOF` ended the strip
+            # early and exposed body text -- including a quoted `git push`,
+            # which then discharged a genuinely pending commit.
+            while i < len(lines) and not _terminates(lines[i], tag, dash):
                 i += 1
             i += 1
             continue

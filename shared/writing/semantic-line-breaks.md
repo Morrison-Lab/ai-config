@@ -119,6 +119,41 @@ rather than accepting the joins.
 `Morrison-Lab/gha@da46419`, whose `_DEFAULT_CLAUSE_BREAKS` is `True` and
 `_DEFAULT_CLAUSE_MIN_LENGTH` is 80.)
 
+**The disagreement has a second, sharper form: the gate splits a boundary the
+reformatter leaves whole.**
+The clause case above is the reformatter doing too much, joining wrapped lines
+the gate then flags.
+This is the reformatter doing too little, leaving two sentences on one line that
+the gate then flags as `Line packs more than one sentence`.
+The two tools carry different sentence-boundary rules.
+`scripts/semantic-line-breaks.py` has one break regex, `_SENT_BREAK_RE`, whose
+lookahead demands an uppercase letter or markup after the period, so a sentence
+ending in `.` before a lowercase word is no boundary to it.
+The gate carries that same branch plus a second one the reformatter lacks,
+`_SENT_BREAK_LOWER_RE` (added in `d-morrison/gha` #389), matching
+`(?<=[a-z][a-z])([.!?])\s+(?=[a-z])` --- a period after two lowercase letters,
+then a space, then a lowercase word.
+So `...rules, or agents. opencode instead reads...` is one line to the
+reformatter and two sentences to the gate, because the lowercased brand name
+`opencode` follows the period after `agents`.
+The reformatter's preview cannot surface this split, since the branch that makes
+it is absent from the reformatter --- so reading that preview, the remedy the
+section above gives, is blind to exactly this case.
+
+- **Do:** run the real `check-new-line-breaks.py` locally to catch a
+  lowercase-follower boundary, and hand-break after the period.
+- **Do:** treat a `.` before a lowercased package or brand name (`opencode`,
+  `renv`) opening a sentence as a boundary the gate will split.
+- **Don't:** read the reformatter leaving a line whole as evidence the gate
+  passes it --- the reformatter has no lowercase-follower branch.
+
+(Both mechanisms verified by source, read at `main` on 2026-08-20:
+the reformatter's single `_SENT_BREAK_RE` in `scripts/semantic-line-breaks.py`,
+and the gate's added `_SENT_BREAK_LOWER_RE` in `d-morrison/gha`'s
+`check-new-line-breaks.py`.
+Corroborated by two `check-new-line-breaks` CI failures on the offending
+README.md line.)
+
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
 `d-morrison/gha@e91b8bf` ("fail by default when violations are found",

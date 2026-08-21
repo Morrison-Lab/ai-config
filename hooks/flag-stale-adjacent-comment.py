@@ -374,8 +374,15 @@ def run_cli(argv):
     """Read a unified diff from a file or stdin; exit 1 on any finding."""
     target = argv[0]
     try:
-        diff_text = (sys.stdin.read() if target == "-"
-                     else open(target, errors="replace").read())
+        if target == "-":
+            # Same reason as the two reads above: a diff can carry non-UTF-8
+            # bytes, and strict decoding turns that into a traceback rather
+            # than a verdict. Reconfigure rather than re-wrap, since stdin is
+            # already an open text stream by the time we get it.
+            sys.stdin.reconfigure(errors="replace")
+            diff_text = sys.stdin.read()
+        else:
+            diff_text = open(target, errors="replace").read()
     except OSError as exc:
         print(f"flag-stale-adjacent-comment: cannot read {target} ({exc})",
               file=sys.stderr)

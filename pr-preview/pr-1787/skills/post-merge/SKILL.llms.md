@@ -329,7 +329,7 @@ This step exists because README’s activation gate creates a **deferred step wi
 
 It shares its shape with step 3.5 above and differs in the half that decides what to do. Both are owed after a merge, and neither turns anything red. But 3.5’s action force-moves a shared ref, so it is reserved for the human, whereas this one writes one machine’s own settings file and is yours to perform now. Do not carry 3.5’s “don’t run it yourself” bullet over to this step; here that would leave the guard inert, which is the failure rather than the caution.
 
-Two lookups settle it, run in the ai-config checkout after step 3 has already put it on `main` and pulled:
+One lookup and two calls settle it, run in the ai-config checkout after step 3 has already put it on `main` and pulled:
 
 ``` bash
 git show --name-only --format= HEAD -- hooks/   # did this merge bring in a hook?
@@ -377,6 +377,8 @@ The local branch is tidied and `main` is fast-forwarded.
 
 Every deferred item has a filed follow-up issue.
 
+If the merge brought in a hook, step 3.75 ran `install-hooks.py --fix` and the counts are reported. The bare invocation only reports, so “I ran install-hooks” is not evidence that anything was registered.
+
 **Killer item: step 4’s UMS pass actually executed**, or was deliberately skipped under the recursion guard and that is stated. Marked because reporting this skill complete asserts that its final step ran, and the recorded failure is a `post-merge` run reported done whose UMS step never happened — which discards the learnings rather than delaying them. Naming what UMS changed (or that nothing durable emerged) is the evidence; “ran UMS” on its own is not.
 
 Then a linked summary: the merged PR, the auto-closed issue, any deferred follow-up issues, what UMS updated, and a Pacific-time timestamp (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`; the explicit `TZ` enforces PT on a machine set to any other zone).
@@ -402,6 +404,7 @@ Then a linked summary: the merged PR, the auto-closed issue, any deferred follow
 - ❌ Skipping UMS on a normal PR — the just-merged PR is exactly when the lessons are freshest.
 - ❌ Recursing UMS on a UMS PR — running UMS again when the just-merged PR was itself the learnings PR, restating lessons it already banked (see step 4’s guard). The chain has to terminate somewhere.
 - ❌ Leaving deferred/acknowledged items without follow-up issues.
+- ❌ Reporting a hook PR wrapped up without step 3.75’s `--fix` run – the hook is merged, documented, and inert, which is the deferred-step-with-no-owner shape this skill’s own step 3.75 exists to close, arriving one level up in the checklist meant to catch it.
 - ❌ Calling a merge wrapped up in a release-gated repo without comparing the release ref against `main` (step 3.5) – the merged docs pin a version consumers cannot resolve until a human slides the tag.
 - ❌ Reporting “all cleaned up” while a stacked sibling branch dangles unmentioned.
 - ❌ Treating the whole cascade-scan hit list as work caused by this merge, without intersecting it against the merge’s own deleted and renamed paths (step 1.5’s own step 2) — on an old backlog that claims other people’s stale PRs for no reason.

@@ -35,6 +35,7 @@ It does not silence you. The user is present, so the point is to stop *asking* r
 - **[`back`](../../skills/back/SKILL.llms.md)** – revokes `away`. Nothing revokes `daytb`, because it expires on its own.
 - **[`mwc`](../../skills/mwc/SKILL.llms.md)** – the grant that *does* extend to merging. `daytb` deliberately stops short of it.
 - **[`prompt-me`](../../skills/prompt-me/SKILL.llms.md) / [`prompt-me-all`](../../skills/prompt-me-all/SKILL.llms.md)** – the opposite direction: surface the questions rather than resolve them.
+- **[`dmmhyh`](../../skills/dmmhyh/SKILL.llms.md)** – built on this skill’s procedure for resolving the triggering item, but fires when the user is correcting a *pattern* of over-asking rather than just handing back one decision. It adds a standing in-session recalibration and a durable memory write that `daytb` alone doesn’t do – reach for `dmmhyh` instead of `daytb` when the user’s complaint is about asking too much in general, not this one question.
 
 ## Anti-patterns
 

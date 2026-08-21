@@ -45,22 +45,13 @@ In a Claude Code session, type `/` and confirm the skills appear (e.g.
 
 ### opencode
 
-[opencode](https://opencode.ai) has no skills-bundle "plugin" — its `plugin`
-config field loads JavaScript/TypeScript event-hook modules, not skills, rules,
-or agents. opencode instead reads ai-config through its ordinary config fields
-plus convention-based discovery (`.claude/skills/`, `.agents/skills/`,
-`.opencode/agents/`):
+[opencode](https://opencode.ai) has no skills-bundle "plugin" — its `plugin` config field loads JavaScript/TypeScript event-hook modules, not skills, rules, or agents.
+opencode instead reads ai-config through its ordinary config fields plus convention-based discovery (`.claude/skills/`, `.agents/skills/`, `.opencode/agents/`):
 
-- **This repo.** The root [`opencode.json`](opencode.json) wires opencode when
-  you run it inside ai-config: `instructions` loads `AGENTS.md`/`CLAUDE.md`,
-  `skills.paths` adds `skills/` and the vendored `shared/sembr-skills/skills`,
-  `references` exposes `shared/` and `memories/`, and the subagents in
-  [`.opencode/agents/`](.opencode/agents) are auto-discovered.
-- **Another repo (consumer).** A project that vendors ai-config at `.ai-config/`
-  (as [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) does via
-  `tools/bootstrap-ai-config.sh` + a pinned `.ai-config-ref`) points its own
-  `opencode.json` at that checkout — the opencode analogue of the Claude plugin
-  and the `.agents/*.json` Antigravity/Gemini config:
+- **This repo.**
+  The root [`opencode.json`](opencode.json) wires opencode when you run it inside ai-config: `instructions` loads `AGENTS.md`/`CLAUDE.md`, `skills.paths` adds `skills/` and the vendored `shared/sembr-skills/skills`, `references` exposes `shared/` and `memories/`, and the subagents in [`.opencode/agents/`](.opencode/agents) are auto-discovered.
+- **Another repo (consumer).**
+  A project that vendors ai-config at `.ai-config/` (as [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) does via `tools/bootstrap-ai-config.sh` + a pinned `.ai-config-ref`) points its own `opencode.json` at that checkout — the opencode analogue of the Claude plugin and the `.agents/*.json` Antigravity/Gemini config:
 
   ```json
   {
@@ -76,9 +67,7 @@ plus convention-based discovery (`.claude/skills/`, `.agents/skills/`,
   }
   ```
 
-  To make ai-config available to opencode in **every** project, copy or symlink
-  `skills/` into `~/.config/opencode/skills/` and add `instructions` entries to
-  `~/.config/opencode/opencode.json`.
+  To make ai-config available to opencode in **every** project, copy or symlink `skills/` into `~/.config/opencode/skills/` and add `instructions` entries to `~/.config/opencode/opencode.json`.
 
 
 ### Codex wrappers

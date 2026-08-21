@@ -568,3 +568,60 @@ Two newer hooks each re-derived a weaker version instead of reusing it.
 - **Don't:** reason about the trigger's self-reference trap and leave its sibling unexamined --- writing the paragraph is what makes the omission feel handled.
 - **Don't:** treat a command-position anchor as covering quoted text;
   strip heredoc bodies first.
+
+## Measure CPU time, not wall clock, when the assertion is about work done
+
+A performance regression test asserts something about the *code*.
+`perf_counter` answers a question about the *machine*: it counts the time a measured span spends descheduled, waiting for a core, alongside the time spent computing.
+On an idle laptop those are nearly the same number, which is why a wall-clock bound looks calibrated right up until it runs somewhere busy.
+
+`time.process_time()` counts CPU actually consumed and does not advance while the process waits for a core.
+That is the property that makes a reading reproducible across machines and across load, and it is a property of the instrument rather than of the statistic computed from it.
+
+Measured on `offending()` in `hooks/no-unauthorized-merge.py`, under six busy-loops on four cores, against byte-identical code:
+
+| clock | growth ratio over eight runs |
+| --- | --- |
+| `perf_counter` | 2.18 - 4.58x |
+| `process_time` | 3.96 - 4.31x |
+
+The same scan's wall-clock figure had already been reported at 342ms, 1122ms and 2115ms on three machines, a 6x spread with nothing about the scanner changed, across four separate issue filings ([#1314](https://github.com/Morrison-Lab/ai-config/issues/1314), [#1396](https://github.com/Morrison-Lab/ai-config/issues/1396), [#1785](https://github.com/Morrison-Lab/ai-config/issues/1785), [#1796](https://github.com/Morrison-Lab/ai-config/issues/1796)).
+Four reports of one defect is itself the tell that the instrument was wrong rather than the code under it.
+
+Two limits are worth knowing before reaching for it.
+
+The one thing CPU time cannot see is a span that blocks on I/O instead of burning cycles, so keep a wall-clock ceiling where the measured code can block.
+For a pure-CPU scan it cannot, and a CPU-time ceiling is the honest one.
+
+Its resolution is also platform-dependent, which matters when the measured span is short.
+Do not assume it, and do not generalize from the machine in front of you: read `time.get_clock_info('process_time')`, which reports the implementation and resolution for the interpreter actually running.
+On the Linux container these figures were measured on, that call returns `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)` at `1e-09`.
+CPython uses a different call on Windows, whose effective granularity is coarse enough to quantize a span of a few tens of milliseconds.
+Size the baseline to clear that granularity by a wide margin, and fail loudly when it does not rather than dividing by a number the clock could not measure.
+
+- **Do:** time a performance regression test with `process_time`, and label the reported figure as CPU so a reader knows which clock produced it.
+- **Do:** keep a wall-clock ceiling only where the measured code can actually block.
+- **Don't:** read a red `perf_counter` bound as a regression.
+  On a shared runner it is at least as likely to be a busy neighbour.
+- **Don't:** treat a wall-clock bound as calibrated because it passes locally, which is the machine least like CI.
+
+### A ratio cancels noise only when both terms are equally exposed to it
+
+The obvious repair for a machine-dependent bound is to divide it out: time the same code at two input sizes and assert the growth factor, so the machine's speed appears in both terms and cancels.
+That reasoning is sound about *speed* and wrong about *noise*, and the error is easy to miss because the ratio genuinely does fix the cross-machine half of the problem.
+
+Preemption is not a constant factor applied to a measurement.
+It is a hazard per unit of elapsed time, so a span four times longer is likelier to be interrupted at least once.
+Taking the minimum of several runs does not repair the asymmetry either, and inverts in the unhelpful direction: the minimum filters the short measurement well, because a short span often lands inside one uninterrupted timeslice, and filters the long one badly for exactly the same reason.
+
+Measured: the wall-clock growth ratio of an unchanged, genuinely linear scanner reached **8.45x** under four busy-loops on four cores, against a bound of 8.0 that its unloaded readings of 4.2x sat nowhere near.
+The ratio was doing its job on speed and amplifying the noise it was supposed to remove.
+
+The general form is what carries past this instance.
+Before dividing one measurement by another to cancel a nuisance term, ask what that term is proportional to.
+Where it does not enter both measurements with the same magnitude, the ratio amplifies it rather than removing it, and the resulting statistic looks stable on an idle machine, which is the condition under which every timing method looks fine.
+
+- **Do:** ask what the nuisance term scales with before assuming a ratio removes it.
+- **Do:** fix the instrument when the noise is instrument-borne, rather than building a statistic that tolerates it.
+- **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
+- **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.

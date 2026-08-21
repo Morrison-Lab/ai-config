@@ -306,7 +306,7 @@ the seam is the thing to read.
 
 **Relocating prose is the strongest form of touching it, not an exception to
 this rule.**
-The section above is about a line you *edit*.
+The editing and splicing cases above both change a line's text.
 Moving a section to another file edits none of its lines, and every one of them
 still lands in the diff as an added line --- so a file split, an extraction, or
 a move between fragments makes the whole moved body yours at once.

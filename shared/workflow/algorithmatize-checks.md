@@ -546,16 +546,16 @@ heredoc body containing gh pr list --repo o/r   discharged=True
 The reviewer's sharpest observation was that the hook's own reminder text names `gh pr list --repo <owner>/<repo>` --- so the guard told the user to run the command that would have disarmed it.
 
 **That draft's bug is fixed, and the timing is the point rather than a caveat.**
-`ca4a5651` added heredoc stripping at 09:57 and `911f0ea8` anchored the discharge at 11:40, both on #1749's own branch.
+`ca4a5651` added heredoc stripping at 09:57 PDT and `911f0ea8` anchored the discharge at 11:40 PDT, both on #1749's own branch.
 Its head now reads `RX_DISCHARGE.search(strip_heredocs(text))`, so none of the three lines above still evaluates `True` there.
-This section's first commit landed at 11:48 --- **eight minutes after** the anchoring fix --- so the example was already historical when it was first written, and saying otherwise took three review rounds to catch.
+This section's first commit landed at 11:48 PDT --- **eight minutes after** the anchoring fix --- so the example was already historical when it was first written, and saying otherwise took three review rounds to catch.
 Keep it as a worked example anyway: the discharge really was a bare substring search, the reviewer really did find it, and a bug fixed within the hour is still the bug this section is about.
 What is not safe is the present tense.
 
 **Command-position anchoring is not sufficient on its own, because a heredoc body is full of line starts.**
 `^` matches inside quoted prose, so a fenced reproduction block in a PR comment satisfies the anchor.
 `hooks/no-unshipped-commit.py` had exactly this shape, and fired permanently once a heredoc quoted a commit command ([#1775](https://github.com/Morrison-Lab/ai-config/issues/1775)).
-That one is fixed: [#1807](https://github.com/Morrison-Lab/ai-config/pull/1807) merged 2026-08-21 and added `strip_quoted`, which masks a heredoc body written by `cat`/`tee` into a redirect before the trigger scans it.
+That one is fixed: [#1807](https://github.com/Morrison-Lab/ai-config/pull/1807) merged 2026-08-21 and added `strip_quoted`, which **drops** a heredoc body written by `cat`/`tee` into a redirect before the trigger scans it --- distinct from `mask_heredocs` below, which blanks a body while preserving its length and line structure.
 The example is kept in the past tense because the shape is the point, and because a present-tense claim about a hook's current behaviour is exactly what goes stale --- as this sentence did, four hours after that PR merged.
 
 **The machinery already exists, which makes this a [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md) finding too.**

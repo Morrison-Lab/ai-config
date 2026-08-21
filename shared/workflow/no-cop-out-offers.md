@@ -92,3 +92,17 @@ push that `CLAUDE.md`'s standing PR authorization already covered.
 The same session had earlier closed a turn with "I'll keep digging unless
 you'd rather", which stalled work for 2.5 hours against a hard deadline, and
 "want me to kick off the re-run" for a run the user had already asked for.)
+
+## Relationship to `report-mistakes-proactively`
+
+[`report-mistakes-proactively`](report-mistakes-proactively.md)'s "Offering to
+hand over work you have already finished" section is the narrower ancestor of
+this rule: same phrasing, same failure, scoped to filing an issue or posting a
+PR comment.
+It also predicts this hook --- "a `Stop` hook can enforce this mechanically ...
+scan the outgoing message for an offer-to-file pattern and block it" --- so the
+instrument here is that section's own proposal, generalized past filing to any
+already-authorized work.
+
+Read that section for the artifact-already-exists case, which is the sharpest
+instance, and this one for the general rule.

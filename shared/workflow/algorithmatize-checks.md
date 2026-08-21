@@ -593,7 +593,8 @@ For a pure-CPU scan it cannot, and a CPU-time ceiling is the honest one.
 
 - **Do:** time a performance regression test with `process_time`, and label the reported figure as CPU so a reader knows which clock produced it.
 - **Do:** keep a wall-clock ceiling only where the measured code can actually block.
-- **Don't:** read a red `perf_counter` bound as a regression; on a shared runner it is at least as likely to be a busy neighbour.
+- **Don't:** read a red `perf_counter` bound as a regression.
+  On a shared runner it is at least as likely to be a busy neighbour.
 - **Don't:** treat a wall-clock bound as calibrated because it passes locally, which is the machine least like CI.
 
 ### A ratio cancels noise only when both terms are equally exposed to it

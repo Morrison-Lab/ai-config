@@ -744,7 +744,7 @@ Do not carry 3.5's "don't run it yourself" bullet over to this step; here
 that would leave the guard inert, which is the failure rather than the
 caution.
 
-One lookup and two calls settle it, run in the ai-config checkout after step 3
+One lookup and two calls settle it, run in the ai-config checkout after step 2
 has already put it on `main` and pulled:
 
 ```bash

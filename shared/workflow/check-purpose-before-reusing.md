@@ -189,29 +189,33 @@ A guard you cannot explain skipping is one you skipped by not looking.
   sibling's guards exist for the inputs the happy path never shows.
 
 **The sibling is sometimes not a separate artifact but the other branch of the
-same decision**, and that variant is harder to see.
-Above, two blocks do the same kind of job in different places, so the sibling
-is visibly a model to copy from.
-Here there is one decision with two paths to it --- a new discharge condition,
-an extra early return, an alternative source for a value --- and the guard the
-old path carries is a precondition on the *decision*, not a detail of the old
-branch.
-Nothing marks it as inheritable, because from inside the new branch its
-absence looks like nothing at all.
+same decision**,
+and this form of the failure is harder to see.
+Above, two blocks do the same kind of job in different places,
+so the sibling is visibly a model to copy from.
+Here there is one decision with two paths to it ---
+a new discharge condition, an extra early return,
+an alternative source for a value ---
+and the guard the old path carries is a precondition on the *decision*,
+not a detail of the old branch.
+Nothing marks it as inheritable,
+because from inside the new branch its absence looks like nothing at all.
 
-**A fix is the likeliest context for the omission**, which inverts the caution
-the situation deserves.
+**The omission is especially likely in a fix.**
 A new branch added to correct a bug exists precisely to handle a case the old
-one got wrong, so differing from the old path is the point --- and that framing
-makes a dropped guard read as intentional.
+one got wrong,
+so deliberate differences from the old path are the point ---
+which is exactly what makes a dropped guard look intentional.
 
-The clause-by-clause diff above still applies, asked of the **older** branch:
-what must be true before it fires, and does the new path require it too?
-Reading the new branch alone cannot answer that.
-Then write the test the question implies: exercise the new path with the old
-path's precondition violated.
-That is the case neither branch's own tests cover, and it is where this
-recurred.
+The clause-by-clause diff above still applies,
+asked of the **older** branch.
+What must be true before it fires?
+Does the new path require it too?
+Reading the new branch alone cannot answer either question.
+Then write the test they imply:
+exercise the new path with the old path's precondition violated.
+That is the cross-branch case a branch-local test is likely to miss,
+and it is where this recurred.
 
 - **Do:** treat the other branch of a shared decision as a sibling, not only a
   neighbouring block.
@@ -225,10 +229,10 @@ The existing path required the reading to be newer than the previous message;
 the new one carried no position at all, so a reading from hours earlier
 discharged any later claim that happened to land within tolerance --- which is
 the bug the PR existed to fix, in a new shape.
-The same round's fourth finding was the same shape again, in the branch that
-read the marker out of a tool result.
-Both branches read correctly in isolation, and the reviewer found it by asking
-what the older one required.)
+The position-reading path and the value-reading path were each internally
+consistent, so neither looked wrong on its own.
+The reviewer located the missing gate by asking what the position-reading path
+required.)
 
 (Morrison-Lab/ai-config#1490, 2026-08-15/16: a human-review query was added
 beside two siblings --- the Copilot query and the `CHANGES_REQUESTED` check

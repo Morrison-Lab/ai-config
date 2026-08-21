@@ -1,0 +1,53 @@
+diff --git a/shared/workflow/check-purpose-before-reusing.md b/shared/workflow/check-purpose-before-reusing.md
+index b06cb595..93eda30f 100644
+--- a/shared/workflow/check-purpose-before-reusing.md
++++ b/shared/workflow/check-purpose-before-reusing.md
+@@ -188,6 +188,48 @@ A guard you cannot explain skipping is one you skipped by not looking.
+ - **Don't:** read "my new block works" as evidence it is finished --- the
+   sibling's guards exist for the inputs the happy path never shows.
+ 
++**The sibling is sometimes not a separate artifact but the other branch of the
++same decision**, and that variant is harder to see.
++Above, two blocks do the same kind of job in different places, so the sibling
++is visibly a model to copy from.
++Here there is one decision with two paths to it --- a new discharge condition,
++an extra early return, an alternative source for a value --- and the guard the
++old path carries is a precondition on the *decision*, not a detail of the old
++branch.
++Nothing marks it as inheritable, because from inside the new branch its
++absence looks like nothing at all.
++
++**A fix is the likeliest context for the omission**, which inverts the caution
++the situation deserves.
++A new branch added to correct a bug exists precisely to handle a case the old
++one got wrong, so differing from the old path is the point --- and that framing
++makes a dropped guard read as intentional.
++
++The clause-by-clause diff above still applies, asked of the **older** branch:
++what must be true before it fires, and does the new path require it too?
++Reading the new branch alone cannot answer that.
++Then write the test the question implies: exercise the new path with the old
++path's precondition violated.
++That is the case neither branch's own tests cover, and it is where this
++recurred.
++
++- **Do:** treat the other branch of a shared decision as a sibling, not only a
++  neighbouring block.
++- **Don't:** exempt a bug fix --- it is the case where the omission is most
++  likely and reads most like a decision.
++
++(Morrison-Lab/ai-config#1850, 2026-08-21: a guard comparing a claimed clock
++time gained a second discharge path, reading a captured value where the
++existing path read a position.
++The existing path required the reading to be newer than the previous message;
++the new one carried no position at all, so a reading from hours earlier
++discharged any later claim that happened to land within tolerance --- which is
++the bug the PR existed to fix, in a new shape.
++The same round's fourth finding was the same shape again, in the branch that
++read the marker out of a tool result.
++Both branches read correctly in isolation, and the reviewer found it by asking
++what the older one required.)
++
+ (Morrison-Lab/ai-config#1490, 2026-08-15/16: a human-review query was added
+ beside two siblings --- the Copilot query and the `CHANGES_REQUESTED` check
+ --- in `pr-status`/`pr-status-all`.

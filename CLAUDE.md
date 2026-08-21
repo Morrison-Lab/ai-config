@@ -303,6 +303,33 @@ Keep the markers stable so they become muscle memory.
 The set-apart ❓ **QUESTION** format also gives the `prompt-me` / `prompt-me-all` skills a reliable signal to key off when they sweep the transcript for unanswered questions later.
 The user may tune the emoji set; the full taxonomy and rationale live in `memories/preferences.md`.
 
+## Never close a reply by offering to do work you are already allowed to do
+
+[shared/workflow/no-cop-out-offers.md](shared/workflow/no-cop-out-offers.md)
+
+"Say the word and I'll push."
+"Want me to kick off the re-run?"
+Each reads as courtesy and delivers nothing: the work does not happen, you
+spend a turn, and the reply reported nothing.
+
+The phrase is not the defect --- asking before a merge, a force-push, or a
+deletion is correct, and those sentences look identical.
+What decides it is whether the action was **already authorized**, by a
+standing instruction, a `daytb`/`away` grant, or your having asked for the
+outcome earlier.
+When it was, the offer is avoidance wearing courtesy, and the cost is
+asymmetric: an unwanted action is cheap to revert, while an unanswered offer
+leaves no branch, no PR, no issue --- nothing another session could find.
+
+`hooks/flag-cop-out-offer.py` is the instrument.
+It warns rather than blocks, because authorization is not lexically decidable.
+
+- **Do:** perform the authorized action and report it in the past tense.
+- **Do:** ask plainly, with no offer wording, when the action is genuinely
+  unauthorized and destructive or outward-facing.
+- **Don't:** attach a user-conditional to work a standing instruction covers.
+- **Don't:** close a status recap with an offer --- that is where this hides.
+
 ## Always produce a reply --- never end a turn silently
 
 Every turn ends with user-visible prose.

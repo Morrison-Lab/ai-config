@@ -422,58 +422,6 @@ surprising one, and it arrives at the moment it will be acted on.
 - **Don't:** relax the check because the match supports a decision already
   taken.
 
-## A new branch beside an existing one inherits none of its guards
-
-When a change adds a second path to a decision the code already makes --- a
-new discharge condition, an extra early return, an alternative source for a
-value --- the new path starts with **no** preconditions.
-Every gate the original path carries has to be restated on it deliberately,
-and the ones that matter are the gates that are invisible *from the new
-branch* --- their absence there looks like nothing at all, whether they came
-from the original design or from a later fix.
-
-The reason this survives review is that both branches are individually correct.
-The old one still carries its checks.
-The new one does exactly what its author intended.
-Nothing is missing from either in isolation --- what is missing is the
-*relationship*, and a diff shows the added lines rather than the invariant they
-were supposed to preserve.
-
-It is sharpest when the change is a **fix**, because then the new branch exists
-precisely to handle a case the old one got wrong, so the difference between
-them feels like the point rather than like a risk.
-That framing makes an omitted gate read as intentional.
-
-The check is one question, asked of the older branch rather than the new one:
-
-> What must be true before the existing path fires, and does the new path
-> require it too?
-
-Answer it by reading the old branch's conditions and mapping each onto the new
-one, naming any you deliberately drop.
-Reading the new branch alone cannot answer it, since the omission is not
-visible there.
-
-- **Do:** enumerate the existing branch's preconditions and restate or
-  consciously waive each on the new one.
-- **Do:** write the test where the new path is taken and the old path's
-  precondition is violated --- the case neither branch's own tests cover.
-- **Don't:** read "both branches are correct" as "the decision is correct";
-  the defect lives between them.
-- **Don't:** treat a fix as exempt --- a new branch added to correct a bug is
-  the likeliest one to drop a guard, because differing from the old path is
-  its purpose.
-
-(Morrison-Lab/ai-config#1850, 2026-08-21: a guard comparing a claimed clock
-time gained a second discharge path, reading a captured value where the
-existing path read a position.
-The existing path required the reading to be newer than the previous message.
-The new one carried no position at all, so a reading from hours earlier
-discharged any later claim that happened to be numerically close --- which is
-the bug the PR existed to fix, in a new shape.
-Both branches read correctly on their own; a reviewer found it by asking what
-the older one required.)
-
 ## A docstring that explains why, but not how, misattributes the mechanism
 
 A docstring can be entirely correct and still hide a dead parameter, if it states the *reason* a behaviour holds without saying *how* the code produces it.

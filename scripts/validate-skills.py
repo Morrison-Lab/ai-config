@@ -47,16 +47,34 @@ FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.S)
 MARKETPLACE_DESCRIPTION_LIMIT = 1024
 
 # Claude Code includes every installed skill's name and description in its
-# routing prompt. Keep the entire catalog below roughly 1% of a 200k-token
-# context window (about 8,000 characters at four characters per token), so
-# the list remains routable instead of being truncated by the harness.
-SKILL_LISTING_BUDGET_CHARS = 8_000
+# routing prompt, so this caps the whole catalog to keep the list routable
+# rather than truncated by the harness.
+#
+# Re-derived 2026-08-21 (ai-config#1702). The previous 8,000 was "roughly 1%
+# of a 200k-token context window at four characters per token" -- arithmetic
+# that checks out, against an assumption that had gone stale. It left two
+# characters of headroom on a 186-entry catalog, so the next skill added
+# anywhere in the repo turned `validate` red for every open PR, and the first
+# one to hit it (ai-config#1849) was 70 over with a single entry and no alias.
+#
+# 9,000 is the same 1% reasoning re-priced against a 225k-token budget, and it
+# is deliberately a modest step rather than a comfortable one: it restores
+# about 23 skills of runway, which is enough that a normal PR stops tripping
+# the cap and short enough that the catalog's growth stays visible.
+#
+# This buys time; it does not fix the cause. The budget is consumed by ENTRY
+# COUNT, not by verbose descriptions -- per-entry overhead alone is ~16.5% of
+# the cap -- so the lever that actually scales is having fewer entries. Alias
+# directories are the obvious candidates, being a second listing entry apiece
+# for a skill already listed; ai-config#1852 tracks that work. If routing
+# quality degrades before then, this number comes back down rather than up.
+SKILL_LISTING_BUDGET_CHARS = 9_000
 LISTING_ENTRY_OVERHEAD_CHARS = 8
 
 # How close to the cap counts as "nearly spent", expressed in ENTRIES rather
 # than characters. The budget is consumed by entry count rather than by verbose
 # descriptions -- as of 2026-08-21, 186 entries average 43 chars each, and the
-# per-entry overhead alone is 19% of the cap -- so headroom is only meaningful
+# per-entry overhead alone is 16.5% of the cap -- so headroom is only meaningful
 # as "how many more skills fit". Deriving the threshold from the catalog's own
 # mean entry cost keeps it honest as the catalog changes, instead of pinning a
 # character count that silently stops meaning what it meant.

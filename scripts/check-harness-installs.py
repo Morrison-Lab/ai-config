@@ -39,8 +39,18 @@ def codex_plugin_enabled(config: Path) -> bool:
     return module.ai_config_plugin_enabled(config)
 
 
-def collect_flat(repo_root: Path, source_rel: str, install_dir: Path, harness: str):
-    """Classify an individually-linked catalog, including consumer-only paths."""
+def collect_flat(repo_root: Path, source_rel: str, install_dir: Path, harness: str,
+                 repo_roots: set[Path] | None = None):
+    """Classify an individually-linked catalog, including consumer-only paths.
+
+    `repo_roots` is the set of checkouts a symlink may point into and still
+    count as tracking this repo. These catalogs are installed by the same
+    `bootstrap.sh` run as the Claude ones, so they carry the same worktree
+    hazard (ai-config#1729): a link into a sibling worktree is not misdirected.
+    Defaults to `{repo_root}`, preserving the pre-worktree behaviour.
+    """
+    if repo_roots is None:
+        repo_roots = {repo_root}
     source = repo_root / source_rel
     if not install_dir.is_dir():
         return []
@@ -52,7 +62,7 @@ def collect_flat(repo_root: Path, source_rel: str, install_dir: Path, harness: s
             install_dir / name,
             harness,
             name,
-            repo_root,
+            repo_roots,
         )
         for name in sorted(names)
         if name not in ci.IGNORED_NAMES
@@ -82,16 +92,20 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
+    # Union, never substitute: an empty result (git missing, not a repo) leaves
+    # the original single-root behaviour untouched. See check-install.py's
+    # module docstring for why no worktree is privileged as "the" install source.
+    repo_roots = {repo_root} | ci.repo_worktrees(repo_root)
     codex_dir = Path(args.codex_dir)
     codex_uses_plugin = codex_plugin_enabled(codex_dir / "config.toml")
     codex_entries = [] if codex_uses_plugin else collect_flat(
-        repo_root, "codex-skills", codex_dir / "skills", "codex"
+        repo_root, "codex-skills", codex_dir / "skills", "codex", repo_roots
     )
     checks = (
-        ("Claude", ci.collect(repo_root, Path(args.claude_dir))),
+        ("Claude", ci.collect(repo_root, Path(args.claude_dir), repo_roots)),
         ("Codex (plugin; wrappers intentionally absent)" if codex_uses_plugin else "Codex", codex_entries),
-        ("Gemini", collect_flat(repo_root, "skills", Path(args.gemini_dir) / "skills", "gemini")),
-        ("Cursor", collect_flat(repo_root, "cursor-rules", Path(args.cursor_dir) / "rules", "cursor")),
+        ("Gemini", collect_flat(repo_root, "skills", Path(args.gemini_dir) / "skills", "gemini", repo_roots)),
+        ("Cursor", collect_flat(repo_root, "cursor-rules", Path(args.cursor_dir) / "rules", "cursor", repo_roots)),
     )
     defects = sum(report(name, entries) for name, entries in checks)
     if defects:

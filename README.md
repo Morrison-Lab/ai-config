@@ -177,9 +177,12 @@ The skill listing is budgeted at roughly 1% of the context window,
 and past that budget descriptions are truncated and skill routing degrades ---
 measured ~3.8x over budget on one doubly-installed machine (ai-config#1409).
 Pick one route.
-The checked-in catalog is capped at 8,000 characters (about 2,000 tokens) by
-`scripts/validate-skills.py`; keep descriptions concise and put procedural
-detail in the skill body.
+The checked-in catalog is capped at 9,000 characters (about 2,250 tokens) by
+`scripts/validate-skills.py`.
+Keep descriptions concise and put procedural detail in the skill body.
+That cap is a stopgap rather than headroom: the budget is consumed by entry
+count, not by verbose descriptions, so the lever that scales is fewer entries
+(ai-config#1852).
 On a `bootstrap.sh` machine, leave the plugin disabled;
 the symlinked copy already serves every skill.
 

@@ -191,9 +191,71 @@ to a premise you were handed.
 - **Don't:** build one from the recap's own status table, however recently
   that table was assembled.
 
+## A removal proposal's premise is about the substitute, not about the artifact you are acting on
+
+The section above is keyed on the **object** of the recommendation: re-query
+the artifact's state before recommending an action on it.
+That check is sound and it cannot reach a proposal to remove, forbid, or
+replace something, because such a proposal's load-bearing premise is not about
+its object at all.
+It is about the **substitute** --- the path that would carry the work once the
+object is gone.
+
+So the check passes and the premise stays unchecked.
+Re-querying the object confirms exactly what you already believed, which
+supplies the sensation of having verified while the claim that decides whether
+the proposal is safe was never opened.
+[`verify-the-right-artifact`](verify-the-right-artifact.md) names that shape in
+its opening paragraph: "It is thorough verification of the wrong object."
+
+Two things make it worse than the same claim stated plainly.
+The premise rides in a subordinate clause --- "drop the allowance, so the
+pre-written file is the only path" --- while the main clause is a
+recommendation, so a reader's attention goes to whether the change is a good
+idea rather than to whether the second half is true.
+And removal is the one direction with no soft failure: a proposal that adds
+something on a false premise is merely useless, whereas one that removes a
+capability whose replacement does not exist converts a fix into a regression,
+invisible until the capability is gone.
+
+- **Do:** open the artifact that would supply the substitute before proposing
+  to remove, forbid, or replace something, and cite the file and line.
+- **Do:** read a proposal's subordinate clauses as claims, since that is where
+  a removal's premises live.
+- **Don't:** count re-querying the object as having checked the proposal ---
+  for a removal those are different artifacts.
+- **Don't:** read "this is only a suggestion" as lowering the bar; a proposal
+  acted on is a change, and its premise is not re-checked at the moment it is
+  carried out.
+
+(`Morrison-Lab/gha#543`, 2026-08-21.
+The reviewer was exhausting its permission budget retrying variants of
+`gh pr diff ... > /tmp/pr.diff`, each denied as a compound command.
+The proposal made twice on that issue was to drop `Bash(gh pr diff:*)` from the
+reviewer's allowlist, so that the pre-written diff file would be the only path
+left.
+The allowlist was exactly as believed, so re-querying it would have confirmed
+the proposal rather than refuting it.
+Reading `.github/actions/run-claude-review-attempt/action.yml` --- the
+substitute --- showed there was no pre-written diff file: the harness saves a
+command's output to a file only *after* the bare call succeeds, so removing the
+allowance would have starved the reviewer of the diff entirely.
+`Morrison-Lab/gha#567` supplied the file instead and left the allowance in
+place.
+
+The first draft of this entry, in `Morrison-Lab/ai-config#1861`, opened by
+calling this a shape "no rule in this file or its neighbours currently
+watches".
+The section directly above it already did, and the reviewer found it.
+That is the same error one level up --- a corpus-gap claim asserted rather than
+derived, which
+[`grep-is-not-coverage`](grep-is-not-coverage.md) exists to prevent --- so the
+entry is written here, as a narrowing of that section, rather than elsewhere as
+a new one.)
+
 ## Calling your own note stale is a state claim about that note
 
-The section above finds a state claim hidden inside a recommendation.
+The two sections above find a state claim hidden inside a recommendation.
 
 - **Do:** open the file before saying it is stale, and quote the line you
   believe is wrong.
@@ -435,6 +497,63 @@ invalidates every figure it produced".**
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 "A re-measurement with a different instrument".
 
+## A mechanism declining to act is a policy, not a prediction
+
+The claim types in *Key on claim type, because confidence cannot be the
+trigger* cover assertions you make about the world.
+This one is about a sentence a **safeguard** hands you, and the reason it slips
+past every check here is that it arrives already looking checked: a gate
+declined to do something, the gate is well-designed, and its refusal reads as a
+finding about whether the thing is possible.
+
+It is not.
+A guard that withholds a retry is answering a question about **its own**
+cost and benefit --- is another attempt worth the money, would it likely repeat
+--- and that question has a different subject from "can this succeed at all".
+Converting one into the other is an Inference-type overreach, but it is worth
+naming separately because the two sentences do not look adjacent.
+The gate says *I will not retry this*.
+You report *this cannot be reviewed*.
+
+**The guard's own prose is usually what supplies the false generality.**
+A well-written safeguard explains itself, and the explanation is phrased as a
+claim about the world because that is what motivates the policy.
+`check-review-execution.sh`'s comment says gha#198's pattern "has repeatedly
+NOT recovered", which is true of the **automatic same-run retry** it governs
+and reads as a statement about recovery generally.
+So the sentence you quote back is the guard's, which makes the report feel
+sourced rather than inferred.
+
+**Measured 2026-08-21 on Morrison-Lab/gha#555.**
+One commit, one workflow, one allowlist, three attempts: attempt 1
+quota-skipped, attempt 2 produced no verdict at 8 denials and was classified
+`high-denial` so the automatic retry was withheld, attempt 3 produced a
+complete review with two well-founded findings.
+On the strength of attempt 2 I reported the PR as structurally un-reviewable
+and told the user that re-running "only spends money".
+[`self-review-fallback`](self-review-fallback.md) already says the opposite in
+as many words --- the denial count "is a label rather than a prognosis", and
+"the one manual re-run stays worth spending" --- and records a run that posted
+a real verdict at 72 denials.
+The rule was loaded and did not fire, because nothing about reading a
+classification feels like making a claim.
+
+**The test is to name the decision the mechanism actually made.**
+Write its subject, then write yours, the way *A sound measurement does not
+license the claim standing next to it* does for measurements.
+"The workflow declined a same-run retry" and "no review can be obtained" have
+different subjects, and setting them side by side is enough.
+
+- **Do:** read a gate's refusal as a fact about the gate, and say which
+  decision it made.
+- **Do:** spend the cheap manual retry before reporting something unobtainable,
+  when the only evidence is a safeguard having declined.
+- **Don't:** quote a guard's rationale as evidence for a wider claim --- its
+  prose is written to justify a policy, not to bound what is possible.
+- **Don't:** treat a well-designed refusal as more informative than a poorly
+  designed one; the quality of the policy says nothing about the reach of the
+  claim.
+
 ## A sound measurement does not license the claim standing next to it
 
 The reachable-half and retraction-reach sections both concern a reading that
@@ -497,6 +616,60 @@ So write the population your command actually enumerated into the same sentence
 as the claim.
 "No branch contains it" and "no ref contains it" differ by one word, and the
 first is the one you measured.
+
+**A recurrence on
+[Morrison-Lab/gha#555](https://github.com/Morrison-Lab/gha/pull/555),
+2026-08-21, over that repository's root `README.md` --- in the shape where no
+near-synonym exists to slip on, because the noun was supplied rather than
+mistaken.**
+`branch` and `ref` are two named populations one word apart, so that case at
+least offers a wrong word to catch.
+Here the command named no population at all.
+`grep -c '^|' README.md`, run in a checkout of that repository, returned 46,
+and 46 was published as its capability table's row count --- but `grep` had
+enumerated *lines beginning with a pipe*,
+and "rows" was a noun I contributed from what I expected the file to contain.
+There was nothing to misread, which is why re-reading the sentence would not
+have helped.
+
+**The specific trap is that a whole-file pattern match silently unions every
+region that matches, and the claim is almost always about one region.**
+At the commit where the count was taken, that `README.md` held **three**
+disjoint runs of pipe-prefixed lines: the capability table, a blank line
+splitting it in two, and an unrelated table 158 lines further down.
+Enumerating **contiguous blocks** rather than counting lines gives
+`5 + 35 + 6`, which is where the 46 comes from -- 42 data rows and four
+header or separator lines, across a population the sentence described as one
+table.
+
+**The counts a reviewer later checked it against came from a different commit,
+which is the same error one layer up.**
+Two rounds of review were spent on this entry: the first because it never
+named the repository, the second because the figures it did give were drawn
+from more than one file state and presented as a single re-derivation.
+Deriving the whole sequence settles it, and is what should have been written
+the first time:
+
+| Commit | Pipe lines | Blocks |
+| --- | --- | --- |
+| pre-PR `main` | 45 | `5 + 34 + 6` |
+| where 46 was measured | 46 | `5 + 35 + 6` |
+| after the blank line was removed | 46 | `40 + 6` |
+
+The total is unchanged across the last two, which is precisely why an
+unstructured count could not see the defect it was being used to describe.
+
+The remedy is the same one this section already states, applied one step
+earlier: before writing the noun, ask what the command's unit actually was.
+A count is only about a table if something in the pipeline knew where the table
+ended.
+
+- **Do:** derive a count over the structure the claim names, not over a pattern
+  that happens to occur inside it.
+- **Do:** treat a whole-file scan as producing a union until you have shown the
+  file holds one matching region.
+- **Don't:** trust a number more because a command produced it --- the command
+  chose the unit, and you chose the noun.
 
 That makes this the **scope** claim type's composition-time counterpart rather
 than a rival to it.

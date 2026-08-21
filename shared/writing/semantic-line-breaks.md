@@ -208,9 +208,13 @@ exists for.
 
 The old advice --- read its output rather than its color --- is still worth
 keeping, because it now points the other way.
-A green job means the added lines passed, and it is the *local* run that can
-still say nothing: the script is diff-scoped, so a run against the wrong base
-reports a clean exit over a diff it never examined.
+A green **`pull_request`-triggered** job means the added lines passed.
+Two other green results mean nothing was examined, and both come from the same
+cause --- the script is diff-scoped, so a run against the wrong base, or against
+no base at all, reports a clean exit over a diff it never looked at.
+The local run does this when pointed at the wrong base ref.
+The push-triggered CI job does it unconditionally, as the section above
+records.
 
 **The sentence rule has no minimum line length; only the CLAUSE rule does.**
 `NLB_CLAUSE_MIN_LENGTH` (80) gates the mid-line-semicolon check alone, so a

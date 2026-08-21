@@ -421,3 +421,47 @@ includes, so a theorem added above it in any earlier include moves it:
 `grep -n '{#thm-' chapters/algebra.qmd | grep -n 'thm-log-prod'` returns
 `15:279:`, whose leading field is the ordinal.
 Fixed in `84d0052de` by naming the result rather than numbering it.)
+
+## A quoted section title decays too, and the link resolving is what hides it
+
+The section above ends by prescribing the **name** in place of the number,
+because the name is the stable half.
+It is stabler, and it is not stable.
+A heading renamed in place leaves the file where it was, so the link still
+resolves, the target still exists, and only the title quoted beside the link
+now describes a section that no longer goes by that name.
+
+Nothing in this repo reports it, and that is a property of the instruments
+rather than an oversight.
+`scripts/check-links.py` captures only the link **target**: its
+`\[[^\]]*\]\(([^)]+)\)` never captures the link text, since `[^\]]*` is a
+character class rather than a group and the one capture group holds the target.
+It then splits any `#anchor` off the path before testing
+(`re.split(r"[#?]", target, maxsplit=1)[0]`), so its only assertion is
+`resolved.exists()`.
+So the sweep that would plausibly catch a bad citation passes with the citation
+intact, which is worse than having no check at all: a green link run reads as
+having validated the reference.
+
+Two things follow about where to look.
+The decay is invisible to the **citing** file, since nothing there changed ---
+it is the *renaming* edit that breaks it, one file away, and that edit has no
+reason to grep for its own old heading.
+So the obligation sits with the rename: when you retitle a section, search the
+corpus for the old title as a quoted string before you finish, per
+[`reorganize-prose`](reorganize-prose.md)'s rule that a move is authorship.
+Use a whitespace-tolerant search rather than `grep`, since a quoted title long
+enough to be worth citing is long enough to have been split across a semantic
+line break --- [`memories/debugging.md`](../../memories/debugging.md)'s "An
+empty grep for one spelling is not evidence the concept is absent" owns that
+trap and its remedies.
+
+- **Do:** search the corpus for a section's old title whitespace-tolerantly
+  (`grep -Pz` with a `\s+` pattern, or `rg -U`) in the same edit that renames
+  it, rather than a literal `grep`.
+- **Do:** quote a title you are citing only if you have just read it, since a
+  resolving link is no evidence about the text beside it.
+- **Don't:** read a green `check-links.py` as covering a quoted title --- it
+  discards link text and strips anchors by construction.
+- **Don't:** expect the citing file's own review to catch this; the edit that
+  invalidated it happened somewhere else.

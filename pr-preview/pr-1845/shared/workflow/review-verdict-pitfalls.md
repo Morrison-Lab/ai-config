@@ -609,10 +609,12 @@ Read the run's own `Run Claude Code Review` step instead, which is where an exec
 
 - **Do:** read the failing run's `Run Claude Code Review` step before acting on a skip notice.
 - **Do:** treat the notice as evidence that the run errored with no billable work, which is all its trigger condition establishes.
-- **Don't:** rotate a credential or check billing on the notice's wording alone; on #1841 the secret was present and the account was not exhausted.
+- **Don't:** rotate a credential or check billing on the notice's wording alone;
+  on #1841 the secret was present and the account was not exhausted.
 - **Don't:** read a notice repeated across pushes as corroboration --- it is one condition firing repeatedly, not several observations agreeing.
 
-(Filed upstream as [Morrison-Lab/gha#561](https://github.com/Morrison-Lab/gha/issues/561), which proposes the notice distinguish its cases; [ai-config#1048](https://github.com/Morrison-Lab/ai-config/issues/1048) tracks the repo-wide failure it was masking.)
+(Filed upstream as [Morrison-Lab/gha#561](https://github.com/Morrison-Lab/gha/issues/561), which proposes the notice distinguish its cases.
+[ai-config#1048](https://github.com/Morrison-Lab/ai-config/issues/1048) tracks the repo-wide failure it was masking.)
 
 **A check-run reading `failure` is a fact about one *attempt*, not about the
 whole `run_id` -- a later attempt of that same run can still resolve on its

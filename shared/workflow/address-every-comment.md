@@ -587,3 +587,59 @@ refutation of it.**
 - **Don't:** let your own refutation past the check you would have applied to
   the reviewer's finding --- it is a fresh claim, and overturning something
   feels like having verified it.
+
+**Count a round's findings before pushing its fix, because disposing of one
+correctly generates no evidence about the others.**
+
+The rule above governs the finding you decline to act on.
+This governs the finding you never see, having already acted on its sibling.
+
+A round can carry several findings, and acting on one produces every artifact
+that handling the whole round produces: a verified claim, a commit, a reply, a
+resolved thread.
+Completeness is a property of the **set**, so nothing in that sequence reports
+that a second finding existed.
+There is no moment that feels like stopping early, because each step was
+performed properly --- which is why this needs a count rather than more care.
+
+**The body-only finding is where it hides**, and
+[`fully-clean`](fully-clean.md) already names why: a finding about something
+the diff did not touch cannot be attached as an inline comment, so it appears
+in the verdict body alone.
+Inline threads produce a visible checklist and a body-only finding produces
+nothing to tick off, so "all threads resolved" reads as "round handled".
+A **PR title** is the pure case, being out-of-diff by construction --- and on a
+multi-commit PR a squash merge takes its commit subject from that title under
+GitHub's default, so an overclaiming title can outlive the PR page it was
+raised on.
+
+The remedy is mechanical, and it is a count rather than a judgment: before
+pushing, re-read the verdict body **and** re-fetch the thread list, then state
+how many findings the round raised and dispose of all of them in one push.
+Say explicitly which are deferred, per [`issue-first`](issue-first.md).
+
+- **Do:** state the round's finding count before pushing, derived from both the
+  body and the thread list.
+- **Do:** read a title, a changelog line, and a PR body as reviewable surfaces
+  --- a finding about any of them can only arrive in the body.
+- **Don't:** read "every thread is resolved" as "every finding is handled";
+  the thread list cannot see an out-of-diff finding.
+- **Don't:** treat a correct, complete disposition of one finding as evidence
+  about the round --- that is a per-finding claim wearing a per-round shape.
+
+(Measured twice within half an hour on 2026-08-21, in both available shapes.
+On [ai-config#1833](https://github.com/Morrison-Lab/ai-config/pull/1833) round
+1 posted two inline findings; the first was fixed and pushed, and round 2
+opened by re-raising the second --- "the text at this location is essentially
+unchanged from what was flagged before" --- at a cost of $2.20.
+On [gha#550](https://github.com/Morrison-Lab/gha/pull/550) round 1 posted three
+inline findings and a fourth in the verdict body only, about the PR title
+claiming work that had been deferred to another issue.
+All three threads were addressed, resolved, and pushed; the body-only one was
+missed.
+The second occurrence came after the first had already been written up, which
+is the argument for a count rather than for intending to look harder.
+The two are anchored by the re-raise at 17:12:39Z and by noticing the second
+miss at 17:41:36Z --- derived from the PR timestamps rather than carried over
+from a figure quoted in a live comment, which is how "ninety minutes" reached
+the first draft of this entry.)

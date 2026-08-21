@@ -510,42 +510,152 @@ finally:
     ai_session("release", "--id", session_b)
     ai_session("release", "--id", session_c)
 
-# The command-position anchor makes every `;`, `&`, backtick and `$(` a place
-# the matcher restarts. With an UNBOUNDED expansion prefix each of those N
-# restarts rescanned the rest of a long substitution run before failing, which
-# is quadratic: 610ms on 800 chained backtick pairs, against 2.8ms for the
-# pre-anchor matcher, on a hook that runs before EVERY Bash call. Bounding the
-# repetition restores linear behaviour (~19ms at 1600).
+# Both scanners below were quadratic once, and both fixes are worth a
+# regression test. The command-position anchor makes every `;`, `&`, backtick
+# and `$(` a place the matcher restarts; with an UNBOUNDED expansion prefix
+# each of those N restarts rescanned the rest of a long substitution run before
+# failing -- 610ms on 800 chained backtick pairs, against 2.8ms for the
+# pre-anchor matcher, on a hook that runs before EVERY Bash call. Deciding
+# whether a quoted span is a live operand likewise needs the start of its
+# simple command, and rescanning for that from position zero per quote is
+# quadratic; the separator offsets are computed once per pass instead, without
+# which the same input takes ~10x as long.
 #
-# The threshold is deliberately loose -- this asserts the SHAPE of the growth,
-# not a runtime budget, so it survives a slow or loaded runner. A reintroduced
-# quadratic lands near 2.4s here, over an order of magnitude past the bound.
+# Two things this deliberately does NOT do, both of which it used to.
+#
+# It does not assert a WALL-CLOCK bound. `perf_counter` counts the time a scan
+# spends descheduled, so its reading is a fact about the machine's load rather
+# than about the scan. The same 2000-span input measured 342ms on one machine,
+# 1122ms on a GitHub runner and 2115ms on a third, all on byte-identical work
+# with an unchanged scanner -- a 6x spread. Any bound tight enough to catch a
+# regression sits inside that spread, so it goes red on PRs that never touched
+# this hook, which is how a gating check stops being read (#1314, #1396,
+# #1785, #1796). `process_time` counts CPU actually consumed and does not
+# advance while the process waits for a core, which is the property that makes
+# the reading reproducible. Measured under 6 busy-loops on 4 cores, on
+# unchanged code: the wall-clock ratio for these two scanners ranged
+# 2.18-4.58x, while the CPU-time ratio over the same runs held at 3.96-4.31x.
+# At the sizes set below the loaded and unloaded readings are
+# indistinguishable, 4.0-4.3x either way.
+#
+# It does not assert a MILLISECOND figure at all. What these fixes protect is
+# the SHAPE of the growth, so that is what is asserted: each scanner is timed
+# at two input sizes in the same process, and the machine's own speed divides
+# out of the ratio. Quadrupling the input grows a linear scan ~4x and a
+# quadratic one ~16x, and the bound is the geometric mean of those, sitting
+# equally far from both in log terms however slow the machine is.
 import importlib.util  # noqa: E402
 import time  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("_guard", HOOK)
 _guard = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_guard)
-_adversarial = "`x` " * 1600 + "echo hi"
-_t0 = time.perf_counter()
-_guard.offending(_adversarial)
-_elapsed = time.perf_counter() - _t0
-wrong += (_elapsed > 1.0)
-print(f"  {'allow' if _elapsed <= 1.0 else 'SLOW ':<6} "
-      f"1600 chained substitutions scanned in {_elapsed * 1000:.0f}ms (bound 1000ms)")
 
-# Deciding whether a quoted span is a live operand needs the start of its
-# simple command. Rescanning for that from position zero per quote is
-# quadratic; the separator offsets are computed once per pass instead. Without
-# the precompute this input takes ~10x as long, so the bound is a real guard
-# and not decoration.
-_manyquotes = " ".join(f'echo "field {i}"' for i in range(2000))
-_t0 = time.perf_counter()
-_guard.offending(_manyquotes)
-_elapsed_q = time.perf_counter() - _t0
-wrong += (_elapsed_q > 1.0)
-print(f"  {'allow' if _elapsed_q <= 1.0 else 'SLOW ':<6} "
-      f"2000 quoted spans scanned in {_elapsed_q * 1000:.0f}ms (bound 1000ms)")
+SCAN_SMALL = 300            # repetitions in the baseline input
+SCAN_STEP = 4               # the large input is this multiple of the small one
+SCAN_GROWTH_BOUND = 8.0     # sqrt(4 * 16): halfway between linear and quadratic
+SCAN_BASELINE_REPS = 3
+SCAN_TARGET_REPS = 2
+
+# The ratio is only as trustworthy as its denominator. A baseline this far
+# below the ~60ms these inputs actually cost means the platform's CPU clock is
+# too coarse to measure them (Windows resolves `process_time` to about 15ms),
+# and dividing by it would report a growth figure that is really clock noise.
+# Fail on that rather than blaming the scanner for it.
+SCAN_FLOOR_SECONDS = 0.001
+
+# A liveness ceiling, deliberately absurd rather than a runtime budget: the
+# ratio is blind to a constant-factor blowup, and this hook runs before EVERY
+# Bash call, so a scan burning half a minute of CPU is broken whatever its
+# shape. The slowest reading ever reported was 2.1s, on an input five times
+# larger than the one measured here, so this ceiling cannot flake.
+SCAN_ABSURD_SECONDS = 30.0
+
+
+def fastest_scan(scan, text, reps):
+    """Least CPU time any of `reps` `scan(text)` calls consumed, in seconds.
+
+    A garbage collection or a page fault can only ever ADD work to a run, so
+    the minimum of a few runs is the sample least contaminated by one. Bails
+    out early once a call has blown the liveness ceiling, so a genuinely
+    broken scanner fails in one pass rather than in `reps` of them.
+    """
+    best = float("inf")
+    for _ in range(reps):
+        started = time.process_time()
+        scan(text)
+        best = min(best, time.process_time() - started)
+        if best > SCAN_ABSURD_SECONDS:
+            break
+    return best
+
+
+def growth_of(build_input, small=SCAN_SMALL, scan=_guard.offending):
+    """Growth factor, large-input seconds, and the baseline it divided by."""
+    base = fastest_scan(scan, build_input(small), SCAN_BASELINE_REPS)
+    large = fastest_scan(scan, build_input(small * SCAN_STEP), SCAN_TARGET_REPS)
+    if base < SCAN_FLOOR_SECONDS:
+        return float("nan"), large, base
+    return large / base, large, base
+
+
+def report_growth(label, build_input):
+    """Assert the scan grows linearly, and report the measurement either way."""
+    growth, large, base = growth_of(build_input)
+    if base < SCAN_FLOOR_SECONDS:
+        print(f"  WRONG  {label}: baseline of {base * 1000:.1f}ms is below the "
+              f"{SCAN_FLOOR_SECONDS * 1000:.0f}ms floor, so this platform's CPU "
+              f"clock cannot measure the growth")
+        return False
+    ok = growth <= SCAN_GROWTH_BOUND and large <= SCAN_ABSURD_SECONDS
+    print(f"  {'allow' if ok else 'SLOW ':<6} "
+          f"{label} {SCAN_SMALL} -> {SCAN_SMALL * SCAN_STEP} grew {growth:.1f}x "
+          f"(linear ~{SCAN_STEP}x, bound {SCAN_GROWTH_BOUND:g}x, "
+          f"{large * 1000:.0f}ms CPU)")
+    return ok
+
+
+def chained_substitutions(n):
+    return "`x` " * n + "echo hi"
+
+
+def quoted_spans(n):
+    return " ".join(f'echo "field {i}"' for i in range(n))
+
+
+wrong += (not report_growth("chained substitutions", chained_substitutions))
+wrong += (not report_growth("quoted spans", quoted_spans))
+
+
+# Negative control. A ratio test that never fires is indistinguishable from a
+# scanner that is fine, so prove the bound still catches what it exists for:
+# a deliberately quadratic scan, measured through the same helper at the same
+# size step, has to land ABOVE the bound. Without this the two assertions
+# above would keep passing if `fastest_scan` or the bound were ever broken.
+#
+# The control needs a much longer input than the scanners above, for two
+# reasons that push the same way. Python's own per-iteration overhead is
+# linear, and below a few thousand characters it is large enough to mask the
+# quadratic term and understate the growth. And the baseline has to clear
+# SCAN_FLOOR_SECONDS with room to spare, or the control disqualifies itself.
+# At this size the baseline costs ~6ms, six times the floor, and the measured
+# growth is 15.1-15.7x against a theoretical 16x.
+SCAN_CONTROL_SMALL = 6000
+
+
+def quadratic_scan(text):
+    """Deliberately O(n^2): every suffix from position i is rescanned."""
+    for i in range(len(text)):
+        text.count("q", i)
+
+
+_control_growth, _, _ = growth_of(
+    lambda n: "x" * n, small=SCAN_CONTROL_SMALL, scan=quadratic_scan)
+_control_ok = _control_growth > SCAN_GROWTH_BOUND
+wrong += (not _control_ok)
+print(f"  {'allow' if _control_ok else 'WRONG':<6} "
+      f"negative control: a quadratic scan grew {_control_growth:.1f}x, "
+      f"past the {SCAN_GROWTH_BOUND:g}x bound")
 
 # The executor scan reads a DIFFERENT string from the one being masked, and the
 # two are interchangeable only because both are length-preserving. A caller that
@@ -605,6 +715,6 @@ for tool_name, tool_input, desc in MCP_ALLOW:
     wrong += (v != "allow")
     print(f"  {v:<6} {desc}")
 
-total = len(BLOCK) + len(ALLOW) + len(MCP_BLOCK) + len(MCP_ALLOW) + 11
+total = len(BLOCK) + len(ALLOW) + len(MCP_BLOCK) + len(MCP_ALLOW) + 12
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

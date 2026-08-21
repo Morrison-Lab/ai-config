@@ -1,0 +1,209 @@
+Avoid hard-coding data that already has a reliable external source of truth ---
+a version number, a package list, a dependency's release date, a set of
+downstream consumers, a schema, an enum's valid values. Read or generate it
+from that source instead of copying a snapshot into the codebase:
+
+- **Versions and pins.** Don't retype a dependency's version in prose or a
+  second config file when a lockfile, `DESCRIPTION`, or manifest already
+  states it --- reference that file, or generate the mention from it.
+- **Generated lists.** A list of consumers, plugins, or registered items that
+  the source system can enumerate (an API, a directory scan, a registry)
+  should be produced by querying that system, not maintained by hand
+  alongside it.
+- **Cross-file duplication.** When the same fact must appear in two places
+  (a usage example and a reference doc, a schema and its example), generate
+  the second from the first, or have CI check they agree, rather than
+  trusting two hand-edited copies to stay in sync.
+
+## Prose enumerations count, and they are the ones that rot unnoticed
+
+The "generated lists" bullet reads as being about code, and the rule is
+easiest to break in a sentence.
+An enumeration written into documentation --- "the rules below (A, B, C,
+...)" --- is a hand-maintained copy of a directory listing, and it has no
+generator, no test, and no linter behind it.
+Nothing fails when the directory grows; the sentence simply becomes wrong
+and stays wrong, while still reading as authoritative.
+
+When a prose list mirrors something the filesystem or an API already
+enumerates, prefer a pointer to the source over the list: "every fragment
+under `shared/coding/`" cannot drift, while a parenthetical naming seven of
+them silently can.
+Keep an explicit list only where the *selection* is the point --- a curated
+subset, an ordering that matters --- and then say that it is a selection, so
+a reader knows not to trust it as complete.
+
+**Fixing a drifted list by refreshing it only resets the clock.**
+The list will drift again on the next addition, by exactly the same
+mechanism.
+Replace it with the pointer instead, and treat "this needs updating again"
+as the signal that it should not have been a list.
+(ai-config#774, 2026-07-28: `CLAUDE.md`'s KISS section enumerated the
+coding rules beneath it and had reached 7 of the 13 files then in
+`shared/coding/`, having silently missed six additions.
+The PR was adding four more.
+Refreshing the parenthetical to 17 entries would have been wrong again
+within weeks, so it became "every fragment under `shared/coding/`, indexed
+by the principle it serves in the catalog above".)
+
+This is conditioned on the external source being **reliably available** ---
+don't add a network fetch or a fragile dependency where a static value would
+do. A constant that has no external owner (a magic number intrinsic to the
+algorithm, a default chosen by this project) is not "hard-coded data" in this
+sense --- it is just a value. The target is duplicated *ownership* of a fact:
+if updating the external source should have updated this value too, and
+didn't, that is the bug this guidance prevents.
+
+### A count in the prose above a block is the same duplicate, one line away
+
+The section above describes a list mirroring something *elsewhere* --- a
+directory the sentence cannot see, drifting over weeks as files land.
+The tighter case is a count of the items in the block directly beneath it:
+"Three reads settle it", above three commands.
+Same defect, since the count is a hand-maintained copy of something the block
+already enumerates.
+What differs is who invalidates it and when.
+Nobody adding a file to some other directory breaks this one.
+**You** break it, in the same review round, by fixing the block the count
+describes.
+
+Two things keep it out of view at exactly that moment.
+
+The count was **correct when written**, so it was never a mistake to notice
+and carry forward --- it became false only when the block gained a command.
+And a review finding points at the block, so correcting the block feels like
+the whole action.
+The sentence introducing it is not part of what the reviewer flagged, so
+nothing prompts a re-read.
+
+The second is that adjacency reads as safe.
+A count of items in a distant file is obviously fragile, and that visible
+fragility is what makes anyone check it.
+A count one line above the thing it counts feels like it cannot drift, since
+both are on the screen at once --- which is precisely why nobody looks at the
+prose while editing the block.
+
+**The remedy above does not transfer, so do not reach for it.**
+That section says to replace the list with a pointer to its source, and a
+count has no source to point at: "every fragment under `shared/coding/`"
+works because a directory can be named, whereas the number three cannot be
+delegated to anything.
+Two options that do work:
+
+- **Drop the count.**
+  The block is immediately below, so "These reads settle it" loses nothing a
+  reader could not get by looking down.
+  This is the better answer whenever the number carries no argument.
+- **Re-derive it mechanically before pushing**, when the number is doing real
+  work in the sentence.
+  One command decides it exactly, which makes this an
+  [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) case rather
+  than something to settle by recollection.
+
+  **Scope that command to the block, not to the whole file.**
+  A file-wide `grep -c` is right only while the pattern happens to match
+  nothing outside the block, which is a property of the file today rather
+  than of the command.
+  An unrelated edit that adds one matching line anywhere else silently
+  inflates the count, so the instrument acquires exactly the failure mode it
+  was reached for to prevent.
+  Bracket the block with two unique anchors instead:
+
+```bash
+awk '/^Four reads settle it/,/^An identical tree/' shared/workflow/claim-pr.md |
+  grep -c '^git '
+```
+
+Count list items, bullets, or numbered steps the same way.
+Two habits keep the range honest.
+Confirm each anchor matches exactly once (`grep -c` on the anchor itself)
+before trusting it, since a repeated start anchor makes an `awk` range
+restart and silently widen.
+And run the range once without the counting stage, to see that the lines it
+selects are the ones you meant.
+
+- **Do:** re-read the sentence introducing a block whenever a review finding
+  changes what is in that block.
+- **Do:** delete a count the neighbouring block already states, and re-derive
+  by command any count you keep.
+- **Don't:** treat a fix to the block as complete because the finding named
+  only the block.
+- **Don't:** read adjacency as protection --- the nearest duplicate is the one
+  your own edit falsifies first.
+
+(Morrison-Lab/ai-config#975, 2026-07-31: a new section in
+`shared/workflow/claim-pr.md` opened "Three reads settle it before you touch
+anything:" above a fenced block of `git` commands.
+Review round 1 correctly found the block needed a fourth command, and that
+fix is what made the preamble false.
+Round 2 flagged the stale count, fixed in `42214b0` as "Four reads settle it
+before you touch anything:".)
+
+## Where the rule stops: text that records what was observed
+
+Everything above pushes toward replacing a literal with whatever owns it.
+There is one boundary it must not cross, and a consistency sweep is precisely
+the operation that crosses it without noticing.
+
+Text that **asserts what was observed** is not configuration.
+A command someone actually ran, the output it actually produced, and the
+conditions a measurement was actually taken under are claims about the past,
+and their literals are the evidence for those claims.
+Parameterizing them does not generalize the record.
+It falsifies it, in the name of consistency, and leaves no trace that anything
+was changed.
+
+Three forms, each of which looks exactly like the hard-coding this fragment
+bans:
+
+- **A command that was executed.**
+  `git worktree add /tmp/wt-ums main` reports a run.
+  Rewriting it to `<default-branch>` asserts a run that never happened.
+- **A verbatim error string.**
+  `fatal: invalid reference: origin/main` is what the tool printed.
+  A reader matches it against their own terminal, so a parameterized version
+  matches nothing and stops being findable.
+- **The conditions of a measurement.**
+  A sentence saying the runs used a repo whose default branch is literally
+  `main` states the scope of the result.
+  It is usually the sentence that explains why the measurement did not surface
+  the bug.
+
+The tell is tense and mood rather than syntax.
+Prescriptive text tells a reader what to do next, and should name the
+parameter.
+Evidentiary text says what happened, and should keep the literal.
+One file routinely carries both, so decide occurrence by occurrence.
+
+[`ascii-punctuation-in-source`](ascii-punctuation-in-source.md) records the
+same over-application for punctuation, where a whole-file replace turned a
+one-line finding into a 104-line diff.
+The failure there is scope, and the diff is still true.
+Here the rewritten text becomes false, which no diff size reveals.
+
+- **Do:** parameterize the occurrences that instruct, and leave the ones that
+  record.
+- **Do:** decide per occurrence in a file that carries both, reading each one's
+  surrounding sentence.
+- **Don't:** run a whole-file replace over a literal that also appears inside
+  quoted commands, quoted output, or a statement of measurement conditions.
+- **Don't:** treat an unparameterized literal inside a case record as a defect
+  left behind -- there it is the evidence.
+
+(Morrison-Lab/ai-config#1008, merged 2026-08-01 as `3eb15a4`: it parameterized
+the base branch to `<default-branch>` across `skills/gip/SKILL.md` and
+`memories/preferences.md`, and stopped at three places on purpose.
+`memories/preferences.md` keeps `git worktree add /tmp/wt-ums main` and the
+scores measured with it, and closes that block by saying those runs "used a
+repo whose default branch is literally `main`, which is why they are written
+that way here and why they did not surface the hard-coding".
+`skills/gip/SKILL.md` keeps `fatal: invalid reference: origin/main` as the
+error a reader will actually see.
+Both files state their reasoning in place --- `preferences.md` in the sentence
+quoted above, `gip/SKILL.md` at the line that says hard-coding "fails with
+`fatal: invalid reference: origin/main` on any repo whose default is named
+otherwise".
+So the judgment was written down, and a sweep still re-flagged them, because an
+in-file rationale is not something a `grep` for `main` can consult.
+That is the transferable part: recording *why* an instance is exempt protects a
+reader, not a mechanical sweep, and the two need different affordances.)

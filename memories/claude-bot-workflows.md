@@ -591,9 +591,10 @@ not block `claude-review`.)
 - **`permission_denials_count` is per-attempt (per job), not per-PR.**
   A single PR can carry multiple `review/claude-review` jobs (manual re-runs,
   workflow retries), each with its own denial count.
-  Example: `ai-config#1689` had three jobs at 41, 101, and 72 denials ---
-  the 72-denial job posted a real verdict, while `ai-config#1767` produced
-  no verdict at 12 and then 24.
+  Example: `ai-config#1689` had `permission_denials_count=55` on one attempt
+  (run 32391984929, cited in PR comment) and `72` on another (job 96505024829,
+  from execution-log parse) --- the 72-denial job posted a real verdict.
+  Meanwhile `ai-config#1767` produced no verdict at 12 and then 24.
   A high count on one job is not evidence the reviewer has given up on the
   PR --- the manual re-run is still worth spending.
   When citing a count, name the job id, not just the PR.

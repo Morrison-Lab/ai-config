@@ -45,13 +45,13 @@ In a Claude Code session, type `/` and confirm the skills appear (e.g.
 
 ### opencode
 
-[opencode](https://opencode.ai) has no skills-bundle "plugin" — its `plugin` config field loads JavaScript/TypeScript event-hook modules, not skills, rules, or agents.
+[opencode](https://opencode.ai) has no skills-bundle "plugin" --- its `plugin` config field loads JavaScript/TypeScript event-hook modules, not skills, rules, or agents.
 opencode instead reads ai-config through its ordinary config fields plus convention-based discovery (`.claude/skills/`, `.agents/skills/`, `.opencode/agents/`):
 
 - **This repo.**
   The root [`opencode.json`](opencode.json) wires opencode when you run it inside ai-config: `instructions` loads `AGENTS.md`/`CLAUDE.md`, `skills.paths` adds `skills/` and the vendored `shared/sembr-skills/skills`, `references` exposes `shared/` and `memories/`, and the subagents in [`.opencode/agents/`](.opencode/agents) are auto-discovered.
 - **Another repo (consumer).**
-  A project that vendors ai-config at `.ai-config/` (as [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) does via `tools/bootstrap-ai-config.sh` + a pinned `.ai-config-ref`) points its own `opencode.json` at that checkout — the opencode analogue of the Claude plugin and the `.agents/*.json` Antigravity/Gemini config:
+  A project that vendors ai-config at `.ai-config/` (as [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) does via `tools/bootstrap-ai-config.sh` + a pinned `.ai-config-ref`) can point its own `opencode.json` at that checkout --- the opencode analogue of the Claude plugin and the `.agents/*.json` Antigravity/Gemini config:
 
   ```json
   {
@@ -347,7 +347,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `ensure-open-pr-monitor.py` | `UserPromptSubmit` | ensures the agent-independent all-open-PR monitor service is running when an agent session begins |
 | `monitor-open-prs.py` | detached timer | reconciles every open PR authored by the authenticated user every two minutes, including PRs opened outside the current session |
 | `no-heavy-work-on-head-node.py` | `PreToolUse` (Bash) | blocks a heavy R/Quarto command run on a cluster's login node; inert off a cluster |
-| `remind-brief-premises.py` | `PreToolUse` (Agent) | reminds, never blocks, when an `Agent` brief asserts corpus state that nothing derived |
+| `remind-brief-premises.py` | `PreToolUse` (Agent, Task, SendMessage) | reminds, never blocks, when a brief asserts corpus state that nothing derived --- including a `SendMessage` follow-up to a running agent, where corrections and new premises land |
 | `remind-both-sides-from-git.py` | `UserPromptSubmit` | reminds, never blocks, when a revision-qualified blob is compared against the working-tree copy of that path |
 | `remind-deserialize-before-binary-claim.py` | `UserPromptSubmit` | reminds, never blocks, when an escalation names a serialized artifact nobody deserialized |
 | `flag-unchained-branch-switch.py` | `PreToolUse` (Bash) | warns, never blocks, when a branch switch and a later mutating git command are not joined by `&&` |

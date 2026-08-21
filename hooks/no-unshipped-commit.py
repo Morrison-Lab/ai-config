@@ -11,6 +11,92 @@ COMMIT = re.compile(r"(?:^|[;&|\n]\s*)git\s+commit\b", re.MULTILINE)
 PUSH = re.compile(r"(?:^|[;&|\n]\s*)git\s+push\b", re.MULTILINE)
 CREATE = re.compile(r"(?:^|[;&|\n]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 
+# A heredoc body redirected INTO A FILE is text, not commands: `cat > x <<'EOF'
+# ... EOF` writes the lines rather than running them. A corpus about git
+# workflow quotes git commands inside issue and PR bodies constantly, and a
+# line-oriented scan cannot tell a quoted example from an executed one --
+# shared/writing/examples-are-scanned.md states exactly this, and names
+# teaching the checker about quoted regions as the fix where we own it.
+#
+# Measured on ai-config#1806: filing an issue whose body quoted
+# `pr-on-claim.md`'s own start-commit mechanic armed this guard, and the same
+# command's `gh issue create` did not disarm it, so a fully-pushed session was
+# told to push.
+#
+# ONLY the file-redirect form is stripped. `bash <<'EOF' ... EOF` genuinely
+# executes its body, so a heredoc this does not recognise as a file write
+# keeps arming the guard -- the unrecognised case fails toward the old
+# behaviour rather than toward a hole.
+# `(?<!<)` rejects the second `<` of a `<<<` HERESTRING. Without it,
+# `cat <<< hello` parses as a heredoc with tag `hello`; a herestring has no
+# body and no terminator line, so the terminator search runs off the end of
+# the command and swallows EVERY remaining line -- unbounded trailing text,
+# not one heredoc body. `cat <<< "$v" > /tmp/out` is an ordinary way to write
+# a literal to a file, so this is reachable rather than contrived.
+HEREDOC_START = re.compile(r"(?<!<)(<<(-?))\s*(['\"]?)([A-Za-z_]\w*)\3")
+# Both tests below run against the pipeline/list SEGMENT that owns the
+# heredoc, never the whole line. Scoping is the whole game here: on a whole
+# line, `cat <<'EOF' | bash` finds `cat` and a redirect and calls an executed
+# heredoc "data", and `cat notes > /tmp/x; bash <<'EOF'` does the same across
+# a `;`. Both hide a real commit, which is the failure this guard exists to
+# prevent.
+SEPARATOR = re.compile(r"\|\||&&|[;&|]")
+# A redirect to a file, within the owning segment. Necessary, not sufficient.
+REDIRECT = re.compile(r"[12]?>>?\s*\S")
+# The owning segment's command word must WRITE its heredoc rather than run it.
+WRITER = re.compile(r"^\s*(?:cat|tee)\b")
+
+
+def _owning_segment(line, start):
+    """The pipeline/list segment containing the heredoc token.
+
+    Separators inside quotes are not honoured. That is deliberate: a
+    mis-split can only ever make the segment look LESS like a plain
+    `cat`/`tee` write, so the guard keeps arming -- the safe direction.
+    """
+    cuts = [0] + [m.end() for m in SEPARATOR.finditer(line)] + [len(line)]
+    for lo, hi in zip(cuts, cuts[1:]):
+        if lo <= start.start() < hi:
+            return line[lo:hi]
+    return line
+
+
+def _terminates(line, tag, dash):
+    """Match bash's heredoc terminator rule exactly."""
+    return (line.lstrip("\t") if dash else line) == tag
+
+
+def strip_quoted(command):
+    """Drop heredoc bodies written to a file rather than executed."""
+    lines = command.split("\n")
+    kept, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        start = HEREDOC_START.search(line)
+        segment = _owning_segment(line, start) if start else ""
+        if (start and WRITER.search(segment)
+                and REDIRECT.search(HEREDOC_START.sub("", segment))):
+            kept.append(line)
+            dash, tag = start.group(2), start.group(4)
+            i += 1
+            # Drop the body AND the terminator: neither is executed, and the
+            # terminator line carries nothing this scans for. Keeping it was
+            # an equivalent mutant -- no assertion could pin it, so it was
+            # untestable code rather than tested code.
+            # bash's real termination rule, not `.strip()`. A plain `<<TAG`
+            # terminates only on a line equal to TAG with NO surrounding
+            # whitespace; `<<-TAG` strips leading TABS only. `.strip()` was
+            # looser than both, so an indented decoy `  EOF` ended the strip
+            # early and exposed body text -- including a quoted `git push`,
+            # which then discharged a genuinely pending commit.
+            while i < len(lines) and not _terminates(lines[i], tag, dash):
+                i += 1
+            i += 1
+            continue
+        kept.append(line)
+        i += 1
+    return "\n".join(kept)
+
 
 def pending_commit(path):
     pending = None
@@ -32,9 +118,10 @@ def pending_commit(path):
                     if block.get("name") not in {"Bash", "bash", "run_command"}:
                         continue
                     command = str((block.get("input") or {}).get("command") or (block.get("input") or {}).get("cmd") or (block.get("input") or {}).get("CommandLine") or "")
-                    if COMMIT.search(command):
+                    scanned = strip_quoted(command)
+                    if COMMIT.search(scanned):
                         pending = command
-                    if pending and (PUSH.search(command) or CREATE.search(command)):
+                    if pending and (PUSH.search(scanned) or CREATE.search(scanned)):
                         pending = None
     except Exception:
         return None

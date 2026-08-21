@@ -21,7 +21,7 @@ scope restriction.
 
 ## No empty promises
 
-A commitment about your own future behaviour --- "going forward, I will X", "from now on I won't Y", "I'll always Z", "I won't do that again" --- must ship an implemented accountability mechanism in the same turn, or not be made at all.
+A commitment about your own future behaviour --- "going forward, I will X", "from now on I won't Y", "I'll always Z", "I won't do that again", "that is owed by me" --- must ship an implemented accountability mechanism in the same turn, or not be made at all.
 A written rule or memory entry is the minimum and is always available;
 a hook or equivalent guard is the right form when the condition is decidable automatically;
 a filed issue covers work someone has to schedule.
@@ -150,7 +150,7 @@ below).
 ## Request review and drive every started PR to clean
 
 Whenever starting or working on a Pull Request:
-1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment or `@agy review` / dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
+1. **Trigger AI review when done pushing**: Request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
 3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
 

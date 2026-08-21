@@ -442,6 +442,43 @@ are easy to swap without noticing.
 - **Don't:** ship a superlative you have not counted even where it turns out to
   be true --- an undefended claim is a finding on its own, per the bullet above.
 
+## A clause you carried through a rewrite is a claim you are now asserting
+
+The section above covers a phrase you bring **in** from somewhere else --- an
+issue body, a sibling repo's comment --- where the tell is that copying feels
+like faithful porting.
+This is the nearer miss and it has no import step at all: the clause was
+already in the sentence, and you rewrote the sentence around it.
+
+[`ascii-punctuation-in-source`](../coding/ascii-punctuation-in-source.md) states
+the line-level form --- touching a line makes its contents yours, because the
+diff cannot tell which words you meant to change.
+The content-level form has no check behind it, so nothing reports it at all.
+
+Rewriting a sentence puts every clause in it under your name, including the ones
+that rode through unexamined: a locator, a figure, an attribution, a claim about
+what some other file says.
+Those parts go on feeling like someone else's while you work, precisely because
+you were not thinking about them --- and that feeling is the defect rather than
+a symptom of it.
+Attention went to the clause being changed, and the untouched clause quietly
+inherited the confidence of the rewrite around it.
+
+The check has to be deliberate, since nothing prompts it and the sentence reads
+as freshly written.
+Read the finished sentence back as though you had written it from scratch, and
+verify each factual clause against its referent rather than against your memory
+of having left it alone.
+
+- **Do:** verify every factual clause in a sentence you rewrote, not only the
+  part you rewrote it for.
+- **Do:** re-check locators and figures specifically, since those are the
+  clauses a rewrite is least likely to touch and most likely to invalidate.
+- **Don't:** treat a clause you did not deliberately change as still belonging
+  to whoever wrote it --- you shipped the sentence.
+- **Don't:** read this as covered by the import rule above; there is no source
+  to have been faithful to, which is what removes the moment of doubt.
+
 ## A definition can resolve, render, and still say nothing
 
 The "Rendered/computed artifacts" bullet above covers a computed value or a
@@ -685,3 +722,87 @@ the other way\|the mirror of\|inverts cleanly" shared/
 one phrasing family among several.
 The exclusion is load-bearing rather than tidy: this paragraph quotes the pattern
 it searches for, so a run that includes this file counts itself.)
+
+## An availability claim about a repository is a state claim, not a safe default
+
+The **Factual claims** bullet above already covers claims checkable against an
+external source.
+This is the shape that slips past it: a claim about a repository's or
+service's *current status* --- public or private, released or unreleased,
+open-source or not --- reads as a safe default rather than as a claim, because
+it lines up with intent rather than with anything actually asserted.
+
+Writing "open-source, available at `<URL>`" in a Code and Data Availability
+statement, a README, or similar prose feels natural when publication is
+planned or eventually expected.
+It is a claim about **state** in
+[`metacognitive-monitoring`](../workflow/metacognitive-monitoring.md)'s
+taxonomy, and a claim about state gets re-queried, not recalled from what
+seems likely.
+A repository actively being developed toward eventual publication is not
+automatically public yet, and intent to publish is not evidence of the state
+now.
+
+Query the system directly before writing the claim: `gh api
+repos/<owner>/<repo> --jq .private`, or an unauthenticated fetch of the given
+URL.
+Neither a `DESCRIPTION` file's `URL:` field nor "most packages like this
+eventually go public" settles it, since both describe intent rather than the
+live state.
+
+- **Do:** verify a repository's or service's current visibility live, before
+  asserting it in an Availability statement, README, or similar prose.
+- **Do:** treat a live-looking URL offered as evidence of accessibility as
+  itself a claim needing the same check.
+- **Don't:** write an availability or open-source claim as a natural default
+  because publication is planned or intended.
+- **Don't:** infer current visibility from a config file's URL field, or from
+  what similar projects usually do.
+
+This is a first occurrence of this specific pattern, so it does not yet clear
+[`deterministic-tools`](../principles/deterministic-tools.md)'s
+third-occurrence bar for a dedicated instrument.
+Revisit as a check only if the pattern recurs.
+
+## An insertion asserts something about the whole file, not just the added lines
+
+Two earlier sections in this file each turn a sentence back on its own document --- [`Check a general claim against the concrete numbers in the same document`](#check-a-general-claim-against-the-concrete-numbers-in-the-same-document) and [`A contrast sentence imports the neighbouring rule's parameters`](#a-contrast-sentence-imports-the-neighbouring-rules-parameters).
+Both compare the new text against something *inside* the passage being written --- a figure the same passage reports, or the rule the contrast sentence is stating.
+This one compares it against a sentence it never touched.
+Naming them beats counting to them here, deliberately, because the section directly above this one ([`An availability claim about a repository is a state claim, not a safe default`](#an-availability-claim-about-a-repository-is-a-state-claim-not-a-safe-default)) is about verifying against **external** live state and is not one of them.
+
+Inserting a paragraph into an existing fragment publishes a file, not a paragraph.
+Whatever the insertion claims, the file now claims, alongside everything the file already said --- so a sentence a dozen lines away that **qualifies, bounds, or hedges the same phenomenon** is part of the assertion you are making, and contradicting it makes the fragment say both things at once.
+
+**Nothing in the normal loop looks there.**
+The author reads the insertion, which is coherent on its own.
+The reviewer reads the diff, and the contradicted sentence appears in it as context or not at all, so a review can be careful, correct, and still never consider it.
+This is the instrument-soundness argument [`sync-with-main`](../workflow/sync-with-main.md) already states for merges --- "when a defect can be introduced by **deleting** a line, any instrument keyed on added lines is unsound" --- borrowed for its *reasoning* rather than for its merge case.
+Here the added line is the defective one, and it is only defective **relative to an unchanged line**, which leaves every diff-scoped check equally blind.
+
+**Read the surrounding paragraphs before landing the insertion, not the insertion point.**
+Read far enough out to cover the section the insertion joins, and look specifically for a sentence that already limits the claim you are about to state without limits.
+A hedge is the likeliest collision, because a hedge and a confident restatement of the same finding are the two natural things to write about one phenomenon.
+Duplication is the same read's second finding --- an option list or definition the file already owns elsewhere --- and [`challenge-redundant-content`](../workflow/challenge-redundant-content.md) governs what to do with it.
+
+**This does not license checking your claim against the neighbour.**
+[`A contrast sentence imports the neighbouring rule's parameters`](#a-contrast-sentence-imports-the-neighbouring-rules-parameters) above says the neighbour is where a wrong parameter comes *from*, never what you verify against, and that still holds: a deliberate asymmetry between two rules is sanctioned there.
+The question here is different --- not whether your parameter matches the neighbour's, but whether the file now states two incompatible things about **one** phenomenon.
+Where the difference is deliberate, say so in the insertion, so the next reader does not reconcile them by deleting one.
+
+- **Do:** read the whole section an insertion joins, before pushing it, for a sentence that qualifies or bounds the same phenomenon.
+- **Do:** rewrite whichever of the two is wrong, or state the difference as deliberate in the insertion itself.
+- **Don't:** treat a clean review as evidence of consistency --- the reviewer read the diff, and the contradicted sentence was not in it.
+- **Don't:** confuse this with a deliberate asymmetry between two rules, when the defect is two readings of one phenomenon rather than two rules with different thresholds.
+
+No mechanical check is proposed, and this is not a case where one is being deferred: contradiction between two paragraphs is semantic, so it is not lexically decidable over the artifact, and [`grep-is-not-coverage`](../workflow/grep-is-not-coverage.md)'s point applies to any grep that would stand in for it.
+The reviewable action is the read, not an instrument.
+
+(Morrison-Lab/ai-config#1788, 2026-08-20.
+Commit `4d1a979b` inserted a paragraph into [`self-review-fallback`](../workflow/self-review-fallback.md) calling a high-denial review stub a "non-recovering" subcase, asserting that "re-running this pattern has repeatedly NOT recovered", and that "two high-denial stubs back to back is conclusive".
+Thirteen lines below, untouched by the diff, the file already said that two stubs back to back is "still not conclusive" and that the failure modes behind stubs "don't always repeat".
+The automated reviewer read the same diff and reported only a tense problem on a different line.
+The insertion additionally re-listed a set of reviewer options the same file defines in another section, which [#1778](https://github.com/Morrison-Lab/ai-config/pull/1778) was concurrently editing.
+Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794), and corrected on the branch by `0cc398ca`.
+This section's own first draft then committed the same error: it opened by describing "the two sections above", carrying that framing over from its neighbour, when the section directly above it argues the opposite of what the sentence attributed to it.
+The reviewer on [#1795](https://github.com/Morrison-Lab/ai-config/pull/1795) caught it, which is worth recording as evidence about the remedy rather than about the author --- naming a target beats counting to it, exactly as [`forward-references`](forward-references.md) says, and the count was wrong here because an unrelated section had been inserted between the two being counted.)

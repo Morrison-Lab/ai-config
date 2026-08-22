@@ -78,6 +78,15 @@ A branch in `INLINE` that the branch pass had classified **active** is a
 contradiction between the two skills, not a subtraction.
 Stop and surface it.
 
+`INLINE` can also collide with the 8c bucket, and that one is a **precedence**
+question rather than a contradiction: a branch with no configured upstream can
+sit in a Dead worktree, so it is both "deleted inline by the worktree pass" and
+"local-only, kept".
+**8c wins.**
+Drop it from `INLINE`, leave it in the flagged bucket, and say so in the plan
+--- the two buckets disagree about whether the work exists anywhere else, and
+the conservative reading is the one that keeps it.
+
 ## Procedure
 
 ### 1. Classify, both passes
@@ -104,9 +113,16 @@ git branch --merged origin/main --format='%(refname:short)' \
 git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads \
   | grep '\[gone\]'
 
-# 8c --- never pushed, has unique commits. Kept and flagged, never deleted.
+# 8c --- NO CONFIGURED UPSTREAM. That is what this command detects, and it is
+# wider than clean-branches' "never pushed, has unique commits" label: it also
+# returns branches whose upstream was unset, branches already merged, and
+# main/current unless excluded. Filter before presenting.
 git for-each-ref --format='%(refname:short) %(upstream)' refs/heads \
-  | awk '$2=="" {print $1}'
+  | awk '$2=="" {print $1}' \
+  | grep -vxE 'main|master' \
+  | while read -r b; do
+      [ "$(git rev-list --count "origin/main..$b")" -gt 0 ] && echo "$b"
+    done
 ```
 
 **Do not run the `git branch -d` or `-D` lines that share those blocks.**
@@ -130,9 +146,32 @@ Say so in the plan anyway, per step 2's `Pruned stubs` line.
 A silent mutation under a heading promising none is how a reader stops
 believing the rest of the guarantees.
 
-The invariant the gate actually protects is therefore narrower than "no
-mutation", and stating it precisely is what makes it worth anything:
-**nothing that can lose work happens before confirmation.**
+**A second pre-gate mutation, and this one is not safe by construction.**
+Both delegates refresh remote-tracking state in their classify steps ---
+[`clean-worktrees`](../clean-worktrees/SKILL.md) step 3 and
+[`clean-branches`](../clean-branches/SKILL.md) step 2 each run
+`git fetch --prune origin`.
+`--prune` deletes remote-tracking refs whose upstream branch is gone, and such
+a ref can be the last thing in this clone pointing at those commits.
+
+So "nothing that can lose work happens before confirmation" is **false as an
+unconditional claim**, and narrowing it further would keep the same defect in
+smaller print.
+Snapshot the refs first instead, which makes the statement true rather than
+merely careful:
+
+```bash
+git for-each-ref --format='%(objectname) %(refname)' refs/remotes/origin \
+  > "$TMP/pre-prune-refs.txt"
+```
+
+Report the snapshot's path in the plan.
+Anything the prune removed is recoverable from it for as long as the objects
+survive gc, and a reader who knows the file exists can check before confirming.
+
+With that snapshot taken, the invariant the gate protects is:
+**nothing that can lose work happens before confirmation, and the one pre-gate
+mutation that could is recorded first.**
 
 Derive the `INLINE` set.
 These commands share a scratch directory, so create one first --- `$TMP` is
@@ -146,8 +185,12 @@ This first command produces the raw worktree-to-branch mapping, every worktree
 included --- which is **not** `INLINE`:
 
 ```bash
-git worktree list --porcelain \
-  | awk '/^worktree /{p=$2} /^branch /{sub("refs/heads/","",$2); print $2"\t"p}' \
+# -z plus NUL-safe parsing: a worktree path may contain spaces, and `$2`
+# truncates it, silently dropping that branch from INLINE.
+git worktree list --porcelain -z \
+  | tr '\0' '\n' \
+  | awk '/^worktree /{p=substr($0,10)}
+         /^branch /{b=substr($0,8); sub("refs/heads/","",b); print b"\t"p}' \
   > "$TMP/wt-branches.tsv"
 ```
 
@@ -196,7 +239,9 @@ that had nothing wrong with it.
 ### Branches to delete --- local
 ### Branches to rebase + open MR (stale)
 ### Skipped --- active / new / current
-### Branches flagged --- local-only, unpushed (kept, never deleted)
+### Branches flagged --- no upstream, unique commits (kept, never deleted)
+### Survived both passes --- needs a human
+### Pre-prune ref snapshot: <path>
 ### Subtracted from the branch pass LOCAL list (deleted inline by the worktree pass): <N>
 ```
 
@@ -226,8 +271,14 @@ git worktree list --porcelain | grep -Fqx "worktree $path" \
   That is routine rather than exceptional: `clean-worktrees` step 5 documents
   the refusal at length for squash-merged branches, and measured an 18/11
   `-d`/`-D` split across a 29-branch sweep.
-  Leave it to the branch pass, which is equipped to confirm the merge and
-  escalate to `-D`.
+  Hand it to the branch pass **only if it falls in 8b**, whose `[gone]`
+  branches get merged-PR confirmation and may escalate to `-D`.
+  8a retries `git branch -d` and says "never `-D`" explicitly, so it has no
+  escalation path.
+  A branch merged into `origin/main` but not into `HEAD`, with no configured
+  upstream and no merged PR, therefore survives **both** passes.
+  Report it as `Survived both passes --- needs a human`, since silently
+  leaving it is what makes a sweep look complete when it is not.
 - **The worktree is still there.**
   Then removal genuinely failed, which stops the branch pass.
 

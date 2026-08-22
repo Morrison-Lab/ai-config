@@ -403,7 +403,22 @@ SHOULD_STAY_SILENT = [
 ]
 
 
-def verdict(hook_path, repo, command):
+# The WARN text is behaviour, not decoration: it names the commit the guard
+# compared against, and a reader reconciles against whatever it names. The
+# suite used to assert only WARN-vs-DENY-vs-silent, which is how a message
+# reading "your local HEAD" over `feature-x`'s tip shipped -- wrong in exactly
+# the case the source-ref fix exists for.
+#
+# `(case_id) -> (must_appear, must_not_appear)`. A violation returns its own
+# verdict string, so the mutation harness covers the label the same way it
+# covers every other clause rather than needing a second pass.
+LABEL_EXPECT = {
+    "W6": ("your local `feature-x`", "your local HEAD"),
+    "W2": ("your local HEAD", "your local `"),
+}
+
+
+def verdict(hook_path, repo, command, case_id=None):
     proc = subprocess.run(
         ["python3", hook_path], input=json.dumps(bash(command)),
         capture_output=True, text=True, cwd=repo,
@@ -425,7 +440,13 @@ def verdict(hook_path, repo, command):
                  "BYPASS the normal permission prompt for every push")
     if decision == "deny":
         return "DENY"
-    return "WARN" if hso.get("additionalContext") else "silent"
+    context = hso.get("additionalContext")
+    if not context:
+        return "silent"
+    want, unwanted = LABEL_EXPECT.get(case_id, (None, None))
+    if want and (want not in context or unwanted in context):
+        return "WARN-WRONGLABEL"
+    return "WARN"
 
 
 # Fixture repos are built ONCE and reused across every hook variant.
@@ -446,7 +467,7 @@ def build_all(cases):
 
 def build_and_verdict(hook_path, case_id):
     path, command = _BUILT[case_id]
-    return verdict(hook_path, path, command)
+    return verdict(hook_path, path, command, case_id)
 
 
 if not os.path.isfile(HOOK):
@@ -566,6 +587,13 @@ MUTATIONS = {
         # currently checked-out branch instead.
         {"W6", "S16", "S13", "S14"},
     ),
+    "warning_names_the_pushed_ref": (
+        "the WARN text names the ref actually compared, not always HEAD",
+        [('        srclabel = ("your local HEAD" if source == "HEAD"\n'
+          '                    else f"your local `{source}`")',
+          '        srclabel = "your local HEAD"')],
+        {"W6"},
+    ),
     "ancestor_gate": (
         "a remote tip that IS an ancestor of HEAD is a fast-forward and "
         "warns about nothing",
@@ -610,8 +638,17 @@ with tempfile.TemporaryDirectory() as tmp:
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(mutated)
 
+        # Re-run a case ONCE before calling it flipped.
+        #
+        # The guard fails open on any subprocess timeout, so a slow
+        # `ls-remote` under load yields "silent" and reads as a mutation
+        # flip. Observed once here: `negation_aware` reported flipping W3,
+        # whose flags are provably identical under that mutant, and a clean
+        # re-run showed 14/14. A genuine flip is deterministic and survives
+        # the retry, so this removes the flake without masking a regression.
         flipped = {cid for cid in CASES
-                   if build_and_verdict(path, cid) != EXPECTED[cid]}
+                   if build_and_verdict(path, cid) != EXPECTED[cid]
+                   and build_and_verdict(path, cid) != EXPECTED[cid]}
 
         ok = flipped == expected_flips
         mutation_wrong += not ok

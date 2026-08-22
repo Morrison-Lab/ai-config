@@ -64,11 +64,16 @@ It is a fresh reading taken at the moment of the push:
 nothing -- so the hook cannot itself change the state it is reporting on.
 The reading is then classified:
 
-  - remote ref absent          -> nothing to collide with; silent
-  - remote tip == local HEAD   -> already pushed; silent
-  - remote tip is an ancestor  -> fast-forward; silent (the common case, so
-                                  the hook stays quiet in normal operation)
-  - remote tip is NOT an ancestor of HEAD -> WARN, and say what is at risk
+  - remote ref absent            -> nothing to collide with; silent
+  - remote tip == the pushed ref -> already pushed; silent
+  - remote tip is an ancestor    -> fast-forward; silent (the common case, so
+                                    the hook stays quiet in normal operation)
+  - remote tip is NOT an ancestor of the pushed ref -> WARN, say what is at risk
+
+The local side of every comparison above is the ref being PUSHED, which is
+`HEAD` only when the refspec says so -- see `_target`'s docstring. The warning
+names it explicitly rather than saying "HEAD", because on `git push origin
+feature-x` from `main` the two are different branches.
 
 In that last case the hook tries to describe the divergent commits. Whether it
 can turns on one thing worth distinguishing in the report:
@@ -385,7 +390,7 @@ DENY = (
 
 WARN_HEAD = (
     "Checked `{remote}/{branch}` just now with `git ls-remote`: its tip is "
-    "**{tip}**, which is NOT an ancestor of your local HEAD ({local}).\n\n"
+    "**{tip}**, which is NOT an ancestor of {srclabel} ({local}).\n\n"
     "  command:  {segment}\n\n"
 )
 
@@ -505,8 +510,15 @@ def evaluate(command):
         if anc.returncode == 0:
             continue  # plain fast-forward; nothing at risk
 
+        # Name the ref actually compared. Saying "your local HEAD" here was
+        # wrong in precisely the case the source-ref fix exists for: on
+        # `git push origin feature-x` from `main` it labelled `feature-x`'s
+        # tip as HEAD, so a reader would reconcile against the wrong branch.
+        srclabel = ("your local HEAD" if source == "HEAD"
+                    else f"your local `{source}`")
         body = WARN_HEAD.format(remote=remote, branch=branch, tip=tip[:12],
-                                local=local[:12], segment=segment)
+                                local=local[:12], segment=segment,
+                                srclabel=srclabel)
         described = _describe(local, tip)
         if described:
             n, commits = described

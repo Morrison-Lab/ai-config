@@ -439,26 +439,41 @@ def _describe(local, tip, limit=10):
 
 
 def evaluate(command):
-    """`('deny', reason)`, `('warn', context)`, or `None`."""
+    """`('deny', reason)`, `('warn', context)`, or `None`.
+
+    TWO passes over the compound command, deliberately, and the refusal pass
+    runs first.
+
+    A single pass returning on the first verdict let a `warn` on an earlier
+    push suppress the `deny` a later one deserved:
+    `git push origin diverged; git push --force origin mine` returned `warn`,
+    which attaches context and does NOT block, so the bare force push ran.
+    A refusal blocks the whole Bash call regardless of position, so scanning
+    every simple command for one before reporting any warning is both correct
+    and cheaper -- the refusal is decided from the command text alone and
+    spends no network read.
+    """
     cmds = _simple_commands(command)
     if cmds is None:
         return None
 
+    parsed = []
     for argv in cmds:
         rest, override = _push_argv(argv)
         if rest is None:
             continue
         flags, positionals, repo_opt, ok = _parse_push(rest)
-        segment = " ".join(argv)
+        parsed.append((argv, flags, positionals, repo_opt, ok, override))
 
-        # The refusal runs FIRST and does not consult the lease. `git push
-        # --help` on `-f, --force`: "when --force-with-lease option is used,
-        # the command refuses to update a remote ref whose current value does
-        # not match what is expected. This flag disables these checks." So
-        # `--force --force-with-lease` is a plain force push, and treating the
-        # lease as clearing the refusal was a bypass rather than a nicety.
+    # Pass 1 -- refusal. Lexical, so no network read, and any command in the
+    # compound counts.
+    for argv, flags, _pos, _repo, _ok, override in parsed:
         if flags["force"] and not flags["dry_run"] and not override:
-            return "deny", DENY.format(segment=segment)
+            return "deny", DENY.format(segment=" ".join(argv))
+
+    # Pass 2 -- the reading. Only reached when nothing is refused.
+    for argv, flags, positionals, repo_opt, ok, _override in parsed:
+        segment = " ".join(argv)
 
         # Everything below reports on ONE branch, so anything that is not one
         # ordinary branch push is out of scope rather than guessed at.
@@ -488,8 +503,6 @@ def evaluate(command):
         # source of `origin :main` is empty and the source of
         # `refs/heads/*:refs/heads/*` contains a `*`, and `git rev-parse
         # --verify` resolves neither (measured: both exit 1 with no output).
-        # A separate guard for them changed no outcome and could not be
-        # tested, so it is gone rather than declared.
         local = _git(["rev-parse", "--verify", "--quiet", source + "^{commit}"],
                      timeout=5)
         if not local:

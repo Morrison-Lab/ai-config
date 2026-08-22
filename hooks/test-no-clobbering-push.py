@@ -126,6 +126,21 @@ def short_cluster_case(path, bare):
     return "git push -fu origin HEAD"
 
 
+def warn_then_force_case(path, bare):
+    """A compound command whose FIRST push warns and whose SECOND is a bare
+    force push.
+
+    A single-pass `evaluate()` returned on the first verdict, and a warn only
+    attaches context -- it does not block -- so the force push ran. The
+    reverse order was always safe, because a deny blocks the whole Bash call
+    regardless of position. Nothing in the suite chained two pushes, so the
+    path was untested as well as wrong.
+    """
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    return "git push; git push --force origin HEAD"
+
+
 def force_plus_lease_case(path, bare):
     """`git push --help` on `-f, --force`: "when --force-with-lease option is
     used, the command refuses ... This flag disables these checks." So the two
@@ -361,6 +376,8 @@ SHOULD_DENY = [
      "`-fo ci.skip` is force, and `o` eats the next word"),
     ("D8", git_global_option_case,
      "`git -C <dir> push --force` -- the global option is skipped first"),
+    ("D9", warn_then_force_case,
+     "a warn-worthy push chained BEFORE a bare force push must still deny"),
 ]
 
 SHOULD_WARN = [
@@ -508,9 +525,9 @@ MUTATIONS = {
     "force_deny": (
         "a force push is refused",
         [('        if flags["force"] and not flags["dry_run"] and not override:\n'
-          '            return "deny", DENY.format(segment=segment)',
+          '            return "deny", DENY.format(segment=" ".join(argv))',
           "        pass")],
-        {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"},
+        {"D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9"},
     ),
     "force_ignores_lease": (
         "the refusal does NOT consult the lease -- `--force` disables it",
@@ -557,8 +574,9 @@ MUTATIONS = {
     ),
     "override": (
         "a real `ALLOW_FORCE_PUSH=1` assignment clears the refusal",
-        [("and not flags[\"dry_run\"] and not override:",
-          "and not flags[\"dry_run\"]:")],
+        [('        if flags["force"] and not flags["dry_run"] '
+          "and not override:",
+          '        if flags["force"] and not flags["dry_run"]:')],
         {"S2"},
     ),
     "out_of_scope_gate": (
@@ -586,6 +604,16 @@ MUTATIONS = {
         # what declines them, so reverting it makes both warn about the
         # currently checked-out branch instead.
         {"W6", "S16", "S13", "S14"},
+    ),
+    "deny_scans_every_command": (
+        "the refusal pass examines every simple command, not just the first",
+        [("    for argv, flags, _pos, _repo, _ok, override in parsed:\n"
+          '        if flags["force"] and not flags["dry_run"] '
+          "and not override:",
+          "    for argv, flags, _pos, _repo, _ok, override in parsed[:1]:\n"
+          '        if flags["force"] and not flags["dry_run"] '
+          "and not override:")],
+        {"D9"},
     ),
     "warning_names_the_pushed_ref": (
         "the WARN text names the ref actually compared, not always HEAD",

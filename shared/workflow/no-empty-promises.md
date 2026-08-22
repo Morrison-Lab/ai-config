@@ -103,8 +103,11 @@ An undischarged promise is wrong to send, and delivering it first buys nothing
   is always available, so "there was no mechanism to build" is never the reason.
 - **Do:** drop the promise and state the plain fact when the mechanism is not
   worth building.
-- **Don't:** promise future behaviour and leave the turn with no durable
+- **Don't:** promise a *standing rule* and leave the turn with no durable
   artifact in it.
+  An owed **action** is the one case where an armed firing substitutes for the
+  durable artifact --- see the debt section below, which is the only exemption
+  and does not widen to rule promises.
 - **Don't:** promise the *mechanism* in the future tense ("I'll add a hook for
   this") --- that is the same empty promise one level down.
 - **Don't:** read an apology, an explanation, or a restatement of the rule as a
@@ -120,16 +123,47 @@ Those commit to future behaviour exactly as the modal forms do, and they are har
 The sentence reads as bookkeeping rather than as a pledge, so naming the debt feels like the diligent move --- which is what an unbacked promise always feels like at the moment of making it.
 The trade is the one this rule already rejects, and it is arguably worse here: costless to produce, invisible to every instrument, and it closes the item on the record so nobody returns to it.
 
-The remedy is unchanged.
 Ship the mechanism in the same turn and name it in the past tense, or drop the debt language and state the plain fact --- that the work was not done, and whether anything tracks it.
 
-[`hooks/no-empty-promise.py`](../../hooks/no-empty-promise.py) matches this form too, anchored on a first-person **owner** rather than on the word alone.
+**What the mechanism IS, though, is not unchanged, and that is the half this section originally got wrong.**
+A rule promise is kept by something **durable**, because it has to survive into every future occasion it covers.
+A debt is one specific outstanding action, so what keeps it is something that will actually **fire**: a `ScheduleWakeup` carrying the next step, a `CronCreate` or scheduled task for a check-in that must outlive this session, the `schedule` or `loop` skill (both harness-provided rather than in this repo), [`workaround-watcher`](../../skills/workaround-watcher/SKILL.md), or the repo's own detached poller (`python3 hooks/monitor-open-prs.py`) when the debt is a PR to watch.
+
+The durable record still clears a debt, and deliberately so.
+It is the always-available floor this fragment insists on everywhere else, and it is the *right* answer when the debt is somebody else's to schedule --- a filed issue is exactly how you hand work to whoever will do it.
+It is the wrong instinct when the debt is yours and has a next step.
+A memory entry saying "#1937 needs an ARDI round" documents an outstanding loop.
+It does not run one, and nothing wakes the session when the re-review lands.
+
+That gap is what made the debt phrasing worth a rule of its own rather than a footnote to the modal one.
+Before it was named, the cheapest way past a blocked "I owe #1937 the ARDI loop" was to write a memory entry and re-send the same sentence --- leaving the debt documented, closed on the record, and still undelivered, which is the exact failure this whole fragment exists to prevent, now wearing the remedy's clothes.
+
+**The implication runs one way only.**
+A timer does not keep a rule promise.
+It fires once and dies, so treating an arming as sufficient there would let an unrelated wakeup launder "going forward I'll always X".
+Durable clears both; scheduled clears only the debt.
+
+**Report the firing, not just the arming.**
+Per `CLAUDE.md`'s "State the actual time when reporting a scheduled check-in", say the clock time the timer returns rather than the delay, and say what fires --- otherwise the arming is itself an unverifiable claim, which is the shape this rule is about.
+
+- **Do:** arm the next step when the debt is yours and has one, and report what you armed and when it fires.
+- **Do:** file the issue instead when the debt is somebody else's to schedule.
+- **Don't:** reach for a written record when the owed **action** is yours and has a next step you could arm --- documenting an ARDI loop is not running one.
+  A record still discharges the debt.
+  It is the wrong instinct, not an invalid mechanism, and the `Do` pair above says which case is which.
+- **Don't:** count a timer as keeping a standing rule --- it cannot outlive the one firing.
+
+(Directive from the user, 2026-08-22: "phrases with 'owe' ... should be triggers for our no-empty-promises guards;
+the models should be pushed or forced to create and report a mechanism for delivering on what they owe, such as scheduling a timer or other PR-watcher to trigger the next step of the ardi loop when it is time".
+Tracked as ai-config#1946.)
+
+[`hooks/no-empty-promise.py`](../../hooks/no-empty-promise.py) matches this form too, anchored on a first-person **owner** rather than on the word alone, and applies the debt discharge set above to it rather than the rule one.
 That anchoring is load-bearing rather than fussy: this corpus says "an owed UMS pass" and "the pass is owed" in ordinary rule prose, so a matcher keyed on bare `owed` would block every reply that cites those rules --- the trap [`hooks/no-placeholder-reply.py`](../../hooks/no-placeholder-reply.py) avoids by anchoring on the whole message rather than a substring.
 So "an owed UMS pass" stays clean, and "owed by me" does not.
 
-- **Do:** file the issue, write the memory, or do the work, then say the debt is discharged.
+- **Do:** file the issue, write the memory, arm the next step, or do the work, then say the debt is discharged.
 - **Do:** say plainly that something was not done, and name what tracks it, when nothing durable followed.
-- **Don't:** write "owed by me", "I owe", or "I still owe" into a turn that wrote nothing durable.
+- **Don't:** write "owed by me", "I owe", or "I still owe" into a turn that shipped neither a durable artifact nor an armed firing.
 - **Don't:** read the absence of a modal as the absence of a promise.
 
 (Directive from the user, 2026-08-20: "'Owed by me' is another phrase indicating a broken promise".

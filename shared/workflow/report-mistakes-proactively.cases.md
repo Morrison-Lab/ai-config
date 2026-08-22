@@ -80,17 +80,16 @@ reader can check against the filesystem.)
 the duplicate-search and the create ran in one Bash call, the list and the
 heredoc separated by nothing more than a `;`:
 
-    gh issue list --repo O/R --state open --search "..." \
-      --json number,title --limit 10
-    cat > /tmp/body.md <<'BODY' ... BODY
-    gh issue create -R O/R --title "..." --body-file /tmp/body.md
+```bash
+gh issue list --repo O/R --state open --search "..." --json number,title --limit 10; cat > /tmp/body.md <<'BODY' ... BODY
+gh issue create -R O/R --title "..." --body-file /tmp/body.md
+```
 
 The search returned the right match --- #1737,
 "semantic-line-breaks.py has no clause-break mode, so it disagrees with
 new-line-breaks CI and reverts manual fixes" --- and #1952 was created anyway.
-#1952 was then closed as a duplicate and its content moved to a comment on
-#1737, which is the disposition step 2 would have selected had its answer been
-read.
+The duplicate was then closed and its content moved to a comment on #1737,
+which is the disposition step 2 would have selected had its answer been read.
 
 Two things were checked while writing the rule rather than assumed.
 `hooks/warn-pr-create-without-dupe-check.py` matches `gh pr create`,

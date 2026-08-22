@@ -245,9 +245,9 @@ Here the reader is you, so the query has to **finish in its own call**, with
 its output in front of you, before the gated command is composed at all.
 
 **The existing instrument does not reach this, so do not expect a warning.**
-`hooks/warn-pr-create-without-dupe-check.py` guards `gh pr create` and
-`mcp__github__create_pull_request` only, and no `gh issue create` counterpart
-exists.
+`hooks/warn-pr-create-without-dupe-check.py` guards `gh pr create`,
+`glab mr create`, and `mcp__github__create_pull_request`, and no
+`gh issue create` counterpart exists anywhere in `hooks/`.
 Its discharge is a session-wide lexical scan of the transcript for any earlier
 PR-surfacing command, so it asks whether a query happened rather than whether
 its result was read --- which is the distinction this section is entirely

@@ -523,6 +523,41 @@ in [`github-repo-transfers.md`](github-repo-transfers.md).
   - **Don't:** treat an accepted POST (200 or 201) as evidence the moratorium is over --- all four 2026-08-19 requests were accepted and none produced a review.
   - **Don't:** let September 2026 pass without re-verifying.
     The expiry is part of the rule, not a footnote to it.
+
+  **Recurrence 2026-08-21 (Morrison-Lab/gha#571), and the new failure is what happened AFTER the request, not the request itself.**
+  Copilot was requested on that PR on 2026-08-20 despite this moratorium, which is the slippage already recorded above.
+  What had not been recorded is the second half: the absence of a review was then investigated as an **open question**, and `Morrison-Lab/gha#575` was filed asking whether Copilot is licensed for the org --- a question the 2026-08-06 re-measurement above had already answered, with a wider denominator than the sweep that re-asked it.
+  The issue was retracted and closed within the hour.
+  Read that as the more expensive error of the two.
+  A forbidden request wastes one call.
+  Treating its predictable silence as a mystery spends a search sweep, a negative-control sweep, and a filed issue,
+  and it publishes a tracker item asserting that Copilot is "one of two cross-vendor reviewers still in service" while a standing directive says it is not.
+  The rule this violates is already in the corpus and is not Copilot-specific: [`shared/workflow/grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md) governs asserting a gap from a search, and the gap here was in the memory file rather than in the repo.
+
+  **The moratorium's mechanism is enforced against the HOOK and not against the session, which is why a self-initiated request still gets through.**
+  `hooks/no-unreviewed-pr.py`'s `moratorium_active()` makes the guard return before scanning, so it stops **demanding** a Copilot request.
+  Nothing anywhere refuses one a session decides to make on its own initiative.
+  Standing down and forbidding are different operations, and the paragraphs above describe only the first --- so the fix for the turn-by-turn nag is complete while the directive itself has no enforcement at the moment of action.
+  Tracked as `Morrison-Lab/ai-config#1877`.
+
+  **`reviewed-by:copilot-pull-request-reviewer` is not a way to ask whether Copilot has engaged, and its zero is a trap.**
+  Measured 2026-08-21: that qualifier returns `total_count: 0` for both `Morrison-Lab/gha` and `Morrison-Lab/ai-config`, while ai-config demonstrably holds the 39 Copilot review objects counted above.
+  So refusal reviews are not indexed by it, and a zero there means neither "never requested" nor "never answered".
+  The posted review **body** remains the only surface that discriminates, exactly as [`shared/workflow/pr-on-claim.cases.md`](../shared/workflow/pr-on-claim.cases.md) already says for the pending-request list.
+
+  **Two negative controls are needed before reading anything into a zero from a `reviewed-by:` search, and they test different things.**
+  The first is the ordinary one this corpus already requires of any sweep: does the detector run at all?
+  `repo:Morrison-Lab/ai-config reviewed-by:d-morrison` returns `total_count: 273`, so the qualifier works.
+  The second is specific to a search keyed on a **login**, and it is free: GitHub rejects a nonexistent one outright rather than returning zero.
+  `reviewed-by:Copilot` fails with `422 Validation Failed ... The listed users cannot be searched either because the users do not exist or you do not have permission to view the users`, whereas `copilot-pull-request-reviewer` returned `0` with no `422`.
+  A quiet zero therefore establishes that the login resolved, and a `422` establishes that it did not --- so the error channel is the negative control for the predicate, and running the search against a deliberately bogus value is the cheapest way to prove the value you care about was understood.
+  Note what neither control can reach: both came back clean here, and the zero was still uninformative for the reason in the paragraph above.
+
+  - **Do:** run a bogus-value search alongside a login-keyed one, so a `422` versus a quiet zero tells you whether the value resolved.
+  - **Do:** re-read this section before investigating a missing Copilot review --- the answer for any date before September 2026 is already here.
+  - **Don't:** treat a moratorium the hook honors as a moratorium the session is prevented from breaking.
+    Only the nag is mechanized.
+  - **Don't:** file an issue asking why Copilot did not review, or whether it is licensed, while the moratorium is live.
 - **`gh pr checks` prints the literal word `fail` for a CANCELLED job, but only
   when its output is not a terminal --- which is always, for an agent.**
   A cancellation and a real failure are therefore the same word in the column

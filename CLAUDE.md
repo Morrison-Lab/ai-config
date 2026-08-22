@@ -185,8 +185,11 @@ The two levers above spend less on the work **as shaped**, and their saving expi
 This one changes the shape, so it pays every future session --- and it is the one that never announces itself, because following an expensive procedure correctly reads as compliance, and pulling either lever above reads as having managed quota.
 So ask separately what a procedure costs *by construction*: always-loaded content only some sessions read, a judgment made twice that wants an instrument, a serial loop the base outruns, an enumerated brief that should have been a query, work at this tier a free CLI could do.
 The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
-`python scripts/check-context-closure.py` is the built instrument for the always-loaded pool; its budget is advisory by design, so read an over-budget line as the prompt it is.
-Two boundaries: efficiency never outranks correctness, so no saving is bought with a skipped check; and the restructuring goes in its own issue or PR rather than happening inside whatever task noticed it.
+`python scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
+Its budget is advisory by design, so read an over-budget line as the prompt it is.
+Two boundaries.
+Efficiency never outranks correctness, so no saving is bought with a skipped check.
+And the restructuring goes in its own issue or PR rather than happening inside whatever task noticed it.
 
 - **Do:** ask what a procedure costs by construction, separately from what this run costs.
 - **Don't:** read a pulled lever as having answered the structural question.

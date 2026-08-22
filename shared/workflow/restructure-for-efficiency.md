@@ -27,7 +27,8 @@ Each is a fragment this corpus already has, read for its **cost** rather than fo
   Only demotion or deletion pays.
 - **A judgment call you have now made twice.**
   The third time is an instrument, per [`algorithmatize-checks`](algorithmatize-checks.md) and [`deterministic-tools`](../principles/deterministic-tools.md).
-  Those two argue correctness and inspectability; the token saving is real and additional, since an instrument's verdict costs a tool call where the judgment costs a reasoning pass every time.
+  Those two argue correctness and inspectability.
+  The token saving is real and additional, since an instrument's verdict costs a tool call where the judgment costs a reasoning pass every time.
 - **A serial loop whose base moves faster than one round of it.**
   Batch it, per [`batch-merge-and-resolve`](batch-merge-and-resolve.md), which supplies the two measurements that decide it rather than leaving it to judgment.
 - **A brief that hands over an enumerated set rather than the query deriving it.**
@@ -48,7 +49,8 @@ python scripts/check-context-closure.py
 Measured on `main` at 2026-08-22: 9 files, 243,069 bytes (~60,767 tokens at 4 B/token), which is **43,069 bytes over** the 200,000-byte budget.
 Nothing turns red, and that is deliberate rather than a defect --- the script's own comment says the budget "can stay advisory because crossing it is a prompt to decide what comes out".
 Read an over-budget line as the prompt it is, and act on it or route it to [#1138](https://github.com/Morrison-Lab/ai-config/issues/1138) rather than noting it and moving on.
-Re-run the checker rather than quoting that figure; the corpus grows several KB a day.
+Re-run the checker rather than quoting that figure.
+The corpus grows several KB a day.
 
 ## What "act on it" means
 

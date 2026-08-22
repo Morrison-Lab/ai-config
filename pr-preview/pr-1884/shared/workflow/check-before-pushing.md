@@ -49,15 +49,24 @@ Whether you already hold the remote tip's object is the sharpest part of the rea
 
 ## `--force-with-lease` is not the safe form on its own
 
-This corpus reaches for `--force-with-lease` as *the* safe force-push in [`use-existing-pr-branch`](use-existing-pr-branch.md), [`memories/git.md`](../../memories/git.md), [`memories/preferences.md`](../../memories/preferences.md), and the `stack-prs`, `mma`, `clean-branches`, and `rescue-closed` skills.
-It is much safer than bare `--force` and it is not sufficient, because the lease is defeatable and nothing in those sites says so.
+This corpus reaches for `--force-with-lease` as *the* safe force-push at nine sites, derived rather than recalled:
+
+```bash
+git grep -l "force-with-lease" origin/main -- '*.md'
+```
+
+On 2026-08-22 that returned [`memories/git-worktrees.md`](../../memories/git-worktrees.md), [`memories/git.md`](../../memories/git.md), [`memories/preferences.md`](../../memories/preferences.md), [`keep-checkouts-fresh`](keep-checkouts-fresh.md), [`use-existing-pr-branch`](use-existing-pr-branch.md), and the `clean-branches`, `mma`, `rescue-closed`, and `stack-prs` skills.
+It is much safer than bare `--force` and it is not sufficient, because the lease is defeatable and none of those nine says so.
 
 The mechanism: the lease compares the remote tip against **your remote-tracking ref**, not against anything you have actually looked at.
 So any background `git fetch` refreshes that ref and the lease then passes over the very commits it existed to protect --- a scheduled poller, another tool working the same checkout, a `--recurse-submodules` fetch, an IDE's auto-fetch.
 The push succeeds, reports nothing unusual, and the commits are gone from the remote.
 
-`--force-if-includes` (git 2.30+) is the missing half.
-It additionally requires that the remote-tracking commits the lease is vouching for are actually reachable from what you are pushing --- so a fetch you never saw no longer satisfies the lease.
+`--force-if-includes` is the missing half, added in Git 2.30.0, whose release notes describe it as ensuring "that what is being force-pushed was created after examining the commit at the tip of the remote ref that is about to be force-replaced".
+Mechanically it checks the remote-tracking tip against the local branch's **reflog** rather than against its ancestry, so a fetch you never saw no longer satisfies the lease.
+`git push --help` names the hazard directly: the refs it guards against are ones "that may have been implicitly updated in the background".
+It is an *ancillary* option, so passing it without a bare `--force-with-lease` does nothing for you.
+The two always travel together.
 Use both, always:
 
 ```bash
@@ -105,4 +114,4 @@ Never force-push over the difference to find out which it was.
 "cai: add protections against clobbering commits from other agents on a branch
 you think you own; always check immediately before pushing".
 Tracked as ai-config#1883.
-`grep -rn 'force-if-includes'` over the whole repo returned 0 hits when the directive arrived, against 8 files reaching for `--force-with-lease` as the safe form.)
+`grep -rn 'force-if-includes'` over the whole repo returned 0 hits when the directive arrived, against the nine files enumerated above reaching for `--force-with-lease` as the safe form.)

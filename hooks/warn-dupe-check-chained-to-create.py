@@ -2,10 +2,14 @@
 """PreToolUse reminder: a gating search and the create it gates in ONE Bash call.
 
 [`report-mistakes-proactively`](../shared/workflow/report-mistakes-proactively.md)
-makes a tracker dupe-check step 2 of filing, and its section "A dupe-check
-chained into the same call as the create gates nothing" states the shape this
-hook watches for. That section arrives with Morrison-Lab/ai-config#1955; the
-rule it encodes was recorded as #1954, and this hook is #1956.
+makes a tracker dupe-check step 2 of filing, and the shape this hook watches for
+is the one that defeats it. Morrison-Lab/ai-config#1954 records the rule, #1955
+adds the section stating it in that fragment, and this hook is #1956.
+
+Citations here name the fragment's PATH and the ISSUE rather than that section's
+title, deliberately: #1955 is open at the time of writing, so a title citation
+would dangle if this merges first. The same applies to the reminder text below,
+which a user reads at the moment it fires.
 
 WHAT IT DETECTS
 ---------------
@@ -132,6 +136,14 @@ manufacture one --- neither ever inserts a separator character.
     removes it. The cost is a miss on `bash -c "gh issue list; gh issue create"`,
     which is the safe direction and is not a shape this workflow uses.
 
+    The double-quoted branch has to be escape-aware for that "safe direction"
+    claim to hold, and an earlier revision's was not. A naive `"[^"]*"` ends its
+    span at a `\"` that the shell does not treat as closing, which can expose an
+    interior `;` as a real command position and produce a spurious FIRE rather
+    than a miss. Caught in review on ai-config#1957 and pinned by a test. Single
+    quotes stay escape-blind on purpose: the shell processes no escapes inside
+    `'...'`, so `'[^']*'` is exactly right there.
+
 A COMMAND SUBSTITUTION IS INVISIBLE, WHICH CUTS THE RIGHT WAY
 -------------------------------------------------------------
 A check whose output is captured --- `$(gh issue list ...)`, quoted or not ---
@@ -219,9 +231,20 @@ RX_HEREDOC = re.compile(
 )
 
 # A single- or double-quoted span, scanned left to right so the quote that opens
-# first wins. `[^']`/`[^"]` match newlines, which is the point: a multi-line
-# `-b "..."` body is one span.
-RX_QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
+# first wins. The negated classes match newlines, which is the point: a
+# multi-line `-b "..."` body is one span.
+#
+# The double-quoted branch is ESCAPE-AWARE and the single-quoted one is not,
+# matching the shell: inside `'...'` a backslash is literal and only `'` closes,
+# while inside `"..."` a `\"` does not close. A naive `"[^"]*"` therefore ends
+# the span at an escaped quote, which can expose a `;` that shell would have
+# treated as ordinary text -- a FALSE POSITIVE rather than the miss the
+# NORMALIZATION note claims. Caught in review on ai-config#1957 with
+# `echo "before\"; gh issue list -R o/r; gh issue create -R o/r \" after"`.
+#
+# The two alternation branches are disjoint on their first character, so this
+# stays linear rather than backtracking.
+RX_QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
 
 NOTE = """\
 A gating check and the action it gates are in the same Bash call.
@@ -231,8 +254,8 @@ A gating check and the action it gates are in the same Bash call.
 
 Both will run. The search's result arrives at the same instant as the create, so
 nothing can branch on it --- the check is present, it executes, and it gates
-nothing. `report-mistakes-proactively`'s section "A dupe-check chained into the
-same call as the create gates nothing" is the rule.
+nothing. The rule is `shared/workflow/report-mistakes-proactively.md`'s tracker
+dupe-check, recorded as ai-config#1954.
 
 Run the query in its OWN call, read what it returns, and only then compose the
 create. If the search finds an existing {kind}, the disposition is to add to it

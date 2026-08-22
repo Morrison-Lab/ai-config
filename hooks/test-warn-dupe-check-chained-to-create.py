@@ -160,6 +160,24 @@ check("both inside a multi-line double-quoted comment body",
       False)
 check("both quoted in a commit message",
       fires("git commit -m 'ran gh issue list; then gh issue create'"), False)
+# A backslash-escaped quote does NOT close a double-quoted span in the shell,
+# so an interior `;` is ordinary text. A naive `"[^"]*"` ended the span early
+# and exposed it as a command position, firing spuriously -- the opposite of
+# the safe direction the docstring claims. Caught in review on ai-config#1957.
+check("an escaped quote does not end a double-quoted span",
+      fires('echo "before\\"; gh issue list -R o/r; '
+            'gh issue create -R o/r \\" after"'),
+      False)
+# An escaped BACKSLASH before the closing quote must still close it, so a real
+# command after the span is still seen. The fix must not swallow the rest of
+# the line.
+check("an escaped backslash still closes the span",
+      fires('echo "a path C:\\\\"; gh issue list -R o/r; gh issue create'),
+      True)
+# The shell processes no escapes inside single quotes, so a backslash there is
+# literal and only `'` closes.
+check("a backslash inside single quotes is literal",
+      fires("echo 'a\\'; gh issue list -R o/r; gh issue create"), True)
 check("prose mentioning both mid-sentence",
       fires('echo "run gh issue list before gh issue create"'), False)
 

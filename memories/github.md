@@ -1090,9 +1090,15 @@ bug" for the broader lesson.)
   This directly distinguishes an installed Claude app from a repository that
   merely has workflow files or secrets.
 - The organization endpoint
-  `gh api orgs/<org>/installations` can return a deliberately hidden 404 even
-  when the current classic PAT has `admin:org`; use the per-repository settings
-  page when organization-owner installation visibility is unavailable.
+  `gh api orgs/<org>/installations` returned 404 in this session even though
+  the current classic PAT reports `admin:org`.
+  GitHub documents that the direct repository-installation endpoint requires
+  an app JWT, while the user-installation listing requires a GitHub App user
+  access token; the current classic PAT is therefore not an authoritative
+  browser-free fallback
+  ([GitHub App installation API](https://docs.github.com/en/rest/apps/installations)).
+  Use the per-repository settings page when those App credentials are
+  unavailable.
 - Verified 2026-08-21: `ucdavis/bcs` listed **Claude**, developed by Anthropic,
   while `ucdavis/hac.it` listed only GitHub Learning Lab.
 

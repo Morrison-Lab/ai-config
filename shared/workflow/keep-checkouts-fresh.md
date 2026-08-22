@@ -105,7 +105,6 @@ In every session --- at session start, and again periodically during long sessio
    Measured the same day: a real weakness in a guard's discharge logic was reproduced and filed as the cause of a missed warning, while that guard was one of the forty-one.
    The weakness was genuine; the attribution was not.
 
-
    **Measured recurrence, 2026-08-20: `registered=15 missing=16 stale=0` against a 31-hook manifest, on a machine where every rule above was already written.**
    That is worth recording as evidence about the *rule* rather than about the machine.
    Each paragraph above is correct and none of them fired, because all of them describe a check somebody has to decide to run, and the drift is silent by construction.

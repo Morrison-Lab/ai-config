@@ -427,6 +427,24 @@
   This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
   Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs --- that silently changes the branch out from under any other session or task pointed at that path.
   Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.) (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
+- **An uncommitted change in your tree is not evidence that it is new. Diff it against the base before treating it as precious.**
+  The bullet above says a concurrent session's uncommitted work can be silently wiped, so protect it.
+  This is its counterweight, and the two are easy to conflate: *protect it* and *it is worth protecting* are different claims, and only the first follows from finding a dirty file.
+  Provenance and value are independent --- "another session wrote this" says nothing about whether that session already landed it.
+  One command settles it, per path:
+
+  ```sh
+  git diff origin/main -- <path>          # or: git show origin/main:<path> | grep -F "<the new text>"
+  ```
+
+  The failure is self-reinforcing, which is why it needs stating rather than leaving to care.
+  Caution about someone else's work feels like the responsible posture, so the belief never gets tested, and every later turn inherits it as settled.
+  Its cost is not only wasted deference: a stale duplicate can carry a **regression** that the assumed-precious framing protects from scrutiny.
+  (Measured 2026-08-21 on ai-config#1884: two `memories/` files went dirty mid-session and were treated for hours as a peer session's valuable in-flight work, warned about in several status recaps, and deliberately left unstaged.
+  Checked only when an archive dialog announced it would discard them.
+  Both additions were already on `main` in fuller form --- the "memories never stay local-only" rule and the primary-checkout mistake pattern --- and the diff additionally rewrote three *correct* relative links into repo-root-relative ones that broke from inside `memories/`, which is what had been failing `check-links.py` all session.
+  Discarding them lost nothing and fixed three broken links.)
+
 - **Don't touch anyone else's branch.**
   **Do:** only push to or modify branches I created in my own worktree.
   **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user --- even if the content looks worth keeping or the branch looks abandoned.

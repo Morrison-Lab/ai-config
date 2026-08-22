@@ -105,3 +105,63 @@ This trigger needs the transcript compared against the PR's own timeline --- who
 - **Don't:** wait for a formal finding before recording the lesson; the action itself, unremarked, is the finding.
 
 (Directive from the user, 2026-08-07: "if you see someone else do something manually on a PR you've claimed (like ask for a review), consider whether you should have done that yourself already, and learn/improve yourself accordingly.")
+
+A fix for a defect class is where a fresh instance of that class hides.
+The section above fires on the **second** time a reviewer raises a class, and asks whether your instrument can decide the question at all.
+This one fires on the **first**, and asks a different question.
+Where is the next instance going to be?
+The answer is the fix.
+
+[`ardi`](ardi.md)'s "Run that check over your own fix, too" already states the code half, and asks whether the fix's own new code instantiates the class it just closed.
+That is posed per fix and answered yes or no.
+The increment here is that the same exposure reaches **prose**, that the fix's new lines are members of a **population** rather than the subject of a yes-or-no question, and that a residual you *name* asserts a survey nobody ran.
+
+Measured twice in two consecutive rounds on [ai-config#1947](https://github.com/Morrison-Lab/ai-config/pull/1947).
+
+**The prose sweep that skipped its own new line.**
+Round 1 named three pre-existing `Don't` bullets reading as a blanket ban on a case the PR was introducing an exemption for.
+All three were correctly scoped.
+Round 2 found that the bullet the same branch had itself added carried the identical contradiction, at *closer range* --- 11 lines from the prose it contradicted, against 13 to 40 for the ones that were fixed.
+Proximity ran inverse to the catch rate, which is the tell that the sweep's population, rather than its pattern, was the defect.
+
+**The residual paragraph that named the rarer case.**
+Round 1 found a regex discharging on a mere mention of a path rather than an execution of it.
+The fix added an execution anchor and a docstring paragraph headed "Residual, named rather than papered over", accepting `python3 -c "print(open('...').read())"` as contrived.
+Round 2 found that `sh -c "cat ..."` --- an ordinary idiom, far commoner than the accepted residual --- walked past the new anchor untouched.
+The paragraph performed the ritual of naming a residual while naming the wrong one, which is worse than naming none, because it reads as having surveyed the class.
+
+**Why the fix moment is the dangerous one.**
+You would expect scrutiny to be highest right after a reviewer names a class.
+It is the opposite, and the mechanism is worth stating rather than leaving to care.
+Having just been shown the class, you feel calibrated to it, so the sweep feels complete the moment the *named instances* are handled.
+The reviewer supplied a list, and the list quietly becomes the population.
+That is [`derive-dont-enumerate`](derive-dont-enumerate.md)'s failure arriving through a review finding instead of a dispatch brief, and [`metacognitive-monitoring`](metacognitive-monitoring.md)'s scope-claim failure --- check the population, do not recall it.
+Note what the substitution does to the existing remedy.
+[`address-every-comment`](address-every-comment.md) already says to derive the site list by grepping "the whole diff", and that search space was fixed before the fix's own lines existed.
+Re-running that sweep *after* the fix is what closes the gap, and nothing about writing a correction prompts a second run.
+
+Two observable actions follow.
+
+- After fixing an instance of class C, re-derive the population of C over the whole diff **including the lines this branch added**, rather than over the reviewer's list.
+  The fix's own new lines are the highest-risk members and the ones no reviewer has looked at yet.
+- When a docstring or comment names an accepted residual, enumerate the residual **class** and say which member is commonest, rather than the one example that came to mind.
+  A named residual asserts a survey happened, so a wrong one buys a reader's trust against nothing.
+
+**This is not algorithmatizable in general, and saying so is the honest answer** rather than a gap to be filled later.
+"Did the sweep cover the diff's own added lines?" has no decidable condition.
+Deciding it needs the *class* the reviewer named, which lives in prose and differs every round, so a hook keyed on it would either match every fix commit or none.
+That is exactly [`algorithmatize-checks`](algorithmatize-checks.md)'s "Limits" case, where a guard that misfires gets switched off and takes the real cases with it.
+No decidable slice was found worth building either.
+The nearest candidate --- warn when a fix commit's added lines contain the literal string a reviewer flagged --- fails on both halves measured here, since neither instance repeated a flagged literal.
+Step 2 above obliges you to *ask* whether a finding is algorithmatizable, not to answer yes, so an answered no carrying its reason discharges that step as completely as a guard would.
+Read `hooks/remind-learn-from-review.py`'s own ONE-OFF discharge clause as the adjacent case rather than this one.
+That clause covers a finding with no rule behind it at all, and this finding has a rule --- the section you are reading.
+What this finding has no room for is a hook.
+
+- **Do:** re-run the sweep over the whole diff including your own fix's added lines, and report the pattern and the hit count.
+- **Do:** enumerate a residual class and name its commonest member whenever you write down an accepted residual.
+- **Don't:** treat the reviewer's enumeration as the population once you have fixed every member of it --- feeling calibrated to a class is not having swept for it.
+- **Don't:** write a "residual, named rather than papered over" paragraph around the first exception that comes to mind, since the naming is what makes it read as surveyed.
+
+(Morrison-Lab/ai-config#1959, from rounds 1 and 2 on #1947.
+Both instances landed in the same PR, and both were found by the reviewer rather than by the sweep that had just run.)

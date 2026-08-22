@@ -931,12 +931,20 @@ wants to be an instrument --- see the fragment for the procedure and tells.
 
 [`shared/workflow/algorithmatize-checks.md`](shared/workflow/algorithmatize-checks.md)
 
-## Deterministic tools over model judgment: write yourself out of a job
+## Automate everything: deterministic tools over work done by hand
+
+Never do by hand any work that can be automated.
 
 The section above governs *checks*.
 This is the same instinct over the work itself: prefer deterministic,
 inspectable algorithms to model reasoning wherever one will serve, and where
 none exists, build it.
+Read "work" broadly --- the rule is not about judgment but about doing by hand
+what something else already computes,
+which includes work carrying no judgment at all.
+A hand-typed section number is nobody's decision;
+it is a value the renderer already produces, kept in a second place by hand,
+and it goes wrong the moment anything enables the real generator.
 One principle with two faces, both binding at once --- a **constraint** on the
 task in front of you (use the instrument that exists) and a **goal** over time
 (build the one that does not, so the constraint gets cheap to obey).

@@ -1,8 +1,19 @@
+**Automate everything.**
+Never do by hand any work that can be automated.
+
 Prefer deterministic, inspectable algorithms over model judgment ---
 and where none exists, build one.
 The goal is to write ourselves out of a job: every task we perform by
 reading and deciding is a candidate to become a script whose output we
 merely consume.
+
+Read "work" broadly.
+Model judgment is the case this fragment was written for and the hardest to displace, but the rule is not about judgment --- it is about **doing by hand what something else already computes**, which includes work carrying no judgment at all.
+A hand-typed section number is not a decision anyone made;
+it is a value the renderer was already producing,
+kept in a second place by hand.
+It is the easiest of the three cases to miss,
+precisely because nothing about it feels like deciding.
 
 This is one principle with two faces, operating on different timescales.
 They are not alternatives, and neither supersedes the other.
@@ -157,6 +168,48 @@ in prose pointing 611 composed lines ahead, so the recommendation was the
 opposite of correct.
 `UCD-SERG/serocalculator#569` had already diagnosed the same thing, and it
 surfaced only during the dupe check before filing a new issue.)
+
+## The third case: a value your toolchain already generates
+
+Two instances of this principle are already well covered.
+Model judgment displaced by an algorithm is this fragment's main subject.
+Data with an external source of truth is [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md).
+
+A third sits between them and belongs to neither: **a value the toolchain already derives from the artifact itself**, written out by hand alongside it.
+Section numbers a renderer computes from heading depth.
+A table of contents a generator emits.
+A count, a total, or a cross-reference that some tool resolves.
+An index whose entries the build produces.
+
+It is the least visible of the three, for a reason worth naming.
+Hard-coded external data has an obvious owner elsewhere, so the question "where does this really come from?" arises naturally.
+Model judgment at least feels like work, so it prompts the question of whether it should be.
+Typing `## 6.2` prompts nothing.
+It is not a decision, it is not a lookup, and it looks like authorship.
+
+**The failure mode is silent divergence, and it is worse than being wrong.**
+Two generators now exist for one value: yours and the tool's.
+While nobody enables the tool's, the hand-written copy looks authoritative and stays correct.
+The moment anything turns the real one on --- a format option, a config inherited from a parent directory, a downstream consumer with different defaults --- both run, and the artifact carries two answers at once.
+
+The measured case: a Quarto document whose 30 headings carried hand-typed numbers while a directory `_metadata.yml` set `number-sections: true`.
+Every heading rendered doubly numbered (`2 1. Objectives and estimands`), and all eight `@sec-` cross-references resolved to the generated scheme while the visible headings showed the hand-typed one --- so each reference named a section number that appeared nowhere in the document.
+None of it was visible in the source, and nine review rounds over a day did not catch it, because every one of them read the `.qmd`.
+
+**The check is one question, asked before typing a value into an artifact:** does anything in this toolchain already compute this?
+If yes, let it, and delete the copy.
+If the tool's version is turned off, prefer turning it on over maintaining the manual one --- an inert generator is a latent conflict, not an absent one.
+
+**And where the value is generated, verify the generated artifact.**
+Source inspection cannot see this class of defect by construction: the hand-typed number and the generated one are both correct in the file, and only the render shows them colliding.
+That is [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) applied here --- checking the `.qmd` is checking an adjacent object.
+
+- **Do:** ask what the toolchain already derives before writing a value by hand.
+- **Do:** enable the generator and delete the hand-maintained copy, rather than leaving the generator off.
+- **Do:** read the rendered output when a value is generated, since the source cannot show the collision.
+- **Don't:** treat "it is not a judgment call" as putting something outside this principle --- the clearest cases involve no judgment at all.
+- **Don't:** assume an unused generator is harmless;
+  it runs the moment a config elsewhere turns it on.
 
 ## Limits
 

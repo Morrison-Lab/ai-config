@@ -121,7 +121,7 @@ Measured twice in two consecutive rounds on [ai-config#1947](https://github.com/
 **The prose sweep that skipped its own new line.**
 Round 1 named three pre-existing `Don't` bullets reading as a blanket ban on a case the PR was introducing an exemption for.
 All three were correctly scoped.
-Round 2 found that the bullet the same branch had itself added carried the identical contradiction, at *closer range* --- 11 lines from the prose it contradicted, against 13 to 40 for the ones that were fixed.
+Round 2 found that the bullet the same branch had itself added carried the identical contradiction, 11 lines from the prose it contradicted, and in the reviewer's own words at *closer range* than the more distant pre-existing bullets the fix had correctly scoped.
 Proximity ran inverse to the catch rate, which is the tell that the sweep's population, rather than its pattern, was the defect.
 
 **The residual paragraph that named the rarer case.**

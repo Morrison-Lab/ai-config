@@ -45,7 +45,8 @@ The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencod
 
 Note what that does to the pre-push guard, since the two rules meet here and pull opposite ways.
 A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
-Use `ALLOW_UNREVIEWED_PUSH=1` there and say in the same reply which reviewer produced the verdict and why the subagent route was unavailable --- the override covers a push whose verdict the guard cannot check, not only a push with nothing to check.
+Prefix the push itself with `ALLOW_UNREVIEWED_PUSH=1` there, and say in the same reply which reviewer produced the verdict and why the subagent route was unavailable --- the override covers a push whose verdict the guard cannot check, not only a push with nothing to check.
+The same applies to a session whose reviewer is registered from a stale definition, which is the case on any rollout of a change to the persona itself.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
 ## Brief it with the diff and the standards, never with your rationale
@@ -71,13 +72,16 @@ A dispatched reviewer makes that concrete, because the finding now has an author
 ## The mechanism
 
 [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case, per [`algorithmatize-checks`](algorithmatize-checks.md).
-It answers two questions rather than one, because provenance alone is not enough.
+It answers three questions rather than one, because provenance alone is not enough.
 
 *Who said it*: a verdict is admitted only from the `tool_result` of an `Agent` call whose `subagent_type` is the reviewer, and only when that result is not an error.
 So an inline pass, a verdict quoted out of a file, the guard's own denial message, and a clean report from some other subagent all fail.
 
-*What it was about*: the reviewer states the commit it read as a `Reviewed-Commit: <sha>` line, and the guard compares that against the pushing repo's `HEAD`.
-A push ships commits, so anything that changes what would be pushed --- a later commit, a `main` merge, a rebase, a commit a subagent made in a transcript the guard cannot see --- moves `HEAD` and fails the comparison.
+*What it said*: restricting provenance does not make a phrase search sound **inside** the admitted body, which is the same failure one layer in --- a review whose closing note quotes the clean verdict it is withholding would read as clean.
+So the verdict is the last line that **is** a verdict line, anchored at line start, and a quotation mid-sentence is not one.
+
+*What it was about*: the reviewer states the commit it read as a `Reviewed-Commit: <sha>` line after its verdict, and the guard resolves what the push would actually ship --- reading the refspec, not just `HEAD` --- and compares.
+A push ships commits, so anything that changes what would be shipped --- a later commit, a `main` merge, a rebase, a commit a subagent made in a transcript the guard cannot see, or a branch other than the reviewed one --- fails the comparison.
 That is also why the review comes **after** committing, which is where [`ardi`](ardi.md) already puts the pause point.
 
 The other cases have no guard and are prose rules here.

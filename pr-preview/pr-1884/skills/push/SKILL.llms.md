@@ -29,10 +29,10 @@ Another session or the author may have pushed since your last fetch.
 
 ``` bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git ls-remote --heads origin "$BRANCH"   # LS_REMOTE — read-only; updates no ref
+git ls-remote --heads origin "$BRANCH"   # LS_REMOTE --- read-only; updates no ref
 ```
 
-If the tip it reports is not an ancestor of your `HEAD` (`git merge-base --is-ancestor <tip> HEAD`), **back off** — another session (or the author) is driving this branch right now. Do not push (a plain push will be rejected anyway, and you must not force-push over their work). Ask the user.
+If the tip it reports is not an ancestor of the ref you are **pushing** (`git merge-base --is-ancestor <tip> <source>`), **back off** — another session (or the author) is driving this branch right now. `<source>` is `HEAD` only when the refspec says so: `git push origin feature-x` from `main` pushes local `feature-x`, and comparing against `HEAD` there reads a divergence as a fast-forward. Do not push (a plain push will be rejected anyway, and you must not force-push over their work). Ask the user.
 
 Fetch to see *what* they pushed, once you already know something is there:
 

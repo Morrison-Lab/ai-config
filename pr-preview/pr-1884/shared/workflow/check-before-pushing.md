@@ -41,8 +41,13 @@ Classify what it returns:
 | --- | --- |
 | no ref | nothing to collide with |
 | tip equals local `HEAD` | already pushed |
-| tip is an ancestor of `HEAD` | fast-forward; safe |
-| tip is **not** an ancestor of `HEAD` | somebody else is driving this branch |
+| tip is an ancestor of the pushed ref | fast-forward; safe |
+| tip is **not** an ancestor of the pushed ref | somebody else is driving this branch |
+
+**The local side of that comparison is the ref you are *pushing*, which is `HEAD` only when the refspec says so.**
+`git push origin feature-x` run while `main` is checked out pushes local `feature-x`, so comparing against `HEAD` compares against the wrong branch.
+It fails in the dangerous direction: a remote commit that happens to be an ancestor of `main` reads as a fast-forward while local `feature-x` genuinely diverges, so the check goes quiet in exactly the case it exists for.
+Resolve the source from the refspec (`src` in `src:dst`, the bare name otherwise, `HEAD` when there is no refspec) and compare against that.
 
 Only the last one needs anything, and it needs a reconcile rather than an overwrite.
 Whether you already hold the remote tip's object is the sharpest part of the reading, and it points the opposite way to intuition: an object you *cannot* resolve locally is the worse signal, not the milder one, because the remote moved after your last fetch and you cannot see what is there.

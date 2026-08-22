@@ -271,6 +271,75 @@ Only the mutation answers whether the assertion depends on the fix.
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
 
+### A predicate a fix adds needs mutation in both directions, not just reversion
+
+The mutation above proves the fix is needed, by reverting it and watching the
+predicate never fire.
+That is one direction.
+A predicate that decides between two outcomes --- admit or exclude, keep or
+blank --- can also fail by firing on **more** than it should, and reverting
+the fix cannot exercise that side at all: removing the predicate makes it
+fire on *nothing*, never on *too much*.
+
+The near-miss is running the revert-mutation, watching the new test fail,
+and reading that as "mutation-tested."
+It is mutation-tested in one direction.
+The revert answers "does this catch the case it was written for," not "does
+this also spare the cases it wasn't."
+
+Two mutations answer the two questions, and neither substitutes for the
+other:
+
+- **Revert (under-inclusive).** Delete or disable the fix. The predicate
+  should now fail to protect what it protects, and the test that catches the
+  original bug should fail.
+- **Over-broaden (over-inclusive).** Widen the predicate's trigger condition
+  --- loosen a marker list, drop a qualifying clause, relax a proximity
+  check --- and confirm a case that should survive now gets wrongly caught.
+  This needs its own fixture, built to sit in the specific gap the widened
+  predicate opens, not a generic input the narrower, correct predicate was
+  never going to catch either way.
+
+A control asserting a property of the fixture is not a control on the
+predicate, and it survives both mutations for the same reason it proves
+nothing under either: it never runs the code under test at all.
+That reads as rigor --- the comment above it usually says exactly what
+property it is isolating --- which is what makes it the harder of the two
+gaps to catch by reading rather than by mutating.
+
+- **Do:** run both mutations --- revert, and over-broaden --- on every
+  predicate a fix adds that decides between two outcomes.
+- **Do:** build the over-broaden fixture to sit in the specific gap the
+  wider predicate opens.
+- **Do:** confirm a negative control fails when the predicate under test is
+  mutated, not only that the fixture contains what its comment claims.
+- **Don't:** read "the revert-mutation failed" as mutation-tested; it is
+  half of it.
+- **Don't:** trust a control whose assertion is about the fixture's
+  contents rather than about what the predicate does with them.
+
+(Morrison-Lab/ai-config#1862, 2026-08-21, two review rounds. The PR added
+`is_non_review_notice()` to exclude bot workflow-status notices from a
+review-item set. Its precedence guard, meant to protect a genuine review
+from that exclusion, used a 3-marker check while the admission gate it
+protected used 6 --- a fallback self-review wide enough to be admitted was
+not wide enough to be protected, and was silently excluded. That is the
+over-inclusive direction of an exclusion predicate, and the suite's own
+revert-mutation could not have found it: reverting the fix removes the
+exclusion outright, it does not narrow the guard that is supposed to spare
+genuine reviews from it. The same round's "negative control" for the
+marker window substituted an unrelated fixture rather than isolating the
+marker text; over-broadening the marker list to absurd values still passed
+it, proving it was inert. Both were reviewer findings.
+
+Morrison-Lab/ai-config#1867: `blank_verdicts_citing_a_comment()` blanked a
+not-clean verdict phrase whenever it sat near any comment permalink, with
+no requirement that the surrounding text say the finding was resolved. The
+suite held a "permalink, resolved" fixture and a "live finding, no
+permalink" fixture --- never the combination, which is exactly what a live
+finding re-raised with its own citation looks like. A reviewer built that
+missing fixture and the phrase was wrongly blanked.)
+
 ## When the runtime is available, run the claim instead of reasoning about it
 
 Every check above can be done by reading.

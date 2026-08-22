@@ -14,6 +14,8 @@ State in one sentence what the requester wants Claude (or Codex, or the `@claude
 
 Then check it’s actually reusable, not a one-off. A single favor for right now doesn’t need infrastructure – just do it. `config-ai` is for capability that should persist beyond this conversation.
 
+Restate the *scope* as narrowly as it was given, too. A request to disable a capability – AI review being the recurring one – covers only the repositories the user explicitly named. Don’t widen it into an organization-wide or cross-repository change. The standing rule and the incident behind it live in [`memories/preferences.md`](../../memories/preferences.md). This step is only the reminder to apply it before picking a mechanism.
+
 ## Step 1 – Pick the implementation form
 
 Work down this table; stop at the first row that fits. Each row hands off to the skill or convention that owns that mechanism – this skill does not duplicate their build steps.

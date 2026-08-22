@@ -145,8 +145,8 @@ The old unanchored `re.search` had never cared about trailing punctuation.
 
 Two things make this the sharpest of the three.
 It landed in the round that deliberately **changed instruments**, the least reflexive fix available and chosen precisely because successive rounds had shown the pattern itself was wrong, so the mechanism is structural rather than a matter of care.
-And a false negative **fails safe**, so nothing announces it.
-A bypass is found by anyone probing the guard, while a missed discharge merely annoys whoever armed something and is then forgotten.
+And a false negative **fails safe**, so it leaves no artifact behind.
+A bypass is found by anyone who probes the guard, whereas a missed discharge inconveniences one author once and is never written down anywhere a later reader could find it.
 
 The transferable tell is that **a rewrite inherits the old implementation's accidental tolerances as unstated requirements.**
 The unanchored search tolerated trailing punctuation by accident, nothing ever recorded that as a requirement, and so the replacement dropped it without any test going red.
@@ -161,31 +161,23 @@ Note what the substitution does to the existing remedy.
 [`address-every-comment`](address-every-comment.md) already says to derive the site list by grepping "the whole diff", and that search space was fixed before the fix's own lines existed.
 Re-running that sweep *after* the fix is what closes the gap, and nothing about writing a correction prompts a second run.
 
-Three observable actions follow.
-
-- After fixing an instance of class C, re-derive the population of C over the whole diff **including the lines this branch added**, rather than over the reviewer's list.
-  The fix's own new lines are the highest-risk members and the ones no reviewer has looked at yet.
-- When a docstring or comment names an accepted residual, enumerate the residual **class** and say which member is commonest, rather than the one example that came to mind.
-  A named residual asserts a survey happened, so a wrong one buys a reader's trust against nothing.
-- Before deleting an implementation, enumerate what it **accepted**, not only what it wrongly accepted, and carry both halves into the replacement's tests.
-  A rewrite is scoped by the defect that prompted it, so the behaviour nobody complained about is the behaviour nothing protects.
-
 **This is not algorithmatizable in general, and saying so is the honest answer** rather than a gap to be filled later.
 "Did the sweep cover the diff's own added lines?" has no decidable condition.
-Deciding it needs the *class* the reviewer named, which lives in prose and differs every round, so a hook keyed on it would either match every fix commit or none.
+Deciding it needs the *class* the reviewer named, which lives in prose and differs every round, so any lexical proxy a hook could key on is uncorrelated with whether the sweep actually ran.
 That is exactly [`algorithmatize-checks`](algorithmatize-checks.md)'s "Limits" case, where a guard that misfires gets switched off and takes the real cases with it.
 No decidable slice was found worth building either.
-The nearest candidate --- warn when a fix commit's added lines contain the literal string a reviewer flagged --- fails on both halves measured here, since neither instance repeated a flagged literal.
+The nearest candidate --- warn when a fix commit's added lines contain the literal string a reviewer flagged --- fails on all three instances measured here, since none of them repeated a flagged literal.
 Step 2 above obliges you to *ask* whether a finding is algorithmatizable, not to answer yes, so an answered no carrying its reason discharges that step as completely as a guard would.
 Read `hooks/remind-learn-from-review.py`'s own ONE-OFF discharge clause as the adjacent case rather than this one.
 That clause covers a finding with no rule behind it at all, and this finding has a rule --- the section you are reading.
 What this finding has no room for is a hook.
 
-- **Do:** re-run the sweep over the whole diff including your own fix's added lines, and report the pattern and the hit count.
-- **Do:** enumerate a residual class and name its commonest member whenever you write down an accepted residual.
+- **Do:** after fixing an instance of class C, re-derive the population of C over the whole diff **including the lines this branch added**, and report the pattern searched and the hit count --- your fix's new lines are the highest-risk members and the ones no reviewer has looked at yet.
+- **Do:** enumerate the residual **class** and name its commonest member whenever you write down an accepted residual, since naming one is itself a claim that you surveyed them.
+- **Do:** enumerate what an implementation **accepted** before you delete it, not only what it wrongly accepted, and carry both halves into the replacement's tests.
 - **Don't:** treat the reviewer's enumeration as the population once you have fixed every member of it --- feeling calibrated to a class is not having swept for it.
 - **Don't:** write a "residual, named rather than papered over" paragraph around the first exception that comes to mind, since the naming is what makes it read as surveyed.
-- **Don't:** read a rewrite as immune because it replaced the thing that was wrong --- it inherits the old implementation's accidental tolerances as requirements nobody wrote down, and dropping one fails safe and so stays silent.
+- **Don't:** read a rewrite as immune because it replaced the thing that was wrong --- it inherits the old implementation's accidental tolerances as requirements nobody wrote down, and dropping one fails safe and so leaves no artifact.
 
 (Morrison-Lab/ai-config#1959, from rounds 2 and 4 of review on #1947.
 All three instances landed in one PR, each inside the fix for the round before it, and each was found by the reviewer rather than by the sweep that had just run.)

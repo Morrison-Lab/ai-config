@@ -429,9 +429,19 @@ SHOULD_STAY_SILENT = [
 # `(case_id) -> (must_appear, must_not_appear)`. A violation returns its own
 # verdict string, so the mutation harness covers the label the same way it
 # covers every other clause rather than needing a second pass.
+# `(case_id) -> (must_all_appear, must_none_appear)`.
+#
+# The remediation COMMANDS are checked alongside the label, because they were
+# the half that stayed wrong after the label was fixed: `WARN_TAIL` emitted
+# `git merge origin/feature-x` unconditionally, which merges that branch into
+# whatever is checked out. Advice is behaviour when a reader runs it.
 LABEL_EXPECT = {
-    "W6": ("your local `feature-x`", "your local HEAD"),
-    "W2": ("your local HEAD", "your local `"),
+    "W6": (["your local `feature-x`",
+            "git log --oneline feature-x..origin/feature-x",
+            "git checkout feature-x"],
+           ["your local HEAD", "HEAD..origin/"]),
+    "W2": (["your local HEAD", "git log --oneline HEAD..origin/"],
+           ["your local `", "git checkout "]),
 }
 
 
@@ -460,8 +470,8 @@ def verdict(hook_path, repo, command, case_id=None):
     context = hso.get("additionalContext")
     if not context:
         return "silent"
-    want, unwanted = LABEL_EXPECT.get(case_id, (None, None))
-    if want and (want not in context or unwanted in context):
+    want, unwanted = LABEL_EXPECT.get(case_id, ([], []))
+    if any(w not in context for w in want) or any(u in context for u in unwanted):
         return "WARN-WRONGLABEL"
     return "WARN"
 
@@ -614,6 +624,14 @@ MUTATIONS = {
           '        if flags["force"] and not flags["dry_run"] '
           "and not override:")],
         {"D9"},
+    ),
+    "reconcile_uses_the_pushed_ref": (
+        "the remediation commands operate on the ref being pushed",
+        [('        if source == "HEAD":\n'
+          '            reconcile = (f"    git fetch origin {branch}\\n"',
+          '        if True:\n'
+          '            reconcile = (f"    git fetch origin {branch}\\n"')],
+        {"W6"},
     ),
     "warning_names_the_pushed_ref": (
         "the WARN text names the ref actually compared, not always HEAD",

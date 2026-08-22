@@ -79,7 +79,7 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
   Use `git push --force-with-lease --force-if-includes`.
   The lease alone is defeatable: it compares against your remote-tracking ref, so any background fetch silently satisfies it over the commits it was protecting.
   `--force-if-includes` (git 2.30+) closes that.
-  Pairing `--force` *with* the lease is not a middle ground: `git push --help` says `--force` "disables these checks", the lease among them.
+  Pairing `--force` *with* the lease is not a middle ground: git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
   A `stale info` refusal is not a reason to force either --- it means the remote branch is gone, so a plain push is the fix (`memories/git.md`).
   `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
   State the reason when you use it.

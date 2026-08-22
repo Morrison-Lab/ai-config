@@ -40,12 +40,20 @@ consistent with the paragraph above -- where the remote ref does not exist,
 there is nothing for any force to overwrite. So the hatch exists for a case this
 guard did not foresee, not for a known one.
 
-The refusal also does NOT consult `--force-with-lease`. `git push --help` on
-`-f, --force`: "when --force-with-lease option is used, the command refuses to
-update a remote ref whose current value does not match what is expected. This
-flag disables these checks." So `--force --force-with-lease` is a plain force
-push, and treating the lease as clearing the refusal was a bypass rather than a
-nicety.
+The refusal also does NOT consult `--force-with-lease`, because `--force`
+disables the lease check. Git's documentation for `-f, --force` says so, and
+the two wordings in circulation differ enough to be worth attributing:
+
+  upstream master (Documentation/git-push.adoc) --- "This flag disables that
+  check, the other safety checks in PUSH RULES below, and the checks in
+  `--force-with-lease`."
+
+  the man page shipped with git 2.50.1 --- "when --force-with-lease option is
+  used, the command refuses to update a remote ref whose current value does not
+  match what is expected. / This flag disables these checks"
+
+So `--force --force-with-lease` is a plain force push, and treating the lease
+as clearing the refusal was a bypass rather than a nicety.
 
 **It WARNS on everything else** (`additionalContext`, no `permissionDecision`),
 because whether a divergence matters is a judgment this hook cannot make: a
@@ -411,9 +419,7 @@ WARN_TAIL = (
     "plain push will be rejected; a forced one would discard the commits "
     "above.\n\n"
     "Reconcile rather than overwrite:\n\n"
-    "    git fetch origin {branch}\n"
-    "    git log --oneline HEAD..origin/{branch}\n"
-    "    git merge origin/{branch}      # or rebase, if the branch is yours alone\n\n"
+    "{reconcile}\n"
     "Before deciding it is your own earlier work, compare trees and parents -- "
     "`shared/workflow/claim-pr.md` distinguishes an identical merge (reset onto "
     "it) from a differently-resolved one (merge the two commits, never reset)."
@@ -538,7 +544,24 @@ def evaluate(command):
             body += WARN_KNOWN.format(n=n, commits=commits)
         else:
             body += WARN_UNKNOWN
-        body += WARN_TAIL.format(branch=branch)
+        # The remediation commands must operate on the ref being pushed, for
+        # the same reason the label above does. Emitting
+        # `git merge origin/feature-x` while `main` is checked out merges
+        # `feature-x`'s remote content INTO `main` -- wrong branch, and
+        # destructive, in precisely the scenario this guard exists for.
+        if source == "HEAD":
+            reconcile = (f"    git fetch origin {branch}\n"
+                         f"    git log --oneline HEAD..origin/{branch}\n"
+                         f"    git merge origin/{branch}"
+                         "      # or rebase, if the branch is yours alone\n")
+        else:
+            reconcile = (f"    git fetch origin {branch}\n"
+                         f"    git log --oneline {source}..origin/{branch}\n"
+                         f"    git checkout {source}"
+                         "      # you are not on the branch being pushed\n"
+                         f"    git merge origin/{branch}"
+                         "      # or rebase, if the branch is yours alone\n")
+        body += WARN_TAIL.format(branch=branch, reconcile=reconcile)
         return "warn", body
 
     return None

@@ -191,8 +191,14 @@ Two boundaries.
 Efficiency never outranks correctness, so no saving is bought with a skipped check.
 And the restructuring goes in its own issue or PR rather than happening inside whatever task noticed it.
 
+Human steps are in scope too --- a merge method, a batching habit, a review-request convention each shape the procedure and each has a price.
+Naming one and stopping there is `no-empty-promises` pointed outward, so every suggestion about human behaviour ships a mechanism in the same reply: a written rule at minimum, then a visible marker at the moment of the action, then a guard, then a setting that removes the option.
+Pick the rung from the cost of the mistake rather than the strength of the opinion, and leave the decision with the user, per `flag-practice-slippage`.
+
 - **Do:** ask what a procedure costs by construction, separately from what this run costs.
+- **Do:** ship a mechanism in the same reply that names a human behaviour change.
 - **Don't:** read a pulled lever as having answered the structural question.
+- **Don't:** name a behaviour change with nothing behind it.
 
 When several levers genuinely apply at once, do the self-directed ones first.
 Compress, compact, or file the structural finding before asking the user to act on a model change.

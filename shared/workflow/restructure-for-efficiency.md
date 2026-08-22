@@ -69,6 +69,65 @@ A cheaper procedure that checks less is not a saving, and this rule must never b
 The change belongs in its own issue or PR, on the corpus, where someone can disagree with it.
 A workflow quietly reshaped inside a session that was doing something else is [`incidents-dont-repeal-decisions`](incidents-dont-repeal-decisions.md)'s lapsed decision wearing an efficiency argument.
 
+## Human behaviour is in scope, and a suggestion with no mechanism is not one
+
+A workflow includes the people in it.
+A merge-method choice, a habit of trickling review requests, a convention about when to open a stacked PR --- each is a decision about the *shape* of the procedure, each has a token price, and none of them is the agent's to make.
+So the tells above apply to human steps exactly as they do to agent ones, and finding one is worth saying.
+
+**Naming the behaviour and stopping there is the near-miss**, and it reads as helpful rather than as evasive.
+It is [`no-empty-promises`](no-empty-promises.md)'s failure pointed outward: the suggestion costs nothing to produce, changes no file, and closes the topic on the record, so nobody returns to it.
+A behaviour nobody was given a reason to change does not change.
+
+So every suggestion about human behaviour ships **at least one mechanism** for encouraging or enforcing it, in the same reply.
+Four rungs, weakest first:
+
+1. **A written rule**, in the skill or doc that owns the action.
+   Always available, so it is the floor rather than an option --- there is no case where nothing can be written down.
+2. **A visible marker at the moment of the action** --- a PR label, a `> [!IMPORTANT]` alert in the PR body, a bot comment on the thread.
+   This is the rung that changes behaviour most per unit of effort, because it makes the wrong action *look* wrong exactly when someone is about to take it, rather than in a document read months earlier.
+3. **A guard that intercepts the action** --- a `PreToolUse` hook, a required check.
+   Reserve it for a condition a query can decide, per [`algorithmatize-checks`](algorithmatize-checks.md), and default to warning rather than blocking.
+   [`pr-on-claim`](pr-on-claim.md) records a `PreToolUse` block considered and **rejected** on exactly this reasoning: "the bias that is safe for a nag is not safe for a refusal", and a genuine block needs adversarial hardening that has to be weighed against what it actually prevents.
+4. **A setting that removes the option** --- a repo setting, a branch ruleset.
+   Strongest and bluntest.
+   It also removes the legitimate uses, so it needs a case that the option has no legitimate use here.
+
+Pick the rung from the cost of the mistake and the cost of a false positive, not from how strongly you hold the opinion.
+[`deterministic-tools`](../principles/deterministic-tools.md)'s third-occurrence bar governs rungs 3 and 4: build the guard once the mistake has actually recurred, not because it could.
+
+**The decision stays the human's.**
+[`flag-practice-slippage`](flag-practice-slippage.md) sets the manner: name the specific practice and gap, cite the rule or label the opinion as an opinion, say it before the action rather than in the retrospective, and say it **once**.
+Shipping a mechanism is not a licence to relitigate a decision already made.
+
+### Worked example: squash-merging a base PR taxes every PR stacked on it
+
+Squash-merging PR A rewrites its commits into one new commit with a new SHA.
+A PR B stacked on A still carries A's original commits, so once A lands, git sees the same content twice under two different SHAs and conflicts on every co-touched file.
+A **merge commit** makes A's own commits ancestors of the base branch, so B's copies are already reachable and the sync is clean.
+
+Measured in an isolated throwaway repo on 2026-08-22 --- one file, PR A adding two commits, PR B stacked with one:
+
+| base merged with | merging the base back into the stacked branch |
+|---|---|
+| `--squash` | **CONFLICT** in the co-touched file |
+| merge commit | clean |
+
+The price of the squash is one deconflict, one CI run, and one review round **per stacked PR**, and [`efficient-pr-babysitting`](efficient-pr-babysitting.md) measured one review round on this repo at $42.92.
+
+The corpus already pays this tax without having priced it.
+[`cascade`](../../skills/cascade/SKILL.md)'s step 3 exists only to remediate it --- it resolves "squash-stack conflicts" by taking the branch side and then proving the merge was content-neutral.
+A whole remediation step, for a cost the merge method chooses.
+That is the shape to look for: **a procedure that exists to clean up after a choice, where changing the choice deletes the procedure.**
+
+Note what this example does *not* establish.
+Squash is a good default for an unstacked feature branch with many small iteration commits, which is why [`merge-it`](../../skills/merge-it/SKILL.md) has it, and nothing here argues against that.
+The claim is narrow: it is the wrong method when the PR has open dependents, and whether it does is decidable by one query.
+
+```bash
+gh pr list --repo <owner>/<repo> --state open --base "$(gh pr view <N> --repo <owner>/<repo> --json headRefName --jq .headRefName)"
+```
+
 ## Dogfooding
 
 This fragment is referenced from `CLAUDE.md` by a **markdown link** rather than an `@`-import, so it loads only when read.
@@ -78,7 +137,10 @@ The check on any addition to this corpus is the same one: which pool does it lan
 - **Do:** ask what a procedure costs *by construction*, separately from what this run of it costs.
 - **Do:** file the structural finding with its measurement, and route it rather than absorbing it silently.
 - **Do:** check which context pool an addition lands in before writing it.
+- **Do:** treat a human step as in scope, and ship a mechanism --- a written rule at minimum --- in the same reply that names the behaviour.
 - **Don't:** read a pulled lever --- a cheaper subagent, a compaction --- as having answered the structural question.
   Those are the other two levers, and they expire with the session.
 - **Don't:** buy a saving with a skipped check.
 - **Don't:** reshape a workflow inside a task that was doing something else.
+- **Don't:** name a human behaviour change and leave it at that.
+  A suggestion nobody was given a reason to adopt is the empty promise pointed outward.

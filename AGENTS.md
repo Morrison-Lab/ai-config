@@ -58,6 +58,11 @@ Those are per-session levers, and their saving expires with the session.
 Ask separately what a procedure costs *by construction*: instructions loaded at launch that only some tasks read, a judgment made twice that wants a deterministic check, a serial loop whose base moves faster than one round, a brief that enumerates a set instead of deriving it.
 The deliverable there is a change to the workflow --- fixed in stride when small, filed with its measurement when not --- never a quieter run of the same procedure.
 
+Human steps count as workflow shape, so say so when one is costly --- and ship a mechanism in the same reply rather than only a suggestion.
+A written rule is the floor.
+A visible marker at the moment of the action, a guard, or a setting that removes the option are the stronger rungs.
+The decision stays the human's.
+
 Two boundaries.
 Efficiency never outranks correctness, so no saving is bought with a skipped verification or a shortened review.
 And restructure in its own issue or PR, not inside whatever task happened to notice it.

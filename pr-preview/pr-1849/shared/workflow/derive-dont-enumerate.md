@@ -246,6 +246,28 @@ The figure was carried from PR #1454's body, which had read "all 5 open PRs exam
 That PR merged at `18:14:51Z` and #1455 opened at `20:22:48Z`, so one subject replaced another and the total stayed 5.
 Re-deriving the total at #1455's own moment therefore returns the very figure that was wrong.)
 
+## A closed population inside one file still needs deriving, not guessing
+
+Everything above governs external sets --- PRs, issues, files matching a pattern --- that can grow while the work runs.
+A population confined to one file, frozen at the commit being edited, cannot grow out from under you the same way.
+That makes it tempting to search for the specific members a sweep expects to be affected, rather than deriving the whole set --- and the temptation runs backwards, because a **closed** population, per the closedness test above, is exactly the one a derivation can enumerate completely.
+
+A back-reference sweep that bumps one section's ordinal (fifth to sixth, say) has to update every downstream reference to the old count.
+The natural query names the strings the sweep expects to be stale --- the old ordinal word, the old count phrase --- and that query is unsound by construction: it can only match text that still says the *old* value, so a section whose own back-reference was never in the search terms passes the sweep untouched and collides with the section just bumped.
+
+The remedy is this fragment's own rule, applied to a smaller population: derive every ordinal and count-word the file contains with one query covering the whole class, and read the resulting sequence for internal consistency, rather than searching for the handful of strings predicted to need a fix.
+
+- **Do:** enumerate every ordinal or count-word in a file with one query covering the whole class, before touching any of them.
+- **Do:** read the resulting sequence for collisions and stale back-references across the whole file, not only near the edit.
+- **Don't:** grep for the specific old strings a sweep expects to be stale --- that query cannot match a value it was never told to expect.
+- **Don't:** treat a within-file population as exempt from this fragment's rule merely because it cannot grow while you work;
+  it still needs deriving rather than guessing.
+
+(Morrison-Lab/ai-config#1864, 2026-08-21, review comment [3834448521](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834448521): a PR bumped `shared/workflow/verify-the-right-artifact.md`'s "interpreter's own defaults" section from "fifth" to "sixth adjacent artifact", correctly, but its own back-reference sweep grepped for `four recognizable shapes` and `a fifth adjacent` --- strings that, by construction, cannot match `sixth` or `The five above`.
+The downstream section "A sixth: the fact that a check ran..." kept its stale ordinal and collided with the newly bumped one.
+The author's own fix commit named the mechanism directly ([comment 3834476467](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834476467)): "I grepped for the strings I *expected* to be stale...
+Derive the population of ordinals; do not search for the ones you predict.")
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

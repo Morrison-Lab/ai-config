@@ -44,7 +44,17 @@ A branch in `INLINE` that the branch pass had classified **active** is a contrad
 
 ### 1. Classify, both passes
 
-Run [`clean-worktrees`](../../skills/clean-worktrees/SKILL.llms.md) steps 1 through 3. Run [`clean-branches`](../../skills/clean-branches/SKILL.llms.md) steps 1 through 3 and step 8’s local enumeration.
+Run [`clean-worktrees`](../../skills/clean-worktrees/SKILL.llms.md) steps 1 through 3. Run [`clean-branches`](../../skills/clean-branches/SKILL.llms.md) steps 1 through 3.
+
+For the local half, run step 8’s **classification** only. `clean-branches` step 8 has no separately-runnable enumeration sub-step: each of 8a, 8b, and 8c bundles its listing command and its `git branch -d`/`-D` into one fenced block. So name the read half explicitly rather than delegating to a sub-step that does not exist:
+
+``` bash
+git branch --merged origin/main \
+  | grep -vE '^\s*\*|^\s*main\s*$|^\s*master\s*$'   # 8a, listing only
+git branch -vv | grep '\[gone\]'                        # 8b candidates
+```
+
+**Do not run the `git branch -d` or `-D` lines that share those blocks.** Those deletions belong to this skill’s step 3, after the gate. `clean-branches` is safe on its own here only because of a prose instruction after all three sub-steps (“no silent local deletions … wait for confirmation”), not because the blocks are deletion-free — so an orchestrator that cites the block without that prose inherits none of the protection.
 
 **Neither pass touches a live worktree, branch, or remote before the gate — with one exception, and it is worth naming rather than rounding off.** `clean-worktrees` step 2 runs `git worktree prune -v` for real, not `--dry-run`, so a mutation has already happened by the time the plan is presented.
 
@@ -52,7 +62,7 @@ It is safe by construction rather than by convention: `git worktree prune` only 
 
 The invariant the gate actually protects is therefore narrower than “no mutation”, and stating it precisely is what makes it worth anything: **nothing that can lose work happens before confirmation.**
 
-Derive the `INLINE` set. The command below is **not** `INLINE` — it is the raw worktree-to-branch mapping, every worktree included:
+Derive the `INLINE` set. This first command produces the raw worktree-to-branch mapping, every worktree included — which is **not** `INLINE`:
 
 ``` bash
 git worktree list --porcelain \
@@ -74,9 +84,9 @@ awk -F'\t' 'NR==FNR { dead[$0]; next } $2 in dead { print $1 }' \
   | sort -u > "$TMP/inline.txt"
 ```
 
-Give it the negative control every filter needs: `wc -l` both files, and confirm `inline.txt` is shorter than `wt-branches.tsv` whenever any live worktree exists. An `INLINE` the same length as the raw mapping means the filter did not run, which is the failure the next paragraph describes.
+Give it the negative control every filter needs: `wc -l` both files, and confirm `inline.txt` is shorter than `wt-branches.tsv` whenever any live worktree exists. An `INLINE` the same length as the raw mapping means the filter did not run: every live worktree’s branch is still in it, including the main checkout’s, so the contradiction rule fires spuriously on all of them.
 
-Using the raw mapping as `INLINE` breaks the sweep immediately rather than subtly, which is worth stating because it looks like a shortcut that would merely over-subtract. Every live worktree appears in it, including the main checkout and the one you are standing in. Their branches are `Active` to the branch pass by construction, so the contradiction rule below fires on the first one and halts a sweep that had nothing wrong with it.
+Using the raw mapping as `INLINE` breaks the sweep immediately rather than subtly, which is worth stating because it looks like a shortcut that would merely over-subtract. Every live worktree appears in it, including the main checkout and the one you are standing in. Their branches are `Active` to the branch pass by construction, so the contradiction rule stated earlier fires on the first one and halts a sweep that had nothing wrong with it.
 
 ### 2. Present one combined plan — wait for confirmation
 
@@ -104,7 +114,7 @@ git worktree list --porcelain | grep -Fq "worktree $path" && echo STILL-THERE ||
 ```
 
 - **The worktree is gone.** Then removal succeeded and `git branch -d` simply refused. That is routine rather than exceptional: `clean-worktrees` step 5 documents the refusal at length for squash-merged branches, and measured an 18/11 `-d`/`-D` split across a 29-branch sweep. Leave it to the branch pass, which is equipped to confirm the merge and escalate to `-D`.
-- **The worktree is still there.** Then removal genuinely failed, and the safety rule below applies.
+- **The worktree is still there.** Then removal genuinely failed, which stops the branch pass.
 
 Distinguishing them matters because the safety rule stops the branch pass on a worktree failure. Reading every surviving branch as a failure would abort the whole sweep on the commonest outcome there is.
 

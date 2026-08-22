@@ -212,6 +212,21 @@ and the verdict's own conclusion every round.**
   explicitly ("inline comments were unavailable for out-of-diff lines").
   A thread count therefore cannot see it.
   Zero unresolved threads is not evidence of zero findings.
+- **A notification that truncates the body hides exactly that finding.**
+  The rule above says to read the body, and assumes you are reading the body.
+  A CI-monitor or webhook event delivers the review as *quoted text*, capped
+  at some length, and the inline findings are enumerated first because they
+  are numbered --- so what gets cut is the tail, which is where an out-of-diff
+  finding and the verdict both live.
+  The event is honest about it, and that is the trap: it prints a marker like
+  `[truncated --- full text: gh api repos/<owner>/<repo>/issues/comments/<id>]`,
+  which reads as a courtesy rather than as an instruction, and the visible
+  portion looks like a complete, well-structured review.
+  Acting on the inline comments alone then feels like having addressed the
+  round, and the thread sweep confirms it, because the missed finding was
+  never a thread.
+  So run that command before treating a finding list as complete, whenever the
+  review reached you through a notification rather than through a direct read.
 - **An empty body hides the mirror case.**
   A review can post a completely empty top-level body and carry its entire
   finding in one inline comment, so a body-only read finds nothing to act on

@@ -334,7 +334,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
 | `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
-| `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour ("going forward, I will/won't") when the same turn wrote no durable mechanism |
+| `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
 | `no-stale-pr-status.py` | `Stop` | blocks a reply asserting a PR's check state from a reading older than the last push |
 | `no-incomplete-check-enumeration.py` | `Stop` | blocks a reply declaring a PR clean when the only reading is `gh pr checks`, which omits check runs (not registered -- see ai-config#1717) |

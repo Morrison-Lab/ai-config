@@ -7,8 +7,20 @@ import re
 import sys
 import tempfile
 
-COMMIT = re.compile(r"(?:^|[;&|\n]\s*)git\s+commit\b", re.MULTILINE)
-PUSH = re.compile(r"(?:^|[;&|\n]\s*)git\s+push\b", re.MULTILINE)
+# `(?![\w-])`, not `\b`. A word boundary sits happily between `commit` and
+# `-`, because `-` is a non-word character -- so `git\s+commit\b` matched
+# `git commit-tree`, plumbing that writes a commit object and moves no ref.
+# There is nothing to push, by construction, so the call that used it never
+# contained a `git push`, `pending` was never cleared, and every later Stop in
+# the session blocked on a fully-pushed branch (ai-config#1963, measured while
+# driving #1947). `git commit-graph write` is the second instance, and the one
+# people actually run.
+#
+# PUSH carries the same guard for symmetry rather than as a second repair:
+# `git push` has no hyphenated plumbing sibling today, so that half prevents
+# the mirror bug instead of fixing a live one.
+COMMIT = re.compile(r"(?:^|[;&|\n]\s*)git\s+commit(?![\w-])", re.MULTILINE)
+PUSH = re.compile(r"(?:^|[;&|\n]\s*)git\s+push(?![\w-])", re.MULTILINE)
 CREATE = re.compile(r"(?:^|[;&|\n]\s*)gh\s+pr\s+create\b", re.MULTILINE)
 
 # A heredoc body redirected INTO A FILE is text, not commands: `cat > x <<'EOF'

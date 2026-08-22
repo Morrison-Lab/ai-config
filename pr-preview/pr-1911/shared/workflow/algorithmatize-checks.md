@@ -158,9 +158,138 @@ The section above asks for "a set whose right answer you independently know", an
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A green check on the default branch is a free labelled corpus".
 
+#### Where the space is a product of a few small dimensions, generate it rather than labelling it
+
+Both rungs above collect inputs somebody chose ---
+the reported one, then a corpus of real ones.
+A third rung opens when the inputs have structure.
+Where the space is a product of a few small dimensions,
+it can be enumerated exhaustively,
+and every member checked against one invariant
+rather than against its own expected answer.
+
+The tell is that each round's new case differs from the last
+in the value of a single dimension.
+An interpreter, a flag subset, an argument form.
+That is a product rather than a list,
+and a product is generated rather than remembered.
+
+Generating it takes the author's choice of members out of the loop,
+which is the only part of the test that was ever wrong.
+The section above already says authored cases
+"inherit the understanding that produced the bug",
+and prescribes a labelled corpus as the escape.
+Where the space has structure you need no corpus to escape it.
+You need the dimensions and one invariant.
+
+Assert the invariant rather than a per-case expectation:
+no combination of interpreter and flags discharges a wrapped read.
+A case list grows by one member per round by construction,
+so a green suite after each addition says only that the reported case is closed.
+An invariant over a generated space cannot be satisfied
+by the member nobody thought of.
+
+**The mirror is the other half, and it is the half that gets skipped.**
+A sweep asserting that nothing bad passes is one-sided,
+and a matcher that rejects everything satisfies it.
+So pair it with an assertion that every genuine input still passes.
+
+**The two directions do not generate equally cheaply,
+and saying so keeps the rule honest.**
+A bypass is any member of the product, so the negative direction generates.
+A genuine input has to be a command someone would really run,
+so the positive direction stays an enumeration of realistic shapes.
+Generate the direction that generates,
+and enumerate the other rather than skipping it.
+
+Report how many combinations were examined and not only how many leaked,
+per [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s negative-control rule ---
+a sweep reporting zero leaks and a sweep that never ran print the same line.
+
+- **Do:** enumerate the product where the space is a few small dimensions,
+  and assert one invariant across every member.
+- **Do:** pair a negative sweep with a positive one,
+  since a matcher that rejects everything passes the negative sweep alone.
+- **Do:** say how many combinations the sweep examined.
+- **Don't:** add the newly reported case to a case list
+  and read the resulting green suite as evidence the class is closed.
+- **Don't:** leave the positive direction unasserted because it cannot be generated ---
+  an enumeration of realistic shapes is worth more there than nothing,
+  and nothing is what a rewrite silently spends.
+
+(Measured on [ai-config#1947](https://github.com/Morrison-Lab/ai-config/pull/1947),
+merged 2026-08-22 after six review rounds.
+Four of those rounds each closed one more way of wrapping a read of the same path ---
+`cat <path>`, then `sh -c "cat <path>"`, then `bash -x -c` and `python3.11 -c`,
+then `python3 -c <bare path>`.
+`hooks/test-no-empty-promise.py` now sweeps interpreters against ordered flag subsets
+and asserts that no combination discharges,
+alongside a mirror asserting that every genuine arming shape still does.
+Round 3's rewrite had dropped one such shape with nothing to report it.)
+
+### An exclusion clause has a population too, and a character it spends may carry a second meaning
+
+The three rungs above all grow the population of *inputs* a matcher is tested against.
+The reported one, then a corpus of real ones, then a generated product.
+Each takes the author's choice of members further out of the loop.
+
+None of them reaches a dimension the author never conceived, and the **exclusion clause** is where that dimension hides.
+A clause names characters rather than syntaxes.
+It is written against the one syntax the guard must not fire on, and a character it spends there may serve a second syntax that needed the opposite verdict.
+
+The worked example is a guard that must distinguish *reading* a skill's file from *invoking* the skill:
+
+```python
+_NOT_PATH     = r"(?<![\w/-])"      # rejects skills/ums and ./ums-helper
+_NOT_PATH_END = r"(?![\w/-]|\.\w)"
+```
+
+That is correct about paths, and it is the whole reason the clause exists.
+But the `/` inside the lookbehind is doing two jobs, and only one of them was intended.
+In `skills/ums` it is a path separator, so the word must not match.
+In `/ums` it is a slash-command invocation, so the word must match.
+One character class collapses the two, so the guard silently stops recognizing `/ums`, `/memorize`, and `/record-learnings` as invocations at all.
+
+The discriminator sits one position further out, and splitting the single lookbehind into a pair recovers it:
+
+```python
+_NOT_PATH = r"(?<![\w-])(?<![\w.]/)"
+```
+
+A path separator carries a word character or a `.` before it.
+A slash-command carries nothing, or whitespace.
+
+The same enumeration finds a third meaning for `/`, and it is worth running on the example itself: a leading separator opens an absolute path.
+The pair does not split that one, and does not need to, because `/usr/ums` is already rejected on the `r` before its separator and only a bare top-level `/ums` stays ambiguous.
+A residual case you have named and sized is a different thing from one you never looked for.
+
+**Nothing in the guard's own tests could see this**, which is the part worth transferring.
+The negative cases an author writes come from the syntax the exclusion clause was aimed at.
+Paths were the frame, so paths were the cases, and every one of them passed in both directions.
+Slash-commands never entered the frame, so no reported input, no corpus of real ones, and no generated product contained one --- a product is generated over the dimensions you named, which is exactly the limit of the rung above.
+
+**Three fragments now name a population a check silently fails to cover, and they are worth telling apart, because each has a different remedy.**
+
+- [`examples-are-scanned`](../writing/examples-are-scanned.md) --- the **checker's** population: the file it scans contains its own explanatory example.
+- [`grep-is-not-coverage`](grep-is-not-coverage.md) --- the **query's** population: strings are matched, and concepts get claimed.
+- This section --- the **pattern's** population: a character excluded for one syntax is excluded for every syntax that uses it.
+
+The check is cheap and runs at composition time.
+Before spending a character in a class or a lookbehind, ask what else that character means in the text the matcher reads.
+Ask it of the character rather than of the input, since the input you would have thought to try is the one already covered.
+
+- **Do:** enumerate every syntax an excluded character participates in, before spending it in a class or a lookbehind.
+- **Do:** split one exclusion into a pair of narrower ones when a character serves two syntaxes that need opposite verdicts.
+- **Do:** assert a positive case per syntax, so the second one is checked rather than assumed.
+- **Don't:** read a passing negative suite as evidence the exclusion is right --- those cases came from the syntax you were already thinking about.
+- **Don't:** widen the class to admit the missing syntax --- that readmits the one the clause was written to exclude.
+
+(Measured on [ai-config#1968](https://github.com/Morrison-Lab/ai-config/pull/1968), merged 2026-08-22.
+`(?<![\w/-])` entered `hooks/no-empty-promise.py` in [#1724](https://github.com/Morrison-Lab/ai-config/pull/1724) and stood unchanged on `main` until #1968 replaced it, so for that whole interval a dispatch prompt saying `/ums` did not discharge a promise.)
+
 ### An attribution claim in a guide-for-future-edits comment is settled by mutation, not by re-reading it
 
-The section above governs a comment claiming *what* a matcher matches.
+"Test the instrument against the incident that prompted it, verbatim"'s closing **Don't** governs a comment claiming *what* a matcher matches.
 
 **That remedy has a precondition worth naming, because a comment gives no sign
 of which side of it a claim sits on.**

@@ -1152,6 +1152,76 @@ def main() -> int:
         check(f"a body carrying the agent marker {agent_marker!r} is not excluded",
               not checker.is_non_review_notice(body))
 
+    # --- a quoted prior verdict must not outrank this comment's own ---------
+    #
+    # ai-config#1510 and #1690. A confirming review states what it is confirming,
+    # which is what makes it a confirming review -- so this is close to
+    # guaranteed on the round where a PR finally becomes mergeable.
+    #
+    # The discriminator is the PERMALINK, not the wording: three rounds on
+    # #1752/#1760/#1762 established that a live finding re-raised across rounds
+    # writes the identical bold-plus-citation fragment. What it does not write is
+    # a link to the comment it quotes.
+    confirming_1841 = (
+        "This is a confirming review. The most recent Claude verdict, "
+        "[posted here](https://github.com/o/r/pull/1841#issuecomment-5376065321), "
+        "was **Needs more work**, citing two inline findings at commit `c29ecbd2`."
+        "\n\nBoth are addressed.\n\n### Verdict\n\n**Ready for merge**"
+    )
+    check("a confirming review quoting the verdict it supersedes reads clean (#1690)",
+          checker.classify_verdict(confirming_1841) == "clean")
+    check("negative control: it really does contain the not-clean phrase",
+          "Needs more work" in confirming_1841)
+
+    prior_1487 = (
+        "Prior review: [comment](https://github.com/o/r/pull/1487#issuecomment-123) "
+        "(2026-08-16T16:57:08Z), verdict **Needs more work**, with the blocking item fixed."
+        "\n\n### Verdict\n\n**Ready for merge**"
+    )
+    check("a prior-review citation in prose reads clean (#1510)",
+          checker.classify_verdict(prior_1487) == "clean")
+
+    # The gate must stay OFF the live-finding case, which is the dangerous
+    # direction. #1762's fixture cites the SHA a finding was first flagged at
+    # and carries no comment permalink, which is exactly what keeps it not-clean.
+    live_finding = (
+        "The one finding from the previous review round (**Needs more work**, "
+        "reviewed at `53f9acbf`) is still present and unaddressed in this diff."
+        "\n\n### Verdict\n**Ready for merge** -- no new issues found."
+    )
+    check("a live finding citing a SHA is still not-clean",
+          checker.classify_verdict(live_finding) == "not-clean")
+    check("negative control: the live-finding case carries no comment permalink",
+          checker.RX_COMMENT_PERMALINK.search(live_finding) is None)
+
+    check("this comment's OWN not-clean verdict survives a permalink elsewhere",
+          checker.classify_verdict(
+              "See [prior](https://github.com/o/r/pull/1#issuecomment-9)."
+              "\n\n### Verdict\n\n**Needs more work**") == "not-clean")
+
+    # Blanking a verdict phrase must not disarm the STRUCTURAL findings scan,
+    # which is a separate signal and the one that enforces "findings win over
+    # the verdict line".
+    with_findings = {
+        "createdAt": "2026-08-21T20:00:00Z",
+        "author": {"login": "github-actions"},
+        "body": ("**Claude finished review**\n\nAs noted in "
+                 "[my earlier comment](https://github.com/o/r/pull/1#issuecomment-9), "
+                 "this is still wrong. Reviewed sha123.\n\n## Findings\n"
+                 "**Location:** a.py:1\n\n### Verdict\n**Ready for merge**"),
+    }
+    with patch.object(checker, "run_cmd",
+                      return_value=json.dumps({"comments": [with_findings], "reviews": []})):
+        wf_ok, _ = checker.check_review_comments("1", "sha123", TEST_REPO)
+    check("structural findings still block even when a verdict phrase is blanked",
+          not wf_ok)
+
+    # Splicing, not split-and-rejoin: the clean-verdict guards are position
+    # sensitive, so normalising separators would silently unmark a real verdict.
+    check("blanking preserves the surrounding text byte-for-byte",
+          len(checker.blank_verdicts_citing_a_comment(confirming_1841))
+          == len(confirming_1841))
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

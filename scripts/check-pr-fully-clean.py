@@ -311,6 +311,64 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
     return len(issues) == 0, issues
 
 
+# A permalink to another comment on this PR: `#issuecomment-<id>` for a
+# top-level comment, `#discussion_r<id>` for a review comment.
+RX_COMMENT_PERMALINK = re.compile(r"#(?:issuecomment-|discussion_r)\d+")
+
+# A bold verdict phrase, the shape a citation of another comment's verdict takes.
+RX_BOLD_VERDICT = re.compile(
+    r"\*\*\s*(?:Needs\s+(?:more\s+)?work|Changes\s+requested)\s*[:.]?\s*\*\*",
+    re.IGNORECASE,
+)
+
+
+def blank_verdicts_citing_a_comment(text: str) -> str:
+    """Blank a bold verdict phrase in a sentence that links to another comment.
+
+    A sentence carrying a permalink to another comment on the same PR is
+    REPORTING what that comment said, not stating this comment's own verdict.
+    A confirming review does this by construction --- saying what it confirms is
+    what makes it a confirming review --- so this is close to guaranteed on the
+    round where a PR finally becomes mergeable, which is the worst round to
+    misread (ai-config#1510, ai-config#1690).
+
+    Measured on both open occurrences. ai-config#1841's confirming review reads
+    "The most recent Claude verdict, [posted here](...#issuecomment-5376065321)
+    [...] was **Needs more work**", and its own heading reads Ready for merge.
+    ai-config#1487's reads "Prior review: [comment](...), verdict
+    **Needs more work**". Both scored not-clean.
+
+    The permalink is the discriminator rather than the wording, because wording
+    cannot separate the two cases --- three rounds of review on #1752/#1760/#1762
+    established that a live finding re-raised across rounds writes the identical
+    bold-plus-citation fragment. What it does NOT write is a link to the comment
+    it is quoting: #1762's live-finding case cites the SHA a finding was first
+    flagged at and carries no comment permalink at all, which is what keeps this
+    gate off it.
+
+    Only the bold verdict phrase is blanked, never the sentence around it, so a
+    live finding stated in the same sentence still survives --- the same
+    discipline the citation gate above uses, and the same safe direction: missing
+    a not-clean signal is the dangerous failure, so this blanks as little as it
+    can while still covering the measured cases.
+    """
+    # Spliced in place rather than split-and-rejoined. Rejoining normalises the
+    # separators, and the clean-verdict guards are POSITION-sensitive -- a bare
+    # `**Ready for merge**` counts only when its line marks it -- so collapsing
+    # `\n\n### Verdict\n\n` into spaces silently unmarks a genuine verdict.
+    # Everything outside a blanked span stays byte-for-byte.
+    out = text
+    for match in reversed(list(RX_BOLD_VERDICT.finditer(text))):
+        start = max((text.rfind(sep, 0, match.start()) for sep in (". ", "! ", "? ", "\n\n")),
+                    default=-1)
+        end_candidates = [e for e in (text.find(sep, match.end()) for sep in (". ", "! ", "? ", "\n\n"))
+                          if e != -1]
+        end = min(end_candidates) if end_candidates else len(text)
+        if RX_COMMENT_PERMALINK.search(text[start + 1:end]):
+            out = out[:match.start()] + " " * (match.end() - match.start()) + out[match.end():]
+    return out
+
+
 def strip_cited_finding_vocab(text: str) -> str:
     """Blank out spans where finding-indicator vocabulary appears as a *citation*
     rather than as a raised finding, so ``finding_patterns`` keys on genuine
@@ -600,7 +658,7 @@ def classify_verdict(body: str, state: str = "") -> str:
     if state in ("CHANGES_REQUESTED", "REJECTED"):
         return "not-clean"
 
-    scan = strip_cited_finding_vocab(body)
+    scan = blank_verdicts_citing_a_comment(strip_cited_finding_vocab(body))
 
     for pat in VERDICT_NOT_CLEAN_PATTERNS:
         for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
@@ -851,7 +909,7 @@ def check_review_comments(pr_num: str, sha: str, repo: str, review_decision: str
         # Scan a copy with cited finding vocabulary (code spans, fenced blocks,
         # double-quoted spans) blanked out, so a clean verdict that merely quotes
         # finding vocabulary is not read as raising a finding (#1202).
-        scan_body = strip_cited_finding_vocab(body)
+        scan_body = blank_verdicts_citing_a_comment(strip_cited_finding_vocab(body))
         for pat in finding_patterns:
             for match in re.finditer(pat, scan_body, re.IGNORECASE | re.MULTILINE):
                 if pat == r"changes\s+requested\b":

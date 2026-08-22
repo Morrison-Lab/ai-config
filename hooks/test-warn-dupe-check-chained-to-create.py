@@ -178,6 +178,32 @@ check("an escaped backslash still closes the span",
 # literal and only `'` closes.
 check("a backslash inside single quotes is literal",
       fires("echo 'a\\'; gh issue list -R o/r; gh issue create"), True)
+# A backslash-NEWLINE inside double quotes is a line continuation: bash keeps
+# the quote open and hands the whole thing over as one argument. Confirmed by
+# running it rather than by reading the pattern --
+#
+#     $ bash -c 'echo "before\
+#     > gh issue list -R o/r; gh issue create -R o/r"'
+#     beforegh issue list -R o/r; gh issue create -R o/r
+#
+# one `echo`, nothing else run. An escape class of `\\.` cannot consume it
+# without re.DOTALL, so the span failed to match at all and the text after the
+# continuation was exposed at a command position. Caught in review on
+# ai-config#1957, round 2, as a REGRESSION against the naive `"[^"]*"` that the
+# escaped-quote fix replaced.
+check("a backslash-newline continuation keeps the span open",
+      fires('echo "before\\\ngh issue list -R o/r; gh issue create -R o/r"'),
+      False)
+check("a line-wrapped --body carrying both commands",
+      fires('gh issue create -R o/r -t T -b "context: we ran \\\n'
+            'gh issue list -R o/r first; gh issue create was then run"'),
+      False)
+# The population-shrink guard for that fix. A `[\s\S]` escape class is wider
+# than `.`, so it must not swallow past the closing quote and blind the hook to
+# a real command after the span.
+check("a continuation span still ends at its closing quote",
+      fires('echo "wrapped \\\ntext"; gh issue list -R o/r; gh issue create'),
+      True)
 check("prose mentioning both mid-sentence",
       fires('echo "run gh issue list before gh issue create"'), False)
 

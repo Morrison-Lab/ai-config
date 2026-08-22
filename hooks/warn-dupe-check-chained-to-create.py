@@ -144,6 +144,14 @@ manufacture one --- neither ever inserts a separator character.
     quotes stay escape-blind on purpose: the shell processes no escapes inside
     `'...'`, so `'[^']*'` is exactly right there.
 
+    "Escape-aware" here means two escapes rather than one, and the first fix
+    shipped only one. An escaped QUOTE is the obvious case. An escaped NEWLINE
+    is the one that bites, because bash reads it inside double quotes as a line
+    continuation, keeps the quote open, and hands the whole thing over as one
+    argument. Both are covered, and both are pinned by tests --- the second one
+    against real `bash` output rather than against what the pattern looks like
+    it should do. Caught in review on ai-config#1957, round 2.
+
 A COMMAND SUBSTITUTION IS INVISIBLE, WHICH CUTS THE RIGHT WAY
 -------------------------------------------------------------
 A check whose output is captured --- `$(gh issue list ...)`, quoted or not ---
@@ -231,8 +239,10 @@ RX_HEREDOC = re.compile(
 )
 
 # A single- or double-quoted span, scanned left to right so the quote that opens
-# first wins. The negated classes match newlines, which is the point: a
-# multi-line `-b "..."` body is one span.
+# first wins. EVERY branch here matches a newline -- the negated classes by
+# construction, and the escape class because it is `[\s\S]` rather than `.` --
+# which is the point: a multi-line `-b "..."` body is one span, continuation
+# backslashes and all.
 #
 # The double-quoted branch is ESCAPE-AWARE and the single-quoted one is not,
 # matching the shell: inside `'...'` a backslash is literal and only `'` closes,
@@ -242,9 +252,28 @@ RX_HEREDOC = re.compile(
 # NORMALIZATION note claims. Caught in review on ai-config#1957 with
 # `echo "before\"; gh issue list -R o/r; gh issue create -R o/r \" after"`.
 #
+# The escape class is `\\[\s\S]` rather than `\\.`, and the difference is a
+# second false positive rather than pedantry. `.` does not match a newline
+# without `re.DOTALL`, so `\\.` cannot consume a backslash-NEWLINE -- which bash
+# treats as a line continuation INSIDE double quotes, leaving the quote open and
+# the whole thing one argument. Confirmed by running it:
+#
+#     $ bash -c 'echo "before\
+#     > gh issue list -R o/r; gh issue create -R o/r"'
+#     beforegh issue list -R o/r; gh issue create -R o/r
+#
+# One `echo`, nothing else run. With `\\.` the span failed to match at all, so
+# the text after the continuation was left exposed at a command position --
+# a REGRESSION against the naive `"[^"]*"`, whose negated class matched newlines
+# by accident. Caught in review on ai-config#1957, round 2.
+#
+# `[\s\S]` is used rather than the `re.DOTALL` flag so the pattern stays
+# self-contained: there is no other `.` here for the flag to affect, and a flag
+# set at compile time is easy to drop when the pattern is later edited.
+#
 # The two alternation branches are disjoint on their first character, so this
 # stays linear rather than backtracking.
-RX_QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+RX_QUOTED = re.compile(r"'[^']*'|\"(?:\\[\s\S]|[^\"\\])*\"")
 
 NOTE = """\
 A gating check and the action it gates are in the same Bash call.

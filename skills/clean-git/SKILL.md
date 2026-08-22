@@ -83,7 +83,27 @@ Stop and surface it.
 ### 1. Classify, both passes
 
 Run [`clean-worktrees`](../clean-worktrees/SKILL.md) steps 1 through 3.
-Run [`clean-branches`](../clean-branches/SKILL.md) steps 1 through 3 and step 8's local enumeration.
+Run [`clean-branches`](../clean-branches/SKILL.md) steps 1 through 3.
+
+For the local half, run step 8's **classification** only.
+`clean-branches` step 8 has no separately-runnable enumeration sub-step:
+each of 8a, 8b, and 8c bundles its listing command and its
+`git branch -d`/`-D` into one fenced block.
+So name the read half explicitly rather than delegating to a sub-step that
+does not exist:
+
+```bash
+git branch --merged origin/main \
+  | grep -vE '^\s*\*|^\s*main\s*$|^\s*master\s*$'   # 8a, listing only
+git branch -vv | grep '\[gone\]'                        # 8b candidates
+```
+
+**Do not run the `git branch -d` or `-D` lines that share those blocks.**
+Those deletions belong to this skill's step 3, after the gate.
+`clean-branches` is safe on its own here only because of a prose instruction
+after all three sub-steps ("no silent local deletions ... wait for
+confirmation"), not because the blocks are deletion-free --- so an orchestrator
+that cites the block without that prose inherits none of the protection.
 
 **Neither pass touches a live worktree, branch, or remote before the gate ---
 with one exception, and it is worth naming rather than rounding off.**
@@ -142,8 +162,8 @@ merely over-subtract.
 Every live worktree appears in it, including the main checkout and the one you
 are standing in.
 Their branches are `Active` to the branch pass by construction, so the
-contradiction rule below fires on the first one and halts a sweep that had
-nothing wrong with it.
+contradiction rule stated earlier fires on the first one and halts a sweep
+that had nothing wrong with it.
 
 ### 2. Present one combined plan --- wait for confirmation
 

@@ -9,7 +9,9 @@ merely consume.
 
 Read "work" broadly.
 Model judgment is the case this fragment was written for and the hardest to displace, but the rule is not about judgment --- it is about **doing by hand what something else already computes**, which includes work carrying no judgment at all.
-A hand-typed section number is not a decision anyone made; it is a value the renderer was already producing, kept in a second place by hand.
+A hand-typed section number is not a decision anyone made;
+it is a value the renderer was already producing,
+kept in a second place by hand.
 The section below covers that case, and it is the easiest of the three to miss precisely because nothing about it feels like deciding.
 
 This is one principle with two faces, operating on different timescales.
@@ -205,7 +207,8 @@ That is [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md) 
 - **Do:** enable the generator and delete the hand-maintained copy, rather than leaving the generator off.
 - **Do:** read the rendered output when a value is generated, since the source cannot show the collision.
 - **Don't:** treat "it is not a judgment call" as putting something outside this principle --- the clearest cases involve no judgment at all.
-- **Don't:** assume an unused generator is harmless; it runs the moment a config elsewhere turns it on.
+- **Don't:** assume an unused generator is harmless;
+  it runs the moment a config elsewhere turns it on.
 
 ## Limits
 

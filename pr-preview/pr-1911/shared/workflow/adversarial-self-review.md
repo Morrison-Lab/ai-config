@@ -93,3 +93,51 @@ The other cases have no guard and are prose rules here.
 - **Don't:** brief the reviewer with the rationale for the change.
 - **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.
   It is a self-review, performed properly.
+
+## The review gates the push, not the work --- and it is one round, not a loop
+
+The rule above is a gate on a **push**.
+It is not a rule that the work must stop moving until the reviewer is happy,
+and reading it that way turns one gate into an unbounded loop.
+
+The failure runs like this.
+A review returns findings, you fix them, and the fix needs its own review ---
+correctly, since a fix is a diff nobody has read.
+So far so good.
+The trap is treating each round's fix as something that must clear review
+*before the branch can be pushed at all*, because that condition never
+arrives: every round produces new code, new code owes a review, and the
+commits pile up locally while the loop runs.
+Measured on [ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911):
+five rounds on one file, every round finding something real, and nothing
+pushed for hours.
+
+It reads as rigour from the inside, which is what makes it worth a rule.
+Each individual decision to hold is defensible, and the loop is invisible
+because no single round is the one that went wrong.
+
+**Pushing is not merging, and the costs run the other way.**
+A pushed branch is where CI and the repo's own reviewer can see the code, so
+pushing *adds* scrutiny rather than skipping it.
+Holding subtracts it, and adds costs of its own: the work is invisible to
+other sessions, it is unbacked-up, and its merge conflict with a moving base
+grows the whole time.
+
+So the gate is per push and the review is of what that push ships.
+Once a round's fix is verified --- its own tests, its own mutation control,
+its own measurement --- push it, and let the next review run against the
+pushed head, which is the head that matters.
+
+- **Do:** push a verified round and let the reviewer read the pushed head.
+- **Do:** batch a round's fixes into one push, per
+  [`efficient-pr-babysitting`](efficient-pr-babysitting.md), rather than
+  trickling or hoarding.
+- **Don't:** hold a branch until some future round returns clean --- that
+  condition recedes with every fix.
+- **Don't:** read a gate on pushing as a gate on shipping any of the work.
+
+(Directive from the user, 2026-08-22, mid-session on #1911: "what are you
+waiting for?".
+Five commits were sitting unpushed behind a self-imposed review queue while
+the branch's conflict with `main` had to be re-resolved twice.
+The honest answer to the question was "nothing".)

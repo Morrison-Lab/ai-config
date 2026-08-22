@@ -861,3 +861,57 @@ Where it does not enter both measurements with the same magnitude, the ratio amp
 - **Do:** fix the instrument when the noise is instrument-borne, rather than building a statistic that tolerates it.
 - **Don't:** assume min-of-N filters two measurements equally when one is much longer than the other.
 - **Don't:** read a ratio's stability on an idle machine as evidence that it is load-independent.
+
+## Reading an instrument's PROSE instead of its exit status, generalized past the PR checker
+
+[`fully-clean`](fully-clean.md)'s "Calling the checker is not consuming it"
+section states this rule for `check-pr-fully-clean.py` and states it well: the
+script answers twice, in prose for a human and in an exit status for a program,
+and only the second is a stable interface.
+
+The rule is written entirely in terms of that one script, so it reads as a fact
+about that script.
+It is a fact about **every** instrument this repo ships.
+`check-links.py`, `validate-skills.py`, `check-hook-catalog.py`,
+`semantic-line-breaks.py` and the rest all print findings and then exit
+non-zero, and every one of them can be misread the same way.
+
+**`tail` is the same defect as `grep`, and it is easier to commit** because it
+does not feel like parsing.
+Piping a checker to `tail -2` to keep a status recap short is a formatting
+decision, not an interpretation --- and that is exactly what makes it
+dangerous: a checker that prints its findings *before* its verdict shows you
+the findings and hides the verdict, and a checker that prints many findings
+shows you the last two.
+Neither looks like a misread.
+
+The failure direction is the same one `fully-clean` names: it fails **toward
+clean**.
+The tail of a passing run and the tail of a failing run look alike when the
+failing run's last lines are finding bullets, so "no verdict line visible" gets
+read as "nothing wrong".
+
+**One reading settles it, and it is shorter than the pipe:**
+
+```bash
+python3 scripts/check-links.py >/tmp/out.txt 2>&1; rc=$?
+case $rc in
+  0) echo CLEAN ;;
+  *) echo "NOT clean (rc=$rc)"; cat /tmp/out.txt ;;
+esac
+```
+
+**The tell is a sentence about an instrument that names no exit status.**
+"Links OK", "validators green", "checks pass" --- if you cannot say which code
+the check returned, you did not read its answer.
+
+- **Do:** branch on a checker's exit status, whichever checker it is.
+- **Do:** treat `tail`, `head`, and a truncating pipe as interpretations of an
+  instrument's answer, subject to the same rule as `grep`.
+- **Don't:** report an instrument's verdict in a sentence that names no exit
+  status.
+- **Don't:** read this rule as scoped to `check-pr-fully-clean.py` because that
+  is the script `fully-clean.md` happens to describe.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"Tailing check-links.py reported clean over three broken links".

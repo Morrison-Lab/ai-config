@@ -149,10 +149,10 @@ Default to archive-and-start-new over a bare `/clear` whenever the session might
 The mid-task counterpart, covered in the fragment above: don't wait for automatic compaction to guess what matters, and flag it yourself (same `⚠️ FLAG` tag) once a session has grown large with a live task still in flight --- many tool calls, long tool outputs no longer needed, or a session already through one auto-compaction.
 Use `/clear`'s menu when there is nothing left to carry forward; use `compress-session` when there is.
 
-## Actively manage quota usage: models and compaction
+## Actively manage quota usage: models, compaction, and workflow structure
 
 Treat quota as something to manage continuously through a session, not only at a wrap-up or fan-out moment.
-Two levers; when either applies, act on it without waiting to be asked.
+Three levers; when any applies, act on it without waiting to be asked.
 
 **Model tier.**
 For dispatched work (`Agent` calls, `Workflow` `agent()` calls), route model and effort per [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md)'s "Route each agent's model/effort" section.
@@ -178,9 +178,31 @@ The agent has no direct view into it, though --- the usage bar lives in the clie
 So key this off what's actually visible: the user naming or showing usage pressure, or --- inside a `Workflow` run with a stated token target --- `budget.spent()`/`budget.remaining()`.
 Either is reason enough to compress or recommend a lighter model, on the same terms those sections already set out.
 
-When both levers genuinely apply at once, do the self-directed one first.
-Compress or compact before asking the user to act on a model change.
-Only the second one costs them a step.
+**Workflow structure.**
+[`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md)
+
+The two levers above spend less on the work **as shaped**, and their saving expires with the session.
+This one changes the shape, so it pays every future session --- and it is the one that never announces itself, because following an expensive procedure correctly reads as compliance, and pulling either lever above reads as having managed quota.
+So ask separately what a procedure costs *by construction*: always-loaded content only some sessions read, a judgment made twice that wants an instrument, a serial loop the base outruns, an enumerated brief that should have been a query, work at this tier a free CLI could do.
+The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
+`python3 scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
+Its budget is advisory by design, so read an over-budget line as the prompt it is.
+Two boundaries.
+Efficiency never outranks correctness, so no saving is bought with a skipped check.
+And the restructuring goes in its own issue or PR rather than happening inside whatever task noticed it.
+
+Human steps are in scope too --- a merge method, a batching habit, a review-request convention each shape the procedure and each has a price.
+Naming one and stopping there is `no-empty-promises` pointed outward, so every suggestion about human behaviour ships a mechanism in the same reply: a written rule at minimum, then a visible marker at the moment of the action, then a guard, then a setting that removes the option.
+Pick the rung from the cost of the mistake rather than the strength of the opinion, and leave the decision with the user, per `flag-practice-slippage`.
+
+- **Do:** ask what a procedure costs by construction, separately from what this run costs.
+- **Do:** ship a mechanism in the same reply that names a human behaviour change.
+- **Don't:** read a pulled lever as having answered the structural question.
+- **Don't:** name a behaviour change with nothing behind it.
+
+When several levers genuinely apply at once, do the self-directed ones first.
+Compress, compact, or file the structural finding before asking the user to act on a model change.
+Only the model change costs them a step.
 
 ## Keep a running on-disk session lab notebook
 
@@ -583,11 +605,15 @@ The strong form of the claim: after claiming an issue you're about to work, open
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
 The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 
-## Run local adversarial self-review before pushing
+## Every self-review is an adversarial review by a separate subagent
 
-Before pushing any feature branch, execute a local self-review using an adversarial review persona or the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent against `git diff origin/main...HEAD`.
-Confirm that the review achieves a clean verdict (`### Verdict: Ready for merge`) and that all defects or convention violations are resolved prior to `git push`.
-Pushing without a clean self-review is mechanistically blocked by `hooks/no-push-without-self-review.py`.
+[shared/workflow/adversarial-self-review.md](shared/workflow/adversarial-self-review.md)
+
+Whenever reviewing your own work is called for --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only) against `git diff origin/<default-branch>...HEAD`, and treat its findings as findings.
+The authoring session cannot do it inline: it knows what the change was *meant* to say, so it reads the diff and recovers the intent, which is confirmation rather than review.
+Brief the reviewer with the diff and the standards, never with the rationale for the change --- handing over your account of it is what makes the reviewer agree with you.
+`hooks/no-push-without-self-review.py` gates the pre-push case.
+The fragment covers the rest, including why a same-vendor subagent buys independence of *intent* and not of blind spot.
 
 ## Open a PR for every pushed feature branch
 
@@ -737,6 +763,21 @@ Whenever starting or working on a Pull Request:
 - **Do:** Trigger AI review (`@claude review`) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
 - **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
 
+
+## Check the remote immediately before every push
+
+[`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md)
+
+Take a fresh `git ls-remote` reading of the branch immediately before every `git push` --- not at the start of the round, not when you last synced, not when you opened the PR.
+The branch you cut and whose PR you opened is the one you are *least* likely to check, because ownership makes the check read as ceremony rather than as a question with an unknown answer.
+`claim-pr` records three ways it gains another agent's commits anyway (the `@claude` agent's `main`-sync, a second CLI session, a human), and every recovery procedure there runs *after* the collision.
+An earlier fetch is a measurement of a moment that has passed, and it expires exactly the way a clock reading does.
+
+`--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
+Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
+A `stale info` refusal is not a reason to force either: `memories/git.md` records that it means the remote branch is gone, so a plain push is the fix.
+`ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee, and using it means stating why.
+`hooks/no-clobbering-push.py` is the mechanism: it refuses a bare force push, whose remedy costs one word, and only warns on a divergence, whose significance it cannot judge.
 
 ## Keep PR branches synced with main
 
@@ -1439,6 +1480,99 @@ Open the PR.
   `git commit -F <file>` succeeded immediately either way, which is why the remedy needs no diagnosis first.
   - **Do:** write a commit message carrying backticks to a file and commit it with `git commit -F <file>`.
   - **Don't:** pass a backtick-carrying message through `git commit -m "..."`, or spend a round diagnosing a guard refusal when the file route costs one command.
+
+## Tool transport collapses doubled backslashes
+
+The sibling of the backtick hazard above, and the same class: content silently
+transformed between what I type and what the interpreter receives.
+
+Inside a Bash-tool heredoc with a **quoted** delimiter (`<<'PY'`), which
+should be entirely literal, a doubled backslash `\\` arrives as a single `\`.
+A single `\` survives intact.
+So one level of unescaping is applied somewhere in transport.
+
+**Scope it before relying on it: this is a property of the environment, not of
+heredocs.**
+Measured 2026-08-22 on Windows 11 / MINGW64 through the Claude Code Bash tool.
+A reviewer running the same cases in a GitHub Actions Linux runner could **not**
+reproduce any of it, and was right not to --- so a claim stated unconditionally
+here is false there, which is how a true observation becomes a wrong rule.
+Test your own environment before trusting either answer.
+
+The reproducer is one command and needs no interpreter, which is what rules out
+Python's own string parsing as the cause:
+
+```
+cat <<'EOF' > out.txt
+a\\nb
+c\nd
+EOF
+```
+
+Both lines land in `out.txt` carrying **one** backslash: the doubled form
+collapsed, the single form survived.
+Nothing but the transport touched it.
+
+It fails silently and plausibly.
+A patch script's `assert target in s` fails, which reads as a slightly-wrong
+anchor string --- so the natural response is to re-dump the region and retype
+the anchor, which fails identically.
+The tell only appears on printing `repr()` of the constructed string.
+
+The worse case is not a failed assert.
+A heredoc that *writes* `\\d` into a regex emits `\d` --- a corrupted matcher with no
+syntax error and a green suite.
+Anything writing regexes, escape sequences, or Windows paths through a heredoc
+is exposed, including a `jq` filter: `test("\\*\\*Claude finished")` reaches
+`jq` as `test("\*\*...")` and dies with `Invalid escape`.
+
+Build the character rather than typing it:
+
+```
+B = chr(92)
+def bs(t): return t.replace("@@", B)
+
+# A NON-RAW literal is where this bites. Expressing one backslash inside one
+# requires typing two, and that doubled form is exactly what collapses -- so
+# the placeholder is doing real work here.
+target = bs('print("done@@n")')
+# -> the 15 characters  print("done\n")  ... with a real backslash,
+#    which is what the file being patched actually contains.
+```
+
+The same collapse is already described twice.
+[`algorithmatize-checks.rationale.md`](shared/workflow/algorithmatize-checks.rationale.md)
+records it for **this same transport** --- a shell heredoc feeding Python ---
+where `\\b` arrives as `\b` and becomes a **backspace**, worked through as
+a mutation that silently corrupts a guard's own regex.
+[`address-every-comment.rationale.md`](shared/workflow/address-every-comment.rationale.md)
+records a genuinely different one, backslash quoting collapsing across nested
+shell layers.
+What is new here is the trigger context --- a Bash-tool heredoc whose delimiter
+is quoted, so it should be literal --- and the placeholder remedy.
+Cross-linked because a dupe-check keyed on this section's vocabulary would
+otherwise miss both.
+
+A **raw** string needs none of this: `r"^\d+$"` is single backslashes
+throughout, and those survive.
+The machinery is for the doubled form --- a non-raw literal, or any target that
+must itself contain a backslash escape.
+
+- **Do:** route every literal backslash through `chr(92)` (or a placeholder
+  token) when heredoc content must survive verbatim.
+- **Do:** print `repr()` of a constructed string when a match inexplicably
+  fails, rather than retyping the anchor.
+- **Don't:** assume a quoted heredoc delimiter guarantees literal content ---
+  on this platform, measured 2026-08-22, it does not.
+- **Don't:** carry the claim to another platform without re-measuring; it did
+  not reproduce in a Linux CI runner.
+- **Don't:** trust a green suite after writing a regex through a heredoc; read
+  the emitted line back.
+
+(Measured 2026-08-22; tracked as
+[ai-config#1923](https://github.com/Morrison-Lab/ai-config/issues/1923).
+Cost three identical failed patch attempts before the cause was visible, then
+recurred immediately in a `jq` filter reading a PR review body.)
 
 ## Strict Merge Control Policy
 

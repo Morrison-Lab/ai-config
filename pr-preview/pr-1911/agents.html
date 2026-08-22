@@ -342,7 +342,8 @@ ul.task-list li input[type="checkbox"] {
 <p>Agents are custom <strong>subagents</strong> that Claude Code can delegate a task to via its built-in <code>Agent</code> tool. Each <code>.claude/agents/&lt;name&gt;.md</code> file gives a subagent a system prompt, a <code>description</code> (what Claude Code matches invocations against), and a restricted <code>tools</code> list. Claude Code discovers agents in <code>.claude/agents/</code> automatically — like skills, no separate registration step is needed once this repo is bootstrapped.</p>
 <section id="why-read-only-fan-out-workers" class="level2">
 <h2 class="anchored" data-anchor-id="why-read-only-fan-out-workers">Why read-only fan-out workers</h2>
-<p>Several skills fan a task out across many independent targets — one competitor community per research pass, one dependency pin per audit, one claim per fact-check — and want each target checked in parallel without risking a stray worker writing a file, filing an issue, or running a destructive command. Every agent in this repo omits <code>Edit</code> and <code>Write</code> from its <code>tools</code> list, so it can never call those tools to change a file — that restriction is <strong>harness-enforced</strong>. Three of the four agents also keep <code>Bash</code>, which <em>can</em> run write-capable shell commands (<code>git push</code>, <code>rm</code>, a redirect); for those, staying read-only is instruction-level discipline, not a harness guarantee (see the note below the table). Each agent returns a report; only the calling session, which keeps full tool access, applies fixes or writes anything, on the user’s go-ahead.</p>
+<p>Several skills fan a task out across many independent targets — one competitor community per research pass, one dependency pin per audit, one claim per fact-check — and want each target checked in parallel without risking a stray worker writing a file, filing an issue, or running a destructive command. Every agent in this repo omits <code>Edit</code> and <code>Write</code> from its <code>tools</code> list, so it can never call those tools to change a file — that restriction is <strong>harness-enforced</strong>. All but one of them also keep <code>Bash</code>, which <em>can</em> run write-capable shell commands (<code>git push</code>, <code>rm</code>, a redirect); for those, staying read-only is instruction-level discipline, not a harness guarantee (see the note below the table). Each agent returns a report; only the calling session, which keeps full tool access, applies fixes or writes anything, on the user’s go-ahead.</p>
+<p><code>adversarial-reviewer</code> is the one that is not a fan-out worker but a <strong>critic</strong> — it reviews the calling session’s own diff rather than investigating the repo fresh. The read-only constraint matters for the same reason and one more: a reviewer that could edit would turn a finding into a silent fix, losing the finding and its disposition together.</p>
 </section>
 <section id="agents-in-this-repo" class="level2">
 <h2 class="anchored" data-anchor-id="agents-in-this-repo">Agents in this repo</h2>
@@ -359,8 +360,8 @@ ul.task-list li input[type="checkbox"] {
 <tr class="odd">
 <td><a href="https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/adversarial-reviewer.md"><code>adversarial-reviewer</code></a></td>
 <td><code>Bash</code>, <code>Read</code>, <code>Grep</code>, <code>Glob</code>, <code>WebFetch</code>, <code>WebSearch</code></td>
-<td><a href="./skills/push/SKILL.html"><code>push</code></a> / <a href="shared/workflow/ardi.md"><code>ardi</code></a></td>
-<td>Scrutinizes git diffs, challenges implementation decisions and factual claims, checks conventions and edge cases, and emits a structured review with a clear verdict (<code>Ready for merge</code> vs <code>Needs more work</code>)</td>
+<td>every self-review — <a href="./skills/push/SKILL.html"><code>push</code></a>, <a href="shared/workflow/ardi.md"><code>ardi</code></a>, <a href="shared/workflow/self-review-fallback.md"><code>self-review-fallback</code></a></td>
+<td>Scrutinizes a diff for defects, unhandled edge cases, false factual and tool-behaviour claims, and convention violations — judging it by what it says rather than by the author’s account of it — and emits a structured review ending in a verdict (<code>Ready for merge</code> vs <code>Needs more work</code>)</td>
 </tr>
 <tr class="even">
 <td><a href="https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/community-demand-scout.md"><code>community-demand-scout</code></a></td>
@@ -386,9 +387,27 @@ ul.task-list li input[type="checkbox"] {
 <td><a href="./skills/fact-check-prose/SKILL.html"><code>fact-check-prose</code></a> (<code>fcp</code>)</td>
 <td>Checks one factual claim, reasoning step, or computed value/figure against domain knowledge, an external source, or a rendered artifact, and returns a verdict naming the exact source it checked</td>
 </tr>
+<tr class="even">
+<td><a href="https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/overlap-detector.md"><code>overlap-detector</code></a></td>
+<td><code>Bash</code>, <code>Read</code>, <code>Grep</code>, <code>Glob</code></td>
+<td><a href="./skills/find-overlap/SKILL.html"><code>find-overlap</code></a></td>
+<td>Clusters comparable units (skills, memories, docs, code, prose) by similarity, classifies each cluster as intentional-alias / adjacent-but-distinct / genuine-duplicate, and reports each with evidence and a recommended disposition</td>
+</tr>
+<tr class="odd">
+<td><a href="https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/reproducibility-auditor.md"><code>reproducibility-auditor</code></a></td>
+<td><code>Bash</code>, <code>Read</code>, <code>Grep</code>, <code>Glob</code>, <code>WebFetch</code></td>
+<td><a href="./skills/reproducibility-audit/SKILL.html"><code>reproducibility-audit</code></a></td>
+<td>Surveys a project for hidden dependencies, hardcoded absolute paths, undocumented prerequisites, environment assumptions, and output traceability, scoped per project type</td>
+</tr>
+<tr class="even">
+<td><a href="https://github.com/Morrison-Lab/ai-config/blob/main/.claude/agents/skill-usage-auditor.md"><code>skill-usage-auditor</code></a></td>
+<td><code>Bash</code>, <code>Read</code>, <code>Grep</code>, <code>Glob</code></td>
+<td><a href="./skills/skill-audit/SKILL.html"><code>skill-audit</code></a></td>
+<td>Enumerates skills, greps local session transcripts for their invocations, rolls alias counts into their canonical skill, and buckets every skill into actively-used / dormant / dead</td>
+</tr>
 </tbody>
 </table>
-<p><code>adversarial-reviewer</code>, <code>dependency-auditor</code>, <code>hallucination-detector</code>, and <code>prose-fact-checker</code> all keep <code>Bash</code> for read-only checks (<code>grep</code>, <code>gh api</code>, <code>git submodule status</code>, <code>test -e</code>) — avoiding a write-capable shell command (<code>renv::update()</code> without <code>check = TRUE</code>, <code>pre-commit autoupdate</code>) is instruction-level discipline for those four, not a harness-enforced restriction the way the missing <code>Edit</code>/<code>Write</code> is.</p>
+<p>Every agent except <code>community-demand-scout</code> keeps <code>Bash</code> for read-only checks (<code>grep</code>, <code>gh api</code>, <code>git submodule status</code>, <code>test -e</code>) — avoiding a write-capable shell command (<code>renv::update()</code> without <code>check = TRUE</code>, <code>pre-commit autoupdate</code>) is instruction-level discipline for those, not a harness-enforced restriction the way the missing <code>Edit</code>/<code>Write</code> is. Each such agent’s file under <code>.claude/agents/</code> says so in as many words, so the discipline is instructed where it is relied on rather than only asserted here. The <code>.opencode/</code> mirrors are not all the same: opencode’s own permission block can deny <code>bash</code> outright, in which case the restriction is harness-enforced there and the persona says that instead.</p>
 </section>
 <section id="how-theyre-invoked" class="level2">
 <h2 class="anchored" data-anchor-id="how-theyre-invoked">How they’re invoked</h2>

@@ -169,7 +169,7 @@ failure across five hours, two of them reaching duplicate PRs.
 
 One query settles it before you spend a PR:
 
-    gh pr list --repo <owner>/<repo> --state open --search "<keywords>"
+    gh pr list --repo <owner>/<repo> --state all --search "<keywords>"
 
 If a PR already covers this, add to it instead. If you have already checked
 another way, carry on --- this is a reminder, not a refusal.

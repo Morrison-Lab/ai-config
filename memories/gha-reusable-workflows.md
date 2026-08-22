@@ -23,6 +23,14 @@ Generic Actions-authoring material stays there.
     So a repo that wants both a main site AND PR previews must use `@v2` + branch Pages.
   - **Branch-served Quarto needs `.nojekyll`** at the gh-pages root, or Jekyll strips Quarto's `_`-prefixed asset dirs.
     `quarto publish gh-pages` adds it automatically; `JamesIves` does not, so `@v2` touches one in before deploy.
+  - **Private Pages repositories can receive an opaque `*.pages.github.io` hostname instead of `<owner>.github.io/<repo>`.**
+    Read the authoritative URL from `gh api repos/<owner>/<repo>/pages --jq .html_url`.
+    Strip the `https://` prefix and any trailing slash before passing it as `rossjrw/pr-preview-action`'s `pages-base-url`.
+    The action builds its links as `https://$pages_base_url/$preview_url_path/` (`lib/main.sh`), so a full URL produces `https://https://...` preview links.
+    Stripping the scheme is the whole transformation --- **don't also drop the path**.
+    It leaves a bare hostname only for a private site;
+    for an ordinary one it leaves `<owner>.github.io/<repo>`, which is exactly what the action computes for itself by default (`lib/calculate-pages-base-url.sh`), and dropping that `/<repo>` 404s every preview.
+    Quarto's `website.site-url` still takes the complete `https://.../` URL.
   - **The repo's Pages *source* is a manual setting** --- not changeable via the MCP tools or (in scoped sessions) the API.
     Hand the flip to the user,
     and order it safely: deploy to `gh-pages` FIRST (populates root;
@@ -133,4 +141,3 @@ Generic Actions-authoring material stays there.
   Supports `workflow_dispatch`, `/update-snapshots` PR comment (`pr-mode: true`), and auto-update before R-CMD-check (`ref: github.head_ref`).
   Pass system deps via `apt-packages`.
   Added in gha#103; bcs#226 is the reference caller.
-

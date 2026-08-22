@@ -217,11 +217,20 @@ call site forgets --- the caller reads as complete without it, and nothing
 at the call site says otherwise.
 So put the thing that must not be skipped in a REQUIRED argument, and
 derive the rest inside.
-Measured 2026-08-22: a guard threaded an optional `overrides=` through the
-config reads it knew about, and the same commit left one read without it,
-which was a live bypass.
-Making the argument required and deriving the overrides inside the helper
-removed the spelling rather than the instance.
+That closes OMISSION and nothing else.
+A caller passing an empty or wrong value still reaches the unguarded
+behaviour, and only a test asserting on the value forbids that, so name
+which of the two you closed rather than calling the unsafe call unspellable.
+Measured 2026-08-22 on
+[ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911) --- at
+the time of writing on its own branch rather than on `main`.
+A guard threaded an optional `overrides=` through the config reads it knew
+about, and the same commit left one read without it, which was a live
+bypass.
+Making the raw `argv` a required argument in its place, and deriving the
+overrides from it inside the helper, removed the spelling rather than the
+instance --- though a caller passing `argv=[]` derives no overrides and gets
+the same unguarded read, and nothing in that suite asserts against it.
 
 A choke point narrows the class without closing it, so say which you
 achieved.
@@ -295,7 +304,8 @@ The structural count is asserted by nothing at all.
 - **Do:** prefer a choke point the next author must go out of their way to
   bypass over a check the next author must remember.
 - **Do:** make the un-skippable input a required argument and derive the
-  rest inside, so the unsafe call cannot be spelled.
+  rest inside, so the call that SKIPS it cannot be spelled --- then say so
+  in those terms, since a wrong or empty value still can.
 - **Don't:** add the guarded behaviour as an optional parameter --- that
   routes the callers you remembered and leaves the spelling that skips it.
 - **Do:** say whether the count is enforced or merely current, and name

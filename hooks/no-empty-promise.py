@@ -300,20 +300,6 @@ SCHEDULER_SKILLS = {"schedule", "loop", "workaround-watcher"}
 
 # The repo's own detached poller, RUN rather than merely named.
 #
-# The execution anchor is the whole of what makes this sound, and its absence
-# was a real bypass on the first cut of this change: a bare path regex
-# discharged `cat hooks/monitor-open-prs.py`, `grep -n check
-# hooks/monitor-open-prs.py`, and `echo hooks/monitor-open-prs.py` -- which is
-# exactly what `discharges()`'s own docstring says must never happen, in a
-# session working on the poller hooks, where those reads are the likeliest
-# commands of all.
-#
-# So require an interpreter or a direct exec before the path, mirroring the
-# way FILING_CMD demands the actual `gh issue create` verb rather than the
-# word "issue".
-#
-# The repo's own detached poller, RUN rather than merely named.
-#
 # WHY A LEXER RATHER THAN A REGEX
 # -------------------------------
 # This started as a bare path match and took three consecutive review rounds,
@@ -388,7 +374,13 @@ def _poller_executed(command, depth=0):
             if _poller_executed(tokens[index + 1], depth + 1):
                 return True
             continue
-        if not _POLLER_TOKEN.match(token):
+        # `shlex` splits on whitespace and quoting, NOT on shell operators, so
+        # `python3 hooks/monitor-open-prs.py; echo done` yields the token
+        # `hooks/monitor-open-prs.py;` and the anchored match below rejects it.
+        # Strip a trailing operator run rather than dropping the `$` anchor,
+        # which is what keeps `cat hooks/monitor-open-prs.py` from matching a
+        # token that merely ENDS with the path.
+        if not _POLLER_TOKEN.match(token.rstrip(";&|")):
             continue
         if index == 0:
             return True  # `./hooks/monitor-open-prs.py`

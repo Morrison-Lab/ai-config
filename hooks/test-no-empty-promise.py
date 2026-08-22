@@ -557,6 +557,25 @@ CASES = [
       bash("env PATH=/opt/homebrew/bin:$PATH python3 hooks/monitor-open-prs.py "
            "--monitor")],
      False, "an env-prefixed arming discharges (the shape that fixed #1953)"),
+
+    # --- Review round 4 on #1947, reported as non-blocking and fixed anyway.
+    # `shlex` splits on whitespace and quoting, NOT on shell operators, so a
+    # separator with no space before it rides along on the path token and the
+    # anchored match rejected it. A regression the round-3 rewrite introduced
+    # (the old regex used an unanchored search), failing in the safe
+    # direction, and a semicolon with no space is an ordinary way to write a
+    # command.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 hooks/monitor-open-prs.py; echo done")],
+     False, "a trailing `;` on the path token still discharges (#1947 r4)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 hooks/monitor-open-prs.py&")],
+     False, "a trailing `&` with no space still discharges"),
+    # The anchor is stripped, not dropped: a token that merely ENDS with the
+    # path must still be rejected, which is what the `$` was protecting.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("cat hooks/monitor-open-prs.py; echo done")],
+     True, "stripping the separator does NOT reopen the read bypass (#1947 r4)"),
 ]
 
 

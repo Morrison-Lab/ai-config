@@ -586,6 +586,103 @@ A sentence that would still read true with the parameter deleted is explaining t
 Caught as a non-blocking review note.
 Restating the docstring to name the depth filter made the parameter visibly redundant, and it was removed.)
 
+## A rationale can be false while the code it justifies is correct
+
+The section above covers a docstring that is **true and incomplete**.
+This is a related but distinct failure: a comment, docstring, or PR rationale
+that is **explicitly false**, sitting beside code that works.
+The contrast is omitted mechanism versus incorrect explanation, and it is
+worth keeping sharp, because a rationale that merely *understates* how
+something works belongs to that section rather than this one.
+
+The pairing matters because the two are told apart only by checking, and
+nothing about either one feels like a claim while you are writing it.
+A rationale is written in the same breath as the code, from the same
+understanding, and it inherits the code's air of having been verified ---
+the code was tested, so the sentence about the code feels tested too.
+It was not.
+Tests exercise behaviour, and a rationale is a claim about *why* the behaviour
+holds --- so an ordinary behavioural test can pass with the explanation still
+false.
+
+The failure has a signature worth learning:
+
+- **The artifact is right, so nothing fails.**
+  No check goes red and no output is wrong, so the defect is invisible to the
+  behavioural checks a change normally runs.
+- **The claim is checkable in seconds**, and usually by a command adjacent to
+  what you already ran --- reading the function's documented defaults, grepping
+  the file you cited, checking which commit introduced a line.
+- **It survives review** unless a reader independently verifies the claim,
+  because the natural review question is whether the code works.
+
+**A rationale that reasons about defaults is particularly easy to get wrong**,
+because the default is the thing you did not write and therefore did not think
+about.
+"Safe here, because the caller validates the input" is false when the caller
+validates nothing and the safety comes from a filter further upstream ---
+and note that the code is still safe, which is what makes it an instance of
+this pattern rather than of a bug.
+Deleting the sentence would leave a correct program; keeping it teaches the
+next reader to protect the wrong invariant.
+Read the signature and the call site rather than the intent.
+
+The check is one question per justifying sentence:
+**what command would show this false?**
+If a command exists and takes seconds, run it before the sentence ships.
+If none exists, the sentence is not a rationale but a guess, and should be
+written as one.
+
+- **Do:** run the deriving command for a rationale's factual claim --- the
+  documented defaults, the introducing commit, the cited file's text --- and
+  publish it beside the claim where the claim is load-bearing.
+- **Do:** treat a sentence explaining *why* code is correct as unverified until
+  checked, however thoroughly the code itself was tested.
+- **Don't:** let a rationale inherit the code's credibility --- the tests
+  covered the behaviour, never the explanation.
+- **Don't:** reason about a call's semantics from its intent when its
+  **defaults** decide them.
+
+**Not decidable by a guard, though partly checkable by hand.**
+The condition is "a sentence asserting why code behaves as it does is false",
+and deciding it means evaluating the claim against the world, which no
+transcript-scoped trigger can do.
+A cue-word proxy --- `because`, `so that`, `rather than` --- would carry
+unacceptable error in both directions: it fires on correct rationales that use
+those words, and misses false ones that do not.
+That is a claim about a *truth detector*, not about checkability in general.
+The specific checks named above --- reading documented defaults, grepping a
+cited file, finding the commit that introduced a line --- are exactly the
+mechanical steps that settle individual instances, and they are why this is a
+review question and a self-check rather than a guard.
+
+(Measured 2026-08-21, three instances in one session, each caught by a
+reviewer rather than by any check, and in each the artifact itself was
+correct.
+A fragment's prose about a hook attributed an omitted gate to "earlier fixes
+rather than the original design", where `git log -S` put it in the hook's own
+first PR, ai-config#1566 (ai-config#1860).
+The gate was real and the hook was right; only the sentence about where it
+came from was wrong.
+`fully-clean.md` said a checker "annotates duplicated names automatically",
+where it annotates only the lines it reports, never a passing one ---
+which was the very case the passage illustrated (ai-config#1870).
+And a PR rationale justified a reword by saying "the same entry already uses
+the long form", where the entry used the abbreviation (ucdavis/bcs#725).
+
+A fourth candidate was dropped on review, and the reason is instructive.
+An R helper's comment claimed it used R's own regex engine "rather than
+reimplementing the matching and risking a divergence", while calling `grepl()`
+with defaults that are case-sensitive POSIX ERE, against `.Rbuildignore`
+patterns that Writing R Extensions specifies as Perl-like and
+case-insensitive (ucdavis/bcs#720).
+That looks like this section's pattern and is not: the **code** diverged from
+the semantics it was implementing, so the artifact was not correct, and the
+sentence stayed arguably true while omitting which mode was selected ---
+which is the preceding section's failure, not this one's.
+The test of membership is whether the artifact would still be right once the
+sentence were deleted.)
+
 ## What to report
 
 For each issue found, state:

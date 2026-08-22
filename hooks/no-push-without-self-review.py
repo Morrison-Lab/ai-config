@@ -153,11 +153,14 @@ def _is_true(v: str) -> bool:
     return v.strip().lower() in {"true", "yes", "on", "1"}
 
 
+# (key, the flag it mirrors, a predicate on the value, read-as-boolean).
+# The last field matters: a valueless key is true to git and prints empty
+# under a plain `--get`, so a boolean entry has to be read with `--bool`.
 CONFIG_LIKE_INDETERMINATE_FLAGS = (
-    ("remote.{remote}.mirror", "--mirror", _is_true),
-    ("push.followTags", "--follow-tags", _is_true),
+    ("remote.{remote}.mirror", "--mirror", _is_true, True),
+    ("push.followTags", "--follow-tags", _is_true, True),
     ("push.recurseSubmodules", "--recurse-submodules",
-     lambda v: v.strip().lower() in SUBMODULE_PUSH_MODES),
+     lambda v: v.strip().lower() in SUBMODULE_PUSH_MODES, False),
 )
 
 
@@ -416,12 +419,17 @@ def _hints_by_position(command: str) -> list[str | None]:
             return []
         if not argv:
             continue
-        if argv[0] in ("cd", "pushd", "popd"):
-            arg = argv[1] if len(argv) > 1 else None
-            stack[depth] = arg if (arg and not arg.startswith("-")
-                                   and argv[0] != "popd") else None
-            continue
+        # Strip FIRST. Push detection three lines below already does, so a
+        # `cd` behind a shell keyword (`while true; do cd other; git push`)
+        # was invisible here while the push after it was still detected --
+        # and that is the retry-loop shape `skills/push/SKILL.md` prescribes,
+        # so it is reachable by ordinary use rather than only adversarially.
         _, rest = _strip_env(argv)
+        if rest and rest[0] in ("cd", "pushd", "popd"):
+            arg = rest[1] if len(rest) > 1 else None
+            stack[depth] = arg if (arg and not arg.startswith("-")
+                                   and rest[0] != "popd") else None
+            continue
         if rest and _SIBLING and _SIBLING._argv_push(rest):
             hints.append(stack[depth])
     return hints
@@ -679,8 +687,66 @@ def _rev_parse(directory: str | None, rev: str) -> str | None:
     return sha.lower() if sha and re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
-def _git_config(directory: str | None, flag: str, key: str) -> str | None:
-    return _run_git(directory, "config", flag, key) or None
+def _config_overrides(argv: list[str]) -> list[str]:
+    """The pushing command's own `-c key=value` tokens, to forward to `git config`.
+
+    `git -c remote.origin.mirror=true push` is process-local, so a separate
+    `git config --get` subprocess cannot see it. Measured on git 2.43.0 with
+    NO on-disk config: that command ships every branch, including an unreviewed
+    one, while the guard's config read returned nothing.
+
+    `--config-env=KEY=VAR` names an environment variable rather than a value,
+    and this process may not carry it, so it is not forwardable. `main` refuses
+    a push carrying one instead.
+    """
+    out: list[str] = []
+    i = 1
+    while i < len(argv) and argv[i] != "push":
+        tok = argv[i]
+        if tok == "-c" and i + 1 < len(argv):
+            out += ["-c", argv[i + 1]]
+            i += 2
+            continue
+        if tok.startswith("-c") and len(tok) > 2:
+            out += ["-c", tok[2:]]
+        i += 1
+    return out
+
+
+def _has_config_env(argv: list[str]) -> bool:
+    """True if the command carries `--config-env`, which cannot be forwarded."""
+    for tok in argv:
+        if tok == "push":
+            return False
+        if tok == "--config-env" or tok.startswith("--config-env="):
+            return True
+    return False
+
+
+def _git_config(directory: str | None, flag: str, key: str,
+                overrides: list[str] | None = None,
+                as_bool: bool = False) -> str | None:
+    """A config value as the PUSHING git would see it.
+
+    Two ways a plain `git config --get` reads something git does not.
+
+    A valueless key is TRUE to git's boolean parser and prints EMPTY here, so
+    `[remote "origin"]` + a bare `mirror` line read as unset. `--bool --get`
+    normalizes it. Measured on git 2.43.0:
+
+        git config --file t --get      remote.origin.mirror  -> '' (exit 0)
+        git config --file t --bool --get remote.origin.mirror -> 'true'
+
+    And an inline `git -c key=value push` is process-local to that invocation,
+    so a separate `git config` subprocess never sees it. The pushing command's
+    own `-c` tokens are forwarded here for that reason. `--config-env` is not
+    forwardable -- it names an environment variable this process may not carry
+    -- and is refused upstream instead.
+    """
+    args = list(overrides or []) + ["config"]
+    if as_bool:
+        args.append("--bool")
+    return _run_git(directory, *args, flag, key) or None
 
 
 def _push_remote(directory: str | None, argv: list[str]) -> str | None:
@@ -744,6 +810,25 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
                  or t.partition("=")[0] == "--recurse-submodules"]
         which = f" ({', '.join('`' + t + '`' for t in named)})" if named else ""
         return None, ("this push does not name a single reviewable head" + which)
+    overrides = _config_overrides(argv)
+    # These apply whether or not the push names a refspec, so the loop cannot
+    # live in the bare-push branch alone -- the equivalent command-line flag is
+    # refused on both paths. Measured: with `push.recurseSubmodules=on-demand`,
+    # `git push origin main` was ALLOWED while
+    # `git push --recurse-submodules=on-demand origin main` was refused, and
+    # real git reports `Pushing submodule` for the former.
+    remote_for_config = _push_remote(directory, argv)
+    for key, mirrors, verdict, as_bool in CONFIG_LIKE_INDETERMINATE_FLAGS:
+        if "{remote}" in key:
+            # `--mirror` cannot be combined with refspecs (git refuses it), so
+            # its config form only decides anything on the bare-push path.
+            if refspecs or not remote_for_config:
+                continue
+            key = key.format(remote=remote_for_config)
+        value = _git_config(directory, "--get", key, overrides, as_bool)
+        if value and verdict(value):
+            return None, (f"`{key}` is set, which does what `{mirrors}` does "
+                          "without naming it on the command line")
     if not refspecs:
         # A bare `git push` ships the current branch only under the modern
         # `push.default`. Under `matching` (git's default before 2.0, and still
@@ -752,35 +837,14 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
         # the question entirely. Measured on git 2.43.0:
         # `git -c push.default=matching push --dry-run origin` reports a branch
         # that is not HEAD. So this is checked rather than assumed.
-        default = _git_config(directory, "--get", "push.default")
+        default = _git_config(directory, "--get", "push.default", overrides)
         if default and default.lower() == "matching":
             return None, "`push.default` is `matching`, so a bare push ships more than HEAD"
-        remote = _push_remote(directory, argv)
-        if remote and _git_config(directory, "--get-all", f"remote.{remote}.push"):
+        remote = remote_for_config
+        if remote and _git_config(directory, "--get-all",
+                                  f"remote.{remote}.push", overrides):
             return None, (f"`remote.{remote}.push` is configured, so what a bare push "
                           "ships is not simply the current branch")
-        # Several options in PUSH_OPTS_INDETERMINATE have a CONFIG form that
-        # does the same thing without appearing on the command line, so
-        # refusing the flag and not the config leaves the bypass open on the
-        # path that names nothing. A review found `remote.<name>.mirror`;
-        # deriving the rest of the class from git's own config list turned up
-        # two more. Measured on git 2.43.0, each with a bare `git push origin`:
-        #
-        #   remote.<name>.mirror=true  -> ships every branch AND every tag,
-        #                                 including an unreviewed branch
-        #   push.followTags=true       -> ships tags alongside the branch
-        #   push.recurseSubmodules     -> on-demand/only ship commits in
-        #                                 ANOTHER repository
-        #
-        # Add an entry here rather than a branch when the next one appears.
-        for key, mirrors, verdict in CONFIG_LIKE_INDETERMINATE_FLAGS:
-            key = key.format(remote=remote) if remote else key
-            if "{remote}" in key:
-                continue
-            value = _git_config(directory, "--get", key)
-            if value and verdict(value):
-                return None, (f"`{key}` is set, which does what `{mirrors}` does "
-                              "without naming it on the command line")
         head = _rev_parse(directory, "HEAD")
         if head is None:
             return None, "HEAD could not be resolved for the repository being pushed"
@@ -1104,6 +1168,11 @@ def main() -> int:
         for env, argv, directory in iter_pushes(cmd):
             if has_allow_override(env):
                 continue
+            if _has_config_env(argv):
+                deny("this push carries `--config-env`, whose value comes from "
+                     "an environment variable this guard cannot read, so what "
+                     "the push ships cannot be determined")
+                return 0
             if directory is REDIRECTED:
                 deny("this push points git at another repository "
                      "(`--git-dir`/`--work-tree`/`GIT_DIR`/`GIT_WORK_TREE`), "

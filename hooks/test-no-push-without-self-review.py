@@ -417,6 +417,24 @@ CASES = [
     # would resolve OTHER and deny; reading them chained resolves REPO.
     (f"git -C {OTHER} -C {REPO} push origin main", reviewed(), False,
      "a later absolute -C replaces the accumulated path, as git does"),
+    # `git -c k=v push` is process-local, so a separate `git config --get`
+    # subprocess cannot see it. Measured with NO on-disk config: that command
+    # ships every branch while the guard's config read returned nothing.
+    (f"git -C {REPO} -c remote.origin.mirror=true push origin", reviewed(), True,
+     "an inline -c override is forwarded to the config read"),
+    (f"git -C {REPO} -cremote.origin.mirror=true push origin", reviewed(), True,
+     "the attached -c spelling is forwarded too"),
+    (f"git -C {REPO} --config-env=remote.origin.mirror=SNEAKY push origin",
+     reviewed(), True,
+     "--config-env names an env var this guard cannot read, so it refuses"),
+    # The `cd` hint tracker read raw argv while push detection stripped shell
+    # keywords first, so a `cd` behind `do` was invisible and the push after it
+    # was graded against the hook's own cwd. This is the retry-loop shape
+    # skills/push prescribes, so it is reachable by ordinary use.
+    (f"while true; do cd {OTHER}; git push origin main; break; done",
+     reviewed(), True, "a `cd` behind a shell keyword still moves the repo"),
+    (f"for i in 1; do cd {OTHER}; git push origin main; done",
+     reviewed(), True, "the same inside a `for ... do` retry loop"),
     (f"git -C {REPO} push origin +main", reviewed(), False,
      "a forced refspec resolves to the same commit"),
     (f"git -C {REPO} push origin v1", reviewed(), False,
@@ -685,6 +703,16 @@ def config_cases() -> tuple[int, int]:
          ["push.followTags", "false"], f"git -C {REPO} push origin", False, None),
         ("push.recurseSubmodules=check ships nothing extra",
          ["push.recurseSubmodules", "check"], f"git -C {REPO} push origin", False, None),
+        # These apply to a named-refspec push as much as a bare one, and the
+        # loop used to live in the bare-push branch alone -- so the equivalent
+        # command-line flag was refused on both paths and the config form on
+        # only one.
+        ("push.recurseSubmodules fires on a NAMED-refspec push too",
+         ["push.recurseSubmodules", "on-demand"],
+         f"git -C {REPO} push origin main", True, "`push.recurseSubmodules` is set"),
+        ("push.followTags fires on a NAMED-refspec push too",
+         ["push.followTags", "true"],
+         f"git -C {REPO} push origin main", True, "`push.followTags` is set"),
         ("a positional remote still beats --repo naming a different one",
          ["remote.other.push", "refs/heads/*:refs/heads/*"],
          f"git -C {REPO} push other --repo=origin", True, "`remote.other.push` is configured"),
@@ -709,6 +737,47 @@ def config_cases() -> tuple[int, int]:
                 print(f"PASS: {label}")
         finally:
             _git(REPO, "config", "--unset", config[0])
+    return failures, ran
+
+
+def valueless_bool_cases() -> tuple[int, int]:
+    """A valueless config key is TRUE to git and EMPTY to `git config --get`.
+
+    `git config` cannot write this form, so the line is appended to the config
+    file directly. Measured on git 2.43.0:
+
+        git config --file t --get       remote.origin.mirror  -> '' (exit 0)
+        git config --file t --bool --get remote.origin.mirror -> 'true'
+
+    A plain `--get` therefore read a set key as unset, and every entry in
+    CONFIG_LIKE_INDETERMINATE_FLAGS is reached through that read.
+    """
+    failures = 0
+    ran = 0
+    path = os.path.join(REPO, ".git", "config")
+    with open(path) as f:
+        original = f.read()
+    try:
+        with open(path, "a") as f:
+            f.write('[remote "origin"]\n\tmirror\n')
+        ran += 1
+        rc, out = run_hook(f"git -C {REPO} push origin", reviewed())
+        spec = out.get("hookSpecificOutput") or {}
+        denied = spec.get("permissionDecision") == "deny"
+        reason = spec.get("permissionDecisionReason", "")
+        label = "a valueless-true boolean is read as set, not as empty"
+        if rc != 0 or not denied:
+            print(f"FAIL (rc={rc}, denied={denied}): {label}")
+            failures += 1
+        elif "`remote.origin.mirror` is set" not in reason:
+            print(f"FAIL (denied, but not for the mirror key): {label}\n"
+                  f"   reason: {reason[:120]}")
+            failures += 1
+        else:
+            print(f"PASS: {label}")
+    finally:
+        with open(path, "w") as f:
+            f.write(original)
     return failures, ran
 
 
@@ -831,7 +900,8 @@ def main():
                 failed += 1
             else:
                 print(f"PASS: {label}")
-        for fn in (raw_cases, orphan_cases, config_cases, budget_cases):
+        for fn in (raw_cases, orphan_cases, config_cases,
+                   valueless_bool_cases, budget_cases):
             f, r = fn()
             failed += f
             extra += r

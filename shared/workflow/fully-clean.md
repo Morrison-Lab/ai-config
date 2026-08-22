@@ -128,6 +128,30 @@ Worked-example case records for the rules below live in
 
    See [`fully-clean.cases.md`](fully-clean.cases.md), "A green guard step beside a red job".
 
+   **One SHA can carry two check runs of the same name, from the same workflow, with opposite conclusions --- because a workflow gated on a base-ref diff runs VACUOUSLY on `push` and meaningfully on `pull_request`.**
+   The subsection above covers a green step inside a red job.
+   This is the mirror at the run level, and it is worse, because nothing about the green one looks partial: it reports the same check name, it completed, and it passed.
+
+   The mechanism is a workflow that needs a base to diff against.
+   `check-new-line-breaks.yml` passes `base-ref` only when `github.event_name == 'pull_request'`, so the `push`-triggered run of the identical workflow has no base, examines zero added lines, and passes having measured nothing.
+   Both runs attach to the same commit, so `gh pr checks` prints two rows with one name, one `pass` and one `fail`, and reading the list top-down finds whichever came first.
+
+   The vacuous run is the one to discard, and the trigger event is the only field that separates them.
+   `gh api "repos/<owner>/<repo>/actions/runs/<id>" --jq '.event'` settles it in one read per run.
+   A `pass` from a run whose event supplies no base is [`algorithmatize-checks`](algorithmatize-checks.md)'s zero-matrix problem arriving as a green check: a detector that never ran and a detector that found nothing are the same observable.
+
+   Note that this is not the same as [ai-config#1870](https://github.com/Morrison-Lab/ai-config/pull/1870)'s ambiguity, where two *different* workflows contribute check runs sharing a name.
+   Here it is one workflow, and the disambiguator is the event rather than the workflow name --- so a fix keyed on `workflowName` cannot see it.
+
+   - **Do:** read the `event` of any run whose verdict you are about to rely on, whenever the same check name appears twice on one head.
+   - **Do:** take the verdict from the `pull_request`-triggered run for any check that diffs against a base.
+   - **Don't:** read a `pass` as evidence the check examined anything --- ask what population it was given first.
+   - **Don't:** resolve a same-name disagreement by workflow name; on this shape both runs carry the same one.
+
+   (Measured 2026-08-22 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884).
+   Run `32545283504` (`event=push`) and run `32545289903` (`event=pull_request`) both had `head_sha=8c456074`, both were named `new-line-breaks / check-new-line-breaks`, and they concluded `success` and `failure` respectively.
+   The push run was read first and taken as the verdict; the PR run was the one carrying four real findings.)
+
 2. **The latest review is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
 
 **Criterion 2's test is the absence of findings, not the presence of a verdict

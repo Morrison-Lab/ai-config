@@ -19,7 +19,7 @@ Portable AI agent config — skills, memories, and commands synced across machin
 
 ## Three ways to use these skills
 
-**Local CLI** — clone the repo and run `bootstrap.sh` once. It symlinks each directory into `~/.claude/`, `~/.gemini/`, `~/.codex/`, and `~/.cursor/rules/` (and, when no Cursor plugin is already installed, `~/.cursor/skills/`). Skills appear in Claude Code, Gemini CLI, and Cursor as `/skill-name`.
+**Local CLI** — clone the repo and run `bootstrap.sh` once. It symlinks each directory into `~/.claude/`, `~/.gemini/`, `~/.codex/`, and `~/.cursor/rules/` (and, when no Cursor plugin or Claude skill catalog is already serving this repo, `~/.cursor/skills/`). Skills appear in Claude Code, Gemini CLI, and Cursor as `/skill-name`.
 
 **Codex & Cursor** — the same bootstrap links generated wrappers from `codex-skills/` into `${CODEX_HOME:-$HOME/.codex}/skills` and user-global Cursor rules from `cursor-rules/` into `${CURSOR_HOME:-$HOME/.cursor}/rules`. This repo is also a Cursor plugin (`.cursor-plugin/plugin.json`). `AGENTS.md` acts as a universal entrypoint.
 

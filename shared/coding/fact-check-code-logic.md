@@ -785,7 +785,10 @@ The enumeration disappears from the working tree when the change lands, which is
 Finding that sha is the only fiddly part, and it is worth saying plainly that it is **not** always the commit before the PR: a replacement landing mid-PR has its own predecessor inside the same branch.
 Derive it rather than assuming.
 `git log --oneline -- <path>` names the commits that touched the file, and the one before the swap is the one to read --- but check how the repo merges before trusting that list, because a squash-merging repo collapses a PR to a single commit and the mid-PR predecessors never appear in it.
-Where that is the case, reach them by sha through the PR's own ref, which a default clone does not fetch: run `git fetch origin refs/pull/<n>/head` first, and they are readable like any other commit after that.
+Where that is the case, reach them by sha through the PR's own ref, which a default clone does not fetch --- and note that fetching it is only half the route.
+`git fetch origin refs/pull/<n>/head` writes `FETCH_HEAD` and no persistent ref, and a bare `git log --oneline -- <path>` still walks `HEAD`, so it lists the same squash it listed before.
+Name the ref you just fetched: `git log --oneline FETCH_HEAD -- <path>`.
+Fetch into a durable ref (`refs/pull/*/head:refs/remotes/pr/*`) if you want it to survive the next fetch.
 
 This is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s "mirror failure" section pointed at a **replacement** rather than at a sibling.
 That one governs a new check written *beside* an existing one, where the guards to mine are still in the tree.

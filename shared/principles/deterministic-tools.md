@@ -235,9 +235,9 @@ counter-example instead of patching the instance.
 The first asks whether the instrument is the right kind of thing; the
 second asks how wide the defect is.
 Both wait on a recurrence to tell them.
-That file's "A fix for a defect class is where a fresh instance of that
-class hides" is the closest relative of all, and the complement to this
-one: it asks where the next instance will be and answers "the fix", where
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md)'s
+"A fix for a defect class is where a fresh instance of that class hides"
+is the closest relative of all, and the complement to this one: it asks where the next instance will be and answers "the fix", where
 this asks how many places could host one at all.
 This one asks how many places can commit the defect, which a single diff
 can answer before any recurrence --- though answerable is not answered,

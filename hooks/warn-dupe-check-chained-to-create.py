@@ -106,8 +106,9 @@ Three narrowings, each of which suppresses a real false positive:
     `;`, `&`, `|`, or a newline. This corpus quotes every one of these commands
     constantly, in fragments, issue bodies, and this docstring. `(` and `{` are
     deliberately absent from that class: a parenthetical aside is ordinary in
-    prose, and ai-config#1749 measured exactly that shape misfiring on the
-    sibling hook. Losing `URL=$(gh issue create ...)` chained after a list is
+    prose, and ai-config#1749's third review round caught exactly that shape on
+    the sibling hook, where `git commit -m "document (gh pr list) usage"` would
+    have matched. Losing `URL=$(gh issue create ...)` chained after a list is
     the cheap direction.
   * SAME OBJECT KIND. `gh pr list ; gh issue create` does not fire. A PR search
     does not gate an issue creation, so the pairing carries no claim to check.
@@ -130,6 +131,27 @@ manufacture one --- neither ever inserts a separator character.
     position anchoring alone cannot see. Stripping `'...'` and `"..."` spans
     removes it. The cost is a miss on `bash -c "gh issue list; gh issue create"`,
     which is the safe direction and is not a shape this workflow uses.
+
+A COMMAND SUBSTITUTION IS INVISIBLE, WHICH CUTS THE RIGHT WAY
+-------------------------------------------------------------
+A check whose output is captured --- `$(gh issue list ...)`, quoted or not ---
+never reaches a command position, so it is not seen as a check and the call does
+not fire. That is not an oversight, and it is the single most important thing
+the narrowing buys:
+
+    if [ -z "$(gh issue list -R o/r --search "x")" ]; then
+      gh issue create -R o/r --title t
+    fi
+
+This is REAL gating. The create genuinely runs only when the search came back
+empty, all inside one call, and firing on it would be a false positive on
+precisely the behaviour the rule wants.
+
+The same blindness costs a miss on the capture-and-ignore shape,
+`HITS=$(gh issue list ...) ; gh issue create ...`, where the result is captured
+and then not branched on. Separating the two would mean deciding whether a
+conditional actually consumes the captured value, which is real shell analysis.
+Missing a defect is the cheap direction; firing on a correct conditional is not.
 
 KNOWN FALSE POSITIVES, ACCEPTED
 -------------------------------

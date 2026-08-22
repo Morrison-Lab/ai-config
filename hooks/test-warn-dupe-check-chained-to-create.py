@@ -84,8 +84,9 @@ check("env-assignment prefixes on both halves",
 check("extra whitespace between words",
       fires("gh   issue   list -R o/r ;  gh   issue   create"), True)
 # The heredoc strip must keep the opener line's tail, which is still shell and
-# routinely carries the create itself (the failure ai-config#1749 measured on
-# the sibling hook).
+# routinely carries the create itself. Discarding the tail along with the body
+# suppressed exactly the commands the sibling hook exists to catch, which its
+# review caught on ai-config#1749.
 check("create chained onto a heredoc opener line",
       fires(
           "gh issue list -R o/r; cat <<'EOF' > /tmp/b.md && "
@@ -194,7 +195,26 @@ check("listfoo / createbar are not the commands",
 check("a longer word ending in the verb",
       fires("gh issue list; gh issue recreate"), False)
 
-# 9. Degenerate inputs.
+# 9. A command substitution, which is REAL gating and must not fire. The
+#    create here runs only when the search came back empty, so a warning would
+#    land on exactly the behaviour the rule asks for.
+check("a shell conditional gating on the search",
+      fires(
+          "if [ -z \"$(gh issue list -R o/r --search 'x' --jq '.[].number')\" ]"
+          "; then gh issue create -R o/r --title t; fi"),
+      False)
+check("an unquoted command substitution in a test",
+      fires("if [ -z $(gh issue list -R o/r) ]; then gh issue create -R o/r; fi"),
+      False)
+# The same blindness costs this miss, which is the cheap direction: captured
+# and then never branched on. Asserted so a later change that starts firing
+# here is visible rather than silent.
+check("capture-and-ignore is a documented MISS, not a fire",
+      fires("HITS=$(gh issue list -R o/r --json number)\n"
+            "gh issue create -R o/r --title t"),
+      False)
+
+# 10. Degenerate inputs.
 check("empty command", fires(""), False)
 check("whitespace only", fires("   \n  "), False)
 check("unrelated command", fires("git status --short"), False)

@@ -9,8 +9,9 @@ caught by reviewers rather than by any check.
    file, so every redirect targeted the filesystem root.
 2. The fix added the definition, and a later commit then added a *new consumer*
    --- a pre-prune ref snapshot --- fifteen lines **above** it, reintroducing
-   the same defect. The original fix was still correct; the file had grown a
-   use upstream of it.
+   the same defect.
+   The original fix was still correct.
+   What changed is that the file had grown a use upstream of it.
 3. The same snapshot also sat sixty-four lines **after** the
    `Run clean-worktrees steps 1 through 3` instruction that triggers the
    `git fetch --prune origin` it exists to precede, so it captured post-prune

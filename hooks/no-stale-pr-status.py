@@ -74,6 +74,13 @@ RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 RX_QUERY = re.compile(
     r"gh\s+pr\s+checks|statusCheckRollup|get_check_runs|"
     r"gh\s+run\s+view|checkSuites|mergeStateStatus|"
+    # The REST check-runs endpoint, hyphenated. `fully-clean.md` MANDATES this
+    # over `gh pr checks` -- "take the check-run half of criterion 1 from the
+    # paginated check-runs endpoint" -- so omitting it meant the guard warned
+    # of a stale reading at the one query the corpus tells you to prefer, and
+    # told the author to re-run the weaker command instead. The MCP spelling
+    # `get_check_runs` was covered; the CLI/REST spelling was not.
+    r"commits/[^\s]+/check-runs|commits/[^\s]+/status|"
     r"python3?\s+.*(?<!test_)\bcheck-pr-fully-clean\.py",
     re.I,
 )

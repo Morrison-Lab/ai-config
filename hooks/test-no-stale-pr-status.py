@@ -172,6 +172,33 @@ ATTRIBUTION = [
      "so does the spelled-out form"),
 ]
 
+# The REST check-runs endpoint must count as a status query. `fully-clean.md`
+# mandates it over `gh pr checks`, so a guard blind to it warns precisely when
+# the stronger command was used -- and tells the author to re-run the weaker
+# one. Found by the guard firing on this PR's own session.
+QUERY_FORMS = [
+    ("gh pr checks 1922 -R Morrison-Lab/ai-config", "the gh porcelain"),
+    ("gh api --paginate repos/o/r/commits/abc1234/check-runs --jq '.x'",
+     "the paginated REST check-runs endpoint"),
+    ("gh api repos/o/r/commits/abc1234/status", "the legacy commit-status endpoint"),
+    ("gh pr view 1922 --json statusCheckRollup", "the rollup field"),
+]
+
+
+def check_query_forms():
+    """Every spelling of a status query must discharge the staleness warning."""
+    failures = 0
+    for cmd, label in QUERY_FORMS:
+        events = [PUSH,
+                  {"type": "assistant", "message": {"content": [
+                      {"type": "tool_use", "input": {"command": cmd}}]}},
+                  say("All checks green at head abc1234.")]
+        fired = run(events)
+        ok = not fired
+        failures += 0 if ok else 1
+        print(f"{'ok  ' if ok else 'FAIL'}  query-form: {label}")
+    return failures
+
 
 def check_attribution():
     """Each warning must describe what it matched, not what it assumed."""
@@ -210,7 +237,8 @@ def main():
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"{'block' if want_block else 'allow'}: {label}")
     failures += check_attribution()
-    total = len(CASES) + len(ATTRIBUTION)
+    failures += check_query_forms()
+    total = len(CASES) + len(ATTRIBUTION) + len(QUERY_FORMS)
     print(f"\n{total - failures}/{total} passed")
     return 1 if failures else 0
 

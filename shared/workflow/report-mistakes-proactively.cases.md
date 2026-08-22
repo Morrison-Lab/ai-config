@@ -95,11 +95,12 @@ Two things were checked while writing the rule rather than assumed.
 `hooks/warn-pr-create-without-dupe-check.py` matches `gh pr create`,
 `glab mr create`, and `mcp__github__create_pull_request`, and nothing else.
 `grep -rln 'issue create\|create_issue\|issue_write' hooks/*.py` returns
-`no-empty-promise.py`, `no-unauthorized-merge.py`, `no-unfiled-finding.py`,
-and `no-unshipped-commit.py`, none of which guards a create against a missing
-or unread dupe-check --- the first, third, and fourth read filing as a
-*discharge*, and the second only mentions the phrase in a comment about
-heredoc quoting.
+eight files: `no-empty-promise.py`, `no-unauthorized-merge.py`,
+`no-unfiled-finding.py`, `no-unshipped-commit.py`, and the four matching
+`test-*.py` counterparts.
+None of the four guards a create against a missing or unread dupe-check ---
+three of them read filing as a *discharge*, and `no-unauthorized-merge.py`
+only mentions the phrase in a comment about heredoc quoting.
 And that hook's `transcript_has_dupe_check()` walks prior `tool_use` blocks
 for a lexical match on `gh pr list`/`view`/`status` or `gh search prs`, with a
 deliberately session-wide discharge, so even on the PR side it establishes

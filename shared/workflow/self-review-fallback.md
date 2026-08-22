@@ -213,6 +213,26 @@ This is the fallback-specific sharpening of "Apply the same review standards the
 - **Don't:** let a fallback self-review stop at structural checks (dogfood, ASCII, line breaks) and report "no findings".
 - **Don't:** read "the bot was down" as permission for a lighter review than the bot itself would have given.
 
+**Where a diff makes a claim about a TOOL's behaviour, check the tool's own documentation --- the prose fact-check above cannot reach it.**
+The section above closes the structural-versus-semantic gap, and it has a blind spot of its own that only shows up on a diff encoding how some external tool behaves: a hook wrapping `git push`, a script parsing `gh` output, a workflow reading an Actions field.
+
+`fact-check-prose` asks whether a sentence is true, and a sentence *describing* a tool can be perfectly true while the code beside it implements a different tool than the one that exists.
+Verifying that means re-deriving the tool's contract --- reading `--help`, the man page, the release notes --- rather than re-reading the sentence, and re-reading is what a prose pass does.
+
+Measured 2026-08-21/22 on [ai-config#1884](https://github.com/Morrison-Lab/ai-config/pull/1884), where the split was clean: a self-review ran the prose fact-check faithfully and found two real prose defects in its own diff, and found **none** of four force-push bypasses in the same diff --- each of which one line of `git push --help` or `git push -h` would have settled.
+A cross-vendor reviewer found all four.
+
+The tell is a diff that *quotes no source* for a behavioural claim.
+"`--force-with-lease` compares against the remote-tracking ref" reads as settled fact.
+`git push --help` saying so is what makes it one.
+
+- **Do:** read the tool's own `--help`, man page, or release notes when a diff asserts how that tool behaves, and quote what you read.
+- **Do:** enumerate the tool's real option set from its own output rather than from memory, when a diff parses one.
+- **Don't:** count a clean `fact-check-prose` pass as having verified a behavioural claim --- it checks the sentence, not the tool.
+- **Don't:** treat a plausible mechanism as checked because nothing in the diff contradicts it.
+
+See [`self-review-fallback.cases.md`](self-review-fallback.cases.md), "A cross-vendor reviewer found seven defects the primary never reached".
+
 
 **A defect the self-review SURFACES and then dismisses
 is worse than one it misses.**

@@ -173,7 +173,65 @@ SILENT = [
      "admission then a ums commit clears it"),
     ([txt("I was wrong about that.", sidechain=True)],
      "a SUBAGENT's admission is not my outgoing message"),
+    # ai-config#1965, the TRUE-positive half. A bare-word use of an action
+    # word still discharges. The defect was that these and the path reads in
+    # PATH_READS below were indistinguishable, so a suite carrying only one
+    # side cannot tell a correct guard from an over-tightened one.
+    ([ADMIT, tool("Bash", {"command": "grep -n ums README.md"})],
+     "bare-word `ums` in a command still discharges"),
+    ([ADMIT, tool("Skill", {"skill": "ums"})],
+     "invoking the ums skill by name still discharges"),
+    ([ADMIT, tool("Task", {"prompt": "Please run ums."})],
+     "sentence-final `ums.` still discharges -- a bare dot is not a path"),
+    ([ADMIT, tool("Task", {"prompt": "update memories and skills for this"})],
+     "the `update memories` phrase still discharges"),
+    ([ADMIT, tool("Task", {"prompt": "memorize this correction"})],
+     "bare `memorize` still discharges"),
+    ([ADMIT, tool("Task", {"prompt": "run record-learnings on it"})],
+     "bare `record-learnings` still discharges"),
+    # Review finding on #1968. `/ums` is how this corpus spells the
+    # invocation, so the first path guard -- which rejected any preceding
+    # `/` -- silently dropped it. A path and an invocation are separated by
+    # what sits BEFORE the slash, not by the slash itself.
+    ([ADMIT, tool("Task", {"prompt": "Run /ums to record this"})],
+     "the slash-command spelling `/ums` still discharges"),
+    ([ADMIT, tool("Task", {"prompt": "/memorize this correction"})],
+     "`/memorize` at the start of a prompt still discharges"),
+    ([ADMIT, tool("Bash", {"command": "echo /record-learnings"})],
+     "`/record-learnings` still discharges"),
 ]
+
+# ai-config#1965, the FALSE-positive half. `\b` treats `-`, `/`, and `.` as
+# boundaries, so `\bums\b` fired inside a PATH and a mere READ discharged the
+# reminder -- silently, since this hook fails open. Reading the fragment that
+# states the UMS rule was enough, so the sessions most likely to be consulting
+# the rule were exactly the ones the hook stopped nagging.
+PATH_READS = [
+    ([ADMIT, tool("Bash", {"command": "cat shared/workflow/run-ums-proactively.md"})],
+     "reading the UMS rule fragment does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "ls skills/ums-notes/"})],
+     "listing a hyphenated ums-* directory does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "open memories/record-learnings-policy.md"})],
+     "reading a record-learnings-* path does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "git show HEAD:docs/memorize-rules.md"})],
+     "reading a memorize-* path does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "python3 hooks/test-remind-ums-after-error.py"})],
+     "running this hook's own test file does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "cat memories/ums-cases.md"})],
+     "reading a ums-* memory file does not discharge"),
+    ([ADMIT, tool("Task", {"prompt": "Read shared/workflow/run-ums-proactively.md"})],
+     "a dispatch that only names the fragment does not discharge"),
+    # The other side of the same slash: a path ending exactly in the action
+    # word, with nothing after it for `_NOT_PATH_END` to catch. Only the
+    # lookbehind rejects these, which is why it cannot simply drop `/`.
+    ([ADMIT, tool("Bash", {"command": "ls skills/ums"})],
+     "a path ending in `ums` does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "./ums-helper --check"})],
+     "a relative path `./ums-helper` does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "ls ~/.claude/skills/ums"})],
+     "an absolute path ending in `ums` does not discharge"),
+]
+REMIND += PATH_READS
 
 
 def run(recs, sentinel_dir=None):

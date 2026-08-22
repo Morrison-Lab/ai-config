@@ -367,6 +367,79 @@ FIRE-condition addition", so both parties held the evidence and neither drew the
 conclusion that the count needed a ref rather than a correction.
 The fix stated the ref and the flags and changed no number.)
 
+## A claim that nothing exists owes its deriving command, even when no search ran
+
+Every section above starts from a query that was actually run.
+The commonest version of this failure runs no query at all.
+You assert that nothing else touches a file, that no such sibling exists, that some construction is immune --- and the sentence goes out in confident phrasing that reads as already-checked, because nothing in it announces that the check was skipped rather than performed.
+
+This fragment's own rule stops one step short of it.
+Its opening Do/Don't block says to write "I did not find" rather than "there is no" **when the evidence is a search**, which is a precondition.
+An assertion made with no search never meets that precondition, so the rule is loaded and matches nothing.
+Derived at the time of writing:
+
+```
+$ grep -n "I did not find" shared/workflow/grep-is-not-coverage.md
+39:- **Do:** say "I did not find" rather than "there is no", when the evidence is
+```
+
+It is also distinct from "Searching the wrong corpus is the same error with no grep in it" above, which is the nearest sibling and is narrower.
+There a dupe check genuinely ran, correctly, over the wrong population.
+Here nothing ran, so there is no query to critique and no null result to over-read --- only a sentence and the confidence it was written with.
+
+**The failure is structural rather than a matter of care.**
+That is the part worth stating, because the obvious remedy --- be more careful --- is the one the evidence rules out.
+All four instances below were composed during careful work, and the fourth was committed inside the brief that commissioned this very entry, by someone actively thinking about the failure while writing about it.
+A rule whose remedy is vigilance cannot survive that.
+
+**The observable action is to paste the deriving command beside the claim**, in a brief, an issue body, a PR body, or a review comment --- the same discipline [`challenge-the-assignment`](challenge-the-assignment.md) already requires of a brief that asserts corpus state, extended to every artifact a negative claim gets published in.
+The command is usually one line, and having to write it is the whole cost.
+
+The three that settled these instances are the reusable part:
+
+```
+gh pr diff <N> --name-only     # what else touches this file
+git --list-cmds=main,others    # what commands exist HERE (see the caveat below)
+printf '%s' "$payload" | python3 hooks/<guard>.py   # what this code does
+```
+
+The second one carries a caveat the other two do not, and the case record below is where it came from: its output varies by git build, so it settles what exists on the machine you ran it on and nothing wider.
+
+Note what the third one is for.
+A claim that some code is immune to a bug class is a claim about behaviour, so no amount of reading settles it --- the probe does, and it is two lines.
+[`self-review-fallback`](self-review-fallback.md)'s "Where a diff makes a claim about a TOOL's behaviour" section makes the same point for a diff under review.
+
+- **Do:** run the deriving command before publishing a claim that something does not exist, and paste it beside the claim.
+- **Do:** write what the command returned, so a reader can see which population the negative is about.
+- **Do:** probe behaviour rather than reading it, when the claim is that some code cannot do something.
+- **Do:** record the tool version beside a command whose output is build-dependent, since running it is necessary and not sufficient when the answer differs by environment.
+- **Don't:** publish "nothing else", "no such", "immune", or "disjoint" on recollection --- confident phrasing is what makes such a claim read as checked.
+- **Don't:** read this file's "say 'I did not find' rather than 'there is no'" rule as covering the case, since its precondition is that a search happened.
+
+**No guard covers this, and one was built and measured before being rejected.**
+The candidate was a warn-only hook over `gh issue create` and its siblings, firing on negative-existence phrasing in a body with no deriving query beside it.
+Measured against 1,759 distinct bodies recovered from this machine's transcripts, a tightened matcher fired 40 times, and of 12 distinct fires read by hand 2 were genuine and 10 were not.
+The reason is not tuning.
+An issue body's genre is reporting findings, and a finding is routinely negative, so "the workaround does not exist" and "there was no breadcrumb" are conclusions the author had just derived --- textually identical to a guess, and frequently derived somewhere the body does not show.
+[`remind-brief-premises.py`](../../hooks/remind-brief-premises.py) escapes this because it anchors on a corpus path, a rare token that is nearly always a real assertion, where negation is the ordinary vocabulary of a bug report.
+
+The fourth instance closes the question.
+"`grep-is-not-coverage.md` states this rule for a search result" is grammatically **positive**, so no negation matcher can see it at all, which means the class was never lexically negative to begin with.
+The feature that matters is that the claim was underived, and that is not decidable from the text.
+Building the guard anyway would trade one caught instance for roughly thirty wrong warnings on issue filings, against a corpus that makes filing near-unconditional --- which is [`deterministic-tools`](../principles/deterministic-tools.md)'s own warning that a misfiring guard gets switched off and takes the real cases with it.
+
+(Morrison-Lab/ai-config#1979, 2026-08-22: four claims in one session, each cheap to verify and none verified before publishing.
+"`shared/workflow/learn-from-review-findings.md` is disjoint from every open PR", written into a subagent brief --- false, since [#1911](https://github.com/Morrison-Lab/ai-config/pull/1911) touches it.
+"Hooks that tokenize commands are immune to the entire bug class by construction", published in [#1967](https://github.com/Morrison-Lab/ai-config/issues/1967) --- false, since `sh -c "git push --force origin main"` draws no output at all from `hooks/no-clobbering-push.py`, where the same command unwrapped is denied.
+The gap is filed as [#1973](https://github.com/Morrison-Lab/ai-config/issues/1973).
+"Of `add|commit|apply|mv|rm`, only `commit` has real hyphenated siblings", published in [#1966](https://github.com/Morrison-Lab/ai-config/issues/1966) --- false on the machine it was asserted from, where `git --list-cmds=main,others` reports `add--interactive` under git 2.50.1 (Apple Git-155), whose exec-path still ships a `git-add--interactive`.
+This PR's own review then ran the same command under git 2.55.0 and got no such entry, modern git having rewritten `add -i` in C and dropped the Perl dispatcher.
+Both runs are honest, which makes this the sharpest of the four: the deriving command was necessary and **not sufficient**, because its answer is build-dependent and neither party could see that without running it in both places.
+So pair such a command with the version it was run against, per [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).
+And the characterization of this file quoted above, written into the brief asking for this section, which `hooks/remind-brief-premises.py` flagged as an unverified corpus assertion.
+It happened to be true.
+Its author did not know that when writing it, which is the whole of the point.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

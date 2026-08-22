@@ -583,6 +583,12 @@ The strong form of the claim: after claiming an issue you're about to work, open
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
 The `gi`, `gii`, `gip`, and `st` skills operationalize this.
 
+## Run local adversarial self-review before pushing
+
+Before pushing any feature branch, execute a local self-review using an adversarial review persona or the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent against `git diff origin/main...HEAD`.
+Confirm that the review achieves a clean verdict (`### Verdict: Ready for merge`) and that all defects or convention violations are resolved prior to `git push`.
+Pushing without a clean self-review is mechanistically blocked by `hooks/no-push-without-self-review.py`.
+
 ## Open a PR for every pushed feature branch
 
 After pushing a feature branch, create its PR

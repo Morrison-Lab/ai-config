@@ -30,6 +30,22 @@ check in that case.
 Run these in order. Stop at the first one that fires and ask the user (see
 [Asking for guidance](#asking-for-guidance)).
 
+### 0. Local adversarial self-review clean verdict
+
+Before pushing changes to a remote branch, run an adversarial self-review on your diff
+(using the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent)
+against `git diff origin/main...HEAD`.
+Confirm that the review output concludes with a clean verdict:
+
+```text
+### Verdict: Ready for merge
+```
+
+All findings must be addressed or rebutted before pushing.
+Pushing code without running a local self-review that achieves a clean verdict is mechanistically
+blocked by `hooks/no-push-without-self-review.py` (unless explicitly overridden with `ALLOW_UNREVIEWED_PUSH=1`,
+such as when pushing an initial empty PR branch under `pr-on-claim`).
+
 ### 1. Protected branch
 
 ```bash

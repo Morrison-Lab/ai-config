@@ -282,6 +282,13 @@
             "timeout": 15,
             "script": "flag-stale-adjacent-comment.py",
             "why": "shared/workflow/learn-from-review-findings.md, from ucdavis/bcs#679. Warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-self-review.py\"",
+            "timeout": 10,
+            "script": "no-push-without-self-review.py",
+            "why": "cai: don't push until you run self-review locally and get a clean verdict, and use an adversarial subagent for the local self-review -- blocks git push in PreToolUse unless local adversarial self-review produced a clean verdict or ALLOW_UNREVIEWED_PUSH=1 is set."
           }
         ]
       },

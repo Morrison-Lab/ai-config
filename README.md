@@ -366,6 +366,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `require-stopping-point.py` | `Stop` | blocks a final reply lacking an explicit clean or non-clean stopping-point declaration |
 | `flag-stale-adjacent-comment.py` | `PreToolUse` (Bash) | warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one |
 | `no-misattributed-quote.py` | `Stop` | blocks a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
+| `no-push-without-self-review.py` | `PreToolUse` (Bash) | blocks `git push` unless local adversarial self-review with the `adversarial-reviewer` subagent produced a clean verdict (`Ready for merge`) or `ALLOW_UNREVIEWED_PUSH=1` is provided |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:

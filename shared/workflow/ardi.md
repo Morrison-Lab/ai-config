@@ -207,6 +207,10 @@ your own conventions already covered".
 
 **Pause point: after committing, before `git push`.**
 
+- [ ] **Local adversarial self-review ran and achieved a clean verdict**
+      (`### Verdict: Ready for merge`) using the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
+      subagent against `git diff origin/main...HEAD`, with every defect,
+      factual error, or convention violation addressed before pushing.
 - [ ] **The whole test suite ran**, not the files you predicted the change
       touches, and the tests/failed/**skipped** triple was read --- a
       non-trivial skip count means re-running with the gating flags set

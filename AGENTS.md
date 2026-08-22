@@ -79,11 +79,24 @@ Each reading expires immediately: run the command fresh for every recap rather t
 When asked to implement, edit, or write up a change on a feature branch, do
 not stop at an uncommitted worktree.
 Complete the delivery cycle: create the applicable tracking issue when
-issue-first workflow applies, commit the scoped changes, push the branch, open
-or update its Pull Request, request AI review after the final push, and drive
-CI and review findings to a clean result.
+issue-first workflow applies, commit the scoped changes, run local adversarial
+self-review to a clean verdict, push the branch, open or update its Pull
+Request, request AI review after the final push, and drive CI and review
+findings to a clean result.
 This does not grant merge authority; the strict merge policy below still
 applies.
+
+## Run local adversarial self-review before pushing
+
+Never push code to a remote branch blind.
+Before running `git push`, run local self-review using an adversarial review
+persona or the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md)
+subagent against `git diff origin/main...HEAD`.
+Verify that the review yields a clean verdict (`### Verdict: Ready for merge`)
+and that all defects, unhandled edge cases, and convention violations are
+resolved before pushing.
+Pushing without a clean self-review is mechanistically blocked by pre-push
+guards.
 
 ## Put PRs in ready mode when they are ready for review
 

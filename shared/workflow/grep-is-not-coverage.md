@@ -440,6 +440,85 @@ And the characterization of this file quoted above, written into the brief askin
 It happened to be true.
 Its author did not know that when writing it, which is the whole of the point.)
 
+## The sentence that CORRECTS an overclaim is where the next one gets written
+
+The section above governs a negative existence claim published anywhere.
+This one names the single site where that class is likeliest and least checked: the sentence that answers a review finding by narrowing a claim you already published.
+
+The correcting commit is not a neutral place for a new claim to appear.
+It is the place where a fresh claim draws the least scrutiny it will ever draw, and three separate mechanisms push in that direction at once.
+
+**The corrective mood reads as rigor.**
+Hedging, narrowing, conceding a limit are the opposite of overclaiming, so a sentence performing one of them does not present as an assertion needing evidence.
+It presents as the evidence-respecting move.
+That inversion is the whole difficulty: the check would fire on a confident sentence and does not fire on a modest one, while the modest one can be just as underived.
+
+**The correction inherits the finding's credibility.**
+The finding was checked --- somebody read the artifact and found the claim too strong --- and the answer arrives inside the same thread, minutes later, wearing the same subject matter.
+The scrutiny that landed on the finding reads as covering the reply to it.
+It does not.
+Nobody has read the replacement against anything.
+
+**It fails in the safe-sounding direction.**
+An overclaim invites "prove it".
+An underclaim invites nothing, because understating a guarantee sounds conservative, and a reader who suspects you of underselling your own work has no reason to make you derive it.
+So the one claim shape that reliably attracts a demand for evidence is exactly the shape a correction is written to avoid.
+
+The remedy does not change.
+It is the section above's: run the deriving command, and paste it beside the claim.
+What changes is knowing when to expect to need it, and the trigger is lexical enough to use rather than judge --- a **negative** written while conceding a limit.
+"nothing asserts against it", "no test covers this", "nothing forbids", "only X closes that" are each a claim about a population, and each is one command away from being checked or refuted.
+
+Three neighbouring rules sit close and none of them reaches this.
+
+- [`learn-from-review-findings`](learn-from-review-findings.md)'s "A fix for a defect class is where a fresh instance of that class hides" is the nearest, and its residual-paragraph case runs the other way: there the fix names a residual and thereby **overstates** a survey nobody ran, and the remedy is to enumerate the class.
+  Here the correction **understates** a guarantee, and the remedy is a single command rather than a survey.
+- [`metacognitive-monitoring`](metacognitive-monitoring.md)'s "A correction inherits its instrument" governs a replacement figure read off the same gauge as the original.
+  That presupposes a gauge was used.
+  Here none was, in either the claim or its correction.
+- The same file's "A summary written above the account it summarizes escapes the re-read" keys on **position** --- a quantifier placed above the account it generalizes over.
+  A correction is a claim about a population that lives somewhere else entirely, so nothing about where it sits marks it.
+
+So the check to add is not a new kind of scrutiny but the existing one, pointed at a sentence that does not look like it needs any.
+
+- **Do:** run the deriving command for any negative you write while narrowing a claim, and paste the command and its result beside it.
+- **Do:** treat the reply to a review finding as unverified prose, separately from the finding that prompted it.
+- **Don't:** read a hedge as self-evidently safe --- an understated guarantee is a claim about a population, and it can be as false as the overclaim it replaced.
+- **Don't:** let the scrutiny a finding received stand in for scrutiny of the sentence answering it.
+
+(Measured 2026-08-22 on [ai-config#1992](https://github.com/Morrison-Lab/ai-config/pull/1992), merged the same day as `593d25cc`.
+Commit `fd929f52` claimed that making an argument required meant the unsafe call "cannot be spelled".
+The PR's first review found that overclaimed, and commit `97402dea` corrected it --- writing, in the correcting sentence, that a caller passing `argv=[]` reaches the unguarded read "and nothing in that suite asserts against it".
+No command was run for that.
+An adversarial review of the correction ran one, and commit `a6a0860f` replaced the claim with the narrower true statement now on `main`: the value is asserted at every call site that exists, and nothing forbids a **new** call site spelling it.
+
+Reproduced independently against [ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911), **unmerged** at the time of writing, at branch head `51be639e`:
+
+```
+$ python3 hooks/test-no-push-without-self-review.py hooks/no-push-without-self-review.py
+All 169 cases passed
+$ sed '817s/key, argv, env)/key, [], env)/' hooks/no-push-without-self-review.py \
+    > hooks/mut-empty-argv.py
+$ python3 hooks/test-no-push-without-self-review.py hooks/mut-empty-argv.py
+FAIL (expected blocked=True, got False): an inline -c redirecting the DEFAULT remote is followed, not ignored
+FAIL (expected blocked=True, got False): the sibling pushRemote key redirects the same way
+2/169 cases failed
+```
+
+The call site is at line 912 in the revision `a6a0860f` cites and at 817 at that branch head, so take the site from a grep rather than from the line number.
+The mutant has to live in `hooks/`, and the first run of it did not.
+Written to the repo root, the same mutation fails 85 of 169, because the hook loads a sibling detector from its own directory --- [`algorithmatize-checks`](algorithmatize-checks.md)'s sixth mutation outcome, a mutant failing for a reason other than the mutation.
+What exposes that is running an **unmutated** copy from the mutant's own location, and reading a shared failure as evidence about the location:
+
+```
+$ cp hooks/no-push-without-self-review.py ./ctl-root-copy.py
+$ python3 hooks/test-no-push-without-self-review.py ./ctl-root-copy.py
+85/169 cases failed
+```
+
+Identical to the mutant, so the 85 is the path and not the change.
+Note which direction that control runs, since the intuitive reading is backwards: it is the control **failing** that attributes the failure elsewhere, and a passing control at some *other* location would have settled nothing.)
+
 ## Where this fires
 
 The skills whose workflows run exactly this grep, and whose next step is to

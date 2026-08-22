@@ -139,11 +139,22 @@ def _has_inplace_flag(cmd_word, args):
 # escaping a literal `/`, e.g. in a path). Deliberately NOT exhaustive --
 # under-matching an exotic delimiter is far cheaper than a false positive.
 _DELIMS = "/|#,~^!@"
+# The two alternatives below must stay DISJOINT. Written as
+# `(?:\\.|(?!(?P=delim)).)*`, a backslash matches either branch -- once as
+# `\\.` and once as the any-character branch -- so an unterminated
+# substitution with a run of backslashes backtracks exponentially. Measured
+# 2026-08-21 on the ambiguous form: 0.004s at 22 backslashes, 0.049s at 26,
+# 0.357s at 30, and no completion in 120s at 50,000. Excluding the backslash
+# from the second branch removes the ambiguity and makes it linear.
+#
+# The lookahead stays keyed to the ACTUAL delimiter rather than excluding
+# every delimiter character. `s/a#b/c/` is a real substitution whose pattern
+# contains a `#`, and a blanket `[^` + _DELIMS + `\\]` would stop matching it.
 _SUBST_RE = re.compile(
     r"\bs(?P<delim>[" + _DELIMS + r"])"
-    r"(?:\\.|(?!(?P=delim)).)*"
+    r"(?:\\.|(?!(?P=delim))[^\\])*"
     r"(?P=delim)"
-    r"(?:\\.|(?!(?P=delim)).)*"
+    r"(?:\\.|(?!(?P=delim))[^\\])*"
     r"(?P=delim)"
     r"(?P<flags>[A-Za-z0-9]*)",
     re.S,

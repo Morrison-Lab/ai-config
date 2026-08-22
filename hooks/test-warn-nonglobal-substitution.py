@@ -59,6 +59,10 @@ SHOULD_WARN = [
      "has it -- the first alone is enough to warn"),
     ("W10", "FOO=1 sed -i 's/a/b/' file.txt",
      "a leading env-assignment is skipped before matching the invocation"),
+    ("W11", "sed -i 's/a#b/c/' file.txt",
+     "a pattern containing ANOTHER delimiter character still matches -- the "
+     "lookahead is keyed to the delimiter actually in use, so excluding "
+     "every delimiter character would silently stop warning here"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -178,6 +182,38 @@ print(f"\n{total - wrong}/{total} correct"
 
 EXPECTED = {case_id: "WARN" for case_id, *_ in SHOULD_WARN}
 EXPECTED.update({case_id: "silent" for case_id, *_ in SHOULD_STAY_SILENT})
+# The matcher must stay linear on an UNTERMINATED substitution carrying a run
+# of backslashes. The two alternatives in `_SUBST_RE` were once ambiguous (a
+# backslash matched both), which backtracks exponentially -- 0.357s at 30
+# backslashes, no completion in 120s at 50,000. Every case above is
+# well-formed, so none of them can reach it; this is the only guard.
+# Asserted on elapsed time because the defect is runtime, not verdict.
+def _redos_guard():
+    import time
+    # The quoting must BALANCE. An unbalanced quote makes shlex refuse the
+    # command, so `find_offenses` returns before `_SUBST_RE` runs at all and
+    # the guard passes with the vulnerable pattern in place -- which is how
+    # the first version of this guard was vacuous.
+    #
+    # 37 is calibrated, not arbitrary. Measured 2026-08-21 against the
+    # ambiguous pattern: 0.98s at 33, 2.7s at 35, 7.2s at 37. Below ~35 the
+    # guard would not trip; far above it the suite HANGS instead of failing,
+    # which stalls CI rather than reporting. 37 fails in seconds and leaves
+    # headroom on a slower runner.
+    payload = "perl -i -pe " + "'" + "s/" + ("\\" * 37) + "'"
+    start = time.time()
+    verdict_for_command(HOOK, payload)
+    elapsed = time.time() - start
+    if elapsed > 2.0:
+        print(f"  WRONG REDOS  unterminated substitution with 37 backslashes "
+              f"took {elapsed:.2f}s -- _SUBST_RE's alternatives are ambiguous "
+              f"again")
+        return 1
+    print(f"  ok   REDOS    unterminated substitution stays linear "
+          f"({elapsed:.4f}s)")
+    return 0
+
+
 CASES = {case_id: command
          for case_id, command, _ in SHOULD_WARN + SHOULD_STAY_SILENT}
 
@@ -272,4 +308,6 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
 print(f"\n{len(MUTATIONS) - mutation_wrong}/{len(MUTATIONS)} clauses "
       "behaved as declared under reversion")
 
-sys.exit(1 if (wrong or mutation_wrong) else 0)
+redos_wrong = _redos_guard()
+
+sys.exit(1 if (wrong or mutation_wrong or redos_wrong) else 0)

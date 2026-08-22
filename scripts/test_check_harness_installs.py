@@ -53,6 +53,23 @@ with tempfile.TemporaryDirectory() as raw:
     check("absent consumer is explicit", hc.collect_flat(repo, "skills", root / "absent", "gemini") == [])
     write(codex / "config.toml", "[plugins.\"ai-config@example\"]\nenabled = true\n")
     check("enabled Codex plugin skips bare wrappers", hc.codex_plugin_enabled(codex / "config.toml"))
+    (cursor / "skills").mkdir(parents=True)
+    write(cursor / "skills" / "alpha" / "SKILL.md", "stale")
+    claude = root / "claude"
+    check(
+        "Cursor stale skill is detected",
+        statuses(hc.collect_flat(repo, "skills", cursor / "skills", "cursor"))
+        == {"cursor/alpha": "stale"},
+    )
+    check(
+        "empty Cursor dirs do not skip skill audit",
+        not hc.cursor_skill_catalog_served(cursor, claude, repo),
+    )
+    (cursor / "plugins" / "local" / "ai-config").mkdir(parents=True)
+    check(
+        "Cursor plugin skips bare skill audit",
+        hc.cursor_skill_catalog_served(cursor, claude, repo),
+    )
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

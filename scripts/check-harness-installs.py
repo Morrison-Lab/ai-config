@@ -39,6 +39,19 @@ def codex_plugin_enabled(config: Path) -> bool:
     return module.ai_config_plugin_enabled(config)
 
 
+def cursor_skill_catalog_served(
+    cursor_dir: Path, claude_dir: Path, repo_root: Path
+) -> bool:
+    """True when a Cursor plugin or Claude catalog already serves this repo."""
+    spec = importlib.util.spec_from_file_location(
+        "cursor_plugin_enabled", ROOT / "scripts" / "cursor-plugin-enabled.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module.skip_reason(cursor_dir, claude_dir, repo_root) is not None
+
+
 def collect_flat(repo_root: Path, source_rel: str, install_dir: Path, harness: str,
                  repo_roots: set[Path] | None = None):
     """Classify an individually-linked catalog, including consumer-only paths.
@@ -97,15 +110,34 @@ def main() -> int:
     # module docstring for why no worktree is privileged as "the" install source.
     repo_roots = {repo_root} | ci.repo_worktrees(repo_root)
     codex_dir = Path(args.codex_dir)
+    cursor_dir = Path(args.cursor_dir)
+    claude_dir = Path(args.claude_dir)
     codex_uses_plugin = codex_plugin_enabled(codex_dir / "config.toml")
+    cursor_uses_catalog = cursor_skill_catalog_served(
+        cursor_dir, claude_dir, repo_root
+    )
     codex_entries = [] if codex_uses_plugin else collect_flat(
         repo_root, "codex-skills", codex_dir / "skills", "codex", repo_roots
     )
+    cursor_skill_entries = [] if cursor_uses_catalog else collect_flat(
+        repo_root, "skills", cursor_dir / "skills", "cursor", repo_roots
+    )
     checks = (
-        ("Claude", ci.collect(repo_root, Path(args.claude_dir), repo_roots)),
+        ("Claude", ci.collect(repo_root, claude_dir, repo_roots)),
         ("Codex (plugin; wrappers intentionally absent)" if codex_uses_plugin else "Codex", codex_entries),
         ("Gemini", collect_flat(repo_root, "skills", Path(args.gemini_dir) / "skills", "gemini", repo_roots)),
-        ("Cursor", collect_flat(repo_root, "cursor-rules", Path(args.cursor_dir) / "rules", "cursor", repo_roots)),
+        (
+            "Cursor skills (plugin/catalog; ~/.cursor/skills intentionally absent)"
+            if cursor_uses_catalog
+            else "Cursor skills",
+            cursor_skill_entries,
+        ),
+        (
+            "Cursor rules",
+            collect_flat(
+                repo_root, "cursor-rules", cursor_dir / "rules", "cursor", repo_roots
+            ),
+        ),
     )
     defects = sum(report(name, entries) for name, entries in checks)
     if defects:

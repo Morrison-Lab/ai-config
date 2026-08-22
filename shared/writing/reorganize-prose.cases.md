@@ -1,8 +1,8 @@
 # Case records: reorganize-prose
 
 Worked-example case records for the rules in
-[`reorganize-prose.md`](reorganize-prose.md), moved here verbatim to keep them
-out of the auto-loaded `CLAUDE.md` context.
+[`reorganize-prose.md`](reorganize-prose.md), kept here to stay out of the
+auto-loaded `CLAUDE.md` context.
 Each heading names the rule the record supports.
 
 ## Three ordering regressions in one skill

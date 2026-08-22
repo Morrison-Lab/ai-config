@@ -399,9 +399,11 @@ The three that settled these instances are the reusable part:
 
 ```
 gh pr diff <N> --name-only     # what else touches this file
-git --list-cmds=main,others    # what commands actually exist
+git --list-cmds=main,others    # what commands exist HERE (see the caveat below)
 printf '%s' "$payload" | python3 hooks/<guard>.py   # what this code does
 ```
+
+The second one carries a caveat the other two do not, and the case record below is where it came from: its output varies by git build, so it settles what exists on the machine you ran it on and nothing wider.
 
 Note what the third one is for.
 A claim that some code is immune to a bug class is a claim about behaviour, so no amount of reading settles it --- the probe does, and it is two lines.
@@ -410,6 +412,7 @@ A claim that some code is immune to a bug class is a claim about behaviour, so n
 - **Do:** run the deriving command before publishing a claim that something does not exist, and paste it beside the claim.
 - **Do:** write what the command returned, so a reader can see which population the negative is about.
 - **Do:** probe behaviour rather than reading it, when the claim is that some code cannot do something.
+- **Do:** record the tool version beside a command whose output is build-dependent, since running it is necessary and not sufficient when the answer differs by environment.
 - **Don't:** publish "nothing else", "no such", "immune", or "disjoint" on recollection --- confident phrasing is what makes such a claim read as checked.
 - **Don't:** read this file's "say 'I did not find' rather than 'there is no'" rule as covering the case, since its precondition is that a search happened.
 
@@ -429,7 +432,10 @@ Building the guard anyway would trade one caught instance for roughly thirty wro
 "`shared/workflow/learn-from-review-findings.md` is disjoint from every open PR", written into a subagent brief --- false, since [#1911](https://github.com/Morrison-Lab/ai-config/pull/1911) touches it.
 "Hooks that tokenize commands are immune to the entire bug class by construction", published in [#1967](https://github.com/Morrison-Lab/ai-config/issues/1967) --- false, since `sh -c "git push --force origin main"` draws no output at all from `hooks/no-clobbering-push.py`, where the same command unwrapped is denied.
 The gap is filed as [#1973](https://github.com/Morrison-Lab/ai-config/issues/1973).
-"Of `add|commit|apply|mv|rm`, only `commit` has real hyphenated siblings", published in [#1966](https://github.com/Morrison-Lab/ai-config/issues/1966) --- false, since `git --list-cmds=main,others` reports `add--interactive`.
+"Of `add|commit|apply|mv|rm`, only `commit` has real hyphenated siblings", published in [#1966](https://github.com/Morrison-Lab/ai-config/issues/1966) --- false on the machine it was asserted from, where `git --list-cmds=main,others` reports `add--interactive` under git 2.50.1 (Apple Git-155), whose exec-path still ships a `git-add--interactive`.
+This PR's own review then ran the same command under git 2.55.0 and got no such entry, modern git having rewritten `add -i` in C and dropped the Perl dispatcher.
+Both runs are honest, which makes this the sharpest of the four: the deriving command was necessary and **not sufficient**, because its answer is build-dependent and neither party could see that without running it in both places.
+So pair such a command with the version it was run against, per [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md).
 And the characterization of this file quoted above, written into the brief asking for this section, which `hooks/remind-brief-premises.py` flagged as an unverified corpus assertion.
 It happened to be true.
 Its author did not know that when writing it, which is the whole of the point.)

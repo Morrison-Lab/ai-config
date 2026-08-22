@@ -253,7 +253,7 @@ and the verdict's own conclusion every round.**
 - **The notification that wakes you carries a SUBSET of the findings, and
   nothing in it says so.**
   Every case above is a surface *on GitHub* that a query can reach.
-  This one is the channel that tells you to look at all: a
+  This one is the channel that tells you to look in the first place: a
   `pull_request_review_comment.created` wake delivers **one** comment, and a
   review posting five of them wakes you five times, asynchronously, with no
   count and no "1 of 5".

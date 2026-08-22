@@ -6,7 +6,10 @@ Not at the start of the round, not when you last synced, not when you opened the
 The branch you cut, whose PR you opened, and whose review round you are driving is the branch you are *least* likely to check before pushing to.
 That is the whole difficulty, and it is not carelessness: you know what is on the branch because you put it there, so a check reads as ceremony rather than as a question with an unknown answer.
 
-The belief is routinely wrong, and [`claim-pr`](claim-pr.md) already records all three ways: the `@claude` agent pushes to your branch on PR activity, typically to merge `main` in; a second CLI session under the same account can claim the same PR and drive it; and a human can push to it at any time.
+The belief is routinely wrong, and [`claim-pr`](claim-pr.md) already records all three ways.
+The `@claude` agent pushes to your branch on PR activity, typically to merge `main` in.
+A second CLI session under the same account can claim the same PR and drive it.
+And a human can push to it at any time.
 None of those announce themselves in your conversation.
 
 Note which direction the parallelism runs, because it inverts the usual intuition: the more agents are working a repo, the likelier a collision and the less any single session can observe one coming.
@@ -94,9 +97,12 @@ Never force-push over the difference to find out which it was.
 - **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and name `ALLOW_FORCE_PUSH=1` only for an unsatisfiable lease.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.
 - **Don't:** treat an earlier fetch, sync, or green CI run as the check --- each was a reading of a moment that has passed.
-- **Don't:** read "I opened this branch and its PR" as evidence you are its only driver; that belief is what the check exists to test.
+- **Don't:** read "I opened this branch and its PR" as evidence you are its only driver.
+  That belief is what the check exists to test.
 - **Don't:** reach for bare `git push --force`, and don't read `--force-with-lease` alone as safe --- a background fetch defeats it silently.
 
-(Directive from the user, 2026-08-21: "cai: add protections against clobbering commits from other agents on a branch you think you own; always check immediately before pushing".
+(Directive from the user, 2026-08-21:
+"cai: add protections against clobbering commits from other agents on a branch
+you think you own; always check immediately before pushing".
 Tracked as ai-config#1883.
 `grep -rn 'force-if-includes'` over the whole repo returned 0 hits when the directive arrived, against 8 files reaching for `--force-with-lease` as the safe form.)

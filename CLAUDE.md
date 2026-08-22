@@ -737,7 +737,8 @@ Whenever starting or working on a Pull Request:
 [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md)
 
 Take a fresh `git ls-remote` reading of the branch immediately before every `git push` --- not at the start of the round, not when you last synced, not when you opened the PR.
-The branch you cut and whose PR you opened is the one you are *least* likely to check, because ownership makes the check read as ceremony rather than as a question with an unknown answer; `claim-pr` records three ways it gains another agent's commits anyway (the `@claude` agent's `main`-sync, a second CLI session, a human), and every recovery procedure there runs *after* the collision.
+The branch you cut and whose PR you opened is the one you are *least* likely to check, because ownership makes the check read as ceremony rather than as a question with an unknown answer.
+`claim-pr` records three ways it gains another agent's commits anyway (the `@claude` agent's `main`-sync, a second CLI session, a human), and every recovery procedure there runs *after* the collision.
 An earlier fetch is a measurement of a moment that has passed, and it expires exactly the way a clock reading does.
 
 `--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.

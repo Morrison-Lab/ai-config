@@ -493,6 +493,10 @@ Print a summary covering **both** local and remote:
   *branches*; that one sweeps the *worktrees* a branch is checked out into. Run
   both so neither a dead worktree nor an orphaned branch lingers.
 
+- **`clean-git`** --- the combined sweep.
+  Runs `clean-worktrees` first, then this skill,
+  because a branch held by a worktree cannot be deleted.
+
 ## Anti-patterns
 
 - ❌ Deleting branches without checking for open MRs/issues first

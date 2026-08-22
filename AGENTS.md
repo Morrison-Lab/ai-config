@@ -30,6 +30,13 @@ A promise costs nothing to produce and changes no file, so no review, check, or 
 It is worse than saying nothing, because silence leaves the problem visibly open while a promise closes it on the record.
 Promising the mechanism itself in the future tense ("I'll add a guard for this") is the same empty promise one level down.
 
+**An owed *action* needs a mechanism that will fire, not only one that records.**
+"I owe this PR the ARDI loop", "the UMS pass is owed by me", "I still owe that follow-up" each commit to one specific outstanding step, and a written record documents it without doing it.
+So arm the next step --- a scheduled wakeup or timer carrying it, a cron or scheduled task when the check-in must outlive this session, a PR watcher when the debt is a PR --- and report what you armed and the clock time it fires.
+A durable record still clears such a debt and is the right answer when it is somebody else's to schedule.
+It is the wrong instinct when the debt is yours and has a next step.
+The implication runs one way: a timer fires once and dies, so it cannot keep a standing rule.
+
 When no mechanism is worth building, drop the promise and state the plain fact instead.
 See `shared/workflow/no-empty-promises.md`.
 
@@ -48,6 +55,25 @@ after the work, not a substitute for it. When an issue cannot be fixed
 directly, carry it forward with an actual next action. Every issue noticed,
 however small or outside the current task's scope, must at minimum be filed in
 the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
+
+## Manage quota, including the structural kind
+
+Treat token cost as a property of a workflow's **shape**, not only of the choices made inside one session.
+Route bounded mechanical work to a cheaper model, a subagent, or a separately-billed CLI rather than the conductor's own tier, and compact or hand off before context bloat forces it.
+
+Those are per-session levers, and their saving expires with the session.
+Ask separately what a procedure costs *by construction*: instructions loaded at launch that only some tasks read, a judgment made twice that wants a deterministic check, a serial loop whose base moves faster than one round, a brief that enumerates a set instead of deriving it.
+The deliverable there is a change to the workflow --- fixed in stride when small, filed with its measurement when not --- never a quieter run of the same procedure.
+
+Human steps count as workflow shape, so say so when one is costly --- and ship a mechanism in the same reply rather than only a suggestion.
+A written rule is the floor.
+A visible marker at the moment of the action, a guard, or a setting that removes the option are the stronger rungs.
+The decision stays the human's.
+
+Two boundaries.
+Efficiency never outranks correctness, so no saving is bought with a skipped verification or a shortened review.
+And restructure in its own issue or PR, not inside whatever task happened to notice it.
+See `shared/workflow/restructure-for-efficiency.md`.
 
 ## Keep ai-config and repo checkouts fresh
 

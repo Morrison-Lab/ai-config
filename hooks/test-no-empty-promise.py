@@ -12,6 +12,13 @@ Three near-misses are load-bearing:
     same words and commits to nothing;
   * quoting the rule while discussing it, which this corpus does constantly.
 
+The #1946 block below adds the other axis: a promise stated as a DEBT ("I owe
+#1937 the ARDI loop") discharges on an armed FIRING as well as on a durable
+record, while a RULE promise still discharges only on the durable one. The
+near-misses that decide whether that is usable are the arming-shaped calls
+that deliver nothing -- `stop: true`, a cron LIST, an `ardi` run that already
+happened, and the word "schedule" sitting in a read-only brief.
+
 Run: python3 hooks/test-no-empty-promise.py hooks/no-empty-promise.py
 """
 import json
@@ -117,10 +124,64 @@ GREP_RULE = {"type": "assistant", "message": {"content": [
 CAT_RULE = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "name": "Bash",
      "input": {"command": "cat shared/workflow/ardi.md | head -40"}}]}}
+# --- #1946 fixtures: an owed ACTION discharges on an armed firing.
+# Tool names verified against 232 local transcripts on 2026-08-22 rather than
+# invented: ScheduleWakeup 302 occurrences, Monitor 126, CronCreate 18,
+# CronList 13 -- so the CronList near-miss below is a real shape, not a
+# contrived one.
+ARMED_WAKEUP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "ScheduleWakeup",
+     "input": {"delaySeconds": 300, "noop": False,
+               "reason": "Waiting on the re-review verdict for #1937.",
+               "prompt": "Continue the ARDI loop on ai-config #1937."}}]}}
+ARMED_CRON = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "CronCreate",
+     "input": {"schedule": "*/10 * * * *", "prompt": "Check #1937."}}]}}
+ARMED_MCP_TASK = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "mcp__scheduled-tasks__create_scheduled_task",
+     "input": {"prompt": "Re-check #1937's review."}}]}}
+ARMED_SKILL = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Skill",
+     "input": {"skill": "schedule", "args": "check #1937 in 10 minutes"}}]}}
+ARMED_POLLER = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Bash",
+     "input": {"command": "python3 hooks/monitor-open-prs.py"}}]}}
+# Ending a dynamic loop is the OPPOSITE of arming one.
+STOPPED_WAKEUP = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "ScheduleWakeup", "input": {"stop": True}}]}}
+# A read of the schedule, not an arming of one.
+LISTED_CRONS = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "CronList", "input": {}}]}}
+# The `ardi` skill runs the round that is ALREADY done by the time the debt
+# sentence is composed; the debt is about the NEXT round.
+RAN_ARDI = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Skill",
+     "input": {"skill": "ardi", "args": "#1937 drive to clean"}}]}}
+# Prose in `args` must not reach SCHEDULER_SKILLS -- only the `skill` field.
+ASKED_ABOUT_SCHEDULE = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "name": "Task",
+     "input": {"prompt": "What does the schedule skill do, and does loop "
+                         "call workaround-watcher?",
+               "description": "read-only lookup"}}]}}
+ARM_ATTEMPT = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "id": "tu9", "name": "ScheduleWakeup",
+     "input": {"delaySeconds": 300, "prompt": "check #1937"}}]}}
+ARM_DENIED = {"type": "user", "message": {"content": [
+    {"type": "tool_result", "tool_use_id": "tu9", "is_error": True,
+     "content": "Permission to use ScheduleWakeup was denied"}]}}
+
 PROMPT = {"type": "user", "message": {"content": [
     {"type": "text", "text": "next task please"}]}}
 TOOL_RESULT = {"type": "user", "message": {"content": [
     {"type": "tool_result", "content": "ok"}]}}
+
+
+# Running a negative control against another revision of the hook: copy that
+# revision AND `remind-ums-after-error.py` into one directory and point this
+# suite at the copy. `no-empty-promise.py` imports `visible_prose` from that
+# sibling and returns 0 unconditionally when the import fails, so a copy
+# placed on its own goes silent on EVERY case -- which reports as a suite-wide
+# failure rather than as the missing dependency it is.
 
 
 def say(text):
@@ -258,6 +319,16 @@ CASES = [
      False, "'memorize.' at a sentence end still discharges"),
     ([say("Going forward I'll do X."), dispatch("Open ums.md and summarize it.")],
      True, "a dotted FILENAME still does not discharge"),
+    # Review finding on #1968. `_NOT_PATH` originally rejected ANY preceding
+    # `/`, which silently dropped `/ums` -- the spelling this corpus actually
+    # uses to invoke a skill, and the one likeliest to appear in a dispatch
+    # prompt. A path and an invocation differ in what precedes the slash.
+    ([say("Going forward I'll do X."), dispatch("Then run /ums on this.")],
+     False, "the slash-command spelling `/ums` still discharges (#1968)"),
+    ([say("Going forward I'll do X."), dispatch("/memorize the outcome.")],
+     False, "`/memorize` at the start of a prompt still discharges"),
+    ([say("Going forward I'll do X."), dispatch("Open skills/ums and read it.")],
+     True, "a path ending in `ums` still does not discharge"),
 
     # Round 9: a bare skill word in a BASH payload is a search term, not an
     # action -- `grep -n ums README.md` discharged a promise.
@@ -332,6 +403,309 @@ CASES = [
      False, "'owed by' a third party does not block"),
     ([say("I owed you an answer yesterday and gave it.")],
      False, "past-tense 'owed' reports rather than promises"),
+
+    # --- #1946: an owed ACTION owes a firing, not only a record.
+    # The user's own example, verbatim in shape.
+    ([say("Stopping Point: Not a clean stopping point --- #1937 is open "
+          "awaiting re-review at 98d79c81, and I owe it the ARDI loop.")],
+     True, "the owed-ARDI-loop recap blocks with nothing armed (#1946)"),
+    ([say("Stopping Point: #1937 awaits re-review and I owe it the ARDI "
+          "loop."), ARMED_WAKEUP],
+     False, "an armed ScheduleWakeup discharges an owed action"),
+    ([say("I owe #1937 the ARDI loop."), ARMED_CRON],
+     False, "CronCreate discharges an owed action"),
+    ([say("I owe #1937 the ARDI loop."), ARMED_MCP_TASK],
+     False, "a scheduled task discharges an owed action"),
+    ([say("I owe #1937 the ARDI loop."), ARMED_SKILL],
+     False, "the schedule skill discharges an owed action"),
+    ([say("I owe #1937 the ARDI loop."), ARMED_POLLER],
+     False, "arming the detached PR poller discharges an owed action"),
+    # The durable floor still clears a debt -- it is the wrong instinct, not
+    # an invalid mechanism, and blocking it would wedge the honest case where
+    # the debt is somebody else's to schedule.
+    ([say("I owe a follow-up entry here."), WROTE_MEMORY],
+     False, "a durable record still discharges an owed action"),
+
+    # Near-misses on the arming side. Each of these LOOKS like a scheduler
+    # call and delivers nothing.
+    ([say("I owe #1937 the ARDI loop."), STOPPED_WAKEUP],
+     True, "`stop: true` ends the loop and does NOT discharge (#1946)"),
+    ([say("I owe #1937 the ARDI loop."), LISTED_CRONS],
+     True, "listing crons is a read and does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."), RAN_ARDI],
+     True, "running ardi THIS turn does not discharge the NEXT round"),
+    ([say("I owe #1937 the ARDI loop."), ASKED_ABOUT_SCHEDULE],
+     True, "'the schedule skill' in brief prose does NOT discharge"),
+    ([ARM_ATTEMPT, ARM_DENIED, say("I owe #1937 the ARDI loop.")],
+     True, "a DENIED arming does not discharge"),
+    ([ARM_ATTEMPT, say("I owe #1937 the ARDI loop.")],
+     False, "an arming with no result yet still discharges"),
+
+    # The asymmetry: a timer keeps an owed ACTION and cannot keep a RULE.
+    ([say("Going forward I'll always check the remote first."), ARMED_WAKEUP],
+     True, "a timer does NOT discharge a rule promise (#1946)"),
+    ([say("From now on I won't skip the sweep."), ARMED_CRON],
+     True, "CronCreate does NOT discharge a rule promise"),
+    # A turn carrying one of each is blocked on the STRICTER requirement, and
+    # blocked once rather than twice.
+    ([say("Going forward I'll always check first, and I owe #1937 the ARDI "
+          "loop."), ARMED_WAKEUP],
+     True, "a rule beside a debt is judged on the rule's requirement"),
+    ([say("Going forward I'll always check first, and I owe #1937 the ARDI "
+          "loop."), WROTE_FRAGMENT],
+     False, "a durable write clears both kinds at once"),
+
+    # --- Review round on #1947, Finding 1. `POLLER_CMD` was a bare path
+    # regex, so merely NAMING the poller discharged an owed action -- in a
+    # session working on the poller hooks, where these reads are the likeliest
+    # commands of all. Each was reproduced against the PR head before the fix.
+    ([say("I owe #1937 the ARDI loop."), bash("cat hooks/monitor-open-prs.py")],
+     True, "cat of the poller does NOT discharge (review #1947)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("grep -n check hooks/monitor-open-prs.py")],
+     True, "grepping the poller does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."), bash("echo hooks/monitor-open-prs.py")],
+     True, "echoing the poller path does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."), bash("ls -la hooks/monitor-open-prs.py")],
+     True, "listing the poller does NOT discharge"),
+    # The arming shapes that must keep working.
+    ([say("I owe #1937 the ARDI loop."), bash("python3 hooks/monitor-open-prs.py")],
+     False, "running the poller discharges"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("nohup python3 ~/.claude/hooks/monitor-open-prs.py --monitor "
+           ">/dev/null 2>&1 &")],
+     False, "a backgrounded poller with an absolute path discharges"),
+    ([say("I owe #1937 the ARDI loop."), bash("./hooks/monitor-open-prs.py")],
+     False, "a direct exec of the poller discharges"),
+
+    # The same finding's SECOND half: testing the arming before the durable
+    # write made `git add` on a poller file return "scheduled", which a RULE
+    # promise does not accept -- so a turn that had shipped its mechanism was
+    # blocked and told to do what it had just done. Durable must win.
+    ([say("Going forward I'll always arm the watcher."),
+      bash("git add hooks/no-unmonitored-pr.py && git commit -m fix")],
+     False, "committing a poller hook is DURABLE, so it clears a rule (#1947)"),
+    ([say("Going forward I'll always arm the watcher."),
+      bash("sed -i 's/a/b/' hooks/ensure-open-pr-monitor.py")],
+     False, "editing a poller hook in place is durable, not merely scheduled"),
+    # Control: the same shape on a non-poller hook, which never regressed.
+    ([say("Going forward I'll always arm the watcher."),
+      bash("git add hooks/other.py && git commit -m fix")],
+     False, "the non-poller control still discharges a rule promise"),
+
+    # A plugin exposes the same skill under a qualified name, and only the
+    # bare one matched.
+    ([say("I owe #1937 the ARDI loop."),
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "Skill",
+           "input": {"skill": "ai-config:workaround-watcher",
+                     "args": "watch #1937"}}]}}],
+     False, "a plugin-prefixed scheduling skill discharges (#1947)"),
+
+    # `noop: true` is NOT `stop: true`. Read against ScheduleWakeup's schema:
+    # `noop` decides how the tick is DISPLAYED and is "required unless `stop`
+    # is true", so it is mandatory on every genuine arming -- and a quiet hold
+    # is exactly the `noop: true` case. Pinned so the rebuttal is mechanical
+    # rather than remembered.
+    ([say("I owe #1937 the ARDI loop."),
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "ScheduleWakeup",
+           "input": {"delaySeconds": 600, "noop": True,
+                     "reason": "quiet hold on #1937's review",
+                     "prompt": "Continue the ARDI loop on #1937."}}]}}],
+     False, "`noop: true` is a display flag and still discharges (#1947)"),
+
+    # --- Review round 2 on #1947. The execution anchor from round 1 still
+    # admitted a plain read wrapped in `sh -c`/`bash -c` -- a commoner idiom
+    # than the `python3 -c` residual round 1 had accepted, so the lookahead
+    # now retires both.
+    ([say("I owe #1937 the ARDI loop."),
+      bash('sh -c "cat hooks/monitor-open-prs.py"')],
+     True, "`sh -c` wrapping a read does NOT discharge (review #1947 r2)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('bash -c "grep -n check hooks/monitor-open-prs.py"')],
+     True, "`bash -c` wrapping a grep does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('sh -ec "cat hooks/monitor-open-prs.py"')],
+     True, "a combined short flag (`sh -ec`) is covered too"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -c \"print(open('hooks/monitor-open-prs.py').read())\"")],
+     True, "the round-1 `python3 -c` residual is now closed as well"),
+    # Disqualifying the interpreter must NOT discard the whole command: any
+    # other exec token still anchors, so a genuine arming inside `bash -c`
+    # keeps discharging.
+    ([say("I owe #1937 the ARDI loop."),
+      bash('bash -c "python3 hooks/monitor-open-prs.py --monitor"')],
+     False, "a real arming inside `bash -c` still discharges (#1947 r2)"),
+
+    # --- Review round 3 on #1947. The `_NOT_DASH_C` lookahead was pinned to
+    # the token immediately after the interpreter, so ANY flag between them
+    # walked past it -- as did a versioned interpreter name, since
+    # `\bpython3\b` matches inside `python3.11`. All four are ordinary
+    # commands (`-x` trace, `-u` unbuffered, a side-by-side interpreter), and
+    # each silently discharged a debt with nothing armed.
+    #
+    # The fix is not a fourth lookahead: `POLLER_CMD` is gone and
+    # `_poller_executed()` tokenizes with `shlex` instead, because "is this
+    # token being executed?" is a fact about shell grammar rather than about
+    # character adjacency.
+    ([say("I owe #1937 the ARDI loop."),
+      bash('bash -x -c "cat hooks/monitor-open-prs.py"')],
+     True, "a flag between interpreter and `-c` does NOT discharge (#1947 r3)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('python3 -u -c "cat hooks/monitor-open-prs.py"')],
+     True, "`python3 -u -c` wrapping a read does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('python3.11 -c "cat hooks/monitor-open-prs.py"')],
+     True, "a versioned interpreter does NOT discharge a wrapped read"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('python3.12 -B -u -c "cat hooks/monitor-open-prs.py"')],
+     True, "several flags plus a versioned interpreter does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."), bash("head -20 hooks/monitor-open-prs.py")],
+     True, "`head` on the poller does NOT discharge"),
+    # Real armings the lexer must keep accepting, including the shapes the
+    # regex never handled at all.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3.11 hooks/monitor-open-prs.py --monitor")],
+     False, "a versioned interpreter RUNNING the poller discharges (#1947 r3)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("/usr/bin/env python3 hooks/monitor-open-prs.py --monitor")],
+     False, "`/usr/bin/env python3` discharges"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("env PATH=/opt/homebrew/bin:$PATH python3 hooks/monitor-open-prs.py "
+           "--monitor")],
+     False, "an env-prefixed arming discharges (the shape that fixed #1953)"),
+
+    # --- Review round 4 on #1947, reported as non-blocking and fixed anyway.
+    # `shlex` splits on whitespace and quoting, NOT on shell operators, so a
+    # separator with no space before it rides along on the path token and the
+    # anchored match rejected it. A regression the round-3 rewrite introduced
+    # (the old regex used an unanchored search), failing in the safe
+    # direction, and a semicolon with no space is an ordinary way to write a
+    # command.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 hooks/monitor-open-prs.py; echo done")],
+     False, "a trailing `;` on the path token still discharges (#1947 r4)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 hooks/monitor-open-prs.py&")],
+     False, "a trailing `&` with no space still discharges"),
+    # The anchor is stripped, not dropped: a token that merely ENDS with the
+    # path must still be rejected, which is what the `$` was protecting.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("cat hooks/monitor-open-prs.py; echo done")],
+     True, "stripping the separator does NOT reopen the read bypass (#1947 r4)"),
+
+    # --- Review round 5 on #1947. The `-c` recursion applied SHELL semantics
+    # uniformly, but only a shell's `-c` takes a nested command line. Python's
+    # takes source, where a bare path is an expression -- `python3 -c
+    # hooks/monitor-open-prs.py` raises `NameError: name 'hooks' is not
+    # defined` and runs nothing, yet discharged.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -c hooks/monitor-open-prs.py")],
+     True, "`python3 -c <bare path>` does NOT discharge (#1947 r5)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -c hooks/monitor-open-prs.py --monitor")],
+     True, "`python3 -c <path> --monitor` does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3.11 -c hooks/monitor-open-prs.py")],
+     True, "a versioned Python's `-c` does NOT discharge either"),
+    # The shell half must keep working: `bash -c <path>` really does execute
+    # it, which is the asymmetry the fix turns on.
+    ([say("I owe #1937 the ARDI loop."), bash("bash -c hooks/monitor-open-prs.py")],
+     False, "`bash -c <bare path>` DOES execute it, so it discharges (#1947 r5)"),
+
+    # A false NEGATIVE the same walk-back fixed, not reported by the review:
+    # an ordinary interpreter flag between the interpreter and the script made
+    # a genuine arming stop discharging. `-u` is the one you actually want on
+    # a poller.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -u hooks/monitor-open-prs.py")],
+     False, "an interpreter flag before the script still discharges (#1947 r5)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -B -u hooks/monitor-open-prs.py --monitor")],
+     False, "several interpreter flags before the script still discharge"),
+
+    # --- ai-config#1966. `BASH_WRITE` decides what counts as a durable
+    # write, so a false match there is a false DISCHARGE -- the silent
+    # direction. `\b` sits between a name and a following `-`, so `--write\b`
+    # matched curl's `--write-out` and `git\s+(?:add|commit|...)\b` matched
+    # `git commit-tree`. Both directions are pinned, because the defect was
+    # precisely that a real write and these were indistinguishable.
+    #
+    # The curl line is verbatim from the issue. It pairs a rule-surface path
+    # (a URL ending in CLAUDE.md) with a flag that writes nothing, so a pure
+    # HTTP status check read as having shipped a mechanism.
+    ([say("Going forward I'll always check this before replying."),
+      bash("curl -s --write-out '%{http_code}' "
+           "https://example.com/CLAUDE.md")],
+     True, "`curl --write-out` writes nothing and does NOT discharge (#1966)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit-tree -p HEAD -m 'shared/workflow/fully-clean.md' $TREE")],
+     True, "`git commit-tree` is not `git commit` and does NOT discharge"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit-graph write && cat shared/workflow/fully-clean.md")],
+     True, "`git commit-graph write` does NOT discharge"),
+
+    # The true-positive half. Each of these still has to work, or the guard
+    # has been tightened past the defect into the behaviour itself.
+    ([say("Going forward I'll always check this before replying."),
+      bash("python3 scripts/semantic-line-breaks.py --write "
+           "shared/workflow/fully-clean.md")],
+     False, "a genuine `--write` flag still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git commit -m 'record it' shared/workflow/fully-clean.md")],
+     False, "`git commit` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git add shared/workflow/fully-clean.md")],
+     False, "`git add` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git rm shared/workflow/fully-clean.md")],
+     False, "`git rm` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("git mv shared/workflow/fully-clean.md shared/workflow/fc.md")],
+     False, "`git mv` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("sed -i 's/a/b/' shared/workflow/fully-clean.md")],
+     False, "`sed -i` still discharges (no hyphenated sibling to guard)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("sed -i.bak 's/a/b/' shared/workflow/fully-clean.md")],
+     False, "`sed -i.bak` still discharges -- `.` is already a non-word char"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("tee -a shared/workflow/fully-clean.md < /tmp/note")],
+     False, "`tee` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("cat CLAUDE.md | tee shared/workflow/fully-clean.md")],
+     False, "`tee` mid-pipeline still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("mkdir -p skills/new-guard")],
+     False, "`mkdir` still discharges"),
+    # `memories/notes` deliberately does NOT work here, and that is
+    # MECHANISM_PATH rather than BASH_WRITE: each of its alternatives demands
+    # a FILE, so a bare directory cannot discharge a promise. Pinned so the
+    # `mkdir` case above is not read as the guard failing.
+    ([say("Going forward I'll always check this before replying."),
+      bash("mkdir -p memories/notes")],
+     True, "creating a bare DIRECTORY does not discharge (MECHANISM_PATH)"),
+    # Second review finding on #1968: the earlier comment justified leaving
+    # `tee`/`mkdir` on a plain `\b` by the hyphenated-sibling axis, which is
+    # the wrong axis -- `\btee\b` matched inside a PATH, so a READ discharged
+    # a promise. Latent (no such path exists in this repo today) but wrong in
+    # exactly the way the rest of this diff is about.
+    ([say("Going forward I'll always check this before replying."),
+      bash("cat shared/workflow/tee-notes.md")],
+     True, "a path containing `tee` is a READ and does NOT discharge (#1968)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("grep -n x shared/workflow/mkdir-guide.md")],
+     True, "a path containing `mkdir` does NOT discharge"),
+    # `commit` is NOT the only member of that group with a hyphenated
+    # sibling: `git --list-cmds=main,others` also reports `add--interactive`,
+    # the deprecated interactive backend. Pinned so the exclusion is a
+    # checked decision rather than an assumption -- and pinned in the LOUD
+    # direction, since a genuine staging that stops discharging costs an
+    # extra block the author clears in one command.
+    ([say("Going forward I'll always check this before replying."),
+      bash("git add--interactive shared/workflow/fully-clean.md")],
+     True, "`git add--interactive` is excluded with the rest of the group"),
 ]
 
 
@@ -382,6 +756,78 @@ def main():
     else:
         print("FAIL: should fail open on an unreadable transcript")
         failures += 1
+
+    # A standing adversarial sweep over flag permutations. Three consecutive
+    # review rounds each found one more way to wrap a READ of the poller in an
+    # interpreter, and each fix covered only the shape that had been reported.
+    # Enumerating the space is what stops the fourth round: this fails on any
+    # combination that discharges, not merely on the ones someone thought of.
+    import importlib.util as _ilu
+    import itertools
+    _spec = _ilu.spec_from_file_location("_nep", HOOK)
+    _mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    path = "hooks/monitor-open-prs.py"
+    leaks = []
+    for interp in ("sh", "bash", "dash", "python3", "python3.11", "python3.12"):
+        for count in (0, 1, 2):
+            for combo in itertools.permutations(("-x", "-u", "-O", "-e", "-B"),
+                                                count):
+                flags = " ".join(combo)
+                command = f'{interp} {flags} -c "cat {path}"'.replace("  ", " ")
+                if _mod.discharges("Bash", {"command": command}) is not None:
+                    leaks.append(command)
+    if leaks:
+        print(f"FAIL: {len(leaks)} flag permutation(s) discharge a wrapped "
+              f"read, e.g. {leaks[0]}")
+        failures += 1
+    else:
+        print("PASS: no flag permutation discharges a wrapped read of the "
+              "poller")
+        passes += 1
+
+    # Round 5's shape, swept rather than sampled: a Python interpreter's `-c`
+    # takes source, so no flag combination in front of it may discharge a bare
+    # path.
+    py_leaks = []
+    for interp in ("python", "python3", "python3.11", "python3.12"):
+        for count in (0, 1, 2):
+            for combo in itertools.permutations(("-u", "-B", "-O", "-E"),
+                                                count):
+                flags = " ".join(combo)
+                command = f"{interp} {flags} -c {path}".replace("  ", " ")
+                if _mod.discharges("Bash", {"command": command}) is not None:
+                    py_leaks.append(command)
+    if py_leaks:
+        print(f"FAIL: {len(py_leaks)} `python -c <bare path>` permutation(s) "
+              f"discharge, e.g. {py_leaks[0]}")
+        failures += 1
+    else:
+        print("PASS: no `python -c <bare path>` permutation discharges")
+        passes += 1
+
+    # The mirror direction: a genuine arming must survive the same wrappers.
+    missed = [
+        c for c in (
+            f"python3 {path}",
+            f"python3.11 {path} --monitor",
+            f"./{path}",
+            f'bash -c "python3 {path} --monitor"',
+            f"nohup python3 ~/.claude/{path} --monitor >/dev/null 2>&1 &",
+            f"/usr/bin/env python3 {path} --monitor",
+            f"python3 -u {path}",
+            f"bash -c {path}",
+            f"python3 {path}; echo done",
+        )
+        if _mod.discharges("Bash", {"command": c}) != "scheduled"
+    ]
+    if missed:
+        print(f"FAIL: {len(missed)} genuine arming(s) stopped discharging, "
+              f"e.g. {missed[0]}")
+        failures += 1
+    else:
+        print("PASS: every genuine arming shape still discharges")
+        passes += 1
 
     # Malformed stdin must not crash the Stop event either.
     out = subprocess.run(

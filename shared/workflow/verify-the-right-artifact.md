@@ -292,6 +292,57 @@ and set it explicitly before concluding anything.
 - **Don't:** let a failed reproduction retire a report; it retires one
   environment.
 
+**The mirror of that, for the person who made the report: a reviewer's failed
+reproduction is not a refutation, and the remedy is to SCOPE the claim rather
+than retract it.**
+The section above tells whoever failed to reproduce what they owe.
+It does not say what the original claimant owes when someone competent runs
+the case, carefully, and sees nothing --- and the pull there is strongly
+toward retracting, because the reviewer has evidence and you have a memory.
+
+Both can be right, and usually are.
+An observation made on one machine is true on that machine; stating it without
+a scope is what makes it false everywhere else.
+So the disagreement is rarely about whether the thing happened.
+It is about a qualifier nobody wrote down.
+
+Two moves settle it, in order.
+**Re-run your own original case**, since a remembered failure is not evidence
+and may simply have been a mistake.
+Then, if it reproduces, **reduce it to a form that removes the suspected
+explanation** --- the reviewer's runs are a hypothesis about the cause, so
+build a case their hypothesis cannot account for.
+
+What lands in the corpus afterwards is the scoped claim plus the environment
+both parties measured, and the reviewer's null result belongs in the entry
+rather than being discarded by it.
+A rule stated unconditionally, true where it was written and false where it is
+read, is [`timestamp-volatile-claims`](../writing/timestamp-volatile-claims.md)'s
+failure with an environment in place of a date.
+
+- **Do:** re-run your original case before conceding anything.
+- **Do:** reduce to a form that rules out the reviewer's proposed cause, then
+  publish the scope both of you measured.
+- **Do:** record the null result in the entry; it is what tells the next reader
+  to test rather than trust.
+- **Don't:** retract a reproducible finding because someone else could not see
+  it --- that discards a true observation to resolve a missing qualifier.
+- **Don't:** defend it unscoped either; unconditional is the actual defect.
+
+(Measured 2026-08-22 on
+[ai-config#1926](https://github.com/Morrison-Lab/ai-config/pull/1926).
+A `CLAUDE.md` entry claimed a doubled backslash collapses inside a quoted
+heredoc.
+The reviewer ran three cases in a Linux CI runner, could not reproduce any of
+it, and said so with its evidence.
+Re-running the original case reproduced it immediately; reducing it to a `cat`
+heredoc writing two lines to a file --- no interpreter anywhere --- showed a
+typed `\\` and a typed `\` both landing as one backslash, which the
+reviewer's Python-parsing explanation could not account for.
+Platform: Windows 11 / MINGW64 through the Claude Code Bash tool.
+The entry now leads with that scope and carries the reviewer's null result.)
+
+
 **A sixth: the fact that a check ran, standing in for what the check found.**
 The five above all substitute one artifact for another --- a file, a run, an
 environment.

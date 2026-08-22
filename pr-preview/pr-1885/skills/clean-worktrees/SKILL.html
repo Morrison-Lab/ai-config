@@ -594,6 +594,7 @@ Proceed? (or pick specific worktrees)</code></pre>
 <ul>
 <li><strong><code>session-lock</code> / <code>deconflict-sessions</code></strong> — <em>creates</em> the worktrees this skill cleans up; consult its registry (step 3d) so you never remove one a live session holds. Its own teardown is <code>git worktree remove</code> at session end; this skill is the bulk sweep for the ones that slipped through.</li>
 <li><strong><code>clean-branches</code> / <code>cb</code> / <code>prune</code></strong> — the <strong>branch</strong> counterpart. Run it after this skill (or let step 5 delete branches inline) so a removed worktree’s branch doesn’t linger. Same dry-run-then-confirm discipline.</li>
+<li><strong><code>clean-git</code></strong> — the combined sweep. It runs this skill and then <code>clean-branches</code>, behind one dry-run plan and one confirmation, and owns the ordering constraint that makes worktrees-first mandatory.</li>
 <li><strong><code>post-merge</code></strong> — after a PR merges, removing its worktree is part of the tidy-up (step 2 there); that skill can hand off here for a repo-wide sweep.</li>
 <li><strong><code>wrap-up</code></strong> — the session-level bookend surfaces leftover worktrees and offers to run this skill to sweep the dead ones.</li>
 </ul>

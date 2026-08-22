@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Diagnose tool prompting behavior.">
+<meta name="description" content="Sweep dead worktrees then dead branches, in that order.">
 
 <title>skill – ai-config</title>
 <style>
@@ -346,23 +346,24 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#permission-check-diagnose-why-claude-code-is-or-isnt-prompting" id="toc-permission-check-diagnose-why-claude-code-is-or-isnt-prompting" class="nav-link active" data-scroll-target="#permission-check-diagnose-why-claude-code-is-or-isnt-prompting">permission-check — diagnose why Claude Code is (or isn’t) prompting</a>
+  <li><a href="#clean-git" id="toc-clean-git" class="nav-link active" data-scroll-target="#clean-git">Clean Git</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
-  <li><a href="#the-resolution-model" id="toc-the-resolution-model" class="nav-link" data-scroll-target="#the-resolution-model">The resolution model</a></li>
+  <li><a href="#why-the-order-is-the-whole-point" id="toc-why-the-order-is-the-whole-point" class="nav-link" data-scroll-target="#why-the-order-is-the-whole-point">Why the order is the whole point</a></li>
+  <li><a href="#the-overlap-this-skill-has-to-resolve" id="toc-the-overlap-this-skill-has-to-resolve" class="nav-link" data-scroll-target="#the-overlap-this-skill-has-to-resolve">The overlap this skill has to resolve</a></li>
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
-  <li><a href="#get-the-exact-pattern-to-diagnose" id="toc-get-the-exact-pattern-to-diagnose" class="nav-link" data-scroll-target="#get-the-exact-pattern-to-diagnose">1. Get the exact pattern to diagnose</a></li>
-  <li><a href="#read-every-layer-in-precedence-order" id="toc-read-every-layer-in-precedence-order" class="nav-link" data-scroll-target="#read-every-layer-in-precedence-order">2. Read every layer, in precedence order</a></li>
-  <li><a href="#extract-every-matching-rule" id="toc-extract-every-matching-rule" class="nav-link" data-scroll-target="#extract-every-matching-rule">3. Extract every matching rule</a></li>
-  <li><a href="#apply-the-resolution-model-and-report" id="toc-apply-the-resolution-model-and-report" class="nav-link" data-scroll-target="#apply-the-resolution-model-and-report">4. Apply the resolution model and report</a></li>
-  <li><a href="#if-nothing-explains-the-observed-behavior" id="toc-if-nothing-explains-the-observed-behavior" class="nav-link" data-scroll-target="#if-nothing-explains-the-observed-behavior">5. If nothing explains the observed behavior</a></li>
+  <li><a href="#classify-both-passes" id="toc-classify-both-passes" class="nav-link" data-scroll-target="#classify-both-passes">1. Classify, both passes</a></li>
+  <li><a href="#present-one-combined-plan-wait-for-confirmation" id="toc-present-one-combined-plan-wait-for-confirmation" class="nav-link" data-scroll-target="#present-one-combined-plan-wait-for-confirmation">2. Present one combined plan — wait for confirmation</a></li>
+  <li><a href="#execute-worktrees-then-branches" id="toc-execute-worktrees-then-branches" class="nav-link" data-scroll-target="#execute-worktrees-then-branches">3. Execute — worktrees, then branches</a></li>
+  <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">4. Report</a></li>
   </ul></li>
+  <li><a href="#safety-rules" id="toc-safety-rules" class="nav-link" data-scroll-target="#safety-rules">Safety rules</a></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
   </ul></li>
   </ul>
-<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/permission-check/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/permission-check/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/clean-git/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/clean-git/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
 <main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
@@ -371,112 +372,183 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
-<section id="permission-check-diagnose-why-claude-code-is-or-isnt-prompting" class="level1">
-<h1>permission-check — diagnose why Claude Code is (or isn’t) prompting</h1>
-<p>A read-only diagnostic: given a tool/action pattern (e.g.&nbsp;<code>Bash(rm:*)</code>, <code>Edit</code>, <code>WebFetch(domain:example.com)</code>), walk every settings layer that can carry a <code>permissions</code> block, find every rule that matches the pattern, and report which one actually wins — and why.</p>
-<p>This never edits a settings file. For <em>changing</em> permission config (adding an allow entry, moving a rule to a different layer), hand off to <code>update-config</code>.</p>
+<section id="clean-git" class="level1">
+<h1>Clean Git</h1>
+<p>Sweep a repo’s dead <strong>worktrees</strong> and dead <strong>branches</strong> in one pass, in the order that actually works, behind a single dry-run plan and a single confirmation.</p>
+<p>This skill owns <strong>sequencing and presentation only</strong>. Every classification decision belongs to the two skills it drives:</p>
+<ul>
+<li><a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> — which worktrees are dead.</li>
+<li><a href="../../skills/clean-branches/SKILL.html"><code>clean-branches</code></a> — which branches are dead, stale, or active.</li>
+</ul>
+<p>Read both before running this. Do not restate or re-derive their tables here; a divergence between this file and either of them is a bug in this file.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
-<li>“permission check”, “why does this keep prompting me”, “why is this auto-allowed”, “check my permissions”, “diagnose this permission prompt”</li>
-<li>“what rule controls <code>&lt;tool pattern&gt;</code>”, “why did that just prompt when it didn’t last time”</li>
+<li>“clean git”, “clean up the repo”, “sweep worktrees and branches”</li>
+<li>“clean everything”, “tidy up git”, “prune it all”</li>
+<li>After a batch of PRs merge and both <code>.claude/worktrees/</code> and the branch list have grown.</li>
 </ul>
+<p>Use the individual skills instead when only one half is wanted.</p>
 </section>
-<section id="the-resolution-model" class="level2">
-<h2 class="anchored" data-anchor-id="the-resolution-model">The resolution model</h2>
-<p>This is the part worth getting exactly right, because it’s counterintuitive: <strong>rule type beats layer.</strong> All layers’ matching rules are pooled into one set, then resolved by type — <strong>deny, then ask, then allow</strong> — the first match in that order wins, and neither pattern specificity nor which layer a rule came from changes that order. A <code>deny</code> in <em>any</em> layer blocks a matching <code>allow</code> in <em>any other</em> layer, including a higher-precedence one (a project-shared <code>deny</code> on <code>Bash(aws *)</code> still blocks a project-local <code>allow</code> on <code>Bash(aws s3 ls)</code>). The same holds one level down: a matching <code>ask</code> in any layer forces a prompt even when a more specific <code>allow</code> in a different layer also matches — a broad <strong>user</strong>-level <code>ask</code> can override a narrow <strong>project-local</strong> <code>allow</code> for the same call, which is easy to miss if you assume “more local wins.”</p>
-<p>Layer precedence still matters, but for a narrower thing than resolving individual rule conflicts — it decides which layers’ rules are even in the pool at all:</p>
+<section id="why-the-order-is-the-whole-point" class="level2">
+<h2 class="anchored" data-anchor-id="why-the-order-is-the-whole-point">Why the order is the whole point</h2>
+<p>Worktrees first, then branches. Not a preference — a constraint.</p>
+<p>A branch checked out in a worktree cannot be deleted. <code>git branch -d</code> and <code>git branch -D</code> both refuse with <code>cannot delete branch 'X' used by worktree</code>. So a branch-first sweep leaves every worktree-held branch undeletable, and does it behind a message this corpus has already had to warn about: <a href="../../shared/workflow/flag-session-boundaries.md"><code>flag-session-boundaries</code></a> records “<strong>Don’t:</strong> read <code>used by worktree</code> as evidence that a separate live worktree exists”, because the usual cause is that repo’s own ordinary checkout sitting on the branch.</p>
+<p>Both skills already state this order in their own cross-references. Nothing enforced it except the user typing two commands in sequence. That is the gap this skill closes.</p>
+</section>
+<section id="the-overlap-this-skill-has-to-resolve" class="level2">
+<h2 class="anchored" data-anchor-id="the-overlap-this-skill-has-to-resolve">The overlap this skill has to resolve</h2>
+<p><a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code> step 5</a> <strong>already deletes each dead worktree’s branch inline</strong>, with a documented <code>-d</code> then <code>-D</code> fallback. So the two passes genuinely overlap, and a naive merged plan double-counts: the branch pass, computed up front, lists branches the worktree pass is about to delete on its own.</p>
+<p>The orchestrator resolves this by <strong>subtraction</strong>, not by suppression:</p>
 <ol type="1">
-<li><strong>Managed policy settings</strong> — always in the pool, and can enforce two absolute overrides nothing below can undo: its own <code>deny</code> rules, and (if set) <code>allowManagedPermissionRulesOnly: true</code>, which excludes every other layer’s <code>allow</code>/<code>ask</code>/<code>deny</code> rules from the pool entirely (not just overridden — genuinely not considered). File locations: <code>/Library/Application Support/ClaudeCode/managed-settings.json</code> (+ <code>managed-settings.d/</code>) on macOS, <code>/etc/claude-code/managed-settings.json</code> (+ <code>managed-settings.d/</code>) on Linux/WSL, <code>C:\Program Files\ClaudeCode\managed-settings.json</code> (+ <code>managed-settings.d\</code>) on Windows.</li>
-<li><strong>CLI arguments</strong> for this invocation (<code>--allowedTools</code>, <code>--disallowedTools</code>, <code>--permission-mode</code>) — temporary session overrides.</li>
-<li><strong>Project-local settings</strong> — <code>.claude/settings.local.json</code> (gitignored, personal).</li>
-<li><strong>Project-shared settings</strong> — <code>.claude/settings.json</code> (checked in).</li>
-<li><strong>User settings</strong> — <code>~/.claude/settings.json</code>.</li>
+<li>Compute the worktree plan.</li>
+<li>Derive <code>INLINE</code> — the set of branches attached to worktrees classified dead, which the worktree pass will delete itself.</li>
+<li>Compute the branch plan.</li>
+<li>Subtract <code>INLINE</code> from the branch plan’s <strong>local</strong> delete list only, and report the subtracted count rather than dropping it silently.</li>
 </ol>
-<p>Beyond the managed-settings special cases above, once a layer’s rules are in the pool, its rank in this list does <strong>not</strong> break ties among rules of the <em>same</em> type — two matching <code>allow</code> rules from different layers both just mean “allowed;” there’s no conflict to resolve. The list matters for step 2 below (only a layer that’s actually present contributes rules) and for knowing when managed settings might be excluding a layer altogether.</p>
-<p><strong>Hooks</strong> (<code>PreToolUse</code>) run <em>before</em> the permission prompt but don’t bypass this chain: a matching <code>deny</code>/<code>ask</code> rule still applies regardless of what a hook itself returns. A hook that exits with code 2 is a separate, stronger mechanism — it blocks the call <em>before</em> permission rules are even evaluated, so it can stop a call an <code>allow</code> rule would otherwise have let through.</p>
-<p>Exit 2 is not the only way to deny, and it is not the way this repo’s own blocking hooks do it: they print a <code>permissionDecision: "deny"</code> JSON object to stdout and exit 0. That matters when testing one, since an exit-code check then reads a denial as an allow — see <a href="../../memories/claude-code.md"><code>memories/claude-code.md</code></a>’s “A <code>PreToolUse</code> hook denies on stdout and still exits 0”.</p>
-<p>Source: <a href="https://code.claude.com/docs/en/permissions.md">Claude Code permissions docs</a> (rule evaluation order, hook interaction) and <a href="https://code.claude.com/docs/en/settings.md">settings docs</a> (layer list and paths). If either page has since changed its ordering or paths, that page wins over this skill’s restatement — re-fetch it rather than trust this file blindly on a stale point.</p>
-<p>For the matcher’s own syntax and matching mechanics — how a compound Bash command is checked segment by segment, what a bare tool name matches, the <code>//</code> absolute-path prefix, and where <code>Tool(param:value)</code> rules apply — see <a href="../../memories/claude-code-permissions.md"><code>memories/claude-code-permissions.md</code></a>, a sibling satellite covering the matcher rather than the scope/evaluation-order question this skill answers.</p>
+<p><code>clean-worktrees</code> step 5 deletes with <code>git branch -d</code>, which is a <strong>local</strong> delete and never touches a remote ref. So subtracting <code>INLINE</code> from the remote list would report a stale <code>origin/&lt;branch&gt;</code> as handled while nothing in either pass deletes it. The remote list passes through untouched.</p>
+<p>A branch in <code>INLINE</code> that the branch pass had classified <strong>active</strong> is a contradiction between the two skills, not a subtraction. Stop and surface it.</p>
+<p><code>INLINE</code> can also collide with the 8c bucket, and that one is a <strong>precedence</strong> question rather than a contradiction: a branch with no configured upstream can sit in a Dead worktree, so it is both “deleted inline by the worktree pass” and “local-only, kept”. <strong>8c wins.</strong> Drop it from <code>INLINE</code>, leave it in the flagged bucket, and say so in the plan — the two buckets disagree about whether the work exists anywhere else, and the conservative reading is the one that keeps it.</p>
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<section id="get-the-exact-pattern-to-diagnose" class="level3">
-<h3 class="anchored" data-anchor-id="get-the-exact-pattern-to-diagnose">1. Get the exact pattern to diagnose</h3>
-<p>Ask for (or infer from context) the specific tool-call pattern — the same shape a rule would use: <code>Bash(git push:*)</code>, <code>Edit</code>, <code>WebFetch(domain:x.com)</code>. A vague description (“git stuff”) isn’t enough to match rule syntax precisely; ask the user to narrow it if it’s ambiguous.</p>
+<section id="classify-both-passes" class="level3">
+<h3 class="anchored" data-anchor-id="classify-both-passes">1. Classify, both passes</h3>
+<p>Everything in this step shares a scratch directory, so create it <strong>first</strong>. Several commands write into <code>$TMP</code>, and an undefined <code>$TMP</code> sends each redirect to the filesystem root:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">TMP</span><span class="op">=</span><span class="va">$(</span><span class="fu">mktemp</span> <span class="at">-d</span><span class="va">)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Snapshot the remote-tracking refs before running either pass.</strong> Both delegates refresh remote-tracking state in their classify steps — <a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> step 3 and <a href="../../skills/clean-branches/SKILL.html"><code>clean-branches</code></a> step 2 each run <code>git fetch --prune origin</code>. <code>--prune</code> deletes remote-tracking refs whose upstream branch is gone, and such a ref can be the last thing in this clone pointing at those commits.</p>
+<p>So “nothing that can lose work happens before confirmation” is <strong>false as an unconditional claim</strong>, and narrowing the wording would keep the same defect in smaller print. Snapshotting makes the statement true instead, but only if it runs <strong>before</strong> the passes that prune — a snapshot taken afterwards records the post-prune state and recovers nothing:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> for-each-ref <span class="at">--format</span><span class="op">=</span><span class="st">'%(objectname) %(refname)'</span> refs/remotes/origin <span class="dt">\</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="op">&gt;</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/pre-prune-refs.txt"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Report the snapshot’s path in the plan. Anything the prune removed is recoverable from it for as long as the objects survive gc, and a reader who knows the file exists can check before confirming.</p>
+<p>With that snapshot taken, the invariant the gate protects is: <strong>nothing that can lose work happens before confirmation, and the one pre-gate mutation that could is recorded first.</strong></p>
+<p>Run <a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> steps 1 through 3. Run <a href="../../skills/clean-branches/SKILL.html"><code>clean-branches</code></a> steps 1 through 3.</p>
+<p>For the local half, run step 8’s <strong>classification</strong> only. <code>clean-branches</code> step 8 has no separately-runnable enumeration sub-step: each of 8a, 8b, and 8c bundles its listing command and its <code>git branch -d</code>/<code>-D</code> into one fenced block. So name the read half explicitly rather than delegating to a sub-step that does not exist:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Branches checked out in ANY worktree cannot be deleted. clean-branches 8a</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># gets this free from the `*` prefix its column-anchored grep filters, but</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># `--format` prints no `*`/`+` marker at all, so switching to it to dodge the</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># `+` mangling ALSO drops that protection. Derive the set explicitly instead.</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> worktree list <span class="at">--porcelain</span> <span class="at">-z</span> <span class="kw">|</span> <span class="fu">tr</span> <span class="st">'\0'</span> <span class="st">'\n'</span> <span class="dt">\</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">awk</span> <span class="st">'/^branch /{b=substr($0,8); sub("refs/heads/","",b); print b}'</span> <span class="dt">\</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span> <span class="op">&gt;</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/checked-out.txt"</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 8a --- merged into main. `--format` is clean-worktrees step 3c's documented</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="co"># remedy, applied here because THIS skill guarantees worktrees exist: plain</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co"># `git branch --merged` prefixes a worktree-checked-out branch with `+`, which</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="co"># mangles the name and defeats a column-anchored grep.</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> branch <span class="at">--merged</span> origin/main <span class="at">--format</span><span class="op">=</span><span class="st">'%(refname:short)'</span> <span class="dt">\</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-vxF</span> <span class="at">-e</span> main <span class="at">-e</span> master <span class="dt">\</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-vxFf</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/checked-out.txt"</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co"># 8b --- upstream gone. clean-branches' own command, verbatim.</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> for-each-ref <span class="at">--format</span><span class="op">=</span><span class="st">'%(refname:short) %(upstream:track)'</span> refs/heads <span class="dt">\</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">grep</span> <span class="st">'\[gone\]'</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co"># 8c --- NO CONFIGURED UPSTREAM. That is what this command detects, and it is</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="co"># wider than clean-branches' "never pushed, has unique commits" label: it also</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="co"># returns branches whose upstream was unset, branches already merged, and</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a><span class="co"># main/current unless excluded. Filter before presenting.</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> for-each-ref <span class="at">--format</span><span class="op">=</span><span class="st">'%(refname:short) %(upstream)'</span> refs/heads <span class="dt">\</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">awk</span> <span class="st">'$2=="" {print $1}'</span> <span class="dt">\</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-vxE</span> <span class="st">'main|master'</span> <span class="dt">\</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="cf">while</span> <span class="bu">read</span> <span class="at">-r</span> <span class="va">b</span><span class="kw">;</span> <span class="cf">do</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>      <span class="bu">[</span> <span class="st">"</span><span class="va">$(</span><span class="fu">git</span> rev-list <span class="at">--count</span> <span class="st">"origin/main..</span><span class="va">$b</span><span class="st">"</span><span class="va">)</span><span class="st">"</span> <span class="ot">-gt</span> 0 <span class="bu">]</span> <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> <span class="st">"</span><span class="va">$b</span><span class="st">"</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">done</span> <span class="dt">\</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span> <span class="op">&gt;</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/no-upstream.txt"</span>   <span class="co"># 8c list; INLINE subtracts this</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><strong>Do not run the <code>git branch -d</code> or <code>-D</code> lines that share those blocks.</strong> Those deletions belong to this skill’s step 3, after the gate. <code>clean-branches</code> is safe on its own here only because of a prose instruction after all three sub-steps (“no silent local deletions … wait for confirmation”), not because the blocks are deletion-free — so an orchestrator that cites the block without that prose inherits none of the protection.</p>
+<p><strong>Neither pass touches a live worktree, branch, or remote before the gate — with one exception, and it is worth naming rather than rounding off.</strong> <code>clean-worktrees</code> step 2 runs <code>git worktree prune -v</code> for real, not <code>--dry-run</code>, so a mutation has already happened by the time the plan is presented.</p>
+<p>That prune is safe by construction rather than by convention: <code>git worktree prune</code> only drops administrative records for worktrees whose directory is <strong>already gone from disk</strong>, so there is no state it can destroy and nothing a confirmation could protect. Say so in the plan anyway, per step 2’s <code>Pruned stubs</code> line. A silent mutation under a heading promising none is how a reader stops believing the rest of the guarantees.</p>
+<p>Derive the <code>INLINE</code> set. This first command produces the raw worktree-to-branch mapping, every worktree included — which is <strong>not</strong> <code>INLINE</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># -z plus NUL-safe parsing: a worktree path may contain spaces, and `$2`</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># truncates it, silently dropping that branch from INLINE.</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> worktree list <span class="at">--porcelain</span> <span class="at">-z</span> <span class="dt">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">tr</span> <span class="st">'\0'</span> <span class="st">'\n'</span> <span class="dt">\</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">awk</span> <span class="st">'/^worktree /{p=substr($0,10)}</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="st">         /^branch /{b=substr($0,8); sub("refs/heads/","",b); print b"\t"p}'</span> <span class="dt">\</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">&gt;</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/wt-branches.tsv"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>INLINE</code> is the subset whose <strong>worktree</strong> <a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> step 3 classified <strong>Dead</strong>. Every other step number on this page belongs to <em>this</em> skill, so that one is labelled with its file and the rest are not.</p>
+<p>Write those Dead paths out, then intersect:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># One Dead worktree path per line, from clean-worktrees step 3's classification.</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">'%s\n'</span> <span class="st">"</span><span class="va">${DEAD_WORKTREE_PATHS</span><span class="op">[@]</span><span class="va">}</span><span class="st">"</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span> <span class="op">&gt;</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/dead-worktrees.txt"</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># INLINE: the branch column, kept only where the worktree column is Dead.</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">awk</span> <span class="at">-F</span><span class="st">'\t'</span> <span class="st">'NR==FNR { dead[$0]; next } $2 in dead { print $1 }'</span> <span class="dt">\</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"</span><span class="va">$TMP</span><span class="st">/dead-worktrees.txt"</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/wt-branches.tsv"</span> <span class="dt">\</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-u</span> <span class="op">&gt;</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/inline-raw.txt"</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Apply the 8c-wins precedence rule.</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Stating it in prose is not enough: without this subtraction the PLAN shows</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co"># such a branch under "deleted inline", the opposite of what 8c promises.</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="fu">comm</span> <span class="at">-23</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/inline-raw.txt"</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/no-upstream.txt"</span> <span class="op">&gt;</span> <span class="st">"</span><span class="va">$TMP</span><span class="st">/inline.txt"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>-d</code>’s own merge check would very likely refuse on these branches anyway, since 8c is now filtered to branches with unique commits — so the subtraction is not what keeps the work safe. It is what keeps the <strong>plan honest</strong>, and the plan is the artifact the user confirms. A plan that lists a branch under “deleted inline” while the prose promises it is kept is a single-gate skill misreporting the one thing the gate is for.</p>
+<p>Give it the negative control every filter needs: <code>wc -l</code> both files, and confirm <code>inline-raw.txt</code> is shorter than <code>wt-branches.tsv</code> whenever any live worktree exists. An <code>inline-raw.txt</code> the same length as the raw mapping means the filter did not run: every live worktree’s branch is still in it, including the main checkout’s, so the contradiction rule fires spuriously on all of them.</p>
+<p>Using the raw mapping as <code>INLINE</code> breaks the sweep immediately rather than subtly, which is worth stating because it looks like a shortcut that would merely over-subtract. Every live worktree appears in it, including the main checkout and the one you are standing in. Their branches are <code>Active</code> to the branch pass by construction, so the contradiction rule stated earlier fires on the first one and halts a sweep that had nothing wrong with it.</p>
 </section>
-<section id="read-every-layer-in-precedence-order" class="level3">
-<h3 class="anchored" data-anchor-id="read-every-layer-in-precedence-order">2. Read every layer, in precedence order</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Managed policy (host-global — see privacy gate below before reading)</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># macOS:   /Library/Application Support/ClaudeCode/managed-settings.json</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Linux:   /etc/claude-code/managed-settings.json</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Windows: C:\Program Files\ClaudeCode\managed-settings.json</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co"># (each may also have a managed-settings.d/ directory of fragments)</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. CLI args for this session — not a file; note if the invocation used</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co">#    --allowedTools / --disallowedTools / --permission-mode</span></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Project-local (gitignored, personal)</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> .claude/settings.local.json <span class="dv">2</span><span class="op">&gt;</span>/dev/null</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Project-shared (checked in)</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> .claude/settings.json <span class="dv">2</span><span class="op">&gt;</span>/dev/null</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="co"># 5. User</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> ~/.claude/settings.json <span class="dv">2</span><span class="op">&gt;</span>/dev/null</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><strong>Privacy gate on layer 1.</strong> The managed-policy file is host-global, outside this project and outside the user’s own home-relative config — reading it can surface content unrelated to this session (org-wide policy meant for a different audience). Only read it after telling the user you’re about to, and skip it if they’d rather not. The user-settings file (<code>~/.claude/settings.json</code>) is personal but not host-global; read it without asking, same as the project layers.</p>
-</section>
-<section id="extract-every-matching-rule" class="level3">
-<h3 class="anchored" data-anchor-id="extract-every-matching-rule">3. Extract every matching rule</h3>
-<p><strong>Preflight: check for <code>allowManagedPermissionRulesOnly</code> first.</strong> If the managed-policy file (layer 1) sets <code>"allowManagedPermissionRulesOnly": true</code>, every other layer’s <code>allow</code>/<code>ask</code>/<code>deny</code> rules are excluded from the pool entirely — not overridden, genuinely not considered. When this is set, skip layers 2–5 for this step and apply step 4 only to managed-policy rules; note in the report that the flag is active and why non-managed rules were excluded.</p>
-<p>Otherwise, for each layer that exists, pull its <code>permissions.allow</code> / <code>permissions.ask</code> / <code>permissions.deny</code> arrays and check each entry against the target pattern — an exact match, a wildcard match (<code>Bash(git *)</code> matches <code>Bash(git push:*)</code>), or a bare tool name (<code>Edit</code> matches any <code>Edit</code> call). Record every hit with its layer and rule type; don’t stop at the first one found; the analysis needs the <em>full</em> set to apply the resolution model.</p>
-</section>
-<section id="apply-the-resolution-model-and-report" class="level3">
-<h3 class="anchored" data-anchor-id="apply-the-resolution-model-and-report">4. Apply the resolution model and report</h3>
-<ol type="1">
-<li>Any <code>deny</code> hit, from any layer → <strong>blocked</strong>. Report that layer + rule as the reason, and note that no <code>allow</code>/<code>ask</code> anywhere can override it.</li>
-<li>Else any <code>ask</code> hit, from any layer → <strong>prompts</strong> (with the layer + rule), even if a more specific <code>allow</code> also matched in a different layer.</li>
-<li>Else any <code>allow</code> hit, from any layer → <strong>auto-allowed</strong> (with the layer + rule).</li>
-<li>Else no hit anywhere → <strong>prompts</strong>, by Claude Code’s own default (no rule means ask).</li>
-</ol>
-<p>If a step finds more than one matching rule of the <em>winning</em> type (e.g.&nbsp;two <code>allow</code> rules across different layers both match), name any one of them as the reason — they agree on the outcome, so there’s nothing to break a tie on — and list the others as also-matching.</p>
-<p>Report format — note the counterintuitive result: a broader user-level <code>ask</code> overrides a narrower project-local <code>allow</code>, because type beats layer:</p>
-<pre><code>Pattern: Bash(git push:*)
+<section id="present-one-combined-plan-wait-for-confirmation" class="level3">
+<h3 class="anchored" data-anchor-id="present-one-combined-plan-wait-for-confirmation">2. Present one combined plan — wait for confirmation</h3>
+<pre><code>## Git Cleanup Plan --- &lt;timestamp&gt;
 
-| Layer            | Rule type | Rule                | Matches? |
-|------------------|-----------|----------------------|----------|
-| Managed policy    | —         | (not present)        | —        |
-| CLI args          | —         | (none passed)         | —        |
-| Project-local     | allow     | Bash(git push:*)      | yes      |
-| Project-shared    | —         | (no match)            | —        |
-| User              | ask       | Bash(git *)           | yes      |
-
-Verdict: prompts — the user-level `ask` on `Bash(git *)` wins over
-project-local's more specific `Bash(git push:*)` allow rule, because ask
-beats allow regardless of layer or specificity. If the intent was to make
-this auto-allowed, the fix is to narrow or remove the user-level `ask` rule
-(via `update-config`), not to add a more specific project-local allow rule —
-that's already there and it isn't enough.</code></pre>
+### Pruned stubs (already done --- records for directories already gone)
+### Worktrees to remove (branch deleted inline)
+### Worktrees flagged --- dirty / unpushed (left alone)
+### Branches to delete --- remote
+### Branches to delete --- local
+### Branches to rebase + open MR (stale)
+### Skipped --- active / new / current
+### Branches flagged --- no upstream, unique commits (kept, never deleted)
+### Survived both passes --- needs a human
+### Pre-prune ref snapshot: &lt;path&gt;
+### Subtracted from the branch pass LOCAL list (deleted inline by the worktree pass): &lt;N&gt;</code></pre>
+<p>One confirmation covers the whole plan. Do not proceed on silence.</p>
 </section>
-<section id="if-nothing-explains-the-observed-behavior" class="level3">
-<h3 class="anchored" data-anchor-id="if-nothing-explains-the-observed-behavior">5. If nothing explains the observed behavior</h3>
-<p>If the reported verdict doesn’t match what the user actually saw happen (e.g.&nbsp;it should auto-allow per the rules but still prompted), say so plainly rather than forcing a fit — flag the mismatch and suggest checking for a hook (<code>PreToolUse</code>) that may be intercepting the call before rule evaluation, or a session using <code>--permission-mode plan</code>/<code>bypassPermissions</code> that changes the baseline. Don’t guess at a hook’s behavior; read <code>hooks</code> config in the same settings files if one is suspected.</p>
+<section id="execute-worktrees-then-branches" class="level3">
+<h3 class="anchored" data-anchor-id="execute-worktrees-then-branches">3. Execute — worktrees, then branches</h3>
+<p>Run <code>clean-worktrees</code> steps 5 and 6. Then run <code>clean-branches</code> steps 5 through 8.</p>
+<p>Re-derive the branch list between the two. The worktree pass has just changed it, and step 1’s plan is a prediction rather than a fact. A branch that was in <code>INLINE</code> and is still present after the worktree pass has <strong>two</strong> possible causes, and they call for opposite responses:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># -x is load-bearing: without it, a removed `.../wt/feature` still matches a</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># surviving `worktree .../wt/feature-2` and reports a false STILL-THERE.</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> worktree list <span class="at">--porcelain</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-Fqx</span> <span class="st">"worktree </span><span class="va">$path</span><span class="st">"</span> <span class="dt">\</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">&amp;&amp;</span> <span class="bu">echo</span> STILL-THERE <span class="kw">||</span> <span class="bu">echo</span> REMOVED</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li><strong>The worktree is gone.</strong> Then removal succeeded and <code>git branch -d</code> simply refused. That is routine rather than exceptional: <code>clean-worktrees</code> step 5 documents the refusal at length for squash-merged branches, and measured an 18/11 <code>-d</code>/<code>-D</code> split across a 29-branch sweep. Hand it to the branch pass <strong>only if it falls in 8b</strong>, whose <code>[gone]</code> branches get merged-PR confirmation and may escalate to <code>-D</code>. 8a retries <code>git branch -d</code> and says “never <code>-D</code>” explicitly, so it has no escalation path. A branch merged into <code>origin/main</code> but not into <code>HEAD</code>, with no configured upstream and no merged PR, therefore survives <strong>both</strong> passes. Report it as <code>Survived both passes --- needs a human</code>, since silently leaving it is what makes a sweep look complete when it is not.</li>
+<li><strong>The worktree is still there.</strong> Then removal genuinely failed, which stops the branch pass.</li>
+</ul>
+<p>Distinguishing them matters because the safety rule stops the branch pass on a worktree failure. Reading every surviving branch as a failure would abort the whole sweep on the commonest outcome there is.</p>
 </section>
+<section id="report" class="level3">
+<h3 class="anchored" data-anchor-id="report">4. Report</h3>
+<p>Emit both skills’ report sections under one heading, with the subtraction count carried through from step 2 so the branch pass’s smaller numbers are legible rather than surprising.</p>
+</section>
+</section>
+<section id="safety-rules" class="level2">
+<h2 class="anchored" data-anchor-id="safety-rules">Safety rules</h2>
+<p>Both skills’ safety rules apply unchanged and in full. This skill adds no exceptions to either, and it weakens neither.</p>
+<p>Three that the combined form makes easier to get wrong:</p>
+<ul>
+<li><strong>One confirmation is not blanket authority.</strong> It covers the plan as presented. Anything the re-derivation in step 3 turns up that was not in that plan needs its own confirmation.</li>
+<li><strong>A failure in the worktree pass stops the branch pass.</strong> The branch pass’s plan was computed assuming the worktree pass succeeded. Do not carry on into a sweep whose premise just failed.</li>
+<li><strong>Never <code>--force</code> a dirty worktree to keep the combined run tidy.</strong> A half-finished sweep is the correct outcome there.</li>
+</ul>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><code>update-config</code></strong> — the mutating counterpart. Once this skill identifies <em>which</em> layer and rule should change, hand off there to actually edit it; this skill never writes.</li>
-<li><strong><code>fewer-permission-prompts</code></strong> — scans transcripts for <em>repeated</em> prompts and proposes an allowlist; this skill diagnoses a single pattern’s current resolution on demand. Run <code>fewer-permission-prompts</code> when the question is “what should I allowlist”, and <code>permission-check</code> when it’s “why did/didn’t this one thing prompt.”</li>
+<li><strong><a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> / <code>cw</code></strong> — the first pass. Run it alone when only worktrees are in question.</li>
+<li><strong><a href="../../skills/clean-branches/SKILL.html"><code>clean-branches</code></a> / <code>cb</code></strong> — the second pass. Run it alone in a repo with no worktrees.</li>
+<li><strong><a href="../../skills/wrap-up/SKILL.html"><code>wrap-up</code></a></strong> — its state sweep surfaces leftover worktrees and branches. This is the skill it hands off to.</li>
+<li><strong><a href="../../skills/post-merge/SKILL.html"><code>post-merge</code></a></strong> — per-PR tidy-up. This is the repo-wide bulk form.</li>
+<li><strong><a href="../../skills/session-lock/SKILL.html"><code>session-lock</code></a></strong> — creates the worktrees swept here. Its registry is what keeps a live session’s worktree off the plan.</li>
 </ul>
+<p>Do not confuse this with <strong><code>clear-all</code></strong>, which is an alias for <a href="../../skills/gia/SKILL.html"><code>gia</code></a> and does something entirely unrelated — opening PRs for every issue and driving them to clean. The two names are one letter apart on purpose-avoidance grounds: this skill is deliberately <strong>not</strong> called <code>clean-all</code>.</p>
 </section>
 <section id="anti-patterns" class="level2">
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
 <ul>
-<li>❌ Editing a settings file to “fix” the prompt — that’s <code>update-config</code>’s job; this skill only diagnoses.</li>
-<li>❌ Reading the managed-policy file without telling the user first — it’s host-global, not project- or user-scoped.</li>
-<li>❌ Stopping at the first matching rule found instead of collecting all matches across every layer before applying the deny/ask/allow resolution order.</li>
-<li>❌ Asserting a stale precedence rule from memory instead of checking the cited docs when the diagnosis doesn’t match observed behavior.</li>
+<li>Running the branch pass first, then reading <code>used by worktree</code> as a live parallel session.</li>
+<li>Presenting two separate confirmations and calling that a combined sweep.</li>
+<li>Dropping the inline-deleted branches from the plan silently, so the branch count looks wrong.</li>
+<li>Re-stating either skill’s classification table here, which guarantees the copies drift.</li>
+<li>Continuing into the branch pass after a worktree removal failed.</li>
 </ul>
 
 
@@ -907,7 +979,7 @@ that's already there and it isn't enough.</code></pre>
     </div>   
     <div class="nav-footer-center">
 <p>Built with <a href="https://quarto.org/">Quarto</a></p>
-<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/permission-check/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/permission-check/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/clean-git/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/clean-git/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>

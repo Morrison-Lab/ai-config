@@ -51,7 +51,9 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`merge-it`](skills/merge-it/SKILL.llms.md) | `merged` | Squash-merge a ready PR, then run post-merge cleanup |
 | [`mwc`](skills/mwc/SKILL.llms.md) | `merge-when-confident`, `maw`, `merge-at-will` | Grant session-scoped permission to merge fully-clean PRs without asking per PR |
 | [`post-merge`](skills/post-merge/SKILL.llms.md) |  | After a merge: checkout main, pull, delete branch, run UMS |
-| [`clean-branches`](skills/clean-branches/SKILL.llms.md) | `prune` | Delete local branches already merged or closed |
+| [`clean-branches`](skills/clean-branches/SKILL.llms.md) | `cb`, `prune` | Delete local branches already merged or closed |
+| [`clean-worktrees`](skills/clean-worktrees/SKILL.llms.md) | `cw`, `prune-worktrees` | Remove dead git worktrees left behind by merged PRs and ended sessions |
+| [`clean-git`](skills/clean-git/SKILL.llms.md) |  | Sweep dead worktrees then dead branches in one pass, in the order that works |
 | [`resolve-conflicts`](skills/resolve-conflicts/SKILL.llms.md) | `rmc` | Resolve merge/rebase/cherry-pick conflicts by consolidating the best of both branches |
 
 ### Memory and skills maintenance

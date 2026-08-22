@@ -662,10 +662,11 @@ Proceed? (or pick specific branches to act on)</code></pre>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><code>sync-pr-branch</code></strong> — used internally when rebasing stale branches</li>
-<li><strong><code>claim-pr</code></strong> — checked to avoid touching claimed branches</li>
-<li><strong><code>ardi</code></strong> — user may want to ARDI the newly opened MRs afterward</li>
-<li><strong><code>clean-worktrees</code> / <code>cw</code></strong> — the worktree counterpart. This skill sweeps <em>branches</em>; that one sweeps the <em>worktrees</em> a branch is checked out into. Run both so neither a dead worktree nor an orphaned branch lingers.</li>
+<li><p><strong><code>sync-pr-branch</code></strong> — used internally when rebasing stale branches</p></li>
+<li><p><strong><code>claim-pr</code></strong> — checked to avoid touching claimed branches</p></li>
+<li><p><strong><code>ardi</code></strong> — user may want to ARDI the newly opened MRs afterward</p></li>
+<li><p><strong><code>clean-worktrees</code> / <code>cw</code></strong> — the worktree counterpart. This skill sweeps <em>branches</em>; that one sweeps the <em>worktrees</em> a branch is checked out into. Run both so neither a dead worktree nor an orphaned branch lingers.</p></li>
+<li><p><strong><code>clean-git</code></strong> — the combined sweep. Runs <code>clean-worktrees</code> first, then this skill, because a branch held by a worktree cannot be deleted.</p></li>
 </ul>
 </section>
 <section id="anti-patterns" class="level2">

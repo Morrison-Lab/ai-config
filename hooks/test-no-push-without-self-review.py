@@ -424,6 +424,19 @@ CASES = [
      "an inline -c override is forwarded to the config read"),
     (f"git -C {REPO} -cremote.origin.mirror=true push origin", reviewed(), True,
      "the attached -c spelling is forwarded too"),
+    # `_push_remote`'s fallback chain was the ONE config read that did not
+    # forward the command's own `-c`, so an inline `-c remote.pushDefault=X`
+    # sent the real push to X while the guard resolved the literal `origin`
+    # and checked the wrong remote's keys. Nothing on disk is needed -- both
+    # the redirect and the ref-shipping config ride on the command itself.
+    # The existing mirror rows cannot reach this path: they name their remote
+    # positionally, which returns before the fallback chain runs.
+    (f"git -C {REPO} -c remote.pushDefault=alpha "
+     f"-c remote.alpha.push=refs/heads/*:refs/heads/* push", reviewed(), True,
+     "an inline -c redirecting the DEFAULT remote is followed, not ignored"),
+    (f"git -C {REPO} -c branch.main.pushRemote=alpha "
+     f"-c remote.alpha.push=refs/heads/*:refs/heads/* push", reviewed(), True,
+     "the sibling pushRemote key redirects the same way"),
     (f"git -C {REPO} --config-env=remote.origin.mirror=SNEAKY push origin",
      reviewed(), True,
      "--config-env names an env var this guard cannot read, so it refuses"),

@@ -724,8 +724,7 @@ def _has_config_env(argv: list[str]) -> bool:
 
 
 def _git_config(directory: str | None, flag: str, key: str,
-                overrides: list[str] | None = None,
-                as_bool: bool = False) -> str | None:
+                argv: list[str], as_bool: bool = False) -> str | None:
     """A config value as the PUSHING git would see it.
 
     Two ways a plain `git config --get` reads something git does not.
@@ -738,12 +737,19 @@ def _git_config(directory: str | None, flag: str, key: str,
         git config --file t --bool --get remote.origin.mirror -> 'true'
 
     And an inline `git -c key=value push` is process-local to that invocation,
-    so a separate `git config` subprocess never sees it. The pushing command's
-    own `-c` tokens are forwarded here for that reason. `--config-env` is not
+    so a separate `git config` subprocess never sees it. `--config-env` is not
     forwardable -- it names an environment variable this process may not carry
     -- and is refused upstream instead.
+
+    `argv` is REQUIRED, and the overrides are derived here rather than passed
+    in, because an optional `overrides=` parameter is exactly what a call site
+    forgets. One did: `_push_remote`'s fallback chain read
+    `remote.pushDefault` without them, so `git -c remote.pushDefault=alpha -c
+    remote.alpha.push=... push` sent the real push to `alpha` while the guard
+    resolved the literal `origin` and checked the wrong remote's keys. Every
+    read now goes through this one function and cannot omit them.
     """
-    args = list(overrides or []) + ["config"]
+    args = _config_overrides(argv) + ["config"]
     if as_bool:
         args.append("--bool")
     return _run_git(directory, *args, flag, key) or None
@@ -783,7 +789,7 @@ def _push_remote(directory: str | None, argv: list[str]) -> str | None:
     branch = _rev_parse_ref(directory, "--abbrev-ref", "HEAD")
     for key in ((f"branch.{branch}.pushRemote",) if branch else ()) + (
             "remote.pushDefault",) + ((f"branch.{branch}.remote",) if branch else ()):
-        value = _git_config(directory, "--get", key)
+        value = _git_config(directory, "--get", key, argv)
         if value:
             return value
     return "origin"
@@ -810,7 +816,6 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
                  or t.partition("=")[0] == "--recurse-submodules"]
         which = f" ({', '.join('`' + t + '`' for t in named)})" if named else ""
         return None, ("this push does not name a single reviewable head" + which)
-    overrides = _config_overrides(argv)
     # These apply whether or not the push names a refspec, so the loop cannot
     # live in the bare-push branch alone -- the equivalent command-line flag is
     # refused on both paths. Measured: with `push.recurseSubmodules=on-demand`,
@@ -825,7 +830,7 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
             if refspecs or not remote_for_config:
                 continue
             key = key.format(remote=remote_for_config)
-        value = _git_config(directory, "--get", key, overrides, as_bool)
+        value = _git_config(directory, "--get", key, argv, as_bool)
         if value and verdict(value):
             return None, (f"`{key}` is set, which does what `{mirrors}` does "
                           "without naming it on the command line")
@@ -837,12 +842,12 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
         # the question entirely. Measured on git 2.43.0:
         # `git -c push.default=matching push --dry-run origin` reports a branch
         # that is not HEAD. So this is checked rather than assumed.
-        default = _git_config(directory, "--get", "push.default", overrides)
+        default = _git_config(directory, "--get", "push.default", argv)
         if default and default.lower() == "matching":
             return None, "`push.default` is `matching`, so a bare push ships more than HEAD"
         remote = remote_for_config
         if remote and _git_config(directory, "--get-all",
-                                  f"remote.{remote}.push", overrides):
+                                  f"remote.{remote}.push", argv):
             return None, (f"`remote.{remote}.push` is configured, so what a bare push "
                           "ships is not simply the current branch")
         head = _rev_parse(directory, "HEAD")

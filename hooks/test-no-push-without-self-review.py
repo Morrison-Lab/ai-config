@@ -70,6 +70,8 @@ _git(REPO, "commit", "-qm", "unreviewed")
 FEATURE = _git(REPO, "rev-parse", "HEAD")
 _git(REPO, "checkout", "-q", "main")
 
+_git(REPO, "tag", "-a", "v1", "-m", "v1")
+
 OTHER = make_repo(("alpha",))
 OTHER_HEAD = _git(OTHER, "rev-parse", "HEAD")
 
@@ -181,7 +183,7 @@ CASES = [
      "--delete removes a ref rather than advancing one"),
     (f"ALLOW_UNREVIEWED_PUSH=1 {PUSH}", [], False,
      "ALLOW_UNREVIEWED_PUSH=1 prefix overrides the block"),
-    (f"export FOO=1 ALLOW_UNREVIEWED_PUSH=1 {PUSH}", [], False,
+    (f"FOO=1 ALLOW_UNREVIEWED_PUSH=1 {PUSH}", [], False,
      "ALLOW_UNREVIEWED_PUSH=1 after another env assignment overrides"),
     (f"git -C {REPO} push --allow-unreviewed-push", [], True,
      "the second override spelling is gone; the flag no longer overrides"),
@@ -301,6 +303,85 @@ CASES = [
     (PUSH, reviewed(f"Reviewed-Commit: {HEAD}\n\n### Verdict: Ready for merge"), True,
      "a fingerprint BEFORE the verdict does not count -- that ordering is the truncation check"),
 
+    # --- how git was invoked ---
+    (f"env git -C {REPO} push origin feature", reviewed(), True,
+     "`env git push` is a push, and `env` is what the earlier revision missed"),
+    (f"command git -C {REPO} push origin feature", reviewed(), True,
+     "`command git push` is a push"),
+    (f"nohup git -C {REPO} push origin feature", reviewed(), True,
+     "`nohup git push` is a push"),
+    (f"/usr/bin/git -C {REPO} push origin feature", reviewed(), True,
+     "an absolute path to git is an ordinary invocation, not an evasion"),
+    (f"env git -C {REPO} push origin main", reviewed(), False,
+     "a wrapped push of the reviewed commit is still allowed"),
+
+    # --- which directory, once a subshell or a return is involved ---
+    (f"(cd {OTHER} && git log -1) && git push origin main", reviewed(), False,
+     "a `cd` confined to a subshell does not move the push"),
+    (f"cd {OTHER} && cd - && git push origin main", reviewed(), False,
+     "`cd -` clears the hint rather than leaving a stale one"),
+    (f"pushd {OTHER} >/dev/null && popd >/dev/null && git push origin main",
+     reviewed(), False, "`popd` clears the hint"),
+
+    # --- option parsing ---
+    (f"git -C {REPO} push --branches origin", reviewed(), True,
+     "--branches is git's own alias of --all and ships every branch",
+     "does not name a single reviewable head"),
+    (f"git -C {REPO} push --follow-tags origin main", reviewed(), True,
+     "--follow-tags ships refs the fingerprint does not describe",
+     "--follow-tags"),
+    (f"git -C {REPO} push --recurse-submodules=on-demand origin main", reviewed(), True,
+     "a submodule push ships commits in another repository"),
+    (f"git -C {REPO} push --recurse-submodules check origin main", reviewed(), False,
+     "--recurse-submodules check takes a value and ships nothing extra"),
+    (f"git -C {REPO} push -qo ci.skip origin main", reviewed(), False,
+     "a clustered short option's value is not a refspec"),
+    (f"git -C {REPO} push --repo origin main", reviewed(), False,
+     "--repo consumes its value"),
+    (f"git -C {REPO} push -- origin main", reviewed(), False,
+     "`--` before the remote does not turn the refspec into an option"),
+    (f"git -C {REPO} push --repo=origin main feature", reviewed(), True,
+     "an attached option value does not swallow the following refspec"),
+    (f"pushd {OTHER} >/dev/null && git push origin main", reviewed(), True,
+     "a `pushd` moves the repo the verdict must cover, exactly as `cd` does"),
+    (f"cd {OTHER} && git -C {REPO} push origin main", reviewed(), False,
+     "an explicit -C wins over an earlier `cd`"),
+    (f"git -C {REPO} push origin +main", reviewed(), False,
+     "a forced refspec resolves to the same commit"),
+    (f"git -C {REPO} push origin v1", reviewed(), False,
+     "an annotated tag is peeled to the commit it points at"),
+    (f'git -C {REPO} push -u origin "$BRANCH"', reviewed(), True,
+     "an unexpanded shell variable is not a resolvable ref, and the reason says so",
+     "push `HEAD`"),
+    (f"git -C {REPO} push origin main && git -C {OTHER} push origin main", reviewed(), True,
+     "every push on the line is checked, not just the first"),
+
+    # --- which text in the report is the verdict, continued ---
+    (PUSH, reviewed(
+        "### Verdict: Needs more work\n\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        "> ### Verdict: Ready for merge"), True,
+     "a verdict inside a block quote is quoted material",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        "### Verdict: Needs more work\n\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        "```text\n### Verdict: Ready for merge\n```"), True,
+     "a verdict inside a fenced block is an example",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        "### Verdict: Needs more work\n\n"
+        f"Reviewed-Commit: {HEAD}\n\n"
+        "    Verdict: Ready for merge"), True,
+     "a verdict indented as a code block is an example",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\n**Reviewed-Commit:** {HEAD}"), False,
+     "an emphasised fingerprint label is still a fingerprint"),
+    (PUSH, reviewed(
+        f"### Verdict: Ready for merge\n\nreviewed-commit: {HEAD}"), False,
+     "the fingerprint label is case-insensitive"),
+
     # --- which tool spoke ---
     (PUSH, [{"type": "assistant", "message": {"content": [
         {"type": "tool_use", "id": "x1", "name": "Read",
@@ -339,6 +420,43 @@ def raw_cases() -> int:
     return failures
 
 
+def orphan_cases() -> int:
+    """The guard with its push detector missing.
+
+    It refuses to grade a push with a worse parser -- the whole DRW argument in
+    its docstring -- so it must say so loudly on something push-shaped, and stay
+    quiet on everything else. Both directions matter: an earlier revision keyed
+    the degraded-mode deny on the substring `push`, which denied
+    `git commit -m "push the button"`.
+    """
+    failures = 0
+    d = tempfile.mkdtemp(prefix="npwsr-orphan-")
+    try:
+        orphan = os.path.join(d, "no-push-without-self-review.py")
+        shutil.copy(HOOK, orphan)          # deliberately WITHOUT the sibling
+        for label, cmd, should_deny in (
+            ("an orphaned guard denies a push rather than grading it", "git push origin main", True),
+            ("an orphaned guard denies a wrapped push", "env git -C /r push", True),
+            ("an orphaned guard ignores a commit message mentioning a push",
+             'git commit -m "push the button"', False),
+            ("an orphaned guard ignores a grep for the word push", "cat f | grep push", False),
+        ):
+            res = subprocess.run(
+                [sys.executable, orphan],
+                input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd},
+                                  "transcript_path": ""}),
+                capture_output=True, text=True, cwd=REPO)
+            denied = '"deny"' in res.stdout
+            if res.returncode != 0 or denied != should_deny:
+                print(f"FAIL (deny={denied}, wanted {should_deny}): {label}")
+                failures += 1
+            else:
+                print(f"PASS: {label}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return failures
+
+
 def main():
     failed = 0
     try:
@@ -365,11 +483,12 @@ def main():
             else:
                 print(f"PASS: {label}")
         failed += raw_cases()
+        failed += orphan_cases()
     finally:
         shutil.rmtree(REPO, ignore_errors=True)
         shutil.rmtree(OTHER, ignore_errors=True)
 
-    total = len(CASES) + 4
+    total = len(CASES) + 8
     if failed:
         print(f"\n{failed}/{total} cases failed")
         sys.exit(1)

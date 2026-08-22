@@ -142,7 +142,10 @@ commits ahead) so the user can answer without digging.
 Once every check passes, push with the standard upstream + retry backoff:
 
 ```bash
-git push -u origin "$BRANCH"   # PUSH
+git push -u origin HEAD   # PUSH
+
+`HEAD` rather than `"$BRANCH"`, deliberately: a shell variable reaches the pre-push guard unexpanded, so it cannot resolve which commits the push would ship and refuses.
+`-u origin HEAD` sets the upstream to the current branch just the same.
 ```
 
 If the push fails on a **network** error, retry up to 4 times with exponential

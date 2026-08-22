@@ -51,9 +51,12 @@ exist yet.
 
 WHERE IT DELIBERATELY DOES NOT FIRE
 ------------------------------------
-- `git push --dry-run` and `git push --delete`, and a `:branch` deletion
-  refspec, re-head nothing, so there is no diff to review. (The first two are
-  `no-unreviewed-pr.py`'s `_argv_push` rule, reused rather than re-derived.)
+- `git push --dry-run` and `git push --delete` re-head nothing, so there is no
+  diff to review. (This is `no-unreviewed-pr.py`'s `_argv_push` rule, reused
+  rather than re-derived.)
+- A command running `git` through another interpreter (`bash -c "git push"`,
+  `ssh host git push`) is one simple command whose argv is not a push. Nothing
+  here parses a nested shell.
 - A command this guard cannot parse is treated as not-a-push -- the same
   fail-open direction as `main()`'s bare `except`, stated rather than silent: a
   guard that crashed closed would block every push in the session.
@@ -63,9 +66,20 @@ WHERE IT DELIBERATELY DOES NOT FIRE
   ai-config#1929, not a decision that they are safe.
 
 Authorized override: `ALLOW_UNREVIEWED_PUSH=1`, as an environment assignment on
-the pushing command itself. It is deliberately the only one: a second spelling
-was the surface through which four bypasses arrived, since a quoted mention of
-the flag anywhere in the command line disarmed the guard.
+the pushing command itself.
+
+Scoping it to that command is the whole of the fix. An earlier revision searched
+the WHOLE command line -- splitting on `&&`/`;` and testing each segment -- so a
+quoted mention of the override anywhere disarmed the guard, and this repo
+documents that override in four files. Measured across revisions: with the
+second `--allow-unreviewed-push` spelling neutered and only the env spelling
+live, three of the four known bypasses still worked. So the second spelling was
+not the cause; it is deleted because it was undocumented everywhere and
+duplicated a variable that now has one meaning and one placement.
+
+A `:branch` deletion refspec ships nothing, and so passes the commit comparison
+-- but it still needs a clean verdict to reach that comparison, unlike the two
+forms below, which are never examined at all.
 """
 from __future__ import annotations
 
@@ -75,6 +89,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 # --- what counts as a verdict ----------------------------------------------
 
@@ -82,15 +97,25 @@ import sys
 # separates a verdict from a sentence quoting one, which a bare `Verdict:`
 # search cannot do -- see this module's docstring.
 VERDICT_LINE = re.compile(
-    r"^[ \t>]*(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
+    r"^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
     r"(Ready for merge|Needs (?:more )?work)\b",
     re.I | re.M,
 )
 
+# A fenced block is quoted material, so a verdict inside one is an example
+# rather than a verdict. Blanking fences before matching is what makes the
+# anchoring above mean anything: `> ` is already excluded by the prefix class,
+# and four-space indentation by the `{0,3}` bound, but a fence can hold a line
+# that is anchored and indented exactly like the real thing.
+FENCE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,}).*$", re.M)
+
 # The reviewer's statement of what it read, required to appear AFTER the
 # verdict it belongs to: that ordering is what makes a truncated report fail,
 # and it is why this is searched forward from the verdict rather than globally.
-REVIEWED_COMMIT = re.compile(r"Reviewed-Commit[ \t]*:[ \t]*`?([0-9a-fA-F]{7,40})`?")
+REVIEWED_COMMIT = re.compile(
+    r"\*{0,2}Reviewed-Commit\*{0,2}[ \t]*:[ \t]*\*{0,2}[ \t]*`?([0-9a-fA-F]{7,40})`?",
+    re.I,
+)
 
 # Matched against an Agent/Task call's `subagent_type` ONLY. An earlier revision
 # also matched the call's free-text `prompt`, which any prompt containing the
@@ -107,10 +132,21 @@ OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 
 # Options of `git push` that consume the following token, so a value is never
 # mistaken for a refspec.
-PUSH_OPTS_WITH_VALUE = {"--repo", "--receive-pack", "--exec", "-o", "--push-option"}
+PUSH_OPTS_WITH_VALUE = {"--repo", "--receive-pack", "--exec", "-o", "--push-option",
+                        "--recurse-submodules"}
+
+# Short options that take a value, for the clustered form (`-qo ci.skip`).
+SHORT_OPTS_WITH_VALUE = "o"
 
 # Options after which no single reviewed commit can describe the push.
-PUSH_OPTS_INDETERMINATE = {"--all", "--mirror", "--tags", "--follow-tags"}
+# `--branches` is git's own documented alias of `--all` (`git push -h`), so it
+# ships every branch while looking like an ordinary unknown option.
+PUSH_OPTS_INDETERMINATE = {"--all", "--branches", "--mirror", "--tags",
+                           "--follow-tags"}
+
+# `--recurse-submodules` in these modes pushes commits in ANOTHER repository,
+# which no fingerprint naming a commit in this one can describe.
+SUBMODULE_PUSH_MODES = {"on-demand", "only"}
 
 
 # --- push detection, borrowed rather than re-derived ------------------------
@@ -137,7 +173,8 @@ def _load_sibling():
 try:
     _SIBLING = _load_sibling()
     _SIBLING_ERROR = None
-except Exception as exc:  # pragma: no cover -- exercised via a stubbed sibling
+except Exception as exc:  # covered by test-…'s orphan_cases(), which runs a copy
+                          # of this file in a directory without the sibling
     _SIBLING = None
     _SIBLING_ERROR = str(exc)
 
@@ -145,19 +182,41 @@ except Exception as exc:  # pragma: no cover -- exercised via a stubbed sibling
 ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 
 
+# Wrappers that run the command that follows them, so `git` is not argv[0] even
+# though a push is exactly what happens. `env` is the sharpest of these: the
+# earlier revision handled `export`, which never runs a push at all, and not
+# `env`, which does.
+COMMAND_WRAPPERS = {"env", "command", "nohup", "time", "exec", "builtin"}
+
+
 def _strip_env(argv: list[str]) -> tuple[list[str], list[str]]:
-    """Split a simple command's leading `NAME=value` tokens off its argv.
+    """Split a simple command's leading env assignments and wrappers off its argv.
 
     shlex reports `FOO=1 git push` as three tokens, so the sibling's
     `_argv_push` (which requires `argv[0] == "git"`) never sees such a command
-    as a push. Splitting here is also what scopes the override to the pushing
+    as a push. The same is true of `env git push`, `command git push`, and an
+    absolute `/usr/bin/git push`; the last is an ordinary invocation rather than
+    an evasion. Splitting here is also what scopes the override to the pushing
     command rather than to any segment of the line.
+
+    Returns (env assignments, argv with `git` first) -- the program token is
+    normalized to its basename so the sibling's own check still applies.
     """
-    rest = argv[1:] if argv and argv[0] == "export" else list(argv)
-    i = 0
-    while i < len(rest) and ENV_ASSIGNMENT.match(rest[i]):
-        i += 1
-    return rest[:i], rest[i:]
+    rest = list(argv)
+    env: list[str] = []
+    while rest:
+        tok = rest[0]
+        if ENV_ASSIGNMENT.match(tok):
+            env.append(tok)
+            rest = rest[1:]
+            continue
+        if tok in COMMAND_WRAPPERS or tok == "export":
+            rest = rest[1:]
+            continue
+        break
+    if rest and rest[0] != "git" and os.path.basename(rest[0]) == "git":
+        rest = ["git"] + rest[1:]
+    return env, rest
 
 
 def iter_pushes(command: str):
@@ -174,12 +233,19 @@ def iter_pushes(command: str):
     cmds = _SIBLING._simple_commands(command)
     if not cmds:
         return
+    # A subshell confines a `cd`, and `_simple_commands` does not model nesting,
+    # so a line containing one gets no hint at all rather than a wrong one:
+    # `(cd elsewhere && git log) && git push` pushes in the ORIGINAL directory.
+    nested = "(" in command or ")" in command
     cwd_hint = None
     for argv in cmds:
         if not argv:
             continue
-        if argv[0] in ("cd", "pushd") and len(argv) > 1 and not argv[1].startswith("-"):
-            cwd_hint = argv[1]
+        if argv[0] in ("cd", "pushd", "popd"):
+            # `cd -`, `popd`, and a bare `cd` all move somewhere this cannot
+            # resolve, so they clear the hint rather than leaving a stale one.
+            arg = argv[1] if len(argv) > 1 else None
+            cwd_hint = arg if (arg and not arg.startswith("-") and argv[0] != "popd") else None
             continue
         env, rest = _strip_env(argv)
         if not rest or not _SIBLING._argv_push(rest):
@@ -189,7 +255,7 @@ def iter_pushes(command: str):
             if tok == "-C":
                 directory = rest[i + 1]
                 break
-        yield env, rest, (directory or cwd_hint)
+        yield env, rest, (directory or (None if nested else cwd_hint))
 
 
 def has_allow_override(env: list[str]) -> bool:
@@ -216,14 +282,21 @@ def push_refspecs(argv: list[str]) -> list[str] | None:
     i = idx + 1
     while i < len(argv):
         tok = argv[i]
-        if tok == "--":
-            positionals.extend(argv[i + 1:])
-            break
-        if tok.startswith("-"):
-            head = tok.split("=", 1)[0]
+        if tok.startswith("-") and tok != "-":
+            head, _, value = tok.partition("=")
             if head in PUSH_OPTS_INDETERMINATE:
                 return None
-            if head in PUSH_OPTS_WITH_VALUE and "=" not in tok:
+            if head == "--recurse-submodules" and value in SUBMODULE_PUSH_MODES:
+                return None
+            if head in PUSH_OPTS_WITH_VALUE and not _:
+                if head == "--recurse-submodules" and i + 1 < len(argv) \
+                        and argv[i + 1] in SUBMODULE_PUSH_MODES:
+                    return None
+                i += 2
+                continue
+            # A clustered short form (`-qo ci.skip`) takes its value from the
+            # next token when the cluster ends in a value-taking letter.
+            if not tok.startswith("--") and tok[-1] in SHORT_OPTS_WITH_VALUE:
                 i += 2
                 continue
             i += 1
@@ -233,10 +306,25 @@ def push_refspecs(argv: list[str]) -> list[str] | None:
     return positionals[1:]  # drop the remote
 
 
+# This hook is registered with a 10s timeout in `hooks/hooks.json`, and a
+# PreToolUse hook killed on timeout does not deny -- the push simply proceeds.
+# So the budget is enforced here rather than left to the harness: one call per
+# refspec times a generous per-call timeout would exceed it on a slow repo, and
+# the failure would be a silent allow on the one path this guard exists to hold.
+BUDGET_SECONDS = 6.0
+_DEADLINE = [0.0]
+
+
 def _rev_parse(directory: str | None, rev: str) -> str | None:
+    remaining = _DEADLINE[0] - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("ran out of time resolving what this push would ship")
     args = ["git"] + (["-C", directory] if directory else []) + ["rev-parse", rev]
     try:
-        out = subprocess.run(args, capture_output=True, text=True, timeout=8)
+        out = subprocess.run(args, capture_output=True, text=True,
+                             timeout=min(3.0, remaining))
+    except subprocess.TimeoutExpired:
+        raise TimeoutError("ran out of time resolving what this push would ship")
     except Exception:
         return None
     if out.returncode != 0:
@@ -252,10 +340,15 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
     ref -- which is a refusal rather than a pass, since an unknown payload is
     exactly what a review cannot have covered.
     """
-    refspecs = push_refspecs(argv)
+    try:
+        refspecs = push_refspecs(argv)
+    except Exception:
+        return None, "its arguments could not be parsed"
     if refspecs is None:
-        return None, ("this push does not name a single reviewable head "
-                      "(`--all`, `--mirror`, or `--tags`)")
+        named = [t for t in argv if t.partition("=")[0] in PUSH_OPTS_INDETERMINATE
+                 or t.partition("=")[0] == "--recurse-submodules"]
+        which = f" ({', '.join('`' + t + '`' for t in named)})" if named else ""
+        return None, ("this push does not name a single reviewable head" + which)
     if not refspecs:
         head = _rev_parse(directory, "HEAD")
         if head is None:
@@ -269,7 +362,10 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
             continue  # `:branch` deletes a ref and ships nothing
         sha = _rev_parse(directory, f"{src}^{{commit}}")
         if sha is None:
-            return None, f"`{src}` could not be resolved to a commit"
+            hint = ("; a shell variable cannot be expanded here, so push `HEAD` "
+                    "(`git push -u origin HEAD`) when you mean the current branch"
+                    if "$" in src or "`" in src else "")
+            return None, f"`{src}` could not be resolved to a commit{hint}"
         commits.add(sha)
     return commits, ""
 
@@ -313,6 +409,26 @@ def _iter_blocks(record: dict):
             yield b
 
 
+def _blank_fences(text: str) -> str:
+    """Blank the contents of fenced code blocks, preserving offsets.
+
+    Offsets are preserved because `parse_report` searches for the fingerprint
+    forward from the verdict's own position in the ORIGINAL text.
+    """
+    out = list(text)
+    fences = list(FENCE.finditer(text))
+    for opener, closer in zip(fences[0::2], fences[1::2]):
+        for i in range(opener.start(), closer.end()):
+            if out[i] != "\n":
+                out[i] = " "
+    if len(fences) % 2:  # an unclosed fence swallows the rest
+        last = fences[-1]
+        for i in range(last.start(), len(out)):
+            if out[i] != "\n":
+                out[i] = " "
+    return "".join(out)
+
+
 def parse_report(text: str) -> tuple[str | None, str | None]:
     """(verdict, reviewed_commit) from one reviewer report.
 
@@ -322,7 +438,7 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
     taking the fingerprint from anywhere lets a fingerprint quoted in the
     findings stand in for the report's own.
     """
-    matches = list(VERDICT_LINE.finditer(text))
+    matches = list(VERDICT_LINE.finditer(_blank_fences(text)))
     if not matches:
         return None, None
     last = matches[-1]
@@ -426,7 +542,14 @@ def verify_review(transcript_path: str, directory: str | None,
             "and a report cut short before its fingerprint is not a verdict."
         )
 
-    commits, why = shipped_commits(directory, argv)
+    try:
+        commits, why = shipped_commits(directory, argv)
+    except TimeoutError as e:
+        return False, (
+            f"This guard {e}.\n"
+            "It refuses rather than letting the push through unchecked; re-run once the "
+            "repository is responsive, or use the override and say so."
+        )
     if commits is None:
         return False, (
             f"Cannot determine which commits this push would ship: {why}.\n"
@@ -490,7 +613,14 @@ def main() -> int:
             # Only reached once a push-shaped command is plausible, so a broken
             # install does not deny every Bash call -- but it does deny rather
             # than grade pushes with a detector this file refuses to duplicate.
-            if "push" in cmd:
+            # A degraded-mode heuristic rather than a second parser: it decides
+            # only whether to SAY the guard is broken, never whether a command
+            # is a push. Narrow enough that `git commit -m "push the button"`
+            # and `grep push` do not trip it.
+            if re.search(
+                r"(?:^|[;&|`(\s])(?:[\w./-]*/)?git"
+                r"(?:\s+(?:-C\s+\S+|-c\s+\S+|--(?:git-dir|work-tree|namespace)[= ]\S+|-\S+))*"
+                r"\s+push\b", cmd):
                 deny(
                     "This guard could not load its push detector from "
                     f"`no-unreviewed-pr.py` ({_SIBLING_ERROR}), so it cannot tell whether "
@@ -498,6 +628,7 @@ def main() -> int:
                 )
             return 0
 
+        _DEADLINE[0] = time.monotonic() + BUDGET_SECONDS
         for env, argv, directory in iter_pushes(cmd):
             if has_allow_override(env):
                 continue

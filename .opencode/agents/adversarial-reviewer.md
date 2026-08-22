@@ -56,8 +56,9 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    ```
 
    Read that sha yourself rather than taking it from the brief.
-   The pre-push guard compares it against the repository's HEAD at push time, which is what ties your verdict to the commits the push would ship.
-   A report without it authorizes nothing, and one cut short before it is refused rather than read as clean.
+   The pre-push guard resolves what the push would actually ship --- reading its refspec, not just HEAD --- and compares, which is what ties your verdict to those commits.
+   A report without the line authorizes nothing, and one cut short before it is refused rather than read as clean.
+   Write the label plainly on its own line: emphasis around it is tolerated, but the guard reads the first fingerprint AFTER your verdict, so put it last.
 
 State the verdict on its own line in that exact form --- the pre-push guard reads your call's result for it, and treats anything else as no verdict.
 

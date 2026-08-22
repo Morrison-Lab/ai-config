@@ -58,7 +58,7 @@ ADMIT = txt("Checking that again -- I was wrong about the repo being public.")
 REMIND = [
     # The positive direction for every alternative the `\b` anchoring touched
     # (ai-config#1756). Anchoring can fail two ways: leaking a third-person
-    # match (SILENT above) or losing a real admission (these). A suite carrying
+    # match (SILENT below) or losing a real admission (these). A suite carrying
     # only one side cannot tell a correct anchor from an over-tightened one.
     ([txt("I was wrong about this.")], "first person: was wrong"),
     ([txt("I got that wrong.")], "first person: got that wrong"),
@@ -113,7 +113,12 @@ SILENT = [
     ([txt("The semi mischaracterized the exposure.")], "word ending in i + verb"),
     ([txt("The CLI incorrectly claimed success.")], "acronym + adverb form"),
     ([txt("The Delphi overstated the risk.")], "word ending in i + quantitative"),
-    ([txt("The API needs to retract that header.")], "acronym + retract"),
+    # "needs to" (plural) matches neither `need\s+to\s+` nor the skip-the-group
+    # path, so the obvious phrasing is silent under BOTH regexes and pins
+    # nothing. Caught by review on #1889; "Fermi need to retract" is the form
+    # that actually exercises this alternative's anchor.
+    ([txt("Scientists at Fermi need to retract the finding.")],
+     "word ending in i + retract"),
     ([txt("The AI should have caught it.")], "the already-anchored sibling"),
     ([txt("The review was wrong about the pathspec.")],
      "correcting SOMEONE ELSE, not myself"),

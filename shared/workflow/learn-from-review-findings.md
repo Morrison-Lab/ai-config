@@ -181,3 +181,52 @@ What this finding has no room for is a hook.
 
 (Morrison-Lab/ai-config#1959, from rounds 2 and 4 of review on #1947.
 All three instances landed in one PR, each inside the fix for the round before it, and each was found by the reviewer rather than by the sweep that had just run.)
+
+A review series that stops finding defects has narrowed its search, not finished it.
+The three sections above each fire inside a single round --- a finding accepted, a class recurring, a fix carrying the next instance of the class it just closed.
+This one fires on the shape of the whole **series**, and it fires at the moment the series ends, which is the moment nothing else is looking.
+
+**A reviewer's exhaustion is a scope claim about the family it searched, not about the class.**
+A verdict reporting that it spent substantial effort looking for another bypass and could not construct one reads as coverage.
+It is a report of a search, and like every scope claim it names a population --- so [`metacognitive-monitoring`](metacognitive-monitoring.md)'s scope rule applies to it unchanged: check the population rather than recalling it.
+The increment is that the population belongs to somebody else, and the reviewer never stated it as a choice, so nothing in the verdict marks it as one.
+Such a sentence almost always lists what it probed, usually in a parenthesis.
+Read that list and ask what its members have in common.
+When they share one mechanism, the claim covers that mechanism and is silent about every other way the same effect can be produced.
+
+**The series is what chose the family, which is why the last round is the least likely to escape it.**
+Each round inherits its search space from the previous round's findings, because a reviewer shown a bypass in option parsing goes looking for the next one in option parsing.
+So a converging series narrows onto whatever family it opened in, and the rounds that feel most thorough --- the late ones, where every probe comes back empty --- are the ones searching the smallest space.
+Convergence is therefore evidence about the reviewer's attention rather than about the artifact.
+Note how this differs from the recurrence rule above, which fires when the same finding class keeps returning and asks whether your instrument can decide the question at all.
+Here the findings stop returning, and the question is whether the reviewer was still looking in more than one place.
+
+**So convergence is the moment to enumerate families, not the moment to stop.**
+When several consecutive rounds all find defects in one mechanism, ask what *other* ways the guarded action can be spelled, and probe those yourself.
+For a command guard the list is short enough to write out: an alias, a wrapper or an interpreter, a shell function, an environment variable, a config key, and a different tool reaching the same effect without ever running the command.
+[`least-flexible-tool`](../coding/least-flexible-tool.md) covers the wrapper-and-interpreter rung of that list and says to name the rung you stopped on, which is the same observation about one family rather than about the set.
+
+**A clean verdict discharges the round, and it does not discharge your own probing.**
+This is the half that has no other trigger behind it.
+An accepted finding has [`ardi`](ardi.md)'s dispositions, a recurrence has the rule above, and a red check has CI --- whereas a clean verdict produces no artifact at all, closes the loop, and reads as permission to stop.
+The probe is cheap and it is not one-sided: it returns validated coverage as often as it returns a defect, and a family confirmed already handled is worth as much to a later reader as a family found open.
+Report both, per [`report-mistakes-proactively`](report-mistakes-proactively.md), and file whatever the probe finds before the verdict's apparent finality makes it feel like old news.
+
+- **Do:** read a reviewer's "I could not find another" as a report of the space it searched, and derive that space from the probes it lists.
+- **Do:** treat several consecutive rounds finding defects in one mechanism as evidence the reviewer has locked onto that mechanism, and enumerate the other spellings of the guarded action before accepting the verdict.
+- **Do:** probe the unsearched families yourself once the verdict comes back clean, and record the families the probe confirms as well as the ones it breaks.
+- **Don't:** read an exhaustion claim as coverage of the class --- it covers the family, and the previous rounds chose the family rather than any survey.
+- **Don't:** treat convergence as the series having finished, when the late rounds are the ones searching the smallest space and so the ones likeliest to come back empty for the wrong reason.
+- **Don't:** let a clean verdict end your own probing --- the round is discharged, and nobody at all is looking at the families it never searched.
+
+(Measured 2026-08-22 on the pre-push guard `hooks/no-push-without-self-review.py`, across two stacked PRs.
+[ai-config#1932](https://github.com/Morrison-Lab/ai-config/pull/1932) merged into [#1911](https://github.com/Morrison-Lab/ai-config/pull/1911)'s branch at 16:32Z, and its own body tabulates nine review rounds: rounds 1 through 8 each raised at least one finding, four of them raising a defect the previous round's fix had introduced, and round 9 raised none and returned **Ready for merge**.
+Six further `claude-review` rounds then ran on #1911 between 17:55Z and 21:21Z, and the last of them returned **Ready for merge** on `51be639e` while reporting no new findings to post.
+That PR, #1911, was still unmerged at the time of this reading.
+That final round described the previous round's six findings as "all about a specific bypass class", and its own exhaustion sentence listed six probes --- option-abbreviation resolution, `-C` chaining, subshell depth tracking, wrapper-arg windows, deletion refspecs mixed with real ones, and stale-verdict-versus-fresh-SHA interactions.
+Every one of the six is git option parsing.
+The live bypass outside that family was found the same evening by probing rather than by any round: a git alias expanding to a push (`git config alias.p 'push --mirror'`, then `git p origin`) is not matched by the shared `_argv_push` detector at all, so neither push guard fires, filed as [#1993](https://github.com/Morrison-Lab/ai-config/issues/1993).
+`alias.p = push` is among the commonest git aliases in ordinary use, so the unsearched family was more reachable than any spelling the searched one produced.
+The same probe returned a confirmation as well as a defect, establishing that `GIT_CONFIG_GLOBAL` was already caught by the wholesale environment overlay added in `51be639e`.
+A third family --- the GitHub MCP write tools, which reach a remote branch with no `git push` for the guard to see --- was found by a dispatched `adversarial-reviewer` subagent rather than by `claude-review`, and is filed as [#1929](https://github.com/Morrison-Lab/ai-config/issues/1929).
+That one is worth reading as evidence for the rule rather than against it: a different reviewer searched a different family, which is what makes family coverage a property of who looked rather than of how hard.)

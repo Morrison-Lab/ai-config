@@ -80,14 +80,41 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
+# A plain user prompt, carrying no reading. It is what separates one turn from
+# the next, and several cases below need it explicitly: an assistant turn
+# normally emits narration, tool calls, and THEN the recap as separate
+# messages, so consecutive `say()`s are one turn rather than two. Writing "a
+# later message" as two bare `say()`s modelled a turn boundary that is not
+# there, and keying the guard's window on it is what made it fire on ordinary
+# recaps (ai-config#1917). Where a case means "a later turn", it must say so.
+NEXT_TURN = {"type": "user", "content": "and what about the other one?"}
+
+
 # (events, should_fire, label)
 CASES = [
+    # --- ai-config#1917: the window must start where the USER spoke ---
+    #     An assistant turn emits narration, then tool calls, then the recap.
+    #     Keying the window on the previous assistant TEXT BLOCK put the
+    #     boundary inside the current turn, expiring a reading taken at its
+    #     top -- so the guard fired on ordinary recaps, and even on a turn
+    #     that ran `date` itself. Each of these is that shape.
+    ([hook_clock("21:30:00"), say("Looking into it."), GIT_LOG,
+      say("Stopping Point: clean, as of 21:30 PDT")], False,
+     "#1917: narration before the recap must not expire the injected reading"),
+    ([hook_clock("21:30:00"), say("Checking."), GIT_LOG, say("Found it."),
+      GIT_LOG, say("Recap: 21:30 PDT")], False,
+     "#1917: two narrations before the recap, same turn"),
+    ([hook_clock("21:30:00"), DATE, say("Got it."), say("Recap: 21:31 PDT")],
+     False,
+     "#1917: an explicit `date` THIS turn discharges even with narration after"),
+
     # --- the incident, and its shape ---
-    ([DATE, say("first recap"), say("UPDATE -- 19:24 PDT")], True,
+    ([DATE, say("first recap"), NEXT_TURN, say("UPDATE -- 19:24 PDT")], True,
      "the incident: measured once, extrapolated in a later message"),
-    ([HOOK_CLOCK, say("first recap"), say("as of 18:52 PDT, three PRs open")], True,
+    ([HOOK_CLOCK, say("first recap"), NEXT_TURN,
+      say("as of 18:52 PDT, three PRs open")], True,
      "session-start hook reading, then an extrapolated time a message later"),
-    ([DATE, say("earlier"), say("Session Summary -- 6:40 PM PT")], True,
+    ([DATE, say("earlier"), NEXT_TURN, say("Session Summary -- 6:40 PM PT")], True,
      "12-hour form with a PT marker"),
     ([say("no clock read at all in this session"), say("now 09:15 PST")], True,
      "no reading anywhere in the transcript"),
@@ -135,12 +162,14 @@ CASES = [
      "a `date` run in this turn discharges even when a stale reading exists"),
     ([HOOK_CLOCK_UNPARSEABLE, say("as of 15:22 PDT")], False,
      "an injected line with no readable value falls back to counting as a read"),
-    ([hook_clock("14:48:23"), say("first recap"), say("as of 15:22 PDT")], True,
+    ([hook_clock("14:48:23"), say("first recap"), NEXT_TURN,
+      say("as of 15:22 PDT")], True,
      "a departing claim fires from a later message too"),
 
     # --- review round 1 on #1850: the three regressions the value
     #     comparison introduced, each traced by the reviewer ---
-    ([hook_clock("14:48:23"), say("first recap"), say("as of 14:48 PDT")], True,
+    ([hook_clock("14:48:23"), say("first recap"), NEXT_TURN,
+      say("as of 14:48 PDT")], True,
      "a STALE reading must not discharge by numeric proximity -- that is the "
      "#1848 bug in a new shape"),
     ([hook_clock("08:18:00"),
@@ -211,7 +240,8 @@ def check_output_shape():
     """
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
-        for e in (DATE, say("earlier"), say("UPDATE -- 19:24 PDT")):
+        for e in (DATE, say("earlier"), NEXT_TURN,
+                  say("UPDATE -- 19:24 PDT")):
             fh.write(json.dumps(e) + "\n")
     for f in os.listdir(tempfile.gettempdir()):
         if f.startswith(".claude-clock-claim-"):

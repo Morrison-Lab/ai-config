@@ -18,8 +18,8 @@ guessed. `CLAUDE.md` names that mechanism outright.
 The condition is exactly decidable from the transcript, which is what makes
 this a hook rather than another sentence in the rule:
 
-    message states a Pacific clock time  AND  no clock read since the previous
-    assistant message
+    message states a Pacific clock time  AND  no clock read since the current
+    turn began
 
 What counts as a clock read is deliberately broad -- any `date` invocation, the
 PowerShell fallback the rule prescribes for Git Bash, or the `UserPromptSubmit`
@@ -151,7 +151,14 @@ def _skew(claimed, measured):
 
 
 def scan(path):
-    """Return (opaque_clock_idx, prev_assistant_idx, text, measured_minutes).
+    """Return (opaque_clock_idx, turn_start_idx, text, measured_minutes).
+
+    `turn_start` is the index of the most recent real user prompt, which is
+    where the current turn begins. It is deliberately NOT the previous
+    assistant text block: an assistant turn normally emits narration, then
+    tool calls, then the recap, so keying on text blocks put the window
+    boundary INSIDE the current turn and expired a reading taken at its top
+    (ai-config#1917 -- it fired even on a turn that ran `date` itself).
 
     `opaque_clock_idx` counts only reads whose VALUE this guard cannot see -- a
     `date` invocation, whose output lands in a later tool_result the scan does
@@ -168,8 +175,7 @@ def scan(path):
     discharge the guard or inject a fabricated reading.
     """
     last_clock = -1
-    last_assistant = -1
-    prev_assistant = -1
+    turn_start = -1
     measured = None
     text = ""
     i = 0
@@ -185,6 +191,9 @@ def scan(path):
             if blocks is None:
                 blocks = m.get("content") or []
             if isinstance(blocks, str):
+                # A bare string is a real user prompt, so it opens a new turn.
+                if role != "assistant":
+                    turn_start = i
                 # A user/system turn can carry a bare string, which is where
                 # the UserPromptSubmit clock line arrives.
                 if RX_HOOK_CLOCK.search(blocks):
@@ -196,6 +205,15 @@ def scan(path):
                 continue
             if not isinstance(blocks, list):
                 continue
+            # A user-role message carrying a `text` block is a real prompt and
+            # opens a new turn. One carrying only `tool_result` blocks is this
+            # turn's own tool output, which opens nothing -- that distinction is
+            # the whole fix: the window must start where the USER spoke, not
+            # wherever the assistant last emitted text.
+            if role != "assistant" and any(
+                    isinstance(b, dict) and b.get("type") == "text"
+                    for b in blocks):
+                turn_start = i
             for b in blocks:
                 if not isinstance(b, dict):
                     continue
@@ -213,8 +231,6 @@ def scan(path):
                 # A real `date` run is still caught, on its tool_use above.
                 elif btype == "text":
                     if role == "assistant" and b.get("text", "").strip():
-                        prev_assistant = last_assistant
-                        last_assistant = i
                         text = b["text"]
                     elif role != "assistant" and RX_HOOK_CLOCK.search(
                             b.get("text", "")):
@@ -224,14 +240,14 @@ def scan(path):
                                 i, int(got.group(1)) * 60 + int(got.group(2)))
                         else:
                             last_clock = i
-    return last_clock, prev_assistant, text, measured
+    return last_clock, turn_start, text, measured
 
 
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
         path = payload.get("transcript_path") or ""
-        last_clock, prev_assistant, text, measured = scan(path)
+        last_clock, turn_start, text, measured = scan(path)
     except Exception:
         return 0  # fail open
 
@@ -241,10 +257,12 @@ def main() -> int:
     if not hit:
         return 0
 
-    # A `date` invocation after the previous assistant message makes this
-    # turn's claim measured. Its output is not attributed back here, so there
+    # A `date` invocation inside this turn makes the claim measured. The
+    # comparison is inclusive because the injected read arrives ON the prompt
+    # line that opens the turn, so `>` would expire a reading taken at the very
+    # moment the turn began. Its output is not attributed back here, so there
     # is no value to check it against -- position is all this branch has.
-    if last_clock > prev_assistant:
+    if last_clock >= 0 and last_clock >= turn_start:
         return 0
 
     detail = (
@@ -252,7 +270,7 @@ def main() -> int:
 
     # A value is usable only when the reading it came from is itself in this
     # turn. An older one has expired exactly as a `date` invocation would have.
-    if measured is not None and measured[0] > prev_assistant:
+    if measured is not None and measured[0] >= turn_start:
         claimed = _claim_minutes(hit.group(0))
         if claimed is None:
             return 0  # fail open on a claim shape we cannot compare

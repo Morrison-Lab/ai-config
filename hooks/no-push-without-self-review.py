@@ -181,8 +181,9 @@ def _load_sibling():
 try:
     _SIBLING = _load_sibling()
     _SIBLING_ERROR = None
-except Exception as exc:  # covered by test-…'s orphan_cases(), which runs a copy
-                          # of this file in a directory without the sibling
+except Exception as exc:  # covered by orphan_cases() in
+                          # test-no-push-without-self-review.py, which runs a
+                          # copy of this file in a directory without the sibling
     _SIBLING = None
     _SIBLING_ERROR = str(exc)
 

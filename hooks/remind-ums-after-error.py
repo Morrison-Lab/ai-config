@@ -59,23 +59,29 @@ _APOS = "['\u2019]"
 # First-person admissions only. Correcting SOMEONE ELSE ("the review was
 # wrong", "the docs are incorrect") must never fire this -- hence an explicit
 # first-person subject in every pattern rather than a bare "was wrong".
+# Every bare `i` alternative carries `\b`. Without it the pattern matches the
+# trailing "I" of any word ending in that letter, so "The API was wrong about
+# this endpoint" fired as a first-person admission -- a third-person statement,
+# which the docstring above says this regex must never match. Found on
+# ai-config#1752's review for the `should have` alternative, which was anchored
+# then while its six siblings were not (ai-config#1756).
 ADMISSION = re.compile(
     r"""(
-      i\s+was\s+(wrong|mistaken|incorrect)
-    | i\s+got\s+(that|this|it)\s+wrong
+      \bi\s+was\s+(wrong|mistaken|incorrect)
+    | \bi\s+got\s+(that|this|it)\s+wrong
     | my\s+(mistake|error)\b
     | my\s+(earlier|previous|prior|last)\s+
         (claim|statement|report|answer|assertion|reading|count)\s+
         was\s+(wrong|incorrect|false)
-    | i\s+(mischaracterized|misread|miscounted|misdiagnosed|misremembered)
-    | i\s+(incorrectly|wrongly|falsely)\s+
+    | \bi\s+(mischaracterized|misread|miscounted|misdiagnosed|misremembered)
+    | \bi\s+(incorrectly|wrongly|falsely)\s+
         (said|claimed|stated|reported|assumed|described|characterized)
     # Quantitative self-correction (ai-config#1210). The adverb form above
     # requires an explicit "incorrectly"/"wrongly"; a retraction of a figure
     # rarely carries one -- "I overstated the waste" is a first-person
     # admission of having been wrong by any reading, and was silent.
     # `overclaimed` needs no alternative of its own: over + claimed.
-    | i\s+(over|under)(stated|estimated|counted|reported|claimed)
+    | \bi\s+(over|under)(stated|estimated|counted|reported|claimed)
     # `myself` needs an alternative of its OWN, because `my\b` cannot match
     # inside that word -- which is why ai-config#1210's proposed
     # `(my|this|the)` silently regressed "correcting myself". Its position is
@@ -85,7 +91,7 @@ ADMISSION = re.compile(
     # SOMEONE ELSE, which the first-person rule above exists to exclude.
     | correcting\s+(myself|my|this)\b
     | retracting\s+(my|that\s+claim)
-    | i\s+(need\s+to\s+)?retract\b
+    | \bi\s+(need\s+to\s+)?retract\b
     # Omission self-critique (ai-config#1751): "I should have proactively
     # found the open PRs" is a first-person admission of a behavioral gap,
     # not a factual retraction, so none of the patterns above catch it.

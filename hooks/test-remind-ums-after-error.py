@@ -56,6 +56,16 @@ def user(s):
 ADMIT = txt("Checking that again -- I was wrong about the repo being public.")
 
 REMIND = [
+    # The positive direction for every alternative the `\b` anchoring touched
+    # (ai-config#1756). Anchoring can fail two ways: leaking a third-person
+    # match (SILENT below) or losing a real admission (these). A suite carrying
+    # only one side cannot tell a correct anchor from an over-tightened one.
+    ([txt("I was wrong about this.")], "first person: was wrong"),
+    ([txt("I got that wrong.")], "first person: got that wrong"),
+    ([txt("I mischaracterized it.")], "first person: mischaracterized"),
+    ([txt("I incorrectly claimed success.")], "first person: adverb form"),
+    ([txt("I overstated the waste.")], "first person: quantitative"),
+    ([txt("I retract that.")], "first person: retract"),
     ([ADMIT], "bare admission, nothing after it"),
     ([ADMIT, user("ok"), txt("Continuing with the next task.")],
      "admission then unrelated work"),
@@ -92,6 +102,24 @@ REMIND = [
 
 SILENT = [
     ([txt("All checks are green; nothing to correct.")], "no admission at all"),
+    # A word ending in "i" followed by an admission verb. Without a `\b` before
+    # each bare `i` alternative, the regex matched that trailing letter as the
+    # first-person subject, so every one of these fired on a THIRD-person
+    # statement -- the exact thing the module docstring says it must never do
+    # (ai-config#1756). #1752 anchored the `should have` alternative and left
+    # its six siblings unanchored; these pin all six.
+    ([txt("The API was wrong about this endpoint.")], "acronym + 'was wrong'"),
+    ([txt("The API got that wrong initially.")], "acronym + 'got that wrong'"),
+    ([txt("The semi mischaracterized the exposure.")], "word ending in i + verb"),
+    ([txt("The CLI incorrectly claimed success.")], "acronym + adverb form"),
+    ([txt("The Delphi overstated the risk.")], "word ending in i + quantitative"),
+    # "needs to" (plural) matches neither `need\s+to\s+` nor the skip-the-group
+    # path, so the obvious phrasing is silent under BOTH regexes and pins
+    # nothing. Caught by review on #1889; "Fermi need to retract" is the form
+    # that actually exercises this alternative's anchor.
+    ([txt("Scientists at Fermi need to retract the finding.")],
+     "word ending in i + retract"),
+    ([txt("The AI should have caught it.")], "the already-anchored sibling"),
     ([txt("The review was wrong about the pathspec.")],
      "correcting SOMEONE ELSE, not myself"),
     ([txt("That claim in the docs is incorrect.")], "someone else's claim"),

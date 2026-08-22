@@ -367,6 +367,7 @@ the rule is consulted when it is *read* and broken when a message is
 | `flag-stale-adjacent-comment.py` | `PreToolUse` (Bash) | warns, never blocks, when a `git commit` changes a literal value while an unchanged comment within ten lines still asserts the old one |
 | `no-clobbering-push.py` | `PreToolUse` (Bash) | refuses a bare `git push --force`/`-f`, whose remedy (`--force-with-lease --force-if-includes`) costs one word. Warns on every other push whose remote tip a live, read-only `git ls-remote` shows is not an ancestor of the ref being pushed (which is `HEAD` only when the refspec says so), and stays silent on a fast-forward |
 | `no-misattributed-quote.py` | `Stop` | blocks a reply attributing a quoted phrase to a corpus file that does not contain it, when that phrase is in the file's `.rationale.md`/`.cases.md` sibling; stays silent when the phrase is found nowhere else, since a bare "not found" is the invented-quote misread |
+| `warn-nonglobal-substitution.py` | `PreToolUse` (Bash) | warns, never blocks, on an in-place `perl -i`/`sed -i` substitution whose flags carry neither `g` nor a digit -- the shape that silently changes only the first occurrence, which bit mutation testing four times in one session (not registered -- see ai-config#1900) |
 
 For agent-independent monitoring across all projects and sessions, install the
 user service after the hook files are installed:

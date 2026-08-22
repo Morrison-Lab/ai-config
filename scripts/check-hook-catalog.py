@@ -68,6 +68,7 @@ KNOWN_UNREGISTERED = {
     # itself the plugin-path activation, so this is registered by the
     # follow-up after its authoring PR merges.
     "no-incomplete-check-enumeration.py": 1717,
+    "warn-nonglobal-substitution.py": 1900,
 }
 
 # The README row of an allowlisted hook must contain this, so the table states

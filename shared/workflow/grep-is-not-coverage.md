@@ -194,6 +194,41 @@ The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
 
+## An unmerged PR is part of the corpus a citation can be corroborated against, and no default-branch search reaches it
+
+The section above governs searching the wrong **repo**.
+This one governs searching the wrong **branch state within the right repo**: a citation to content that ships only in an open PR, checked by grepping the default branch.
+
+The null result here is not merely inconclusive --- it is guaranteed whether or not the cited content is genuine.
+A search over the default branch cannot find content that has never been on the default branch, so the check answers a question the corroboration was never asking.
+The failure reads as fabrication rather than as a scope error, because a clean, correctly-constructed zero-hit grep looks exactly like a search that covered the whole corpus.
+
+**The fix belongs primarily to the author, not the searcher, because only the author controls which branch a citation actually lives on.**
+When citing content that is not yet on the default branch, name the PR rather than (or in addition to) the file path, and state in the citation itself that the corroborating file is absent until that PR merges.
+That converts an apparent dead end into an explained one, and it is the only fix that removes the false positive rather than merely shrinking it.
+
+**A reader-side search of open PRs is worth running, and it is a mitigation rather than a remedy --- treat its null result as narrowing the question, not settling it.**
+`gh pr list --state open --search "<term>"` or `gh search code` catches the common case, where the cited content sits in a PR someone opened.
+It still misses a subject living on a branch nobody has opened a PR for, or in a PR that was closed and superseded, so a second null result is not proof either --- it is the same defect one level up, over a slightly wider population.
+Stating the search this way matters: writing the search as *the* fix teaches the next reader to treat its null result as settling the question, which is the exact failure this section exists to prevent.
+
+**Two independent parties running the same grep did not corroborate anything, because both searches keyed on the same surface.**
+[`algorithmatize-checks.rationale.md`](algorithmatize-checks.rationale.md) already states the general form: "The discriminating question is not whether the second method was run independently, but whether it could have failed differently: a second pass that keys on the same token shape will confirm the first pass's misses as readily as its hits."
+A second grep over the same default-branch tree cannot fail differently from the first;
+it can only reproduce the first's dead end and make it feel doubly confirmed.
+
+- **Do:** cite the PR, not just the file path, when the cited content lives only in an open PR --- and say the corroborating file is absent until merge.
+- **Do:** search open PRs before concluding a citation is uncorroborated, but read a null result there as narrowing, not settling, the question.
+- **Don't:** conclude a citation is fabricated from a default-branch grep alone, when the citation names or implies unmerged work.
+- **Don't:** treat a second search that keys on the same population (the default branch, or the open-PR set) as independent corroboration of the first's null result.
+
+(Morrison-Lab/ai-config#1864, 2026-08-21: `shared/workflow/verify-the-right-artifact.md` cited an incident about `skills/clean-git/SKILL.md` step 2 running a real `git worktree prune`.
+The `claude-review` bot ([review comment 3834449057](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834449057)) and a separate CLI session working the same PR each ran `grep -rn "worktree prune" skills/ shared/ memories/`, and both got the same three unrelated hits.
+The incident was real --- ai-config#1849, [review comment 3834408153](https://github.com/Morrison-Lab/ai-config/pull/1849#discussion_r3834408153) --- but `clean-git` does not exist on the default branch;
+it ships only in #1849, which was open at review time and remained open when this entry was written.
+Resolved in [review comment 3834476527](https://github.com/Morrison-Lab/ai-config/pull/1864#discussion_r3834476527): "Your greps finding nothing is itself part of the record...
+`clean-git` does not exist on `main`... so no search of `main` can corroborate the anecdote.")
+
 ## A non-null result has the same defect, when the hits go unenumerated
 
 Everything above governs a grep that returns **nothing** and a conclusion

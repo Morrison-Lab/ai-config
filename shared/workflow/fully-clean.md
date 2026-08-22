@@ -212,6 +212,21 @@ and the verdict's own conclusion every round.**
   explicitly ("inline comments were unavailable for out-of-diff lines").
   A thread count therefore cannot see it.
   Zero unresolved threads is not evidence of zero findings.
+- **A notification that truncates the body hides exactly that finding.**
+  The rule above says to read the body, and assumes you are reading the body.
+  A CI-monitor or webhook event delivers the review as *quoted text*, capped
+  at some length, and the inline findings are enumerated first because they
+  are numbered --- so what gets cut is the tail, which is where an out-of-diff
+  finding and the verdict both live.
+  The event is honest about it, and that is the trap: it prints a marker like
+  `[truncated --- full text: gh api repos/<owner>/<repo>/issues/comments/<id>]`,
+  which reads as a courtesy rather than as an instruction, and the visible
+  portion looks like a complete, well-structured review.
+  Acting on the inline comments alone then feels like having addressed the
+  round, and the thread sweep confirms it, because the missed finding was
+  never a thread.
+  So run that command before treating a finding list as complete, whenever the
+  review reached you through a notification rather than through a direct read.
 - **An empty body hides the mirror case.**
   A review can post a completely empty top-level body and carry its entire
   finding in one inline comment, so a body-only read finds nothing to act on
@@ -235,6 +250,20 @@ and the verdict's own conclusion every round.**
   Read the job's step outcomes when a review is missing rather than inferring
   from the absence of comments.
 
+- **The notification that wakes you carries a SUBSET of the findings, and
+  nothing in it says so.**
+  Every case above is a surface *on GitHub* that a query can reach.
+  This one is the channel that tells you to look in the first place: a
+  `pull_request_review_comment.created` wake delivers **one** comment, and a
+  review posting five of them wakes you five times, asynchronously, with no
+  count and no "1 of 5".
+  So the first wake is indistinguishable from the only wake, and acting on it
+  reads as responsive while leaving the rest unaddressed.
+  It is worse than an ordinary partial read because the thread then *looks*
+  handled: a reply and a resolved thread sit under the one finding you saw.
+  Re-fetch `get_review_comments` on every review wake and act on the whole
+  set, never on the wake's own payload.
+
 - **Do:** read all review surfaces before calling a PR clean,
   every round,
   including collapsed suppressed-comments blocks.
@@ -250,6 +279,8 @@ and the verdict's own conclusion every round.**
   overview prose that merely mentions suppressed findings.
 - **Don't:** read a reviewer's silence as a verdict --- a job that posted
   nothing leaves the same zero counts as a job that found nothing.
+- **Don't:** act on a review wake's own payload --- it is one comment out of
+  however many the round posted, and it never says which.
 
 **A comment can be evidence-dense, correct throughout, and state no verdict at
 all --- and its density is what gets read as the conclusion.**

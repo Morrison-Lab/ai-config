@@ -995,3 +995,31 @@ The admitted one bore no verdict because its verdict phrase sits inside a code s
 
 The prior claim that only bot authors are admitted came from reading the formal-review loop --- which does consult `_is_bot_author` alone, for the reason its own in-code comment gives --- and generalizing it one loop up.
 Tracked as ai-config#1719, which gained the skip-notice trigger the same day, and ai-config#1798.)
+
+## A review wake carried one finding out of five
+
+(`Morrison-Lab/gha#571`, 2026-08-21/22.
+The round-3 review posted **five** inline findings within about two minutes.
+The first wake carried one of them, and a `get_review_comments` fetch made
+seconds later returned four.
+The fifth arrived on its own wake roughly two minutes after that, once the
+first four had already been read, fixed, and their threads resolved.
+
+So the count was wrong twice in the same round, in both directions: acting on
+the wake alone would have missed four, and treating the first fetch as
+complete would have missed the fifth.
+Only the second fetch, made when a later wake arrived, produced the whole set.
+
+The four that the wake did not carry were not minor.
+One was a genuine bug in the diff --- an unanchored `*"$RUN_URL"*` substring
+match, where a run id can be a numeric prefix of another
+(`.../runs/325256962` inside `.../runs/3252569628`), so a failure comment
+about a different run could decide this one.
+Another caught a changelog fragment claiming a fix the PR explicitly did not
+ship.
+
+The general shape is the one this file's list already teaches for GitHub's own
+surfaces, arriving through the delivery channel instead: a count you did not
+derive is not a count.
+Re-fetch on every wake, and treat a later wake as evidence that the earlier
+fetch was incomplete rather than as a duplicate.)

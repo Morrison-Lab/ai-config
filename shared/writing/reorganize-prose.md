@@ -172,6 +172,55 @@ Note that this is the rule failing to *fire* rather than the rule being
 incomplete, which is why the fix is a trigger rather than another statement
 of it.
 
+## Inserting into a procedure carries an ordering dependency the prose cannot show
+
+Everything above concerns **moving** content.
+Inserting has a failure the sweeps cannot reach, and it appears wherever a
+document's steps are meant to be *executed* rather than only read --- a skill,
+a runbook, a setup guide.
+
+Such a document carries dependencies that live in the **order** rather than in
+the words: a variable has to be defined before it is used, a snapshot has to be
+taken before the thing it records, a lock has to be acquired before the work it
+guards.
+Insert a new step on the wrong side of one and the paragraph still reads
+correctly, because a paragraph does not know where it sits.
+No directional word appears, so the forward-reference grep cannot see it;
+nothing is stale, so the self-reference sweep cannot either.
+
+Two kinds, and only one is decidable:
+
+- **Syntactic.**
+  A shell variable used above its assignment.
+  A checker can find this: collect assignments and uses across a file's fenced
+  blocks and compare positions.
+- **Semantic.**
+  A snapshot placed after the command it is meant to precede.
+  Nothing in the text distinguishes it from the correct arrangement, so the
+  remedy is to **state the dependency in the prose** --- "only if it runs
+  before the passes that prune" --- rather than to leave it implied by
+  position.
+
+The check is cheap and mechanical: after inserting a step with an ordering
+dependency, `grep -n` for both the inserted step and the thing it must precede
+or follow, and compare the numbers.
+Reading the passage and finding it sensible tests the wrong property.
+
+- **Do:** verify an inserted step's position by line number against its
+  dependency, not by re-reading the passage.
+- **Do:** state the ordering requirement in the prose when the dependency is
+  semantic, so the constraint survives the next insertion.
+- **Do:** hoist a definition to the top of its step when a second consumer
+  appears, rather than placing the consumer after it --- position stops being
+  a property anyone has to maintain.
+- **Don't:** conclude a fix generalizes because it resolved one dependency;
+  a commit that introduces two can have one fixed and one left.
+- **Don't:** expect the directional-word or self-reference sweeps to catch
+  this --- an insertion in the wrong place is not stale and points nowhere.
+
+See [`reorganize-prose.cases.md`](reorganize-prose.cases.md),
+"Three ordering regressions in one skill".
+
 ## Do and don't
 
 - **Do:** move a section, paragraph, or sentence --- within a file or across

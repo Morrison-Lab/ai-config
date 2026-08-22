@@ -65,10 +65,11 @@ Prefer deleting the pointer over rewording it: in a sequential procedure
 the reader reaches the target anyway, so a step that states its own
 mechanism in brief needs no cross-reference at all.
 
-**A pointer aimed the *wrong* way is a different defect, and fixing one primes
-you to apply the wrong test to the rest.**
-The positional test above is easy to read and easy to invert under a specific,
-common sequence.
+**A pointer aimed the *wrong* way is a different defect, and fixing one can
+leave you applying the wrong test to the rest.**
+The positional test above is easy to read and easy to invert under a specific
+sequence, observed once and recorded here as a risk rather than a frequency
+claim.
 
 A reviewer flags `the rule below` where the rule is actually *above*.
 That is a genuine defect --- a broken reference --- so you fix it, and then
@@ -85,7 +86,12 @@ over them, because the test being applied came from the finding rather than
 from the rule.
 
 The tell is the verdict "this one points forward correctly, so it stays".
-That sentence cannot be true here.
+Outside the roadmap exception this fragment carves out, that sentence is never
+a reason to keep a pointer.
+It restates the definition of the thing being looked for.
+When the roadmap exception *is* what is meant, say so, since "it points the
+right way" and "this is a deliberate structural preview" are different
+defences and only the second one holds.
 
 - **Do:** re-read the rule before sweeping for more instances of a finding,
   rather than generalizing from the instance you were handed.
@@ -95,13 +101,8 @@ That sentence cannot be true here.
   that is the defect, not a defence against it.
 - **Don't:** carry the previous finding's axis into the sweep it prompted.
 
-(Measured 2026-08-21 on
-[ai-config#1849](https://github.com/Morrison-Lab/ai-config/pull/1849).
-Round 3 flagged one backwards `below`; the sweep that followed cleared two
-accurate forward pointers with exactly the reasoning above, in a reply posted
-to the reviewer.
-Round 4 flagged one of them plus a third introduced by the round-3 fix itself.
-All three were removed in `6e195693`.)
+See [`forward-references.cases.md`](forward-references.cases.md),
+"Direction is not the test".
 
 ## Confirming a hit
 

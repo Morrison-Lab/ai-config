@@ -42,3 +42,19 @@ two fire-condition sections it described.
 Review caught it; the fix relocated the inserted section out of the arc so the
 count resolved again.
 CI was fully green throughout --- no mechanical check sees this.)
+
+## "Direction is not the test"
+
+(Morrison-Lab/ai-config#1849, 2026-08-21.
+Round 3 of the review flagged one backwards `below` --- the referent was above
+it --- which is a broken reference rather than a forward one.
+The sweep that followed used the fragment's own grep over the whole file,
+examined each remaining hit, and cleared two of them on the ground that they
+pointed forward *accurately*.
+That reasoning was posted to the reviewer, so it is on the record as having
+been applied deliberately rather than carelessly.
+Round 4 flagged one of those two, plus a third that the round-3 fix commit
+`ea91b375` had itself introduced.
+All three were removed in `6e195693`.
+The cross-vendor review that caught the overclaiming in the first draft of this
+entry is on [#1874](https://github.com/Morrison-Lab/ai-config/pull/1874).)

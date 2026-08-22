@@ -655,6 +655,27 @@ to count the case.**
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A case labelled non-discriminating is a claim about the current clause set".
 
+## A required-subset assertion is not an inventory-pinning test
+
+A test that loops a hand-written table and asserts each entry is present in a
+production list looks like it pins that list.
+It pins only the listed entries as a required subset of the production
+collection, so deleting a production entry the table never named leaves the
+suite green.
+
+- **Do:** assert set equality in both directions where a test's purpose is to
+  pin an inventory, rather than a `for x in required: assert x in actual`
+  loop.
+- **Do:** treat a failure in the reverse direction --- a production entry the
+  table never named --- as a real finding, not as churn from a stale test.
+- **Don't:** read a docstring's claim to "pin the list" as evidence the
+  assertion does --- check what the assertion actually compares.
+- **Don't:** trust a subset test's green run as coverage evidence without
+  mutating an entry the table does not mention.
+
+See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
+"A required-subset assertion is not an inventory-pinning test".
+
 ## Run new scheduled automation once, attended, before its first scheduled run
 
 Every section above is about building the instrument and testing its logic.

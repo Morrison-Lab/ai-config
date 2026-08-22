@@ -157,6 +157,12 @@ CASES = [
      False, "sentence-final `ums.` still discharges -- a bare dot is not a path"),
     ([REVIEW, ACCEPT, tool("Task", {"prompt": "memorize this correction"})],
      False, "bare `memorize` still discharges"),
+    # Review finding on #1968: the slash-command spelling must survive the
+    # path guard, while a path ending in the same word must not.
+    ([REVIEW, ACCEPT, tool("Task", {"prompt": "Run /ums to record this"})],
+     False, "the slash-command spelling `/ums` still discharges"),
+    ([REVIEW, ACCEPT, tool("Bash", {"command": "ls skills/ums"})],
+     True, "a path ending in `ums` does not discharge"),
 ]
 
 
@@ -261,7 +267,11 @@ def main():
         ("ls skills/ums-notes/", False),
         ("open memories/record-learnings-policy.md", False),
         ("python3 hooks/test-remind-ums-after-error.py", False),
+        ("ls skills/ums", False),
+        ("./ums-helper", False),
         ("grep -n ums README.md", True),
+        ("Run /ums to record this", True),
+        ("/memorize this correction", True),
         ("Please run ums.", True),
         ("memorize this correction", True),
         ("run record-learnings on it", True),

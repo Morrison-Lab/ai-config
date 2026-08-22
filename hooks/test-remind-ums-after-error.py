@@ -189,6 +189,16 @@ SILENT = [
      "bare `memorize` still discharges"),
     ([ADMIT, tool("Task", {"prompt": "run record-learnings on it"})],
      "bare `record-learnings` still discharges"),
+    # Review finding on #1968. `/ums` is how this corpus spells the
+    # invocation, so the first path guard -- which rejected any preceding
+    # `/` -- silently dropped it. A path and an invocation are separated by
+    # what sits BEFORE the slash, not by the slash itself.
+    ([ADMIT, tool("Task", {"prompt": "Run /ums to record this"})],
+     "the slash-command spelling `/ums` still discharges"),
+    ([ADMIT, tool("Task", {"prompt": "/memorize this correction"})],
+     "`/memorize` at the start of a prompt still discharges"),
+    ([ADMIT, tool("Bash", {"command": "echo /record-learnings"})],
+     "`/record-learnings` still discharges"),
 ]
 
 # ai-config#1965, the FALSE-positive half. `\b` treats `-`, `/`, and `.` as
@@ -211,6 +221,15 @@ PATH_READS = [
      "reading a ums-* memory file does not discharge"),
     ([ADMIT, tool("Task", {"prompt": "Read shared/workflow/run-ums-proactively.md"})],
      "a dispatch that only names the fragment does not discharge"),
+    # The other side of the same slash: a path ending exactly in the action
+    # word, with nothing after it for `_NOT_PATH_END` to catch. Only the
+    # lookbehind rejects these, which is why it cannot simply drop `/`.
+    ([ADMIT, tool("Bash", {"command": "ls skills/ums"})],
+     "a path ending in `ums` does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "./ums-helper --check"})],
+     "a relative path `./ums-helper` does not discharge"),
+    ([ADMIT, tool("Bash", {"command": "ls ~/.claude/skills/ums"})],
+     "an absolute path ending in `ums` does not discharge"),
 ]
 REMIND += PATH_READS
 

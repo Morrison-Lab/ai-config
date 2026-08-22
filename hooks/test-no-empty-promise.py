@@ -319,6 +319,16 @@ CASES = [
      False, "'memorize.' at a sentence end still discharges"),
     ([say("Going forward I'll do X."), dispatch("Open ums.md and summarize it.")],
      True, "a dotted FILENAME still does not discharge"),
+    # Review finding on #1968. `_NOT_PATH` originally rejected ANY preceding
+    # `/`, which silently dropped `/ums` -- the spelling this corpus actually
+    # uses to invoke a skill, and the one likeliest to appear in a dispatch
+    # prompt. A path and an invocation differ in what precedes the slash.
+    ([say("Going forward I'll do X."), dispatch("Then run /ums on this.")],
+     False, "the slash-command spelling `/ums` still discharges (#1968)"),
+    ([say("Going forward I'll do X."), dispatch("/memorize the outcome.")],
+     False, "`/memorize` at the start of a prompt still discharges"),
+    ([say("Going forward I'll do X."), dispatch("Open skills/ums and read it.")],
+     True, "a path ending in `ums` still does not discharge"),
 
     # Round 9: a bare skill word in a BASH payload is a search term, not an
     # action -- `grep -n ums README.md` discharged a promise.
@@ -663,6 +673,30 @@ CASES = [
     ([say("Going forward I'll always check this before replying."),
       bash("tee -a shared/workflow/fully-clean.md < /tmp/note")],
      False, "`tee` still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("cat CLAUDE.md | tee shared/workflow/fully-clean.md")],
+     False, "`tee` mid-pipeline still discharges"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("mkdir -p skills/new-guard")],
+     False, "`mkdir` still discharges"),
+    # `memories/notes` deliberately does NOT work here, and that is
+    # MECHANISM_PATH rather than BASH_WRITE: each of its alternatives demands
+    # a FILE, so a bare directory cannot discharge a promise. Pinned so the
+    # `mkdir` case above is not read as the guard failing.
+    ([say("Going forward I'll always check this before replying."),
+      bash("mkdir -p memories/notes")],
+     True, "creating a bare DIRECTORY does not discharge (MECHANISM_PATH)"),
+    # Second review finding on #1968: the earlier comment justified leaving
+    # `tee`/`mkdir` on a plain `\b` by the hyphenated-sibling axis, which is
+    # the wrong axis -- `\btee\b` matched inside a PATH, so a READ discharged
+    # a promise. Latent (no such path exists in this repo today) but wrong in
+    # exactly the way the rest of this diff is about.
+    ([say("Going forward I'll always check this before replying."),
+      bash("cat shared/workflow/tee-notes.md")],
+     True, "a path containing `tee` is a READ and does NOT discharge (#1968)"),
+    ([say("Going forward I'll always check this before replying."),
+      bash("grep -n x shared/workflow/mkdir-guide.md")],
+     True, "a path containing `mkdir` does NOT discharge"),
     # `commit` is NOT the only member of that group with a hyphenated
     # sibling: `git --list-cmds=main,others` also reports `add--interactive`,
     # the deprecated interactive backend. Pinned so the exclusion is a

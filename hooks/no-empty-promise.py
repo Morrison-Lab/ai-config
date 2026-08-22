@@ -212,7 +212,16 @@ PROMISE = re.compile(_RULE_SRC + r"|" + _DEBT_SRC, re.I | re.X)
 # `(?![\w./-])`, which also rejected a sentence-final period, so `run ums.`
 # stopped discharging -- the commonest phrasing of all. What marks a path is a
 # dot with a word character AFTER it (`ums.md`), not a dot at a full stop.
-_NOT_PATH = r"(?<![\w/-])"
+# A leading `/` needs splitting apart, because it plays two roles. In a
+# PATH (`skills/ums`, `./ums-helper`) it is a separator and must block
+# the match; as a slash-COMMAND (`/ums`, `/memorize`) it is how this
+# corpus spells the invocation, and blocking that loses a real
+# discharge. What separates them is the character BEFORE the slash: a
+# path has a word character or a dot there, an invocation has
+# whitespace or nothing. So reject `/` only in that context.
+# (Review finding on ai-config#1968: the first spelling, `(?<![\\w/-])`,
+# rejected both, silently dropping `/ums` as a discharge.)
+_NOT_PATH = r"(?<![\w-])(?<![\w.]/)"
 _NOT_PATH_END = r"(?![\w/-]|\.\w)"
 
 # Durable, inspectable rule surfaces. Wider than remind-ums-after-error.py's
@@ -464,13 +473,32 @@ BASH_WRITE = re.compile(
     # command via this guard's own block message. `apply`, `mv`, and `rm`
     # have no hyphenated siblings today, and the group guard means a future
     # one cannot reopen this.
-    r"|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)(?![\w-])"
-    r"|--write(?![\w-])|\bmkdir\b",
+    r"|\bgit\s+(?:add|commit|apply|mv|rm)(?![\w-])"
+    r"|--write(?![\w-])"
+    # `tee` and `mkdir` take the full path pair rather than the hyphen guard;
+    # `sed -i` keeps a plain `\b`. See the note under this pattern for why the
+    # three differ.
+    r"|" + _NOT_PATH + r"tee" + _NOT_PATH_END +
+    r"|" + _NOT_PATH + r"mkdir" + _NOT_PATH_END +
+    r"|\bsed\s+-i\b",
     re.I,
 )
-# `tee`, `mkdir`, and `sed -i` keep a plain `\b`: none has a hyphenated
-# sibling, so the guard would change nothing. (`sed -i.bak` still matches,
-# since `.` is a non-word character and `-i` is complete before it.)
+# `tee` and `mkdir` get the full `_NOT_PATH` pair rather than the `(?![\w-])`
+# guard used above, because the two guards answer different questions. The
+# hyphen guard separates a command from a hyphenated SIBLING; the path pair
+# separates a command from a PATH that happens to contain the word. Neither
+# has a hyphenated sibling, which is what an earlier version of this comment
+# said -- and that justified the wrong axis, since `\btee\b` matched inside
+# `cat shared/workflow/tee-notes.md`, a READ that discharged a promise
+# (review finding on ai-config#1968). No such path exists in this repo today
+# (`git ls-files` finds none as of 2026-08-22), so this was latent rather
+# than firing; it is fixed here because the pattern was wrong in exactly the
+# way the rest of this diff is about.
+#
+# `sed\s+-i` deliberately keeps its plain `\b`, and it is NOT an oversight.
+# The whitespace makes a path form impossible, so `_NOT_PATH` would buy
+# nothing -- and `_NOT_PATH_END` would actively break `sed -i.bak`, whose
+# `.bak` is exactly the `\.\w` shape that pair exists to reject.
 # `mv`/`cp` and a bare `patch` are deliberately absent. `cp shared/x.md /tmp/`
 # copies OUT of a rule surface and writes nothing to it, and the destination is
 # not decidable from a substring match -- so they discharged reads. Losing the

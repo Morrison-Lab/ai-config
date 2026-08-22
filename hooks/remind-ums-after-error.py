@@ -128,7 +128,16 @@ UMS_PATH = re.compile(
 #
 # Same idiom as hooks/no-empty-promise.py's SKILL_WORD, which diagnosed this
 # first; keep the two spellings identical.
-_NOT_PATH = r"(?<![\w/-])"
+# A leading `/` needs splitting apart, because it plays two roles. In a
+# PATH (`skills/ums`, `./ums-helper`) it is a separator and must block
+# the match; as a slash-COMMAND (`/ums`, `/memorize`) it is how this
+# corpus spells the invocation, and blocking that loses a real
+# discharge. What separates them is the character BEFORE the slash: a
+# path has a word character or a dot there, an invocation has
+# whitespace or nothing. So reject `/` only in that context.
+# (Review finding on ai-config#1968: the first spelling, `(?<![\\w/-])`,
+# rejected both, silently dropping `/ums` as a discharge.)
+_NOT_PATH = r"(?<![\w-])(?<![\w.]/)"
 _NOT_PATH_END = r"(?![\w/-]|\.\w)"
 
 # `update\s+memories` is the one alternative left unguarded, and deliberately.

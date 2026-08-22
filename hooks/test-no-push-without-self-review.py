@@ -71,6 +71,12 @@ _git(REPO, "commit", "-qm", "unreviewed")
 FEATURE = _git(REPO, "rev-parse", "HEAD")
 _git(REPO, "checkout", "-q", "main")
 
+# `refs/heads/-dash` is a VALID ref name -- `git check-ref-format` accepts it
+# and `git push -- origin -dash` really ships it. It carries `feature`'s
+# unreviewed commit so a verdict naming HEAD cannot cover it. Created through
+# update-ref because `git branch -- -dash` cannot express a leading dash.
+_git(REPO, "update-ref", "refs/heads/-dash", FEATURE)
+
 _git(REPO, "tag", "-a", "v1", "-m", "v1")
 
 OTHER = make_repo(("alpha",))
@@ -358,6 +364,17 @@ CASES = [
      "--repo consumes its value"),
     (f"git -C {REPO} push -- origin main", reviewed(), False,
      "`--` before the remote does not turn the refspec into an option"),
+    # `--` ends the options, so a dash-prefixed token after it is a REFSPEC.
+    # `refs/heads/-dash` is a valid ref name git really ships, and reading it
+    # as an unknown option left the refspec list empty, grading the command as
+    # a bare push against HEAD -- so a verdict naming the current branch
+    # authorized shipping an unreviewed one.
+    (f"git -C {REPO} push -- origin -dash", reviewed(), True,
+     "after `--`, a DASH-PREFIXED positional is a refspec and is graded as "
+     "one -- reading it as an option empties the refspec list and grades the "
+     "push as bare against HEAD"),
+    (f"git -C {REPO} push origin -- -dash", reviewed(), True,
+     "`--` after the remote still ends the options"),
     (f"git -C {REPO} push --repo=origin main feature", reviewed(), True,
      "an attached option value does not swallow the following refspec"),
     # A review read `--repo` as making every positional a refspec, so that
@@ -604,13 +621,15 @@ def config_cases() -> tuple[int, int]:
         # matched through the resolver. `--al` ships every ref; recognising
         # only `--all` let it straight through. `--pu` is `--push-option`, so
         # an unresolved spelling also re-opened the `-o --repo=X` hole.
-        # These four carry a DELIBERATELY BENIGN config. With
-        # `remote.origin.push` set instead, every one of them denies through
-        # the config path whatever the option table does, and passes against a
-        # build with no resolver at all -- measured, three of four were vacuous
-        # that way. `branch.main.pushRemote` is the row above's own
-        # allow-expecting config, so a deny here can only come from the option
-        # tables.
+        # THREE of the four below carry a deliberately benign config
+        # (`branch.main.pushRemote`, the allow-expecting config from the row
+        # above), so their deny can only come from the option tables. With
+        # `remote.origin.push` set instead they denied through the config path
+        # whatever the option table did, and passed against a build with no
+        # resolver at all -- measured. The `--push-option` row is the
+        # exception: it KEEPS `remote.origin.push`, because that is the remote
+        # its abbreviation must resolve to, and it fails on the bit rather than
+        # the reason against a resolver-less build.
         ("an abbreviation of --all is still indeterminate",
          ["branch.main.pushRemote", "origin"],
          f"git -C {REPO} push --al origin", True, "does not name a single reviewable head"),

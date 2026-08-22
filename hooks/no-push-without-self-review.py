@@ -169,6 +169,12 @@ PUSH_OPTS_INDETERMINATE = {"--all", "--branches", "--mirror", "--tags",
 #   git push --pu --repo=other -> ALLOWED   (`--pu` IS `--push-option`)
 #
 # `--al` ships every ref. So an unresolved abbreviation is not a cosmetic gap.
+# Deliberately partial: it carries the options whose resolution CHANGES a
+# verdict, plus enough neighbours to make ambiguity match git's. `--ipv4` and
+# `--ipv6` are absent, which is safe only because they take no value -- an
+# unknown option is passed through, and a valueless one parses identically
+# either way. A future value-taking option added in a namespace this set does
+# not cover would diverge silently, so add it here when one appears.
 PUSH_LONG_OPTS = frozenset({
     "--all", "--atomic", "--branches", "--delete", "--dry-run", "--exec",
     "--follow-tags", "--force", "--force-if-includes", "--force-with-lease",
@@ -197,7 +203,9 @@ def resolve_long_opt(head: str):
     """
     if head in PUSH_LONG_OPTS:
         return head
-    negated = head.startswith("--no-") and head != "--no-verify"
+    # No `--no-verify` special case is needed here: it is in PUSH_LONG_OPTS,
+    # so the exact-match return above has already fired for it.
+    negated = head.startswith("--no-")
     stem = "--" + head[len("--no-"):] if negated else head
     if stem in PUSH_LONG_OPTS:
         return head
@@ -515,9 +523,21 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
     positionals: list[str] = []
     repo: str | None = None
     i = idx + 1
+    end_of_options = False
     while i < len(argv):
         tok = argv[i]
-        if tok.startswith("-") and tok != "-":
+        if not end_of_options and tok == "--":
+            # `--` ends the options, so every later token is a positional even
+            # when it starts with a dash. `refs/heads/-dash` is a valid ref
+            # name that `git check-ref-format` accepts and `git push -- origin
+            # -dash` really ships, so reading `-dash` as an unknown option left
+            # the refspec list empty and graded the command as a bare push
+            # against HEAD -- authorizing an unreviewed branch under a verdict
+            # naming the current one.
+            end_of_options = True
+            i += 1
+            continue
+        if not end_of_options and tok.startswith("-") and tok != "-":
             head, _, value = tok.partition("=")
             if head.startswith("--"):
                 head = resolve_long_opt(head)
@@ -663,7 +683,7 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
     except Exception:
         return None, "its arguments could not be parsed"
     if refspecs is None:
-        named = [t for t in argv if t.partition("=")[0] in PUSH_OPTS_INDETERMINATE
+        named = [t for t in argv if resolve_long_opt(t.partition("=")[0]) in PUSH_OPTS_INDETERMINATE
                  or t.partition("=")[0] == "--recurse-submodules"]
         which = f" ({', '.join('`' + t + '`' for t in named)})" if named else ""
         return None, ("this push does not name a single reviewable head" + which)

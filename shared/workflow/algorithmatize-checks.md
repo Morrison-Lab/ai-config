@@ -655,6 +655,53 @@ to count the case.**
 See [`algorithmatize-checks.cases.md`](algorithmatize-checks.cases.md),
 "A case labelled non-discriminating is a claim about the current clause set".
 
+## A required-subset assertion is not an inventory-pinning test
+
+A test that loops a hand-written table and asserts each entry is present in
+a production list looks like it pins that list.
+It pins only the table.
+Deleting a production entry the table never named leaves the suite green,
+because the assertion never reads what else the list holds --- it only
+confirms the named entries are present somewhere inside it.
+
+The overclaim usually sits in the docstring, since that is the sentence
+describing the test's *purpose* rather than what the assertion actually
+compares.
+"Pins the deny list" and "confirms every required rule is present" read as
+one claim, and only the second is what a subset assertion checks.
+The gap stays invisible until something is deleted, because a subset test
+cannot fail on an addition, and cannot fail on the deletion of anything
+except one of its own named members --- which a reviewer would have caught
+by inspection anyway, without needing the test at all.
+
+The fix is **set equality**, asserted in both directions: every required
+entry is present, and nothing present is unaccounted for by the table.
+The second direction is what turns the table from a sample into an
+inventory.
+A production rule added with no matching table entry now fails the suite
+immediately, instead of silently widening the gap between what the table
+claims to pin and what the list actually holds.
+
+- **Do:** assert set equality in both directions when a test's purpose is to
+  pin an inventory, not a `for x in required: assert x in actual` loop.
+- **Do:** treat a failure in the reverse direction --- a production entry the
+  table never named --- as a real finding, not as churn from a stale test.
+- **Don't:** read a docstring's claim to "pin the list" as evidence the
+  assertion does --- check what the assertion actually compares.
+- **Don't:** trust a subset test's green run as coverage evidence without
+  mutating an entry the table does not mention.
+
+(Morrison-Lab/gha#578, 2026-08-22: a regression test asserted
+`rule in --disallowedTools` for each of roughly two dozen entries in a
+hand-written table, with a docstring claiming to pin the production deny
+list.
+A reviewer deleted six entries the table never named
+--- `gh pr ready`, `gh release`, `gh label`, `gh run cancel`,
+`gh variable`, and `gh repo edit` --- and the suite stayed green.
+Switching to exact set equality in both directions immediately reported
+24 unpinned rules, and seven individual-entry deletions each turned the
+suite red on the next mutation pass.)
+
 ## Run new scheduled automation once, attended, before its first scheduled run
 
 Every section above is about building the instrument and testing its logic.

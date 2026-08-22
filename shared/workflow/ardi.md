@@ -207,6 +207,8 @@ your own conventions already covered".
 
 **Pause point: after committing, before `git push`.**
 
+- [ ] **A separate `adversarial-reviewer` subagent reviewed this diff and returned a clean verdict** --- dispatched in the foreground against `git diff origin/<default-branch>...HEAD`, briefed with the standards rather than with your rationale for the change, with every finding Addressed, Rebutted, or Deferred to a tracked issue, and re-dispatched after the last commit so its `Reviewed-Commit:` fingerprint names the commits the push would ship ([`adversarial-self-review`](adversarial-self-review.md)).
+  An inline pass under a reviewer framing does not satisfy this, and reads identically in the output --- the test is whether an `Agent` call was made.
 - [ ] **The whole test suite ran**, not the files you predicted the change
       touches, and the tests/failed/**skipped** triple was read --- a
       non-trivial skip count means re-running with the gating flags set
@@ -331,8 +333,7 @@ can wave both through.**
 conventions either, and the reviewer's own "not a finding" is where that
 shows up.**
 
-- **Do:** re-run the project-conventions check against your own diff after a
-  clean verdict, not only before the push.
+- **Do:** re-run the project-conventions check against your own diff after a clean verdict, not only before the push --- dispatched to the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent like any other self-review ([`adversarial-self-review`](adversarial-self-review.md)), rather than performed inline.
 - **Do:** read a reviewer's "observations" and "not a finding" items as
   candidate violations, and grep `CLAUDE.md` for whatever they discuss.
 - **Don't:** let a reasoned "belt-and-suspenders is fine" settle a question

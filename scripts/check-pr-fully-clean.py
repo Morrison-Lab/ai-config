@@ -298,15 +298,42 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
         issues.append(f"No check runs found for SHA {sha[:8]}")
         return False, issues
 
+    # A job name is not unique across workflows: two workflows in one repo can
+    # each define a job called `ubuntu-latest (release)`. Naming one alone is
+    # therefore ambiguous exactly when it matters, and the ambiguity is
+    # invisible in the rendered line, so nothing prompts the reader to check.
+    # Disambiguate the duplicated names with the run's own URL, which the
+    # payload already carries -- no extra API call.
+    seen = {}
+    for cr in check_runs:
+        seen[cr["name"]] = seen.get(cr["name"], 0) + 1
+    duplicated = {n for n, count in seen.items() if count > 1}
+
     for cr in check_runs:
         name = cr["name"]
         status = cr["status"]
         conclusion = cr.get("conclusion")
+        where = ""
+        if name in duplicated:
+            # `html_url` only. A check-suite id was tried as a fallback and
+            # dropped: it is a different numeric namespace from the workflow-run
+            # id that `gh run view` takes, so rendering it in the same slot
+            # points the reader at nothing. And `check_suite` is documented as
+            # `object or null`, so `.get("check_suite", {})` returns None on a
+            # real payload -- `.get()` substitutes only for an absent KEY, not a
+            # null VALUE -- and the AttributeError would exit 1, the status this
+            # repo reserves for "not clean". A payload quirk would then read as
+            # a PR regression. No annotation beats a wrong or fatal one.
+            url = cr.get("html_url")
+            where = f" ({url})" if url else ""
 
         if status != "completed":
-            issues.append(f"Check run '{name}' is still in status '{status}'")
+            issues.append(
+                f"Check run '{name}'{where} is still in status '{status}'")
         elif conclusion not in ("success", "neutral", "skipped"):
-            issues.append(f"Check run '{name}' completed with conclusion '{conclusion}'")
+            issues.append(
+                f"Check run '{name}'{where} completed with conclusion "
+                f"'{conclusion}'")
 
     return len(issues) == 0, issues
 

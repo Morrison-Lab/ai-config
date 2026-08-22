@@ -877,6 +877,55 @@ def main() -> int:
         ci_ok_fail, ci_issues_fail = checker.check_ci_runs("sha123", TEST_REPO)
         check("failed CI check run fails check_ci_runs", not ci_ok_fail and len(ci_issues_fail) == 1)
 
+    # A job name is not unique across workflows (#1869). The live case:
+    # ucdavis/bcs has `ubuntu-latest (release)` in BOTH R-CMD-check.yaml and
+    # check-readme, and a passing check-readme job was nearly read as the
+    # R CMD check having passed while its matrix had not started.
+    mock_ci_dupe = json.dumps({
+        "check_runs": [
+            {"name": "ubuntu-latest (release)", "status": "completed",
+             "conclusion": "success",
+             "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+            {"name": "ubuntu-latest (release)", "status": "in_progress",
+             "conclusion": None,
+             "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+            {"name": "unique-job", "status": "in_progress", "conclusion": None,
+             "html_url": "https://github.com/o/r/actions/runs/3/job/3"},
+        ]
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_ci_dupe):
+        dupe_ok, dupe_issues = checker.check_ci_runs("sha123", TEST_REPO)
+    joined = " | ".join(dupe_issues)
+    check(
+        "a duplicated check-run name is disambiguated by its run URL",
+        not dupe_ok
+        and "runs/2/job/2" in joined
+        and "ubuntu-latest (release)" in joined,
+    )
+    # A duplicated name with no usable URL must degrade to no annotation, not
+    # crash. `check_suite` is documented as `object or null`, and an unhandled
+    # AttributeError here would exit 1 -- the status reserved for "not clean" --
+    # so a payload quirk would read as a PR regression (#1870 review round 1).
+    mock_ci_nourl = json.dumps({
+        "check_runs": [
+            {"name": "dupe", "status": "in_progress", "conclusion": None,
+             "html_url": None, "check_suite": None},
+            {"name": "dupe", "status": "completed", "conclusion": "success",
+             "html_url": None, "check_suite": None},
+        ]
+    })
+    with patch.object(checker, "run_cmd", return_value=mock_ci_nourl):
+        nourl_ok, nourl_issues = checker.check_ci_runs("sha123", TEST_REPO)
+    check(
+        "a duplicated name with a null html_url and null check_suite does not crash",
+        not nourl_ok and nourl_issues == ["Check run 'dupe' is still in status 'in_progress'"],
+    )
+
+    check(
+        "a unique check-run name is left unannotated",
+        any(i.startswith("Check run 'unique-job' is still") for i in dupe_issues),
+    )
+
     # Test 7: the repository is threaded, not hardcoded (#1243, #1338, #1346, #1391)
     #
     # Every case below asserts on the argv the script BUILDS, because that is

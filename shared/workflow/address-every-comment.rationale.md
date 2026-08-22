@@ -204,6 +204,34 @@ criterion, not only for the word or contradiction that exposed it.
 The exposing detail usually appears once; the criterion is what got copied
 around.
 
+**That same search settles a narrower question about placement: a correction
+written NEAR the flagged sentence reads as having replaced it, while the
+flagged sentence survives and the file then states both.**
+The natural fix for a false claim a reviewer named is to write the accurate
+version close by --- a disclaimer above it, a qualifying clause after it.
+That feels like correcting the flagged sentence.
+The flagged sentence is untouched, though, so the file now states both, and a
+reader who reaches the older one gets the false claim back with nothing
+marking it as superseded.
+
+This is the review-response instance of
+[fact-check-prose's insertion rule](../writing/fact-check-prose.md#an-insertion-asserts-something-about-the-whole-file-not-just-the-added-lines):
+not a distant sentence the author never noticed, but the very sentence the
+reviewer just named.
+
+It can survive a self-check, because the obvious check asks the wrong
+question.
+Confirming that the new, true sentence is present answers "did I write
+something accurate", which a self-contradicting file answers yes to.
+The check that can fail is the one the section above already prescribes ---
+search for the claim rather than for the symptom --- run against the flagged
+wording itself.
+
+A commit message claiming to have "dropped" the false claim is a checkable
+claim in its own right.
+Read the diff for a deletion of that line, rather than for an addition beside
+unchanged text.
+
 **When the wrong thing is a figure, the unit of repair is the figure --- across
 every artifact carrying the twin, not just the diff.**
 The rules above all scope the search to the diff, or to the same file.

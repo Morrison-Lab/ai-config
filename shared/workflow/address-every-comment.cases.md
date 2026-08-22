@@ -716,3 +716,17 @@ a lifecycle you personally drove is not a record, and the ordering is the
 part that memory reshapes, because the fixes feel simultaneous in a way the
 commits are not.
 Reconstruct the sequence from the commit list before writing it down.)
+
+## A correction added beside the flagged sentence, which survived
+
+(Morrison-Lab/gha#578, 2026-08-21, review round 2: a source comment overstated
+that "the checkout under review stays untouched".
+Round 1 had flagged the surrounding block for other reasons.
+The fix added an accurate disclaimer a few lines above the overstated
+sentence --- "guard rails, NOT a security boundary ... writes wherever the
+runner account can" --- and left the overstated sentence itself standing.
+Round 2 caught the resulting self-contradiction, and noted that the commit
+message's claim to have "drop[ped] the false boundary claim" was only half
+true: the claim was contradicted, not dropped.
+The eventual fix deleted the overstated sentence outright, and the next
+round's grep for its wording returned nothing.)

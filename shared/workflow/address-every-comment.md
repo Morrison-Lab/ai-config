@@ -181,6 +181,24 @@ already in front of you.**
 - **Don't:** accept a search for the visible contradiction as proof that the
   retired claim itself is gone.
 
+**That same search settles a narrower question about placement: a correction
+written NEAR the flagged sentence reads as having replaced it, while the
+flagged sentence survives and the file then states both.**
+Edit the sentence the reviewer named, and use the search above --- for the
+claim, not for the symptom --- to confirm that wording is gone.
+
+- **Do:** delete or rewrite the flagged sentence itself, rather than adding a
+  truer one beside it.
+- **Do:** mark superseded text as superseded, explicitly, where it is worth
+  keeping as a record of why something was done.
+- **Don't:** read "the file now contains a true sentence" as having addressed
+  a finding about a false one.
+- **Don't:** let a commit message assert a deletion that the diff shows as an
+  addition beside unchanged text.
+
+See [`address-every-comment.cases.md`](address-every-comment.cases.md),
+"A correction added beside the flagged sentence, which survived".
+
 **When the wrong thing is a figure, the unit of repair is the figure --- across
 every artifact carrying the twin, not just the diff.**
 
@@ -266,56 +284,6 @@ the copy git keeps and the copy nobody verified.**
 - **Don't:** treat "permanent in history" as settled while the PR is
   unmerged --- `git commit --amend` still works, and is usually worth a fresh
   CI round against a wrong figure reaching `main`.
-
-**Correcting a flagged false claim means removing it, not adding a truer
-sentence beside it.**
-The natural fix for a false claim a reviewer named is to write the accurate
-version near it --- a disclaimer above, a qualifying clause after.
-That feels like correcting the wrong sentence.
-It has not: the file now states both, and a reader who reaches the older
-sentence gets the false claim back, with nothing marking it as superseded.
-This is the review-response instance of
-[fact-check-prose's insertion rule](../writing/fact-check-prose.md#an-insertion-asserts-something-about-the-whole-file-not-just-the-added-lines):
-not a distant, unrelated sentence the author never noticed, but the very
-sentence the reviewer just named.
-
-This survives review because the check that would catch it asks the wrong
-question.
-Confirming the new, true sentence is present answers "did I write something
-accurate", which a self-contradicting file answers yes to.
-The check that can actually fail is the narrower one: grep the file for the
-**original** wording, and require zero hits.
-
-Where the old sentence is worth keeping as a record of why something was
-done, keep it, but mark it explicitly as superseded rather than letting the
-newer text imply a correction it never performed.
-A commit message claiming to have "dropped" the false claim is itself a
-checkable claim --- read the diff for a deletion of that line, not an
-addition beside unchanged text.
-
-- **Do:** delete or rewrite the flagged sentence itself, rather than adding a
-  correction nearby that leaves it standing.
-- **Do:** grep the file for the original wording after the fix, and require
-  zero hits --- confirming the new wording is present is a different, weaker
-  check.
-- **Do:** mark superseded text as superseded, explicitly, when it is worth
-  keeping as history.
-- **Don't:** read "the file now contains a true sentence" as having addressed
-  a finding about a false one.
-- **Don't:** let a commit message assert a deletion that the diff shows as an
-  addition beside unchanged text.
-
-(Morrison-Lab/gha#578, 2026-08-22, review round 2: a source comment overstated
-that "the checkout under review stays untouched."
-Round 1 flagged the block for other reasons.
-The fix added an accurate disclaimer a few lines above the overstated
-sentence --- "guard rails, NOT a security boundary ... writes wherever the
-runner account can" --- and left the overstated sentence itself standing.
-Round 2 caught the resulting self-contradiction and noted that the commit
-message's claim to have "drop[ped] the false boundary claim" was only half
-true: it was contradicted, not dropped.
-The actual fix deleted the sentence outright, and the next round's grep for
-the phrase returned nothing.)
 
 **A corollary for checking any of this in a semantic-line-break corpus: a
 single-line `grep` returns false negatives on your own prose.**

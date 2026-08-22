@@ -1031,6 +1031,38 @@ is the moment to look.
 Re-run the matrix over the cases previously labelled non-discriminating, and
 rewrite every label the new matrix falsifies.
 
+## A required-subset assertion is not an inventory-pinning test
+
+**A test that loops a hand-written table and asserts each entry is present in
+a production list looks like it pins that list.**
+It pins only the listed entries as a required subset of the production
+collection.
+The assertion never reads what else that collection holds, so it confirms the
+named entries are present somewhere inside it and nothing more.
+
+The overclaim usually sits in the docstring, since that is the sentence
+describing the test's *purpose* rather than what the assertion compares.
+"Pins the deny list" and "confirms every required rule is present" read as one
+claim, and only the second is what a subset assertion checks.
+The gap stays invisible until something is deleted, because a subset assertion
+cannot fail on an addition, and cannot fail on the deletion of anything except
+one of its own named members.
+
+Set equality, asserted in both directions, is the fix where the test's purpose
+is to pin an inventory: every required entry is present, and nothing present
+is unaccounted for by the table.
+The second direction is what turns the table from a sample into an inventory.
+A production entry added with no matching table entry then fails the suite
+immediately, rather than silently widening the gap between what the table
+claims to pin and what the collection actually holds.
+
+That qualifier is doing work.
+A subset assertion is the right shape for a test that deliberately samples ---
+a few representative entries whose presence matters, over a collection
+expected to grow.
+The defect is a sampling assertion described as an inventory one, not the
+assertion form itself.
+
 ## Limits
 
 The rule targets *decidable* checks. Judgments of legibility, intent,

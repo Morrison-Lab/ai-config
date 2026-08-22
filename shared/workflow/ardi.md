@@ -207,10 +207,8 @@ your own conventions already covered".
 
 **Pause point: after committing, before `git push`.**
 
-- [ ] **Local adversarial self-review ran and achieved a clean verdict**
-      (`### Verdict: Ready for merge`) using the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)
-      subagent against `git diff origin/main...HEAD`, with every defect,
-      factual error, or convention violation addressed before pushing.
+- [ ] **A separate `adversarial-reviewer` subagent reviewed this diff and returned a clean verdict** --- dispatched in the foreground against `git diff origin/<default-branch>...HEAD`, briefed with the standards rather than with your rationale for the change, with every finding Addressed, Rebutted, or Deferred to a tracked issue, and re-dispatched after the last edit so the verdict describes the tree being pushed ([`adversarial-self-review`](adversarial-self-review.md)).
+  An inline pass under a reviewer framing does not satisfy this, and reads identically in the output --- the test is whether an `Agent` call was made.
 - [ ] **The whole test suite ran**, not the files you predicted the change
       touches, and the tests/failed/**skipped** triple was read --- a
       non-trivial skip count means re-running with the gating flags set

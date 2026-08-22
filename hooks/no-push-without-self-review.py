@@ -5,6 +5,37 @@ Enforces that an AI agent runs local self-review using an adversarial reviewer
 subagent (`adversarial-reviewer`) and obtains a clean verdict (`Ready for merge`)
 before pushing to remote.
 
+WHY THE VERDICT SCAN IS ID-SCOPED RATHER THAN A TRANSCRIPT-WIDE PHRASE SEARCH
+----------------------------------------------------------------------------
+An earlier revision scanned every text/tool_result block in the transcript for
+the verdict phrase. That is unfixable by tuning, for the reason
+`no-handrolled-verdict-parse.py` already documents (ai-config#1297): verdict
+vocabulary is quoted constantly by the very corpus that defines it, so a phrase
+search cannot separate a verdict from a citation of one. Here it was worse than
+unsound -- it was self-defeating. This guard's own denial message names the
+phrase it looks for, a `PreToolUse` deny reason is surfaced back into the
+transcript as the blocked call's result, and so one blocked push authorized
+every retry after it. Reading `CLAUDE.md`, `skills/push/SKILL.md`, or this
+hook's own persona file did the same thing, since each read is a `tool_result`
+block carrying the phrase.
+
+So a verdict counts only when it arrives as the `tool_result` of an `Agent`
+call whose `subagent_type` IS the reviewer -- matched on that field alone,
+never on the call's free-text prompt. That is a structural tie between the
+permission and the reviewer's own output, and it is what makes the phrase in
+the denial message below harmless rather than load-bearing.
+
+CONSEQUENCE FOR HOW THE REVIEWER IS DISPATCHED
+----------------------------------------------
+A background dispatch returns an agent id rather than a report, so its verdict
+never becomes that call's `tool_result` and this guard cannot see it. Dispatch
+the reviewer in the foreground (`run_in_background: false`), which is correct
+anyway: the push is waiting on the answer.
+
+A clean verdict also goes stale. A file edit recorded after it describes a tree
+the reviewer never read, so the guard requires the clean verdict to be the last
+of the two.
+
 Authorized overrides:
 - `ALLOW_UNREVIEWED_PUSH=1` (env assignment prefix)
 - `--allow-unreviewed-push` (flag outside quotes)
@@ -15,7 +46,6 @@ import json
 import os
 import re
 import sys
-from pathlib import Path
 
 CMD_POS = r"""(?:^|[;&`(\n]|\$\()\s*"""
 KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until)\s+){0,4}"""
@@ -34,18 +64,28 @@ ALLOW_ENV_FLAG = re.compile(
 )
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 
-CLEAN_VERDICT = re.compile(
-    r"(?:###\s*Verdict|Verdict):\s*(?:\*\*)?Ready for merge\b",
+# One pattern for BOTH verdicts, so a body carrying more than one is read
+# left-to-right and the LAST one wins. Two separate searches cannot order their
+# matches against each other, which is how a review that opens by quoting the
+# blocking verdict it is superseding gets read as blocking.
+VERDICT = re.compile(
+    r"(?:###\s*Verdict|Verdict):\s*(?:\*\*)?(Ready for merge|Needs (?:more )?work)\b",
     re.I,
 )
-BLOCKING_VERDICT = re.compile(
-    r"(?:###\s*Verdict|Verdict):\s*(?:\*\*)?Needs (?:more )?work\b",
-    re.I,
-)
-ADVERSARIAL_AGENT_NAME = re.compile(
-    r"\b(?:adversarial|oppositional)(?:-reviewer)?\b",
-    re.I,
-)
+
+# Matched against an Agent/Task call's `subagent_type` ONLY. The earlier
+# revision also matched the call's free-text `prompt`, which any prompt
+# containing the word "adversarial" satisfied -- including a prompt asking some
+# other agent to do something else entirely.
+ADVERSARIAL_AGENT_NAME = re.compile(r"\A\s*adversarial[-_ ]?reviewer\s*\Z", re.I)
+
+# Tool names that dispatch a subagent.
+AGENT_TOOLS = {"agent", "task", "invoke_subagent"}
+
+# Tool names that change a file in the working tree. A clean verdict recorded
+# BEFORE one of these describes a tree the reviewer never read.
+EDIT_TOOLS = {"edit", "write", "multiedit", "notebookedit", "applypatch",
+              "str_replace_editor", "str_replace_based_edit_tool"}
 
 
 def unquote_words(text: str) -> str:
@@ -211,16 +251,63 @@ def has_git_push(command: str) -> bool:
     return False
 
 
+def _result_text(block: dict) -> str:
+    """Flatten a tool_result block's payload into one searchable string.
+
+    A subagent's report arrives as `content`, which is a plain string in some
+    transports and a list of content blocks in others. Reading only one shape
+    silently returns "" for the other, and an empty string is indistinguishable
+    from a report that stated no verdict.
+    """
+    parts: list[str] = []
+    content = block.get("content")
+    if isinstance(content, str):
+        parts.append(content)
+    elif isinstance(content, list):
+        for sub in content:
+            if isinstance(sub, str):
+                parts.append(sub)
+            elif isinstance(sub, dict):
+                parts.append(str(sub.get("text") or sub.get("content") or ""))
+    for key in ("output", "text"):
+        val = block.get(key)
+        if isinstance(val, str):
+            parts.append(val)
+    return "\n".join(p for p in parts if p)
+
+
+def _iter_blocks(record: dict):
+    if isinstance(record.get("message"), dict):
+        blocks = record["message"].get("content") or []
+    else:
+        blocks = record.get("content")
+        if isinstance(blocks, str):
+            blocks = [{"type": "text", "text": blocks}]
+        elif not isinstance(blocks, list):
+            blocks = []
+    for b in blocks:
+        if isinstance(b, dict):
+            yield b
+
+
 def verify_transcript_review_status(transcript_path: str) -> tuple[bool, str]:
-    """Check if transcript records a local adversarial self-review with a clean verdict.
+    """Decide whether the transcript records a CURRENT clean adversarial review.
+
+    A verdict is admitted only from the `tool_result` of an `Agent` call whose
+    `subagent_type` is the adversarial reviewer -- see this module's docstring
+    for why a transcript-wide phrase search cannot work here.
 
     Returns (is_clean, reason).
     """
     if not transcript_path or not os.path.exists(transcript_path):
         return False, "No transcript available to verify local adversarial self-review."
 
-    has_agent_invocation = False
-    latest_verdict = None  # None, 'clean', or 'needs_work'
+    reviewer_call_ids: set[str] = set()
+    saw_reviewer_call = False
+    verdict: str | None = None          # None | "clean" | "needs_work"
+    verdict_seq = -1
+    last_edit_seq = -1
+    seq = 0
 
     try:
         with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -232,54 +319,74 @@ def verify_transcript_review_status(transcript_path: str) -> tuple[bool, str]:
                     record = json.loads(line)
                 except Exception:
                     continue
+                if not isinstance(record, dict):
+                    continue
 
-                blocks = []
-                if "message" in record and isinstance(record["message"], dict):
-                    blocks.extend(record["message"].get("content") or [])
-                elif "content" in record:
-                    content = record.get("content")
-                    if isinstance(content, list):
-                        blocks.extend(content)
-                    elif isinstance(content, str):
-                        blocks.append({"type": "text", "text": content})
-
-                for b in blocks:
-                    if not isinstance(b, dict):
-                        continue
+                seq += 1
+                for b in _iter_blocks(record):
                     b_type = b.get("type")
+
                     if b_type == "tool_use":
                         name = (b.get("name") or "").lower()
-                        inp = b.get("input") or {}
-                        if name in ("agent", "task", "invoke_subagent"):
-                            sub_type = str(inp.get("subagent_type") or inp.get("TypeName") or inp.get("Role") or "")
-                            prompt = str(inp.get("prompt") or inp.get("Prompt") or inp.get("description") or "")
-                            if ADVERSARIAL_AGENT_NAME.search(sub_type) or ADVERSARIAL_AGENT_NAME.search(prompt):
-                                has_agent_invocation = True
-                    elif b_type in ("tool_result", "text"):
-                        text = str(b.get("content") or b.get("output") or b.get("text") or "")
-                        if CLEAN_VERDICT.search(text):
-                            latest_verdict = "clean"
-                        elif BLOCKING_VERDICT.search(text):
-                            latest_verdict = "needs_work"
+                        if name in AGENT_TOOLS:
+                            inp = b.get("input") or {}
+                            sub_type = str(
+                                inp.get("subagent_type")
+                                or inp.get("subagentType")
+                                or inp.get("agent_type")
+                                or ""
+                            )
+                            if ADVERSARIAL_AGENT_NAME.match(sub_type):
+                                saw_reviewer_call = True
+                                call_id = b.get("id")
+                                if isinstance(call_id, str) and call_id:
+                                    reviewer_call_ids.add(call_id)
+                        elif name in EDIT_TOOLS:
+                            last_edit_seq = seq
+
+                    elif b_type == "tool_result":
+                        if b.get("tool_use_id") not in reviewer_call_ids:
+                            continue
+                        found = VERDICT.findall(_result_text(b))
+                        if found:
+                            verdict = (
+                                "clean"
+                                if found[-1].lower().startswith("ready")
+                                else "needs_work"
+                            )
+                            verdict_seq = seq
     except Exception as e:
         return False, f"Failed reading transcript: {e}"
 
-    if not has_agent_invocation and latest_verdict != "clean":
+    if not saw_reviewer_call:
         return False, (
-            "No local adversarial self-review pass found in transcript.\n"
-            "Run an adversarial self-review with the `adversarial-reviewer` subagent on your diff before pushing."
+            "No `adversarial-reviewer` subagent was dispatched in this session.\n"
+            "Dispatch it against your diff and address its findings before pushing."
         )
 
-    if latest_verdict == "needs_work":
+    if verdict is None:
         return False, (
-            "The latest local adversarial self-review produced a 'Needs more work' verdict.\n"
-            "Address or rebut all findings and achieve a 'Ready for merge' verdict before pushing."
+            "An `adversarial-reviewer` subagent was dispatched, but no verdict came "
+            "back as that call's result.\n"
+            "Dispatch it in the foreground (`run_in_background: false`) so its report "
+            "returns as the tool result -- a background dispatch returns an agent id, "
+            "which carries no verdict."
         )
 
-    if latest_verdict == "clean" or has_agent_invocation:
-        return True, "Clean local self-review verified."
+    if verdict == "needs_work":
+        return False, (
+            "The latest adversarial self-review returned a blocking verdict.\n"
+            "Address, rebut, or defer every finding and obtain a clean verdict before pushing."
+        )
 
-    return False, "Local self-review has not completed with a clean verdict."
+    if last_edit_seq > verdict_seq:
+        return False, (
+            "The clean adversarial self-review is stale: a file was edited after it.\n"
+            "Re-dispatch `adversarial-reviewer` against the current diff, so the verdict "
+            "describes the tree you are about to push."
+        )
+
+    return True, "Clean adversarial self-review verified against the current tree."
 
 
 def main() -> int:
@@ -307,11 +414,14 @@ def main() -> int:
                 "permissionDecision": "deny",
                 "permissionDecisionReason": (
                     f"git push blocked by pre-push self-review policy:\n{reason}\n\n"
-                    "Standing rule: Run self-review locally using the `adversarial-reviewer` subagent "
-                    "against `git diff origin/main...HEAD` and obtain a clean verdict (`### Verdict: Ready for merge`) "
-                    "before pushing.\n\n"
-                    "If you are pushing an initial empty PR branch (per pr-on-claim) or need an emergency override, "
-                    "prefix the command with `ALLOW_UNREVIEWED_PUSH=1`."
+                    "Standing rule: every self-review is an adversarial review by a separate "
+                    "subagent. Dispatch `adversarial-reviewer` (foreground) against "
+                    "`git diff origin/<default-branch>...HEAD`, address or rebut every finding, "
+                    "and obtain its clean verdict before pushing.\n\n"
+                    "Only that subagent's own result counts -- this message does not, and neither "
+                    "does reading a file that quotes a verdict.\n\n"
+                    "If you are pushing an initial empty PR branch (per pr-on-claim) or need an "
+                    "emergency override, prefix the command with `ALLOW_UNREVIEWED_PUSH=1`."
                 ),
             }
         }))

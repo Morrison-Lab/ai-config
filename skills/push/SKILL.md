@@ -30,21 +30,17 @@ check in that case.
 Run these in order. Stop at the first one that fires and ask the user (see
 [Asking for guidance](#asking-for-guidance)).
 
-### 0. Local adversarial self-review clean verdict
+### 0. A separate subagent reviewed this diff and cleared it
 
-Before pushing changes to a remote branch, run an adversarial self-review on your diff
-(using the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent)
-against `git diff origin/main...HEAD`.
-Confirm that the review output concludes with a clean verdict:
+Before pushing, dispatch the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent against `git diff origin/<default-branch>...HEAD` and wait for its verdict.
+Dispatch it in the **foreground** --- a background dispatch returns an agent id rather than a report, and you are waiting on the answer anyway.
+Brief it with the base ref, the paths, and the standards that apply; never with your rationale for the change, per [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
 
-```text
-### Verdict: Ready for merge
-```
+Address, rebut, or defer every finding it returns, then re-dispatch it, so the clean verdict describes the tree you are about to push rather than an earlier one.
 
-All findings must be addressed or rebutted before pushing.
-Pushing code without running a local self-review that achieves a clean verdict is mechanistically
-blocked by `hooks/no-push-without-self-review.py` (unless explicitly overridden with `ALLOW_UNREVIEWED_PUSH=1`,
-such as when pushing an initial empty PR branch under `pr-on-claim`).
+`hooks/no-push-without-self-review.py` gates this.
+It admits a verdict only from that subagent's own call result, and only while no file edit has been recorded since --- so an inline pass under a reviewer framing, a quoted verdict, and a stale verdict all fail to satisfy it.
+Override with `ALLOW_UNREVIEWED_PUSH=1` when the push carries nothing to review: the initial empty PR branch under [`pr-on-claim`](../../shared/workflow/pr-on-claim.md), or an emergency.
 
 ### 1. Protected branch
 

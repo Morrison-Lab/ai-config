@@ -109,7 +109,8 @@ Don't treat the review bot as the mechanism that discovers a project's documente
 When a project's own `CLAUDE.md` (or equivalent agent doc) already states specific criteria --- a DRY/no-duplication rule, a doc-sync checklist for a new input, a changelog-category rule, a citation requirement, a "new logic needs test coverage" norm, a prose-quality check like `fact-check-prose`, `fix-forward-references`, or `detect-informal-definitions` --- a first-pass implementation checked only against feature correctness forces the review loop to spend a round re-deriving what the project's own docs already said.
 Before every push, brief the reviewer with the project's own stated review criteria and have it actually invoke the review skills/checks those name against the diff (not just recall them from memory), the same way an external reviewer would apply them.
 That pass is dispatched to a separate [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent rather than performed inline, per [`adversarial-self-review`](adversarial-self-review.md) --- the session that wrote the diff reads it already knowing what it meant, so its own pass confirms rather than reviews.
-Address every finding that pass surfaces --- fix, rebut, or defer, exactly like the ARD step above --- before the push goes out; a self-review that finds issues and pushes anyway has only moved the round to the external reviewer instead of skipping it.
+Address every finding that pass surfaces --- fix, rebut, or defer, exactly like the ARD step above --- before the push goes out.
+A self-review that finds issues and pushes anyway has only moved the round to the external reviewer instead of skipping it.
 Repeat until the dispatched pass comes back clean, then push.
 
 ## Pre-push checklist

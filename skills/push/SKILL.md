@@ -34,7 +34,8 @@ Run these in order. Stop at the first one that fires and ask the user (see
 
 Before pushing, dispatch the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) subagent against `git diff origin/<default-branch>...HEAD` and wait for its verdict.
 Dispatch it in the **foreground** --- a background dispatch returns an agent id rather than a report, and you are waiting on the answer anyway.
-Brief it with the base ref, the paths, and the standards that apply; never with your rationale for the change, per [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
+Brief it with the base ref, the paths, and the standards that apply.
+Never brief it with your rationale for the change, per [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
 
 Address, rebut, or defer every finding it returns, then re-dispatch it, so the clean verdict describes the tree you are about to push rather than an earlier one.
 

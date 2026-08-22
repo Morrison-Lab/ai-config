@@ -61,6 +61,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 State the verdict on its own line in that exact form --- the pre-push guard reads your call's result for it, and treats anything else as no verdict.
 
 You have no Edit or Write access, so you cannot apply a correction, and you must not use `Bash` to work around that.
-`Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`); do not run anything that writes, moves, or deletes a file, pushes, or posts.
+`Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).
+Do not run anything that writes, moves, or deletes a file, pushes, or posts.
 Staying read-only on that side is instruction-level discipline rather than a harness guarantee, so it is on you.
 Report; the authoring session Addresses, Rebuts, or Defers each finding.

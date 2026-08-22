@@ -91,4 +91,5 @@ The other cases have no guard and are prose rules here.
 - **Do:** chase a cross-vendor reviewer on top of it wherever one is reachable.
 - **Don't:** perform a self-review inline under a reviewer framing --- that is the move this rule replaces, and it is indistinguishable from compliance in the output.
 - **Don't:** brief the reviewer with the rationale for the change.
-- **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires; it is a self-review, performed properly.
+- **Don't:** count a subagent's clean verdict as the external verdict [`fully-clean`](fully-clean.md) requires.
+  It is a self-review, performed properly.

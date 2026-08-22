@@ -70,7 +70,8 @@ See [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pus
 - **Read the remote branch fresh, every time.**
   Run `git ls-remote --heads origin <branch>` immediately before every `git push` --- read-only, so it cannot itself change what it reports.
   An earlier `git fetch` is a measurement of a moment that has passed.
-  If the remote tip is not an ancestor of your `HEAD`, another agent is driving the branch: fetch and reconcile, never overwrite.
+  If the remote tip is not an ancestor of the ref you are **pushing**, another agent is driving the branch: fetch and reconcile, never overwrite.
+  That ref is `HEAD` only when the refspec says so --- `git push origin feature-x` from `main` pushes local `feature-x`, and comparing against `HEAD` goes quiet in exactly the dangerous case.
 - **The branch you own is the one to check hardest.**
   Ownership is what suppresses the check.
   The `@claude` agent pushes to your branch on PR activity, a second CLI session can claim the same PR, and a human can push at any time --- none of which appears in your conversation.

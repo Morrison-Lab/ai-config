@@ -183,6 +183,45 @@ def repo_option_case(path, bare):
     return "git push --repo upstream HEAD"
 
 
+def named_branch_case(path, bare):
+    """`git push origin feature-x` while `main` is checked out pushes local
+    `feature-x`, not HEAD.
+
+    The remote's `feature-x` is forced to a commit that IS an ancestor of local
+    `main` while local `feature-x` genuinely diverges from it. Resolving the
+    local side as HEAD read that as a fast-forward and stayed silent -- a false
+    negative in the exact situation this guard exists for.
+    """
+    # main advances to a commit the remote feature-x will also carry.
+    _commit(path, "shared.txt", "shared\n")
+    _run(path, "push", "-q", "origin", "main")
+    # feature-x branches off the ORIGINAL base and diverges independently.
+    _run(path, "checkout", "-q", "-b", "feature-x", "HEAD~1")
+    _commit(path, "mine-fx.txt", "mine\n")
+    _run(path, "push", "-q", "origin", "feature-x")
+    # The remote's feature-x is moved onto main's tip; local feature-x is not.
+    _run(path, "push", "-q", "-f", "origin", "main:feature-x")
+    _run(path, "checkout", "-q", "main")
+    return "git push origin feature-x"
+
+
+def named_branch_source_missing_case(path, bare):
+    """The source ref exists on the REMOTE and diverges, but does not resolve
+    locally -- so there is nothing to compare and the guard declines rather
+    than silently substituting HEAD.
+
+    The remote half matters: without it the `ls-remote` read comes back empty
+    and the case would pass for the wrong reason.
+    """
+    _run(path, "checkout", "-q", "-b", "theirs-only")
+    _commit(path, "theirs-only.txt", "theirs\n")
+    _run(path, "push", "-q", "origin", "theirs-only")
+    _run(path, "checkout", "-q", "main")
+    _run(path, "branch", "-q", "-D", "theirs-only")
+    _local_advances(path)
+    return "git push origin theirs-only"
+
+
 def value_cluster_remote_case(path, bare):
     """`-uo ci.skip upstream HEAD`: `o` eats `ci.skip`, so the remote is
     `upstream`. Without that, `ci.skip` is read as the remote and the reading
@@ -335,6 +374,9 @@ SHOULD_WARN = [
      "`--repo upstream` names the remote, not a value to skip"),
     ("W5", value_cluster_remote_case,
      "`-uo ci.skip upstream` -- `o` eats `ci.skip`, so `upstream` is the remote"),
+    ("W6", named_branch_case,
+     "`git push origin feature-x` from `main` compares against local "
+     "`feature-x`, not HEAD"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -355,6 +397,9 @@ SHOULD_STAY_SILENT = [
     ("S14", wildcard_refspec_case, "a wildcard refspec names no one branch"),
     ("S15", unknown_cluster_case,
      "an unrecognized short cluster -- decline rather than guess a remote"),
+    ("S16", named_branch_source_missing_case,
+     "the pushed source ref does not resolve locally -- decline, don't fall "
+     "back to HEAD"),
 ]
 
 
@@ -510,19 +555,16 @@ MUTATIONS = {
         [('    "--branches": "refset",   # `git push -h`: "alias of --all"', "")],
         {"S12"},
     ),
-    "deletion_refspec": (
-        "a refspec with an empty source is a deletion",
-        [('    if spec.startswith(":"):\n'
-          "        return None, None  # `git push origin :main` is a deletion",
-          "    pass")],
-        {"S13"},
-    ),
-    "wildcard_refspec": (
-        "a wildcard refspec names no single branch",
-        [('    if "*" in dst or dst == "":\n'
-          "        return None, None  # wildcard or empty; not one branch",
-          "    pass")],
-        {"S14"},
+    "local_is_the_source_ref": (
+        "the local side of the comparison is the ref being PUSHED, not HEAD",
+        [('        local = _git(["rev-parse", "--verify", "--quiet", '
+          'source + "^{commit}"],\n'
+          "                     timeout=5)",
+          '        local = _git(["rev-parse", "HEAD"], timeout=5)')],
+        # Also covers the deletion and wildcard refspecs: this one read is
+        # what declines them, so reverting it makes both warn about the
+        # currently checked-out branch instead.
+        {"W6", "S16", "S13", "S14"},
     ),
     "ancestor_gate": (
         "a remote tip that IS an ancestor of HEAD is a fast-forward and "

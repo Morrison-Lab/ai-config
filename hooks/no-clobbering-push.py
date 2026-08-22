@@ -88,8 +88,10 @@ can turns on one thing worth distinguishing in the report:
   M4  it is not a `--delete` / `-d` push (branch deletion is
       `skills/clean-branches`' territory, not this guard's)
 
-Deny additionally requires a `--force` or `-f` token with no
-`--force-with-lease` beside it and no `ALLOW_FORCE_PUSH=1` prefix.
+Deny additionally requires a `--force` or `-f` token and no
+`ALLOW_FORCE_PUSH=1` prefix. It deliberately does NOT look at
+`--force-with-lease`, for the reason given above: `--force` disables the lease
+check, so the pair is a plain force push.
 
 `--mirror` and `--all` are deliberately out of scope: they push ref sets rather
 than one branch, so the single-branch reading below would misdescribe them.
@@ -286,14 +288,23 @@ def _git(args, timeout=8):
 
 
 def _target(positionals, repo_opt):
-    """`(remote, branch)` the push is aimed at, or `(None, None)`.
+    """`(remote, branch, source)` the push is aimed at, or `(None, None, None)`.
 
     Handles the shapes that occur: a bare `git push`, `git push origin`,
-    `git push origin HEAD`, `git push -u origin HEAD`, `git push origin
-    HEAD:branch`, a leading `+`, and `--repo <repository>`.
+    `git push origin HEAD`, `git push origin <branch>`, `git push -u origin
+    HEAD`, `git push origin HEAD:branch`, a leading `+`, and `--repo
+    <repository>`.
 
-    Returns `(None, None)` rather than a guess whenever the destination is not
-    a single named branch --- a wildcard refspec, a deletion refspec, or a
+    `source` is the LOCAL ref being pushed, and it is not always `HEAD`.
+    `git push origin feature-x` run while `main` is checked out pushes local
+    `feature-x`, so comparing the remote tip against `HEAD` compares it against
+    the wrong branch -- silently, and in both directions: a remote commit that
+    happens to be an ancestor of `main` reads as a fast-forward while local
+    `feature-x` genuinely diverges, which is a false negative in the exact
+    situation this guard exists for.
+
+    Returns all-`None` rather than a guess whenever the destination is not a
+    single named branch --- a wildcard refspec, a deletion refspec, or a
     detached HEAD with nothing to name. A wrong branch here would send
     `ls-remote` at the wrong ref and report on something the push never
     touches, which is worse than reporting nothing.
@@ -320,21 +331,20 @@ def _target(positionals, repo_opt):
                 remote = up.strip()
 
     if not specs:
-        return remote, head
+        return remote, head, "HEAD"
     if len(specs) > 1:
-        return None, None  # several refspecs; no single branch to report on
+        return None, None, None  # several refspecs; no single branch
 
     spec = specs[0].lstrip("+")
-    if spec.startswith(":"):
-        return None, None  # `git push origin :main` is a deletion
-    dst = spec.split(":", 1)[1] if ":" in spec else spec
+    if ":" in spec:
+        src, dst = spec.split(":", 1)
+    else:
+        src = dst = spec
     if dst.startswith("refs/heads/"):
         dst = dst[len("refs/heads/"):]
-    if "*" in dst or dst == "":
-        return None, None  # wildcard or empty; not one branch
     if dst == "HEAD":
         dst = head
-    return remote, dst
+    return remote, dst, src
 
 
 DENY = (
@@ -450,24 +460,47 @@ def evaluate(command):
         if flags["dry_run"] or flags["delete"] or flags["refset"] or not ok:
             continue
 
-        remote, branch = _target(positionals, repo_opt)
+        remote, branch, source = _target(positionals, repo_opt)
         if not remote or not branch:
             continue
+        # `source` is deliberately NOT tested for emptiness here. An empty
+        # source is `git push origin :main`, a deletion, and the `rev-parse
+        # --verify` below already declines it (`^{commit}` resolves to
+        # nothing). Testing it twice would leave whichever check ran first
+        # untestable, which is what the removed wildcard guard did.
+
+        # Resolve the LOCAL side first, before spending a network read.
+        #
+        # It is the ref being PUSHED, which is `HEAD` only when the refspec
+        # says so. Resolving it as `HEAD` unconditionally compared
+        # `origin/feature-x` against `main` on any `git push origin
+        # feature-x`, and read a remote commit that happened to be an ancestor
+        # of `main` as a fast-forward -- a false negative in the exact
+        # situation this guard exists for.
+        #
+        # It doubles as the "is this one ordinary branch" test, which is why
+        # there is no separate check for a deletion or wildcard refspec: the
+        # source of `origin :main` is empty and the source of
+        # `refs/heads/*:refs/heads/*` contains a `*`, and `git rev-parse
+        # --verify` resolves neither (measured: both exit 1 with no output).
+        # A separate guard for them changed no outcome and could not be
+        # tested, so it is gone rather than declared.
+        local = _git(["rev-parse", "--verify", "--quiet", source + "^{commit}"],
+                     timeout=5)
+        if not local:
+            continue  # names no single local ref -- fail open, no network read
+        local = local.strip()
 
         ls = _git(["ls-remote", "--heads", remote, branch], timeout=8)
         if not ls or not ls.strip():
             continue  # ref absent remotely, or the read failed -- fail open
         tip = ls.split()[0]
 
-        local = _git(["rev-parse", "HEAD"], timeout=5)
-        if not local:
-            continue
-        local = local.strip()
         if tip == local:
             continue
 
         anc = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", tip, "HEAD"],
+            ["git", "merge-base", "--is-ancestor", tip, local],
             capture_output=True, text=True, timeout=5)
         if anc.returncode == 0:
             continue  # plain fast-forward; nothing at risk

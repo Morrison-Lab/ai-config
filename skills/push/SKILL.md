@@ -45,14 +45,15 @@ it and ask whether to branch first.
 Another session or the author may have pushed since your last fetch.
 
 **Take this reading immediately before the push**, not at the start of the round and not when you last synced.
-A fetch from earlier in the session is a measurement of a moment that has passed, and it stopped being evidence the instant somebody else pushed — see [`check-before-pushing`](../../shared/workflow/check-before-pushing.md).
+A fetch from earlier in the session is a measurement of a moment that has passed, and it stopped being evidence the instant somebody else pushed --- see [`check-before-pushing`](../../shared/workflow/check-before-pushing.md).
 
 ```bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git ls-remote --heads origin "$BRANCH"   # LS_REMOTE — read-only; updates no ref
+git ls-remote --heads origin "$BRANCH"   # LS_REMOTE --- read-only; updates no ref
 ```
 
-If the tip it reports is not an ancestor of your `HEAD` (`git merge-base --is-ancestor <tip> HEAD`), **back off** — another session (or the author) is driving this branch right now.
+If the tip it reports is not an ancestor of the ref you are **pushing** (`git merge-base --is-ancestor <tip> <source>`), **back off** --- another session (or the author) is driving this branch right now.
+`<source>` is `HEAD` only when the refspec says so: `git push origin feature-x` from `main` pushes local `feature-x`, and comparing against `HEAD` there reads a divergence as a fast-forward.
 Do not push (a plain push will be rejected anyway, and you must not force-push over their work).
 Ask the user.
 
@@ -118,7 +119,7 @@ It overwrites the remote tip unconditionally, including commits another agent pu
 git push --force-with-lease --force-if-includes
 ```
 
-`--force-if-includes` (added in Git 2.30.0) is the half usually left off, and without it the lease is defeatable: `--force-with-lease` compares against your *remote-tracking ref*, so any background fetch — a poller, another tool in the same checkout, a `--recurse-submodules` fetch — silently refreshes that ref and the lease then passes over the very commits it existed to protect.
+`--force-if-includes` (added in Git 2.30.0) is the half usually left off, and without it the lease is defeatable: `--force-with-lease` compares against your *remote-tracking ref*, so any background fetch --- a poller, another tool in the same checkout, a `--recurse-submodules` fetch --- silently refreshes that ref and the lease then passes over the very commits it existed to protect.
 `--force-if-includes` closes that by checking the remote-tracking tip against the local branch's reflog.
 It is an *ancillary* option, so it only does anything alongside a bare `--force-with-lease`.
 
@@ -127,7 +128,7 @@ A `stale info` refusal is **not** a reason to force, and reaching for one there 
 `ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee.
 Say what the lease refused and why forcing is right when you use it.
 
-`hooks/no-clobbering-push.py` enforces this half mechanically — it refuses a bare force push and warns on a divergence — so it fires whether or not this skill was invoked.
+`hooks/no-clobbering-push.py` enforces this half mechanically --- it refuses a bare force push and warns on a divergence --- so it fires whether or not this skill was invoked.
 
 ## Asking for guidance
 
@@ -173,14 +174,14 @@ review, not a draft).
   ends in a push and should itself honor these checks.
 - **`ardi`** — its push step should run these checks; the "detect an active
   parallel session before pushing" note in `claim-pr` is the same guard.
-- **[`check-before-pushing`](../../shared/workflow/check-before-pushing.md)** — the standing rule these checks implement, and the home of the immediacy argument and the `--force-if-includes` mechanism.
-  `hooks/no-clobbering-push.py` is its instrument, and it runs on the `git push` itself rather than waiting to be invoked — so it covers the bare push in the middle of an ARDI round that never reaches this skill.
+- **[`check-before-pushing`](../../shared/workflow/check-before-pushing.md)** --- the standing rule these checks implement, and the home of the immediacy argument and the `--force-if-includes` mechanism.
+  `hooks/no-clobbering-push.py` is its instrument, and it runs on the `git push` itself rather than waiting to be invoked --- so it covers the bare push in the middle of an ARDI round that never reaches this skill.
 
 ## Anti-patterns
 
 - ❌ Force-pushing over commits another session added (check #2)
 - ❌ Bare `git push --force` instead of `--force-with-lease --force-if-includes` (check #6)
-- ❌ Reusing an earlier fetch as the check — the reading has to be taken immediately before the push (check #2)
+- ❌ Reusing an earlier fetch as the check --- the reading has to be taken immediately before the push (check #2)
 - ❌ Pushing past a fresh "paws off" claim from someone else (check #3)
 - ❌ Pushing onto a `do-not-merge` / `hold` PR without asking (check #4)
 - ❌ Pushing while a `@claude` run is mid-session on the branch (check #5)

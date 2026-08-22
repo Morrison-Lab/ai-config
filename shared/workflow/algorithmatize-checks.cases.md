@@ -518,3 +518,15 @@ Mutating the call site to pass the genuinely unmasked segment instead failed
 `Spellcheck` is green on `main`, so every one of those was a false positive with nothing left to judge.
 Shipped as `--audit-corpus` rather than as deletions.
 Its first version queried the table directly and reported 6 collisions where 4 were real, over-reporting every word the wordlist already suppresses; the corrected version calls `scan_line()` with the real wordlist, and the correction was stated on the PR rather than the number quietly substituted.)
+
+## A required-subset assertion is not an inventory-pinning test
+
+(Morrison-Lab/gha#578, 2026-08-21: a regression test asserted
+`rule in --disallowedTools` for each of roughly two dozen entries in a
+hand-written table, with a docstring claiming to pin the production deny list.
+A reviewer deleted six entries the table never named --- `gh pr ready`,
+`gh release`, `gh label`, `gh run cancel`, `gh variable`, and `gh repo edit`
+--- and the suite stayed green.
+Switching to exact set equality in both directions immediately reported 24
+unpinned rules, and seven individual-entry deletions each turned the suite red
+on the next mutation pass.)

@@ -39,8 +39,16 @@ Brief it with the base ref, the paths, and the standards that apply; never with 
 Address, rebut, or defer every finding it returns, then re-dispatch it, so the clean verdict describes the tree you are about to push rather than an earlier one.
 
 `hooks/no-push-without-self-review.py` gates this.
-It admits a verdict only from that subagent's own call result, and only while no file edit has been recorded since --- so an inline pass under a reviewer framing, a quoted verdict, and a stale verdict all fail to satisfy it.
-Override with `ALLOW_UNREVIEWED_PUSH=1` when the push carries nothing to review: the initial empty PR branch under [`pr-on-claim`](../../shared/workflow/pr-on-claim.md), or an emergency.
+It admits a verdict only from that subagent's own call result, and only when the report names the commit it read (`Reviewed-Commit: <sha>`) and that commit is the repo's current `HEAD`.
+So an inline pass under a reviewer framing, a verdict quoted out of a file, the guard's own denial message, and a verdict for an earlier commit all fail to satisfy it.
+Review after committing, therefore, not before.
+
+Override with `ALLOW_UNREVIEWED_PUSH=1` when no verdict can exist for the guard to check --- and say in your reply that you used it and why:
+
+- the initial empty PR branch under [`pr-on-claim`](../../shared/workflow/pr-on-claim.md), which carries nothing to review;
+- a review delivered by a separate CLI rather than a subagent, whose verdict never becomes an `Agent` call's result;
+- a session where the reviewer agent is not registered ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921));
+- an emergency.
 
 ### 1. Protected branch
 

@@ -39,8 +39,13 @@ This is the Agent tool's own criterion for `run_in_background: false` --- the ve
 The reviewer reports; the author disposes.
 A reviewer that can edit turns a finding into a silent fix, which loses the finding and the disposition together.
 
-**No Agent tool available?**
+**No Agent tool, or no reviewer registered here?**
 A separate CLI is the same move and a stronger one --- [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.md) or [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md).
+The `adversarial-reviewer` persona also lives at `.claude/agents/` and `.opencode/agents/`, which are project agents: a session rooted in another repo may not be able to resolve it at all ([ai-config#1921](https://github.com/Morrison-Lab/ai-config/issues/1921) tracks shipping it alongside the guard).
+
+Note what that does to the pre-push guard, since the two rules meet here and pull opposite ways.
+A CLI's verdict never becomes an `Agent` call's `tool_result`, so the guard cannot see it however real the review was.
+Use `ALLOW_UNREVIEWED_PUSH=1` there and say in the same reply which reviewer produced the verdict and why the subagent route was unavailable --- the override covers a push whose verdict the guard cannot check, not only a push with nothing to check.
 Where no second context is reachable at all, say so in the review itself rather than letting an inline pass be reported as a dispatched one.
 
 ## Brief it with the diff and the standards, never with your rationale
@@ -66,7 +71,15 @@ A dispatched reviewer makes that concrete, because the finding now has an author
 ## The mechanism
 
 [`hooks/no-push-without-self-review.py`](../../hooks/no-push-without-self-review.py) gates the pre-push case, per [`algorithmatize-checks`](algorithmatize-checks.md).
-It admits a verdict only from the `tool_result` of an `Agent` call whose `subagent_type` is the reviewer, and only while no file edit has been recorded since --- so an inline pass, a quoted verdict, and a verdict that predates the current tree all fail to satisfy it.
+It answers two questions rather than one, because provenance alone is not enough.
+
+*Who said it*: a verdict is admitted only from the `tool_result` of an `Agent` call whose `subagent_type` is the reviewer, and only when that result is not an error.
+So an inline pass, a verdict quoted out of a file, the guard's own denial message, and a clean report from some other subagent all fail.
+
+*What it was about*: the reviewer states the commit it read as a `Reviewed-Commit: <sha>` line, and the guard compares that against the pushing repo's `HEAD`.
+A push ships commits, so anything that changes what would be pushed --- a later commit, a `main` merge, a rebase, a commit a subagent made in a transcript the guard cannot see --- moves `HEAD` and fails the comparison.
+That is also why the review comes **after** committing, which is where [`ardi`](ardi.md) already puts the pause point.
+
 The other cases have no guard and are prose rules here.
 
 - **Do:** dispatch [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) (foreground, read-only) for every self-review, and report which agent produced the verdict.

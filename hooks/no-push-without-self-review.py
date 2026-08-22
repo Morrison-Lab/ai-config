@@ -1,40 +1,63 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: require local adversarial self-review before git push.
+"""PreToolUse guard: require an adversarial self-review before `git push`.
 
-Enforces that an AI agent runs local self-review using an adversarial reviewer
-subagent (`adversarial-reviewer`) and obtains a clean verdict (`Ready for merge`)
-before pushing to remote.
+Every self-review this corpus calls for is dispatched to a separate
+`adversarial-reviewer` subagent rather than performed inline by the session
+that wrote the diff (`shared/workflow/adversarial-self-review.md`). This guard
+enforces the pre-push case.
 
-WHY THE VERDICT SCAN IS ID-SCOPED RATHER THAN A TRANSCRIPT-WIDE PHRASE SEARCH
-----------------------------------------------------------------------------
-An earlier revision scanned every text/tool_result block in the transcript for
-the verdict phrase. That is unfixable by tuning, for the reason
-`no-handrolled-verdict-parse.py` already documents (ai-config#1297): verdict
-vocabulary is quoted constantly by the very corpus that defines it, so a phrase
-search cannot separate a verdict from a citation of one. Here it was worse than
-unsound -- it was self-defeating. This guard's own denial message names the
-phrase it looks for, a `PreToolUse` deny reason is surfaced back into the
-transcript as the blocked call's result, and so one blocked push authorized
-every retry after it. Reading `CLAUDE.md`, `skills/push/SKILL.md`, or this
-hook's own persona file did the same thing, since each read is a `tool_result`
-block carrying the phrase.
+WHAT COUNTS AS A VERDICT, AND WHY IT IS SO NARROW
+-------------------------------------------------
+Two independent questions have to be answered before a push is authorized, and
+an earlier revision answered neither.
 
-So a verdict counts only when it arrives as the `tool_result` of an `Agent`
-call whose `subagent_type` IS the reviewer -- matched on that field alone,
-never on the call's free-text prompt. That is a structural tie between the
-permission and the reviewer's own output, and it is what makes the phrase in
-the denial message below harmless rather than load-bearing.
+**WHO said it.** A transcript-wide search for the verdict phrase cannot work,
+for the reason `no-handrolled-verdict-parse.py` documents (ai-config#1297):
+this corpus quotes verdict vocabulary constantly, so a phrase search cannot
+separate a verdict from a citation of one. Here it was self-defeating rather
+than merely unsound -- a `PreToolUse` deny reason is surfaced back into the
+transcript as the blocked call's result, so one blocked push authorized every
+retry after it, and `Read`ing any of this repo's prose did the same. So a
+verdict is admitted only from the `tool_result` of an `Agent` call whose
+`subagent_type` IS the reviewer, and only when that result is not an error.
 
-CONSEQUENCE FOR HOW THE REVIEWER IS DISPATCHED
-----------------------------------------------
-A background dispatch returns an agent id rather than a report, so its verdict
-never becomes that call's `tool_result` and this guard cannot see it. Dispatch
-the reviewer in the foreground (`run_in_background: false`), which is correct
-anyway: the push is waiting on the answer.
+**WHAT it was about.** Provenance alone still lets one clean verdict authorize
+unlimited later pushes of unrelated work. So the reviewer states the commit it
+read, as a `Reviewed-Commit: <sha>` line, and this guard compares that against
+the pushing repo's current `HEAD`. That comparison is what ties the permission
+to the thing being pushed, and it subsumes every "the verdict went stale"
+case without enumerating tool names: a push ships COMMITS, so anything that
+changes what would be pushed -- an edit committed afterwards, a `main` merge, a
+rebase, a commit made by a subagent in a transcript this guard cannot even see
+-- moves `HEAD` and fails the comparison. Uncommitted working-tree changes are
+not pushed and so do not matter.
 
-A clean verdict also goes stale. A file edit recorded after it describes a tree
-the reviewer never read, so the guard requires the clean verdict to be the last
-of the two.
+It also closes the truncation hole: the reviewer emits the fingerprint AFTER
+its verdict, so a report cut short carries no fingerprint and is refused rather
+than read as clean.
+
+CONSEQUENCES FOR HOW THE REVIEWER IS DISPATCHED
+------------------------------------------------
+Dispatch it in the FOREGROUND (`run_in_background: false`): a background
+dispatch returns an agent id rather than a report, so no verdict ever becomes
+that call's result. This is also the Agent tool's own criterion -- the push is
+waiting on the answer.
+
+Review AFTER committing, which is where `shared/workflow/ardi.md` already puts
+the pause point. A review of uncommitted work is a review of a commit that does
+not exist yet, so it can name no fingerprint this guard can check.
+
+WHERE IT DELIBERATELY DOES NOT FIRE
+------------------------------------
+- `git push --dry-run` and `git push --delete` re-head nothing, so there is no
+  diff to review (this is `no-unreviewed-pr.py`'s `_argv_push` rule, reused
+  rather than re-derived).
+- A command this guard cannot parse is treated as not-a-push. That is the same
+  fail-open posture as `main()`'s bare `except`, stated rather than silent: a
+  guard that crashed closed would block every push in the session.
+- Pushing something other than `HEAD` (`git push origin other-branch`, a
+  `HEAD~2:main` refspec) still requires a verdict naming `HEAD`, since this
+  guard does not resolve refspecs. Those take the override.
 
 Authorized overrides:
 - `ALLOW_UNREVIEWED_PUSH=1` (env assignment prefix)
@@ -42,222 +65,160 @@ Authorized overrides:
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
+import shlex
+import subprocess
 import sys
 
-CMD_POS = r"""(?:^|[;&`(\n]|\$\()\s*"""
-KEYWORD_PREFIX = r"""(?:(?:!|\{|time|nohup|sudo|then|else|do|if|elif|while|until)\s+){0,4}"""
-VAR_PREFIX = r"""(?:(?:\$\{?[A-Za-z0-9_]+\}?|\$\([^)]*\)|`[^`]*`)\s*){0,4}"""
-LEAD = CMD_POS + KEYWORD_PREFIX + VAR_PREFIX
-ENV_WRAP = r"""(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+)*"""
-GIT_PROG = r"(?:[/\w.-]+/)?(?:git|\$GIT|\$\{GIT\})\b"
-DELIM = r"(?:\s+|\$\{IFS\}|\$IFS\b|\$\([^)]*\)|\$[A-Za-z0-9_]+)+"
+# --- verdict and reviewer identification ------------------------------------
 
-PUSH_PATTERN = re.compile(
-    LEAD + ENV_WRAP + GIT_PROG + DELIM + r"push\b"
-)
-
-ALLOW_ENV_FLAG = re.compile(
-    r"^\s*(?:(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_UNREVIEWED_PUSH=(?:\"1\"|'1'|1\b)"
-)
-SPLIT = re.compile(r"&&|\|\||;|\||\n")
-
-# One pattern for BOTH verdicts, so a body carrying more than one is read
-# left-to-right and the LAST one wins. Two separate searches cannot order their
-# matches against each other, which is how a review that opens by quoting the
-# blocking verdict it is superseding gets read as blocking.
+# ONE pattern for BOTH verdicts, so a body carrying more than one is read
+# left-to-right and the last match wins. Two separate searches cannot order
+# their matches against each other, which is how a review that opens by quoting
+# the blocking verdict it supersedes gets read as blocking.
 VERDICT = re.compile(
     r"(?:###\s*Verdict|Verdict):\s*(?:\*\*)?(Ready for merge|Needs (?:more )?work)\b",
     re.I,
 )
 
-# Matched against an Agent/Task call's `subagent_type` ONLY. The earlier
-# revision also matched the call's free-text `prompt`, which any prompt
-# containing the word "adversarial" satisfied -- including a prompt asking some
-# other agent to do something else entirely.
-ADVERSARIAL_AGENT_NAME = re.compile(r"\A\s*adversarial[-_ ]?reviewer\s*\Z", re.I)
+# The reviewer's statement of what it read. Emitted after the verdict, so a
+# truncated report loses it first.
+REVIEWED_COMMIT = re.compile(r"Reviewed-Commit:\s*`?([0-9a-f]{7,40})`?", re.I)
 
-# Tool names that dispatch a subagent.
+# Matched against an Agent/Task call's `subagent_type` ONLY. An earlier revision
+# also matched the call's free-text `prompt`, which any prompt containing the
+# word "adversarial" satisfied. A plugin-namespaced name (`ai-config:adversarial-
+# reviewer`) is accepted, since the same persona is the same reviewer whichever
+# surface registered it.
+ADVERSARIAL_AGENT_NAME = re.compile(
+    r"\A\s*(?:[\w.-]+[:/])?adversarial[-_ ]?reviewer\s*\Z", re.I
+)
+
 AGENT_TOOLS = {"agent", "task", "invoke_subagent"}
 
-# Tool names that change a file in the working tree. A clean verdict recorded
-# BEFORE one of these describes a tree the reviewer never read.
-EDIT_TOOLS = {"edit", "write", "multiedit", "notebookedit", "applypatch",
-              "str_replace_editor", "str_replace_based_edit_tool"}
+ALLOW_ENV_FLAG = re.compile(
+    r"^\s*(?:(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*"
+    r"ALLOW_UNREVIEWED_PUSH=(?:\"1\"|'1'|1\b)"
+)
 
 
-def unquote_words(text: str) -> str:
-    prev = None
-    while prev != text:
-        prev = text
-        text = re.sub(r'''(["'])([A-Za-z0-9_./-]+)\1''', r'\2', text)
-        text = re.sub(r'''(?<=[A-Za-z0-9_./-])(?:""|'')(?:(?=[A-Za-z0-9_./-])|$)''', '', text)
-        text = re.sub(r'''(?:^|(?<=[\s;&|`()]))(?:""|'')(?:(?=[A-Za-z0-9_./-])|$)''', '', text)
-    return text
+# --- push detection ---------------------------------------------------------
+#
+# Reused from `no-unreviewed-pr.py` rather than re-derived. That module's
+# `push_ident` is shell-parsed rather than regex-matched, so it already handles
+# `git -C <dir> push` and `git -c k=v push`, and already excludes the two push
+# forms that re-head nothing. A second hand-rolled detector would be a DRW
+# finding and, worse, would diverge silently from this one
+# (ai-config#1920).
+
+def _load_sibling(name: str, filename: str):
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-def has_allow_override(segment: str) -> bool:
-    if ALLOW_ENV_FLAG.search(segment):
-        return True
+try:
+    _SIBLING = _load_sibling("no_unreviewed_pr", "no-unreviewed-pr.py")
+    push_ident = _SIBLING.push_ident
+    _simple_commands = _SIBLING._simple_commands
+except Exception:  # pragma: no cover -- sibling missing or unimportable
+    _SIBLING = None
+    push_ident = None
+    _simple_commands = None
 
-    for m in re.finditer(r"(?:^|[\s;&|`\n])(--allow-unreviewed-push)\b", segment):
-        idx = m.start(1)
-        in_single = in_double = escaped = False
-        for i in range(idx):
-            c = segment[i]
-            if escaped:
-                escaped = False
-                continue
-            if c == "\\" and not in_single:
-                escaped = True
-                continue
-            if c == "'" and not in_double:
-                in_single = not in_single
-                continue
-            if c == '"' and not in_single:
-                in_double = not in_double
-                continue
-        if not in_single and not in_double:
+
+def _fallback_simple_commands(cmd: str):
+    """Minimal stand-in used only if the sibling module cannot be loaded."""
+    try:
+        lex = shlex.shlex(cmd.replace("\n", ";"), posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return None
+    cmds, cur = [], []
+    for t in toks:
+        if t and set(t) <= set("|&;()<>"):
+            if cur:
+                cmds.append(cur)
+            cur = []
+        else:
+            cur.append(t)
+    if cur:
+        cmds.append(cur)
+    return cmds
+
+
+def simple_commands(cmd: str):
+    fn = _simple_commands or _fallback_simple_commands
+    return fn(cmd)
+
+
+def _fallback_push_ident(cmd: str) -> bool:
+    cmds = simple_commands(cmd)
+    if cmds is None:
+        return False
+    for argv in cmds:
+        if argv and argv[0] == "git" and "push" in argv[1:]:
             return True
     return False
 
 
-def mask_trailing_comments(text: str) -> str:
-    lines = text.split("\n")
-    masked_lines = []
-    for line in lines:
-        in_single = in_double = escaped = False
-        comment_start = -1
-        for i, c in enumerate(line):
-            if escaped:
-                escaped = False
-                continue
-            if c == "\\" and not in_single:
-                escaped = True
-                continue
-            if c == "'" and not in_double:
-                in_single = not in_single
-                continue
-            if c == '"' and not in_single:
-                in_double = not in_double
-                continue
-            if c == "#" and not in_single and not in_double:
-                if i == 0 or line[i - 1] in " \t;&|`()":
-                    comment_start = i
-                    break
-        if comment_start != -1:
-            line = line[:comment_start] + " " * (len(line) - comment_start)
-        masked_lines.append(line)
-    return "\n".join(masked_lines)
+def has_allow_override(command: str) -> bool:
+    """True if the command carries an authorized override.
 
-
-def mask_subexpressions(val: str) -> str:
-    sub_pattern = r"(`[^`]*`|\$\([^)]*\))"
-    tokens = re.split(sub_pattern, val)
-    result = []
-    for i, tok in enumerate(tokens):
-        if i % 2 == 1:
-            result.append(tok)
-        else:
-            result.append("".join("\n" if c == "\n" else " " for c in tok))
-    return "".join(result)
-
-
-HEREDOC_START = re.compile(
-    r"""<<-?[ \t]*(?:(['"])([A-Za-z_][A-Za-z0-9_]*)\1|([A-Za-z_][A-Za-z0-9_]*))"""
-)
-
-
-def _heredoc_intro(line: str):
-    in_single = in_double = escaped = False
-    i, n = 0, len(line)
-    while i < n:
-        c = line[i]
-        if escaped:
-            escaped = False
-        elif c == "\\" and not in_single:
-            escaped = True
-        elif c == "'" and not in_double:
-            in_single = not in_single
-        elif c == '"' and not in_single:
-            in_double = not in_double
-        elif c == "<" and not in_single and not in_double:
-            if line.startswith("<<<", i):
-                i += 3
-                continue
-            m = HEREDOC_START.match(line, i)
-            if m:
-                return m
-        i += 1
-    return None
-
-
-def mask_heredocs(text: str) -> str:
-    lines = text.split("\n")
-    out = list(lines)
-    i = 0
-    while i < len(lines):
-        m = _heredoc_intro(lines[i])
-        if not m:
-            i += 1
-            continue
-        quoted = bool(m.group(2))
-        delim = m.group(2) or m.group(3)
-        j = i + 1
-        while j < len(lines) and lines[j].strip() != delim:
-            out[j] = " " * len(lines[j]) if quoted else mask_subexpressions(lines[j])
-            j += 1
-        i = j + 1
-    return "\n".join(out)
-
-
-def mask_payloads(text: str) -> str:
-    flag_pattern = (
-        r"(?:--body-file\b|--body\b|--title\b|--subject\b|--comment\b|--message\b|"
-        r"--commit-title\b|--commit-message\b|--reason\b|--notes\b|--description\b|"
-        r"--summary\b|-m\b|-b\b|-d\b|-t\b|-s\b)"
-    )
-    hspace = r"[ \t]*"
-
-    def repl_double(m):
-        return m.group(1) + mask_subexpressions(m.group(2))
-
-    def repl_single(m):
-        val = m.group(2)
-        return m.group(1) + "".join("\n" if c == "\n" else " " for c in val)
-
-    def repl_unquoted(m):
-        return m.group(1) + mask_subexpressions(m.group(2))
-
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\"(?:\\.|[^\"])*\")", repl_double, text, flags=re.DOTALL)
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(\'(?:\\.|[^\'])*\')", repl_single, text, flags=re.DOTALL)
-    text = mask_trailing_comments(text)
-    text = re.sub(rf"({flag_pattern}{hspace}=?{hspace})(`[^`]*`|\$\([^)]*\)|[^-;\s&|\n][^;\s&|\n]*)", repl_unquoted, text)
-    return text
-
-
-def has_git_push(command: str) -> bool:
-    norm_command = re.sub(r"\\\n", "", command)
-    heredoc_masked = mask_heredocs(norm_command)
-    unquoted_command = unquote_words(heredoc_masked)
-    masked_command = mask_payloads(unquoted_command)
-
-    for seg in SPLIT.split(masked_command):
-        if PUSH_PATTERN.search(seg):
-            if not has_allow_override(seg):
+    Checked against the whole command rather than per-segment, because the
+    override is a statement about the push the author is making, not about one
+    link in a chain.
+    """
+    for seg in re.split(r"&&|\|\||;|\n", command):
+        if ALLOW_ENV_FLAG.search(seg):
+            return True
+    cmds = simple_commands(command)
+    if cmds:
+        for argv in cmds:
+            if "--allow-unreviewed-push" in argv:
                 return True
     return False
 
+
+def has_git_push(command: str) -> bool:
+    detector = push_ident or _fallback_push_ident
+    try:
+        return bool(detector(command))
+    except Exception:
+        return False
+
+
+def push_directory(command: str) -> str | None:
+    """The `-C <dir>` of the pushing command, if it names one."""
+    cmds = simple_commands(command)
+    if not cmds:
+        return None
+    for argv in cmds:
+        if not argv or argv[0] != "git":
+            continue
+        for i, tok in enumerate(argv[1:-1], start=1):
+            if tok == "-C":
+                return argv[i + 1]
+    return None
+
+
+# --- transcript reading -----------------------------------------------------
 
 def _result_text(block: dict) -> str:
     """Flatten a tool_result block's payload into one searchable string.
 
     A subagent's report arrives as `content`, which is a plain string in some
     transports and a list of content blocks in others. Reading only one shape
-    silently returns "" for the other, and an empty string is indistinguishable
-    from a report that stated no verdict.
+    returns "" for the other, and an empty string is indistinguishable from a
+    report that stated no verdict.
     """
     parts: list[str] = []
     content = block.get("content")
@@ -277,134 +238,167 @@ def _result_text(block: dict) -> str:
 
 
 def _iter_blocks(record: dict):
-    if isinstance(record.get("message"), dict):
-        blocks = record["message"].get("content") or []
-    else:
-        blocks = record.get("content")
-        if isinstance(blocks, str):
-            blocks = [{"type": "text", "text": blocks}]
-        elif not isinstance(blocks, list):
-            blocks = []
+    message = record.get("message")
+    blocks = message.get("content") if isinstance(message, dict) else record.get("content")
+    if isinstance(blocks, str):
+        blocks = [{"type": "text", "text": blocks}]
+    elif not isinstance(blocks, list):
+        blocks = []
     for b in blocks:
         if isinstance(b, dict):
             yield b
 
 
-def verify_transcript_review_status(transcript_path: str) -> tuple[bool, str]:
-    """Decide whether the transcript records a CURRENT clean adversarial review.
+def read_latest_review(transcript_path: str) -> tuple[str | None, str | None, bool]:
+    """(verdict, reviewed_commit, saw_reviewer_call) from the transcript.
 
-    A verdict is admitted only from the `tool_result` of an `Agent` call whose
-    `subagent_type` is the adversarial reviewer -- see this module's docstring
-    for why a transcript-wide phrase search cannot work here.
-
-    Returns (is_clean, reason).
+    `verdict` is "clean", "needs_work", or None. Only the reviewer's own call
+    results are consulted, and an errored result is skipped -- a failed or
+    interrupted reviewer states no verdict, and `fail-fast` forbids letting that
+    look identical to a clean one.
     """
-    if not transcript_path or not os.path.exists(transcript_path):
-        return False, "No transcript available to verify local adversarial self-review."
-
     reviewer_call_ids: set[str] = set()
     saw_reviewer_call = False
-    verdict: str | None = None          # None | "clean" | "needs_work"
-    verdict_seq = -1
-    last_edit_seq = -1
-    seq = 0
+    verdict: str | None = None
+    reviewed_commit: str | None = None
+
+    with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except Exception:
+                continue
+            if not isinstance(record, dict):
+                continue
+
+            for b in _iter_blocks(record):
+                b_type = b.get("type")
+
+                if b_type == "tool_use":
+                    if (b.get("name") or "").lower() not in AGENT_TOOLS:
+                        continue
+                    inp = b.get("input") or {}
+                    sub_type = str(
+                        inp.get("subagent_type")
+                        or inp.get("subagentType")
+                        or inp.get("agent_type")
+                        or ""
+                    )
+                    if ADVERSARIAL_AGENT_NAME.match(sub_type):
+                        saw_reviewer_call = True
+                        call_id = b.get("id")
+                        if isinstance(call_id, str) and call_id:
+                            reviewer_call_ids.add(call_id)
+
+                elif b_type == "tool_result":
+                    if b.get("tool_use_id") not in reviewer_call_ids:
+                        continue
+                    if b.get("is_error"):
+                        continue
+                    text = _result_text(b)
+                    found = VERDICT.findall(text)
+                    if not found:
+                        continue
+                    verdict = (
+                        "clean" if found[-1].lower().startswith("ready") else "needs_work"
+                    )
+                    sha = REVIEWED_COMMIT.search(text)
+                    reviewed_commit = sha.group(1) if sha else None
+
+    return verdict, reviewed_commit, saw_reviewer_call
+
+
+def current_head(directory: str | None) -> str | None:
+    args = ["git"]
+    if directory:
+        args += ["-C", directory]
+    args += ["rev-parse", "HEAD"]
+    try:
+        out = subprocess.run(args, capture_output=True, text=True, timeout=8)
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    sha = out.stdout.strip()
+    return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else None
+
+
+def verify_review(transcript_path: str, directory: str | None) -> tuple[bool, str]:
+    """(is_clean, reason) -- is there a current clean verdict for this HEAD?"""
+    if not transcript_path or not os.path.exists(transcript_path):
+        return False, "No transcript available to verify the adversarial self-review."
 
     try:
-        with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    record = json.loads(line)
-                except Exception:
-                    continue
-                if not isinstance(record, dict):
-                    continue
-
-                seq += 1
-                for b in _iter_blocks(record):
-                    b_type = b.get("type")
-
-                    if b_type == "tool_use":
-                        name = (b.get("name") or "").lower()
-                        if name in AGENT_TOOLS:
-                            inp = b.get("input") or {}
-                            sub_type = str(
-                                inp.get("subagent_type")
-                                or inp.get("subagentType")
-                                or inp.get("agent_type")
-                                or ""
-                            )
-                            if ADVERSARIAL_AGENT_NAME.match(sub_type):
-                                saw_reviewer_call = True
-                                call_id = b.get("id")
-                                if isinstance(call_id, str) and call_id:
-                                    reviewer_call_ids.add(call_id)
-                        elif name in EDIT_TOOLS:
-                            last_edit_seq = seq
-
-                    elif b_type == "tool_result":
-                        if b.get("tool_use_id") not in reviewer_call_ids:
-                            continue
-                        found = VERDICT.findall(_result_text(b))
-                        if found:
-                            verdict = (
-                                "clean"
-                                if found[-1].lower().startswith("ready")
-                                else "needs_work"
-                            )
-                            verdict_seq = seq
+        verdict, reviewed_commit, saw_reviewer_call = read_latest_review(transcript_path)
     except Exception as e:
         return False, f"Failed reading transcript: {e}"
 
     if not saw_reviewer_call:
         return False, (
             "No `adversarial-reviewer` subagent was dispatched in this session.\n"
-            "Dispatch it against your diff and address its findings before pushing."
+            "Dispatch it against your committed diff and address its findings before pushing."
         )
 
     if verdict is None:
         return False, (
-            "An `adversarial-reviewer` subagent was dispatched, but no verdict came "
-            "back as that call's result.\n"
+            "An `adversarial-reviewer` subagent was dispatched, but no verdict came back "
+            "as that call's own result.\n"
             "Dispatch it in the foreground (`run_in_background: false`) so its report "
             "returns as the tool result -- a background dispatch returns an agent id, "
-            "which carries no verdict."
+            "which carries no verdict, and an errored result carries none either."
         )
 
     if verdict == "needs_work":
         return False, (
             "The latest adversarial self-review returned a blocking verdict.\n"
-            "Address, rebut, or defer every finding and obtain a clean verdict before pushing."
+            "Address, rebut, or defer every finding, commit, and re-dispatch the reviewer."
         )
 
-    if last_edit_seq > verdict_seq:
+    head = current_head(directory)
+    if head is None:
         return False, (
-            "The clean adversarial self-review is stale: a file was edited after it.\n"
-            "Re-dispatch `adversarial-reviewer` against the current diff, so the verdict "
-            "describes the tree you are about to push."
+            "Could not resolve HEAD for the repository being pushed, so the clean "
+            "verdict cannot be tied to the commits this push would ship."
         )
 
-    return True, "Clean adversarial self-review verified against the current tree."
+    if not reviewed_commit:
+        return False, (
+            "The clean verdict does not say which commit it read.\n"
+            "The reviewer must end its report with `Reviewed-Commit: <sha>`; without it "
+            "there is nothing tying the verdict to what this push would ship, and a "
+            "report cut short before its fingerprint is not a verdict."
+        )
+
+    if not head.startswith(reviewed_commit.lower()):
+        return False, (
+            f"The clean verdict is for commit {reviewed_commit}, but HEAD is now "
+            f"{head[:12]}.\n"
+            "A push ships commits, so whatever moved HEAD -- a new commit, a `main` merge, "
+            "a rebase -- is unreviewed. Re-dispatch the reviewer against the current HEAD."
+        )
+
+    return True, f"Clean adversarial self-review verified at {head[:12]}."
 
 
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-        tool_name = payload.get("tool_name") or ""
-        if tool_name != "Bash":
+        if (payload.get("tool_name") or "") != "Bash":
             return 0
 
         cmd = (payload.get("tool_input") or {}).get("command") or ""
         if not cmd:
             return 0
 
-        if not has_git_push(cmd):
+        if not has_git_push(cmd) or has_allow_override(cmd):
             return 0
 
-        transcript_path = payload.get("transcript_path") or ""
-        is_clean, reason = verify_transcript_review_status(transcript_path)
+        is_clean, reason = verify_review(
+            payload.get("transcript_path") or "", push_directory(cmd)
+        )
         if is_clean:
             return 0
 
@@ -413,21 +407,27 @@ def main() -> int:
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",
                 "permissionDecisionReason": (
-                    f"git push blocked by pre-push self-review policy:\n{reason}\n\n"
-                    "Standing rule: every self-review is an adversarial review by a separate "
-                    "subagent. Dispatch `adversarial-reviewer` (foreground) against "
-                    "`git diff origin/<default-branch>...HEAD`, address or rebut every finding, "
-                    "and obtain its clean verdict before pushing.\n\n"
-                    "Only that subagent's own result counts -- this message does not, and neither "
-                    "does reading a file that quotes a verdict.\n\n"
-                    "If you are pushing an initial empty PR branch (per pr-on-claim) or need an "
-                    "emergency override, prefix the command with `ALLOW_UNREVIEWED_PUSH=1`."
+                    f"git push blocked by the pre-push self-review policy:\n{reason}\n\n"
+                    "Standing rule: every self-review is an adversarial review by a "
+                    "separate subagent. Dispatch `adversarial-reviewer` in the foreground "
+                    "against your committed diff, address or rebut every finding, and let "
+                    "its report state the commit it read.\n\n"
+                    "Only that subagent's own result counts -- this message does not, and "
+                    "neither does reading a file that quotes a verdict.\n\n"
+                    "Override with `ALLOW_UNREVIEWED_PUSH=1` when no verdict can exist to "
+                    "check: an initial empty PR branch (per pr-on-claim), a review "
+                    "delivered by a separate CLI rather than a subagent, a session where "
+                    "the reviewer agent is not registered, or an emergency. Say in your "
+                    "reply that you used it and why."
                 ),
             }
         }))
         return 0
     except Exception:
-        return 0  # fail open
+        # Fail open, deliberately and in the same direction as the parse-failure
+        # rule above: a guard that crashed closed would block every push in the
+        # session, which is a worse failure than missing one review.
+        return 0
 
 
 if __name__ == "__main__":

@@ -45,7 +45,21 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      If nothing survives rigorous inspection, say exactly: `No actionable findings identified.`
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.
 
+5. **Fingerprint what you read**
+
+   End the report, after the verdict, with the commit you reviewed:
+
+   ```text
+   Reviewed-Commit: <full sha from `git rev-parse HEAD`>
+   ```
+
+   Read that sha yourself rather than taking it from the brief.
+   The pre-push guard compares it against the repository's HEAD at push time, which is what ties your verdict to the commits the push would ship.
+   A report without it authorizes nothing, and one cut short before it is refused rather than read as clean.
+
 State the verdict on its own line in that exact form --- the pre-push guard reads your call's result for it, and treats anything else as no verdict.
 
-You have no Edit or Write access, so you cannot apply a correction.
+You have no Edit or Write access, so you cannot apply a correction, and you must not use `Bash` to work around that.
+`Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`); do not run anything that writes, moves, or deletes a file, pushes, or posts.
+Staying read-only on that side is instruction-level discipline rather than a harness guarantee, so it is on you.
 Report; the authoring session Addresses, Rebuts, or Defers each finding.

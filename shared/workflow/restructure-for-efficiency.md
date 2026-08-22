@@ -43,7 +43,7 @@ Each is a fragment this corpus already has, read for its **cost** rather than fo
 The one pool with a deterministic check already built:
 
 ```bash
-python scripts/check-context-closure.py
+python3 scripts/check-context-closure.py
 ```
 
 Measured on `main` at 2026-08-22: 9 files, 243,069 bytes (~60,767 tokens at 4 B/token), which is **43,069 bytes over** the 200,000-byte budget.
@@ -63,7 +63,7 @@ Two boundaries, so this does not become a licence to wander.
 
 **Efficiency never outranks correctness.**
 A cheaper procedure that checks less is not a saving, and this rule must never be read as permission to skip a verification step, shorten a review, or trust a cached verdict.
-[`fully-clean`](fully-clean.md) prices a review round at tens of dollars and still requires it every time.
+[`efficient-pr-babysitting`](efficient-pr-babysitting.md) prices one review round at $42.92, and [`fully-clean`](fully-clean.md) still requires one every time.
 
 **Don't restructure a workflow mid-task to save tokens on the task in front of you.**
 The change belongs in its own issue or PR, on the corpus, where someone can disagree with it.
@@ -131,7 +131,8 @@ gh pr list --repo <owner>/<repo> --state open --base "$(gh pr view <N> --repo <o
 ## Dogfooding
 
 This fragment is referenced from `CLAUDE.md` by a **markdown link** rather than an `@`-import, so it loads only when read.
-An imported file loads at launch for every session regardless of task, so writing the always-loaded-cost rule as always-loaded content would have cost roughly 5 KB on every session to say "watch the always-loaded cost".
+An imported file loads at launch for every session regardless of task, so writing the always-loaded-cost rule as always-loaded content would have cost 12,532 bytes on every session to say "watch the always-loaded cost".
+Derive that figure rather than estimating it (`wc -c` on this file), which is what the finding that corrected an earlier guess here turned on.
 The check on any addition to this corpus is the same one: which pool does it land in, and does every session pay for it.
 
 - **Do:** ask what a procedure costs *by construction*, separately from what this run of it costs.

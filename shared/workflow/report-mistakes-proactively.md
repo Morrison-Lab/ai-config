@@ -198,6 +198,75 @@ the API actually returned.
 - **Don't:** announce "filed as #N" while the dupe-check is still outstanding
   --- that asserts the new-issue outcome before anything has decided it.
 
+## A dupe-check chained into the same call as the create gates nothing
+
+The section above rules out announcing step 2's outcome before step 2 has
+decided it.
+This one rules out the opposite shape, where step 2 genuinely runs and its
+answer is never consulted, because the search and the `gh issue create` it
+gates were placed in **one** Bash call:
+
+```bash
+gh issue list -R O/R --state open --search "..." --json number,title
+gh issue create -R O/R --title "..." --body-file /tmp/body.md
+```
+
+Both commands execute.
+The search returns its match, and the create runs anyway.
+Nothing can branch on a result that arrives at the same instant as the action
+it was supposed to gate, so the check is decorative.
+
+The near-miss is what makes this worth stating, because the check is not
+skipped.
+It is written, it appears in the transcript, and it returns the right answer,
+so a reply asserting that the tracker was searched is true as far as it goes.
+What is missing has no moment attached to it.
+There is no point in the sequence where a step was dropped, only a call
+boundary that was never drawn --- which is why re-reading step 2 does not
+prevent this, and why it reads as compliance from the inside.
+It also defeats review by transcript, since a compliant session and this one
+emit the same two commands in the same order.
+
+**The general form is what to carry away, because filing is only one
+instance.**
+Any rule of the shape "search first, then act" fails identically: the open-PR
+check before `gh pr create`, a reviewer-reachability read before a dispatch,
+the fresh `git ls-remote` that
+[`check-before-pushing`](check-before-pushing.md) requires immediately before
+every push.
+Each becomes decorative the moment it shares a call with what it gates.
+
+[`pr-on-claim`](pr-on-claim.md) already states the structural sibling for one
+command: the Copilot `requested_reviewers` POST must be the sole, or last,
+command in its Bash call, so that a `Stop` hook can tell whether it ran.
+The reason here is different and stronger.
+There the reader is a hook, and separability is enough.
+Here the reader is you, so the query has to **finish in its own call**, with
+its output in front of you, before the gated command is composed at all.
+
+**The existing instrument does not reach this, so do not expect a warning.**
+`hooks/warn-pr-create-without-dupe-check.py` guards `gh pr create` and
+`mcp__github__create_pull_request` only, and no `gh issue create` counterpart
+exists.
+Its discharge is a session-wide lexical scan of the transcript for any earlier
+PR-surfacing command, so it asks whether a query happened rather than whether
+its result was read --- which is the distinction this section is entirely
+about.
+
+- **Do:** run the gating query in its own call, read its result, and only then
+  run the action it gates.
+- **Do:** treat the call boundary as where the decision gets made, since that
+  is the only point at which a result exists to decide on.
+- **Don't:** chain a dupe or precondition check and the action it gates into
+  one Bash call --- the check runs and gates nothing.
+- **Don't:** read "the search is in the transcript" as evidence it was
+  consulted.
+  A compliant session and this one look identical there.
+
+See
+[`report-mistakes-proactively.cases.md`](report-mistakes-proactively.cases.md),
+"A dupe-check chained into the same call as the create".
+
 ## Where to file
 
 - **The repo where the mistake lives, when it's one we administrate** (our

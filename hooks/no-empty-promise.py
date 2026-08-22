@@ -348,7 +348,17 @@ _POLLER_TOKEN = re.compile(
 # interpreter, so match the basename with an optional version suffix rather
 # than a fixed list of literals.
 _INTERPRETER = re.compile(
-    r"^(?:[\w.@/-]*/)?(?:python[\d.]*|bash|sh|zsh|dash)$", re.I)
+    r"^(?:[\w.@/-]*/)?(?:python[\d.]*|bash|sh|zsh|dash|ksh)$", re.I)
+
+# A SHELL specifically, which is a narrower question than "an interpreter".
+# Only a shell's `-c` takes a nested COMMAND LINE; `python -c` takes Python
+# SOURCE, so a bare path after it is an expression (`hooks / monitor - open -
+# prs.py`) that raises NameError rather than running anything. Re-testing a
+# Python `-c` argument under shell semantics read that as an execution.
+_SHELL = re.compile(r"^(?:[\w.@/-]*/)?(?:bash|sh|zsh|dash|ksh)$", re.I)
+
+# `VAR=value` prefixes a command without changing what runs.
+_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 # A `-c`-shaped flag hands the NEXT token to the interpreter as a command
 # STRING. Combined short flags (`-ec`) count; `-check` does not.
@@ -357,6 +367,27 @@ _DASH_C_FLAG = re.compile(r"^(?:-[a-z]*c|--command)$", re.I)
 # Tokens that may precede the interpreter without changing what runs.
 _EXEC_PREFIX = re.compile(r"^(?:nohup|command|exec|time|env|setsid|stdbuf)$",
                           re.I)
+
+
+def _command_head(tokens, index):
+    """Return (head token introducing TOKENS[INDEX], reached via a `-c`).
+
+    Walks back past flags, `VAR=value` prefixes, and `nohup`-style wrappers,
+    none of which change what runs. A `-c`-shaped flag along the way is
+    reported rather than skipped, because it changes what the token IS: an
+    argument to the interpreter rather than a script operand.
+    """
+    via_dash_c = False
+    previous = index - 1
+    while previous >= 0:
+        token = tokens[previous]
+        if _DASH_C_FLAG.match(token):
+            via_dash_c = True
+        elif not (token.startswith("-") or _EXEC_PREFIX.match(token)
+                  or _ASSIGNMENT.match(token)):
+            break
+        previous -= 1
+    return (tokens[previous] if previous >= 0 else "", via_dash_c)
 
 
 def _poller_executed(command, depth=0):
@@ -369,9 +400,15 @@ def _poller_executed(command, depth=0):
         return False  # unbalanced quotes: unparseable, so do not discharge
 
     for index, token in enumerate(tokens):
-        # A nested command string is re-tested on its own terms.
+        # A SHELL's `-c` argument is a nested command line, so re-test it on
+        # its own terms. A Python interpreter's `-c` argument is source code,
+        # where a bare path is an expression rather than an execution -- so it
+        # is not re-tested, and nothing in it can discharge by looking like a
+        # command head.
         if _DASH_C_FLAG.match(token) and index + 1 < len(tokens):
-            if _poller_executed(tokens[index + 1], depth + 1):
+            head, _ = _command_head(tokens, index)
+            if _SHELL.match(head) and _poller_executed(tokens[index + 1],
+                                                       depth + 1):
                 return True
             continue
         # `shlex` splits on whitespace and quoting, NOT on shell operators, so
@@ -384,11 +421,10 @@ def _poller_executed(command, depth=0):
             continue
         if index == 0:
             return True  # `./hooks/monitor-open-prs.py`
-        # Walk back past `nohup`, `env`, and friends to whatever introduces it.
-        previous = index - 1
-        while previous > 0 and _EXEC_PREFIX.match(tokens[previous]):
-            previous -= 1
-        if _INTERPRETER.match(tokens[previous]):
+        head, via_dash_c = _command_head(tokens, index)
+        if via_dash_c:
+            continue  # an argument to `-c`, not a script operand
+        if _INTERPRETER.match(head):
             return True
     return False
 

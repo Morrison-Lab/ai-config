@@ -576,6 +576,36 @@ CASES = [
     ([say("I owe #1937 the ARDI loop."),
       bash("cat hooks/monitor-open-prs.py; echo done")],
      True, "stripping the separator does NOT reopen the read bypass (#1947 r4)"),
+
+    # --- Review round 5 on #1947. The `-c` recursion applied SHELL semantics
+    # uniformly, but only a shell's `-c` takes a nested command line. Python's
+    # takes source, where a bare path is an expression -- `python3 -c
+    # hooks/monitor-open-prs.py` raises `NameError: name 'hooks' is not
+    # defined` and runs nothing, yet discharged.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -c hooks/monitor-open-prs.py")],
+     True, "`python3 -c <bare path>` does NOT discharge (#1947 r5)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -c hooks/monitor-open-prs.py --monitor")],
+     True, "`python3 -c <path> --monitor` does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3.11 -c hooks/monitor-open-prs.py")],
+     True, "a versioned Python's `-c` does NOT discharge either"),
+    # The shell half must keep working: `bash -c <path>` really does execute
+    # it, which is the asymmetry the fix turns on.
+    ([say("I owe #1937 the ARDI loop."), bash("bash -c hooks/monitor-open-prs.py")],
+     False, "`bash -c <bare path>` DOES execute it, so it discharges (#1947 r5)"),
+
+    # A false NEGATIVE the same walk-back fixed, not reported by the review:
+    # an ordinary interpreter flag between the interpreter and the script made
+    # a genuine arming stop discharging. `-u` is the one you actually want on
+    # a poller.
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -u hooks/monitor-open-prs.py")],
+     False, "an interpreter flag before the script still discharges (#1947 r5)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -B -u hooks/monitor-open-prs.py --monitor")],
+     False, "several interpreter flags before the script still discharge"),
 ]
 
 
@@ -656,6 +686,26 @@ def main():
               "poller")
         passes += 1
 
+    # Round 5's shape, swept rather than sampled: a Python interpreter's `-c`
+    # takes source, so no flag combination in front of it may discharge a bare
+    # path.
+    py_leaks = []
+    for interp in ("python", "python3", "python3.11", "python3.12"):
+        for count in (0, 1, 2):
+            for combo in itertools.permutations(("-u", "-B", "-O", "-E"),
+                                                count):
+                flags = " ".join(combo)
+                command = f"{interp} {flags} -c {path}".replace("  ", " ")
+                if _mod.discharges("Bash", {"command": command}) is not None:
+                    py_leaks.append(command)
+    if py_leaks:
+        print(f"FAIL: {len(py_leaks)} `python -c <bare path>` permutation(s) "
+              f"discharge, e.g. {py_leaks[0]}")
+        failures += 1
+    else:
+        print("PASS: no `python -c <bare path>` permutation discharges")
+        passes += 1
+
     # The mirror direction: a genuine arming must survive the same wrappers.
     missed = [
         c for c in (
@@ -665,6 +715,9 @@ def main():
             f'bash -c "python3 {path} --monitor"',
             f"nohup python3 ~/.claude/{path} --monitor >/dev/null 2>&1 &",
             f"/usr/bin/env python3 {path} --monitor",
+            f"python3 -u {path}",
+            f"bash -c {path}",
+            f"python3 {path}; echo done",
         )
         if _mod.discharges("Bash", {"command": c}) != "scheduled"
     ]

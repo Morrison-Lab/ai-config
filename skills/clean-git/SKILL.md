@@ -124,8 +124,8 @@ mutation", and stating it precisely is what makes it worth anything:
 **nothing that can lose work happens before confirmation.**
 
 Derive the `INLINE` set.
-The command below is **not** `INLINE` --- it is the raw worktree-to-branch
-mapping, every worktree included:
+This first command produces the raw worktree-to-branch mapping, every worktree
+included --- which is **not** `INLINE`:
 
 ```bash
 git worktree list --porcelain \
@@ -153,8 +153,9 @@ awk -F'\t' 'NR==FNR { dead[$0]; next } $2 in dead { print $1 }' \
 Give it the negative control every filter needs: `wc -l` both files, and
 confirm `inline.txt` is shorter than `wt-branches.tsv` whenever any live
 worktree exists.
-An `INLINE` the same length as the raw mapping means the filter did not run,
-which is the failure the next paragraph describes.
+An `INLINE` the same length as the raw mapping means the filter did not run:
+every live worktree's branch is still in it, including the main checkout's, so
+the contradiction rule fires spuriously on all of them.
 
 Using the raw mapping as `INLINE` breaks the sweep immediately rather than
 subtly, which is worth stating because it looks like a shortcut that would
@@ -206,7 +207,7 @@ git worktree list --porcelain | grep -Fq "worktree $path" && echo STILL-THERE ||
   Leave it to the branch pass, which is equipped to confirm the merge and
   escalate to `-D`.
 - **The worktree is still there.**
-  Then removal genuinely failed, and the safety rule below applies.
+  Then removal genuinely failed, which stops the branch pass.
 
 Distinguishing them matters because the safety rule stops the branch pass on a
 worktree failure.

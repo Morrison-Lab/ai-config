@@ -30,6 +30,9 @@ MCP_PUSH = {"type": "assistant", "message": {"content": [
                "files": [{"path": "f.py", "content": "x"}]}}]}}
 
 
+SENTINEL_PREFIX = ".claude-stale-status-"
+
+
 def say(text):
     return {"type": "assistant", "message": {"content": [
         {"type": "text", "text": text}]}}
@@ -120,7 +123,7 @@ def run(events):
     # The guard fires once per distinct message; clear sentinels so repeated
     # runs of this suite stay deterministic.
     for f in os.listdir(tempfile.gettempdir()):
-        if f.startswith(".claude-stale-status-"):
+        if f.startswith(SENTINEL_PREFIX):
             try:
                 os.remove(os.path.join(tempfile.gettempdir(), f))
             except OSError:
@@ -134,6 +137,96 @@ def run(events):
     return bool(out)
 
 
+
+
+# ai-config#1859: the WORDING must match what was actually detected.
+# A bare "<n> pass" with no PR reference near it may well be a local test-suite
+# count, and asserting it is "a PR's check state" was wrong three times
+# ("10 pass", "30 pass", "33 pass"). The staleness verdict is unchanged --
+# only the sentence describing the match. Asserted here rather than in CASES
+# because CASES compares fire/no-fire and would pass either way, which is how
+# a detector that is right about the important part and wrong about the
+# visible part survives a green suite.
+ATTRIBUTION = [
+    ("Local suite: 33 pass.",
+     "states a pass/fail count",
+     "a bare count with no PR reference reads as possibly-local"),
+    ("Tests: 33 pass. Pushed to #1919 and checks are running.",
+     "asserts a PR's check state",
+     "the same count near a PR reference is a check-state claim"),
+    ("All checks green.",
+     "asserts a PR's check state",
+     "an explicit check-state phrase keeps the strong wording"),
+
+    # Review round 1 on #1922. Both were reproduced against the hook by the
+    # reviewer, and both are the SAME defect this PR removes, pointing the
+    # other way: a message that is not soft at all, softened.
+    ("11 pass, 0 fail -- ready to merge.",
+     "asserts a PR's check state",
+     "a later non-count phrase settles it, not just the first match"),
+    ("PR checks: 11 pass, 0 fail.",
+     "asserts a PR's check state",
+     "the plain word PR counts as a nearby reference"),
+    ("The pull request has 11 pass.",
+     "asserts a PR's check state",
+     "so does the spelled-out form"),
+]
+
+# The REST check-runs endpoint must count as a status query. `fully-clean.md`
+# mandates it over `gh pr checks`, so a guard blind to it warns precisely when
+# the stronger command was used -- and tells the author to re-run the weaker
+# one. Found by the guard firing on this PR's own session.
+QUERY_FORMS = [
+    ("gh pr checks 1922 -R Morrison-Lab/ai-config", "the gh porcelain"),
+    ("gh api --paginate repos/o/r/commits/abc1234/check-runs --jq '.x'",
+     "the paginated REST check-runs endpoint"),
+    ("gh api repos/o/r/commits/abc1234/status", "the legacy commit-status endpoint"),
+    ("gh pr view 1922 --json statusCheckRollup", "the rollup field"),
+]
+
+
+def check_query_forms():
+    """Every spelling of a status query must discharge the staleness warning."""
+    failures = 0
+    for cmd, label in QUERY_FORMS:
+        events = [PUSH,
+                  {"type": "assistant", "message": {"content": [
+                      {"type": "tool_use", "input": {"command": cmd}}]}},
+                  say("All checks green at head abc1234.")]
+        fired = run(events)
+        ok = not fired
+        failures += 0 if ok else 1
+        print(f"{'ok  ' if ok else 'FAIL'}  query-form: {label}")
+    return failures
+
+
+def check_attribution():
+    """Each warning must describe what it matched, not what it assumed."""
+    failures = 0
+    for message, expected, label in ATTRIBUTION:
+        fd, path = tempfile.mkstemp(suffix=".jsonl")
+        with os.fdopen(fd, "w") as fh:
+            for e in (QUERY, PUSH, say(message)):
+                fh.write(json.dumps(e) + "\n")
+        for f in os.listdir(tempfile.gettempdir()):
+            if f.startswith(SENTINEL_PREFIX):
+                try:
+                    os.remove(os.path.join(tempfile.gettempdir(), f))
+                except OSError:
+                    pass
+        out = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+        ).stdout.strip()
+        os.remove(path)
+        reason = (json.loads(out).get("reason") if out else "") or ""
+        ok = expected in reason
+        failures += 0 if ok else 1
+        print(f"{'ok  ' if ok else 'FAIL'}  attribution: {label}")
+    return failures
+
+
 def main():
     failures = 0
     for events, want_block, label in CASES:
@@ -143,7 +236,10 @@ def main():
             failures += 1
         print(f"{'ok  ' if ok else 'FAIL'}  "
               f"{'block' if want_block else 'allow'}: {label}")
-    print(f"\n{len(CASES) - failures}/{len(CASES)} passed")
+    failures += check_attribution()
+    failures += check_query_forms()
+    total = len(CASES) + len(ATTRIBUTION) + len(QUERY_FORMS)
+    print(f"\n{total - failures}/{total} passed")
     return 1 if failures else 0
 
 

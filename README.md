@@ -113,7 +113,10 @@ Then reload the Cursor window.
 On Windows, Git Bash `ln -s` may copy instead of linking;
 prefer the GitHub marketplace install there.
 
-`.cursor-plugin/plugin.json` is the Cursor Plugin manifest (skills, project rules, commands).
+`.cursor-plugin/plugin.json` is the Cursor Plugin manifest
+(skills, user-global rules from `cursor-rules/`, commands).
+Project-only rules stay in [`.cursor/rules/`](.cursor/rules/)
+and are not shipped through the plugin.
 Claude Code keeps using `.claude-plugin/`.
 
 ### Tool mappings

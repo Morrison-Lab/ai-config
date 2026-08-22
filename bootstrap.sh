@@ -241,7 +241,31 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
     skip_cursor_rc=$?
     set -e
     if [ "$skip_cursor_rc" -eq 0 ]; then
-      printf 'skip  Cursor skills (%s)\n' "$skip_cursor_skills"
+      # Same as the Codex plugin path: a skip that leaves this checkout's
+      # bare links in place stacks two catalogs (ai-config#1409).
+      removed=0
+      if [ -d "$CURSOR_DIR/skills" ]; then
+        for src in "$SCRIPT_DIR"/skills/*; do
+          [ -d "$src" ] || continue
+          dest="$CURSOR_DIR/skills/$(basename "$src")"
+          if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
+            rm "$dest"
+            removed=$((removed + 1))
+          fi
+        done
+        if [ -d "$SCRIPT_DIR/shared/sembr-skills/skills" ]; then
+          for src in "$SCRIPT_DIR"/shared/sembr-skills/skills/*; do
+            [ -d "$src" ] || continue
+            dest="$CURSOR_DIR/skills/$(basename "$src")"
+            if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
+              rm "$dest"
+              removed=$((removed + 1))
+            fi
+          done
+        fi
+      fi
+      printf 'skip  Cursor skills (%s; removed %d stale skill link(s))\n' \
+        "$skip_cursor_skills" "$removed"
     else
       skip_cursor_skills=""
     fi

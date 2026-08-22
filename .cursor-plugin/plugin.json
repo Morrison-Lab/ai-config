@@ -9,6 +9,6 @@
   "repository": "https://github.com/Morrison-Lab/ai-config",
   "keywords": ["skills", "pr-workflow", "review", "r-packages"],
   "skills": "skills",
-  "rules": ".cursor/rules",
+  "rules": "cursor-rules",
   "commands": "commands"
 }

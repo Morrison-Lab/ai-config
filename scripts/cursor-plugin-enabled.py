@@ -5,9 +5,9 @@ Cursor can load this repo's skills three ways, and stacking any two doubles
 the listing the same way a Claude plugin-plus-symlink install does
 (ai-config#1409):
 
-  * a Cursor plugin --- marketplace cache under ``~/.cursor/plugins/cache``
-    or ``~/.cursor/plugins/marketplaces``, or a local checkout at
-    ``~/.cursor/plugins/local/ai-config``;
+  * a Cursor plugin --- an enabled copy under ``~/.cursor/plugins/cache``
+    or a local checkout at ``~/.cursor/plugins/local/ai-config``
+    (a marketplace catalog clone is not an install);
   * ``~/.claude/skills`` --- Cursor also discovers Claude/Codex skill
     directories, so a live ``bootstrap.sh`` Claude install already serves
     the catalog;
@@ -37,7 +37,14 @@ def _is_relative_to(path: Path, root: Path) -> bool:
 
 
 def plugin_installed(cursor_dir: Path) -> bool:
-    """True when an ai-config Cursor plugin directory is already on disk."""
+    """True when an ai-config Cursor plugin is actually installed.
+
+    Cursor copies an enabled plugin into ``plugins/local/`` or
+    ``plugins/cache/<org>/ai-config/``. ``plugins/marketplaces/`` is only
+    the catalog clone: adding a marketplace does not enable the plugin, and
+    this repo's tree also contains ``plugins/ai-config`` (Antigravity), so a
+    recursive name match there is a false skip.
+    """
     plugins = cursor_dir / "plugins"
     local = plugins / "local" / PLUGIN_DIRNAME
     if local.exists():
@@ -46,11 +53,6 @@ def plugin_installed(cursor_dir: Path) -> bool:
     if cache.is_dir():
         for org in cache.iterdir():
             if (org / PLUGIN_DIRNAME).exists():
-                return True
-    marketplaces = plugins / "marketplaces"
-    if marketplaces.is_dir():
-        for path in marketplaces.rglob(PLUGIN_DIRNAME):
-            if path.is_dir():
                 return True
     return False
 

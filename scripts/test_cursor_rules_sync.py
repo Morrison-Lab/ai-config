@@ -10,6 +10,7 @@ Files that exist in both places must be byte-identical. Project-only rules
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -41,6 +42,12 @@ for name, user_path in sorted(user_files.items()):
         f"{name} is identical in cursor-rules/ and .cursor/rules/",
         user_path.read_bytes() == project_path.read_bytes(),
     )
+
+plugin = json.loads((ROOT / ".cursor-plugin" / "plugin.json").read_text(encoding="utf-8"))
+check(
+    "plugin ships user-global cursor-rules, not project-only 002",
+    plugin.get("rules") == "cursor-rules",
+)
 
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

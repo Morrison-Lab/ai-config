@@ -29,11 +29,15 @@ def check(name: str, condition: bool) -> None:
     failures += not condition
 
 
-def run_bootstrap(tmp: Path, with_plugin: bool) -> tuple[Path, str]:
+def run_bootstrap(tmp: Path, with_plugin: bool, stale_link: bool = False) -> tuple[Path, str]:
     cursor = tmp / "cursor"
     cursor.mkdir(parents=True)
     if with_plugin:
         (cursor / "plugins" / "local" / "ai-config").mkdir(parents=True)
+    if stale_link:
+        dest = cursor / "skills" / "ardi"
+        dest.parent.mkdir(parents=True)
+        dest.symlink_to(ROOT / "skills" / "ardi")
     bin_dir = tmp / "bin"
     bin_dir.mkdir()
     scontrol = bin_dir / "scontrol"
@@ -64,6 +68,24 @@ with tempfile.TemporaryDirectory() as raw:
     check("plugin skip is reported", "Cursor plugin is already installed" in output)
     check("user-global rules still install",
           (cursor / "rules" / "000-global-workflow.mdc").exists())
+
+try:
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        dest = tmp / "probe"
+        dest.symlink_to(ROOT / "skills" / "ardi")
+        can_link = dest.is_symlink()
+except OSError:
+    can_link = False
+if can_link:
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        cursor, output = run_bootstrap(tmp / "stale-link", with_plugin=True, stale_link=True)
+        check("plugin skip removes this checkout's stale skill link",
+              not (cursor / "skills" / "ardi").exists())
+        check("skip reports stale-link removal", "stale skill link" in output)
+else:
+    print("SKIP: stale-link removal (platform cannot create symlink)")
 
 with tempfile.TemporaryDirectory() as raw:
     tmp = Path(raw)

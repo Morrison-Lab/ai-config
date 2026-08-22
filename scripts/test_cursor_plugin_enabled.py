@@ -43,6 +43,16 @@ with tempfile.TemporaryDirectory() as raw:
           "Cursor plugin is already installed" in (mod.skip_reason(cursor, claude, repo) or ""))
     shutil.rmtree(cursor / "plugins")
 
+    listing = cursor / "plugins" / "marketplaces" / "morrison-lab" / "ai-config"
+    (listing / "plugins" / "ai-config").mkdir(parents=True)
+    (listing / ".cursor-plugin").mkdir()
+    (listing / ".cursor-plugin" / "plugin.json").write_text("{}\n", encoding="utf-8")
+    check(
+        "marketplace catalog clone does not skip skill install",
+        mod.skip_reason(cursor, claude, repo) is None,
+    )
+    shutil.rmtree(cursor / "plugins")
+
     claude_skills = claude / "skills"
     claude_skills.parent.mkdir(parents=True, exist_ok=True)
     try:

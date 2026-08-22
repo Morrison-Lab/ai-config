@@ -574,6 +574,79 @@ A sentence that would still read true with the parameter deleted is explaining t
 Caught as a non-blocking review note.
 Restating the docstring to name the depth filter made the parameter visibly redundant, and it was removed.)
 
+## A rationale can be false while the code it justifies is correct
+
+The section above covers a docstring that is **true and incomplete**.
+This is its inverse: a comment, docstring, or PR rationale that is **false**,
+sitting beside code that works.
+
+The pairing matters because the two are told apart only by checking, and
+nothing about either one feels like a claim while you are writing it.
+A rationale is written in the same breath as the code, from the same
+understanding, and it inherits the code's air of having been verified ---
+the code was tested, so the sentence about the code feels tested too.
+It was not.
+Tests exercise behaviour, and a rationale is a claim about *why* the behaviour
+holds, which no test touches.
+
+The failure has a signature worth learning:
+
+- **The artifact is right, so nothing fails.**
+  No check goes red, no output is wrong, and the defect is invisible to every
+  instrument.
+- **The claim is checkable in seconds**, and usually by a command adjacent to
+  what you already ran --- reading the function's documented defaults, grepping
+  the file you cited, checking which commit introduced a line.
+- **It survives review** unless a reader independently verifies the claim,
+  because the natural review question is whether the code works.
+
+**A rationale that reasons about defaults is the highest-risk kind**, because
+the default is the thing you did not write and therefore did not think about.
+"Uses X's own engine, to avoid diverging" is false when the call's defaults
+select a different engine.
+Read the signature rather than the intent.
+
+The check is one question per justifying sentence:
+**what command would show this false?**
+If a command exists and takes seconds, run it before the sentence ships.
+If none exists, the sentence is not a rationale but a guess, and should be
+written as one.
+
+- **Do:** run the deriving command for a rationale's factual claim --- the
+  documented defaults, the introducing commit, the cited file's text --- and
+  publish it beside the claim where the claim is load-bearing.
+- **Do:** treat a sentence explaining *why* code is correct as unverified until
+  checked, however thoroughly the code itself was tested.
+- **Don't:** let a rationale inherit the code's credibility --- the tests
+  covered the behaviour, never the explanation.
+- **Don't:** reason about a call's semantics from its intent when its
+  **defaults** decide them.
+
+**Not mechanizable, and worth saying why.**
+The condition is "a sentence asserting why code behaves as it does is false",
+which requires evaluating the claim against the world.
+No transcript-decidable trigger exists, and a lexical proxy --- flagging
+`because`, `so that`, `rather than` --- would fire on every correct rationale
+in the corpus.
+This is a review question and a self-check, not a guard.
+
+(Measured 2026-08-21, four instances in one session, all caught by reviewers
+rather than by any check.
+A hook comment attributed an omitted gate to "earlier fixes rather than the
+original design", where `git log -S` put it in the hook's first PR
+(ai-config#1860).
+`fully-clean.md` said a checker "annotates duplicated names automatically",
+where it annotates only the lines it reports, never a passing one ---
+which was the very case the passage illustrated (ai-config#1870).
+An R helper's comment said it used R's own regex engine "rather than
+reimplementing the matching and risking a divergence", while calling `grepl()`
+with defaults that are POSIX ERE and case-sensitive, against `.Rbuildignore`
+patterns that Writing R Extensions specifies as Perl-like and
+case-insensitive (ucdavis/bcs#720).
+And a PR rationale justified a reword by saying "the same entry already uses
+the long form", where the entry used the abbreviation (ucdavis/bcs#725).
+Every one of the four artifacts was correct.)
+
 ## What to report
 
 For each issue found, state:

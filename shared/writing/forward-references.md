@@ -65,6 +65,44 @@ Prefer deleting the pointer over rewording it: in a sequential procedure
 the reader reaches the target anyway, so a step that states its own
 mechanism in brief needs no cross-reference at all.
 
+**A pointer aimed the *wrong* way is a different defect, and fixing one primes
+you to apply the wrong test to the rest.**
+The positional test above is easy to read and easy to invert under a specific,
+common sequence.
+
+A reviewer flags `the rule below` where the rule is actually *above*.
+That is a genuine defect --- a broken reference --- so you fix it, and then
+sweep the file's other directional words to be thorough.
+At that point the axis in your head is **direction**, because direction is what
+the finding was about.
+So you check each remaining pointer, find that it aims at something genuinely
+further down, and clear it as correct.
+
+Every one of those is a forward reference.
+Pointing ahead accurately is what *qualifies* a phrase under this rule, not
+what exempts it --- the opening paragraph says so, and the sweep still passes
+over them, because the test being applied came from the finding rather than
+from the rule.
+
+The tell is the verdict "this one points forward correctly, so it stays".
+That sentence cannot be true here.
+
+- **Do:** re-read the rule before sweeping for more instances of a finding,
+  rather than generalizing from the instance you were handed.
+- **Do:** treat an accurate forward pointer as the central case, not the
+  exception.
+- **Don't:** clear a pointer because it aims where it claims to ---
+  that is the defect, not a defence against it.
+- **Don't:** carry the previous finding's axis into the sweep it prompted.
+
+(Measured 2026-08-21 on
+[ai-config#1849](https://github.com/Morrison-Lab/ai-config/pull/1849).
+Round 3 flagged one backwards `below`; the sweep that followed cleared two
+accurate forward pointers with exactly the reasoning above, in a reply posted
+to the reviewer.
+Round 4 flagged one of them plus a third introduced by the round-3 fix itself.
+All three were removed in `6e195693`.)
+
 ## Confirming a hit
 
 For each candidate, check two things:

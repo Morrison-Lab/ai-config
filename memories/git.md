@@ -1176,32 +1176,20 @@ as #1054.)
 ## Git --- deleting a remote branch returns HTTP 403 in a remote/web session
 
 `git push origin --delete <branch>` (and its `:refs/heads/<branch>` spelling)
-fails from a Claude Code remote/web session:
+is refused by the agent proxy from a Claude Code remote/web session:
+`error: RPC failed; HTTP 403`, then `fatal: the remote end hung up`.
+It is a policy answer rather than a transient one, so the retry-with-backoff
+path does not apply --- retrying reproduces the identical 403.
 
-```
-error: RPC failed; HTTP 403 curl 22 The requested URL returned error: 403
-send-pack: unexpected disconnect while reading sideband packet
-fatal: the remote end hung up unexpectedly
-Everything up-to-date
-```
+The failure also prints a trailing `Everything up-to-date`, which reads as
+success once the error line scrolls away.
 
-The agent proxy refuses ref deletion.
-It is a refusal rather than a network fault, so the retry-with-backoff path in
-the push convention does not apply --- retrying produces the identical 403.
-
-Note the trailing `Everything up-to-date`, which reads as success and is the
-reason this can pass unnoticed: the failure line scrolls above it, and the
-exit status is the only reliable signal.
-Confirm with `git ls-remote origin refs/heads/<branch>` rather than by reading
-the output.
-
-- **Do:** delete a remote branch through the forge API or UI in a remote
-  session, and verify with `git ls-remote`.
-- **Do:** leave the branch and say so when neither is available; a stale branch
-  is cheap, and its closed PR is the record of why it exists.
-- **Don't:** retry the delete with backoff --- the 403 is a policy answer, not
-  a transient one.
+- **Do:** delete a remote branch through the forge API or UI here, and confirm
+  with `git ls-remote origin refs/heads/<branch>`.
+- **Do:** leave the branch and say so when neither is available; its closed PR
+  is the record of why it exists.
+- **Don't:** retry the delete with backoff.
 - **Don't:** read `Everything up-to-date` as the delete having succeeded.
 
-(Measured 2026-08-22 while cleaning up a duplicate branch;
+(Measured 2026-08-22;
 [ai-config#1999](https://github.com/Morrison-Lab/ai-config/issues/1999).)

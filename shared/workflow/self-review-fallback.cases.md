@@ -192,9 +192,12 @@ remote ref is absent.
 
 **Two lessons, and the second is the transferable one.**
 
-A cross-vendor reviewer is worth chasing even when the primary is merely slow,
-not only when it is down --- the value here was not redundancy but a different
-reading of the same diff.
+The value here was not redundancy but a *different reading* of the same diff,
+which is a reason to chase a cross-vendor reviewer beyond mere availability.
+Note the limit of what this case shows, though: the primary produced zero
+verdicts across three attempts, which is "down" rather than "slow" by this
+fragment's own taxonomy, so it is evidence about the value of a second reading
+and not about when to reach for one.
 
 And a self-review is systematically weakest on the *mechanism* of the thing it
 is reviewing.

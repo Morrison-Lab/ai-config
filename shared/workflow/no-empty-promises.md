@@ -103,8 +103,11 @@ An undischarged promise is wrong to send, and delivering it first buys nothing
   is always available, so "there was no mechanism to build" is never the reason.
 - **Do:** drop the promise and state the plain fact when the mechanism is not
   worth building.
-- **Don't:** promise future behaviour and leave the turn with no durable
+- **Don't:** promise a *standing rule* and leave the turn with no durable
   artifact in it.
+  An owed **action** is the one case where an armed firing substitutes for the
+  durable artifact --- see the debt section below, which is the only exemption
+  and does not widen to rule promises.
 - **Don't:** promise the *mechanism* in the future tense ("I'll add a hook for
   this") --- that is the same empty promise one level down.
 - **Don't:** read an apology, an explanation, or a restatement of the rule as a
@@ -156,9 +159,9 @@ Tracked as ai-config#1946.)
 That anchoring is load-bearing rather than fussy: this corpus says "an owed UMS pass" and "the pass is owed" in ordinary rule prose, so a matcher keyed on bare `owed` would block every reply that cites those rules --- the trap [`hooks/no-placeholder-reply.py`](../../hooks/no-placeholder-reply.py) avoids by anchoring on the whole message rather than a substring.
 So "an owed UMS pass" stays clean, and "owed by me" does not.
 
-- **Do:** file the issue, write the memory, or do the work, then say the debt is discharged.
+- **Do:** file the issue, write the memory, arm the next step, or do the work, then say the debt is discharged.
 - **Do:** say plainly that something was not done, and name what tracks it, when nothing durable followed.
-- **Don't:** write "owed by me", "I owe", or "I still owe" into a turn that wrote nothing durable.
+- **Don't:** write "owed by me", "I owe", or "I still owe" into a turn that shipped neither a durable artifact nor an armed firing.
 - **Don't:** read the absence of a modal as the absence of a promise.
 
 (Directive from the user, 2026-08-20: "'Owed by me' is another phrase indicating a broken promise".

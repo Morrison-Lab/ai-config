@@ -297,9 +297,27 @@ SCHEDULER_TOOL = re.compile(
 # precisely the reply this guard was extended to catch.
 SCHEDULER_SKILLS = {"schedule", "loop", "workaround-watcher"}
 
-# The repo's own detached poller, invoked directly. `no-unmonitored-pr.py`
-# arms it; running either by hand is the same arming.
+# The repo's own detached poller, RUN rather than merely named.
+#
+# The execution anchor is the whole of what makes this sound, and its absence
+# was a real bypass on the first cut of this change: a bare path regex
+# discharged `cat hooks/monitor-open-prs.py`, `grep -n check
+# hooks/monitor-open-prs.py`, and `echo hooks/monitor-open-prs.py` -- which is
+# exactly what `discharges()`'s own docstring says must never happen, in a
+# session working on the poller hooks, where those reads are the likeliest
+# commands of all.
+#
+# So require an interpreter or a direct exec before the path, mirroring the
+# way FILING_CMD demands the actual `gh issue create` verb rather than the
+# word "issue".
+#
+# Residual, named rather than papered over: `python3 -c "print(open(
+# 'hooks/monitor-open-prs.py').read())"` reads through an interpreter and so
+# still matches. It is contrived next to `cat`, and narrowing further would
+# mean parsing shell rather than matching it.
 POLLER_CMD = re.compile(
+    r"(?:\bpython3?\b|\bbash\b|\bsh\b|(?:^|\s)\./)"
+    r"[^;&|\n]{0,80}?"
     r"\bhooks/(?:monitor-open-prs|no-unmonitored-pr|ensure-open-pr-monitor)\.py",
     re.I,
 )
@@ -489,6 +507,14 @@ def discharges(name, inp):
         # tool's own schema ignores every other field when it is set.
         if inp.get("stop") is True:
             return None
+        # `noop` is deliberately NOT treated the same way, though the two look
+        # alike. Read against ScheduleWakeup's own schema rather than inferred
+        # from the field name: `noop` decides how the tick is DISPLAYED
+        # ("consecutive noop:true ticks are collapsed in the user's terminal
+        # view"), and it is "required unless `stop` is true" -- so it is
+        # mandatory on every genuine arming, and a quiet hold is precisely the
+        # `noop: true` case. Excluding it would reject about half of all real
+        # armings.
         return "scheduled"
 
     if low in WRITE_TOOLS:
@@ -501,12 +527,24 @@ def discharges(name, inp):
         cmd = str(inp.get("command", ""))
         if FILING_CMD.search(cmd):
             return "durable"
-        if POLLER_CMD.search(cmd):
-            return "scheduled"
         # A shell write needs BOTH a rule surface and something that writes to
         # it, so `cat shared/workflow/ardi.md` reads as the read it is.
+        #
+        # This runs BEFORE the poller test, and the order is load-bearing
+        # rather than stylistic. The three poller scripts live under `hooks/`,
+        # so MECHANISM_PATH matches them too -- and testing the arming first
+        # meant `git add hooks/no-unmonitored-pr.py && git commit` returned
+        # "scheduled" where it had returned durable before this change. A RULE
+        # promise now demands "durable" specifically, so that reordering
+        # silently blocked a turn whose author had shipped the mechanism, and
+        # handed them a message telling them to do what they had just done.
+        #
+        # Durable is the stronger claim, so when a command is both a write and
+        # a mention of the poller, the write wins.
         if MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd):
             return "durable"
+        if POLLER_CMD.search(cmd):
+            return "scheduled"
         return None
 
     if low in ("task", "agent", "skill"):
@@ -539,7 +577,11 @@ def discharges(name, inp):
         # rather than against the brief, so that same ambiguity cannot reach
         # them: "what does the schedule skill do?" is prose in `args`, never
         # the value of `skill`.
-        if str(inp.get("skill", "")).strip().lower() in SCHEDULER_SKILLS:
+        # `.split(":")[-1]` because a plugin exposes the same skill under a
+        # qualified name -- `workaround-watcher` and `ai-config:workaround-watcher`
+        # are both live in the same listing, and only the bare one matched.
+        skill = str(inp.get("skill", "")).strip().lower().split(":")[-1]
+        if skill in SCHEDULER_SKILLS:
             return "scheduled"
         blob = " ".join(str(inp.get(k, "")) for k in
                         ("prompt", "description", "skill", "args"))

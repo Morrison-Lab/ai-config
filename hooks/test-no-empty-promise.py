@@ -436,6 +436,66 @@ CASES = [
     ([say("Going forward I'll always check first, and I owe #1937 the ARDI "
           "loop."), WROTE_FRAGMENT],
      False, "a durable write clears both kinds at once"),
+
+    # --- Review round on #1947, Finding 1. `POLLER_CMD` was a bare path
+    # regex, so merely NAMING the poller discharged an owed action -- in a
+    # session working on the poller hooks, where these reads are the likeliest
+    # commands of all. Each was reproduced against the PR head before the fix.
+    ([say("I owe #1937 the ARDI loop."), bash("cat hooks/monitor-open-prs.py")],
+     True, "cat of the poller does NOT discharge (review #1947)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("grep -n check hooks/monitor-open-prs.py")],
+     True, "grepping the poller does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."), bash("echo hooks/monitor-open-prs.py")],
+     True, "echoing the poller path does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."), bash("ls -la hooks/monitor-open-prs.py")],
+     True, "listing the poller does NOT discharge"),
+    # The arming shapes that must keep working.
+    ([say("I owe #1937 the ARDI loop."), bash("python3 hooks/monitor-open-prs.py")],
+     False, "running the poller discharges"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("nohup python3 ~/.claude/hooks/monitor-open-prs.py --monitor "
+           ">/dev/null 2>&1 &")],
+     False, "a backgrounded poller with an absolute path discharges"),
+    ([say("I owe #1937 the ARDI loop."), bash("./hooks/monitor-open-prs.py")],
+     False, "a direct exec of the poller discharges"),
+
+    # The same finding's SECOND half: testing the arming before the durable
+    # write made `git add` on a poller file return "scheduled", which a RULE
+    # promise does not accept -- so a turn that had shipped its mechanism was
+    # blocked and told to do what it had just done. Durable must win.
+    ([say("Going forward I'll always arm the watcher."),
+      bash("git add hooks/no-unmonitored-pr.py && git commit -m fix")],
+     False, "committing a poller hook is DURABLE, so it clears a rule (#1947)"),
+    ([say("Going forward I'll always arm the watcher."),
+      bash("sed -i 's/a/b/' hooks/ensure-open-pr-monitor.py")],
+     False, "editing a poller hook in place is durable, not merely scheduled"),
+    # Control: the same shape on a non-poller hook, which never regressed.
+    ([say("Going forward I'll always arm the watcher."),
+      bash("git add hooks/other.py && git commit -m fix")],
+     False, "the non-poller control still discharges a rule promise"),
+
+    # A plugin exposes the same skill under a qualified name, and only the
+    # bare one matched.
+    ([say("I owe #1937 the ARDI loop."),
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "Skill",
+           "input": {"skill": "ai-config:workaround-watcher",
+                     "args": "watch #1937"}}]}}],
+     False, "a plugin-prefixed scheduling skill discharges (#1947)"),
+
+    # `noop: true` is NOT `stop: true`. Read against ScheduleWakeup's schema:
+    # `noop` decides how the tick is DISPLAYED and is "required unless `stop`
+    # is true", so it is mandatory on every genuine arming -- and a quiet hold
+    # is exactly the `noop: true` case. Pinned so the rebuttal is mechanical
+    # rather than remembered.
+    ([say("I owe #1937 the ARDI loop."),
+      {"type": "assistant", "message": {"content": [
+          {"type": "tool_use", "name": "ScheduleWakeup",
+           "input": {"delaySeconds": 600, "noop": True,
+                     "reason": "quiet hold on #1937's review",
+                     "prompt": "Continue the ARDI loop on #1937."}}]}}],
+     False, "`noop: true` is a display flag and still discharges (#1947)"),
 ]
 
 

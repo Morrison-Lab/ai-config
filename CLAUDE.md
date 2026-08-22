@@ -91,7 +91,9 @@ The implication runs one way only: a timer fires once and dies, so it cannot kee
 - **Do:** arm the next step, and report its clock time, when what you owe is an action rather than a rule.
 - **Do:** drop the promise and state the fact when no mechanism is worth
   building.
-- **Don't:** end a turn carrying a promise and no durable artifact.
+- **Don't:** end a turn carrying a promise and no mechanism --- a durable
+  artifact for a standing rule, and either that or an armed firing for an
+  owed action.
 - **Don't:** promise the mechanism itself in the future tense.
 - **Don't:** answer an owed action with a written record alone --- documenting an ARDI loop is not running one.
 

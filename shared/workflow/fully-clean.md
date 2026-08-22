@@ -138,7 +138,9 @@ Worked-example case records for the rules below live in
 
    The vacuous run is the one to discard, and the trigger event is the only field that separates them.
    `gh api "repos/<owner>/<repo>/actions/runs/<id>" --jq '.event'` settles it in one read per run.
-   A `pass` from a run whose event supplies no base is [`algorithmatize-checks`](algorithmatize-checks.md)'s zero-matrix problem arriving as a green check: a detector that never ran and a detector that found nothing are the same observable.
+   A `pass` from a run whose event supplies no base is [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s zero-matrix problem arriving as a green check.
+   That fragment states it as "a matrix of zeros is indistinguishable from a detector that never ran", and prescribes a negative control before trusting any zero.
+   The same remedy applies here, and the trigger event is what supplies it: a run given no base examined nothing, so its `pass` is the zero rather than a result.
 
    Note that this is not the same as [ai-config#1870](https://github.com/Morrison-Lab/ai-config/pull/1870)'s ambiguity, where two *different* workflows contribute check runs sharing a name.
    Here it is one workflow, and the disambiguator is the event rather than the workflow name --- so a fix keyed on `workflowName` cannot see it.

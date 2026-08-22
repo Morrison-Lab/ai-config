@@ -606,6 +606,51 @@ refutation of it.**
   the reviewer's finding --- it is a fresh claim, and overturning something
   feels like having verified it.
 
+**Refuting the mechanism a finding proposes is not refuting its claim, and the
+quality of the refutation is what hides the difference.**
+The rule above governs a refutation nobody checked.
+This one governs a refutation that survives every check and is then made to
+carry a conclusion wider than itself.
+A finding usually arrives as a claim plus a route --- there is a bypass, and
+here is the function that opens it --- and disproving the route leaves the
+claim exactly where it stood.
+
+The pull toward the wider conclusion is strongest when the refutation is good.
+Having measured the named mechanism against the real tool and watched it fail,
+the reply writes itself, and "there is nothing to exempt" reads as the finding
+of an investigation rather than as an inference drawn from one.
+Nothing further fires, because the thread is now closed.
+
+The check is one question asked before replying, and it is
+[`metacognitive-monitoring`](metacognitive-monitoring.md)'s cause test run
+backwards.
+That rule asks what else would explain an effect you are attributing.
+This asks what else would produce the effect you are denying.
+
+- **Do:** restate a finding as its claim and its proposed route, and say which
+  of the two your evidence reached.
+- **Do:** look for a second route to the same effect before replying, starting
+  with whatever the named function hands off to.
+- **Don't:** let a measured disproof of a mechanism carry a conclusion about
+  the claim --- those are different propositions, and only one was tested.
+- **Don't:** read a wrong mechanism as evidence the reviewer's instinct was
+  wrong --- a finding can be right about what happens and wrong about where.
+
+(Measured 2026-08-22 on
+[ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911).
+A review reported a security bypass in `push_refspecs`, describing how
+`--repo=origin` would smuggle an unreviewed ref past the guard.
+Three `git push --dry-run` runs refuted that mechanism --- an explicit
+positional repository overrides `--repo`, so the dropped positional was never a
+refspec --- and the rebuttal concluded there was nothing unreviewed to exempt.
+The bypass was real and sat one function away in `_push_remote`, which took the
+remote from the positionals and then a config fallback chain and never
+consulted `--repo`.
+So `git push --repo=other` was graded against `origin` and allowed, while
+`git push other` was refused.
+An adversarial review of the rebuttal's own commit found it fifteen minutes
+later.)
+
 **Count a round's findings before pushing its fix, because disposing of one
 correctly generates no evidence about the others.**
 

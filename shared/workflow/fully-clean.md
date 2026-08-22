@@ -87,8 +87,14 @@ Worked-example case records for the rules below live in
    A matrix leg gated on `needs:` may not have started at all, so its absence
    from a run's jobs contradicts any same-named row reported as passing.
 
-   `check-pr-fully-clean.py` annotates duplicated names with the run URL
-   automatically; this is for reading `gh pr checks` by hand, where nothing does.
+   `check-pr-fully-clean.py` annotates a duplicated name with the run URL only
+   on the lines it actually reports --- a run still pending, or one that
+   finished badly.
+   A **passing** duplicated name produces no line at all, so it is never
+   annotated, and the manual lookup above is the only thing that resolves it.
+   That is precisely the case in the measurement below: the passing row
+   belonged to the wrong workflow, and nothing in the script's output would
+   have said so.
 
    - **Do:** take the workflow from the check run's own URL before attributing
      a pass or a failure.

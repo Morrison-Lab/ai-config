@@ -315,7 +315,16 @@ def check_ci_runs(sha: str, repo: str) -> Tuple[bool, List[str]]:
         conclusion = cr.get("conclusion")
         where = ""
         if name in duplicated:
-            url = cr.get("html_url") or cr.get("check_suite", {}).get("id", "")
+            # `html_url` only. A check-suite id was tried as a fallback and
+            # dropped: it is a different numeric namespace from the workflow-run
+            # id that `gh run view` takes, so rendering it in the same slot
+            # points the reader at nothing. And `check_suite` is documented as
+            # `object or null`, so `.get("check_suite", {})` returns None on a
+            # real payload -- `.get()` substitutes only for an absent KEY, not a
+            # null VALUE -- and the AttributeError would exit 1, the status this
+            # repo reserves for "not clean". A payload quirk would then read as
+            # a PR regression. No annotation beats a wrong or fatal one.
+            url = cr.get("html_url")
             where = f" ({url})" if url else ""
 
         if status != "completed":

@@ -8,11 +8,14 @@ reading and deciding is a candidate to become a script whose output we
 merely consume.
 
 Read "work" broadly.
-Model judgment is the case this fragment was written for and the hardest to displace, but the rule is not about judgment --- it is about **doing by hand what something else already computes**, which includes work carrying no judgment at all.
+Model judgment is the case this fragment was written for and the hardest to
+displace, but the rule is not about judgment --- it is about **doing by hand
+what something else already computes**,
+which includes work carrying no judgment at all.
 A hand-typed section number is not a decision anyone made;
 it is a value the renderer was already producing,
 kept in a second place by hand.
-It is the easiest of the three cases to miss,
+That kind of case is the easiest to miss,
 precisely because nothing about it feels like deciding.
 
 This is one principle with two faces, operating on different timescales.
@@ -195,8 +198,16 @@ The moment anything turns the real one on --- a format option, a config inherite
 Measured 2026-08-22 on `ucdavis/matt.contracts#2`:
 a Quarto document whose 30 headings carried hand-typed numbers
 while a directory `_metadata.yml` set `number-sections: true`.
-Every heading rendered doubly numbered (`2 1. Objectives and estimands`), and all eight `@sec-` cross-references resolved to the generated scheme while the visible headings showed the hand-typed one --- so each reference named a section number that appeared nowhere in the document.
-None of it was visible in the source, and nine review rounds over a day did not catch it, because every one of them read the `.qmd`.
+Every heading rendered doubly numbered --- `2 1. Objectives and estimands`,
+`2.3 1.3 Estimand framework` --- and the eight `@sec-` cross-references
+resolved to the generated scheme, so a reference to the estimand section read
+"Section 2.3" while its heading offered the reader both `2.3` and `1.3` with
+nothing to say which was the section number.
+Neither number was wrong on its own.
+What the document lost was the ability to answer what a section is called,
+which is the only thing a cross-reference is for.
+None of it was visible in the source, and nine review rounds over a day did
+not catch it, because every one of them read the `.qmd`.
 
 **The check is one question, asked before typing a value into an artifact:** does anything in this toolchain already compute this?
 If yes, let it, and delete the copy.

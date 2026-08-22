@@ -51,7 +51,7 @@ A scoped rule like `Bash(rm *)` is different in kind, not just narrower: it leav
 
 ## Absolute paths in path-scoped rules need a `//` prefix; a single leading `/` anchors at the settings source, not the filesystem root
 
-**The belief that was wrong (an easy one to default to):** a rule like `Write(/tmp/**)` or `Read(/Users/alice/file)` names an absolute filesystem path because it starts with `/`.
+**The belief that was wrong (an easy one to default to):** a rule like `Edit(/tmp/**)` or `Read(/Users/alice/file)` names an absolute filesystem path because it starts with `/`.
 
 **The fact that replaced it:** a single leading `/` in a `Read`/`Edit`/`Write` (or `Cd`) path pattern anchors at the directory associated with the **settings source that defines the rule** (project root, the local-settings starting directory, `~/.claude/`, etc.) --- not the filesystem root.
 The docs give this exact warning:
@@ -64,14 +64,42 @@ So the four pattern forms are:
 
 | Pattern            | Meaning                              | Example                    |
 | ------------------- | ------------------------------------ | --------------------------- |
-| `//path`            | Absolute path from filesystem root   | `Write(//tmp/**)` = anywhere under `/tmp` |
+| `//path`            | Absolute path from filesystem root   | `Edit(//tmp/**)` = anywhere under `/tmp` |
 | `~/path`            | Path from home directory             | `Read(~/Documents/*.pdf)`   |
 | `/path`             | Path relative to the settings source | `Edit(/src/**/*.ts)` = `<project root>/src/**/*.ts` in project settings |
 | `path` or `./path`  | Path relative to current directory   | `Read(*.env)`               |
 
 On Windows, paths are normalized to POSIX form first, so `//c/**/.env` matches `.env` anywhere on the `C:` drive.
 
-- **Do:** write `//path` (double leading slash) for a genuinely filesystem-root-absolute rule, e.g. `Write(//tmp/**)` to grant scratch writes anywhere under `/tmp` regardless of which settings file defines the rule or where the session started.
+### A path rule must be spelled `Edit(...)`, never `Write(...)`
+
+Getting the `//` prefix right is not sufficient, because the TOOL NAME in a
+path rule matters too, and the natural choice is the wrong one.
+
+> Claude Code checks file permissions against `Edit(path)` and `Read(path)`
+> rules only.
+
+> Use `Edit(docs/**)` in place of `Write(docs/**)`, `NotebookEdit(docs/**)`, or
+> `MultiEdit(docs/**)`, and `Read(docs/**)` in place of `Glob(docs/**)`.
+
+So `Edit(...)` covers the `Write`, `NotebookEdit` and `MultiEdit` tools as well
+as `Edit` itself.
+A `Write(//tmp/**)` rule is accepted without complaint and then never
+consulted, so the grant silently does nothing --- the failure mode is a rule
+that looks present and correct in the config.
+
+Measured 2026-08-21: `Write(//tmp/**)` was written into a real reviewer
+allowlist on the strength of the `//` fix above, and a reviewer caught that the
+tool name defeated it.
+The two facts are independent, and getting the first one right is what makes
+the second easy to miss.
+
+- **Do:** spell every path-scoped rule `Edit(...)` or `Read(...)`, whichever
+  side of the read/write split it governs.
+- **Don't:** write `Write(...)`, `MultiEdit(...)`, `NotebookEdit(...)`, or
+  `Glob(...)` with a path --- each is accepted and ignored.
+
+- **Do:** write `//path` (double leading slash) for a genuinely filesystem-root-absolute rule, e.g. `Edit(//tmp/**)` to grant scratch writes anywhere under `/tmp` regardless of which settings file defines the rule or where the session started.
 - **Don't:** write a single leading `/` and expect it to mean "absolute" --- it means "relative to wherever this settings file's own anchor is," which varies by settings source (project root, starting directory, `~/.claude/`, etc.).
 
 ## Parameter-scoped rules (`Tool(param:value)`) are valid only in deny/ask, never allow -- and an omitted parameter is never matched

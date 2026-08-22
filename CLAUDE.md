@@ -1511,8 +1511,8 @@ target = bs('print("done@@n")')
 The same collapse is already described twice.
 [`algorithmatize-checks.rationale.md`](shared/workflow/algorithmatize-checks.rationale.md)
 records it for **this same transport** --- a shell heredoc feeding Python ---
-where `\\b` arrives as `\b` and becomes a **backspace**; it carries the
-worked table.
+where `\\b` arrives as `\b` and becomes a **backspace**, worked through as
+a mutation that silently corrupts a guard's own regex.
 [`address-every-comment.rationale.md`](shared/workflow/address-every-comment.rationale.md)
 records a genuinely different one, backslash quoting collapsing across nested
 shell layers.

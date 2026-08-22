@@ -181,6 +181,24 @@ already in front of you.**
 - **Don't:** accept a search for the visible contradiction as proof that the
   retired claim itself is gone.
 
+**That same search settles a narrower question about placement: a correction
+written NEAR the flagged sentence reads as having replaced it, while the
+flagged sentence survives and the file then states both.**
+Edit the sentence the reviewer named, and use the search above --- for the
+claim, not for the symptom --- to confirm that wording is gone.
+
+- **Do:** delete or rewrite the flagged sentence itself, rather than adding a
+  truer one beside it.
+- **Do:** mark superseded text as superseded, explicitly, where it is worth
+  keeping as a record of why something was done.
+- **Don't:** read "the file now contains a true sentence" as having addressed
+  a finding about a false one.
+- **Don't:** let a commit message assert a deletion that the diff shows as an
+  addition beside unchanged text.
+
+See [`address-every-comment.cases.md`](address-every-comment.cases.md),
+"A correction added beside the flagged sentence, which survived".
+
 **When the wrong thing is a figure, the unit of repair is the figure --- across
 every artifact carrying the twin, not just the diff.**
 

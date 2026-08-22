@@ -49,6 +49,20 @@ directly, carry it forward with an actual next action. Every issue noticed,
 however small or outside the current task's scope, must at minimum be filed in
 the owning GitHub, GitLab, or equivalent tracker. File it before reporting it.
 
+## Manage quota, including the structural kind
+
+Treat token cost as a property of a workflow's **shape**, not only of the choices made inside one session.
+Route bounded mechanical work to a cheaper model, a subagent, or a separately-billed CLI rather than the conductor's own tier, and compact or hand off before context bloat forces it.
+
+Those are per-session levers, and their saving expires with the session.
+Ask separately what a procedure costs *by construction*: instructions loaded at launch that only some tasks read, a judgment made twice that wants a deterministic check, a serial loop whose base moves faster than one round, a brief that enumerates a set instead of deriving it.
+The deliverable there is a change to the workflow --- fixed in stride when small, filed with its measurement when not --- never a quieter run of the same procedure.
+
+Two boundaries.
+Efficiency never outranks correctness, so no saving is bought with a skipped verification or a shortened review.
+And restructure in its own issue or PR, not inside whatever task happened to notice it.
+See `shared/workflow/restructure-for-efficiency.md`.
+
 ## Keep ai-config and repo checkouts fresh
 
 In every session --- at session start, and again periodically during long sessions --- refresh local state:

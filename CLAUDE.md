@@ -149,10 +149,10 @@ Default to archive-and-start-new over a bare `/clear` whenever the session might
 The mid-task counterpart, covered in the fragment above: don't wait for automatic compaction to guess what matters, and flag it yourself (same `⚠️ FLAG` tag) once a session has grown large with a live task still in flight --- many tool calls, long tool outputs no longer needed, or a session already through one auto-compaction.
 Use `/clear`'s menu when there is nothing left to carry forward; use `compress-session` when there is.
 
-## Actively manage quota usage: models and compaction
+## Actively manage quota usage: models, compaction, and workflow structure
 
 Treat quota as something to manage continuously through a session, not only at a wrap-up or fan-out moment.
-Two levers; when either applies, act on it without waiting to be asked.
+Three levers; when any applies, act on it without waiting to be asked.
 
 **Model tier.**
 For dispatched work (`Agent` calls, `Workflow` `agent()` calls), route model and effort per [`when-to-orchestrate`](shared/workflow/when-to-orchestrate.md)'s "Route each agent's model/effort" section.
@@ -178,9 +178,22 @@ The agent has no direct view into it, though --- the usage bar lives in the clie
 So key this off what's actually visible: the user naming or showing usage pressure, or --- inside a `Workflow` run with a stated token target --- `budget.spent()`/`budget.remaining()`.
 Either is reason enough to compress or recommend a lighter model, on the same terms those sections already set out.
 
-When both levers genuinely apply at once, do the self-directed one first.
-Compress or compact before asking the user to act on a model change.
-Only the second one costs them a step.
+**Workflow structure.**
+[`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md)
+
+The two levers above spend less on the work **as shaped**, and their saving expires with the session.
+This one changes the shape, so it pays every future session --- and it is the one that never announces itself, because following an expensive procedure correctly reads as compliance, and pulling either lever above reads as having managed quota.
+So ask separately what a procedure costs *by construction*: always-loaded content only some sessions read, a judgment made twice that wants an instrument, a serial loop the base outruns, an enumerated brief that should have been a query, work at this tier a free CLI could do.
+The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
+`python scripts/check-context-closure.py` is the built instrument for the always-loaded pool; its budget is advisory by design, so read an over-budget line as the prompt it is.
+Two boundaries: efficiency never outranks correctness, so no saving is bought with a skipped check; and the restructuring goes in its own issue or PR rather than happening inside whatever task noticed it.
+
+- **Do:** ask what a procedure costs by construction, separately from what this run costs.
+- **Don't:** read a pulled lever as having answered the structural question.
+
+When several levers genuinely apply at once, do the self-directed ones first.
+Compress, compact, or file the structural finding before asking the user to act on a model change.
+Only the model change costs them a step.
 
 ## Keep a running on-disk session lab notebook
 

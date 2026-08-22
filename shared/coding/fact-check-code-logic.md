@@ -764,3 +764,47 @@ revert each one flip a case rather than nothing.
 - **Don't:** read "the computation is right now" as the change being finished.
 - **Don't:** rely on an adjacent-comment guard for this; its window is ten
   lines and one file, and these sites are neither.
+
+## Replacing a mechanism: enumerate what the OLD one handled, not what the new one adds
+
+Swapping one implementation for another is not the same review problem as writing one.
+The new code gets read on its own merits and looks better, because it *is* better along the axis that motivated the swap.
+The set of cases the old one handled and the new one does not is absent from the replacement by construction, so reading the new code cannot surface it.
+
+The tell is a justification that enumerates **only the gains**.
+A comment or commit message listing three ways the replacement is superior, with nothing about what it gives up, is not a summary of the trade.
+It is one side of a ledger presented as the whole.
+It reads as thorough precisely because it is specific.
+
+So derive the old one's coverage from the old one's own source and check each case against the new one.
+Where the code being replaced is itself a pattern, that pattern is the enumeration: a regex's alternations, a table's keys, a dispatch dict's entries.
+Turn each entry into a test case, so the coverage claim is asserted and not merely reasoned about.
+
+The enumeration disappears from the working tree when the change lands, which is what makes the loss feel permanent --- but it is still in history.
+`git show <pre-change-commit>:<path>` prints it.
+Finding that sha is the only fiddly part, and it is worth saying plainly that it is **not** always the commit before the PR: a replacement landing mid-PR has its own predecessor inside the same branch.
+Derive it rather than assuming.
+`git log --oneline -- <path>` names the commits that touched the file, and the one before the swap is the one to read --- but check how the repo merges before trusting that list, because a squash-merging repo collapses a PR to a single commit and the mid-PR predecessors never appear in it.
+Where that is the case, reach them by sha through the PR's own ref, which a default clone does not fetch: run `git fetch origin refs/pull/<n>/head` first, and they are readable like any other commit after that.
+
+This is [`check-purpose-before-reusing`](../workflow/check-purpose-before-reusing.md)'s "mirror failure" section pointed at a **replacement** rather than at a sibling.
+That one governs a new check written *beside* an existing one, where the guards to mine are still in the tree.
+Here they are in the diff's own deleted lines.
+[`challenge-redundant-content`](../workflow/challenge-redundant-content.md)'s "inverse failure" section is the third case, where consolidation *gains* a trigger rather than losing one.
+
+Measured 2026-08-22 on [ai-config#1932](https://github.com/Morrison-Lab/ai-config/pull/1932).
+A regex push-detector in a `PreToolUse` hook --- at the time of writing on that PR's branch rather than on `main` --- was replaced by the shell-parsed detector from a sibling hook, correctly, on the DRW grounds the replacing comment itself cited.
+That comment block named three cases the new detector handled better --- `git -C <dir> push`, `git -c k=v push`, and excluding the two forms that re-head nothing --- and none of the cases it dropped.
+The deleted `KEYWORD_PREFIX` alternation had covered twelve shell prefixes, and the deleted `GIT_PROG` pattern had covered an unexpanded `$GIT` or `${GIT}` program token.
+The detector stopped recognizing those forms, so a push written that way was not treated as a push at all and passed the guard unexamined --- among them a `for ... do` retry loop, an `if !` or `while !` guard, a brace group, a bare `!`, and a `sudo` prefix.
+Later rounds restored them, and the restoring comment says outright that dropping them "was a REGRESSION rather than a simplification".
+The alternation listing all twelve was in the deleted lines the whole time.
+
+- **Do:** read the replaced code for its case list, and check the replacement against each one.
+- **Do:** add a test per entry in that list, so the recovered cases are asserted and not argued.
+- **Do:** derive the pre-change sha from the file's own history where the repo's merge style preserves it, and from the PR ref where it does not --- never assuming it is the PR's base.
+- **Do:** state what the swap gives up alongside what it gains, even when the answer is nothing --- an explicit "nothing" is checkable and an omission is not.
+- **Don't:** accept a justification that lists only improvements.
+  The cases it is silent about are the ones nobody will look for.
+- **Don't:** read a passing suite as covering the difference.
+  The suite was written against the old behaviour's *intent* rather than its edges, so a dropped case usually has no test until you write one.

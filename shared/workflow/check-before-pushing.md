@@ -1,47 +1,27 @@
-Take a fresh reading of the remote branch **immediately** before every `git push`,
-and reconcile what it shows rather than overwriting it.
-Not at the start of the round, not when you last synced, not when you opened the PR ---
-immediately before, every time.
+Take a fresh reading of the remote branch **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
+Not at the start of the round, not when you last synced, not when you opened the PR --- immediately before, every time.
 
 ## Ownership is what suppresses the check
 
-The branch you cut, whose PR you opened, and whose review round you are driving
-is the branch you are *least* likely to check before pushing to.
-That is the whole difficulty, and it is not carelessness:
-you know what is on the branch because you put it there,
-so a check reads as ceremony rather than as a question with an unknown answer.
+The branch you cut, whose PR you opened, and whose review round you are driving is the branch you are *least* likely to check before pushing to.
+That is the whole difficulty, and it is not carelessness: you know what is on the branch because you put it there, so a check reads as ceremony rather than as a question with an unknown answer.
 
-The belief is routinely wrong, and [`claim-pr`](claim-pr.md) already records all three ways:
-the `@claude` agent pushes to your branch on PR activity, typically to merge `main` in;
-a second CLI session under the same account can claim the same PR and drive it;
-and a human can push to it at any time.
+The belief is routinely wrong, and [`claim-pr`](claim-pr.md) already records all three ways: the `@claude` agent pushes to your branch on PR activity, typically to merge `main` in; a second CLI session under the same account can claim the same PR and drive it; and a human can push to it at any time.
 None of those announce themselves in your conversation.
 
-Note which direction the parallelism runs, because it inverts the usual intuition:
-the more agents are working a repo, the likelier a collision
-and the less any single session can observe one coming.
-So the check matters most exactly when the evidence for needing it is least visible,
-which is why judgment does not reach it and an instrument has to.
+Note which direction the parallelism runs, because it inverts the usual intuition: the more agents are working a repo, the likelier a collision and the less any single session can observe one coming.
+So the check matters most exactly when the evidence for needing it is least visible, which is why judgment does not reach it and an instrument has to.
 
-That is the same shape [`pr-on-claim`](pr-on-claim.md)'s open-PR check has,
-and it fails the same way: the skipped step is a *query about other people*
-rather than anything in your own sequence,
-so nothing about the moment feels like an omission.
+That is the same shape [`pr-on-claim`](pr-on-claim.md)'s open-PR check has, and it fails the same way: the skipped step is a *query about other people* rather than anything in your own sequence, so nothing about the moment feels like an omission.
 
 ## A fetch is a measurement, and it expires
 
-[`claim-pr`](claim-pr.md) carries three procedures for a push that came back rejected ---
-the identical-merge case, the same-parents-different-tree case,
-and the "already done" comment from a parallel session.
+[`claim-pr`](claim-pr.md) carries three procedures for a push that came back rejected --- the identical-merge case, the same-parents-different-tree case, and the "already done" comment from a parallel session.
 Every one of them runs **after** the collision.
 
 The immediacy rule is what makes them rarely needed.
-A `git fetch` from earlier in the session is a reading of the remote *at that moment*,
-and it stopped being evidence the instant somebody else pushed.
-This is the same expiry [`CLAUDE.md`](../../CLAUDE.md)'s timestamp rule states for the clock,
-and it goes wrong the same way:
-having genuinely checked earlier is what licenses not checking now,
-because the memory of having consulted the remote obscures that the reading has lapsed.
+A `git fetch` from earlier in the session is a reading of the remote *at that moment*, and it stopped being evidence the instant somebody else pushed.
+This is the same expiry [`CLAUDE.md`](../../CLAUDE.md)'s timestamp rule states for the clock, and it goes wrong the same way: having genuinely checked earlier is what licenses not checking now, because the memory of having consulted the remote obscures that the reading has lapsed.
 
 `git ls-remote` is the reading to take, not `git fetch`:
 
@@ -50,10 +30,7 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git ls-remote --heads origin "$BRANCH"
 ```
 
-It is read-only ---
-it updates no remote-tracking ref and writes nothing into the object store ---
-so it cannot itself change the state it reports on,
-and it cannot silently satisfy a lease (see below).
+It is read-only --- it updates no remote-tracking ref and writes nothing into the object store --- so it cannot itself change the state it reports on, and it cannot silently satisfy a lease (see below).
 
 Classify what it returns:
 
@@ -65,71 +42,41 @@ Classify what it returns:
 | tip is **not** an ancestor of `HEAD` | somebody else is driving this branch |
 
 Only the last one needs anything, and it needs a reconcile rather than an overwrite.
-Whether you already hold the remote tip's object is the sharpest part of the reading,
-and it points the opposite way to intuition:
-an object you *cannot* resolve locally is the worse signal, not the milder one,
-because the remote moved after your last fetch and you cannot see what is there.
+Whether you already hold the remote tip's object is the sharpest part of the reading, and it points the opposite way to intuition: an object you *cannot* resolve locally is the worse signal, not the milder one, because the remote moved after your last fetch and you cannot see what is there.
 
 ## `--force-with-lease` is not the safe form on its own
 
-This corpus reaches for `--force-with-lease` as *the* safe force-push
-in [`use-existing-pr-branch`](use-existing-pr-branch.md),
-[`memories/git.md`](../../memories/git.md),
-[`memories/preferences.md`](../../memories/preferences.md),
-and the `stack-prs`, `mma`, `clean-branches`, and `rescue-closed` skills.
-It is much safer than bare `--force` and it is not sufficient,
-because the lease is defeatable and nothing in those sites says so.
+This corpus reaches for `--force-with-lease` as *the* safe force-push in [`use-existing-pr-branch`](use-existing-pr-branch.md), [`memories/git.md`](../../memories/git.md), [`memories/preferences.md`](../../memories/preferences.md), and the `stack-prs`, `mma`, `clean-branches`, and `rescue-closed` skills.
+It is much safer than bare `--force` and it is not sufficient, because the lease is defeatable and nothing in those sites says so.
 
-The mechanism: the lease compares the remote tip against **your remote-tracking ref**,
-not against anything you have actually looked at.
-So any background `git fetch` refreshes that ref
-and the lease then passes over the very commits it existed to protect ---
-a scheduled poller, another tool working the same checkout,
-a `--recurse-submodules` fetch, an IDE's auto-fetch.
+The mechanism: the lease compares the remote tip against **your remote-tracking ref**, not against anything you have actually looked at.
+So any background `git fetch` refreshes that ref and the lease then passes over the very commits it existed to protect --- a scheduled poller, another tool working the same checkout, a `--recurse-submodules` fetch, an IDE's auto-fetch.
 The push succeeds, reports nothing unusual, and the commits are gone from the remote.
 
 `--force-if-includes` (git 2.30+) is the missing half.
-It additionally requires that the remote-tracking commits the lease is vouching for
-are actually reachable from what you are pushing ---
-so a fetch you never saw no longer satisfies the lease.
+It additionally requires that the remote-tracking commits the lease is vouching for are actually reachable from what you are pushing --- so a fetch you never saw no longer satisfies the lease.
 Use both, always:
 
 ```bash
 git push --force-with-lease --force-if-includes
 ```
 
-The one case that genuinely needs bare `--force` is a lease that is
-**unsatisfiable** rather than violated.
-[`memories/git.md`](../../memories/git.md) records it:
-after a squash-merge with auto-delete removed the branch your ref still names,
-`--force-with-lease` fails with `stale info`,
-which reads alarmingly like a race and is not one.
+The one case that genuinely needs bare `--force` is a lease that is **unsatisfiable** rather than violated.
+[`memories/git.md`](../../memories/git.md) records it: after a squash-merge with auto-delete removed the branch your ref still names, `--force-with-lease` fails with `stale info`, which reads alarmingly like a race and is not one.
 Prefix the command with `ALLOW_FORCE_PUSH=1` there.
 
 ## The instrument
 
-`hooks/no-clobbering-push.py` is this rule's mechanism, per
-[`algorithmatize-checks`](algorithmatize-checks.md) ---
-because a rule that has to be *recognized as applicable* at the moment of typing
-is exactly the gap [`skills/push`](../../skills/push/SKILL.md) cannot close on its own.
-That skill states the pre-push checks well and only runs when it is invoked,
-so a bare `git push` in the middle of an ARDI round never passes through it.
+`hooks/no-clobbering-push.py` is this rule's mechanism, per [`algorithmatize-checks`](algorithmatize-checks.md) --- because a rule that has to be *recognized as applicable* at the moment of typing is exactly the gap [`skills/push`](../../skills/push/SKILL.md) cannot close on its own.
+That skill states the pre-push checks well and only runs when it is invoked, so a bare `git push` in the middle of an ARDI round never passes through it.
 
-The hook binds `PreToolUse` on `Bash` and splits the two questions
-by which of them is decidable:
+The hook binds `PreToolUse` on `Bash` and splits the two questions by which of them is decidable:
 
-- It **refuses** a bare `--force` / `-f`, because that is decidable from the command
-  text alone and the remedy costs one word.
-  `--force-with-lease --force-if-includes` is never the worse command ---
-  where the remote ref does not exist the lease succeeds trivially ---
-  so the refusal is always satisfiable, and being wrong about it costs a retype
-  rather than a lost commit.
-- It **warns** on everything else, from the live `ls-remote` reading above,
-  and stays silent on a fast-forward.
-  Whether a divergence matters is a judgment it cannot make:
-  a rebase you did on purpose and a parallel session's commits look identical from here.
-  Per [`README`](../../README.md)'s "A hook that misfires is worse than a missing one",
-  that path only ever adds context.
+- It **refuses** a bare `--force` / `-f`, because that is decidable from the command text alone and the remedy costs one word.
+  `--force-with-lease --force-if-includes` is never the worse command --- where the remote ref does not exist the lease succeeds trivially --- so the refusal is always satisfiable, and being wrong about it costs a retype rather than a lost commit.
+- It **warns** on everything else, from the live `ls-remote` reading above, and stays silent on a fast-forward.
+  Whether a divergence matters is a judgment it cannot make: a rebase you did on purpose and a parallel session's commits look identical from here.
+  Per [`README`](../../README.md)'s "A hook that misfires is worse than a missing one", that path only ever adds context.
 
 ## When the check fires, reconcile
 
@@ -140,32 +87,16 @@ git fetch origin "$BRANCH"
 git log --oneline "HEAD..origin/$BRANCH"
 ```
 
-Then follow [`claim-pr`](claim-pr.md)'s tree-and-parents comparison,
-which distinguishes the two cases a rejected push can mean:
-an identical merge another session already pushed, where the answer is
-`git reset --hard origin/<branch>`,
-and a **differently resolved** one, where a reset silently discards
-whatever your version got right and the answer is to merge the two commits.
+Then follow [`claim-pr`](claim-pr.md)'s tree-and-parents comparison, which distinguishes the two cases a rejected push can mean: an identical merge another session already pushed, where the answer is `git reset --hard origin/<branch>`, and a **differently resolved** one, where a reset silently discards whatever your version got right and the answer is to merge the two commits.
 Never force-push over the difference to find out which it was.
 
-- **Do:** take a fresh `git ls-remote` reading immediately before every push,
-  including on a branch you created and believe you alone are driving.
-- **Do:** push with `--force-with-lease --force-if-includes` whenever a force
-  is genuinely wanted, and name `ALLOW_FORCE_PUSH=1` only for an unsatisfiable
-  lease.
-- **Do:** reconcile a divergence by fetching and reading it, and treat an
-  object you cannot resolve locally as the stronger signal rather than the weaker.
-- **Don't:** treat an earlier fetch, sync, or green CI run as the check ---
-  each was a reading of a moment that has passed.
-- **Don't:** read "I opened this branch and its PR" as evidence you are its only
-  driver; that belief is what the check exists to test.
-- **Don't:** reach for bare `git push --force`, and don't read
-  `--force-with-lease` alone as safe --- a background fetch defeats it silently.
+- **Do:** take a fresh `git ls-remote` reading immediately before every push, including on a branch you created and believe you alone are driving.
+- **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and name `ALLOW_FORCE_PUSH=1` only for an unsatisfiable lease.
+- **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.
+- **Don't:** treat an earlier fetch, sync, or green CI run as the check --- each was a reading of a moment that has passed.
+- **Don't:** read "I opened this branch and its PR" as evidence you are its only driver; that belief is what the check exists to test.
+- **Don't:** reach for bare `git push --force`, and don't read `--force-with-lease` alone as safe --- a background fetch defeats it silently.
 
-(Directive from the user, 2026-08-21:
-"cai: add protections against clobbering commits from other agents on a branch
-you think you own; always check immediately before pushing".
+(Directive from the user, 2026-08-21: "cai: add protections against clobbering commits from other agents on a branch you think you own; always check immediately before pushing".
 Tracked as ai-config#1883.
-`grep -rn 'force-if-includes'` over the whole repo returned 0 hits when the
-directive arrived, against 8 files reaching for `--force-with-lease` as the
-safe form.)
+`grep -rn 'force-if-includes'` over the whole repo returned 0 hits when the directive arrived, against 8 files reaching for `--force-with-lease` as the safe form.)

@@ -450,34 +450,46 @@ def _push_positionals(argv: list[str]) -> list[str] | None:
 # failure direction (allow vs deny) cannot be observed any other way, and a
 # mutation turning its refusal into an allow survived an untested suite.
 BUDGET_SECONDS = float(os.environ.get("NPWSR_BUDGET_SECONDS", "6.0"))
+PER_CALL_SECONDS = 3.0
 _DEADLINE = [0.0]
 
 
-def _rev_parse(directory: str | None, rev: str) -> str | None:
+def _run_git(directory: str | None, *args: str) -> str | None:
+    """Run one git command inside the shared budget; None if it failed.
+
+    EVERY git call goes through here, deliberately. An earlier revision budgeted
+    only `_rev_parse` and let `_git_config`/`_rev_parse_ref` carry their own
+    hardcoded timeouts, so the bare-push resolution path could spend six
+    unbudgeted subprocess calls -- eighteen seconds against a ten-second
+    PreToolUse timeout -- before reaching the one call that enforced the budget.
+    A hook killed on timeout does not deny, so that reopened the silent allow
+    this budget exists to prevent, on the newest path rather than the oldest.
+
+    Sharing one helper is what makes that unrepeatable: a future call site
+    cannot forget to check the deadline, because there is nowhere else to run
+    git from.
+    """
     remaining = _DEADLINE[0] - time.monotonic()
     if remaining <= 0:
         raise TimeoutError("ran out of time resolving what this push would ship")
-    args = ["git"] + (["-C", directory] if directory else []) + ["rev-parse", rev]
+    cmd = ["git"] + (["-C", directory] if directory else []) + list(args)
     try:
-        out = subprocess.run(args, capture_output=True, text=True,
-                             timeout=min(3.0, remaining))
+        out = subprocess.run(cmd, capture_output=True, text=True,
+                             timeout=min(PER_CALL_SECONDS, remaining))
     except subprocess.TimeoutExpired:
         raise TimeoutError("ran out of time resolving what this push would ship")
     except Exception:
         return None
-    if out.returncode != 0:
-        return None
-    sha = out.stdout.strip()
-    return sha.lower() if re.fullmatch(r"[0-9a-f]{40}", sha) else None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def _rev_parse(directory: str | None, rev: str) -> str | None:
+    sha = _run_git(directory, "rev-parse", rev)
+    return sha.lower() if sha and re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
 def _git_config(directory: str | None, flag: str, key: str) -> str | None:
-    args = ["git"] + (["-C", directory] if directory else []) + ["config", flag, key]
-    try:
-        out = subprocess.run(args, capture_output=True, text=True, timeout=3)
-    except Exception:
-        return None
-    return out.stdout.strip() or None
+    return _run_git(directory, "config", flag, key) or None
 
 
 def _push_remote(directory: str | None, argv: list[str]) -> str | None:
@@ -502,13 +514,8 @@ def _push_remote(directory: str | None, argv: list[str]) -> str | None:
 
 
 def _rev_parse_ref(directory: str | None, *args: str) -> str | None:
-    cmd = ["git"] + (["-C", directory] if directory else []) + ["rev-parse", *args]
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
-    except Exception:
-        return None
-    name = out.stdout.strip()
-    return name if out.returncode == 0 and name and name != "HEAD" else None
+    name = _run_git(directory, "rev-parse", *args)
+    return name if name and name != "HEAD" else None
 
 
 def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | None, str]:

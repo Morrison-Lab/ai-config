@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 # Absolute, because every case runs the hook with `cwd` set to a throwaway
 # repository rather than the repo root.
@@ -538,6 +539,53 @@ def config_cases() -> int:
     return failures
 
 
+def budget_cases() -> int:
+    """The budget must bound EVERY git call, not just the last one.
+
+    The `NPWSR_BUDGET_SECONDS=0` table case cannot see this: with a zero budget
+    the first budgeted call raises immediately, so it never observes whether the
+    other calls were bounded at all. An earlier revision budgeted only
+    `_rev_parse` and let the bare-push remote resolution spend up to six
+    unbudgeted subprocess calls first -- long enough to exhaust the harness's
+    own 10s PreToolUse timeout, which does not deny.
+
+    So this measures wall time against a deliberately slow `git`, on the bare
+    push (the path with the most calls), and asserts the whole hook stays inside
+    the budget rather than a multiple of it.
+    """
+    failures = 0
+    d = tempfile.mkdtemp(prefix="npwsr-slow-")
+    try:
+        shim = os.path.join(d, "git")
+        real = shutil.which("git")
+        with open(shim, "w") as f:
+            f.write(f'#!/bin/sh\nsleep 1\nexec {real} "$@"\n')
+        os.chmod(shim, 0o755)
+
+        started = time.monotonic()
+        rc, out = run_hook(f"git -C {REPO} push", reviewed(),
+                           {"PATH": d + os.pathsep + os.environ.get("PATH", ""),
+                            "NPWSR_BUDGET_SECONDS": "2"})
+        elapsed = time.monotonic() - started
+        denied = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+        reason = (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+
+        label = "a slow git exhausts the budget across ALL calls, and the hook refuses"
+        if rc != 0 or not denied or "ran out of time" not in reason:
+            print(f"FAIL (rc={rc}, denied={denied}): {label}")
+            failures += 1
+        elif elapsed > 6.0:
+            # Six unbudgeted 1s calls plus overhead is what the defect looked
+            # like; a budget of 2s that actually binds cannot reach 6s.
+            print(f"FAIL (took {elapsed:.1f}s against a 2s budget): {label}")
+            failures += 1
+        else:
+            print(f"PASS: {label} ({elapsed:.1f}s)")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    return failures
+
+
 def orphan_cases() -> int:
     """The guard with its push detector missing.
 
@@ -608,11 +656,12 @@ def main():
         failed += raw_cases()
         failed += orphan_cases()
         failed += config_cases()
+        failed += budget_cases()
     finally:
         shutil.rmtree(REPO, ignore_errors=True)
         shutil.rmtree(OTHER, ignore_errors=True)
 
-    total = len(CASES) + 14
+    total = len(CASES) + 15
     if failed:
         print(f"\n{failed}/{total} cases failed")
         sys.exit(1)

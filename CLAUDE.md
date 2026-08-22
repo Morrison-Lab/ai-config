@@ -1449,6 +1449,52 @@ Open the PR.
   - **Do:** write a commit message carrying backticks to a file and commit it with `git commit -F <file>`.
   - **Don't:** pass a backtick-carrying message through `git commit -m "..."`, or spend a round diagnosing a guard refusal when the file route costs one command.
 
+## Tool transport collapses doubled backslashes
+
+The sibling of the backtick hazard above, and the same class: content silently
+transformed between what I type and what the interpreter receives.
+
+Inside a Bash-tool heredoc with a **quoted** delimiter (`<<\'PY\'`), which
+should be entirely literal, a doubled backslash `\\` arrives as a single `\`.
+A single `\` survives intact.
+So one level of unescaping is applied somewhere in transport.
+
+It fails silently and plausibly.
+A patch script's `assert target in s` fails, which reads as a slightly-wrong
+anchor string --- so the natural response is to re-dump the region and retype
+the anchor, which fails identically.
+The tell only appears on printing `repr()` of the constructed string.
+
+The worse case is not a failed assert.
+A heredoc that *writes* `\\d` into a regex emits `\d`, and one that writes
+`\d` may emit `d` --- a corrupted matcher with no syntax error and a green
+suite.
+Anything writing regexes, escape sequences, or Windows paths through a heredoc
+is exposed, including a `jq` filter: `test("\\*\\*Claude finished")` reaches
+`jq` as `test("\*\*...")` and dies with `Invalid escape`.
+
+Build the character rather than typing it:
+
+```
+B = chr(92)
+def bs(t): return t.replace("\\", B)
+block = bs(r'RX = re.compile(r"^\\d+\\s+pass$")')
+```
+
+- **Do:** route every literal backslash through `chr(92)` (or a placeholder
+  token) when heredoc content must survive verbatim.
+- **Do:** print `repr()` of a constructed string when a match inexplicably
+  fails, rather than retyping the anchor.
+- **Don't:** assume a quoted heredoc delimiter guarantees literal content ---
+  measured 2026-08-22, it does not.
+- **Don't:** trust a green suite after writing a regex through a heredoc; read
+  the emitted line back.
+
+(Measured 2026-08-22; tracked as
+[ai-config#1923](https://github.com/Morrison-Lab/ai-config/issues/1923).
+Cost three identical failed patch attempts before the cause was visible, then
+recurred immediately in a `jq` filter reading a PR review body.)
+
 ## Strict Merge Control Policy
 
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**

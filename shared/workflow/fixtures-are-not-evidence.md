@@ -479,3 +479,55 @@ reach back *to*, and it passed against code that could not reach back at all.
 The reviewer identified it precisely --- "the fixture likely only exercised two
 declarations with nothing substantive before them" --- and the replacement
 fixtures each place a real answer behind the run.)
+
+## A fixture that models the wrong record SHAPE makes a carve-out look covered while it is inert
+
+Every case above is about a fixture whose *content* was wrong --- too thin to
+reach a branch, or asserting the buggy output.
+This one is about a fixture whose **shape** was wrong, and it is harder to see
+because the shape is the very thing the fixture exists to stand in for.
+
+A guard reading a transcript needs to know what a record looks like.
+Its fixtures encode that belief.
+So when the belief is wrong, the fixtures are wrong in exactly the way that
+makes them agree with the code: both were written from the same guess, the
+suite is green, and the mechanism the fixtures describe **does not exist**.
+
+Nothing internal can catch it.
+The tests pass, the code is self-consistent, and a reviewer reading both sees a
+covered feature.
+Only the real artifact settles it --- which is
+[`verify-the-right-artifact`](verify-the-right-artifact.md)'s point arriving one
+level down, at the fixture rather than at the claim.
+
+So when a guard consumes a machine-produced artifact, read one **real** artifact
+before trusting any fixture of it, and say in the fixture where the shape came
+from.
+A fixture whose docstring cites a live sample is checkable; one that cites
+nothing is a guess with tests around it.
+
+- **Do:** dump a real record and copy its shape into the fixture, citing the
+  date and source.
+- **Do:** treat "the carve-out has a passing test" as evidence about the
+  fixture until you have seen the real shape.
+- **Don't:** infer a record's shape from how the surrounding code reads it ---
+  that is the same guess twice, and their agreement measures the guess.
+- **Don't:** count a green suite as evidence a carve-out fires; an inert branch
+  and a correct one are both green.
+
+(Measured 2026-08-22 on
+[ai-config#1917](https://github.com/Morrison-Lab/ai-config/issues/1917) /
+[#1925](https://github.com/Morrison-Lab/ai-config/pull/1925).
+`no-unmeasured-clock-claim.py` carried a deliberate carve-out so that quoting
+the harness's just-injected clock reading would not trip it, and a fixture named
+"quoting the harness's just-injected reading is exactly what the rule says to do"
+asserted it.
+Both modelled the reading as a bare-string `user` turn.
+A live transcript shows it is not a user record at all: it is its own record,
+`type: "attachment"`, carrying the text under `attachment.content` /
+`attachment.stdout`, with neither a `message` nor a top-level `content` --- so
+the scan skipped it and the carve-out never fired, while its test passed.
+The reviewer on [#1919](https://github.com/Morrison-Lab/ai-config/pull/1919)
+raised the possibility and explicitly could not settle it from the fixtures,
+which is the shape of the problem in one sentence.)
+

@@ -237,6 +237,19 @@ def named_branch_source_missing_case(path, bare):
     return "git push origin theirs-only"
 
 
+def explicit_current_branch_case(path, bare):
+    """`git push origin main` while `main` IS checked out.
+
+    `source` resolves to the literal `"main"` rather than the `"HEAD"`
+    sentinel, so a `source == "HEAD"` test sent this down the not-on-that-branch
+    path and emitted `git checkout main   # you are not on the branch being
+    pushed`, which is false. Harmless to run and still wrong to say.
+    """
+    _remote_advances(path, bare, keep_object=False)
+    _local_advances(path)
+    return "git push origin main"
+
+
 def value_cluster_remote_case(path, bare):
     """`-uo ci.skip upstream HEAD`: `o` eats `ci.skip`, so the remote is
     `upstream`. Without that, `ci.skip` is read as the remote and the reading
@@ -391,6 +404,8 @@ SHOULD_WARN = [
      "`--repo upstream` names the remote, not a value to skip"),
     ("W5", value_cluster_remote_case,
      "`-uo ci.skip upstream` -- `o` eats `ci.skip`, so `upstream` is the remote"),
+    ("W7", explicit_current_branch_case,
+     "`git push origin main` from `main` -- same branch, named explicitly"),
     ("W6", named_branch_case,
      "`git push origin feature-x` from `main` compares against local "
      "`feature-x`, not HEAD"),
@@ -442,6 +457,8 @@ LABEL_EXPECT = {
            ["your local HEAD", "HEAD..origin/"]),
     "W2": (["your local HEAD", "git log --oneline HEAD..origin/"],
            ["your local `", "git checkout "]),
+    "W7": (["git log --oneline main..origin/main"],
+           ["git checkout ", "you are not on the branch being pushed"]),
 }
 
 
@@ -625,11 +642,17 @@ MUTATIONS = {
           "and not override:")],
         {"D9"},
     ),
+    "on_source_is_not_the_HEAD_sentinel": (
+        "whether you are on the pushed branch is decided by comparing refs, "
+        "not by testing the `HEAD` sentinel",
+        [("        if on_source:", '        if source == "HEAD":')],
+        {"W7"},
+    ),
     "reconcile_uses_the_pushed_ref": (
         "the remediation commands operate on the ref being pushed",
-        [('        if source == "HEAD":\n'
+        [("        if on_source:\n"
           '            reconcile = (f"    git fetch origin {branch}\\n"',
-          '        if True:\n'
+          "        if True:\n"
           '            reconcile = (f"    git fetch origin {branch}\\n"')],
         {"W6"},
     ),

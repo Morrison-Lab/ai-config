@@ -301,7 +301,7 @@ def _git(args, timeout=8):
 
 
 def _target(positionals, repo_opt):
-    """`(remote, branch, source)` the push is aimed at, or `(None, None, None)`.
+    """`(remote, branch, source, on_source)` the push is aimed at, or all-`None`.
 
     Handles the shapes that occur: a bare `git push`, `git push origin`,
     `git push origin HEAD`, `git push origin <branch>`, `git push -u origin
@@ -315,6 +315,14 @@ def _target(positionals, repo_opt):
     happens to be an ancestor of `main` reads as a fast-forward while local
     `feature-x` genuinely diverges, which is a false negative in the exact
     situation this guard exists for.
+
+    `on_source` says whether the ref being pushed IS the checked-out one, and
+    it is computed by comparing `source` against the resolved head rather than
+    by testing `source == "HEAD"`. Those differ: the `"HEAD"` sentinel appears
+    only when the refspec omits a source, so `git push origin main` run on
+    `main` yields `source == "main"` -- it would fail a sentinel test while
+    being the same branch, and the advice would then tell a reader to check out
+    the branch they are already on.
 
     Returns all-`None` rather than a guess whenever the destination is not a
     single named branch --- a wildcard refspec, a deletion refspec, or a
@@ -344,9 +352,9 @@ def _target(positionals, repo_opt):
                 remote = up.strip()
 
     if not specs:
-        return remote, head, "HEAD"
+        return remote, head, "HEAD", True
     if len(specs) > 1:
-        return None, None, None  # several refspecs; no single branch
+        return None, None, None, None  # several refspecs; no branch
 
     spec = specs[0].lstrip("+")
     if ":" in spec:
@@ -357,7 +365,7 @@ def _target(positionals, repo_opt):
         dst = dst[len("refs/heads/"):]
     if dst == "HEAD":
         dst = head
-    return remote, dst, src
+    return remote, dst, src, src in ("HEAD", head)
 
 
 DENY = (
@@ -486,7 +494,7 @@ def evaluate(command):
         if flags["dry_run"] or flags["delete"] or flags["refset"] or not ok:
             continue
 
-        remote, branch, source = _target(positionals, repo_opt)
+        remote, branch, source, on_source = _target(positionals, repo_opt)
         if not remote or not branch:
             continue
         # `source` is deliberately NOT tested for emptiness here. An empty
@@ -549,9 +557,9 @@ def evaluate(command):
         # `git merge origin/feature-x` while `main` is checked out merges
         # `feature-x`'s remote content INTO `main` -- wrong branch, and
         # destructive, in precisely the scenario this guard exists for.
-        if source == "HEAD":
+        if on_source:
             reconcile = (f"    git fetch origin {branch}\n"
-                         f"    git log --oneline HEAD..origin/{branch}\n"
+                         f"    git log --oneline {source}..origin/{branch}\n"
                          f"    git merge origin/{branch}"
                          "      # or rebase, if the branch is yours alone\n")
         else:

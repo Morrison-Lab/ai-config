@@ -452,9 +452,18 @@ BASH_WRITE = re.compile(
     # the old classification was not wrong -- it was right by accident, and
     # the next reader could not tell the coincidence from the intent. Neither
     # writes a rule surface, which is the question this pattern is asking.
-    # Of the five subcommands only `commit` has hyphenated siblings; the
-    # guard is applied to the whole group so a future `add-*` cannot reopen
-    # this.
+    #
+    # The guard covers the whole group rather than `commit` alone, because
+    # `commit` is not the only member with a hyphenated sibling:
+    # `git --list-cmds=main,others` reports `add--interactive` as well
+    # (checked 2026-08-22 against git 2.x). That one is the deprecated
+    # backend for `git add -i`, superseded by the builtin, and it is
+    # interactive -- so it is deliberately excluded here rather than special
+    # cased. Excluding it costs a false POSITIVE (a genuine staging that no
+    # longer discharges), which is the loud direction and clearable in one
+    # command via this guard's own block message. `apply`, `mv`, and `rm`
+    # have no hyphenated siblings today, and the group guard means a future
+    # one cannot reopen this.
     r"|\btee\b|\bsed\s+-i\b|\bgit\s+(?:add|commit|apply|mv|rm)(?![\w-])"
     r"|--write(?![\w-])|\bmkdir\b",
     re.I,

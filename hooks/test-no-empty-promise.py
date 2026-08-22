@@ -661,6 +661,15 @@ CASES = [
     ([say("Going forward I'll always check this before replying."),
       bash("tee -a shared/workflow/fully-clean.md < /tmp/note")],
      False, "`tee` still discharges"),
+    # `commit` is NOT the only member of that group with a hyphenated
+    # sibling: `git --list-cmds=main,others` also reports `add--interactive`,
+    # the deprecated interactive backend. Pinned so the exclusion is a
+    # checked decision rather than an assumption -- and pinned in the LOUD
+    # direction, since a genuine staging that stops discharging costs an
+    # extra block the author clears in one command.
+    ([say("Going forward I'll always check this before replying."),
+      bash("git add--interactive shared/workflow/fully-clean.md")],
+     True, "`git add--interactive` is excluded with the rest of the group"),
 ]
 
 

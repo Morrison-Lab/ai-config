@@ -311,12 +311,30 @@ SCHEDULER_SKILLS = {"schedule", "loop", "workaround-watcher"}
 # way FILING_CMD demands the actual `gh issue create` verb rather than the
 # word "issue".
 #
-# Residual, named rather than papered over: `python3 -c "print(open(
-# 'hooks/monitor-open-prs.py').read())"` reads through an interpreter and so
-# still matches. It is contrived next to `cat`, and narrowing further would
-# mean parsing shell rather than matching it.
+# An interpreter given `-c` is NOT an anchor, because its argument is a
+# nested command rather than a script path -- so `sh -c "cat
+# hooks/monitor-open-prs.py"` is the same read as a bare `cat`, wearing a
+# wrapper. That idiom is ordinary (building a command from a variable,
+# running under a different shell), which makes it a likelier bypass than
+# the contrived `python3 -c "print(open(...).read())"` an earlier round of
+# this comment accepted as a residual. The lookahead retires both at once.
+#
+# Disqualifying the interpreter is deliberately narrower than discarding the
+# whole command: any OTHER exec token still anchors, so
+# `bash -c "python3 hooks/monitor-open-prs.py --monitor"` -- a genuine
+# arming -- keeps discharging. Combined short flags (`sh -ec`) are covered.
+#
+# Where the anchor list is not exhaustive (`eval`, `xargs`, a shell function),
+# the check errs toward NOT discharging. That is the safer direction here: a
+# missed arming is visible to its author and one plainer command from
+# clearing, whereas a false discharge defeats the guard silently, which is the
+# whole failure this regex was rewritten to close.
+_NOT_DASH_C = r"(?!\s+-\w*c\b)"
 POLLER_CMD = re.compile(
-    r"(?:\bpython3?\b|\bbash\b|\bsh\b|(?:^|\s)\./)"
+    r"(?:\bpython3?\b" + _NOT_DASH_C +
+    r"|\bbash\b" + _NOT_DASH_C +
+    r"|\bsh\b" + _NOT_DASH_C +
+    r"|(?:^|\s)\./)"
     r"[^;&|\n]{0,80}?"
     r"\bhooks/(?:monitor-open-prs|no-unmonitored-pr|ensure-open-pr-monitor)\.py",
     re.I,

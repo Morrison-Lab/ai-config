@@ -496,6 +496,29 @@ CASES = [
                      "reason": "quiet hold on #1937's review",
                      "prompt": "Continue the ARDI loop on #1937."}}]}}],
      False, "`noop: true` is a display flag and still discharges (#1947)"),
+
+    # --- Review round 2 on #1947. The execution anchor from round 1 still
+    # admitted a plain read wrapped in `sh -c`/`bash -c` -- a commoner idiom
+    # than the `python3 -c` residual round 1 had accepted, so the lookahead
+    # now retires both.
+    ([say("I owe #1937 the ARDI loop."),
+      bash('sh -c "cat hooks/monitor-open-prs.py"')],
+     True, "`sh -c` wrapping a read does NOT discharge (review #1947 r2)"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('bash -c "grep -n check hooks/monitor-open-prs.py"')],
+     True, "`bash -c` wrapping a grep does NOT discharge"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash('sh -ec "cat hooks/monitor-open-prs.py"')],
+     True, "a combined short flag (`sh -ec`) is covered too"),
+    ([say("I owe #1937 the ARDI loop."),
+      bash("python3 -c \"print(open('hooks/monitor-open-prs.py').read())\"")],
+     True, "the round-1 `python3 -c` residual is now closed as well"),
+    # Disqualifying the interpreter must NOT discard the whole command: any
+    # other exec token still anchors, so a genuine arming inside `bash -c`
+    # keeps discharging.
+    ([say("I owe #1937 the ARDI loop."),
+      bash('bash -c "python3 hooks/monitor-open-prs.py --monitor"')],
+     False, "a real arming inside `bash -c` still discharges (#1947 r2)"),
 ]
 
 

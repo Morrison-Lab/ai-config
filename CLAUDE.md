@@ -95,7 +95,11 @@ The implication runs one way only: a timer fires once and dies, so it cannot kee
   artifact for a standing rule, and either that or an armed firing for an
   owed action.
 - **Don't:** promise the mechanism itself in the future tense.
-- **Don't:** answer an owed action with a written record alone --- documenting an ARDI loop is not running one.
+- **Don't:** reach for a written record when the owed action is *yours* and
+  has a next step you could arm --- documenting an ARDI loop is not running
+  one.
+  (A record is a valid discharge, and the wrong instinct here; the `Do` above
+  says which case is which.)
 
 ## Generalize instructions to every AI agent by default
 

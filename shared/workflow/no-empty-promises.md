@@ -148,7 +148,9 @@ Per `CLAUDE.md`'s "State the actual time when reporting a scheduled check-in", s
 
 - **Do:** arm the next step when the debt is yours and has one, and report what you armed and when it fires.
 - **Do:** file the issue instead when the debt is somebody else's to schedule.
-- **Don't:** answer an owed **action** with a written record and call it discharged --- documenting an ARDI loop is not running one.
+- **Don't:** reach for a written record when the owed **action** is yours and has a next step you could arm --- documenting an ARDI loop is not running one.
+  A record still discharges the debt.
+  It is the wrong instinct, not an invalid mechanism, and the `Do` pair above says which case is which.
 - **Don't:** count a timer as keeping a standing rule --- it cannot outlive the one firing.
 
 (Directive from the user, 2026-08-22: "phrases with 'owe' ... should be triggers for our no-empty-promises guards;

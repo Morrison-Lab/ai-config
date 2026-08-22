@@ -25,6 +25,26 @@ import re
 import sys
 import tempfile
 
+# A bare pass/fail count says nothing about WHERE it came from: a local test
+# suite and a check-run query both read "<n> pass". The trigger stays broad,
+# because staleness after a push is worth warning about either way -- but the
+# WORDING must not assert the number is a check-state claim when it may not be.
+# Fired three times on a local suite count (ai-config#1859: "10 pass" and
+# "30 pass", 2026-08-21; "33 pass", 2026-08-22). A warning that visibly
+# misdescribes its own match trains the reader to skim it, which is
+# `algorithmatize-checks`'s "Limits" failure arriving through the remedy.
+RX_BARE_COUNT = re.compile(r"^\d+\s+pass$", re.I)
+
+# What makes a count a claim about THIS PR rather than about a local run.
+# Proximity, not presence anywhere in the message: a recap routinely mentions
+# a PR number paragraphs away from an unrelated test count.
+RX_PR_NEARBY = re.compile(
+    r"#\d+|/pull/\d+|\bgh pr\b|\bcheck[- ]runs?\b|\bstatusCheckRollup\b"
+    r"|\bCI\b|\bworkflow\b|\bhead SHA\b|\bheadRefOid\b",
+    re.I,
+)
+NEARBY_WINDOW = 250
+
 # Assertions about a PR's check state. Deliberately narrow: "checks are
 # running" or "waiting on CI" are honest and must not trip this.
 ASSERT = [
@@ -199,16 +219,34 @@ def main() -> int:
     except Exception:
         pass
 
+    # Attribution, per ai-config#1859. A bare count with no PR reference near
+    # it may well be a local test run, so say what was MATCHED rather than
+    # asserting what it MEANS. The staleness finding is unchanged either way --
+    # the issue's guidance was to soften the wording, not narrow the trigger.
+    window = text[max(0, hit.start() - NEARBY_WINDOW):hit.end() + NEARBY_WINDOW]
+    if RX_BARE_COUNT.match(hit.group(0).strip()) and not RX_PR_NEARBY.search(window):
+        lead = "Your message states a pass/fail count"
+        consequence = (
+            "If that count came from a local test run rather than from this "
+            "PR's checks, say so explicitly -- the fix is to label it, not to "
+            "re-query. If it is a claim about the PR, a reader may merge on it."
+        )
+    else:
+        lead = "Your message asserts a PR's check state"
+        consequence = (
+            "This is a claim about whether work is finished, so the reader may "
+            "merge on it."
+        )
+
     print(json.dumps({
         "decision": "block",
         "reason": (
-            f"Your message asserts a PR's check state -- "
+            f"{lead} -- "
             f"\"{hit.group(0).strip()}\" -- but the most recent status query in "
             "this transcript is OLDER than your most recent push. The reading "
             "you are about to report describes a commit that is no longer the "
             "head.\n\n"
-            "This is a claim about whether work is finished, so the reader may "
-            "merge on it.\n\n"
+            f"{consequence}\n\n"
             "Re-query now, in this same message, and state the head SHA "
             "alongside the counts:\n\n"
             "    git rev-parse --short origin/<branch>\n"

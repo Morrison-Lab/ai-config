@@ -480,6 +480,51 @@ The reviewer identified it precisely --- "the fixture likely only exercised two
 declarations with nothing substantive before them" --- and the replacement
 fixtures each place a real answer behind the run.)
 
+**A fixture can also reach the expected outcome by a second route, and the
+revert check above is what exposes that one.**
+The section above concerns a fixture too thin to exercise the bug.
+This one concerns a fixture rich enough to exercise it, paired with an
+assertion too coarse to say which route produced the result.
+A row asserting only that an input was refused is satisfied by any refusal, so
+a setup carrying an unrelated reason to refuse scores green against the fix and
+against a mutant with the fix removed.
+
+The confounding setup is the natural one to write, which is why foresight alone
+does not reach it.
+A row testing that a guard resolves `--repo=origin` against that remote's
+configuration invites naming the remote `origin`, which is also the literal the
+unfixed code falls back to.
+Both readings then find the same configuration key and refuse.
+
+**The durable remedy is to assert the reason rather than the outcome bit.**
+Isolating the fixture also works and has to be re-derived by hand for every new
+row, which is
+[`algorithmatize-checks`](algorithmatize-checks.md)'s eighth mutation outcome.
+A row that names the reason it must fail for reports
+`denied, but not for` that reason once a masking setup is restored under a
+mutant, where the bit alone reported a pass.
+
+- **Do:** assert the discriminating detail --- the reason, the message, the
+  resolved value --- on any row whose expected outcome has more than one
+  producer.
+- **Do:** run each new row against a mutant with the fix removed before
+  trusting it, since a realistic setup is the kind most likely to mask.
+- **Don't:** read a green row as coverage when its own setup could have
+  produced that outcome without the code under test.
+- **Don't:** treat isolating the fixture as the whole fix --- it holds only
+  until the next author writes the natural setup again.
+
+(Measured 2026-08-22 on
+[ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911),
+repeatedly within one session on `hooks/test-no-push-without-self-review.py`.
+Regression rows written as `--repo=origin` against `remote.origin.push` passed
+against a mutant with the fix removed, because ignoring `--repo` falls through
+to a literal `origin` and finds the same key.
+Rows for the option abbreviations `--al` and `--re` masked the same way until
+their config was switched to a benign `branch.main.pushRemote`.
+That table now states the reason each row must deny for, and its own docstring
+records that the bit alone cannot tell a working row from a masked one.)
+
 ## A fixture that models the wrong record SHAPE makes a carve-out look covered while it is inert
 
 Every case above is about a fixture whose *content* was wrong --- too thin to

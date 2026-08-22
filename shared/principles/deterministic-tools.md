@@ -242,6 +242,144 @@ That framing is the whole content of "write ourselves out of a job".
 - **Don't:** automate a genuine judgment badly to satisfy the rule; a
   misfiring instrument is worse than none.
 
+## Fix the class, not the site: route every call through one checked helper
+
+When a review finds a defect that a *second* call site could reintroduce,
+patching the sites the reviewer named leaves every future site free to
+repeat it.
+Routing all of them through one helper that performs the check narrows the
+class, and the difference is observable: the raw primitive should appear
+once, inside the helper, and nowhere else.
+Read "one place the mistake could live" as the helper itself, never as a
+tolerance for one stray call --- a stray call is a site the fix missed.
+
+Two counts hide behind that sentence, and only the second is mechanical.
+"How many call sites could still commit this defect" is a judgment about
+reachability, and this file's own review list rejects an instrument
+standing in for a judgment it cannot make.
+What a script can count is the raw primitive the helper was built to
+monopolize --- occurrences of `subprocess.run` in a file, of a bare
+`open(`, of the unguarded API.
+Ask the judgment question to decide whether the fix is structural, and
+derive the primitive count to say where it stands.
+If the primitive appears anywhere outside the helper, the fix went to a
+site: one stray call is already an unguarded call site, not a margin.
+
+A helper forbids only what its signature makes unavailable.
+Routing every call through one function does nothing if the function still
+accepts an unguarded call, and an OPTIONAL parameter is a shape a call site
+forgets --- the caller reads as complete without that argument, and nothing
+at the call site says otherwise.
+So put the input the guarded step is derived FROM in a REQUIRED argument,
+and derive the step itself inside.
+That forbids OMISSION and nothing else: a call passing an empty or wrong
+value still reaches the unguarded behaviour, so report that you closed the
+skipping spelling rather than reporting the unsafe call impossible.
+
+Measured 2026-08-22 on
+[ai-config#1911](https://github.com/Morrison-Lab/ai-config/pull/1911), at
+commit `cf6c47ce`; at the time of writing that PR's branch carries it and
+`main` does not.
+One commit threaded an optional `overrides=` through the config reads it
+knew about and left one pre-existing read without it, which was a live
+bypass.
+Making the raw `argv` a required argument in place of `overrides=`, and
+deriving the overrides from `argv` inside the helper, removed the spelling
+rather than the instance --- twice over, since the same helper takes the
+pushing command's environment as a second required argument for the same
+reason.
+
+State the residue in those terms rather than as an impossibility.
+A caller passing `argv=[]` derives no overrides and gets the unguarded read
+back, and two end-to-end rows in that guard's own regression suite fail when
+an existing call site passes one --- so the value is asserted everywhere the
+helper is called today, and nothing stops a NEW call site from spelling it.
+
+A choke point narrows the class without closing it, so say which you
+achieved.
+The next author can still bypass the helper unless something asserts they
+did not --- a test counting the raw primitive, a lint rule, or a
+behavioural test that fails when an unguarded call is added.
+Absent one of those, "one place the mistake could live" describes the
+current revision and not an invariant, and the two claims are worth
+different amounts.
+
+This is the same instinct as the rest of this file, one scale down.
+An instrument beats a rule because a rule can be forgotten.
+A single choke point beats a repeated check for exactly that reason.
+
+Two neighbouring rules cover what this one does not.
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md)'s
+recurrence section fires when the same finding class returns to a
+*detector* that keeps almost working, and answers by replacing the kind of
+evidence.
+[`fact-check-code-logic`](../coding/fact-check-code-logic.md)'s "safe
+because X never happens" section fires when a second counter-example
+refutes one ambiguity, and answers by searching for the general class of
+counter-example instead of patching the instance.
+The first asks whether the instrument is the right kind of thing; the
+second asks how wide the defect is.
+Both wait on a recurrence to tell them.
+[`learn-from-review-findings`](../workflow/learn-from-review-findings.md)'s
+"A fix for a defect class is where a fresh instance of that class hides"
+is the closest relative of all, and the complement to this one: it asks where the next instance will be and answers "the fix", where
+this asks how many places could host one at all.
+This one asks how many places can commit the defect, which a single diff
+can answer before any recurrence --- though answerable is not answered,
+and a class that reopens after a first fix is evidence that nobody asked.
+
+Measured 2026-08-22 on
+[ai-config#1932](https://github.com/Morrison-Lab/ai-config/pull/1932).
+That PR added a `PreToolUse` guard and its test suite --- at the time of
+writing they sit on its own branch rather than on `main` --- and every
+function named below came from one or the other.
+A timeout budget was enforced in `_rev_parse`.
+Two helpers added later, `_git_config` and `_rev_parse_ref`, each ran
+`git` on its own hardcoded timeout and read no deadline, so one path could
+spend six unbudgeted subprocess calls --- eighteen seconds against a
+ten-second `PreToolUse` timeout that fails **open**.
+Patching those two would have left the next helper free to repeat it.
+Every call was routed through one budgeted `_run_git`, leaving the guard
+with a single `subprocess.run`, inside that helper.
+
+How firmly that is held is worth stating, because the two counts land
+differently.
+`budget_cases()` asserts the budget behaviourally: it runs the bare push
+--- the path with the most calls --- against a `git` shim sleeping a
+second per call, and fails on any of four conditions: the hook
+exiting non-zero, not denying, denying for a reason other than running out
+of time, or elapsed passing 6.0 seconds against a 2-second budget.
+The deadline is absolute, set once, so an unguarded call consumes the
+budget instead of extending the run: elapsed tracks the larger of the
+budget and the number of calls, and about six unguarded calls are needed
+to pass 6.0.
+Six is exactly the pre-fix shape, which the fixing commit's own
+message recorded failing at 6.1 seconds.
+So the test catches a wholesale reopening of the class and not one new
+unguarded call, which is weaker than "the budget is enforced".
+The structural count is asserted by nothing at all.
+
+- **Do:** ask which call sites could still commit the defect to decide
+  whether the fix is structural, and derive the primitive's count to say
+  where it stands.
+- **Do:** treat any occurrence of the primitive outside the helper as an
+  unfinished fix, instead of counting to two.
+- **Do:** prefer a choke point the next author must go out of their way to
+  bypass over a check the next author must remember.
+- **Do:** make the input a required argument and derive the guarded step
+  inside, so the call that SKIPS it cannot be spelled.
+- **Do:** say whether the count is enforced or merely current, and name
+  the assertion that would enforce it.
+- **Don't:** patch the sites a reviewer happened to name --- they found
+  the instances, not the boundary.
+- **Don't:** take the un-skippable input as an OPTIONAL parameter --- that
+  routes the callers you remembered and leaves the spelling that skips it.
+- **Don't:** claim a bypass is impossible when nothing tests for one.
+- **Don't:** reach for a choke point when the defect genuinely has one
+  site.
+  `## Limits` above already says a bad tool is worse than the judgment it
+  replaced.
+
 ## In review
 
 Flag these with the same weight as the other principle-level findings:
@@ -256,6 +394,11 @@ Flag these with the same weight as the other principle-level findings:
   corpus, where the second could have re-run the first.
 - Conversely, a new instrument standing in for a judgment it cannot make,
   or built for a task with exactly one occurrence.
+- A fix applied to the two or three call sites a reviewer named, where
+  routing them through one checked helper would drop the unguarded count
+  to zero.
+- A guarding input threaded through call sites as an optional parameter,
+  where making it required would leave the skipping call unspellable.
 
 (Directives from the user, 2026-07-30: "cai: minimize use of generative
 ai in agentic work; maximize use of deterministic, inspectable algorithms

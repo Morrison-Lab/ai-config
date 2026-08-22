@@ -399,6 +399,24 @@ CASES = [
      "a `pushd` moves the repo the verdict must cover, exactly as `cd` does"),
     (f"cd {OTHER} && git -C {REPO} push origin main", reviewed(), False,
      "an explicit -C wins over an earlier `cd`"),
+    # A command can point git at another repository without leaving anything a
+    # `-C` scan would find, so the guard resolved HEAD in its OWN cwd and
+    # graded the wrong repo. Measured: with the hook's cwd on repoA and a
+    # verdict naming repoA's HEAD, the --git-dir and GIT_DIR spellings were
+    # both ALLOWED while the -C spelling of the same push was denied.
+    (f"git --git-dir={OTHER}/.git --work-tree={OTHER} push origin main",
+     reviewed(), True, "--git-dir points git at another repository"),
+    (f"git --git-dir {OTHER}/.git push origin main", reviewed(), True,
+     "the separated --git-dir spelling redirects too"),
+    (f"GIT_DIR={OTHER}/.git git push origin main", reviewed(), True,
+     "GIT_DIR in the env prefix redirects the push"),
+    (f"GIT_WORK_TREE={OTHER} git push origin main", reviewed(), True,
+     "GIT_WORK_TREE in the env prefix redirects the push"),
+    # git CHAINS -C, each applied relative to the last, so the first is not the
+    # answer when several appear (ai-config#1977). Reading only the first here
+    # would resolve OTHER and deny; reading them chained resolves REPO.
+    (f"git -C {OTHER} -C {REPO} push origin main", reviewed(), False,
+     "a later absolute -C replaces the accumulated path, as git does"),
     (f"git -C {REPO} push origin +main", reviewed(), False,
      "a forced refspec resolves to the same commit"),
     (f"git -C {REPO} push origin v1", reviewed(), False,

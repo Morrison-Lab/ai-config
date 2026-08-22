@@ -427,6 +427,16 @@ def _hints_by_position(command: str) -> list[str | None]:
     return hints
 
 
+# Ways a command points git at a repository other than the one a `-C` scan
+# would find. Resolving them means reproducing git's git-dir/work-tree
+# precedence, so the guard refuses instead -- see `iter_pushes`.
+REPO_REDIRECT_OPTS = {"--git-dir", "--work-tree", "--namespace"}
+REDIRECTS_REPO = re.compile(r"\A(?:GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=")
+
+# Distinct from None, which means "the hook's own cwd" and is a real answer.
+REDIRECTED = object()
+
+
 def iter_pushes(command: str):
     """Yield (env, argv, directory) for each `git push` simple command.
 
@@ -439,6 +449,25 @@ def iter_pushes(command: str):
     positional hint list is used only when it agrees with the sibling on how
     many pushes there are; disagreement means this module's structural read and
     the sibling's parse have diverged, and a wrong directory is worse than none.
+
+    `directory` is the sentinel REDIRECTED when the command points git at a
+    repository this scan will not resolve. `--git-dir`/`--work-tree`, and their
+    `GIT_DIR`/`GIT_WORK_TREE` environment forms, all send the push to another
+    repository while leaving nothing for a `-C` scan to find, so the guard
+    resolved HEAD in its OWN cwd and graded the wrong repo. Measured against
+    two throwaway repos, the hook's cwd being repoA and the verdict naming
+    repoA's HEAD:
+
+        git --git-dir=repoB/.git --work-tree=repoB push origin main  -> allowed
+        GIT_DIR=repoB/.git git push origin main                      -> allowed
+
+    while the `-C` spelling of the same push was correctly denied. Resolving
+    them properly means reproducing git's own git-dir/work-tree precedence, so
+    this refuses instead, which is the direction the rest of the module takes
+    when it cannot describe what a push ships.
+
+    `-C` is also CHAINED by git -- each is applied relative to the last -- so
+    the first one is not the answer when several appear (ai-config#1977).
     """
     if _SIBLING is None:
         return
@@ -453,10 +482,23 @@ def iter_pushes(command: str):
         if not rest or not _SIBLING._argv_push(rest):
             continue
         directory = None
-        for i, tok in enumerate(rest[1:-1], start=1):
-            if tok == "-C":
-                directory = rest[i + 1]
-                break
+        if any(REDIRECTS_REPO.match(tok) for tok in env):
+            directory = REDIRECTED
+        else:
+            i = 1
+            while i < len(rest) - 1:
+                tok = rest[i]
+                if tok == "-C" and i + 1 < len(rest):
+                    # Chained: each -C is relative to the accumulated path.
+                    directory = os.path.join(directory or "", rest[i + 1]) \
+                        if directory not in (None, REDIRECTED) else rest[i + 1]
+                    i += 2
+                    continue
+                head = tok.partition("=")[0]
+                if head in REPO_REDIRECT_OPTS:
+                    directory = REDIRECTED
+                    break
+                i += 1
         pushes.append((env, rest, directory))
 
     hints = _hints_by_position(command)
@@ -1062,6 +1104,11 @@ def main() -> int:
         for env, argv, directory in iter_pushes(cmd):
             if has_allow_override(env):
                 continue
+            if directory is REDIRECTED:
+                deny("this push points git at another repository "
+                     "(`--git-dir`/`--work-tree`/`GIT_DIR`/`GIT_WORK_TREE`), "
+                     "so a verdict naming a commit in this one cannot cover it")
+                return 0
             is_clean, reason = verify_review(
                 payload.get("transcript_path") or "", directory, argv
             )

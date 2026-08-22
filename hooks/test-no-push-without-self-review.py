@@ -508,15 +508,25 @@ def config_cases() -> int:
     cover them. Verified against real git rather than asserted.
     """
     failures = 0
-    for label, config, should_deny in (
+    # Both spellings of the command, deliberately. A truly bare `git push` names
+    # no remote, which is exactly when config decides the destination -- and an
+    # earlier revision skipped the `remote.<name>.push` check for that case
+    # while passing the explicit-remote one.
+    for label, config, command, should_deny in (
         ("`push.default = matching` makes a bare push ship more than HEAD",
-         ["push.default", "matching"], True),
+         ["push.default", "matching"], f"git -C {REPO} push origin", True),
+        ("`push.default = matching` is caught with no remote named",
+         ["push.default", "matching"], f"git -C {REPO} push", True),
         ("a configured remote.<name>.push makes a bare push ship something else",
-         ["remote.origin.push", "refs/heads/*:refs/heads/*"], True),
+         ["remote.origin.push", "refs/heads/*:refs/heads/*"], f"git -C {REPO} push origin", True),
+        ("remote.<name>.push is caught with no remote named",
+         ["remote.origin.push", "refs/heads/main:refs/heads/other"], f"git -C {REPO} push", True),
+        ("branch.<name>.pushRemote is resolved when no remote is named",
+         ["branch.main.pushRemote", "origin"], f"git -C {REPO} push", False),
     ):
         _git(REPO, "config", *config)
         try:
-            rc, out = run_hook(f"git -C {REPO} push origin", reviewed())
+            rc, out = run_hook(command, reviewed())
             denied = (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
             if rc != 0 or denied != should_deny:
                 print(f"FAIL (deny={denied}, wanted {should_deny}): {label}")
@@ -602,7 +612,7 @@ def main():
         shutil.rmtree(REPO, ignore_errors=True)
         shutil.rmtree(OTHER, ignore_errors=True)
 
-    total = len(CASES) + 11
+    total = len(CASES) + 14
     if failed:
         print(f"\n{failed}/{total} cases failed")
         sys.exit(1)

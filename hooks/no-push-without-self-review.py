@@ -479,10 +479,35 @@ def _git_config(directory: str | None, flag: str, key: str) -> str | None:
     return out.stdout.strip() or None
 
 
-def _push_remote(argv: list[str]) -> str | None:
-    """The remote a push names -- the first positional after `push`."""
+def _push_remote(directory: str | None, argv: list[str]) -> str | None:
+    """The remote this push acts on, named or not.
+
+    Returning None for a bare `git push` skipped the `remote.<name>.push` check
+    in exactly the case it exists for: the command that names nothing is the one
+    whose destination is decided entirely by config. So when the command does
+    not spell the remote out, resolve the one git would use, in git's own
+    precedence order.
+    """
     positionals = _push_positionals(argv)
-    return positionals[0] if positionals else None
+    if positionals:
+        return positionals[0]
+    branch = _rev_parse_ref(directory, "--abbrev-ref", "HEAD")
+    for key in ((f"branch.{branch}.pushRemote",) if branch else ()) + (
+            "remote.pushDefault",) + ((f"branch.{branch}.remote",) if branch else ()):
+        value = _git_config(directory, "--get", key)
+        if value:
+            return value
+    return "origin"
+
+
+def _rev_parse_ref(directory: str | None, *args: str) -> str | None:
+    cmd = ["git"] + (["-C", directory] if directory else []) + ["rev-parse", *args]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+    except Exception:
+        return None
+    name = out.stdout.strip()
+    return name if out.returncode == 0 and name and name != "HEAD" else None
 
 
 def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | None, str]:
@@ -512,7 +537,7 @@ def shipped_commits(directory: str | None, argv: list[str]) -> tuple[set[str] | 
         default = _git_config(directory, "--get", "push.default")
         if default and default.lower() == "matching":
             return None, "`push.default` is `matching`, so a bare push ships more than HEAD"
-        remote = _push_remote(argv)
+        remote = _push_remote(directory, argv)
         if remote and _git_config(directory, "--get-all", f"remote.{remote}.push"):
             return None, (f"`remote.{remote}.push` is configured, so what a bare push "
                           "ships is not simply the current branch")

@@ -1454,7 +1454,7 @@ Open the PR.
 The sibling of the backtick hazard above, and the same class: content silently
 transformed between what I type and what the interpreter receives.
 
-Inside a Bash-tool heredoc with a **quoted** delimiter (`<<\'PY\'`), which
+Inside a Bash-tool heredoc with a **quoted** delimiter (`<<'PY'`), which
 should be entirely literal, a doubled backslash `\\` arrives as a single `\`.
 A single `\` survives intact.
 So one level of unescaping is applied somewhere in transport.
@@ -1466,9 +1466,8 @@ the anchor, which fails identically.
 The tell only appears on printing `repr()` of the constructed string.
 
 The worse case is not a failed assert.
-A heredoc that *writes* `\\d` into a regex emits `\d`, and one that writes
-`\d` may emit `d` --- a corrupted matcher with no syntax error and a green
-suite.
+A heredoc that *writes* `\\d` into a regex emits `\d` --- a corrupted matcher with no
+syntax error and a green suite.
 Anything writing regexes, escape sequences, or Windows paths through a heredoc
 is exposed, including a `jq` filter: `test("\\*\\*Claude finished")` reaches
 `jq` as `test("\*\*...")` and dies with `Invalid escape`.
@@ -1477,9 +1476,19 @@ Build the character rather than typing it:
 
 ```
 B = chr(92)
-def bs(t): return t.replace("\\", B)
-block = bs(r'RX = re.compile(r"^\\d+\\s+pass$")')
+def bs(t): return t.replace("@@", B)
+block = bs(r'RX = re.compile(r"^@@d+@@s+pass$")')
 ```
+
+The same collapse is already described twice, for different transports:
+[`algorithmatize-checks.rationale.md`](shared/workflow/algorithmatize-checks.rationale.md)
+records `\\b` arriving as `\b` and becoming a **backspace**, and
+[`address-every-comment.rationale.md`](shared/workflow/address-every-comment.rationale.md)
+carries a worked table.
+What is new here is the trigger context --- a Bash-tool heredoc whose delimiter
+is quoted, so it should be literal --- and the placeholder remedy.
+Cross-linked because a dupe-check keyed on this section's vocabulary would
+otherwise miss both.
 
 - **Do:** route every literal backslash through `chr(92)` (or a placeholder
   token) when heredoc content must survive verbatim.

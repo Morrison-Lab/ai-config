@@ -63,3 +63,25 @@ Both quantities derive from the same screening schedule, which is why they
 coincide.
 Withdrawn the following round, when review also found the R constants live in
 simulation-validation code the real pipeline never calls.)
+
+## Mutate the fix, not only the test --- a payload rejected before it arrived
+
+(Morrison-Lab/ai-config#1902, 2026-08-21: a ReDoS regression guard for a
+`PreToolUse` hook fed it a command built to trigger catastrophic
+backtracking --- an opening quote deliberately left unbalanced, followed by a
+long run of backslashes.
+The hook parses commands with `shlex`, which refuses an unbalanced quote, so
+the function returned before the regex ever ran.
+The guard passed in 0.03s with the vulnerable pattern fully in place, and was
+caught only by mutating the fix out and noticing it stayed green.
+Every other part of the test was right.
+The mutation applied to the intended line, the assertion was the right
+assertion, and the timing threshold was calibrated.
+Balancing the quotes delivered the payload to the matcher, after which the
+guard behaved --- exit 0 with the fix at 0.045s, exit 1 without it at 7.22s.
+One line confirming that the parse step returned a value rather than `None`
+would have exposed the gap.
+Note which way the coupling runs.
+The payload had to be malformed to reach the defect, and malformed is
+precisely what `shlex` rejected it for, so the more layers a guard sits
+behind, the likelier this is.)

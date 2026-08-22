@@ -1459,6 +1459,28 @@ should be entirely literal, a doubled backslash `\\` arrives as a single `\`.
 A single `\` survives intact.
 So one level of unescaping is applied somewhere in transport.
 
+**Scope it before relying on it: this is a property of the environment, not of
+heredocs.**
+Measured 2026-08-22 on Windows 11 / MINGW64 through the Claude Code Bash tool.
+A reviewer running the same cases in a GitHub Actions Linux runner could **not**
+reproduce any of it, and was right not to --- so a claim stated unconditionally
+here is false there, which is how a true observation becomes a wrong rule.
+Test your own environment before trusting either answer.
+
+The reproducer is one command and needs no interpreter, which is what rules out
+Python's own string parsing as the cause:
+
+```
+cat <<'EOF' > out.txt
+a\\nb
+c\nd
+EOF
+```
+
+Both lines land in `out.txt` carrying **one** backslash: the doubled form
+collapsed, the single form survived.
+Nothing but the transport touched it.
+
 It fails silently and plausibly.
 A patch script's `assert target in s` fails, which reads as a slightly-wrong
 anchor string --- so the natural response is to re-dump the region and retype
@@ -1509,7 +1531,9 @@ must itself contain a backslash escape.
 - **Do:** print `repr()` of a constructed string when a match inexplicably
   fails, rather than retyping the anchor.
 - **Don't:** assume a quoted heredoc delimiter guarantees literal content ---
-  measured 2026-08-22, it does not.
+  on this platform, measured 2026-08-22, it does not.
+- **Don't:** carry the claim to another platform without re-measuring; it did
+  not reproduce in a Linux CI runner.
 - **Don't:** trust a green suite after writing a regex through a heredoc; read
   the emitted line back.
 

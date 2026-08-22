@@ -648,8 +648,8 @@ review question and a self-check rather than a guard.
 reviewer rather than by any check, and in each the artifact itself was
 correct.
 A fragment's prose about a hook attributed an omitted gate to "earlier fixes
-rather than the original design", where `git log -S` put it in the hook's
-first PR (ai-config#1860).
+rather than the original design", where `git log -S` put it in the hook's own
+first PR, ai-config#1566 (ai-config#1860).
 The gate was real and the hook was right; only the sentence about where it
 came from was wrong.
 `fully-clean.md` said a checker "annotates duplicated names automatically",

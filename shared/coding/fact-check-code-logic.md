@@ -237,7 +237,7 @@ Reading the test is not a substitute.
 A vacuous test usually looks targeted,
 because it was written from the same mental model that produced the fix.
 
-Six distinct mechanisms can make a test pass against the reverted fix:
+Seven distinct mechanisms can make a test pass against the reverted fix:
 
 - **Wrong entry point.**
   The test calls a helper directly,
@@ -257,19 +257,31 @@ Six distinct mechanisms can make a test pass against the reverted fix:
 - **Misleading label.**
   The test name or comment says one property is under test
   while the assertion checks another.
+- **Rejected payload.**
+  The sharpest form of the earlier-guard case:
+  a parsing or validation layer in front of the code under test
+  refuses the fixture outright, so nothing under test runs at all.
+  It is likeliest when the defect is input-shaped,
+  since the payload has to be malformed to reach the bug,
+  and malformed is what the layer above rejects it for.
 
 Those are test bugs,
 not merely weak tests.
-A suite with all six can still be green,
+A suite with all seven can still be green,
 and coverage can still report the lines as exercised.
 Only the mutation answers whether the assertion depends on the fix.
 
 - **Do:** mutate the exact fix and watch the new test fail before trusting it.
 - **Do:** route the fixture through the real entry point
   and confirm it reaches the branch whose behaviour the test names.
+- **Do:** make "the fixture arrived" an assertion in its own right ---
+  a parse step's return value, a counter, a log line ---
+  rather than a thing you satisfied yourself of once by reading the code.
 - **Don't:** accept a test because it mentions the helper that changed,
   or because a coverage report marks the line covered.
 - **Don't:** trust a test label as evidence of what the assertion checks.
+- **Don't:** read a green guard as one whose subject ran.
+  A payload rejected upstream and a working fix are the same observable.
 
 ### A predicate a fix adds needs mutation in both directions, not just reversion
 

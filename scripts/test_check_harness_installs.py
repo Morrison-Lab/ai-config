@@ -66,9 +66,17 @@ with tempfile.TemporaryDirectory() as raw:
         not hc.cursor_skill_catalog_served(cursor, claude, repo),
     )
     (cursor / "plugins" / "local" / "ai-config").mkdir(parents=True)
+    write(repo / "skills" / "beta" / "SKILL.md")
     check(
-        "Cursor plugin skips bare skill audit",
+        "Cursor plugin is detected as serving the catalog",
         hc.cursor_skill_catalog_served(cursor, claude, repo),
+    )
+    check(
+        "Cursor plugin still reports leftover stale skills",
+        statuses(hc.catalog_leftovers(
+            hc.collect_flat(repo, "skills", cursor / "skills", "cursor")
+        ))
+        == {"cursor/alpha": "stale"},
     )
 
 print(f"\n{passes} passed, {failures} failed")

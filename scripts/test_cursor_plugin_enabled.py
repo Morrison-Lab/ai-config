@@ -63,8 +63,36 @@ with tempfile.TemporaryDirectory() as raw:
     if linked:
         check("Claude skill symlink skips Cursor skill install",
               "claude/skills" in (mod.skip_reason(cursor, claude, repo) or "").replace("~/", ""))
+        sibling = root / "worktree"
+        (sibling / "skills" / "ardi").mkdir(parents=True)
+        check(
+            "Claude skills into a sibling worktree still skip",
+            "claude/skills" in (
+                mod.skip_reason(
+                    cursor, claude, sibling,
+                    repo_roots={sibling.resolve(), repo.resolve()},
+                ) or ""
+            ).replace("~/", ""),
+        )
     else:
         print("SKIP: Claude skill symlink (platform cannot create it)")
+
+    unreadable = cursor / "plugins" / "cache"
+    unreadable.mkdir(parents=True)
+    try:
+        unreadable.chmod(0o000)
+        crashed = False
+        try:
+            found = mod.plugin_installed(cursor)
+        except OSError:
+            crashed = True
+            found = None
+        finally:
+            unreadable.chmod(0o755)
+        check("unreadable cache does not crash plugin_installed",
+              (not crashed) and found is False)
+    except OSError:
+        print("SKIP: unreadable cache (platform cannot chmod)")
 
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

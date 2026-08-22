@@ -27,7 +27,8 @@ and any agent that reads markdown instruction files.
 **Local CLI** --- clone the repo and run `bootstrap.sh` once.
 It symlinks each directory into `~/.claude/`, `~/.gemini/`,
 `~/.codex/`, and `~/.cursor/rules/`
-(and, when no Cursor plugin is already installed, `~/.cursor/skills/`).
+(and, when no Cursor plugin or Claude skill catalog is already
+serving this repo, `~/.cursor/skills/`).
 Skills appear in Claude Code, Gemini CLI, and Cursor as `/skill-name`.
 
 **Codex & Cursor** --- the same bootstrap links generated wrappers

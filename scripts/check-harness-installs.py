@@ -40,7 +40,8 @@ def codex_plugin_enabled(config: Path) -> bool:
 
 
 def cursor_skill_catalog_served(
-    cursor_dir: Path, claude_dir: Path, repo_root: Path
+    cursor_dir: Path, claude_dir: Path, repo_root: Path,
+    repo_roots: set[Path] | None = None,
 ) -> bool:
     """True when a Cursor plugin or Claude catalog already serves this repo."""
     spec = importlib.util.spec_from_file_location(
@@ -49,7 +50,18 @@ def cursor_skill_catalog_served(
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
-    return module.skip_reason(cursor_dir, claude_dir, repo_root) is not None
+    return module.skip_reason(
+        cursor_dir, claude_dir, repo_root, repo_roots
+    ) is not None
+
+
+def catalog_leftovers(entries):
+    """Keep on-disk Cursor skill entries when a plugin/catalog already serves.
+
+    ``missing`` is expected in that state (bootstrap did not link
+    ``~/.cursor/skills``). ``stale`` / ``foreign`` leftovers are not.
+    """
+    return [entry for entry in entries if entry.status != "missing"]
 
 
 def collect_flat(repo_root: Path, source_rel: str, install_dir: Path, harness: str,
@@ -114,20 +126,23 @@ def main() -> int:
     claude_dir = Path(args.claude_dir)
     codex_uses_plugin = codex_plugin_enabled(codex_dir / "config.toml")
     cursor_uses_catalog = cursor_skill_catalog_served(
-        cursor_dir, claude_dir, repo_root
+        cursor_dir, claude_dir, repo_root, repo_roots
     )
     codex_entries = [] if codex_uses_plugin else collect_flat(
         repo_root, "codex-skills", codex_dir / "skills", "codex", repo_roots
     )
-    cursor_skill_entries = [] if cursor_uses_catalog else collect_flat(
+    cursor_skill_raw = collect_flat(
         repo_root, "skills", cursor_dir / "skills", "cursor", repo_roots
+    )
+    cursor_skill_entries = (
+        catalog_leftovers(cursor_skill_raw) if cursor_uses_catalog else cursor_skill_raw
     )
     checks = (
         ("Claude", ci.collect(repo_root, claude_dir, repo_roots)),
         ("Codex (plugin; wrappers intentionally absent)" if codex_uses_plugin else "Codex", codex_entries),
         ("Gemini", collect_flat(repo_root, "skills", Path(args.gemini_dir) / "skills", "gemini", repo_roots)),
         (
-            "Cursor skills (plugin/catalog; ~/.cursor/skills intentionally absent)"
+            "Cursor skills (plugin/catalog leftovers)"
             if cursor_uses_catalog
             else "Cursor skills",
             cursor_skill_entries,

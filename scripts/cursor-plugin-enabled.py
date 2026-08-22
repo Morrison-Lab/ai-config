@@ -20,6 +20,7 @@ skips the third when they are.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -50,10 +51,13 @@ def plugin_installed(cursor_dir: Path) -> bool:
     if local.exists():
         return True
     cache = plugins / "cache"
-    if cache.is_dir():
-        for org in cache.iterdir():
-            if (org / PLUGIN_DIRNAME).exists():
-                return True
+    try:
+        if cache.is_dir():
+            for org in cache.iterdir():
+                if (org / PLUGIN_DIRNAME).exists():
+                    return True
+    except OSError:
+        return False
     return False
 
 
@@ -78,11 +82,35 @@ def claude_skills_serve_repo(claude_dir: Path, repo_root: Path) -> bool:
     return False
 
 
-def skip_reason(cursor_dir: Path, claude_dir: Path, repo_root: Path) -> str | None:
-    """Why bootstrap should not link ``~/.cursor/skills``, or None to install."""
+def _repo_worktrees(repo_root: Path) -> set[Path]:
+    """Working trees of *repo_root*, or empty when git cannot answer."""
+    spec = importlib.util.spec_from_file_location(
+        "check_install", Path(__file__).resolve().parent / "check-install.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module.repo_worktrees(repo_root)
+
+
+def skip_reason(
+    cursor_dir: Path,
+    claude_dir: Path,
+    repo_root: Path,
+    repo_roots: set[Path] | None = None,
+) -> str | None:
+    """Why bootstrap should not link ``~/.cursor/skills``, or None to install.
+
+    *repo_roots* is the worktree-inclusive set ``check-harness-installs.py``
+    already computes (ai-config#1729). When omitted, this function derives
+    the same union so a Claude catalog that points at a sibling worktree
+    still counts as serving this repo.
+    """
     if plugin_installed(cursor_dir):
         return "ai-config Cursor plugin is already installed"
-    if claude_skills_serve_repo(claude_dir, repo_root):
+    if repo_roots is None:
+        repo_roots = {repo_root.resolve()} | _repo_worktrees(repo_root)
+    if any(claude_skills_serve_repo(claude_dir, root) for root in repo_roots):
         return "~/.claude/skills already serves this catalog (Cursor loads it)"
     return None
 

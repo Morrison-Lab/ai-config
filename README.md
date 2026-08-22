@@ -1,6 +1,7 @@
 # ai-config
 
-Portable AI agent config — skills, memories, and commands synced across machines via git.
+Portable AI agent config --- skills, memories, and commands
+synced across machines via git.
 Works with Claude Code, Codex, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://cursor.com), VS Code Copilot, and any agent that reads markdown instruction files.
 
 Each top-level subdir is symlinked into the appropriate consumer directory

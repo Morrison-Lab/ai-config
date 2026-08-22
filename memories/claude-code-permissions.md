@@ -84,20 +84,41 @@ path rule matters too, and the natural choice is the wrong one.
 
 So `Edit(...)` covers the `Write`, `NotebookEdit` and `MultiEdit` tools as well
 as `Edit` itself.
-A `Write(//tmp/**)` rule is accepted without complaint and then never
-consulted, so the grant silently does nothing --- the failure mode is a rule
-that looks present and correct in the config.
+A `Write(//tmp/**)` rule is accepted and then never consulted, so the grant
+does nothing.
+
+**It is not silent, though, and the difference decides where you would notice.**
+The same passage continues:
+
+> If you write a path rule for `Write`, `NotebookEdit`, `Glob`, or the legacy
+> `MultiEdit` tool instead, Claude Code accepts the rule but never consults it,
+> and **warns at startup**, except for a `Glob` rule passed in
+> `--allowedTools`.
+> [...]
+> Requires Claude Code v2.1.210 or later.
+
+So an interactive session tells you.
+What does not tell you is a headless CI run, where nobody reads the startup
+log --- which is exactly where such a rule tends to be written, and why the
+grant can look present and correct for as long as it does.
+The version floor matters for the same reason: below v2.1.210 there is no
+warning at all, so the only signal is the one nobody was watching.
 
 Measured 2026-08-21: `Write(//tmp/**)` was written into a real reviewer
-allowlist on the strength of the `//` fix above, and a reviewer caught that the
-tool name defeated it.
+allowlist on the strength of the `//` fix above, in a CI-only workflow, and a
+reviewer caught that the tool name defeated it.
 The two facts are independent, and getting the first one right is what makes
 the second easy to miss.
 
 - **Do:** spell every path-scoped rule `Edit(...)` or `Read(...)`, whichever
   side of the read/write split it governs.
+- **Do:** read the startup warning when one is available, and remember that a
+  headless run gives you no such thing.
 - **Don't:** write `Write(...)`, `MultiEdit(...)`, `NotebookEdit(...)`, or
-  `Glob(...)` with a path --- each is accepted and ignored.
+  `Glob(...)` with a path --- each is accepted and never consulted.
+- **Don't:** describe the failure as silent without qualifying it.
+  It warns at startup from v2.1.210, and the `Glob`-in-`--allowedTools` case
+  is exempt from even that.
 
 - **Do:** write `//path` (double leading slash) for a genuinely filesystem-root-absolute rule, e.g. `Edit(//tmp/**)` to grant scratch writes anywhere under `/tmp` regardless of which settings file defines the rule or where the session started.
 - **Don't:** write a single leading `/` and expect it to mean "absolute" --- it means "relative to wherever this settings file's own anchor is," which varies by settings source (project root, starting directory, `~/.claude/`, etc.).

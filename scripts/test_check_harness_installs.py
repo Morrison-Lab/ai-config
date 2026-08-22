@@ -78,6 +78,21 @@ with tempfile.TemporaryDirectory() as raw:
         ))
         == {"cursor/alpha": "stale"},
     )
+    try:
+        (cursor / "skills" / "beta").symlink_to(repo / "skills" / "beta")
+        linked = True
+    except OSError:
+        linked = False
+    if linked:
+        leftover = statuses(hc.catalog_leftovers(
+            hc.collect_flat(repo, "skills", cursor / "skills", "cursor")
+        ))
+        check("leftover current symlink is stacked, not ok",
+              leftover.get("cursor/beta") == "stacked")
+        check("leftover stale file stays stale beside a stacked link",
+              leftover.get("cursor/alpha") == "stale")
+    else:
+        print("SKIP: leftover stacked symlink (platform cannot create it)")
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

@@ -59,9 +59,23 @@ def catalog_leftovers(entries):
     """Keep on-disk Cursor skill entries when a plugin/catalog already serves.
 
     ``missing`` is expected in that state (bootstrap did not link
-    ``~/.cursor/skills``). ``stale`` / ``foreign`` leftovers are not.
+    ``~/.cursor/skills``). Leftover ``ok`` links are the stacked-catalog
+    hazard (ai-config#1409), so they become ``stacked`` rather than staying
+    healthy. ``stale`` / ``foreign`` leftovers stay as themselves.
     """
-    return [entry for entry in entries if entry.status != "missing"]
+    leftovers = []
+    for entry in entries:
+        if entry.status == "missing":
+            continue
+        if entry.status == "ok":
+            leftovers.append(ci.Entry(
+                entry.group, entry.name, "stacked",
+                entry.repo_path, entry.install_path,
+                detail="plugin or Claude catalog already serves this skill",
+            ))
+        else:
+            leftovers.append(entry)
+    return leftovers
 
 
 def collect_flat(repo_root: Path, source_rel: str, install_dir: Path, harness: str,
@@ -103,7 +117,7 @@ def report(harness: str, entries) -> int:
         counts[entry.status] = counts.get(entry.status, 0) + 1
     print(f"\n{harness}:")
     ci.summarize(entries, counts)
-    return sum(counts.get(status, 0) for status in ci.FIXABLE)
+    return sum(counts.get(status, 0) for status in (*ci.FIXABLE, "stacked"))
 
 
 def main() -> int:

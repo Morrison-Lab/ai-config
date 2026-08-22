@@ -434,7 +434,7 @@ def summarize(entries: list[Entry], counts: dict[str, int]) -> None:
     for entry in entries:
         by_status.setdefault(entry.status, []).append(entry)
 
-    for status in ("stale", "unlinked", "missing", "misdirected", "foreign"):
+    for status in ("stale", "unlinked", "missing", "misdirected", "foreign", "stacked"):
         matching = by_status.get(status, [])
         if not matching:
             continue
@@ -446,7 +446,7 @@ def summarize(entries: list[Entry], counts: dict[str, int]) -> None:
     total = len(entries)
     parts = ", ".join(f"{counts.get(s, 0)} {s}"
                       for s in ("ok", "stale", "unlinked", "missing",
-                                "misdirected", "foreign"))
+                                "misdirected", "foreign", "stacked"))
     print(f"\nchecked {total} installed entries: {parts}")
 
 

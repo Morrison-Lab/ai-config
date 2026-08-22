@@ -296,6 +296,23 @@
             "timeout": 20,
             "script": "warn-nonglobal-substitution.py",
             "why": "shared/workflow/algorithmatize-checks.md. A non-global `s///` changes only the FIRST occurrence, which may not be the one meant. It bites hardest in mutation testing: a mutation that silently failed to apply reads as a surviving mutation, or worse a verified one, because the test stays green from nothing having changed. Measured four times in one session on 2026-08-21, twice where the substitution rewrote a neighbouring comment instead of the code. WARNS, never blocks: it fires only when perl/sed is the segment's leading command AND carries a genuine in-place flag, and scans script text only, never filenames. Tracked as #1900."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-dupe-check-chained-to-create.py\"",
+            "timeout": 10,
+            "script": "warn-dupe-check-chained-to-create.py",
+            "why": "shared/workflow/report-mistakes-proactively.md, 'A dupe-check chained into the same call as the create gates nothing' (ai-config#1954). Measured 2026-08-22: a dupe-search and a `gh issue create` ran in ONE Bash call, the search returned the right match (#1737), and #1952 was created anyway. Nothing can branch on a result that arrives at the same instant as the action, so the check was decorative. WARNS, never blocks -- a duplicate is cheap to close, and the false positive it accepts (a list whose output FEEDS the create) costs one line. Fires only when a check and a create of the SAME object kind both sit at command positions with the check first, over text whose heredoc bodies and quoted spans have been stripped. Registered under Bash only: an MCP call carries one operation, so the shape cannot arise there. Fails open. Tracked as #1956.",
+            "_note_cannot_see_the_general_failure": [
+              "This detects ONE LEXICAL SHAPE: two commands sharing a call.",
+              "A search run in its own call whose result was never read is",
+              "indistinguishable from one that was read, so a silent run is",
+              "evidence only that the two commands were not in one string --",
+              "never that a dupe-check happened or that its answer was",
+              "consulted. Its sibling warn-pr-create-without-dupe-check.py has",
+              "the mirror limit: a session-wide lexical scan establishes that a",
+              "query ran and never that its result mattered."
+            ]
           }
         ]
       },
